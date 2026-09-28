@@ -12,14 +12,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_OCT_TREE_2_UTILS_SLANG
-#define WBE_FILE_OCT_TREE_2_UTILS_SLANG
+#ifndef WBE_FILE_OCTREE_2_UTILS_SLANG
+#define WBE_FILE_OCTREE_2_UTILS_SLANG
 
 /**
  * @brief Four scalar fields with a 16-byte storage-buffer array stride.
  */
 [WBE_DATA_TYPE]
-struct OctTreeNode {
+struct OctreeNode {
     enum class ChildrenState {
         NODE = 0,
         EMPTY = 1,
@@ -70,7 +70,7 @@ struct OctTreeNode {
  * @brief One initialized leaf slot; occupancy is published in its parent node.
  */
 [WBE_DATA_TYPE]
-struct OctTreeLeaf {
+struct OctreeLeaf {
     /**
      * @brief Index of the data in the data buffer.
      */
@@ -85,17 +85,17 @@ struct OctTreeLeaf {
  * @brief Immutable spatial configuration and mutable construction counters.
  */
 [WBE_DATA_TYPE]
-struct OctTreeInfo {
+struct OctreeInfo {
     /**
-     * @brief The origin of the oct tree in world space.
+     * @brief The origin of the octree in world space.
      */
     float3 origin;
     /**
-     * @brief The width of the region this oct tree is covering.
+     * @brief The width of the region this octree is covering.
      */
     float width;
     /**
-     * @brief The maximum depth of the oct tree, at least two; stored nodes start at depth one.
+     * @brief The maximum depth of the octree, at least two; stored nodes start at depth one.
      */
     uint max_depth;
     /**
@@ -152,17 +152,17 @@ struct OctTreeInfo {
  * @brief One voxel traversal retained until the next publication boundary.
  */
 [WBE_DATA_TYPE]
-struct OctTreeDeferredListEntry {
+struct OctreeDeferredListEntry {
     /**
      * @brief Parent-local traversal state to resume after publication.
      */
-    OctTreeNodeTraceInfo unfinished_trace_info;
+    OctreeNodeTraceInfo unfinished_trace_info;
 };
 
 /**
  * @brief Selects one of eight sectors in parent-local coordinates.
  */
-uint get_oct_tree_node_subregion(float3 p_position)
+uint get_octree_node_subregion(float3 p_position)
 {
     return (uint(p_position.x >= 0.5) << 2) |
         (uint(p_position.y >= 0.5) << 1) |
@@ -172,7 +172,7 @@ uint get_oct_tree_node_subregion(float3 p_position)
 /**
  * @brief Traversal position retained across deferred construction rounds.
  */
-struct OctTreeNodeTraceInfo {
+struct OctreeNodeTraceInfo {
     /**
      * @brief Index of the node where traversal resumes.
      */
@@ -194,14 +194,14 @@ struct OctTreeNodeTraceInfo {
 /**
  * @brief Decodes the state from a pass-stable node description.
  */
-OctTreeNode::ChildrenState get_oct_tree_children_state(OctTreeNode p_node) {
-    return OctTreeNode::ChildrenState(p_node.children_data >> 29);
+OctreeNode::ChildrenState get_octree_children_state(OctreeNode p_node) {
+    return OctreeNode::ChildrenState(p_node.children_data >> 29);
 }
 
 /**
  * @brief Decodes the first child index for a NODE or LEAF description.
  */
-uint get_oct_tree_children_index(OctTreeNode p_node) {
+uint get_octree_children_index(OctreeNode p_node) {
     return (p_node.children_data & 0x001fffffu) * 8;
 }
 
@@ -209,14 +209,14 @@ uint get_oct_tree_children_index(OctTreeNode p_node) {
  * @brief Tests an allocated leaf slot's occupancy for debug drawing after construction.
  * @details Invalid parent links report a shader validation error.
  */
-bool is_oct_tree_leaf_occupied(uint p_leaf_index,
-    StructuredBuffer<OctTreeNode> p_nodes,
-    StructuredBuffer<OctTreeLeaf> p_leaves,
-    OctTreeInfo p_tree_info,
+bool is_octree_leaf_occupied(uint p_leaf_index,
+    StructuredBuffer<OctreeNode> p_nodes,
+    StructuredBuffer<OctreeLeaf> p_leaves,
+    OctreeInfo p_tree_info,
     uint p_frame_slot) {
     int parent_index = p_leaves[p_leaf_index].parent_index;
     WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 && uint(parent_index) < p_tree_info.node_count,
-        ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
     return (p_nodes[parent_index].children_data & (1u << (21 + p_leaf_index % 8))) != 0;
 }
 
@@ -224,35 +224,35 @@ bool is_oct_tree_leaf_occupied(uint p_leaf_index,
  * @brief Reads a description that remains immutable throughout a construction pass.
  * @details Newly initialized children become reachable only after the state-update dispatch and its memory dependency.
  */
-OctTreeNode load_oct_tree_node(RWStructuredBuffer<OctTreeNode> p_nodes, uint p_node_index) {
+OctreeNode load_octree_node(RWStructuredBuffer<OctreeNode> p_nodes, uint p_node_index) {
     return p_nodes[p_node_index];
 }
 
 /**
  * @brief Marks occupancy in pending storage without modifying the published traversal description.
  */
-void occupy_oct_tree_leaf(RWStructuredBuffer<uint> p_pending, uint p_node_index, float3 p_position) {
+void occupy_octree_leaf(RWStructuredBuffer<uint> p_pending, uint p_node_index, float3 p_position) {
     uint original_data;
-    InterlockedOr(p_pending[p_node_index], 1u << (21 + get_oct_tree_node_subregion(p_position)), original_data);
+    InterlockedOr(p_pending[p_node_index], 1u << (21 + get_octree_node_subregion(p_position)), original_data);
 }
 
 /**
  * @brief Traverses only published node blocks, stopping at empty nodes or leaves.
  */
-void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNodeTraceInfo p_trace_info) {
+void traverse_octree(RWStructuredBuffer<OctreeNode> p_nodes, inout OctreeNodeTraceInfo p_trace_info) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
-        OctTreeNode node = load_oct_tree_node(p_nodes, node_index);
-        OctTreeNode::ChildrenState children_state = get_oct_tree_children_state(node);
-        if (children_state != OctTreeNode::ChildrenState::NODE) {
+        OctreeNode node = load_octree_node(p_nodes, node_index);
+        OctreeNode::ChildrenState children_state = get_octree_children_state(node);
+        if (children_state != OctreeNode::ChildrenState::NODE) {
             // Traced to an empty/allocating/leaf node, set p_state and return.
             p_trace_info.node_index = node_index;
             p_trace_info.curr_depth = curr_depth;
             p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             return;
         }
-        node_index = get_oct_tree_children_index(node) + get_oct_tree_node_subregion(p_trace_info.svo_position);
+        node_index = get_octree_children_index(node) + get_octree_node_subregion(p_trace_info.svo_position);
         ++curr_depth;
         // Remap from parent-local coordinates into child-local coordinates.
         p_trace_info.svo_position = frac(p_trace_info.svo_position * 2.0);
@@ -267,13 +267,13 @@ void traverse_oct_tree(RWStructuredBuffer<OctTreeNode> p_nodes, inout OctTreeNod
  * @brief Reserves an eight-node block or reports capacity exhaustion to shader validation.
  * @details Uses one atomic add. Capacity and packed-index bounds are checked only when shader debugging is enabled.
  */
-bool try_reserve_oct_tree_nodes(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
+bool try_reserve_octree_nodes(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].node_count, 8, current_count);
     WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
         current_count <= p_tree_info[0].max_node_count &&
         p_tree_info[0].max_node_count - current_count >= 8,
-        ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
     p_children_index = current_count;
     return true;
 }
@@ -281,20 +281,20 @@ bool try_reserve_oct_tree_nodes(RWStructuredBuffer<OctTreeInfo> p_tree_info, uin
 /**
  * @brief Initializes an unreachable eight-node block and its pending descriptions.
  */
-bool create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes,
+bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
     RWStructuredBuffer<uint> p_pending,
-    RWStructuredBuffer<OctTreeInfo> p_tree_info,
+    RWStructuredBuffer<OctreeInfo> p_tree_info,
     uint p_parent_node_index,
     uint p_frame_slot,
     out uint p_children_index) {
-    if (!try_reserve_oct_tree_nodes(p_tree_info, p_frame_slot, p_children_index)) {
+    if (!try_reserve_octree_nodes(p_tree_info, p_frame_slot, p_children_index)) {
         return false;
     }
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Initialize all of the children to empty
         uint child_index = p_children_index + i;
-        p_nodes[child_index].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
-        p_pending[child_index] = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
+        p_nodes[child_index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
+        p_pending[child_index] = uint(OctreeNode::ChildrenState::EMPTY) << 29;
         p_nodes[child_index].parent_index = p_parent_node_index;
     }
     uint new_data_index;
@@ -309,13 +309,13 @@ bool create_oct_tree_children_node(RWStructuredBuffer<OctTreeNode> p_nodes,
  * @brief Reserves an eight-leaf block or reports capacity exhaustion to shader validation.
  * @details Uses one atomic add. Capacity and packed-index bounds are checked only when shader debugging is enabled.
  */
-bool try_reserve_oct_tree_leaves(RWStructuredBuffer<OctTreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
+bool try_reserve_octree_leaves(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].leaves_count, 8, current_count);
     WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
         current_count <= p_tree_info[0].max_leaves_count &&
         p_tree_info[0].max_leaves_count - current_count >= 8,
-        ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+        ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
     p_children_index = current_count;
     return true;
 }
@@ -323,12 +323,12 @@ bool try_reserve_oct_tree_leaves(RWStructuredBuffer<OctTreeInfo> p_tree_info, ui
 /**
  * @brief Initializes an unreachable eight-leaf block before inter-pass publication.
  */
-bool create_oct_tree_children_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves,
-    RWStructuredBuffer<OctTreeInfo> p_tree_info,
+bool create_octree_children_leaf(RWStructuredBuffer<OctreeLeaf> p_leaves,
+    RWStructuredBuffer<OctreeInfo> p_tree_info,
     uint p_parent_node_index,
     uint p_frame_slot,
     out uint p_children_index) {
-    if (!try_reserve_oct_tree_leaves(p_tree_info, p_frame_slot, p_children_index)) {
+    if (!try_reserve_octree_leaves(p_tree_info, p_frame_slot, p_children_index)) {
         return false;
     }
     [unroll] for (uint i = 0; i < 8; ++i) {
@@ -348,30 +348,30 @@ bool create_oct_tree_children_leaf(RWStructuredBuffer<OctTreeLeaf> p_leaves,
  * @details Only the CAS winner initializes children. Contenders never inspect pending payloads.
  * A leaf payload includes the creator's occupancy bit so zero occupancy unambiguously means a node block.
  */
-bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
-    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctTreeInfo> p_tree_info,
+bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuffer<OctreeLeaf> p_leaves,
+    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctreeInfo> p_tree_info,
     uint p_node_index, bool p_is_leaf, float3 p_position, uint p_frame_slot) {
     uint original;
     InterlockedCompareExchange(p_pending[p_node_index],
-        uint(OctTreeNode::ChildrenState::EMPTY) << 29,
-        uint(OctTreeNode::ChildrenState::ALLOCATING) << 29, original);
-    if (original != (uint(OctTreeNode::ChildrenState::EMPTY) << 29)) {
+        uint(OctreeNode::ChildrenState::EMPTY) << 29,
+        uint(OctreeNode::ChildrenState::ALLOCATING) << 29, original);
+    if (original != (uint(OctreeNode::ChildrenState::EMPTY) << 29)) {
         return false;
     }
     uint children_index;
     bool allocated;
     if (p_is_leaf) {
-        allocated = create_oct_tree_children_leaf(p_leaves, p_tree_info, p_node_index, p_frame_slot, children_index);
+        allocated = create_octree_children_leaf(p_leaves, p_tree_info, p_node_index, p_frame_slot, children_index);
     }
     else {
-        allocated = create_oct_tree_children_node(p_nodes, p_pending, p_tree_info, p_node_index, p_frame_slot, children_index);
+        allocated = create_octree_children_node(p_nodes, p_pending, p_tree_info, p_node_index, p_frame_slot, children_index);
     }
     if (!allocated) {
-        InterlockedExchange(p_pending[p_node_index], uint(OctTreeNode::ChildrenState::EMPTY) << 29, original);
+        InterlockedExchange(p_pending[p_node_index], uint(OctreeNode::ChildrenState::EMPTY) << 29, original);
         return false;
     }
-    uint occupancy = p_is_leaf ? (1u << (21 + get_oct_tree_node_subregion(p_position))) : 0;
-    uint pending_data = (uint(OctTreeNode::ChildrenState::ALLOCATING) << 29) | occupancy | (children_index / 8);
+    uint occupancy = p_is_leaf ? (1u << (21 + get_octree_node_subregion(p_position))) : 0;
+    uint pending_data = (uint(OctreeNode::ChildrenState::ALLOCATING) << 29) | occupancy | (children_index / 8);
     // Other invocations may still CAS this word. Publication and visibility are provided by the later dispatch boundary.
     InterlockedExchange(p_pending[p_node_index], pending_data, original);
     return true;
@@ -380,23 +380,23 @@ bool try_create_oct_tree_entry(RWStructuredBuffer<OctTreeNode> p_nodes, RWStruct
 /**
  * @brief Marks a published leaf occupied or saves traversal for the next construction round.
  */
-bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuffer<OctTreeLeaf> p_leaves,
-    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctTreeInfo> p_tree_info,
-    inout OctTreeNodeTraceInfo p_trace_info, uint p_frame_slot) {
+bool try_voxel_allocate(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuffer<OctreeLeaf> p_leaves,
+    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctreeInfo> p_tree_info,
+    inout OctreeNodeTraceInfo p_trace_info, uint p_frame_slot) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
     WBE_SHADER_DEBUG_ASSERT(p_tree_info[0].max_depth >= 2 &&
         p_tree_info[0].max_node_count >= 8 &&
         p_tree_info[0].max_leaves_count != 0,
-        ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+        ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
         WBE_SHADER_DEBUG_ASSERT(curr_depth < p_tree_info[0].max_depth,
-            ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
         WBE_SHADER_DEBUG_ASSERT(node_index < p_tree_info[0].max_node_count,
-            ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        OctTreeNode node = load_oct_tree_node(p_nodes, node_index);
-        if (get_oct_tree_children_state(node) == OctTreeNode::ChildrenState::EMPTY) {
-            try_create_oct_tree_entry(p_nodes, p_leaves, p_pending, p_tree_info, node_index,
+            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        OctreeNode node = load_octree_node(p_nodes, node_index);
+        if (get_octree_children_state(node) == OctreeNode::ChildrenState::EMPTY) {
+            try_create_octree_entry(p_nodes, p_leaves, p_pending, p_tree_info, node_index,
                 curr_depth == p_tree_info[0].max_depth - 1, p_trace_info.svo_position, p_frame_slot);
             // Even the owner retries from this node after publication; no invocation descends into new children this pass.
             p_trace_info.node_index = node_index;
@@ -404,28 +404,28 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
             p_trace_info.remain_depth = p_trace_info.remain_depth < 0 ? p_trace_info.remain_depth : p_trace_info.remain_depth - depth;
             return false;
         }
-        OctTreeNode::ChildrenState child_state = get_oct_tree_children_state(node);
+        OctreeNode::ChildrenState child_state = get_octree_children_state(node);
         switch (child_state) {
-        case OctTreeNode::ChildrenState::NODE:
+        case OctreeNode::ChildrenState::NODE:
             // A node, keep on looking deeper.
             WBE_SHADER_DEBUG_ASSERT(curr_depth < p_tree_info[0].max_depth - 1,
-                ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-            WBE_SHADER_DEBUG_ASSERT(get_oct_tree_children_index(node) <= p_tree_info[0].max_node_count &&
-                p_tree_info[0].max_node_count - get_oct_tree_children_index(node) >= 8,
-                ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+                ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            WBE_SHADER_DEBUG_ASSERT(get_octree_children_index(node) <= p_tree_info[0].max_node_count &&
+                p_tree_info[0].max_node_count - get_octree_children_index(node) >= 8,
+                ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
             break;
-        case OctTreeNode::ChildrenState::LEAF:
+        case OctreeNode::ChildrenState::LEAF:
             // Found a leaf, allocation success.
             WBE_SHADER_DEBUG_ASSERT(curr_depth >= p_tree_info[0].max_depth - 1,
-                ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+                ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
             WBE_SHADER_DEBUG_ASSERT(curr_depth <= p_tree_info[0].max_depth - 1,
-                ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-            WBE_SHADER_DEBUG_ASSERT(get_oct_tree_children_index(node) <= p_tree_info[0].max_leaves_count &&
-                p_tree_info[0].max_leaves_count - get_oct_tree_children_index(node) >= 8,
-                ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-            occupy_oct_tree_leaf(p_pending, node_index, p_trace_info.svo_position);
+                ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+            WBE_SHADER_DEBUG_ASSERT(get_octree_children_index(node) <= p_tree_info[0].max_leaves_count &&
+                p_tree_info[0].max_leaves_count - get_octree_children_index(node) >= 8,
+                ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+            occupy_octree_leaf(p_pending, node_index, p_trace_info.svo_position);
             return true;
-        case OctTreeNode::ChildrenState::ALLOCATING:
+        case OctreeNode::ChildrenState::ALLOCATING:
             // Traced to an empty/allocating/leaf node, set p_state and return.
             p_trace_info.node_index = node_index;
             p_trace_info.curr_depth = curr_depth;
@@ -433,12 +433,12 @@ bool try_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_nodes, RWStructuredBuf
             return false;
         default:
             WBE_SHADER_DEBUG_ASSERT(false, curr_depth < p_tree_info[0].max_depth - 1
-                    ? ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED
-                    : ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED,
+                    ? ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED
+                    : ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED,
                 p_frame_slot);
             break;
         }
-        uint child_index = get_oct_tree_children_index(node) + get_oct_tree_node_subregion(p_trace_info.svo_position);
+        uint child_index = get_octree_children_index(node) + get_octree_node_subregion(p_trace_info.svo_position);
         node_index = child_index;
         ++curr_depth;
         // Remap from parent-local coordinates into child-local coordinates.

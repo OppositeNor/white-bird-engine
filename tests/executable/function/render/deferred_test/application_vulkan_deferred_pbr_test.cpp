@@ -130,9 +130,9 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
         switch (mode) {
         case VoxelDebugViewMode::DISABLED:
-            mode = VoxelDebugViewMode::POST_OCT_TREE_BUILD;
+            mode = VoxelDebugViewMode::POST_OCTREE_BUILD;
             break;
-        case VoxelDebugViewMode::POST_OCT_TREE_BUILD:
+        case VoxelDebugViewMode::POST_OCTREE_BUILD:
             mode = VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
             break;
         case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
@@ -305,19 +305,19 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     create_shadow_map_resources();
     create_gbuffer_resources();
     create_lighting_output_resources();
-    OctTreeRenderFeature::Implementation oct_tree_implementation = OctTreeRenderFeature::Implementation::PASS_PUBLISHED;
-    if (const char* selection = std::getenv("WBE_OCT_TREE_IMPLEMENTATION")) {
+    OctreeRenderFeature::Implementation octree_implementation = OctreeRenderFeature::Implementation::PASS_PUBLISHED;
+    if (const char* selection = std::getenv("WBE_OCTREE_IMPLEMENTATION")) {
         if (std::string_view(selection) == "1") {
-            oct_tree_implementation = OctTreeRenderFeature::Implementation::ATOMIC;
+            octree_implementation = OctreeRenderFeature::Implementation::ATOMIC;
         }
         else if (std::string_view(selection) != "2") {
-            throw std::runtime_error("WBE_OCT_TREE_IMPLEMENTATION must be 1 or 2.");
+            throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
         }
     }
-    oct_tree = make_unique<OctTreeRenderFeature>(render_allocator, renderer_vk, static_set_resources,
-        &voxel_debug_view_mode, oct_tree_implementation);
-    stdout_log(WBE_CHANNEL_DEBUG)->message(oct_tree_implementation == OctTreeRenderFeature::Implementation::PASS_PUBLISHED
-        ? "Octree construction: oct_tree_2 (pass publication)." : "Octree construction: oct_tree (atomic publication).");
+    octree = make_unique<OctreeRenderFeature>(render_allocator, renderer_vk, static_set_resources,
+        &voxel_debug_view_mode, octree_implementation);
+    stdout_log(WBE_CHANNEL_DEBUG)->message(octree_implementation == OctreeRenderFeature::Implementation::PASS_PUBLISHED
+        ? "Octree construction: octree_2 (pass publication)." : "Octree construction: octree (atomic publication).");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = create_shadow_task(false);

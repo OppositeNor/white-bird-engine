@@ -36,11 +36,11 @@
 /** Stable error codes shared with the CPU shader-debug reader. */
 enum class ShaderDebugError {
     DEBUG_BUFFER_FULL = 1,
-    OCT_TREE_NODE_INDEX_OVERFLOW = 2,
-    OCT_TREE_LEAF_INDEX_OVERFLOW = 3,
-    OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
-    OCT_TREE_DEEPER_THAN_EXPECTED = 5,
-    OCT_TREE_SHALLOWER_THAN_EXPECTED = 6,
+    OCTREE_NODE_INDEX_OVERFLOW = 2,
+    OCTREE_LEAF_INDEX_OVERFLOW = 3,
+    OCTREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
+    OCTREE_DEEPER_THAN_EXPECTED = 5,
+    OCTREE_SHALLOWER_THAN_EXPECTED = 6,
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "core/allocator/heap_allocator_ram.hh"
-#include "core/data_structures/oct_tree.hh"
+#include "core/data_structures/octree.hh"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -23,12 +23,12 @@
 #include <utility>
 
 using WhiteBirdEngine::HeapAllocatorRAM;
-using WhiteBirdEngine::OctTree;
+using WhiteBirdEngine::Octree;
 
-TEST(WBEOctTreeTest, EmptyTreeHasRootAndReleasesNodes) {
+TEST(WBEOctreeTest, EmptyTreeHasRootAndReleasesNodes) {
     HeapAllocatorRAM allocator;
     {
-        OctTree<int> tree(&allocator);
+        Octree<int> tree(&allocator);
         auto root = tree.get_node({0.0F, 0.0F, 0.0F});
         ASSERT_NE(root, nullptr);
         EXPECT_FALSE(root->value.has_value());
@@ -38,9 +38,9 @@ TEST(WBEOctTreeTest, EmptyTreeHasRootAndReleasesNodes) {
     EXPECT_TRUE(allocator.is_empty());
 }
 
-TEST(WBEOctTreeTest, RootValueCanBeReplacedWithoutRemovingChildren) {
+TEST(WBEOctreeTest, RootValueCanBeReplacedWithoutRemovingChildren) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     tree.insert(7, {0.0F, 0.0F, 0.0F}, 0);
     tree.insert(11, {0.75F, 0.75F, 0.75F}, 1);
     tree.insert(9, {0.0F, 0.0F, 0.0F}, 0);
@@ -51,9 +51,9 @@ TEST(WBEOctTreeTest, RootValueCanBeReplacedWithoutRemovingChildren) {
     EXPECT_EQ(*tree.get_node({0.75F, 0.75F, 0.75F})->value, 11);
 }
 
-TEST(WBEOctTreeTest, DistinguishesAllEightOctantsAndLinksParents) {
+TEST(WBEOctreeTest, DistinguishesAllEightOctantsAndLinksParents) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     const std::array<glm::vec3, 8> positions = {
         glm::vec3{0.25F, 0.25F, 0.25F}, glm::vec3{0.25F, 0.25F, 0.75F},
         glm::vec3{0.25F, 0.75F, 0.25F}, glm::vec3{0.25F, 0.75F, 0.75F},
@@ -75,9 +75,9 @@ TEST(WBEOctTreeTest, DistinguishesAllEightOctantsAndLinksParents) {
     }
 }
 
-TEST(WBEOctTreeTest, TraversesChildLocalCoordinatesAndReturnsExistingAncestor) {
+TEST(WBEOctreeTest, TraversesChildLocalCoordinatesAndReturnsExistingAncestor) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     tree.insert(42, {0.625F, 0.625F, 0.625F}, 2);
 
     auto root = tree.get_node({0.625F, 0.625F, 0.625F}, 0);
@@ -92,50 +92,50 @@ TEST(WBEOctTreeTest, TraversesChildLocalCoordinatesAndReturnsExistingAncestor) {
     EXPECT_EQ(tree.get_node({0.25F, 0.625F, 0.625F}).get(), root.get());
 }
 
-TEST(WBEOctTreeTest, RemapsEachAxisAfterDescending) {
+TEST(WBEOctreeTest, RemapsEachAxisAfterDescending) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     const glm::vec3 position{0.375F, 0.625F, 0.875F};
     tree.insert(17, position, 2);
 
     auto root = tree.get_node(position, 0);
-    auto first_level = root->children[OctTree<int>::OctTreeNode::NX_PY_PZ];
+    auto first_level = root->children[Octree<int>::OctreeNode::NX_PY_PZ];
     ASSERT_NE(first_level, nullptr);
-    auto second_level = first_level->children[OctTree<int>::OctTreeNode::PX_NY_PZ];
+    auto second_level = first_level->children[Octree<int>::OctreeNode::PX_NY_PZ];
     ASSERT_NE(second_level, nullptr);
     EXPECT_EQ(tree.get_node(position).get(), second_level.get());
     EXPECT_EQ(*second_level->value, 17);
 }
 
-TEST(WBEOctTreeTest, CenterPlanesBelongToUpperOctants) {
+TEST(WBEOctreeTest, CenterPlanesBelongToUpperOctants) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     tree.insert(1, {0.0F, 0.0F, 0.0F}, 1);
     tree.insert(2, {0.5F, 0.5F, 0.5F}, 1);
 
     auto root = tree.get_node({0.0F, 0.0F, 0.0F}, 0);
-    EXPECT_EQ(*root->children[OctTree<int>::OctTreeNode::NX_NY_NZ]->value, 1);
-    EXPECT_EQ(*root->children[OctTree<int>::OctTreeNode::PX_PY_PZ]->value, 2);
+    EXPECT_EQ(*root->children[Octree<int>::OctreeNode::NX_NY_NZ]->value, 1);
+    EXPECT_EQ(*root->children[Octree<int>::OctreeNode::PX_PY_PZ]->value, 2);
 }
 
-TEST(WBEOctTreeTest, MovingTreeTransfersNodeOwnership) {
+TEST(WBEOctreeTest, MovingTreeTransfersNodeOwnership) {
     HeapAllocatorRAM allocator;
     {
-        OctTree<int> source(&allocator);
+        Octree<int> source(&allocator);
         source.insert(5, {0.75F, 0.75F, 0.75F}, 1);
-        OctTree<int> destination(std::move(source));
+        Octree<int> destination(std::move(source));
         EXPECT_EQ(*destination.get_node({0.75F, 0.75F, 0.75F})->value, 5);
     }
     EXPECT_TRUE(allocator.is_empty());
 }
 
-TEST(WBEOctTreeTest, RejectsInvalidConstruction) {
-    EXPECT_THROW((OctTree<int>(nullptr)), std::runtime_error);
+TEST(WBEOctreeTest, RejectsInvalidConstruction) {
+    EXPECT_THROW((Octree<int>(nullptr)), std::runtime_error);
 }
 
-TEST(WBEOctTreeTest, RejectsPositionsOutsideRootAndUnrepresentableDepth) {
+TEST(WBEOctreeTest, RejectsPositionsOutsideRootAndUnrepresentableDepth) {
     HeapAllocatorRAM allocator;
-    OctTree<int> tree(&allocator);
+    Octree<int> tree(&allocator);
     EXPECT_THROW(tree.insert(1, {1.0F, 0.0F, 0.0F}, 1), std::runtime_error);
     EXPECT_THROW(tree.insert(1, {0.0F, -0.1F, 0.0F}, 1), std::runtime_error);
     EXPECT_THROW(tree.get_node({0.0F, 0.0F, 1.0F}), std::runtime_error);

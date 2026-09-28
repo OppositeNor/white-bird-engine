@@ -79,7 +79,7 @@ def main() -> int:
     output = Path(tempfile.mkdtemp(prefix=f'octree{args.octree}_{args.mode}_', dir=parent))
     capture = output / 'mipmap.png'
     log_path = output / 'application.log'
-    env = dict(os.environ, WBE_WAIT_PROCESS_INJECT='0', WBE_OCT_TREE_IMPLEMENTATION=args.octree)
+    env = dict(os.environ, WBE_WAIT_PROCESS_INJECT='0', WBE_OCTREE_IMPLEMENTATION=args.octree)
     for name in ('WBE_CAPTURE_PNG', 'WBE_CAPTURE_FRAME'):
         env.pop(name, None)
     if args.mode == 'capture':

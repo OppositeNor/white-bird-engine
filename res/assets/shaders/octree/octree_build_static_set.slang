@@ -12,11 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_OCT_TREE_BUILD_SLANG
-#define WBE_OCT_TREE_BUILD_SLANG
+#ifndef WBE_OCTREE_BUILD_SLANG
+#define WBE_OCTREE_BUILD_SLANG
 
 #include "utils/utils.slang"
-#include "oct_tree/oct_tree_utils.slang"
+#include "octree/octree_utils.slang"
 
 /**
  * @brief The input data from the vertex buffer
@@ -38,12 +38,12 @@ struct VSOutput {
      */
     float4 position       : SV_Position;
     /**
-     * @brief Position in SVO space (0, 0 is the corner of the oct tree's region, and values inside the
-     * oct tree are ranged [0, 1)^3)
+     * @brief Position in SVO space (0, 0 is the corner of the octree's region, and values inside the
+     * octree are ranged [0, 1)^3)
      */
     float3 svo_position : TEXCOORD0;
     /**
-     * @brief Number of cells along each oct-tree axis.
+     * @brief Number of cells along each octree axis.
      */
     nointerpolation uint grid_extent : TEXCOORD1;
 };
@@ -77,14 +77,14 @@ struct GSOutput {
 // Closed-cell overlap includes surfaces on cell boundaries. This tolerance is in voxel units.
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
 
-struct OctTreeDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
-    uint2 oct_tree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_node_buffer")]
+struct OctreeDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    uint2 octree_info;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_leaves_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_deferred_list_ping")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
     uint2 deferred_list;
     [WBE_DEFAULT_PUSH("frame_slot")]
     uint shader_debug_frame_slot;
@@ -93,18 +93,18 @@ struct OctTreeDescriptorIndices {
 };
 
 [[vk::push_constant]]
-ConstantBuffer<OctTreeDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-set vertex for the oct tree.
+ * @brief Transform a static-set vertex for the octree.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into static_set.instances.
  * @return Vertex output in clip space.
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    RWStructuredBuffer<OctTreeInfo> oct_tree_info_buffer = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
-    OctTreeInfo oct_tree_info = oct_tree_info_buffer[0];
+    RWStructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
+    OctreeInfo octree_info = octree_info_buffer[0];
     StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
     StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
     StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
@@ -116,9 +116,9 @@ VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) 
     float3x3 direction_transform = (float3x3)node.transform;
 
     VSOutput output;
-    output.svo_position = (world_position.xyz - oct_tree_info.origin) / oct_tree_info.width;
+    output.svo_position = (world_position.xyz - octree_info.origin) / octree_info.width;
     output.position = float4(output.svo_position * 2.0 - 1.0, 1.0);
-    output.grid_extent = 1u << oct_tree_info.max_depth;
+    output.grid_extent = 1u << octree_info.max_depth;
     return output;
 }
 
@@ -202,23 +202,23 @@ bool triangle_overlaps_voxel(float3 p_a, float3 p_b, float3 p_c, float3 p_center
  * @brief Allocates an intersected cell, retaining unfinished traversal in the deferred queue on contention.
  */
 void allocate_covered_voxel(float3 p_svo_position) {
-    RWStructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
-    RWStructuredBuffer<OctTreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<OctTreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWStructuredBuffer<OctTreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
+    RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
+    RWStructuredBuffer<OctreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
-    OctTreeNodeTraceInfo trace_info;
-    trace_info.node_index = get_oct_tree_node_subregion(p_svo_position);
+    OctreeNodeTraceInfo trace_info;
+    trace_info.node_index = get_octree_node_subregion(p_svo_position);
     trace_info.curr_depth = 1;
-    trace_info.remain_depth = int(oct_tree_info[0].max_depth) - 1;
+    trace_info.remain_depth = int(octree_info[0].max_depth) - 1;
     trace_info.svo_position = frac(p_svo_position * 2.0);
     // Try to allocate the node.
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, oct_tree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
-        InterlockedAdd(oct_tree_info[0].deferred_task_count_ping, 1, new_task_index);
-        WBE_SHADER_DEBUG_ASSERT(new_task_index < oct_tree_info[0].max_deferred_task_count,
-            ShaderDebugError::OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+        InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
+        WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
+            ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
         deferred_list[new_task_index].unfinished_trace_info = trace_info;
     }
 }
@@ -233,7 +233,7 @@ void fragment_main(GSOutput p_input) {
     if (IsHelperLane()) {
         return;
     }
-    StructuredBuffer<OctTreeInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
+    StructuredBuffer<OctreeInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;

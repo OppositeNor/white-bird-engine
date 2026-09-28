@@ -13,31 +13,31 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "oct_tree_2/oct_tree_utils.slang"
+#include "octree_2/octree_utils.slang"
 
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
  */
-struct OctTreeUpdateStatesDescriptorIndices {
+struct OctreeUpdateStatesDescriptorIndices {
     /**
-     * @brief Descriptor-heap reference to oct_tree_info.
+     * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
-    uint2 oct_tree_info;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    uint2 octree_info;
     /**
-     * @brief Descriptor-heap reference to oct_tree_node_buffer.
+     * @brief Descriptor-heap reference to octree_node_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_node_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
     /**
-     * @brief Descriptor-heap reference to oct_tree_pending_children.
+     * @brief Descriptor-heap reference to octree_pending_children.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_pending_children")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_pending_children")]
     uint2 pending_children;
 };
 
 [[vk::push_constant]]
-ConstantBuffer<OctTreeUpdateStatesDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeUpdateStatesDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Publishes completed allocations and accumulated leaf occupancy between construction passes.
@@ -47,16 +47,16 @@ ConstantBuffer<OctTreeUpdateStatesDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    StructuredBuffer<OctTreeInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
+    StructuredBuffer<OctreeInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     uint node_index = p_dispatch_thread_id.x;
     if (node_index >= tree_info[0].node_count) {
         return;
     }
-    RWStructuredBuffer<OctTreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<uint> pending = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     uint children_data = pending[node_index];
-    if ((children_data >> 29) == uint(OctTreeNode::ChildrenState::ALLOCATING)) {
-        uint state = (children_data & 0x1fe00000u) != 0 ? uint(OctTreeNode::ChildrenState::LEAF) : uint(OctTreeNode::ChildrenState::NODE);
+    if ((children_data >> 29) == uint(OctreeNode::ChildrenState::ALLOCATING)) {
+        uint state = (children_data & 0x1fe00000u) != 0 ? uint(OctreeNode::ChildrenState::LEAF) : uint(OctreeNode::ChildrenState::NODE);
         children_data = (children_data & 0x1fffffffu) | (state << 29);
         pending[node_index] = children_data;
     }

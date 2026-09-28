@@ -37,16 +37,16 @@ inline constexpr uint32_t SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
 enum class ShaderDebugError : uint32_t {
     /** The report buffer ran out of entry storage. */
     DEBUG_BUFFER_FULL = 1,
-    /** An oct-tree node allocation would exceed its buffer. */
-    OCT_TREE_NODE_INDEX_OVERFLOW = 2,
-    /** An oct-tree leaf allocation would exceed its buffer. */
-    OCT_TREE_LEAF_INDEX_OVERFLOW = 3,
-    /** An oct-tree deferred task would exceed its ping-pong buffer. */
-    OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
-    /** An oct-tree branch extends beyond its configured maximum depth. */
-    OCT_TREE_DEEPER_THAN_EXPECTED = 5,
-    /** An oct-tree branch terminates before its configured maximum depth. */
-    OCT_TREE_SHALLOWER_THAN_EXPECTED = 6,
+    /** An octree node allocation would exceed its buffer. */
+    OCTREE_NODE_INDEX_OVERFLOW = 2,
+    /** An octree leaf allocation would exceed its buffer. */
+    OCTREE_LEAF_INDEX_OVERFLOW = 3,
+    /** An octree deferred task would exceed its ping-pong buffer. */
+    OCTREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
+    /** An octree branch extends beyond its configured maximum depth. */
+    OCTREE_DEEPER_THAN_EXPECTED = 5,
+    /** An octree branch terminates before its configured maximum depth. */
+    OCTREE_SHALLOWER_THAN_EXPECTED = 6,
 };
 
 /**
@@ -58,16 +58,16 @@ constexpr std::string_view shader_debug_error_name(ShaderDebugError p_error) {
     switch (p_error) {
     case ShaderDebugError::DEBUG_BUFFER_FULL:
         return "DEBUG_BUFFER_FULL";
-    case ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW:
-        return "OCT_TREE_NODE_INDEX_OVERFLOW";
-    case ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW:
-        return "OCT_TREE_LEAF_INDEX_OVERFLOW";
-    case ShaderDebugError::OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW:
-        return "OCT_TREE_DEFERRED_TASK_INDEX_OVERFLOW";
-    case ShaderDebugError::OCT_TREE_DEEPER_THAN_EXPECTED:
-        return "OCT_TREE_DEEPER_THAN_EXPECTED";
-    case ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED:
-        return "OCT_TREE_SHALLOWER_THAN_EXPECTED";
+    case ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW:
+        return "OCTREE_NODE_INDEX_OVERFLOW";
+    case ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW:
+        return "OCTREE_LEAF_INDEX_OVERFLOW";
+    case ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW:
+        return "OCTREE_DEFERRED_TASK_INDEX_OVERFLOW";
+    case ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED:
+        return "OCTREE_DEEPER_THAN_EXPECTED";
+    case ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED:
+        return "OCTREE_SHALLOWER_THAN_EXPECTED";
     }
     return "UNKNOWN_SHADER_DEBUG_ERROR";
 }

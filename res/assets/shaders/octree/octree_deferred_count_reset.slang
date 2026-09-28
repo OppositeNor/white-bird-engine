@@ -13,15 +13,15 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "oct_tree/oct_tree_utils.slang"
+#include "octree/octree_utils.slang"
 
-struct OctTreeDeferredCountResetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
-    uint2 oct_tree_info;
+struct OctreeDeferredCountResetDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    uint2 octree_info;
 };
 
 [[vk::push_constant]]
-ConstantBuffer<OctTreeDeferredCountResetDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeDeferredCountResetDescriptorIndices> descriptor_indices;
 
 /**
  * @brief Clears the deferred-list count selected by the shader variant.
@@ -29,10 +29,10 @@ ConstantBuffer<OctTreeDeferredCountResetDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
+    RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
 #ifdef WBE_RESET_PING_COUNT
-    oct_tree_info[0].deferred_task_count_ping = 0;
+    octree_info[0].deferred_task_count_ping = 0;
 #else
-    oct_tree_info[0].deferred_task_count_pong = 0;
+    octree_info[0].deferred_task_count_pong = 0;
 #endif
 }

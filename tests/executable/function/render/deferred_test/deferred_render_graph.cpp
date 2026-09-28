@@ -154,17 +154,17 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     dynamic_gbuffer.after(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED).read(GBUFFER_CAMERA_INFO_BUFFER, RendResUsageVK::UNIFORM_BUFFER);
     pipeline_desc.add_task(std::move(dynamic_gbuffer));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
-    oct_tree->add_construction_render_tasks(pipeline_desc, RT_RUN_DIRECT_LIGHTING, *dynamic_mesh);
-    pipeline_desc.add_task(oct_tree->get_deferred_construction_render_task_desc());
-    pipeline_desc.add_task(oct_tree->get_debug_draw_setup_render_task_desc())
+    octree->add_construction_render_tasks(pipeline_desc, RT_RUN_DIRECT_LIGHTING, *dynamic_mesh);
+    pipeline_desc.add_task(octree->get_deferred_construction_render_task_desc());
+    pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc())
         .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
         .add_task(create_combine_lighting_task_desc())
         .add_task(create_bloom_extract_task_desc())
         .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
-        .add_task(oct_tree->get_debug_draw_render_task_desc(RT_RUN_PRESENT_RESULT_IMAGE))
-        .add_task(oct_tree->get_pre_deferred_debug_draw_render_task_desc())
+        .add_task(octree->get_debug_draw_render_task_desc(RT_RUN_PRESENT_RESULT_IMAGE))
+        .add_task(octree->get_pre_deferred_debug_draw_render_task_desc())
         .add_task(create_light_billboard_task_desc());
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
@@ -201,7 +201,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, light_billboard_ubo)
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
         .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
-    oct_tree->register_render_graph_data(p_pipeline_desc);
+    octree->register_render_graph_data(p_pipeline_desc);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
@@ -284,7 +284,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
     task_desc.after("dynamic_gbuffer")
-        .after(OctTreeRenderFeature::RT_RUN_BUILD_OCT_TREE_DEFERRED)
+        .after(OctreeRenderFeature::RT_RUN_BUILD_OCTREE_DEFERRED)
         .read(SHADOW_MOMENTS_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(SHADOWMAP_COLOR_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
         .read(RSM_NORMAL_IMAGE_VIEW, RendResUsageVK::SAMPLED_IMAGE)
@@ -445,7 +445,7 @@ void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
-    task_desc.after(OctTreeRenderFeature::RT_RUN_OCT_TREE_PRE_DEFERRED_DEBUG_DRAW);
+    task_desc.after(OctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_pipeline = light_billboard_pipeline]() -> Unique<IRenderTaskVK> {

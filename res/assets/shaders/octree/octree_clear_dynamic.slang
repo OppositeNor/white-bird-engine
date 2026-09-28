@@ -13,36 +13,36 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "oct_tree/oct_tree_utils.slang"
-#include "oct_tree/oct_tree_dynamic_types.slang"
+#include "octree/octree_utils.slang"
+#include "octree/octree_dynamic_types.slang"
 /**
  * @brief Descriptor-heap resources used by incremental maintenance.
  */
 struct DynamicDescriptorIndices {
     /**
-     * @brief Descriptor-heap reference to oct_tree_info.
+     * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
     uint2 info;
     /**
-     * @brief Descriptor-heap reference to oct_tree_node_buffer.
+     * @brief Descriptor-heap reference to octree_node_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_node_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 nodes;
     /**
-     * @brief Descriptor-heap reference to oct_tree_dynamic_nodes.
+     * @brief Descriptor-heap reference to octree_dynamic_nodes.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_dynamic_nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes")]
     uint2 dynamic_nodes;
     /**
-     * @brief Descriptor-heap reference to oct_tree_dynamic_leaves.
+     * @brief Descriptor-heap reference to octree_dynamic_leaves.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_dynamic_leaves")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
     uint2 dynamic_leaves;
     /**
-     * @brief Descriptor-heap reference to oct_tree_voxel_claims.
+     * @brief Descriptor-heap reference to octree_voxel_claims.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_voxel_claims")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
     uint2 claims;
 };
 [[vk::push_constant]]
@@ -56,9 +56,9 @@ ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<OctTreeInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
-    RWStructuredBuffer<OctTreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
-    StructuredBuffer<OctTreeDynamicLeafBlock> leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+    RWStructuredBuffer<OctreeInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
+    RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
+    StructuredBuffer<OctreeDynamicLeafBlock> leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     RWStructuredBuffer<uint> claims = ResourceDescriptorHeap[descriptor_indices.claims.x];
     uint index = p_id.x;
     uint extent = 1u << info[0].max_depth;
@@ -68,9 +68,9 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
         uint state = description >> 29;
-        if (state == uint(OctTreeNode::ChildrenState::NODE_DYNAMIC)) {
-            nodes[index].children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
-        } else if (state == uint(OctTreeNode::ChildrenState::LEAF_DYNAMIC)) {
+        if (state == uint(OctreeNode::ChildrenState::NODE_DYNAMIC)) {
+            nodes[index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
+        } else if (state == uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)) {
             nodes[index].children_data = leaves[description & 0x001fffffu].original_children_data;
         }
     }

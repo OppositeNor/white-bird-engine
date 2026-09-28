@@ -12,13 +12,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_OCT_TREE_DYNAMIC_TYPES_SLANG
-#define WBE_FILE_OCT_TREE_DYNAMIC_TYPES_SLANG
+#ifndef WBE_FILE_OCTREE_DYNAMIC_TYPES_SLANG
+#define WBE_FILE_OCTREE_DYNAMIC_TYPES_SLANG
 
 /**
  * @brief Copy-on-write leaf block: the original packed parent state followed by its eight leaves.
  */
-[WBE_DATA_TYPE] struct OctTreeDynamicLeafBlock {
+[WBE_DATA_TYPE] struct OctreeDynamicLeafBlock {
     /**
      * @brief Complete original parent description, including static occupancy and block index.
      */
@@ -26,7 +26,7 @@
     /**
      * @brief Copied static leaves or newly initialized dynamic leaves.
      */
-    OctTreeLeaf leaves[8];
+    OctreeLeaf leaves[8];
 };
 
 #endif

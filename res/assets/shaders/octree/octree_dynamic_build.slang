@@ -12,21 +12,21 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_OCT_TREE_DYNAMIC_BUILD_SLANG
-#define WBE_FILE_OCT_TREE_DYNAMIC_BUILD_SLANG
-#include "oct_tree/oct_tree_dynamic_types.slang"
+#ifndef WBE_FILE_OCTREE_DYNAMIC_BUILD_SLANG
+#define WBE_FILE_OCTREE_DYNAMIC_BUILD_SLANG
+#include "octree/octree_dynamic_types.slang"
 
 /**
  * @brief Extends static topology using pass-published dynamic children and copy-on-write leaves.
  * @details Dynamic node links use virtual indices starting at max_node_count. Only the CAS owner
  * initializes a block. All contenders retry after the publication dispatch; none read unfinished payloads.
  */
-bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
-    RWStructuredBuffer<OctTreeLeaf> p_static_leaves,
-    RWStructuredBuffer<OctTreeNode> p_dynamic_nodes,
-    RWStructuredBuffer<OctTreeDynamicLeafBlock> p_dynamic_leaves,
-    RWStructuredBuffer<OctTreeInfo> p_info,
-    inout OctTreeNodeTraceInfo p_trace,
+bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctreeNode> p_static_nodes,
+    RWStructuredBuffer<OctreeLeaf> p_static_leaves,
+    RWStructuredBuffer<OctreeNode> p_dynamic_nodes,
+    RWStructuredBuffer<OctreeDynamicLeafBlock> p_dynamic_leaves,
+    RWStructuredBuffer<OctreeInfo> p_info,
+    inout OctreeNodeTraceInfo p_trace,
     uint p_frame_slot) {
     uint static_capacity = p_info[0].max_node_count;
     for (int step = 0; p_trace.remain_depth < 0 || p_trace.remain_depth > 0; ++step) {
@@ -34,7 +34,7 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
         bool is_static = node_index < static_capacity;
         uint local_index = is_static ? node_index : node_index - static_capacity;
         WBE_SHADER_DEBUG_ASSERT(is_static ? local_index < p_info[0].node_count : local_index < p_info[0].dynamic_node_count,
-            ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW,
+            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW,
             p_frame_slot);
         uint description;
         if (is_static) {
@@ -43,8 +43,8 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
             InterlockedAdd(p_dynamic_nodes[local_index].children_data, 0, description);
         }
         uint state = description >> 29;
-        uint sector = get_oct_tree_node_subregion(p_trace.svo_position);
-        if (state == uint(OctTreeNode::ChildrenState::NODE) || state == uint(OctTreeNode::ChildrenState::NODE_DYNAMIC)) {
+        uint sector = get_octree_node_subregion(p_trace.svo_position);
+        if (state == uint(OctreeNode::ChildrenState::NODE) || state == uint(OctreeNode::ChildrenState::NODE_DYNAMIC)) {
             p_trace.node_index = (description & 0x001fffffu) * 8 + sector;
             ++p_trace.curr_depth;
             if (p_trace.remain_depth > 0) {
@@ -53,7 +53,7 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
             p_trace.svo_position = frac(p_trace.svo_position * 2.0);
             continue;
         }
-        if (state == uint(OctTreeNode::ChildrenState::LEAF_DYNAMIC)) {
+        if (state == uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)) {
             uint ignored;
             if (is_static) {
                 InterlockedOr(p_static_nodes[local_index].children_data, 1u << (21 + sector), ignored);
@@ -62,14 +62,14 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
             }
             return true;
         }
-        if (state == uint(OctTreeNode::ChildrenState::ALLOCATING_DYNAMIC)) {
+        if (state == uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC)) {
             return false;
         }
-        WBE_SHADER_DEBUG_ASSERT(state == uint(OctTreeNode::ChildrenState::EMPTY) || state == uint(OctTreeNode::ChildrenState::LEAF),
-            ShaderDebugError::OCT_TREE_SHALLOWER_THAN_EXPECTED,
+        WBE_SHADER_DEBUG_ASSERT(state == uint(OctreeNode::ChildrenState::EMPTY) || state == uint(OctreeNode::ChildrenState::LEAF),
+            ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED,
             p_frame_slot);
         uint original;
-        uint allocating = uint(OctTreeNode::ChildrenState::ALLOCATING_DYNAMIC) << 29;
+        uint allocating = uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC) << 29;
         if (is_static) {
             InterlockedCompareExchange(p_static_nodes[local_index].children_data, description, allocating, original);
         } else {
@@ -89,12 +89,12 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
         if (is_leaf) {
             InterlockedAdd(p_info[0].dynamic_leaves_count, 8, children);
             WBE_SHADER_DEBUG_ASSERT(
-                children < p_info[0].max_dynamic_leaves_count, ShaderDebugError::OCT_TREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+                children < p_info[0].max_dynamic_leaves_count, ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
             uint block = children / 8;
             p_dynamic_leaves[block].original_children_data = original;
             [unroll] for (uint i = 0; i < 8; ++i) {
-                OctTreeLeaf leaf;
-                if (state == uint(OctTreeNode::ChildrenState::LEAF)) {
+                OctreeLeaf leaf;
+                if (state == uint(OctreeNode::ChildrenState::LEAF)) {
                     leaf = p_static_leaves[(original & 0x001fffffu) * 8 + i];
                 } else {
                     leaf.data_index = p_info[0].data_count + p_info[0].max_dynamic_node_count + children + i;
@@ -106,10 +106,10 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctTreeNode> p_static_nodes,
         } else {
             InterlockedAdd(p_info[0].dynamic_node_count, 8, children);
             WBE_SHADER_DEBUG_ASSERT(
-                children < p_info[0].max_dynamic_node_count, ShaderDebugError::OCT_TREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+                children < p_info[0].max_dynamic_node_count, ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
             [unroll] for (uint i = 0; i < 8; ++i) {
-                OctTreeNode child;
-                child.children_data = uint(OctTreeNode::ChildrenState::EMPTY) << 29;
+                OctreeNode child;
+                child.children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
                 child.data_index = p_info[0].data_count + children + i;
                 child.parent_index = int(node_index);
                 child.original_children_data = child.children_data;

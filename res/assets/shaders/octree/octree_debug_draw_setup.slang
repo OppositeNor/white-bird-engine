@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "oct_tree/oct_tree_utils.slang"
+#include "octree/octree_utils.slang"
 
 struct DrawIndexedIndirectCommand {
     uint index_count;
@@ -23,27 +23,27 @@ struct DrawIndexedIndirectCommand {
     uint first_instance;
 };
 
-struct OctTreeDebugDrawSetupDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_info")]
-    uint2 oct_tree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "oct_tree_debug_draw_indirect_buffer")]
+struct OctreeDebugDrawSetupDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    uint2 octree_info;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
 };
 
 [[vk::push_constant]]
-ConstantBuffer<OctTreeDebugDrawSetupDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeDebugDrawSetupDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Builds the indexed-indirect command used to draw every oct-tree leaf plus the tree's bounds.
+ * @brief Builds the indexed-indirect command used to draw every octree leaf plus the tree's bounds.
  */
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    StructuredBuffer<OctTreeInfo> oct_tree_info = ResourceDescriptorHeap[descriptor_indices.oct_tree_info.x];
+    StructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
     DrawIndexedIndirectCommand command;
     command.index_count = 36;
-    command.instance_count = oct_tree_info[0].leaves_count + oct_tree_info[0].dynamic_leaves_count + 1;
+    command.instance_count = octree_info[0].leaves_count + octree_info[0].dynamic_leaves_count + 1;
     command.first_index = 0;
     command.vertex_offset = 0;
     command.first_instance = 0;

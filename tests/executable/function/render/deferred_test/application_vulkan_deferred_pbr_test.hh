@@ -41,7 +41,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
-#include "oct_tree_render_feature.hh"
+#include "octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <atomic>
 #include <cstddef>
@@ -180,7 +180,7 @@ private:
 
     Unique<DynamicMeshRenderFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
-    Unique<OctTreeRenderFeature> oct_tree;
+    Unique<OctreeRenderFeature> octree;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;

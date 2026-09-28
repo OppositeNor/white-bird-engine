@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_OCT_TREE_HH
-#define WBE_FILE_OCT_TREE_HH
+#ifndef WBE_FILE_OCTREE_HH
+#define WBE_FILE_OCTREE_HH
 
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/i_allocator.hh"
@@ -30,7 +30,7 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class OctTree
+ * @class Octree
  * @brief Stores values in nodes of a cubic octree.
  *
  * The root covers SVO coordinates [0, 1) on each axis. The tree owns its nodes, while the allocator must outlive the tree
@@ -40,38 +40,38 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the values in the nodes.
  */
 template <typename T>
-class OctTree {
+class Octree {
 public:
     /**
-     * @struct OctTreeNode
+     * @struct OctreeNode
      * @brief A node with an optional value and up to eight children.
      * Nodes cannot be copied or moved because their child ownership and parent links must remain connected.
      */
-    struct OctTreeNode {
+    struct OctreeNode {
         /**
          * @brief Create an empty node.
          */
-        OctTreeNode() = default;
+        OctreeNode() = default;
         /**
          * @brief Release the owned child nodes.
          */
-        ~OctTreeNode() = default;
+        ~OctreeNode() = default;
         /**
          * @brief Node ownership cannot be copied.
          */
-        OctTreeNode(const OctTreeNode&) = delete;
+        OctreeNode(const OctreeNode&) = delete;
         /**
          * @brief Node ownership cannot be copied.
          */
-        OctTreeNode& operator=(const OctTreeNode&) = delete;
+        OctreeNode& operator=(const OctreeNode&) = delete;
         /**
          * @brief Node identity and parent links cannot be moved.
          */
-        OctTreeNode(OctTreeNode&&) = delete;
+        OctreeNode(OctreeNode&&) = delete;
         /**
          * @brief Node identity and parent links cannot be moved.
          */
-        OctTreeNode& operator=(OctTreeNode&&) = delete;
+        OctreeNode& operator=(OctreeNode&&) = delete;
 
         /**
          * @enum Subregion
@@ -91,9 +91,9 @@ public:
         /** The value stored directly in this node, if any. */
         std::optional<T> value = std::nullopt;
         /** The non-owning link to the parent; empty for the root. */
-        RefWeak<const OctTreeNode> parent;
+        RefWeak<const OctreeNode> parent;
         /** The owning links to child nodes, indexed by Subregion. */
-        std::array<Ref<OctTreeNode>, MAX_SUBREGION> children;
+        std::array<Ref<OctreeNode>, MAX_SUBREGION> children;
     };
 
     /**
@@ -101,33 +101,33 @@ public:
      * @param p_allocator Allocator that must outlive the tree and returned node references.
      * @throws std::runtime_error If the allocator is null.
      */
-    explicit OctTree(HeapAllocator* p_allocator) : allocator(p_allocator) {
+    explicit Octree(HeapAllocator* p_allocator) : allocator(p_allocator) {
         if (allocator == nullptr) {
-            throw std::runtime_error("OctTree requires a non-null allocator.");
+            throw std::runtime_error("Octree requires a non-null allocator.");
         }
-        root = make_ref<OctTreeNode>(allocator);
+        root = make_ref<OctreeNode>(allocator);
     }
 
     /**
      * @brief Release the tree's nodes.
      */
-    ~OctTree() = default;
+    ~Octree() = default;
     /**
      * @brief Trees cannot be copied because they own their node hierarchy.
      */
-    OctTree(const OctTree&) = delete;
+    Octree(const Octree&) = delete;
     /**
      * @brief Trees cannot be copied because they own their node hierarchy.
      */
-    OctTree& operator=(const OctTree&) = delete;
+    Octree& operator=(const Octree&) = delete;
     /**
      * @brief Transfer ownership of the node hierarchy.
      */
-    OctTree(OctTree&&) noexcept = default;
+    Octree(Octree&&) noexcept = default;
     /**
      * @brief Replace this tree's hierarchy with another tree's hierarchy.
      */
-    OctTree& operator=(OctTree&&) noexcept = default;
+    Octree& operator=(Octree&&) noexcept = default;
 
     /**
      * @brief Store a value at the node selected by an SVO position and depth.
@@ -145,7 +145,7 @@ public:
         for (uint32_t i = 0; i < p_depth; ++i) {
             child_size /= 2.0F;
             if (child_size == 0.0F) {
-                throw std::runtime_error("OctTree insertion depth exceeds float range.");
+                throw std::runtime_error("Octree insertion depth exceeds float range.");
             }
         }
         auto current = root;
@@ -154,7 +154,7 @@ public:
             auto subregion = get_subregion(position);
             auto child = current->children[subregion];
             if (child == MEM_NULL) {
-                child = make_ref<OctTreeNode>(allocator);
+                child = make_ref<OctreeNode>(allocator);
                 child->parent = current;
                 current->children[subregion] = child;
             }
@@ -171,9 +171,9 @@ public:
      * @return A read-only reference to the selected node, including an empty root for an empty tree.
      * @throws std::runtime_error If the position lies outside [0, 1)^3.
      */
-    Ref<const OctTreeNode> get_node(glm::vec3 p_position, int32_t p_depth = -1) const {
+    Ref<const OctreeNode> get_node(glm::vec3 p_position, int32_t p_depth = -1) const {
         check_position(p_position);
-        Ref<const OctTreeNode> current = root;
+        Ref<const OctreeNode> current = root;
         glm::vec3 position = p_position;
         for (int32_t depth = 0; p_depth < 0 || depth < p_depth; ++depth) {
             auto child = current->children[get_subregion(position)];
@@ -188,19 +188,19 @@ public:
 
 private:
     HeapAllocator* allocator = nullptr;
-    Ref<OctTreeNode> root;
+    Ref<OctreeNode> root;
     void check_position(glm::vec3 p_position) const {
         if (!std::isfinite(p_position.x) || !std::isfinite(p_position.y) || !std::isfinite(p_position.z) ||
             p_position.x < 0.0F || p_position.y < 0.0F || p_position.z < 0.0F || p_position.x >= 1.0F ||
             p_position.y >= 1.0F || p_position.z >= 1.0F) {
-            throw std::runtime_error("OctTree position lies outside [0, 1)^3.");
+            throw std::runtime_error("Octree position lies outside [0, 1)^3.");
         }
     }
 
-    static typename OctTreeNode::Subregion get_subregion(glm::vec3 p_position) {
+    static typename OctreeNode::Subregion get_subregion(glm::vec3 p_position) {
         uint8_t subregion = (p_position.x >= 0.5F ? 0b100 : 0) | (p_position.y >= 0.5F ? 0b010 : 0) |
                             (p_position.z >= 0.5F ? 0b001 : 0);
-        return static_cast<typename OctTreeNode::Subregion>(subregion);
+        return static_cast<typename OctreeNode::Subregion>(subregion);
     }
 };
 
