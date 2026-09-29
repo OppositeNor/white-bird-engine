@@ -194,20 +194,22 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
     }
 
     bool spot_light_changed = false;
+    glm::vec3 spot_light_forward = test_camera_forward(spot_light_yaw, 0.0F);
+    glm::vec3 spot_light_right = glm::normalize(glm::cross(spot_light_forward, glm::vec3(0.0F, 1.0F, 0.0F)));
     if (input_manager->get_input_status(KEYCODE_I).is_down()) {
-        spot_light_component.position.z -= move_delta;
+        spot_light_component.position += spot_light_forward * move_delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(KEYCODE_K).is_down()) {
-        spot_light_component.position.z += move_delta;
+        spot_light_component.position -= spot_light_forward * move_delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(KEYCODE_J).is_down()) {
-        spot_light_component.position.x -= move_delta;
+        spot_light_component.position -= spot_light_right * move_delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(KEYCODE_L).is_down()) {
-        spot_light_component.position.x += move_delta;
+        spot_light_component.position += spot_light_right * move_delta;
         spot_light_changed = true;
     }
     if (input_manager->get_input_status(KEYCODE_U).is_down()) {

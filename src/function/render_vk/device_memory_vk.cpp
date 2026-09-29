@@ -69,11 +69,12 @@ DeviceMemoryVK::Builder& DeviceMemoryVK::Builder::set_domain(DeviceDomain p_doma
     return *this;
 }
 
-Ref<DeviceMemoryVK> DeviceMemoryVK::Builder::create_ref(const BaseRenderDataVK* p_render_data) const {
-    return make_ref<DeviceMemoryVK>(p_render_data->allocator, p_render_data, *this);
+Ref<DeviceMemoryVK> DeviceMemoryVK::Builder::create_ref(const BaseRenderDataVK* p_render_data, bool p_is_dedicated) const {
+    return make_ref<DeviceMemoryVK>(p_render_data->allocator, p_render_data, *this, p_is_dedicated);
 }
 
-DeviceMemoryVK::DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : render_data(p_render_data) {
+DeviceMemoryVK::DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder, bool p_is_dedicated)
+    : render_data(p_render_data), is_dedicated(p_is_dedicated) {
     const int source_count = static_cast<int>(p_builder.buffer != VK_NULL_HANDLE) + static_cast<int>(p_builder.image != VK_NULL_HANDLE) +
                              static_cast<int>(p_builder.requirements.has_value());
     if (source_count != 1) {
@@ -81,6 +82,7 @@ DeviceMemoryVK::DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Buil
     }
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
     VmaAllocationCreateInfo create_info = allocation_create_info(exposed_fields.domain);
+    create_info.flags |= is_dedicated ? VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT : VMA_ALLOCATION_CREATE_CAN_ALIAS_BIT;
     VmaAllocationInfo allocation_info{};
     VkResult result = VK_SUCCESS;
     if (p_builder.buffer != VK_NULL_HANDLE) {
@@ -105,12 +107,19 @@ DeviceMemoryVK::~DeviceMemoryVK() {
 }
 
 VkBuffer DeviceMemoryVK::create_buffer(const VkBufferCreateInfo& p_create_info, VkDeviceSize p_offset) const {
+    if (is_dedicated) {
+        throw std::runtime_error("Failed to create aliasing buffer: the memory allocation is dedicated.");
+    }
     const VkDeviceBufferMemoryRequirements requirements_info{
         .sType = VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS,
         .pCreateInfo = &p_create_info,
     };
-    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    VkMemoryDedicatedRequirements dedicated_requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS};
+    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, .pNext = &dedicated_requirements};
     vkGetDeviceBufferMemoryRequirements(render_data->logic_device, &requirements_info, &requirements);
+    if (dedicated_requirements.requiresDedicatedAllocation == VK_TRUE) {
+        throw std::runtime_error("Failed to create aliasing buffer: the buffer requires dedicated memory.");
+    }
     if (!is_compatible(requirements.memoryRequirements, p_offset)) {
         throw std::runtime_error(std::format("Failed to create aliasing buffer: device memory cannot hold {} bytes at offset {}.",
             requirements.memoryRequirements.size,
@@ -125,12 +134,19 @@ VkBuffer DeviceMemoryVK::create_buffer(const VkBufferCreateInfo& p_create_info, 
 }
 
 VkImage DeviceMemoryVK::create_image(const VkImageCreateInfo& p_create_info, VkDeviceSize p_offset) const {
+    if (is_dedicated) {
+        throw std::runtime_error("Failed to create aliasing image: the memory allocation is dedicated.");
+    }
     const VkDeviceImageMemoryRequirements requirements_info{
         .sType = VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS,
         .pCreateInfo = &p_create_info,
     };
-    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    VkMemoryDedicatedRequirements dedicated_requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS};
+    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, .pNext = &dedicated_requirements};
     vkGetDeviceImageMemoryRequirements(render_data->logic_device, &requirements_info, &requirements);
+    if (dedicated_requirements.requiresDedicatedAllocation == VK_TRUE) {
+        throw std::runtime_error("Failed to create aliasing image: the image requires dedicated memory.");
+    }
     if (!is_compatible(requirements.memoryRequirements, p_offset)) {
         throw std::runtime_error(std::format("Failed to create aliasing image: device memory cannot hold {} bytes at offset {}.",
             requirements.memoryRequirements.size,
@@ -148,7 +164,7 @@ bool DeviceMemoryVK::is_compatible(const VkMemoryRequirements& p_requirements, V
     const bool memory_type_allowed = (p_requirements.memoryTypeBits & (1U << exposed_fields.memory_type_index)) != 0;
     const bool aligned = p_requirements.alignment == 0 || (exposed_fields.offset + p_offset) % p_requirements.alignment == 0;
     const bool fits = p_offset <= exposed_fields.size && p_requirements.size <= exposed_fields.size - p_offset;
-    return memory_type_allowed && aligned && fits;
+    return !is_dedicated && memory_type_allowed && aligned && fits;
 }
 
 void DeviceMemoryVK::flush(VkDeviceSize p_offset, VkDeviceSize p_size) const {

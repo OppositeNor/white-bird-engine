@@ -1,9 +1,5 @@
----
-name: white-bird-render-testing
-description: Capture and inspect White Bird Engine rendering-test PNGs, script executable-test input with WBE_EXEC_TEST_INPUT_SEQUENCE, automate deferred lighting/voxel checks with clean shutdown, and integrate shared capture and input hooks in rendering executables.
----
 
-# Rendering test screenshots
+# Rendering executable tests
 
 ## Inspect current implementation
 
@@ -71,7 +67,7 @@ Readback stalls the GPU and can change timing. Verify crashes and synchronizatio
 
 ## Automated deferred checks
 
-Use [check_deferred.py](../../../.codex/skills/white-bird-render-testing/scripts/check_deferred.py) for the deferred executable's existing `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read those handlers if they change. This helper does not build, run unit tests, or judge visual correctness. It needs a POSIX platform and a display the renderer can open, but no windowing-system automation tools; request GUI execution permission when the environment requires it.
+Use [check_deferred.py](../../../../.codex/skills/white-bird-render-testing/scripts/check_deferred.py) for the deferred executable's existing `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read those handlers if they change. This helper does not build, run unit tests, or judge visual correctness. It needs a POSIX platform and a display the renderer can open, but no windowing-system automation tools; request GUI execution permission when the environment requires it.
 
 From the repository root:
 

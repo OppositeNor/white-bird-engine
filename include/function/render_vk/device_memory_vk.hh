@@ -34,6 +34,9 @@ namespace WhiteBirdEngine {
  * share the memory contents, so callers must synchronize their use of it. Buffers and
  * images retain a Ref to the memory they are bound to until their own delayed destruction, so the allocation outlives every
  * bound resource.
+ * Dedicated allocations cannot be aliased. Callers must request dedicated memory when the source resource requires it;
+ * otherwise allocations permit aliasing even when VMA chooses a separate memory block. An alias that itself requires a
+ * dedicated allocation is rejected.
  *
  * The allocation is freed immediately when the last Ref is released, which must only happen after the GPU no longer uses the
  * memory. The object is neither copyable nor movable and is confined to the rendering thread.
@@ -45,7 +48,7 @@ public:
      * @brief Configuration of a device-memory allocation.
      *
      * Exactly one requirement source is used: a buffer, an image, or explicit memory requirements. Buffer and image sources let
-     * VMA select memory for their usage and apply dedicated-allocation requirements.
+     * VMA select memory for their usage. Callers select whether the allocation is dedicated when constructing it.
      */
     struct Builder {
         /** Buffer whose memory requirements the allocation satisfies. */
@@ -88,10 +91,11 @@ public:
         /**
          * @brief Allocate the memory.
          * @param p_render_data The base render data.
+         * @param p_is_dedicated Request dedicated, non-aliasable memory. Must be true when the source resource requires it.
          * @return The shared memory handle.
          * @throws std::runtime_error If the configuration is incomplete or the allocation fails.
          */
-        Ref<DeviceMemoryVK> create_ref(const BaseRenderDataVK* p_render_data) const;
+        Ref<DeviceMemoryVK> create_ref(const BaseRenderDataVK* p_render_data, bool p_is_dedicated = false) const;
     };
 
     /**
@@ -119,9 +123,10 @@ public:
      * @brief Allocate memory.
      * @param p_render_data The base render data.
      * @param p_builder The allocation configuration.
+     * @param p_is_dedicated Request dedicated, non-aliasable memory. Must be true when the source resource requires it.
      * @throws std::runtime_error If the configuration is incomplete or the allocation fails.
      */
-    DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder, bool p_is_dedicated = false);
     ~DeviceMemoryVK();
     DeviceMemoryVK(const DeviceMemoryVK&) = delete;
     DeviceMemoryVK(DeviceMemoryVK&&) noexcept = delete;
@@ -165,10 +170,10 @@ public:
     VkImage create_image(const VkImageCreateInfo& p_create_info, VkDeviceSize p_offset) const;
 
     /**
-     * @brief Check whether a resource with the given requirements can be bound at an offset of this memory.
+     * @brief Check memory type, alignment, and size for a resource that does not require a dedicated allocation.
      * @param p_requirements The resource's memory requirements.
      * @param p_offset Offset inside the allocation.
-     * @return True when the memory type, alignment, and size are compatible.
+     * @return True when this allocation permits aliasing and the memory type, alignment, and size are compatible.
      */
     bool is_compatible(const VkMemoryRequirements& p_requirements, VkDeviceSize p_offset) const;
 
@@ -191,6 +196,7 @@ public:
 private:
     const BaseRenderDataVK* render_data;
     VmaAllocation allocation = VK_NULL_HANDLE;
+    bool is_dedicated = false;
     ExposedFields exposed_fields{};
 };
 
