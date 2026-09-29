@@ -182,8 +182,10 @@ write the same graph resource as a storage buffer when a chain of edges on that 
 Before constructing the task:
 
 1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
-2. Create every attachment resource referenced by the task configuration. Bind the renderer's swap-chain image-view container
-  explicitly under `REND_RES_SWAP_CHAIN` when the graph renders to the swap chain.
+2. Declare every attachment resource referenced by the task configuration with `RendGraphDescVK::add_image()` and
+  `add_image_view()`; the graph allocates them when it is compiled. Import the renderer's swap-chain image-view container under
+  `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph renders to the swap chain, and import the compiled static set with
+  `add_static_set()`.
 3. Compile one `CompiledStaticSetVK` per set-plus-pipeline combination and order its generic graphics task with resource edges
   declared by `RendTaskDescVK::connect()`.
 

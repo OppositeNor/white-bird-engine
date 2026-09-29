@@ -32,12 +32,15 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -312,6 +315,83 @@ VkAccessFlags2 edge_dst_access(RendEdgeTypeVK p_type) {
     throw std::runtime_error("RenderGraphVK: unknown resource edge type.");
 }
 
+VkBufferUsageFlags buffer_usage_flags(RendResPrimaryUsageVK p_usage, std::string_view p_resource_id) {
+    switch (p_usage) {
+    case RendResPrimaryUsageVK::BUFFER_UNIFORM:
+        return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    case RendResPrimaryUsageVK::BUFFER_STORAGE:
+        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    case RendResPrimaryUsageVK::BUFFER_INDIRECT:
+        return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    case RendResPrimaryUsageVK::BUFFER_VERTEX:
+        return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    case RendResPrimaryUsageVK::BUFFER_INDEX:
+        return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    default:
+        break;
+    }
+    throw std::runtime_error(std::format("RenderGraphVK: buffer '{}' has a non-buffer primary usage.", p_resource_id));
+}
+
+VkImageUsageFlags image_usage_flags(RendResPrimaryUsageVK p_usage, std::string_view p_resource_id) {
+    switch (p_usage) {
+    case RendResPrimaryUsageVK::IMAGE_READ_ONLY:
+        return VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case RendResPrimaryUsageVK::IMAGE_READ_WRITE:
+        return VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    case RendResPrimaryUsageVK::IMAGE_RENDER_TARGET:
+        return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    case RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET:
+        return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    default:
+        break;
+    }
+    throw std::runtime_error(std::format("RenderGraphVK: image '{}' has a non-image primary usage.", p_resource_id));
+}
+
+bool is_depth_format(VkFormat p_format) {
+    switch (p_format) {
+    case VK_FORMAT_D16_UNORM:
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+    case VK_FORMAT_D32_SFLOAT:
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+Ref<ROImageViewVK> make_image_view(const BaseRenderDataVK* p_render_data, Ref<ROImageVK> p_image, const RendImageViewDeclVK& p_view_decl) {
+    const RendImageViewDescVK& desc = p_view_decl.desc;
+    const ROImageVK::ExposedFields& image = p_image->fields();
+    if (desc.base_mip_level >= image.mipmap_levels || desc.base_array_layer >= image.layers_count) {
+        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' starts outside image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
+    }
+    const uint32_t mip_level_count =
+        desc.mip_level_count == VK_REMAINING_MIP_LEVELS ? image.mipmap_levels - desc.base_mip_level : desc.mip_level_count;
+    const uint32_t layer_count =
+        desc.layer_count == VK_REMAINING_ARRAY_LAYERS ? image.layers_count - desc.base_array_layer : desc.layer_count;
+    if (mip_level_count == 0 || layer_count == 0 || mip_level_count > image.mipmap_levels - desc.base_mip_level ||
+        layer_count > image.layers_count - desc.base_array_layer) {
+        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
+    }
+    const VkFormat format = desc.format.value_or(image.format);
+    return ROImageViewVK::Builder()
+        .set_image(p_image)
+        .set_view_type(desc.view_type.value_or(image.view_type))
+        .set_format(format)
+        .set_subresource_range(VkImageSubresourceRange{
+            .aspectMask = desc.aspect_mask.value_or(is_depth_format(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
+            .baseMipLevel = desc.base_mip_level,
+            .levelCount = mip_level_count,
+            .baseArrayLayer = desc.base_array_layer,
+            .layerCount = layer_count,
+        })
+        .create_ref(p_render_data);
+}
+
 } // namespace
 
 RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data)
@@ -518,6 +598,7 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     all_resources.clear();
 
     all_resources = index_resources(p_desc);
+    allocate_resources(p_desc);
     instantiate_tasks(p_desc);
     add_resource_edges(p_desc);
 
@@ -572,6 +653,113 @@ Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources
         resources_by_id.emplace(resource_desc.res_id, std::move(resource_ref));
     }
     return resources_by_id;
+}
+
+void RenderGraphVK::register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container) {
+    if (all_resources.contains(p_resource_id)) {
+        throw std::runtime_error(std::format("RenderGraphVK: duplicate resource id: {}.", p_resource_id));
+    }
+    auto resource = make_ref<RendResVK>(render_data->allocator);
+    resource->res_id = p_resource_id;
+    resource->res_type_id = p_container->get_resource_type_id();
+    resource->container = std::move(p_container);
+    all_resources.emplace(std::string(p_resource_id), std::move(resource));
+}
+
+Ref<RenderObjectContainerVK> RenderGraphVK::create_container(
+    bool p_per_frame, const std::function<Ref<IRenderObjectVK>(uint32_t)>& p_factory) const {
+    if (p_per_frame) {
+        const uint32_t frames = std::max<uint32_t>(render_data->frames_in_flight, 1U);
+        return make_ref<ROCMultislotsVK>(render_data->allocator, render_data->allocator, frames, p_factory);
+    }
+    return make_ref<ROCSingleVK>(render_data->allocator, p_factory(0));
+}
+
+void RenderGraphVK::allocate_resources(const RendGraphDescVK& p_desc) {
+    // Reject duplicate ids before any GPU object is created.
+    Set<std::string_view, RenderAllocator> declared_ids(render_data->allocator);
+    auto declare = [this, &declared_ids](std::string_view p_resource_id) {
+        if (all_resources.contains(p_resource_id) || !declared_ids.insert(p_resource_id).second) {
+            throw std::runtime_error(std::format("RenderGraphVK: duplicate resource id: {}.", p_resource_id));
+        }
+    };
+    for (const RendBufferDeclVK& buffer_decl : p_desc.buffers) {
+        declare(buffer_decl.res_id);
+    }
+    for (const RendImageDeclVK& image_decl : p_desc.images) {
+        declare(image_decl.res_id);
+    }
+    for (const RendImageViewDeclVK& view_decl : p_desc.image_views) {
+        declare(view_decl.res_id);
+    }
+    for (const RendSamplerDeclVK& sampler_decl : p_desc.samplers) {
+        declare(sampler_decl.res_id);
+    }
+
+    for (const RendBufferDeclVK& buffer_decl : p_desc.buffers) {
+        const RendBufferDescVK& desc = buffer_decl.desc;
+        const size_t size = desc.size == 0 ? desc.initial_data.size() : desc.size;
+        if (size == 0) {
+            throw std::runtime_error(std::format("RenderGraphVK: buffer '{}' has no size.", buffer_decl.res_id));
+        }
+        if (desc.initial_data.size() > size) {
+            throw std::runtime_error(std::format("RenderGraphVK: initial data of buffer '{}' exceeds its size.", buffer_decl.res_id));
+        }
+        ROBufferVK::Builder builder;
+        if (!desc.initial_data.empty()) {
+            builder.initial_data(desc.initial_data, desc.domain);
+        }
+        builder.set_size(size).set_domain(desc.domain).add_usage(buffer_usage_flags(desc.usage, buffer_decl.res_id) | desc.additional_usage);
+        register_resource(buffer_decl.res_id, create_container(desc.per_frame, [this, &builder](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+            return builder.create_ref(render_data);
+        }));
+    }
+    for (const RendImageDeclVK& image_decl : p_desc.images) {
+        const RendImageDescVK& desc = image_decl.desc;
+        if (desc.format == VK_FORMAT_UNDEFINED || desc.extent.width == 0 || desc.extent.height == 0 || desc.extent.depth == 0 ||
+            desc.mip_levels == 0 || desc.layers == 0) {
+            throw std::runtime_error(std::format("RenderGraphVK: image '{}' has an undefined format, extent, mip count, or layer count.", image_decl.res_id));
+        }
+        ROImageVK::Builder builder;
+        builder.set_image_type(desc.image_type)
+            .set_format(desc.format)
+            .set_extent(desc.extent)
+            .set_mipmap_level(desc.mip_levels)
+            .set_layers(desc.layers)
+            .set_usage(image_usage_flags(desc.usage, image_decl.res_id) | desc.additional_usage);
+        register_resource(image_decl.res_id, create_container(desc.per_frame, [this, &builder](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+            return builder.create_ref(render_data);
+        }));
+    }
+    for (const RendImageViewDeclVK& view_decl : p_desc.image_views) {
+        auto image_resource = all_resources.find(view_decl.image_id);
+        if (image_resource == all_resources.end() || image_resource->second->container == MEM_NULL ||
+            image_resource->second->res_type_id != TypeUUID<ROImageVK>::UUID) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: image view '{}' views '{}', which is not a declared image resource.", view_decl.res_id, view_decl.image_id));
+        }
+        Ref<RenderObjectContainerVK> image_container = image_resource->second->container;
+        const bool per_frame = image_container.dynamic_cast_ref<ROCMultislotsVK>() != MEM_NULL;
+        auto create_view = [this, &view_decl, &image_container](uint32_t p_slot) -> Ref<IRenderObjectVK> {
+            Ref<ROImageVK> image = image_container->get(p_slot).dynamic_cast_ref<ROImageVK>();
+            WBE_DEBUG_ASSERT(image != MEM_NULL);
+            return make_image_view(render_data, image, view_decl);
+        };
+        register_resource(view_decl.res_id, create_container(per_frame, create_view));
+    }
+    for (const RendSamplerDeclVK& sampler_decl : p_desc.samplers) {
+        register_resource(sampler_decl.res_id, create_container(false, [this, &sampler_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+            return sampler_decl.builder.create_ref(render_data);
+        }));
+    }
+}
+
+Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_resource_id) const {
+    auto resource = all_resources.find(p_resource_id);
+    if (resource == all_resources.end() || resource->second == MEM_NULL || resource->second->container == MEM_NULL) {
+        throw std::runtime_error(std::format("RenderGraphVK: resource '{}' is not declared or has no container.", p_resource_id));
+    }
+    return resource->second->container;
 }
 
 void RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {

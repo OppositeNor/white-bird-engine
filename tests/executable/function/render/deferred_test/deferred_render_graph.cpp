@@ -251,37 +251,95 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDe
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    add_static_set_graph_resources(p_pipeline_desc, static_set_resources);
+    p_pipeline_desc.add_static_set(static_set_resources);
     dynamic_mesh->register_resources(p_pipeline_desc);
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
-        .add_resource(SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(RSM_NORMAL_IMAGE_VIEW, shadow_normal_view)
-        .add_resource(SHADOW_MOMENTS_IMAGE_VIEW, shadow_moments_attachment_view)
-        .add_resource(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, shadow_moments_sampled_view)
-        .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, shadow_moments_summed_area_table_horizontal_view)
-        .add_resource(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, shadow_moments_summed_area_table_view)
-        .add_resource(SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
-        .add_resource(GBUFFER_ALBEDO_IMAGE_VIEW, gbuffer_albedo_view)
-        .add_resource(GBUFFER_NORMAL_IMAGE_VIEW, gbuffer_normal_view)
-        .add_resource(GBUFFER_RMA_IMAGE_VIEW, gbuffer_rma_view)
-        .add_resource(GBUFFER_DEPTH_IMAGE_VIEW, gbuffer_depth_view)
-        .add_resource(DIRECT_LIGHTING_IMAGE_VIEW, direct_lighting_view)
-        .add_resource(INDIRECT_LIGHTING_IMAGE_VIEW, indirect_lighting_view)
-        .add_resource(RESULT_IMAGE_VIEW, result_image_view)
-        .add_resource(BLOOM_PING_IMAGE_VIEW, bloom_ping_image_view)
-        .add_resource(BLOOM_PONG_IMAGE_VIEW, bloom_pong_image_view)
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, gbuffer_camera_info_ubos)
         .add_resource(COMPOSITION_CAMERA_INFO_BUFFER, composition_camera_info_ubos)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_buffers)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, spot_light_info_buffers)
         .add_resource(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_buffer)
-        .add_resource(SHADOW_SAMPLER, shadow_sampler)
-        .add_resource(GBUFFER_SAMPLER, gbuffer_sampler)
-        .add_resource(BLOOM_SAMPLER, bloom_sampler)
         .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, light_billboard_ubo)
-        .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
-        .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
+        .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view);
+    add_graph_owned_resources(p_pipeline_desc);
     octree->register_render_graph_data(p_pipeline_desc);
+}
+
+void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const {
+    constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
+    constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
+    constexpr std::string_view RSM_NORMAL_IMAGE = "rsm_normal_image";
+    constexpr std::string_view SHADOW_MOMENTS_IMAGE = "shadow_moments_image";
+    constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE = "shadow_moments_sat_horizontal_image";
+    constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE = "shadow_moments_sat_image";
+    constexpr std::string_view GBUFFER_ALBEDO_IMAGE = "gbuffer_albedo_image";
+    constexpr std::string_view GBUFFER_NORMAL_IMAGE = "gbuffer_normal_image";
+    constexpr std::string_view GBUFFER_RMA_IMAGE = "gbuffer_rma_image";
+    constexpr std::string_view GBUFFER_DEPTH_IMAGE = "gbuffer_depth_image";
+    constexpr std::string_view DIRECT_LIGHTING_IMAGE = "direct_lighting_image";
+    constexpr std::string_view INDIRECT_LIGHTING_IMAGE = "indirect_lighting_image";
+    constexpr std::string_view RESULT_IMAGE = "result_color_image";
+    constexpr std::string_view BLOOM_PING_IMAGE = "bloom_ping_image";
+    constexpr std::string_view BLOOM_PONG_IMAGE = "bloom_pong_image";
+    auto image = [](RendResPrimaryUsageVK p_usage, VkFormat p_format, VkExtent2D p_extent) {
+        return RendImageDescVK{.usage = p_usage, .format = p_format, .extent = {.width = p_extent.width, .height = p_extent.height, .depth = 1}};
+    };
+    const VkExtent2D screen_extent = base_render_data->swap_chain_extent;
+    RendImageDescVK shadow_moments = image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, SHADOW_MOMENTS_FORMAT, shadow_extent);
+    shadow_moments.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    shadow_moments.mip_levels = shadow_mipmap_level_count;
+    RendImageDescVK bloom_ping = image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, bloom_extent);
+    bloom_ping.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    const ROSamplerVK::Builder clamped_linear_sampler =
+        ROSamplerVK::Builder().set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR).set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+    // Shadow and reflective-shadow-map targets.
+    p_pipeline_desc.add_image(SHADOWMAP_DEPTH_IMAGE, image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, shadow_extent))
+        .add_image(SHADOWMAP_COLOR_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_FLUX_FORMAT, shadow_extent))
+        .add_image(RSM_NORMAL_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_NORMAL_FORMAT, shadow_extent))
+        .add_image(SHADOW_MOMENTS_IMAGE, shadow_moments)
+        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE,
+            image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, shadow_extent))
+        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, shadow_extent))
+        .add_image_view(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
+        .add_image_view(SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
+        .add_image_view(RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE)
+        .add_image_view(SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE)
+        .add_image_view(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE, {.mip_level_count = VK_REMAINING_MIP_LEVELS})
+        .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE)
+        .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE)
+        .add_sampler(SHADOW_SAMPLER,
+            ROSamplerVK::Builder()
+                .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
+                .set_mipmap_mode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
+                .set_lod_range(0.0F, static_cast<float>(shadow_mipmap_level_count - 1))
+                .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE));
+
+    // G-buffer targets.
+    p_pipeline_desc.add_image(GBUFFER_ALBEDO_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_ALBEDO_FORMAT, screen_extent))
+        .add_image(GBUFFER_NORMAL_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_NORMAL_FORMAT, screen_extent))
+        .add_image(GBUFFER_RMA_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_RMA_FORMAT, screen_extent))
+        .add_image(GBUFFER_DEPTH_IMAGE, image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, GBUFFER_DEPTH_FORMAT, screen_extent))
+        .add_image_view(GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_IMAGE)
+        .add_image_view(GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE)
+        .add_image_view(GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_IMAGE)
+        .add_image_view(GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_IMAGE)
+        .add_sampler(GBUFFER_SAMPLER,
+            ROSamplerVK::Builder().set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST).set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE));
+
+    // Lighting and post-processing outputs.
+    p_pipeline_desc.add_image(DIRECT_LIGHTING_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
+        .add_image(INDIRECT_LIGHTING_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
+        .add_image(RESULT_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
+        .add_image(BLOOM_PING_IMAGE, bloom_ping)
+        .add_image(BLOOM_PONG_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, bloom_extent))
+        .add_image_view(DIRECT_LIGHTING_IMAGE_VIEW, DIRECT_LIGHTING_IMAGE)
+        .add_image_view(INDIRECT_LIGHTING_IMAGE_VIEW, INDIRECT_LIGHTING_IMAGE)
+        .add_image_view(RESULT_IMAGE_VIEW, RESULT_IMAGE)
+        .add_image_view(BLOOM_PING_IMAGE_VIEW, BLOOM_PING_IMAGE)
+        .add_image_view(BLOOM_PONG_IMAGE_VIEW, BLOOM_PONG_IMAGE)
+        .add_sampler(BLOOM_SAMPLER, clamped_linear_sampler)
+        .add_sampler(LIGHT_BILLBOARD_SAMPLER, clamped_linear_sampler);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {

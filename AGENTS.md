@@ -69,6 +69,9 @@ For non-trivial implementation tasks:
   edge_type, src_stage, dst_stage)`; the graph must be a DAG. Declared reads and writes do not create edges. Every read-write,
   write-read, and write-write conflict on a resource must be ordered by a chain of edges on that same resource; unordered conflicts
   make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
+- The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
+  `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource()` / `add_static_set()` only to import resources owned
+  outside the graph.
 - The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
   descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
 

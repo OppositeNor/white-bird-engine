@@ -28,6 +28,7 @@
 #include "function/render_vk/semaphore_vk.hh"
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -277,6 +278,18 @@ public:
      */
     DebugData list_descriptors() const;
 
+    /**
+     * @brief Acquire the container bound to a graph resource.
+     *
+     * Resources allocated by the graph are held in an ROCSingleVK, or in an ROCMultislotsVK with one slot per frame in flight
+     * when they were declared per frame. Use the container to update graph-owned buffers on the rendering thread.
+     *
+     * @param p_resource_id The graph resource identifier.
+     * @return The resource container.
+     * @throws std::runtime_error If the resource is not declared or is an aggregate resource list.
+     */
+    Ref<RenderObjectContainerVK> acquire_resource(std::string_view p_resource_id) const;
+
 private:
     const BaseRenderDataVK* render_data;
 
@@ -308,6 +321,9 @@ private:
         VkPipelineStageFlags2 p_dst_stage);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
+    void allocate_resources(const RendGraphDescVK& p_desc);
+    void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
+    Ref<RenderObjectContainerVK> create_container(bool p_per_frame, const std::function<Ref<IRenderObjectVK>(uint32_t)>& p_factory) const;
     void instantiate_tasks(const RendGraphDescVK& p_desc);
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;

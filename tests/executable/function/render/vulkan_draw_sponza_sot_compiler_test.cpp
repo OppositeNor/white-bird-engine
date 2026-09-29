@@ -71,15 +71,12 @@ public:
     void setup_draw_task();
 
 private:
-    void create_depth_resources();
-    void write_camera_descriptor();
 
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUStaticOpaqueSet> sponza_set;
-    Ref<ROImageVK> depth_image;
-    Ref<ROImageViewVK> depth_view;
+    // Graph-owned camera buffer, updated from the logic thread through render jobs.
     Ref<ROBufferVK> camera_info_buffer;
     ComponentCamera camera_component{};
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
@@ -163,7 +160,6 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
         throw std::runtime_error("Failed to setup indirect Sponza test: static graphics pipeline resource was not found.");
     }
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
-    create_depth_resources();
 
     Ref<StaticSetResourcesVK> static_set_resources =
         create_static_set_resources(renderer_vk, sponza_set, MEM_NULL, graphics_pipeline, MEM_NULL, graphics_pipeline);
@@ -186,37 +182,26 @@ void ApplicationVulkanDrawSponzaIndirectTest::setup_draw_task() {
         base_render_data->swap_chain_extent,
         color_attachments,
         REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW);
-    write_camera_descriptor();
 
     RendGraphDescVK graph_desc(render_allocator);
-    add_static_set_graph_resources(graph_desc, static_set_resources);
+    constexpr std::string_view DEPTH_IMAGE = "draw_sponza_indirect_depth_image";
+    const VkExtent2D extent = base_render_data->swap_chain_extent;
+    graph_desc.add_static_set(static_set_resources);
     graph_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
-        .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, depth_view)
-        .add_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_CAMERA_INFO_BUFFER, camera_info_buffer);
+        .add_image(DEPTH_IMAGE,
+            {.usage = RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
+                .format = DRAW_SPONZA_INDIRECT_DEPTH_FORMAT,
+                .extent = {.width = extent.width, .height = extent.height, .depth = 1}})
+        .add_image_view(REND_RES_TEST_DRAW_SPONZA_INDIRECT_DEPTH_IMAGE_VIEW, DEPTH_IMAGE)
+        .add_buffer(REND_RES_TEST_DRAW_SPONZA_INDIRECT_CAMERA_INFO_BUFFER,
+            {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                .domain = DeviceDomain::HOST_DEVICE,
+                .initial_data = to_initial_data(make_camera_info_ubo(camera_component))});
     graph_desc.tasks.emplace_back(std::move(task_desc));
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_indirect_graph", std::move(graph_desc));
+    camera_info_buffer = graph->acquire_resource(REND_RES_TEST_DRAW_SPONZA_INDIRECT_CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<ROBufferVK>();
     write_descriptor_debug_output("draw_sponza_indirect_graph_descriptors", graph->list_descriptors());
     renderer_vk->activate_render_graph("draw_sponza_indirect_graph");
-}
-
-void ApplicationVulkanDrawSponzaIndirectTest::create_depth_resources() {
-    depth_image = ROImageVK::Builder()
-                      .set_properties_2d(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-                      .create_ref(base_render_data);
-    depth_view =
-        ROImageViewVK::Builder()
-            .set_image(depth_image)
-            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-            .set_format(DRAW_SPONZA_INDIRECT_DEPTH_FORMAT)
-            .set_subresource_range(VkImageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
-            .create_ref(base_render_data);
-}
-
-void ApplicationVulkanDrawSponzaIndirectTest::write_camera_descriptor() {
-    CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    camera_info_buffer =
-        ROBufferVK::Builder().set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).initial_data(&camera_info, sizeof(camera_info)).create_ref(base_render_data);
 }
 
 } // namespace WhiteBirdEngine

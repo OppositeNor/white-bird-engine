@@ -26,7 +26,29 @@
 
 ## Descriptor pattern
 
-Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null `RenderObjectContainerVK`. `RenderGraphVK::build_from_descriptor()` now rejects null containers, so descriptor construction must be complete before registration.
+Declare resources before graph registration. Resource and task IDs use lower-snake-case strings, and every id is unique across
+imported and graph-owned resources.
+
+Graph-owned resources are declared as configurations and created by `RenderGraphVK::build_from_descriptor()` before tasks are
+instantiated:
+
+```cpp
+graph_desc.add_image("gbuffer_depth_image",
+        {.usage = RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = VK_FORMAT_D32_SFLOAT, .extent = {.width = 1920, .height = 1080, .depth = 1}})
+    .add_image_view("gbuffer_depth", "gbuffer_depth_image")
+    .add_image_view("shadow_moments_sampled", "shadow_moments_image", {.mip_level_count = VK_REMAINING_MIP_LEVELS})
+    .add_buffer("camera_info", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true})
+    .add_sampler("gbuffer_sampler", ROSamplerVK::Builder().set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST));
+```
+
+The primary usage selects the Vulkan usage flags (`additional_usage` adds more, such as transfer usage for mip generation or
+readback). Images are device-local; buffers take a `DeviceDomain` and optional initial data. View fields left unset follow the
+viewed image, and depth formats default to the depth aspect. After registration, `RenderGraphVK::acquire_resource(id)` returns the
+container of any resource. Invalid usages, sizes, formats, and views of undeclared images make graph construction fail.
+
+Imported resources pair the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null
+`RenderObjectContainerVK`; `add_static_set()` imports every compiled static-set resource under the `REND_RES_STATIC_SET_*` ids.
+`RenderGraphVK::build_from_descriptor()` rejects null containers, so descriptor construction must be complete before registration.
 
 `RenderResourceList` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
 as `<resource_list_key>[<index>]`. A task read or write, or an edge, on the aggregate expands to all indexed entries before

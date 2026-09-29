@@ -24,12 +24,156 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @class RendResPrimaryUsageVK
+ * @brief Primary usage of a resource allocated by the render graph; it selects the Vulkan usage flags of the resource.
+ */
+enum class RendResPrimaryUsageVK : uint32_t {
+    /** Image sampled by shaders; its content is written by transfers. Sampled and transfer-destination usage. */
+    IMAGE_READ_ONLY,
+    /** Image read and written by shaders. Storage and sampled usage. */
+    IMAGE_READ_WRITE,
+    /** Color attachment that is later sampled. Color-attachment and sampled usage. */
+    IMAGE_RENDER_TARGET,
+    /** Depth/stencil attachment that is later sampled. Depth-stencil-attachment and sampled usage. */
+    IMAGE_DEPTH_TARGET,
+    /** Uniform buffer. */
+    BUFFER_UNIFORM,
+    /** Storage buffer read or written by shaders. */
+    BUFFER_STORAGE,
+    /** Indirect command buffer written by shaders. Indirect and storage usage. */
+    BUFFER_INDIRECT,
+    /** Vertex buffer. */
+    BUFFER_VERTEX,
+    /** Index buffer. */
+    BUFFER_INDEX,
+};
+
+/**
+ * @class RendBufferDescVK
+ * @brief Configuration of a buffer allocated by the render graph during graph compilation.
+ */
+struct RendBufferDescVK {
+    /** Primary usage; must be one of the BUFFER_* usages. */
+    RendResPrimaryUsageVK usage = RendResPrimaryUsageVK::BUFFER_STORAGE;
+    /** Vulkan usage flags added to the flags selected by the primary usage. */
+    VkBufferUsageFlags additional_usage = 0;
+    /** Buffer size in bytes. Zero selects the size of initial_data. */
+    size_t size = 0;
+    /** Memory domain where the buffer is allocated. */
+    DeviceDomain domain = DeviceDomain::DEVICE;
+    /** Whether one buffer is allocated per frame in flight instead of one for the whole graph. */
+    bool per_frame = false;
+    /** Bytes uploaded into every allocated buffer during graph compilation. */
+    std::vector<uint8_t> initial_data;
+};
+
+/**
+ * @class RendImageDescVK
+ * @brief Configuration of a device-local image allocated by the render graph during graph compilation.
+ */
+struct RendImageDescVK {
+    /** Primary usage; must be one of the IMAGE_* usages. */
+    RendResPrimaryUsageVK usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE;
+    /** Vulkan usage flags added to the flags selected by the primary usage. */
+    VkImageUsageFlags additional_usage = 0;
+    /** Image format. */
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    /** Image extent. A two-dimensional image uses a depth of one. */
+    VkExtent3D extent{.width = 0, .height = 0, .depth = 1};
+    /** Image dimensionality. */
+    VkImageType image_type = VK_IMAGE_TYPE_2D;
+    /** Number of mip levels. */
+    uint32_t mip_levels = 1;
+    /** Number of array layers. */
+    uint32_t layers = 1;
+    /** Whether one image is allocated per frame in flight instead of one for the whole graph. */
+    bool per_frame = false;
+};
+
+/**
+ * @class RendImageViewDescVK
+ * @brief Configuration of an image view created by the render graph over a graph image resource.
+ *
+ * Unset optional fields are derived from the viewed image.
+ */
+struct RendImageViewDescVK {
+    /** View type. Defaults to the image's default view type. */
+    std::optional<VkImageViewType> view_type;
+    /** View format. Defaults to the image format. */
+    std::optional<VkFormat> format;
+    /** Aspect mask. Defaults to depth for depth formats and color otherwise. */
+    std::optional<VkImageAspectFlags> aspect_mask;
+    /** First viewed mip level. */
+    uint32_t base_mip_level = 0;
+    /** Number of viewed mip levels; VK_REMAINING_MIP_LEVELS views every level from base_mip_level. */
+    uint32_t mip_level_count = 1;
+    /** First viewed array layer. */
+    uint32_t base_array_layer = 0;
+    /** Number of viewed array layers; VK_REMAINING_ARRAY_LAYERS views every layer from base_array_layer. */
+    uint32_t layer_count = 1;
+};
+
+/**
+ * @class RendBufferDeclVK
+ * @brief A buffer resource declared on a graph descriptor.
+ */
+struct RendBufferDeclVK {
+    /** Graph resource identifier. */
+    std::string res_id;
+    /** Buffer configuration. */
+    RendBufferDescVK desc;
+};
+
+/**
+ * @class RendImageDeclVK
+ * @brief An image resource declared on a graph descriptor.
+ */
+struct RendImageDeclVK {
+    /** Graph resource identifier. */
+    std::string res_id;
+    /** Image configuration. */
+    RendImageDescVK desc;
+};
+
+/**
+ * @class RendImageViewDeclVK
+ * @brief An image view resource declared on a graph descriptor.
+ */
+struct RendImageViewDeclVK {
+    /** Graph resource identifier of the view. */
+    std::string res_id;
+    /** Graph resource identifier of the viewed image. */
+    std::string image_id;
+    /** View configuration. */
+    RendImageViewDescVK desc;
+};
+
+/**
+ * @class RendSamplerDeclVK
+ * @brief A sampler resource declared on a graph descriptor.
+ */
+struct RendSamplerDeclVK {
+    /** Graph resource identifier. */
+    std::string res_id;
+    /** Sampler configuration. */
+    ROSamplerVK::Builder builder;
+};
 
 /**
  * @class RendResEdgeDescVK
@@ -124,12 +268,15 @@ struct RendTaskDescVK {
  * @class RendGraphDescVK
  * @brief A high-level Vulkan render pipeline descriptor.
  *
- * Every resource is declared once in this graph-wide descriptor. Tasks refer to those bindings by id through their read,
- * write, attachment, and reflected shader declarations.
+ * Every resource is declared once in this graph-wide descriptor. Buffers, images, image views, and samplers declared with
+ * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled;
+ * resources owned elsewhere are imported with add_resource() or add_static_set(). Tasks refer to every resource by id through
+ * their read, write, attachment, and reflected shader declarations.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)
-        : allocator(p_allocator), tasks(p_allocator), resources(p_allocator) {
+        : allocator(p_allocator), tasks(p_allocator), resources(p_allocator), buffers(p_allocator), images(p_allocator),
+          image_views(p_allocator), samplers(p_allocator) {
     }
 
     /**
@@ -200,12 +347,64 @@ struct RendGraphDescVK {
      */
     RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list);
 
+    /**
+     * @brief Declare a buffer allocated by the graph during compilation.
+     * @param p_resource_id Graph resource identifier.
+     * @param p_desc Buffer configuration.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_buffer(std::string_view p_resource_id, RendBufferDescVK p_desc);
+
+    /**
+     * @brief Declare an image allocated by the graph during compilation.
+     * @param p_resource_id Graph resource identifier.
+     * @param p_desc Image configuration.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_image(std::string_view p_resource_id, RendImageDescVK p_desc);
+
+    /**
+     * @brief Declare an image view created by the graph during compilation.
+     *
+     * A view of a per-frame image is itself per-frame.
+     *
+     * @param p_resource_id Graph resource identifier of the view.
+     * @param p_image_id Graph resource identifier of the viewed image, allocated by the graph or imported as an ROImageVK.
+     * @param p_desc View configuration.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_image_view(std::string_view p_resource_id, std::string_view p_image_id, RendImageViewDescVK p_desc = {});
+
+    /**
+     * @brief Declare a sampler created by the graph during compilation.
+     * @param p_resource_id Graph resource identifier.
+     * @param p_builder Sampler configuration.
+     * @return This graph descriptor.
+     */
+    RendGraphDescVK& add_sampler(std::string_view p_resource_id, ROSamplerVK::Builder p_builder);
+
+    /**
+     * @brief Import every resource of a compiled static set under the REND_RES_STATIC_SET_* ids.
+     *
+     * Optional categories that the static set does not contain are not declared.
+     *
+     * @param p_static_set Compiled static-set resources, retained by the graph descriptor.
+     * @return This graph descriptor.
+     * @throws std::runtime_error If p_static_set is null.
+     */
+    RendGraphDescVK& add_static_set(Ref<StaticSetResourcesVK> p_static_set);
+
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-
     // sorts them based on their resource dependency edges.
     Vector<RendTaskDescVK, RenderAllocator> tasks;
-    // The set of resources used by the pipeline. Looked up by res_id.
+    // Imported resources used by the pipeline. Looked up by res_id.
     Vector<RendResVK, RenderAllocator> resources;
+    // Resources allocated and owned by the graph during compilation.
+    Vector<RendBufferDeclVK, RenderAllocator> buffers;
+    Vector<RendImageDeclVK, RenderAllocator> images;
+    Vector<RendImageViewDeclVK, RenderAllocator> image_views;
+    Vector<RendSamplerDeclVK, RenderAllocator> samplers;
 };
 
 } // namespace WhiteBirdEngine

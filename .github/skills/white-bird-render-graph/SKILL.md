@@ -9,8 +9,8 @@ Treat a render graph as a statically built DAG of `IRenderTaskVK` nodes connecte
 
 ## Build a graph descriptor
 
-1. Add one `RendResVK` declaration for every resource ID that tasks read. Bind each declaration to a concrete `RenderObjectContainerVK` before graph build, and set its type to `TypeUUID<ConcreteRenderObject>::UUID`.
-2. Add task descriptors with unique lower-snake-case string `task_id` values and factories that return `Unique<RenderTaskVK>`.
+1. Declare every resource tasks use. The graph compiler allocates and owns resources declared with `add_buffer()`, `add_image()`, `add_image_view(view_id, image_id, ...)`, and `add_sampler()`: each takes a primary usage (`RendResPrimaryUsageVK`, such as `IMAGE_READ_WRITE`, `IMAGE_RENDER_TARGET`, `IMAGE_DEPTH_TARGET`, or `BUFFER_UNIFORM`) plus format, extent, mip levels, memory domain, per-frame allocation, and initial data as applicable. Import resources owned elsewhere (the swap chain, loaded textures, buffers shared between graphs) with `add_resource()`, and a compiled static set with `add_static_set()`.
+2. Add task descriptors with unique lower-snake-case string `task_id` values and factories that return `Unique<IRenderTaskVK>`.
 3. Connect tasks with `connect(next_task_id, resource_id, RendEdgeTypeVK::READ | WRITE, src_stage, dst_stage)` on the earlier task's descriptor. The edge names the resource, whether the next task reads or writes it, the stages where the previous task last uses it, and the stages where the next task first uses it. Use `RendGraphDescVK::get_task()` to connect a task that was already added. Declared resource accesses never create edges, and there is no other ordering mechanism.
 4. Use descriptor `read()` / `write()` calls for shader resources not declared intrinsically by the task.
 5. Register and activate the graph through `RendererVK`; do not manually drive graph execution from application code.
@@ -35,7 +35,7 @@ Presentation remains graphics-specific: swap-chain acquire waits attach to the f
 
 ## Bind runtime resources through the renderer
 
-Render-graph resources are now bind-once for the graph lifetime. `RenderGraphVK::build_from_descriptor()` rejects any `RendResVK` whose container is null. When a resource varies by frame, bind one stable container up front and mutate the render objects inside it instead of rebinding the graph resource.
+Render-graph resources are bind-once for the graph lifetime. `RenderGraphVK::build_from_descriptor()` allocates graph-owned resources before instantiating tasks, rejects duplicate ids, and rejects any imported `RendResVK` whose container is null. Graph-owned resources live in an `ROCSingleVK`, or an `ROCMultislotsVK` with one slot per frame in flight when declared per frame; a view of a per-frame image is per-frame. Update graph-owned buffers through `RenderGraphVK::acquire_resource(id)` on the rendering thread. When an imported resource varies by frame, bind one stable container up front and mutate the render objects inside it instead of rebinding the graph resource.
 
 The swap-chain path uses this pattern: the application binds `REND_RES_SWAP_CHAIN` to `RendererVK::acquire_swap_chain_image_view_container()` before graph registration, and each frame the renderer replaces only the current slot's image view before execution. Construct swap-chain `ROCMultislotsVK` containers with `p_flush = false` so slot replacement does not trigger buffer-update generation tracking.
 

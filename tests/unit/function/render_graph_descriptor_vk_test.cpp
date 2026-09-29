@@ -19,7 +19,9 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/function_utils.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -129,6 +131,42 @@ TEST(WBERenderGraphDescriptorVKTest, ResourceListIsStoredAsAnAggregateBinding) {
     EXPECT_EQ(descriptor.resources.front().res_id, "textures");
     EXPECT_EQ(descriptor.resources.front().resource_list, resource_list);
     EXPECT_EQ(descriptor.resources.front().container, MEM_NULL);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsAreStoredForCompilation) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+
+    descriptor
+        .add_buffer("camera", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true, .initial_data = {1, 2}})
+        .add_image("albedo_image",
+            {.usage = RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 8, .height = 8, .depth = 1}, .mip_levels = 2})
+        .add_image_view("albedo", "albedo_image", {.mip_level_count = VK_REMAINING_MIP_LEVELS})
+        .add_sampler("sampler", ROSamplerVK::Builder().set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST));
+
+    ASSERT_EQ(descriptor.buffers.size(), 1U);
+    EXPECT_EQ(descriptor.buffers.front().res_id, "camera");
+    EXPECT_TRUE(descriptor.buffers.front().desc.per_frame);
+    EXPECT_EQ(descriptor.buffers.front().desc.initial_data.size(), 2U);
+    ASSERT_EQ(descriptor.images.size(), 1U);
+    EXPECT_EQ(descriptor.images.front().desc.mip_levels, 2U);
+    ASSERT_EQ(descriptor.image_views.size(), 1U);
+    EXPECT_EQ(descriptor.image_views.front().image_id, "albedo_image");
+    EXPECT_EQ(descriptor.image_views.front().desc.mip_level_count, VK_REMAINING_MIP_LEVELS);
+    ASSERT_EQ(descriptor.samplers.size(), 1U);
+    EXPECT_EQ(descriptor.samplers.front().builder.min_filter, VK_FILTER_NEAREST);
+    EXPECT_TRUE(descriptor.resources.empty());
+}
+
+TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsRejectEmptyIds) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+
+    EXPECT_THROW(descriptor.add_buffer("", {}), std::runtime_error);
+    EXPECT_THROW(descriptor.add_image("", {}), std::runtime_error);
+    EXPECT_THROW(descriptor.add_image_view("view", ""), std::runtime_error);
+    EXPECT_THROW(descriptor.add_sampler("", ROSamplerVK::Builder()), std::runtime_error);
+    EXPECT_THROW(descriptor.add_static_set(MEM_NULL), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

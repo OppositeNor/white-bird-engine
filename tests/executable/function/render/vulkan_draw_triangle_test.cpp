@@ -97,18 +97,8 @@ public:
         WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
             WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangle_submesh->vertices);
 
-        triangle_vertex_buffer =
-            WBE::ROBufferVK::Builder()
-                .set_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-                .initial_data(triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start,
-                    triangle_submesh->vertices.binary.size)
-                .create_ref(base_render_data);
-        triangle_index_buffer =
-            WBE::ROBufferVK::Builder()
-                .set_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
-                .initial_data(triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start,
-                    triangle_submesh->indices.binary.size)
-                .create_ref(base_render_data);
+        const char* vertex_data = triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start;
+        const char* index_data = triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start;
 
         const WBE::IndexedDrawRegionVK indexed_draw_region{
             .first_index = 0,
@@ -117,8 +107,14 @@ public:
         };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
-            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, triangle_vertex_buffer)
-            .add_resource(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, triangle_index_buffer);
+            .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
+                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_VERTEX,
+                    .domain = WBE::DeviceDomain::HOST_DEVICE,
+                    .initial_data = std::vector<uint8_t>(vertex_data, vertex_data + triangle_submesh->vertices.binary.size)})
+            .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
+                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_INDEX,
+                    .domain = WBE::DeviceDomain::HOST_DEVICE,
+                    .initial_data = std::vector<uint8_t>(index_data, index_data + triangle_submesh->indices.binary.size)});
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.create =
@@ -144,8 +140,6 @@ public:
     }
 
 private:
-    WBE::Ref<WBE::ROBufferVK> triangle_vertex_buffer;
-    WBE::Ref<WBE::ROBufferVK> triangle_index_buffer;
 };
 
 int main(int p_argc, char* p_argv[]) {

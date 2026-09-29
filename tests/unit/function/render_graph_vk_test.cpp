@@ -26,6 +26,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
@@ -539,6 +540,65 @@ TEST(WBERenderGraphVKTest, RejectsResourceChainsWithoutSharedMiddleStage) {
     RenderGraphVK graph(&render_data);
 
     EXPECT_NE(build_error(graph, descriptor).find("do not share a stage at task 'middle'"), std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, GraphOwnedResourcesRejectDuplicateIdsBeforeAllocation) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+
+    RendGraphDescVK imported_duplicate(&allocator);
+    imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    imported_duplicate.add_buffer(TEST_LOGICAL_RESOURCE, {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = 16});
+    EXPECT_NE(build_error(graph, imported_duplicate).find("duplicate resource id: logical"), std::string::npos);
+
+    RendGraphDescVK owned_duplicate(&allocator);
+    owned_duplicate.add_image(TEST_SHARED_RESOURCE, {.format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 4, .height = 4, .depth = 1}});
+    owned_duplicate.add_sampler(TEST_SHARED_RESOURCE, ROSamplerVK::Builder());
+    EXPECT_NE(build_error(graph, owned_duplicate).find("duplicate resource id: shared"), std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, RejectsInvalidGraphOwnedResourceDeclarations) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+
+    RendGraphDescVK image_usage_buffer(&allocator);
+    image_usage_buffer.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .size = 16});
+    EXPECT_NE(build_error(graph, image_usage_buffer).find("buffer 'buffer' has a non-buffer primary usage"), std::string::npos);
+
+    RendGraphDescVK empty_buffer(&allocator);
+    empty_buffer.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM});
+    EXPECT_NE(build_error(graph, empty_buffer).find("buffer 'buffer' has no size"), std::string::npos);
+
+    RendGraphDescVK oversized_data(&allocator);
+    oversized_data.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .size = 2, .initial_data = {1, 2, 3}});
+    EXPECT_NE(build_error(graph, oversized_data).find("initial data of buffer 'buffer' exceeds its size"), std::string::npos);
+
+    RendGraphDescVK buffer_usage_image(&allocator);
+    buffer_usage_image.add_image("image",
+        {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 4, .height = 4, .depth = 1}});
+    EXPECT_NE(build_error(graph, buffer_usage_image).find("image 'image' has a non-image primary usage"), std::string::npos);
+
+    RendGraphDescVK undefined_image(&allocator);
+    undefined_image.add_image("image", {.extent = {.width = 4, .height = 4, .depth = 1}});
+    EXPECT_NE(build_error(graph, undefined_image).find("image 'image' has an undefined format"), std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, ImageViewsMustViewDeclaredImages) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+
+    RendGraphDescVK missing_image(&allocator);
+    missing_image.add_image_view("view", "missing_image");
+    EXPECT_NE(build_error(graph, missing_image).find("image view 'view' views 'missing_image', which is not a declared image resource"),
+        std::string::npos);
+
+    RendGraphDescVK non_image(&allocator);
+    non_image.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    non_image.add_image_view("view", TEST_LOGICAL_RESOURCE);
+    EXPECT_NE(build_error(graph, non_image).find("which is not a declared image resource"), std::string::npos);
 }
 
 } // namespace WhiteBirdEngine

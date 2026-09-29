@@ -302,9 +302,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         gbuffer_opaque_pipeline_resource,
         2);
     setup_spot_light();
-    create_shadow_map_resources();
-    create_gbuffer_resources();
-    create_lighting_output_resources();
+    setup_bloom_acquisition();
     OctreeRenderFeature::Implementation octree_implementation = OctreeRenderFeature::Implementation::PASS_PUBLISHED;
     if (const char* selection = std::getenv("WBE_OCTREE_IMPLEMENTATION")) {
         if (std::string_view(selection) == "1") {
@@ -465,10 +463,6 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .initial_data(&light_billboard_info, sizeof(light_billboard_info))
                               .create_ref(base_render_data);
-    light_billboard_sampler = ROSamplerVK::Builder()
-                                  .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
-                                  .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                                  .create_ref(base_render_data);
 
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
@@ -484,170 +478,12 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
     light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
-void ApplicationVulkanDeferredPBRTest::create_shadow_map_resources() {
-    shadow_depth_image = ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
-    shadow_color_image = ROImageVK::Builder()
-                             .set_properties_2d(RSM_FLUX_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                             .create_ref(base_render_data);
-    shadow_normal_image = ROImageVK::Builder()
-                              .set_properties_2d(RSM_NORMAL_FORMAT, shadow_extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                              .create_ref(base_render_data);
-    shadow_moments_image = ROImageVK::Builder()
-                               .set_properties_2d(SHADOW_MOMENTS_FORMAT,
-                                   shadow_extent,
-                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-                               .set_mipmap_level(shadow_mipmap_level_count)
-                               .create_ref(base_render_data);
-    shadow_moments_summed_area_table_horizontal_image =
-        ROImageVK::Builder()
-            .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-            .create_ref(base_render_data);
-    shadow_moments_summed_area_table_image =
-        ROImageVK::Builder()
-            .set_properties_2d(SHADOW_MOMENTS_FORMAT, shadow_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-            .create_ref(base_render_data);
-    shadow_depth_view = ROImageViewVK::Builder()
-                            .set_image(shadow_depth_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
-                            .set_format(SHADOWMAP_DEPTH_FORMAT)
-                            .create_ref(base_render_data);
-    shadow_color_view = ROImageViewVK::Builder()
-                            .set_image(shadow_color_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_format(RSM_FLUX_FORMAT)
-                            .create_ref(base_render_data);
-    shadow_normal_view = ROImageViewVK::Builder()
-                             .set_image(shadow_normal_image)
-                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                             .set_format(RSM_NORMAL_FORMAT)
-                             .create_ref(base_render_data);
-    shadow_moments_attachment_view = ROImageViewVK::Builder()
-                                         .set_image(shadow_moments_image)
-                                         .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                         .set_format(SHADOW_MOMENTS_FORMAT)
-                                         .create_ref(base_render_data);
-    shadow_moments_sampled_view = ROImageViewVK::Builder()
-                                      .set_image(shadow_moments_image)
-                                      .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                      .set_format(SHADOW_MOMENTS_FORMAT)
-                                      .set_mip_level_count(shadow_mipmap_level_count)
-                                      .create_ref(base_render_data);
-    shadow_moments_summed_area_table_horizontal_view = ROImageViewVK::Builder()
-                                                           .set_image(shadow_moments_summed_area_table_horizontal_image)
-                                                           .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                                           .set_format(SHADOW_MOMENTS_FORMAT)
-                                                           .create_ref(base_render_data);
-    shadow_moments_summed_area_table_view = ROImageViewVK::Builder()
-                                                .set_image(shadow_moments_summed_area_table_image)
-                                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                                .set_format(SHADOW_MOMENTS_FORMAT)
-                                                .create_ref(base_render_data);
-    shadow_sampler = ROSamplerVK::Builder()
-                         .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
-                         .set_mipmap_mode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-                         .set_lod_range(0.0F, static_cast<float>(shadow_mipmap_level_count - 1))
-                         .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                         .create_ref(base_render_data);
-}
-
-void ApplicationVulkanDeferredPBRTest::create_gbuffer_resources() {
-    VkExtent2D extent = base_render_data->swap_chain_extent;
-    gbuffer_albedo_image =
-        ROImageVK::Builder()
-            .set_properties_2d(GBUFFER_ALBEDO_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-            .create_ref(base_render_data);
-    gbuffer_normal_image =
-        ROImageVK::Builder()
-            .set_properties_2d(GBUFFER_NORMAL_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-            .create_ref(base_render_data);
-    gbuffer_rma_image = ROImageVK::Builder()
-                            .set_properties_2d(GBUFFER_RMA_FORMAT, extent, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                            .create_ref(base_render_data);
-    gbuffer_depth_image = ROImageVK::Builder()
-                              .set_properties_2d(GBUFFER_DEPTH_FORMAT, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                              .create_ref(base_render_data);
-    gbuffer_albedo_view = ROImageViewVK::Builder()
-                              .set_image(gbuffer_albedo_image)
-                              .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                              .set_format(GBUFFER_ALBEDO_FORMAT)
-                              .create_ref(base_render_data);
-    gbuffer_normal_view = ROImageViewVK::Builder()
-                              .set_image(gbuffer_normal_image)
-                              .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                              .set_format(GBUFFER_NORMAL_FORMAT)
-                              .create_ref(base_render_data);
-    gbuffer_rma_view = ROImageViewVK::Builder()
-                           .set_image(gbuffer_rma_image)
-                           .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                           .set_format(GBUFFER_RMA_FORMAT)
-                           .create_ref(base_render_data);
-    gbuffer_depth_view = ROImageViewVK::Builder()
-                             .set_image(gbuffer_depth_image)
-                             .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                             .set_format(GBUFFER_DEPTH_FORMAT)
-                             .set_aspect_mask(VK_IMAGE_ASPECT_DEPTH_BIT)
-                             .create_ref(base_render_data);
-    gbuffer_sampler = ROSamplerVK::Builder()
-                          .set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST)
-                          .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                          .create_ref(base_render_data);
-}
-
-void ApplicationVulkanDeferredPBRTest::create_lighting_output_resources() {
-    VkExtent2D extent = base_render_data->swap_chain_extent;
-    bloom_extent = extent;
+void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
+    bloom_extent = base_render_data->swap_chain_extent;
     if (bloom_extent.width > std::numeric_limits<size_t>::max() / bloom_extent.height / BLOOM_BYTES_PER_PIXEL) {
         throw std::runtime_error("Failed to allocate the deferred bloom acquisition buffer: image byte size is too large.");
     }
     bloom_acquire_buffer.resize(static_cast<size_t>(bloom_extent.width) * bloom_extent.height * BLOOM_BYTES_PER_PIXEL);
-    direct_lighting_image = ROImageVK::Builder()
-                                .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                .create_ref(base_render_data);
-    indirect_lighting_image = ROImageVK::Builder()
-                                  .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                                  .create_ref(base_render_data);
-    result_image = ROImageVK::Builder()
-                       .set_properties_2d(LIGHTING_OUTPUT_FORMAT, extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                       .create_ref(base_render_data);
-    bloom_ping_image = ROImageVK::Builder()
-                           .set_properties_2d(LIGHTING_OUTPUT_FORMAT,
-                               bloom_extent,
-                               VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-                           .create_ref(base_render_data);
-    bloom_pong_image = ROImageVK::Builder()
-                           .set_properties_2d(LIGHTING_OUTPUT_FORMAT, bloom_extent, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT)
-                           .create_ref(base_render_data);
-    direct_lighting_view = ROImageViewVK::Builder()
-                               .set_image(direct_lighting_image)
-                               .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                               .set_format(LIGHTING_OUTPUT_FORMAT)
-                               .create_ref(base_render_data);
-    indirect_lighting_view = ROImageViewVK::Builder()
-                                 .set_image(indirect_lighting_image)
-                                 .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                 .set_format(LIGHTING_OUTPUT_FORMAT)
-                                 .create_ref(base_render_data);
-    result_image_view = ROImageViewVK::Builder()
-                            .set_image(result_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_format(LIGHTING_OUTPUT_FORMAT)
-                            .create_ref(base_render_data);
-    bloom_ping_image_view = ROImageViewVK::Builder()
-                                .set_image(bloom_ping_image)
-                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                .set_format(LIGHTING_OUTPUT_FORMAT)
-                                .create_ref(base_render_data);
-    bloom_pong_image_view = ROImageViewVK::Builder()
-                                .set_image(bloom_pong_image)
-                                .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                                .set_format(LIGHTING_OUTPUT_FORMAT)
-                                .create_ref(base_render_data);
-    bloom_sampler = ROSamplerVK::Builder()
-                        .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
-                        .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                        .create_ref(base_render_data);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {

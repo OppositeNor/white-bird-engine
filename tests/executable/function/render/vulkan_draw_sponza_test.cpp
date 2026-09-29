@@ -163,8 +163,6 @@ private:
     void load_resources();
     void setup_static_scene_resources();
     void setup_spot_light();
-    void create_shadow_map_resources();
-    void create_main_depth_resources();
     void setup_light_billboard_overlay_resources();
     void write_shadow_dynamic_descriptors();
     void write_main_dynamic_descriptors();
@@ -187,13 +185,6 @@ private:
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_masked_graphics_pipeline;
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_opaque_graphics_pipeline;
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_masked_graphics_pipeline;
-    WBE::Ref<WBE::ROImageVK> shadow_depth_image;
-    WBE::Ref<WBE::ROImageVK> shadow_color_image;
-    WBE::Ref<WBE::ROImageViewVK> shadow_depth_view;
-    WBE::Ref<WBE::ROImageViewVK> shadow_color_view;
-    WBE::Ref<WBE::ROImageVK> main_depth_image;
-    WBE::Ref<WBE::ROImageViewVK> main_depth_view;
-    WBE::Ref<WBE::ROSamplerVK> shadow_sampler;
     WBE::Ref<WBE::ROCMultislotsVK> camera_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_count_ubos;
@@ -204,7 +195,6 @@ private:
     WBE::Ref<WBE::ROBufferVK> light_billboard_ubo;
     WBE::Ref<WBE::ROImageViewVK> light_billboard_texture_view;
     WBE::Ref<WBE::ROGraphicsPipelineVK> light_billboard_pipeline;
-    WBE::Ref<WBE::ROSamplerVK> light_billboard_sampler;
     WBE::ComponentCamera camera_component{};
     glm::vec3 camera_position = glm::vec3(0.0F);
     float camera_yaw = 0.0F;
@@ -394,8 +384,6 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
         spot_light_component.view =
             glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
     }
-    create_shadow_map_resources();
-    create_main_depth_resources();
 
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
@@ -513,62 +501,6 @@ void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
     };
 }
 
-void ApplicationVulkanDrawSponzaTest::create_shadow_map_resources() {
-    shadow_depth_image = WBE::ROImageVK::Builder().shadow_map_depth(spot_light_component).create_ref(base_render_data);
-    shadow_color_image = WBE::ROImageVK::Builder().shadow_map_color(spot_light_component).create_ref(base_render_data);
-
-    VkImageSubresourceRange depth_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
-    VkImageSubresourceRange color_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
-    shadow_depth_view = WBE::ROImageViewVK::Builder()
-                            .set_image(shadow_depth_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_format(SHADOWMAP_DEPTH_FORMAT)
-                            .set_subresource_range(depth_subresource)
-                            .create_ref(base_render_data);
-    shadow_color_view = WBE::ROImageViewVK::Builder()
-                            .set_image(shadow_color_image)
-                            .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                            .set_format(SHADOWMAP_COLOR_FORMAT)
-                            .set_subresource_range(color_subresource)
-                            .create_ref(base_render_data);
-
-    shadow_sampler = WBE::ROSamplerVK::Builder()
-                         .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
-                         .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                         .create_ref(base_render_data);
-}
-
-void ApplicationVulkanDrawSponzaTest::create_main_depth_resources() {
-    main_depth_image = WBE::ROImageVK::Builder()
-                           .set_properties_2d(MAIN_DEPTH_FORMAT, base_render_data->swap_chain_extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-                           .create_ref(base_render_data);
-    VkImageSubresourceRange depth_subresource{
-        .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-    };
-    main_depth_view = WBE::ROImageViewVK::Builder()
-                          .set_image(main_depth_image)
-                          .set_view_type(VK_IMAGE_VIEW_TYPE_2D)
-                          .set_format(MAIN_DEPTH_FORMAT)
-                          .set_subresource_range(depth_subresource)
-                          .create_ref(base_render_data);
-}
-
 void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() {
     auto* resource_manager = WBE::ResourceManager::get_singleton();
     auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("billboard_face_camera_pipeline");
@@ -583,15 +515,6 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     if (camera_info_ubos == WBE::MEM_NULL) {
         camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
     }
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
-    light_billboard_ubo = WBE::ROBufferVK::Builder()
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .initial_data(&light_billboard_info, sizeof(light_billboard_info))
-                              .create_ref(base_render_data);
-    light_billboard_sampler = WBE::ROSamplerVK::Builder()
-                                  .set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR)
-                                  .set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-                                  .create_ref(base_render_data);
 
     WBE::GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
@@ -641,22 +564,40 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     WBE::RendTaskDescVK p_shadow_masked_task,
     WBE::RendTaskDescVK p_main_opaque_task,
     WBE::RendTaskDescVK p_main_masked_task) {
+    constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
+    constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
+    constexpr std::string_view MAIN_DEPTH_IMAGE = "draw_sponza_depth_image";
+    const VkExtent3D shadow_image_extent{.width = shadow_extent.width, .height = shadow_extent.height, .depth = 1};
+    const VkExtent3D main_image_extent{
+        .width = base_render_data->swap_chain_extent.width, .height = base_render_data->swap_chain_extent.height, .depth = 1};
+    const WBE::ROSamplerVK::Builder clamped_linear_sampler =
+        WBE::ROSamplerVK::Builder().set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR).set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
+    pipeline_desc.add_static_set(static_set_resources);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
-        .add_resource(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, main_depth_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, shadow_color_view)
-        .add_resource(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, shadow_depth_view)
+        .add_image(SHADOWMAP_DEPTH_IMAGE,
+            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = SHADOWMAP_DEPTH_FORMAT, .extent = shadow_image_extent})
+        .add_image(SHADOWMAP_COLOR_IMAGE,
+            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, .format = SHADOWMAP_COLOR_FORMAT, .extent = shadow_image_extent})
+        .add_image(MAIN_DEPTH_IMAGE,
+            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = MAIN_DEPTH_FORMAT, .extent = main_image_extent})
+        .add_image_view(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_IMAGE)
+        .add_image_view(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
+        .add_image_view(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubos)
         .add_resource(CAMERA_INFO_BUFFER, camera_info_ubos)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, spot_light_info_ubos)
         .add_resource(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_ubos)
-        .add_resource(SHADOWMAP_SAMPLED_IMAGE_VIEW, shadow_depth_view)
-        .add_resource(SHADOW_SAMPLER, shadow_sampler)
+        .add_image_view(SHADOWMAP_SAMPLED_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
+        .add_sampler(SHADOW_SAMPLER, clamped_linear_sampler)
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, camera_info_ubos)
-        .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, light_billboard_ubo)
+        .add_buffer(LIGHT_BILLBOARD_INFO_BUFFER,
+            {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                .domain = WBE::DeviceDomain::HOST_DEVICE,
+                .initial_data = WBE::to_initial_data(make_light_billboard_info(spot_light_component))})
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
-        .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
+        .add_sampler(LIGHT_BILLBOARD_SAMPLER, clamped_linear_sampler);
 
     constexpr VkPipelineStageFlags2 DEPTH_STAGES = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
     constexpr VkPipelineStageFlags2 COLOR_STAGE = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -698,6 +639,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
 
     WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));
+    light_billboard_ubo = graph->acquire_resource(LIGHT_BILLBOARD_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
     WBE::write_descriptor_debug_output("draw_sponza_pipeline_graph_descriptors", graph->list_descriptors());
     renderer_vk->activate_render_graph("draw_sponza_pipeline");
 }

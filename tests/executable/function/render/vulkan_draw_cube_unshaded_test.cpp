@@ -97,11 +97,6 @@ public:
             throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }
 
-        camera_info_ubo = WBE::ROBufferVK::Builder()
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .initial_data(&camera_info, sizeof(camera_info))
-                              .create_ref(base_render_data);
-
         WBE::Ref<WBE::StaticSetResourcesVK> static_set_resources =
             WBE::create_static_set_resources(renderer, cube_set, WBE::MEM_NULL, pipeline_resource, WBE::MEM_NULL, WBE::MEM_NULL);
         if (static_set_resources->acquire_textures() == WBE::MEM_NULL) {
@@ -122,12 +117,16 @@ public:
             base_render_data->swap_chain_extent,
             color_attachments);
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        WBE::add_static_set_graph_resources(pipeline_desc, static_set_resources);
+        pipeline_desc.add_static_set(static_set_resources);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
-            .add_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
+            .add_buffer(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER,
+                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                    .domain = WBE::DeviceDomain::HOST_DEVICE,
+                    .initial_data = WBE::to_initial_data(camera_info)});
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        camera_info_ubo = graph->acquire_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

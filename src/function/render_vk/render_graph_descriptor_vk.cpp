@@ -24,6 +24,8 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -158,6 +160,66 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, R
         .res_id = std::string(p_resource_id),
         .resource_list = std::move(p_resource_list),
     });
+}
+
+RendGraphDescVK& RendGraphDescVK::add_buffer(std::string_view p_resource_id, RendBufferDescVK p_desc) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add render graph buffer: resource id is empty.");
+    }
+    buffers.push_back({.res_id = std::string(p_resource_id), .desc = std::move(p_desc)});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_image(std::string_view p_resource_id, RendImageDescVK p_desc) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add render graph image: resource id is empty.");
+    }
+    images.push_back({.res_id = std::string(p_resource_id), .desc = p_desc});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_image_view(std::string_view p_resource_id, std::string_view p_image_id, RendImageViewDescVK p_desc) {
+    if (p_resource_id.empty() || p_image_id.empty()) {
+        throw std::runtime_error("Failed to add render graph image view: resource id or image id is empty.");
+    }
+    image_views.push_back({.res_id = std::string(p_resource_id), .image_id = std::string(p_image_id), .desc = p_desc});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_sampler(std::string_view p_resource_id, ROSamplerVK::Builder p_builder) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to add render graph sampler: resource id is empty.");
+    }
+    samplers.push_back({.res_id = std::string(p_resource_id), .builder = std::move(p_builder)});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_static_set(Ref<StaticSetResourcesVK> p_static_set) {
+    if (p_static_set == MEM_NULL) {
+        throw std::runtime_error("Failed to add static set to render graph: static set is null.");
+    }
+    add_resource(REND_RES_STATIC_SET_VERTICES, p_static_set->acquire_vertices())
+        .add_resource(REND_RES_STATIC_SET_INDICES, p_static_set->acquire_indices())
+        .add_resource(REND_RES_STATIC_SET_SUBMESHES, p_static_set->acquire_submeshes())
+        .add_resource(REND_RES_STATIC_SET_NODES, p_static_set->acquire_nodes())
+        .add_resource(REND_RES_STATIC_SET_INSTANCES, p_static_set->acquire_instances())
+        .add_resource(REND_RES_STATIC_SET_TEXTURES, p_static_set->acquire_textures());
+    if (p_static_set->acquire_opaque_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES, p_static_set->acquire_opaque_draw_batches());
+    }
+    if (p_static_set->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_static_set->acquire_opaque_double_sided_draw_batches());
+    }
+    if (p_static_set->acquire_masked_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_SET_MASKED_DRAW_BATCHES, p_static_set->acquire_masked_draw_batches());
+    }
+    if (p_static_set->acquire_material_params() != MEM_NULL) {
+        add_resource(p_static_set->get_material_params_resource_id(), p_static_set->acquire_material_params());
+    }
+    if (p_static_set->acquire_material_sampler() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_SET_MATERIAL_SAMPLER, p_static_set->acquire_material_sampler());
+    }
+    return *this;
 }
 
 } // namespace WhiteBirdEngine

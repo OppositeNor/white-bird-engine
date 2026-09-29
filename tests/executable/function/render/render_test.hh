@@ -67,6 +67,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -213,29 +214,16 @@ inline Ref<StaticSetResourcesVK> create_static_set_resources(RendererVK* p_rende
             p_opaque_double_sided_set);
 }
 
-inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticSetResourcesVK> p_resources) {
-    p_graph.add_resource(REND_RES_STATIC_SET_VERTICES, p_resources->acquire_vertices())
-        .add_resource(REND_RES_STATIC_SET_INDICES, p_resources->acquire_indices())
-        .add_resource(REND_RES_STATIC_SET_SUBMESHES, p_resources->acquire_submeshes())
-        .add_resource(REND_RES_STATIC_SET_NODES, p_resources->acquire_nodes())
-        .add_resource(REND_RES_STATIC_SET_INSTANCES, p_resources->acquire_instances())
-        .add_resource(REND_RES_STATIC_SET_TEXTURES, p_resources->acquire_textures());
-    if (p_resources->acquire_opaque_draw_batches() != MEM_NULL) {
-        p_graph.add_resource(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES, p_resources->acquire_opaque_draw_batches());
-    }
-    if (p_resources->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
-        p_graph.add_resource(
-            REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_resources->acquire_opaque_double_sided_draw_batches());
-    }
-    if (p_resources->acquire_masked_draw_batches() != MEM_NULL) {
-        p_graph.add_resource(REND_RES_STATIC_SET_MASKED_DRAW_BATCHES, p_resources->acquire_masked_draw_batches());
-    }
-    if (p_resources->acquire_material_params() != MEM_NULL) {
-        p_graph.add_resource(p_resources->get_material_params_resource_id(), p_resources->acquire_material_params());
-    }
-    if (p_resources->acquire_material_sampler() != MEM_NULL) {
-        p_graph.add_resource(REND_RES_STATIC_SET_MATERIAL_SAMPLER, p_resources->acquire_material_sampler());
-    }
+/**
+ * @brief Copy a trivially copyable value into bytes used as initial graph-buffer data.
+ * @param p_value The value to copy.
+ * @return The object representation of p_value.
+ */
+template <typename T>
+std::vector<uint8_t> to_initial_data(const T& p_value) {
+    static_assert(std::is_trivially_copyable_v<T>);
+    const auto* bytes = reinterpret_cast<const uint8_t*>(&p_value);
+    return std::vector<uint8_t>(bytes, bytes + sizeof(T));
 }
 
 /**
