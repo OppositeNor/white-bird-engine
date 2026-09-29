@@ -56,6 +56,27 @@ struct OctreeNode {
 };
 
 /**
+ * @brief Bit offset of the ChildrenState field (bits 31:29) in OctreeNode::children_data.
+ */
+static const uint OCTREE_CHILDREN_STATE_SHIFT = 29;
+/**
+ * @brief Bit offset of sector zero's occupancy bit in OctreeNode::children_data.
+ */
+static const uint OCTREE_CHILDREN_OCCUPANCY_SHIFT = 21;
+/**
+ * @brief Mask of the eight sector occupancy bits (bits 28:21) in OctreeNode::children_data.
+ */
+static const uint OCTREE_CHILDREN_OCCUPANCY_MASK = 0x1fe00000u;
+/**
+ * @brief Mask of the eight-child block index (bits 20:0) in OctreeNode::children_data.
+ */
+static const uint OCTREE_CHILDREN_BLOCK_INDEX_MASK = 0x001fffffu;
+/**
+ * @brief Mask of every bit below the ChildrenState field (occupancy and block index) in OctreeNode::children_data.
+ */
+static const uint OCTREE_CHILDREN_PAYLOAD_MASK = 0x1fffffffu;
+
+/**
  * @brief One initialized leaf slot; occupancy is published in its parent node.
  */
 [WBE_DATA_TYPE]
@@ -184,14 +205,14 @@ struct OctreeNodeTraceInfo {
  * @brief Decodes the state from a pass-stable node description.
  */
 OctreeNode::ChildrenState get_octree_children_state(OctreeNode p_node) {
-    return OctreeNode::ChildrenState(p_node.children_data >> 29);
+    return OctreeNode::ChildrenState(p_node.children_data >> OCTREE_CHILDREN_STATE_SHIFT);
 }
 
 /**
  * @brief Decodes the first child index for a NODE or LEAF description.
  */
 uint get_octree_children_index(OctreeNode p_node) {
-    return (p_node.children_data & 0x001fffffu) * 8;
+    return (p_node.children_data & OCTREE_CHILDREN_BLOCK_INDEX_MASK) * 8;
 }
 
 /**
@@ -206,7 +227,7 @@ bool is_octree_leaf_occupied(uint p_leaf_index,
     int parent_index = p_leaves[p_leaf_index].parent_index;
     WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 && uint(parent_index) < p_tree_info.node_count,
         ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-    return (p_nodes[parent_index].children_data & (1u << (21 + p_leaf_index % 8))) != 0;
+    return (p_nodes[parent_index].children_data & (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + p_leaf_index % 8))) != 0;
 }
 
 /**
@@ -222,7 +243,9 @@ OctreeNode load_octree_node(RWStructuredBuffer<OctreeNode> p_nodes, uint p_node_
  */
 void occupy_octree_leaf(RWStructuredBuffer<uint> p_pending, uint p_node_index, float3 p_position) {
     uint original_data;
-    InterlockedOr(p_pending[p_node_index], 1u << (21 + get_octree_node_subregion(p_position)), original_data);
+    InterlockedOr(p_pending[p_node_index],
+        1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + get_octree_node_subregion(p_position)),
+        original_data);
 }
 
 /**
@@ -259,7 +282,7 @@ void traverse_octree(RWStructuredBuffer<OctreeNode> p_nodes, inout OctreeNodeTra
 bool try_reserve_octree_nodes(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].node_count, 8, current_count);
-    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
+    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= OCTREE_CHILDREN_BLOCK_INDEX_MASK &&
         current_count <= p_tree_info[0].max_node_count &&
         p_tree_info[0].max_node_count - current_count >= 8,
         ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
@@ -282,8 +305,8 @@ bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Initialize all of the children to empty
         uint child_index = p_children_index + i;
-        p_nodes[child_index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
-        p_pending[child_index] = uint(OctreeNode::ChildrenState::EMPTY) << 29;
+        p_nodes[child_index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
+        p_pending[child_index] = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
         p_nodes[child_index].parent_index = p_parent_node_index;
     }
     uint new_data_index;
@@ -301,7 +324,7 @@ bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
 bool try_reserve_octree_leaves(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p_frame_slot, out uint p_children_index) {
     uint current_count;
     InterlockedAdd(p_tree_info[0].leaves_count, 8, current_count);
-    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= 0x001fffffu &&
+    WBE_SHADER_DEBUG_ASSERT(current_count / 8 <= OCTREE_CHILDREN_BLOCK_INDEX_MASK &&
         current_count <= p_tree_info[0].max_leaves_count &&
         p_tree_info[0].max_leaves_count - current_count >= 8,
         ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
@@ -342,9 +365,9 @@ bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructure
     uint p_node_index, bool p_is_leaf, float3 p_position, uint p_frame_slot) {
     uint original;
     InterlockedCompareExchange(p_pending[p_node_index],
-        uint(OctreeNode::ChildrenState::EMPTY) << 29,
-        uint(OctreeNode::ChildrenState::ALLOCATING) << 29, original);
-    if (original != (uint(OctreeNode::ChildrenState::EMPTY) << 29)) {
+        uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT,
+        uint(OctreeNode::ChildrenState::ALLOCATING) << OCTREE_CHILDREN_STATE_SHIFT, original);
+    if (original != (uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT)) {
         return false;
     }
     uint children_index;
@@ -356,11 +379,13 @@ bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructure
         allocated = create_octree_children_node(p_nodes, p_pending, p_tree_info, p_node_index, p_frame_slot, children_index);
     }
     if (!allocated) {
-        InterlockedExchange(p_pending[p_node_index], uint(OctreeNode::ChildrenState::EMPTY) << 29, original);
+        InterlockedExchange(
+            p_pending[p_node_index], uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT, original);
         return false;
     }
-    uint occupancy = p_is_leaf ? (1u << (21 + get_octree_node_subregion(p_position))) : 0;
-    uint pending_data = (uint(OctreeNode::ChildrenState::ALLOCATING) << 29) | occupancy | (children_index / 8);
+    uint occupancy = p_is_leaf ? (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + get_octree_node_subregion(p_position))) : 0;
+    uint pending_data =
+        (uint(OctreeNode::ChildrenState::ALLOCATING) << OCTREE_CHILDREN_STATE_SHIFT) | occupancy | (children_index / 8);
     // Other invocations may still CAS this word. Publication and visibility are provided by the later dispatch boundary.
     InterlockedExchange(p_pending[p_node_index], pending_data, original);
     return true;

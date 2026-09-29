@@ -80,6 +80,9 @@ struct GSOutput {
 
 // Closed-cell overlap includes surfaces on cell boundaries. This tolerance is in voxel units.
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
+// Voxel claims are a bitset packed into 32-bit words.
+static const uint VOXEL_CLAIM_WORD_SHIFT = 5;
+static const uint VOXEL_CLAIM_BIT_MASK = 31u;
 
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
@@ -254,9 +257,9 @@ void allocate_covered_voxel(float3 p_svo_position) {
     uint3 voxel = uint3(p_svo_position * float(extent));
     uint voxel_index = voxel.x + extent * (voxel.y + extent * voxel.z);
     RWStructuredBuffer<uint> voxel_claims = ResourceDescriptorHeap[descriptor_indices.voxel_claims.x];
-    uint bit = 1u << (voxel_index & 31u);
+    uint bit = 1u << (voxel_index & VOXEL_CLAIM_BIT_MASK);
     uint original_claims;
-    InterlockedOr(voxel_claims[voxel_index >> 5], bit, original_claims);
+    InterlockedOr(voxel_claims[voxel_index >> VOXEL_CLAIM_WORD_SHIFT], bit, original_claims);
     if ((original_claims & bit) != 0) {
         return;
     }

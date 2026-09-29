@@ -67,11 +67,11 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     }
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
-        uint state = description >> 29;
+        uint state = description >> OCTREE_CHILDREN_STATE_SHIFT;
         if (state == uint(OctreeNode::ChildrenState::NODE_DYNAMIC)) {
-            nodes[index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
+            nodes[index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
         } else if (state == uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)) {
-            nodes[index].children_data = leaves[description & 0x001fffffu].original_children_data;
+            nodes[index].children_data = leaves[description & OCTREE_CHILDREN_BLOCK_INDEX_MASK].original_children_data;
         }
     }
     if (index == 0) {

@@ -54,9 +54,10 @@ bool is_incremental_leaf_occupied(uint p_index,
     bool dynamic = p_index >= p_info.leaves_count;
     uint local = dynamic ? p_index - p_info.leaves_count : p_index;
     uint expected = uint(dynamic ? OctreeNode::ChildrenState::LEAF_DYNAMIC : OctreeNode::ChildrenState::LEAF);
-    if ((parent.children_data >> 29) != expected || get_octree_children_index(parent) / 8 != local / 8) {
+    if ((parent.children_data >> OCTREE_CHILDREN_STATE_SHIFT) != expected ||
+        get_octree_children_index(parent) / 8 != local / 8) {
         return false;
     }
-    return (parent.children_data & (1u << (21 + local % 8))) != 0;
+    return (parent.children_data & (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + local % 8))) != 0;
 }
 #endif

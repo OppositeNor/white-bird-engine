@@ -64,12 +64,12 @@ void main(uint3 p_id : SV_DispatchThreadID) {
         return;
     }
     uint description = is_static ? nodes[local].children_data : dynamic_nodes[local].children_data;
-    if ((description >> 29) != uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC)) {
+    if ((description >> OCTREE_CHILDREN_STATE_SHIFT) != uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC)) {
         return;
     }
-    uint state = (description & 0x1fe00000u) != 0 ? uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)
+    uint state = (description & OCTREE_CHILDREN_OCCUPANCY_MASK) != 0 ? uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)
                                                   : uint(OctreeNode::ChildrenState::NODE_DYNAMIC);
-    description = (description & 0x1fffffffu) | (state << 29);
+    description = (description & OCTREE_CHILDREN_PAYLOAD_MASK) | (state << OCTREE_CHILDREN_STATE_SHIFT);
     if (is_static) {
         nodes[local].children_data = description;
     } else {

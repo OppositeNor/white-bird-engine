@@ -55,9 +55,10 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<uint> pending = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     uint children_data = pending[node_index];
-    if ((children_data >> 29) == uint(OctreeNode::ChildrenState::ALLOCATING)) {
-        uint state = (children_data & 0x1fe00000u) != 0 ? uint(OctreeNode::ChildrenState::LEAF) : uint(OctreeNode::ChildrenState::NODE);
-        children_data = (children_data & 0x1fffffffu) | (state << 29);
+    if ((children_data >> OCTREE_CHILDREN_STATE_SHIFT) == uint(OctreeNode::ChildrenState::ALLOCATING)) {
+        uint state = (children_data & OCTREE_CHILDREN_OCCUPANCY_MASK) != 0 ? uint(OctreeNode::ChildrenState::LEAF)
+                                                                   : uint(OctreeNode::ChildrenState::NODE);
+        children_data = (children_data & OCTREE_CHILDREN_PAYLOAD_MASK) | (state << OCTREE_CHILDREN_STATE_SHIFT);
         pending[node_index] = children_data;
     }
     // Existing leaves also need their newly accumulated occupancy published.

@@ -42,10 +42,10 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctreeNode> p_static_nodes,
         } else {
             InterlockedAdd(p_dynamic_nodes[local_index].children_data, 0, description);
         }
-        uint state = description >> 29;
+        uint state = description >> OCTREE_CHILDREN_STATE_SHIFT;
         uint sector = get_octree_node_subregion(p_trace.svo_position);
         if (state == uint(OctreeNode::ChildrenState::NODE) || state == uint(OctreeNode::ChildrenState::NODE_DYNAMIC)) {
-            p_trace.node_index = (description & 0x001fffffu) * 8 + sector;
+            p_trace.node_index = (description & OCTREE_CHILDREN_BLOCK_INDEX_MASK) * 8 + sector;
             ++p_trace.curr_depth;
             if (p_trace.remain_depth > 0) {
                 --p_trace.remain_depth;
@@ -56,9 +56,11 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctreeNode> p_static_nodes,
         if (state == uint(OctreeNode::ChildrenState::LEAF_DYNAMIC)) {
             uint ignored;
             if (is_static) {
-                InterlockedOr(p_static_nodes[local_index].children_data, 1u << (21 + sector), ignored);
+                InterlockedOr(
+                    p_static_nodes[local_index].children_data, 1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + sector), ignored);
             } else {
-                InterlockedOr(p_dynamic_nodes[local_index].children_data, 1u << (21 + sector), ignored);
+                InterlockedOr(
+                    p_dynamic_nodes[local_index].children_data, 1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + sector), ignored);
             }
             return true;
         }
@@ -69,7 +71,7 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctreeNode> p_static_nodes,
             ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED,
             p_frame_slot);
         uint original;
-        uint allocating = uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC) << 29;
+        uint allocating = uint(OctreeNode::ChildrenState::ALLOCATING_DYNAMIC) << OCTREE_CHILDREN_STATE_SHIFT;
         if (is_static) {
             InterlockedCompareExchange(p_static_nodes[local_index].children_data, description, allocating, original);
         } else {
@@ -95,21 +97,21 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<OctreeNode> p_static_nodes,
             [unroll] for (uint i = 0; i < 8; ++i) {
                 OctreeLeaf leaf;
                 if (state == uint(OctreeNode::ChildrenState::LEAF)) {
-                    leaf = p_static_leaves[(original & 0x001fffffu) * 8 + i];
+                    leaf = p_static_leaves[(original & OCTREE_CHILDREN_BLOCK_INDEX_MASK) * 8 + i];
                 } else {
                     leaf.data_index = p_info[0].data_count + p_info[0].max_dynamic_node_count + children + i;
                     leaf.parent_index = int(node_index);
                 }
                 p_dynamic_leaves[block].leaves[i] = leaf;
             }
-            occupancy = (original & 0x1fe00000u) | (1u << (21 + sector));
+            occupancy = (original & OCTREE_CHILDREN_OCCUPANCY_MASK) | (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + sector));
         } else {
             InterlockedAdd(p_info[0].dynamic_node_count, 8, children);
             WBE_SHADER_DEBUG_ASSERT(
                 children < p_info[0].max_dynamic_node_count, ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
             [unroll] for (uint i = 0; i < 8; ++i) {
                 OctreeNode child;
-                child.children_data = uint(OctreeNode::ChildrenState::EMPTY) << 29;
+                child.children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
                 child.data_index = p_info[0].data_count + children + i;
                 child.parent_index = int(node_index);
                 child.original_children_data = child.children_data;
