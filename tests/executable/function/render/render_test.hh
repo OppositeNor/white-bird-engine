@@ -55,6 +55,7 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <nlohmann/json.hpp>
@@ -234,6 +235,39 @@ inline void add_static_set_graph_resources(RendGraphDescVK& p_graph, Ref<StaticS
     }
     if (p_resources->acquire_material_sampler() != MEM_NULL) {
         p_graph.add_resource(REND_RES_STATIC_SET_MATERIAL_SAMPLER, p_resources->acquire_material_sampler());
+    }
+}
+
+/**
+ * @class ResourceChainLink
+ * @brief One task in an execution-ordered chain of uses of a single graph resource.
+ */
+struct ResourceChainLink {
+    /** @brief Task that uses the resource. */
+    std::string_view task_id;
+    /** @brief Pipeline stages at which the task uses the resource. */
+    VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
+    /** @brief Whether the task writes the resource. */
+    bool writes = false;
+};
+
+/**
+ * @brief Connect consecutive uses of one resource with resource edges.
+ *
+ * Every link is connected to the next one; the edge type follows whether the next task writes the resource.
+ *
+ * @param p_graph Graph descriptor that already contains every linked task.
+ * @param p_resource_id Graph resource carried by the edges.
+ * @param p_links Uses of the resource in execution order.
+ */
+inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
+    const ResourceChainLink* previous = nullptr;
+    for (const ResourceChainLink& link : p_links) {
+        if (previous != nullptr) {
+            p_graph.get_task(previous->task_id)
+                .connect(link.task_id, p_resource_id, link.writes ? RendEdgeTypeVK::WRITE : RendEdgeTypeVK::READ, previous->stage, link.stage);
+        }
+        previous = &link;
     }
 }
 

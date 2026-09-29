@@ -80,11 +80,22 @@ struct ResAccessVK {
 };
 
 /**
+ * @class RendEdgeTypeVK
+ * @brief Kind of a render-graph resource dependency, described from the point of view of the next task.
+ */
+enum class RendEdgeTypeVK : uint32_t {
+    /** The next task reads the resource after the previous task's use. */
+    READ,
+    /** The next task writes the resource after the previous task's use. */
+    WRITE,
+};
+
+/**
  * @class IRenderTaskVK
  * @brief Vulkan render task. A IRenderTaskVK records work into a single
  * Vulkan command buffer per frame; the owning RenderGraphVK schedules it
  * onto a queue family chosen by `queue_family()` and synchronises it with
- * other tasks via the read/write resource declarations and execution edges.
+ * other tasks through the graph's resource dependency edges.
  */
 struct IRenderTaskVK : public IRenderTask {
     IRenderTaskVK() = default;
@@ -132,9 +143,10 @@ struct IRenderTaskVK : public IRenderTask {
     /**
      * @brief Record this task's commands into the given command buffer. The
      * command buffer has already been begun by the graph and will be ended by
-     * the graph after this call returns. Timeline-semaphore waits required by
-     * incoming resource dependencies accompany this task's submission;
-     * required image layout transitions are emitted first.
+     * the graph after this call returns. Barriers and timeline-semaphore waits
+     * required by incoming resource dependencies are emitted or attached by the
+     * graph before this task's commands, together with required image layout
+     * transitions.
      *
      * @param p_command_buffer The command buffer to record into.
      * @param p_delta     The frame delta in seconds.

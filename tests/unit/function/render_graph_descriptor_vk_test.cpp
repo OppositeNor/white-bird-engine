@@ -81,16 +81,41 @@ TEST(WBERenderGraphDescriptorVKTest, FluentResourceDeclarationsUseStringsAndComp
     RenderAllocator allocator(WBE_KI_B(64));
     RendTaskDescVK descriptor(&allocator);
     descriptor.task_id = "run_lighting";
-    descriptor.after("run_gbuffer").read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE).write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
+    descriptor.read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
+        .write("lighting_output", RendResUsageVK::STORAGE_IMAGE)
+        .connect("run_bloom",
+            "lighting_output",
+            RendEdgeTypeVK::READ,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 
-    ASSERT_EQ(descriptor.prev.size(), 1U);
-    EXPECT_EQ(descriptor.prev.front(), "run_gbuffer");
+    ASSERT_EQ(descriptor.next.size(), 1U);
+    EXPECT_EQ(descriptor.next.front().next_task_id, "run_bloom");
+    EXPECT_EQ(descriptor.next.front().res_id, "lighting_output");
+    EXPECT_EQ(descriptor.next.front().type, RendEdgeTypeVK::READ);
+    EXPECT_EQ(descriptor.next.front().src_stage, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    EXPECT_EQ(descriptor.next.front().dst_stage, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
     ASSERT_EQ(descriptor.reads.size(), 1U);
     EXPECT_EQ(descriptor.reads.front().res_id, "gbuffer_albedo");
     EXPECT_EQ(descriptor.reads.front().usage, RendResUsageVK::SAMPLED_IMAGE);
     ASSERT_EQ(descriptor.writes.size(), 1U);
     EXPECT_EQ(descriptor.writes.front().res_id, "lighting_output");
     EXPECT_EQ(descriptor.writes.front().usage, RendResUsageVK::STORAGE_IMAGE);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, GetTaskReturnsStoredDescriptorForLaterConnections) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+    RendTaskDescVK task(&allocator);
+    task.task_id = "producer";
+    descriptor.add_task(std::move(task));
+
+    descriptor.get_task("producer").connect(
+        "consumer", "buffer", RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+    ASSERT_EQ(descriptor.tasks.front().next.size(), 1U);
+    EXPECT_EQ(descriptor.tasks.front().next.front().type, RendEdgeTypeVK::WRITE);
+    EXPECT_THROW(descriptor.get_task("missing"), std::runtime_error);
 }
 
 TEST(WBERenderGraphDescriptorVKTest, ResourceListIsStoredAsAnAggregateBinding) {

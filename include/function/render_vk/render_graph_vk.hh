@@ -37,6 +37,7 @@
 namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
+struct RGNode;
 
 /**
  * @class RendResVK
@@ -103,25 +104,84 @@ private:
 };
 
 /**
+ * @class RGResEdge
+ * @brief A resource dependency between two graph nodes.
+ *
+ * The edge orders `from` before `to` and makes the previous task's use of `res_id` visible to the next task. Edges whose nodes
+ * run on the same Vulkan queue are recorded as pipeline barriers before the next task; edges crossing queues are satisfied
+ * with timeline semaphores.
+ */
+struct RGResEdge {
+    // The node that uses the resource first.
+    Ref<RGNode> from;
+    // The node that uses the resource next.
+    Ref<RGNode> to;
+    // The graph resource id carried by the edge. Aggregate resource-list ids are expanded to their indexed entries.
+    std::string res_id;
+    // Whether the next task reads or writes the resource.
+    RendEdgeTypeVK type = RendEdgeTypeVK::READ;
+    // The pipeline stages at which the previous task last uses the resource.
+    VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
+    // The pipeline stages at which the next task first uses the resource.
+    VkPipelineStageFlags2 dst_stage = VK_PIPELINE_STAGE_2_NONE;
+};
+
+/**
+ * @class RGBarrierVK
+ * @brief A same-queue resource dependency recorded as a pipeline barrier before a node's commands.
+ */
+struct RGBarrierVK {
+    // The graph resource id resolved to a buffer, image, or global memory barrier at record time.
+    std::string res_id;
+    // Source stages merged from all same-queue incoming edges on the resource.
+    VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
+    // Source accesses made available by the barrier.
+    VkAccessFlags2 src_access = VK_ACCESS_2_NONE;
+    // Destination stages merged from all same-queue incoming edges on the resource.
+    VkPipelineStageFlags2 dst_stage = VK_PIPELINE_STAGE_2_NONE;
+    // Destination accesses made visible by the barrier.
+    VkAccessFlags2 dst_access = VK_ACCESS_2_NONE;
+};
+
+/**
+ * @class RGSemaphoreWaitVK
+ * @brief A cross-queue dependency waited on when a node is submitted.
+ */
+struct RGSemaphoreWaitVK {
+    // The producer node's timeline semaphore.
+    Ref<SemaphoreVK> semaphore;
+    // Destination stages merged from all incoming edges from the producer.
+    VkPipelineStageFlags2 wait_stage = VK_PIPELINE_STAGE_2_NONE;
+};
+
+/**
  * @class RGNode
  * @brief A node of the render graph.
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : exec_before(p_allocator), exec_after(p_allocator), reads(p_allocator), writes(p_allocator) {
+        : in_edges(p_allocator), out_edges(p_allocator), reads(p_allocator), writes(p_allocator), barriers(p_allocator),
+          semaphore_waits(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
     Unique<IRenderTaskVK> render_task;
     // String identifier copied from the graph descriptor for diagnostics.
     RendTaskID task_id;
-    // The execution process edge before this node. All of these need
-    // to be finished before executing this node.
-    Vector<RefWeak<struct RGExecEdge>, RenderAllocator> exec_before;
-    // The execution process edge after this node.
-    Vector<RefWeak<struct RGExecEdge>, RenderAllocator> exec_after;
+    // Resource edges whose next task is this node.
+    Vector<RefWeak<RGResEdge>, RenderAllocator> in_edges;
+    // Resource edges whose previous task is this node.
+    Vector<RefWeak<RGResEdge>, RenderAllocator> out_edges;
     // Compact resource declarations, including intrinsic task usage and descriptor additions.
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
+    // Same-queue incoming dependencies, recorded as barriers before the task.
+    Vector<RGBarrierVK, RenderAllocator> barriers;
+    // Cross-queue incoming dependencies, waited on by this node's submission.
+    Vector<RGSemaphoreWaitVK, RenderAllocator> semaphore_waits;
+    // Timeline semaphore signaled by this node when it has cross-queue successors; otherwise null.
+    Ref<SemaphoreVK> signal_semaphore;
+    // Source stages merged from all cross-queue outgoing edges.
+    VkPipelineStageFlags2 signal_stage = VK_PIPELINE_STAGE_2_NONE;
     // The queue family where this node lives (graphics/compute/...).
     QueueFamilyVK in_queue = QueueFamilyVK::GRAPHICS;
     // Topological order for scheduling.
@@ -129,36 +189,15 @@ struct RGNode {
 };
 
 /**
- * @class RGExecEdge
- * @brief An edge of execution flow between two graph nodes. A timeline
- * semaphore is allocated per edge: the producer signals it; the consumer
- * waits on it. When the edge directly orders a resource hazard, its wait and
- * signal stage scopes are tightened to the relevant producer and consumer
- * resource usage.
- */
-struct RGExecEdge {
-    // The node before this edge.
-    Ref<RGNode> before;
-    // The node after this edge.
-    Ref<RGNode> after;
-    // The pipeline stage at which the producer's work is considered
-    // observable.
-    VkPipelineStageFlags2 before_finish_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    // The pipeline stage at which the consumer's work needs the producer's
-    // output to be visible.
-    VkPipelineStageFlags2 after_start_pipeline_stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    // The timeline semaphore used to signal/wait this edge between submits.
-    Ref<SemaphoreVK> semaphore;
-};
-
-/**
  * @class RenderGraphVK
  * @brief Vulkan-specific render graph. Manages per-task command buffers on
- * the appropriate queue family and uses explicit timeline-semaphore
- * execution edges to sequence submits and make memory visible. Declared
- * resource accesses are validated against those explicit edges during graph
- * build; conflicting accesses that are not ordered by an execution path make
- * graph construction fail.
+ * the appropriate queue family. The graph is built from resource dependency
+ * edges declared with RendTaskDescVK::connect(); it must be a DAG. Edges
+ * between tasks on the same queue are recorded as pipeline barriers and edges
+ * crossing queues use timeline semaphores. Every conflicting (read-write,
+ * write-read, or write-write) pair of declared accesses on a resource must be
+ * ordered by a chain of edges carrying that same resource; otherwise graph
+ * construction fails.
  *
  * The graph is built once from a RendGraphDescVK; thereafter, execute()
  * may be called every frame.
@@ -181,9 +220,13 @@ public:
 
     /**
      * @brief Build the graph from a high-level descriptor: instantiate every
-     * task, add explicit execution edges based on `prev`, validate that those
-     * edges order every conflicting declared resource access, and allocate the
-     * command buffers. After this call, the graph is ready to execute().
+     * task, add the resource dependency edges, reject cycles, validate that
+     * every conflicting declared resource access is ordered by edges on that
+     * resource, derive barriers and semaphores, and allocate the command
+     * buffers. After this call, the graph is ready to execute().
+     *
+     * @throws std::runtime_error If the descriptor is invalid, cyclic, or
+     * leaves a resource conflict unordered.
      *
      * @param p_desc The render graph descriptor.
      */
@@ -191,10 +234,9 @@ public:
 
     /**
      * @brief Execute every node in topological order, submitting each to the
-     * command buffer of its queue family and signals/waits the timeline
-     * semaphore on each execution edge. Resource hazards must already be
-     * ordered by explicit execution paths established during graph build;
-     * image layout transitions remain explicit.
+     * queue of its queue family. Same-queue resource edges are recorded as
+     * barriers at the start of the next task; cross-queue edges signal and
+     * wait timeline semaphores.
      *
      * Wait/signal semaphores in p_extra_waits_first_submit and
      * p_extra_signals_last_submit are attached to the first and last
@@ -239,7 +281,7 @@ private:
     const BaseRenderDataVK* render_data;
 
     Vector<Ref<RGNode>, RenderAllocator> nodes;
-    Vector<Ref<RGExecEdge>, RenderAllocator> exec_edges;
+    Vector<Ref<RGResEdge>, RenderAllocator> resource_edges;
     // All resources known to the graph, keyed by res_id.
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
 
@@ -257,21 +299,32 @@ private:
     uint32_t terminal_semaphore_index() const;
     void topological_sort();
     Ref<RGNode> add_node(Unique<IRenderTaskVK> p_task);
-    Ref<RGExecEdge> add_exec_edge(
-        Ref<RGNode> p_before, Ref<RGNode> p_after, VkPipelineStageFlags2 p_before_finish_stage, VkPipelineStageFlags2 p_after_start_stage);
+    Ref<RGNode> find_node(std::string_view p_task_id) const;
+    void add_resource_edge(Ref<RGNode> p_from,
+        Ref<RGNode> p_to,
+        std::string p_resource_id,
+        RendEdgeTypeVK p_type,
+        VkPipelineStageFlags2 p_src_stage,
+        VkPipelineStageFlags2 p_dst_stage);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
-    Vector<RendTaskID, RenderAllocator> instantiate_tasks(const RendGraphDescVK& p_desc);
+    void instantiate_tasks(const RendGraphDescVK& p_desc);
     void normalize_task_accesses(Ref<RGNode> p_node) const;
-    void add_exec_edges_from_prev(const RendGraphDescVK& p_desc, const Vector<RendTaskID, RenderAllocator>& p_task_ids);
-    void validate_explicit_resource_dependencies();
-    bool has_exec_path(Ref<RGNode> p_from, Ref<RGNode> p_to) const;
+    Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
+    void add_resource_edges(const RendGraphDescVK& p_desc);
+    void validate_resource_edges() const;
+    void validate_resource_conflicts() const;
+    void validate_queue_completion() const;
+    bool has_resource_path(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string_view p_resource_id) const;
+    void build_synchronization();
+    bool is_same_queue(QueueFamilyVK p_left, QueueFamilyVK p_right) const;
 
     std::tuple<size_t, size_t> find_graphics_range() const;
     void record_node(Ref<RGNode> p_node, VkCommandBuffer p_command_buffer, const RendResViewVK& p_resources, double p_delta, bool p_record_present_transition);
     void record_general_transition(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const RendResViewVK& p_resources);
+    void record_edge_barriers(VkCommandBuffer p_command_buffer, Ref<RGNode> p_node, const RendResViewVK& p_resources) const;
     void record_present_transition(VkCommandBuffer p_command_buffer);
-    void collect_edge_semaphores(Ref<RGNode> p_node,
+    void collect_node_semaphores(Ref<RGNode> p_node,
         uint64_t p_timeline_value,
         Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_waits,
         Vector<VkSemaphoreSubmitInfo, RenderAllocator>& p_signals) const;

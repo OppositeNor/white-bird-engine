@@ -4,19 +4,19 @@
 
 1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` factories.
 2. `RendererVK::register_render_graph` stores the descriptor and immediately builds a `RenderGraphVK`.
-3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds explicit predecessor edges, topologically sorts nodes, validates that those edges order every resource conflict, allocates per-node command buffers, and creates terminal semaphores.
+3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds resource edges, rejects cycles while topologically sorting nodes, validates that edges on each resource order every conflict on it, derives same-queue barriers and cross-queue semaphores, allocates per-node command buffers, and creates terminal semaphores.
 4. Each frame, the renderer acquires a swap-chain image, updates the explicitly bound swap-chain image-view container for the current frame slot, executes the graph, and presents.
 5. `RenderGraphVK::execute` records and submits nodes individually in topological order to their selected graphics or compute queue.
 
 ## Core APIs
 
 - `include/function/render_vk/render_graph_descriptor_vk.hh`
-  - `RendTaskDescVK`: string `task_id`, fluent `after()` / `read()` / `write()` declarations, and a task factory in `create`.
-  - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations.
-- `include/function/render_vk/render_task_vk.hh`
-  - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `RenderTaskVK` contract.
+  - `RendTaskDescVK`: string `task_id`, fluent `connect()` / `read()` / `write()` declarations, and a task factory in `create`.
+  - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations, plus `get_task()` for connecting added tasks.
+- `include/function/render_vk/i_render_task_vk.hh`
+  - `QueueFamilyVK`, `RendEdgeTypeVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
-  - Descriptor building, explicit-path validation, execution, bind-once resource contracts, and terminal semaphore access.
+  - Descriptor building, resource-edge validation, synchronization derivation, execution, bind-once resource contracts, and terminal semaphore access.
 - `include/function/render/render_resource_list.hh`
   - CPU-side aggregate of render objects that can be bound once and accessed through one graph resource key.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
@@ -29,8 +29,8 @@
 Declare resources before graph registration. Resource and task IDs use lower-snake-case strings. A resource declaration pairs the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null `RenderObjectContainerVK`. `RenderGraphVK::build_from_descriptor()` now rejects null containers, so descriptor construction must be complete before registration.
 
 `RenderResourceList` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
-as `<resource_list_key>[<index>]`. A task read or write on the aggregate expands to all indexed entries before dependency
-validation and synchronization scope derivation. Populate the list before graph construction; the list itself is CPU-only and
+as `<resource_list_key>[<index>]`. A task read or write, or an edge, on the aggregate expands to all indexed entries before
+validation and synchronization derivation. Populate the list before graph construction; the list itself is CPU-only and
 does not create a GPU object.
 
 All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
@@ -44,9 +44,12 @@ A pipeline-run task descriptor captures only construction data. The render graph
 ```cpp
 RendTaskDescVK task_desc(render_allocator);
 task_desc.task_id = "run_lighting";
-task_desc.after("run_gbuffer")
-    .read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
-    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
+task_desc.read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
+    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE)
+    .connect("present", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+// The G-buffer pass was added earlier; connect it to the lighting task.
+graph_desc.get_task("run_gbuffer")
+    .connect("run_lighting", "gbuffer_albedo", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 task_desc.create = [task_render_allocator = render_allocator,
                        task_base_render_data = base_render_data]() -> Unique<RenderTaskVK> {
     return make_unique<RTRunComputePipelineVK>(task_render_allocator,
@@ -58,18 +61,27 @@ task_desc.create = [task_render_allocator = render_allocator,
 
 Keep task creation logic in the application class when it has meaningful setup. Preserve `RendTaskDescVK`'s one-shot direct-task ownership rule: copies share the same transfer state, so prefer factories for reusable or rebuildable descriptors.
 
-## Explicit dependency model
+## Resource dependency model
 
-`prev` creates explicit execution edges by task ID. Use it for:
+Edges are the only ordering mechanism. `connect()` on the earlier task's descriptor adds one edge carrying one resource:
 
-- phase boundaries;
-- every read-write, write-read, or write-write resource conflict;
-- ordering with no named resource dependency;
-- a required compute-to-presentation path.
+- `RendEdgeTypeVK::READ`: the next task reads the resource after the previous task's use.
+- `RendEdgeTypeVK::WRITE`: the next task writes the resource after the previous task's use. An edge into a task that declares a
+  write to the resource must be `WRITE`.
+- `src_stage`: stages where the previous task last uses the resource. `dst_stage`: stages where the next task first uses it.
 
-Declared reads and writes never create execution edges. After topological sorting, `validate_explicit_resource_dependencies()` checks every conflicting task pair and requires a path through explicit edges; a transitive path is sufficient. Read-read accesses do not conflict. Missing paths make graph construction throw before command buffers are allocated.
+Graph construction fails on cycles, self edges, unknown tasks, undeclared resources, empty stages, and graphics-only stages on
+compute tasks. After topological sorting, every read-write, write-read, or write-write pair of declared accesses on a resource
+must be connected by a chain of edges on that same resource; a transitive chain is sufficient, but edges on other resources are
+not. Read-read accesses do not conflict. Consecutive edges of a chain must share a stage at the middle task so the dependencies
+chain. Views of the same image are separate resource ids; connect the id each task actually accesses.
 
-Each explicit edge owns a timeline semaphore that supplies execution ordering and memory visibility. When two directly connected tasks have a declared resource conflict, the edge's broad stage masks are tightened to the relevant producer and consumer usages. A transitive path validates the ordering but does not add a shortcut edge. Image layout transitions remain explicit image barriers; queue ownership transfers are not encoded by graph dependencies.
+Synchronization is derived per edge. Same-queue edges become one pipeline barrier recorded before the next task, merged per
+resource: a buffer barrier for buffers, a whole-image barrier (every mip level and layer) for image views in `GENERAL`, and a global
+memory barrier for other resources. The source access is memory write; the destination access is memory read, plus memory write
+for `WRITE` edges. Cross-queue edges signal the producer's timeline semaphore at the merged source stages and wait on it at the
+merged destination stages. Image layout transitions out of `UNDEFINED` or `PRESENT_SRC_KHR` remain automatic for written images;
+queue ownership transfers are not encoded.
 
 ## Queue behavior
 
@@ -87,7 +99,7 @@ Presentation integration assumes at least one graphics node:
 - the last graphics node transitions the swap-chain image to `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`;
 - terminal binary semaphore signaling and the in-flight fence attach to the last graphics submission.
 
-Ensure every compute node whose completion matters to presentation reaches the final graphics node through explicit `prev` dependencies. The fence represents the dependent work leading to that last graphics submission, not unrelated graph branches.
+Every task on a queue other than graphics must reach a graphics task through edges; graph construction fails otherwise. The fence then covers that work through the graphics queue's submission order.
 
 ## Runtime lifecycle
 
@@ -105,17 +117,17 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - Confirm every `RendResVK` is bound to a non-null container before registration and that container UUIDs match their declarations.
 - For a `RenderResourceList`, confirm every entry is a render object for the active backend and populate the list before graph
   registration.
-- Confirm task IDs and `prev` references are valid and acyclic.
+- Confirm task IDs and `connect()` targets are valid and acyclic.
 - Confirm each compact usage describes the actual command and that reads and writes are declared on the correct side.
-- Add explicit ordering for every read-write, write-read, and write-write hazard.
-- Confirm compute outputs reach a graphics node before presentation.
+- Add a chain of edges on the resource for every read-write, write-read, and write-write hazard, with stages that chain.
+- Confirm compute tasks reach a graphics task through edges.
 - Preserve concurrent sharing for resources crossing distinct queue families.
 - Check factory captures remain alive and recreate tasks when rebuilding.
 
 ## Canonical examples
 
-- `tests/executable/function/render/vulkan_draw_cube_test.cpp`: compact graphics graph construction and explicit predecessor ordering.
-- `tests/executable/function/render/vulkan_draw_sponza_deferred_test.cpp`: graphics-to-compute deferred pipeline, declared shader accesses, and final presentation dependency.
+- `tests/executable/function/render/vulkan_draw_cube_test.cpp`: compact graphics graph construction with one resource edge.
+- `tests/executable/function/render/deferred_test/deferred_render_graph.cpp`: graphics-to-compute deferred pipeline wired with `connect_resource_chain()` from `render_test.hh`.
 - `tests/unit/function/render_graph_descriptor_vk_test.cpp`: direct-task ownership and descriptor-copy behavior.
-- `src/function/render_vk/render_graph_vk.cpp`: authoritative build, dependency validation, heap binding, barrier, and submission behavior.
+- `src/function/render_vk/render_graph_vk.cpp`: authoritative build, edge validation, heap binding, barrier, and submission behavior.
 - `src/function/render_vk/renderer_vk.cpp`: graph registration, swap-chain image-view container acquisition and per-frame updates, execution, presentation, and delayed destruction.

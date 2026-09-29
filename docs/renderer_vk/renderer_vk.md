@@ -7,12 +7,13 @@ Tick render stages:
 
 - Run render tasks: The active `RenderGraphVK` (built from a
   `RendGraphDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
-  in topological order. Each `RenderTaskVK` records into its own primary
-  command buffer; cross-submit ordering between tasks is enforced with timeline
-  semaphores attached to the graph's explicit execution edges. Compact
-  `RendResUsageVK` declarations describe accesses but do not create edges;
-  `RendTaskDescVK::after()` must establish a path for every conflicting access pair.
-  Vulkan access and stage masks remain graph-internal. After the
+  in topological order. Each `IRenderTaskVK` records into its own primary
+  command buffer. The graph is a DAG built from resource dependency edges
+  declared with `RendTaskDescVK::connect()`; edges between tasks on the same
+  queue become pipeline barriers, and edges crossing queues use timeline
+  semaphores. Compact `RendResUsageVK` declarations describe accesses but do not
+  create edges; every conflicting access pair on a resource must be ordered by a
+  chain of edges on that resource. After the
   last graphics submission the graph signals a terminal binary semaphore, which
   `RendererVK::present()` waits on before `vkQueuePresentKHR`.
 
@@ -176,15 +177,15 @@ binds its minimum vertex-view byte offset, and is split at the device's `maxDraw
 
 The indirect command buffer has both `VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT` and `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`. Each
 sequential graphics entry selects a contiguous command range and records one `vkCmdDrawIndexedIndirect`; a future compute task can
-write the same graph resource as a storage buffer when an explicit execution path orders it before the graphics task.
+write the same graph resource as a storage buffer when a chain of edges on that resource orders it before the graphics task.
 
 Before constructing the task:
 
 1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
 2. Create every attachment resource referenced by the task configuration. Bind the renderer's swap-chain image-view container
   explicitly under `REND_RES_SWAP_CHAIN` when the graph renders to the swap chain.
-3. Compile one `CompiledStaticSetVK` per set-plus-pipeline combination and order its generic graphics task explicitly with
-  `RendTaskDescVK::after()`.
+3. Compile one `CompiledStaticSetVK` per set-plus-pipeline combination and order its generic graphics task with resource edges
+  declared by `RendTaskDescVK::connect()`.
 
 ```cpp
 RendererVK* renderer = RendererVK::get_singleton();
@@ -279,28 +280,31 @@ At record time, the pipeline resolves the container from `current_frame_slot` an
 Publish buffer contents and replace bindings on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
 Field lookup comes from shader reflection and throws when the requested path is absent or the resource type is incompatible.
 
-To add an execution dependency, construct the descriptor explicitly before moving it into the graph:
+To add a dependency, connect the earlier task to the later one through the resource they share. The edge states whether the next
+task reads or writes the resource, the stages where the earlier task last uses it, and the stages where the next task first uses
+it:
 
 ```cpp
-RendTaskDescVK task_desc(render_allocator, "run_gbuffer", std::move(task));
-task_desc.after("run_shadow")
-    .read("shadow_moments", RendResUsageVK::SAMPLED_IMAGE)
-    .write("gbuffer_albedo", RendResUsageVK::COLOR_ATTACHMENT);
+RendTaskDescVK task_desc(render_allocator, "run_shadow", std::move(task));
+task_desc.connect("run_gbuffer",
+    "shadow_moments",
+    RendEdgeTypeVK::READ,
+    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 graph_desc.tasks.emplace_back(std::move(task_desc));
 ```
 
 Compute and graphics pipeline-run tasks push their pipeline-owned descriptor-index blocks automatically after the graph binds the
 global heaps. Shader resources that are not intrinsic task inputs are declared fluently on the task descriptor. These declarations
-validate explicit dependency paths and narrow queue-aware synchronization scopes; they do not create execution edges:
+are validated against the resource edges; they do not create edges:
 
 ```cpp
 RendTaskDescVK lighting(render_allocator);
 lighting.task_id = "run_lighting";
-lighting.after("run_gbuffer")
-    .read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
+lighting.read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
     .read("gbuffer_depth", RendResUsageVK::SAMPLED_IMAGE)
     .write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
-lighting.create = [render_allocator, render_data]() -> Unique<RenderTaskVK> {
+lighting.create = [render_allocator, render_data]() -> Unique<IRenderTaskVK> {
     return make_unique<RTRunComputePipelineVK>(render_allocator,
         render_data,
         "lighting_pipeline",

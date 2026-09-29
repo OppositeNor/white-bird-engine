@@ -27,8 +27,26 @@
 #include "function/render_vk/render_object_container_vk.hh"
 #include <functional>
 #include <string_view>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @class RendResEdgeDescVK
+ * @brief A resource dependency declared from one task descriptor to a later task.
+ */
+struct RendResEdgeDescVK {
+    /** Identifier of the task that uses the resource next. */
+    RendTaskID next_task_id;
+    /** Graph resource identifier carried by the edge. */
+    std::string res_id;
+    /** Whether the next task reads or writes the resource. */
+    RendEdgeTypeVK type = RendEdgeTypeVK::READ;
+    /** Pipeline stages at which the previous task last uses the resource. */
+    VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
+    /** Pipeline stages at which the next task first uses the resource. */
+    VkPipelineStageFlags2 dst_stage = VK_PIPELINE_STAGE_2_NONE;
+};
 
 /**
  * @class RendTaskDescVK
@@ -55,11 +73,24 @@ struct RendTaskDescVK {
     RendTaskDescVK& operator=(RendTaskDescVK&&) noexcept = default;
 
     /**
-     * @brief Add a predecessor dependency.
-     * @param p_task_id Identifier of the task that must finish first.
+     * @brief Connect this task to a later task through a resource dependency.
+     *
+     * The edge orders this task before the next task and synchronizes the resource between them: with a pipeline barrier
+     * when both tasks run on the same queue, otherwise with a timeline semaphore. Aggregate resource-list ids apply to every
+     * indexed entry.
+     *
+     * @param p_next_task_id Identifier of the task that uses the resource next.
+     * @param p_resource_id Graph resource identifier carried by the edge.
+     * @param p_edge_type Whether the next task reads or writes the resource.
+     * @param p_src_stage Pipeline stages at which this task last uses the resource.
+     * @param p_dst_stage Pipeline stages at which the next task first uses the resource.
      * @return This descriptor.
      */
-    RendTaskDescVK& after(std::string_view p_task_id);
+    RendTaskDescVK& connect(std::string_view p_next_task_id,
+        std::string_view p_resource_id,
+        RendEdgeTypeVK p_edge_type,
+        VkPipelineStageFlags2 p_src_stage,
+        VkPipelineStageFlags2 p_dst_stage);
 
     /**
      * @brief Declare an additional resource read performed through pipeline descriptors.
@@ -79,9 +110,8 @@ struct RendTaskDescVK {
 
     // The id of this task within the graph.
     RendTaskID task_id;
-    // The ids of tasks that must complete before this task starts. Used by the
-    // graph to insert execution edges.
-    Vector<RendTaskID, RenderAllocator> prev;
+    // Resource dependencies from this task to later tasks.
+    Vector<RendResEdgeDescVK, RenderAllocator> next;
     // Additional descriptor-mediated resource reads and writes.
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
@@ -116,6 +146,17 @@ struct RendGraphDescVK {
      * @return This graph descriptor.
      */
     RendGraphDescVK& add_task(std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
+
+    /**
+     * @brief Get a task descriptor that was already added, typically to connect it to later tasks.
+     *
+     * The reference is invalidated when another task is added.
+     *
+     * @param p_task_id The task id.
+     * @return The stored task descriptor.
+     * @throws std::runtime_error If no task has the id.
+     */
+    RendTaskDescVK& get_task(std::string_view p_task_id);
 
     /**
      * @brief Append a resource binding to the graph.
@@ -161,7 +202,7 @@ struct RendGraphDescVK {
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-
-    // sorts them based on `prev` edges.
+    // sorts them based on their resource dependency edges.
     Vector<RendTaskDescVK, RenderAllocator> tasks;
     // The set of resources used by the pipeline. Looked up by res_id.
     Vector<RendResVK, RenderAllocator> resources;

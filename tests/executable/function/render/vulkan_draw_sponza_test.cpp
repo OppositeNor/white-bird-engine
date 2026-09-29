@@ -658,17 +658,26 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
         .add_resource(LIGHT_BILLBOARD_SAMPLER, light_billboard_sampler);
 
+    constexpr VkPipelineStageFlags2 DEPTH_STAGES = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+    constexpr VkPipelineStageFlags2 COLOR_STAGE = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    p_shadow_opaque_task
+        .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE)
+        .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, DEPTH_STAGES, DEPTH_STAGES);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_opaque_task));
-    p_shadow_masked_task.after(RT_RUN_SHADOWMAP_OPAQUE);
+    p_shadow_masked_task
+        .connect(RT_RUN_MAIN_OPAQUE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT)
+        .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_masked_task));
-    p_main_opaque_task.after(RT_RUN_SHADOWMAP_MASKED).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    p_main_opaque_task.read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE)
+        .connect(RT_RUN_MAIN_MASKED, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE)
+        .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, DEPTH_STAGES, DEPTH_STAGES);
     pipeline_desc.tasks.emplace_back(std::move(p_main_opaque_task));
-    p_main_masked_task.after(RT_RUN_MAIN_OPAQUE).read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE);
+    p_main_masked_task.read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE)
+        .connect(RT_RUN_LIGHT_BILLBOARD, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE);
     pipeline_desc.tasks.emplace_back(std::move(p_main_masked_task));
 
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
     light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
-    light_billboard_task_desc.after(RT_RUN_MAIN_MASKED);
     light_billboard_task_desc.create = [render_allocator = render_allocator,
                                            base_render_data = base_render_data,
                                            light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::IRenderTaskVK> {

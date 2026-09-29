@@ -419,10 +419,10 @@ void OctreeRenderFeature::initialize() {
     octree_nodes->update_buffer(first_sectors.data(), sizeof(first_sectors));
 }
 
-RendTaskDescVK OctreeRenderFeature::get_reset_render_task_desc(std::string_view p_previous_task_id) const {
+RendTaskDescVK OctreeRenderFeature::get_reset_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RESET_OCTREE;
-    task_desc.after(p_previous_task_id).write(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER).write(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
+    task_desc.write(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER).write(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
     if (implementation == Implementation::PASS_PUBLISHED) {
         task_desc.write(OCTREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER).write(OCTREE_VOXEL_CLAIMS, RendResUsageVK::STORAGE_BUFFER);
     }
@@ -439,7 +439,7 @@ RendTaskDescVK OctreeRenderFeature::get_reset_render_task_desc(std::string_view 
 }
 
 RendTaskDescVK OctreeRenderFeature::get_construction_render_task_desc(
-    std::string_view p_task_id, std::string_view p_previous_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh) const {
+    std::string_view p_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh) const {
     constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
     constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
     RendTaskDescVK task_desc =
@@ -458,8 +458,7 @@ RendTaskDescVK OctreeRenderFeature::get_construction_render_task_desc(
                   VK_ATTACHMENT_LOAD_OP_CLEAR,
                   VK_ATTACHMENT_LOAD_OP_CLEAR,
                   p_double_sided);
-    task_desc.after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
@@ -485,8 +484,7 @@ RendTaskDescVK OctreeRenderFeature::get_construction_render_task_desc(
 RendTaskDescVK OctreeRenderFeature::get_deferred_construction_render_task_desc(bool p_dynamic) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_BUILD_OCTREE_DEFERRED;
-    task_desc.after(RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
@@ -549,12 +547,10 @@ RendTaskDescVK OctreeRenderFeature::get_deferred_construction_render_task_desc(b
     return task_desc;
 }
 
-RendTaskDescVK OctreeRenderFeature::get_debug_capture_render_task_desc(
-    std::string_view p_task_id, std::string_view p_previous_task_id, VoxelDebugViewMode p_mode) const {
+RendTaskDescVK OctreeRenderFeature::get_debug_capture_render_task_desc(std::string_view p_task_id, VoxelDebugViewMode p_mode) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = p_task_id;
-    task_desc.after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DEFERRED_LIST_PING, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -579,8 +575,7 @@ RendTaskDescVK OctreeRenderFeature::get_debug_capture_render_task_desc(
 RendTaskDescVK OctreeRenderFeature::get_debug_draw_setup_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_SETUP_OCTREE_DEBUG_DRAW;
-    task_desc.after(RT_RUN_BUILD_OCTREE_DEFERRED)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, RendResUsageVK::STORAGE_BUFFER);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
@@ -591,7 +586,7 @@ RendTaskDescVK OctreeRenderFeature::get_debug_draw_setup_render_task_desc() cons
     return task_desc;
 }
 
-RendTaskDescVK OctreeRenderFeature::get_debug_draw_render_task_desc(std::string_view p_previous_task_id) const {
+RendTaskDescVK OctreeRenderFeature::get_debug_draw_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_OCTREE_DEBUG_DRAW;
     task_desc.create = [task_render_allocator = render_allocator,
@@ -613,9 +608,7 @@ RendTaskDescVK OctreeRenderFeature::get_debug_draw_render_task_desc(std::string_
             VoxelDebugViewMode::POST_OCTREE_BUILD,
             VoxelDebugViewMode::POST_OCTREE_BUILD);
     };
-    task_desc.after(RT_SETUP_OCTREE_DEBUG_DRAW)
-        .after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
@@ -646,8 +639,7 @@ RendTaskDescVK OctreeRenderFeature::get_pre_deferred_debug_draw_render_task_desc
             VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
             VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
     };
-    task_desc.after(RT_RUN_OCTREE_DEBUG_DRAW)
-        .read(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_LEAF_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)
@@ -676,40 +668,97 @@ void OctreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) c
     p_graph.add_resource(OCTREE_PENDING_CHILDREN, pending_children).add_resource(OCTREE_VOXEL_CLAIMS, voxel_claims);
 }
 
-void OctreeRenderFeature::add_construction_render_tasks(
-    RendGraphDescVK& p_graph, std::string_view p_previous_task_id, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
+void OctreeRenderFeature::add_construction_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
     RendTaskDescVK begin(render_allocator);
-    begin.task_id = "octree_frame_begin";
-    begin.after(p_previous_task_id);
+    begin.task_id = RT_OCTREE_FRAME_BEGIN;
     begin.create = [allocator = render_allocator]() -> Unique<IRenderTaskVK> {
         return make_unique<RTOctreeFrameBeginVK>(allocator, allocator);
     };
     p_graph.add_task(std::move(begin));
-    p_graph.add_task(make_static_once(get_reset_render_task_desc("octree_frame_begin")))
-        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE, RT_RESET_OCTREE)))
-        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_RUN_BUILD_OCTREE, true)));
-    std::string_view previous = RT_RUN_BUILD_OCTREE_DOUBLE_SIDED;
+    p_graph.add_task(make_static_once(get_reset_render_task_desc()))
+        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE)))
+        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true)));
     if (implementation == Implementation::PASS_PUBLISHED) {
-        p_graph.add_task(make_static_once(get_state_update_render_task_desc(previous)));
-        previous = RT_UPDATE_OCTREE_STATES;
+        p_graph.add_task(make_static_once(get_state_update_render_task_desc()));
     }
     auto static_deferred = get_deferred_construction_render_task_desc(false);
-    static_deferred.task_id = "static_octree_deferred";
-    static_deferred.prev.clear();
-    static_deferred.after(previous);
+    static_deferred.task_id = RT_STATIC_OCTREE_DEFERRED;
     p_graph.add_task(make_static_once(std::move(static_deferred), true));
-    p_graph.add_task(get_dynamic_clear_task_desc("static_octree_deferred"));
-    p_graph.add_task(get_construction_render_task_desc("dynamic_octree", "clear_dynamic_octree", false, &p_dynamic_mesh));
-    p_graph.add_task(get_dynamic_publication_task_desc("dynamic_octree"));
-    p_graph.add_task(get_debug_capture_render_task_desc(
-        RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, "publish_dynamic_octree", VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
+    p_graph.add_task(get_dynamic_clear_task_desc());
+    p_graph.add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE, false, &p_dynamic_mesh));
+    p_graph.add_task(get_dynamic_publication_task_desc());
+    p_graph.add_task(get_debug_capture_render_task_desc(RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
 }
 
-RendTaskDescVK OctreeRenderFeature::get_state_update_render_task_desc(std::string_view p_previous_task_id) const {
+void OctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph, std::string_view p_lighting_task_id) const {
+    constexpr VkPipelineStageFlags2 COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    constexpr VkPipelineStageFlags2 RASTER = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    const bool pass_published = implementation == Implementation::PASS_PUBLISHED;
+    const ResourceChainLink reset{.task_id = RT_RESET_OCTREE, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink build{.task_id = RT_RUN_BUILD_OCTREE, .stage = RASTER, .writes = true};
+    const ResourceChainLink build_double_sided{.task_id = RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, .stage = RASTER, .writes = true};
+    const ResourceChainLink state_update{.task_id = RT_UPDATE_OCTREE_STATES, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink static_deferred{.task_id = RT_STATIC_OCTREE_DEFERRED, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink clear{.task_id = RT_CLEAR_DYNAMIC_OCTREE, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink dynamic_build{.task_id = RT_RUN_BUILD_DYNAMIC_OCTREE, .stage = RASTER, .writes = true};
+    const ResourceChainLink publish{.task_id = RT_PUBLISH_DYNAMIC_OCTREE, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink capture{.task_id = RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink deferred{.task_id = RT_RUN_BUILD_OCTREE_DEFERRED, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink setup{.task_id = RT_SETUP_OCTREE_DEBUG_DRAW, .stage = COMPUTE, .writes = true};
+    const ResourceChainLink debug_draw{.task_id = RT_RUN_OCTREE_DEBUG_DRAW, .stage = RASTER};
+    const ResourceChainLink pre_deferred_draw{.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, .stage = RASTER};
+    auto read = [](ResourceChainLink p_link) {
+        p_link.writes = false;
+        return p_link;
+    };
+
+    // The frame-begin barrier orders this frame's octree mutation after the previous frame's consumers.
+    p_graph.get_task(RT_OCTREE_FRAME_BEGIN)
+        .connect(RT_RESET_OCTREE, OCTREE_INFO, RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, COMPUTE);
+    if (pass_published) {
+        connect_resource_chain(p_graph,
+            OCTREE_INFO,
+            {reset, build, build_double_sided, read(state_update), static_deferred, clear, dynamic_build, read(publish), read(capture), deferred, read(setup), debug_draw});
+        connect_resource_chain(p_graph,
+            OCTREE_NODE_BUFFER,
+            {reset, build, build_double_sided, state_update, static_deferred, clear, dynamic_build, publish, deferred, debug_draw, pre_deferred_draw});
+        connect_resource_chain(p_graph, OCTREE_PENDING_CHILDREN, {reset, build, build_double_sided, state_update, static_deferred, dynamic_build, deferred});
+        connect_resource_chain(p_graph, OCTREE_VOXEL_CLAIMS, {reset, build, build_double_sided, clear, dynamic_build});
+    } else {
+        connect_resource_chain(p_graph,
+            OCTREE_INFO,
+            {reset, build, build_double_sided, static_deferred, clear, dynamic_build, read(publish), read(capture), deferred, read(setup), debug_draw});
+        connect_resource_chain(p_graph,
+            OCTREE_NODE_BUFFER,
+            {reset, build, build_double_sided, static_deferred, clear, dynamic_build, publish, deferred, debug_draw, pre_deferred_draw});
+        connect_resource_chain(p_graph, OCTREE_VOXEL_CLAIMS, {clear, dynamic_build});
+    }
+    connect_resource_chain(
+        p_graph, OCTREE_LEAF_BUFFER, {build, build_double_sided, static_deferred, dynamic_build, deferred, debug_draw, pre_deferred_draw});
+    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PING, {build, build_double_sided, static_deferred, dynamic_build, read(capture), deferred});
+    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {static_deferred, deferred});
+    connect_resource_chain(p_graph, OCTREE_DYNAMIC_NODES, {dynamic_build, publish, deferred, debug_draw, pre_deferred_draw});
+    connect_resource_chain(p_graph, OCTREE_DYNAMIC_LEAVES, {read(clear), dynamic_build, deferred, debug_draw, pre_deferred_draw});
+    connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {capture, pre_deferred_draw});
+    connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, {capture, pre_deferred_draw});
+    connect_resource_chain(p_graph,
+        OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER,
+        {capture, {.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT}});
+    connect_resource_chain(p_graph,
+        OCTREE_DEBUG_DRAW_INDIRECT_BUFFER,
+        {setup, {.task_id = RT_RUN_OCTREE_DEBUG_DRAW, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT}});
+
+    // Lighting samples the completed tree through its reflected shader bindings.
+    const ResourceChainLink lighting{.task_id = p_lighting_task_id, .stage = COMPUTE};
+    for (std::string_view resource_id : {OCTREE_INFO, OCTREE_NODE_BUFFER, OCTREE_LEAF_BUFFER, OCTREE_DYNAMIC_NODES, OCTREE_DYNAMIC_LEAVES}) {
+        connect_resource_chain(p_graph, resource_id, {deferred, lighting});
+    }
+}
+
+RendTaskDescVK OctreeRenderFeature::get_state_update_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_UPDATE_OCTREE_STATES;
-    task_desc.after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task_desc.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_PENDING_CHILDREN, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER);
@@ -738,11 +787,10 @@ RendTaskDescVK OctreeRenderFeature::make_static_once(RendTaskDescVK p_task, bool
     return p_task;
 }
 
-RendTaskDescVK OctreeRenderFeature::get_dynamic_clear_task_desc(std::string_view p_previous_task_id) const {
+RendTaskDescVK OctreeRenderFeature::get_dynamic_clear_task_desc() const {
     RendTaskDescVK task(render_allocator);
-    task.task_id = "clear_dynamic_octree";
-    task.after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task.task_id = RT_CLEAR_DYNAMIC_OCTREE;
+    task.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
@@ -755,11 +803,10 @@ RendTaskDescVK OctreeRenderFeature::get_dynamic_clear_task_desc(std::string_view
     return task;
 }
 
-RendTaskDescVK OctreeRenderFeature::get_dynamic_publication_task_desc(std::string_view p_previous_task_id) const {
+RendTaskDescVK OctreeRenderFeature::get_dynamic_publication_task_desc() const {
     RendTaskDescVK task(render_allocator);
-    task.task_id = "publish_dynamic_octree";
-    task.after(p_previous_task_id)
-        .read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
+    task.task_id = RT_PUBLISH_DYNAMIC_OCTREE;
+    task.read(OCTREE_INFO, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .write(OCTREE_NODE_BUFFER, RendResUsageVK::STORAGE_BUFFER)
         .read(OCTREE_DYNAMIC_NODES, RendResUsageVK::STORAGE_BUFFER)

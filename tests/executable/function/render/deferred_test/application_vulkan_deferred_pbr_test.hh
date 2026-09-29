@@ -131,6 +131,8 @@ private:
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
+    static constexpr std::string_view RT_RUN_DYNAMIC_SHADOW = "dynamic_shadow";
+    static constexpr std::string_view RT_RUN_DYNAMIC_GBUFFER = "dynamic_gbuffer";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
     static constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE = "build_shadow_sat";
     static constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
@@ -170,6 +172,7 @@ private:
     void register_deferred_render_graph(
         std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
+    void connect_deferred_render_tasks(RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_task_desc() const;
     RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;

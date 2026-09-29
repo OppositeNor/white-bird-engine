@@ -29,6 +29,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -54,19 +55,29 @@ struct RendTaskDescVKDirectTaskState {
     Unique<IRenderTaskVK> task;
 };
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : prev(p_allocator), reads(p_allocator), writes(p_allocator) {
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : next(p_allocator), reads(p_allocator), writes(p_allocator) {
 }
 
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task)
-    : task_id(p_task_id), prev(p_allocator), reads(p_allocator), writes(p_allocator) {
+    : task_id(p_task_id), next(p_allocator), reads(p_allocator), writes(p_allocator) {
     Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
     create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<IRenderTaskVK> {
         return direct_task_state->take_task();
     };
 }
 
-RendTaskDescVK& RendTaskDescVK::after(std::string_view p_task_id) {
-    prev.emplace_back(p_task_id);
+RendTaskDescVK& RendTaskDescVK::connect(std::string_view p_next_task_id,
+    std::string_view p_resource_id,
+    RendEdgeTypeVK p_edge_type,
+    VkPipelineStageFlags2 p_src_stage,
+    VkPipelineStageFlags2 p_dst_stage) {
+    next.push_back({
+        .next_task_id = std::string(p_next_task_id),
+        .res_id = std::string(p_resource_id),
+        .type = p_edge_type,
+        .src_stage = p_src_stage,
+        .dst_stage = p_dst_stage,
+    });
     return *this;
 }
 
@@ -88,6 +99,15 @@ RendGraphDescVK& RendGraphDescVK::add_task(RendTaskDescVK p_task_desc) {
 RendGraphDescVK& RendGraphDescVK::add_task(std::string_view p_task_id, Unique<IRenderTaskVK> p_task) {
     tasks.emplace_back(allocator, p_task_id, std::move(p_task));
     return *this;
+}
+
+RendTaskDescVK& RendGraphDescVK::get_task(std::string_view p_task_id) {
+    for (RendTaskDescVK& task : tasks) {
+        if (task.task_id == p_task_id) {
+            return task;
+        }
+    }
+    throw std::runtime_error(std::format("Failed to get render graph task: no task has id '{}'.", p_task_id));
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {

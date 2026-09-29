@@ -65,8 +65,10 @@ For non-trivial implementation tasks:
 
 ## Vulkan Render Graph
 
-- Declared render-graph reads and writes do not create execution edges. Add explicit `RendTaskDescVK::after()` paths for every
-  read-write, write-read, and write-write conflict; unordered conflicts make graph construction fail.
+- Render graphs are built only from resource dependency edges declared with `RendTaskDescVK::connect(next_task_id, resource_id,
+  edge_type, src_stage, dst_stage)`; the graph must be a DAG. Declared reads and writes do not create edges. Every read-write,
+  write-read, and write-write conflict on a resource must be ordered by a chain of edges on that same resource; unordered conflicts
+  make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
 - The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
   descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
 

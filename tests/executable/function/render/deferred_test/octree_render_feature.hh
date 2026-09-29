@@ -84,19 +84,23 @@ public:
     /**
      * @brief Adds reset, static and dynamic raster draws, initial publication when required, and pre-deferred capture.
      */
-    void add_construction_render_tasks(
-        RendGraphDescVK& p_graph, std::string_view p_previous_task_id, const DynamicMeshRenderFeature& p_dynamic_mesh) const;
+    void add_construction_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const;
     /**
-     * @brief Creates the per-frame reset ordered after the supplied graph task.
+     * @brief Connects every octree task through resource edges on the octree buffers.
+     * @details Call after all construction, deferred, debug-draw, and lighting tasks were added to p_graph.
+     * @param p_graph Graph descriptor containing the octree tasks.
+     * @param p_lighting_task_id Task that samples the completed tree.
      */
-    RendTaskDescVK get_reset_render_task_desc(std::string_view p_previous_task_id) const;
+    void connect_render_tasks(RendGraphDescVK& p_graph, std::string_view p_lighting_task_id) const;
+    /**
+     * @brief Creates the per-frame reset.
+     */
+    RendTaskDescVK get_reset_render_task_desc() const;
     /**
      * @brief Creates one raster construction pass over the retained scene.
      */
-    RendTaskDescVK get_construction_render_task_desc(std::string_view p_task_id,
-        std::string_view p_previous_task_id,
-        bool p_double_sided = false,
-        const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr) const;
+    RendTaskDescVK get_construction_render_task_desc(
+        std::string_view p_task_id, bool p_double_sided = false, const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr) const;
     /**
      * @brief Creates bounded deferred retries, including publication after every iteration for octree_2.
      */
@@ -106,9 +110,9 @@ public:
      */
     RendTaskDescVK get_debug_draw_setup_render_task_desc() const;
     /**
-     * @brief Creates the completed-tree overlay after the supplied presentation task.
+     * @brief Creates the completed-tree overlay drawn over the presented image.
      */
-    RendTaskDescVK get_debug_draw_render_task_desc(std::string_view p_previous_task_id) const;
+    RendTaskDescVK get_debug_draw_render_task_desc() const;
     /**
      * @brief Creates the pre-deferred overlay after the completed-tree overlay task.
      */
@@ -151,10 +155,14 @@ private:
     void initialize();
     void compile_pipelines();
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
-    RendTaskDescVK get_state_update_render_task_desc(std::string_view p_previous_task_id) const;
-    RendTaskDescVK get_debug_capture_render_task_desc(
-        std::string_view p_task_id, std::string_view p_previous_task_id, VoxelDebugViewMode p_mode) const;
+    RendTaskDescVK get_state_update_render_task_desc() const;
+    RendTaskDescVK get_debug_capture_render_task_desc(std::string_view p_task_id, VoxelDebugViewMode p_mode) const;
     static constexpr std::string_view RT_UPDATE_OCTREE_STATES = "update_octree_states";
+    static constexpr std::string_view RT_OCTREE_FRAME_BEGIN = "octree_frame_begin";
+    static constexpr std::string_view RT_STATIC_OCTREE_DEFERRED = "static_octree_deferred";
+    static constexpr std::string_view RT_CLEAR_DYNAMIC_OCTREE = "clear_dynamic_octree";
+    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE = "dynamic_octree";
+    static constexpr std::string_view RT_PUBLISH_DYNAMIC_OCTREE = "publish_dynamic_octree";
     static constexpr std::string_view OCTREE_VOXEL_CLAIMS = "octree_voxel_claims";
     static constexpr std::string_view OCTREE_PENDING_CHILDREN = "octree_pending_children";
     static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
@@ -264,8 +272,8 @@ private:
     static_assert(offsetof(OctreeNode, original_children_data) == 12);
     static_assert(OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
 
-    RendTaskDescVK get_dynamic_clear_task_desc(std::string_view p_previous_task_id) const;
-    RendTaskDescVK get_dynamic_publication_task_desc(std::string_view p_previous_task_id) const;
+    RendTaskDescVK get_dynamic_clear_task_desc() const;
+    RendTaskDescVK get_dynamic_publication_task_desc() const;
     RendTaskDescVK make_static_once(RendTaskDescVK p_task, bool p_finish = false) const;
 
     struct OctreeDeferredListEntry {
