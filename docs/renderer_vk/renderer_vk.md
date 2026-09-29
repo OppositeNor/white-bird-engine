@@ -39,6 +39,18 @@ matching acceleration, so duplicate names and distinct-name hash collisions are 
 vertex contract resolvers then apply their domain rules; Vulkan code only translates the validated vertex contract or binds the
 validated texture table.
 
+## Device Memory
+
+`ROBufferVK` and `ROImageVK` bind to a `DeviceMemoryVK`, which owns one VMA allocation. Their ordinary `Builder` creates the
+resource, allocates a `Ref<DeviceMemoryVK>` for its requirements, and binds it through `DeviceMemoryVK::get()`. An `AliasBuilder`
+instead takes an existing `Ref<DeviceMemoryVK>` and an offset and binds the new resource through `get_alias()`, which counts the
+alias; construction fails when the memory type, alignment, or remaining size cannot hold the resource. Aliasing resources share
+their contents, so their use must be synchronized. Memory for several aliases can be allocated from explicit requirements with
+`DeviceMemoryVK::Builder::set_requirements()`, or taken from an existing resource with `acquire_memory()`.
+
+Every resource retains its memory until its own delayed destruction, and the allocation is freed when the last reference is
+released. Swap-chain and libktx images do not use `DeviceMemoryVK`. The render graph does not alias resources.
+
 ## Descriptor Heap Binding
 
 The Vulkan backend requires `VK_EXT_descriptor_heap`, shader untyped pointers, maintenance5, buffer device address, and memory that

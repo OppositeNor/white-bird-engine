@@ -22,6 +22,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
@@ -230,6 +231,51 @@ public:
     };
 
     /**
+     * @class AliasBuilder
+     * @brief Builder for a buffer bound to existing device memory instead of its own allocation.
+     *
+     * The buffer takes the domain of the memory and shares the memory contents with every other resource bound to it.
+     */
+    struct AliasBuilder {
+        /** Buffer configuration. Its domain, when set, must match the memory's domain. */
+        Builder buffer;
+        /** Memory the buffer is bound to. */
+        Ref<DeviceMemoryVK> memory;
+        /** Offset of the buffer inside the memory allocation. */
+        VkDeviceSize offset = 0;
+
+        /**
+         * @brief Set the buffer configuration.
+         * @param p_buffer The buffer configuration.
+         * @return *this.
+         */
+        AliasBuilder& set_buffer(const Builder& p_buffer) {
+            buffer = p_buffer;
+            return *this;
+        }
+
+        /**
+         * @brief Set the memory the buffer aliases.
+         * @param p_memory The memory.
+         * @param p_offset Offset of the buffer inside the memory allocation.
+         * @return *this.
+         */
+        AliasBuilder& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
+            memory = std::move(p_memory);
+            offset = p_offset;
+            return *this;
+        }
+
+        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+        }
+    };
+
+    /**
      * @class BufferMemoryBarrierBuilder
      * @brief Builder for buffer memory barriers.
      *
@@ -405,11 +451,20 @@ public:
     };
 
     /**
-     * @brief Constructor.
+     * @brief Constructor. Allocates a device memory for the buffer and binds it.
      *
      * @param p_builder The builder instance.
      */
     ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    /**
+     * @brief Constructor. Binds the buffer to existing device memory as an alias.
+     *
+     * @param p_builder The alias builder instance.
+     * @throws std::runtime_error If the memory is null, its domain differs from the configured one, or it cannot hold the
+     * buffer at the offset.
+     */
+    ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder);
     virtual ~ROBufferVK() override;
     ROBufferVK(const ROBufferVK&) = delete;
     ROBufferVK(ROBufferVK&&) noexcept = delete;
@@ -433,6 +488,24 @@ public:
      * @return The buffer device address.
      */
     VkDeviceAddress get_device_address() const;
+
+    /**
+     * @brief Acquire the device memory the buffer is bound to, for example to alias another resource onto it.
+     *
+     * @return The device memory.
+     */
+    Ref<DeviceMemoryVK> acquire_memory() const {
+        return memory;
+    }
+
+    /**
+     * @brief Get the offset of the buffer inside its device memory allocation.
+     *
+     * @return The memory offset.
+     */
+    VkDeviceSize get_memory_offset() const {
+        return memory_offset;
+    }
 
     DebugDataRows descriptor_debug_data() const override;
 
@@ -547,11 +620,15 @@ public:
 private:
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
-    VmaAllocation allocation = VK_NULL_HANDLE;
+    Ref<DeviceMemoryVK> memory;
+    VkDeviceSize memory_offset = 0;
     ExposedFields exposed_fields{};
     VkBufferUsageFlags usage = 0;
     mutable std::optional<uint32_t> uniform_view_index;
     mutable std::optional<uint32_t> storage_view_index;
+
+    void create_buffer(const Builder& p_builder);
+    void finish_creation(const Builder& p_builder);
 };
 } // namespace WhiteBirdEngine
 

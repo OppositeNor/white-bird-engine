@@ -21,6 +21,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/ecs/components.hh"
+#include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -136,6 +137,51 @@ public:
         }
     };
 
+    /**
+     * @class AliasBuilder
+     * @brief Builder for a device-local image bound to existing device memory instead of its own allocation.
+     *
+     * The image shares the memory contents with every other resource bound to it; its initial contents are undefined.
+     */
+    struct AliasBuilder {
+        /** Image configuration. */
+        Builder image;
+        /** Memory the image is bound to. */
+        Ref<DeviceMemoryVK> memory;
+        /** Offset of the image inside the memory allocation. */
+        VkDeviceSize offset = 0;
+
+        /**
+         * @brief Set the image configuration.
+         * @param p_image The image configuration.
+         * @return *this.
+         */
+        AliasBuilder& set_image(const Builder& p_image) {
+            image = p_image;
+            return *this;
+        }
+
+        /**
+         * @brief Set the memory the image aliases.
+         * @param p_memory The memory.
+         * @param p_offset Offset of the image inside the memory allocation.
+         * @return *this.
+         */
+        AliasBuilder& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
+            memory = std::move(p_memory);
+            offset = p_offset;
+            return *this;
+        }
+
+        Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
+            return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+        }
+
+        Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
+            return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+        }
+    };
+
     ROImageVK() = delete;
     virtual ~ROImageVK() override;
     ROImageVK(const ROImageVK&) = delete;
@@ -146,12 +192,21 @@ public:
     TypeID get_type_uuid() const override;
 
     /**
-     * @brief Constructor.
+     * @brief Constructor. Allocates a device-local device memory for the image and binds it.
      *
      * @param p_render_data The base render data.
      * @param p_builder Configuration builder.
      */
     ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    /**
+     * @brief Constructor. Binds the image to existing device memory as an alias.
+     *
+     * @param p_render_data The base render data.
+     * @param p_builder Alias configuration builder.
+     * @throws std::runtime_error If the memory is null or cannot hold the image at the offset.
+     */
+    ROImageVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder);
 
     /**
      * @brief Constructor for swap chain images. This image will not manually
@@ -179,6 +234,17 @@ public:
      */
     VkImage get_image() const {
         return exposed_fields.image;
+    }
+
+    /**
+     * @brief Acquire the device memory the image is bound to, for example to alias another resource onto it.
+     *
+     * Swap-chain and libktx images do not use a DeviceMemoryVK and return null.
+     *
+     * @return The device memory, or null.
+     */
+    Ref<DeviceMemoryVK> acquire_memory() const {
+        return memory;
     }
 
     /**
@@ -225,7 +291,7 @@ public:
          */
         bool is_swap_chain_image = false;
         /**
-         * @brief VMA-owned device-memory handle containing the image allocation.
+         * @brief Device-memory handle containing the image allocation.
          *
          * This handle is exposed for introspection only and must not be freed or rebound directly.
          */
@@ -441,17 +507,17 @@ public:
 
 private:
     enum class Ownership {
-        VMA,
+        DEVICE_MEMORY,
         KTX,
         SWAP_CHAIN,
     };
 
     ExposedFields exposed_fields{};
-    VmaAllocation allocation = VK_NULL_HANDLE;
+    Ref<DeviceMemoryVK> memory;
     ktxVulkanTexture ktx_texture{};
-    Ownership ownership = Ownership::VMA;
+    Ownership ownership = Ownership::DEVICE_MEMORY;
 
-    void init(const Builder& p_builder);
+    void create_image(const Builder& p_builder);
 };
 } // namespace WhiteBirdEngine
 
