@@ -13,8 +13,11 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -23,6 +26,7 @@
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include <atomic>
+#include <cstdint>
 #include <cstring>
 #include <semaphore>
 #include <span>
@@ -36,8 +40,7 @@ namespace WhiteBirdEngine {
 
 RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(
     const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id, std::span<uint8_t> p_destination, std::binary_semaphore* p_completion_semaphore)
-    : render_data(p_render_data), buffer_id(p_buffer_id), destination(p_destination),
-      completion_semaphore(p_completion_semaphore) {
+    : render_data(p_render_data), buffer_id(p_buffer_id), destination(p_destination), completion_semaphore(p_completion_semaphore) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
     }

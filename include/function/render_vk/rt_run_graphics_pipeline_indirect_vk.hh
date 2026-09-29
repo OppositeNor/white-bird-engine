@@ -42,9 +42,9 @@ namespace WhiteBirdEngine {
  * @class RTRunGraphicsPipelineIndirectVK
  * @brief Render task that submits indexed draw commands from a GPU buffer in one Vulkan call.
  *
- * Every pipeline batch renders into `render_target_colors[<index>]` and `render_target_depth` following the pipelines' shared
- * attachment layout. The task reports those accesses, its draw buffers, and every batch's reflected shader resources; map them
- * to graph resources with RendTaskDescVK::alias().
+ * Every pipeline batch renders into `render_target_colors[<index>]` and `render_target_depth` following the pipelines'
+ * shared attachment layout. The task reports those accesses, its draw buffers, and every batch's reflected shader resources;
+ * map them to graph resources with RendTaskDescVK::alias().
  */
 struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     /**
@@ -187,8 +187,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 

@@ -22,10 +22,10 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstddef>
 #include <cstdint>
@@ -118,8 +118,8 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
     if (render_extent.width == 0 || render_extent.height == 0) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: render extent is empty.");
     }
-    descriptor_bindings =
-        make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, graphics_pipeline->get_descriptor_layout());
 }
 
 void RTRunGraphicsPipelineVK::append_accesses(
@@ -171,8 +171,8 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
             vertex_input.attributes.data());
         vkCmdBindIndexBuffer(p_command_buffer, index_buffer->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
         const uint32_t full_index_count = static_cast<uint32_t>(index_buffer->fields().buffer_size / sizeof(uint32_t));
-        const IndexedDrawRegionVK region =
-            indexed_draw_region.value_or(IndexedDrawRegionVK{.first_index = 0, .index_count = full_index_count, .vertex_offset = 0});
+        const IndexedDrawRegionVK region = indexed_draw_region.value_or(
+            IndexedDrawRegionVK{.first_index = 0, .index_count = full_index_count, .vertex_offset = 0});
         if (region.first_index > full_index_count || region.index_count > full_index_count - region.first_index) {
             throw std::runtime_error("RTRunGraphicsPipelineVK: indexed draw region exceeds index buffer bounds.");
         }

@@ -21,9 +21,10 @@
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
-#include "function/render_vk/debug_data_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render/render_task_resource_map.hh"
+#include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
@@ -72,8 +73,8 @@ public:
      * @param p_resources The resource map to view.
      * @param p_resource_map Optional task resource map; lookups resolve task-local identifiers through it first.
      */
-    explicit RendResViewVK(
-        const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, const RenderTaskResourceMap* p_resource_map = nullptr)
+    explicit RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources,
+        const RenderTaskResourceMap* p_resource_map = nullptr)
         : resources(p_resources), resource_map(p_resource_map) {
     }
 
@@ -115,9 +116,9 @@ private:
  * @class RGResEdge
  * @brief A resource dependency between two graph nodes.
  *
- * The edge orders `from` before `to` and makes the previous task's use of `res_id` visible to the next task. Edges whose nodes
- * run on the same Vulkan queue are recorded as pipeline barriers before the next task; edges crossing queues are satisfied
- * with timeline semaphores.
+ * The edge orders `from` before `to` and makes the previous task's use of `res_id` visible to the next task. Edges whose
+ * nodes run on the same Vulkan queue are recorded as pipeline barriers before the next task; edges crossing queues are
+ * satisfied with timeline semaphores.
  */
 struct RGResEdge {
     // The node that uses the resource first.
@@ -290,8 +291,8 @@ public:
     /**
      * @brief Acquire the container bound to a graph resource.
      *
-     * Resources allocated by the graph are held in an ROCSingleVK, or in an ROCMultislotsVK with one slot per frame in flight
-     * when they were declared per frame. Use the container to update graph-owned buffers on the rendering thread.
+     * Resources allocated by the graph are held in an ROCSingleVK, or in an ROCMultislotsVK with one slot per frame in
+     * flight when they were declared per frame. Use the container to update graph-owned buffers on the rendering thread.
      *
      * @param p_resource_id The graph resource identifier.
      * @return The resource container.
@@ -322,12 +323,8 @@ private:
     void topological_sort();
     Ref<RGNode> add_node(Unique<IRenderTaskVK> p_task);
     Ref<RGNode> find_node(std::string_view p_task_id) const;
-    void add_resource_edge(Ref<RGNode> p_from,
-        Ref<RGNode> p_to,
-        std::string p_resource_id,
-        RendEdgeTypeVK p_type,
-        VkPipelineStageFlags2 p_src_stage,
-        VkPipelineStageFlags2 p_dst_stage);
+    void add_resource_edge(
+        Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id, RendEdgeTypeVK p_type, VkPipelineStageFlags2 p_src_stage, VkPipelineStageFlags2 p_dst_stage);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     void allocate_resources(const RendGraphDescVK& p_desc);

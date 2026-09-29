@@ -20,6 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
+#include "function/function_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -57,7 +58,8 @@ static constexpr std::string_view REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_B
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawCubeUnshadedTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+    }
 
     virtual void logic_update(double /* p_delta */) override {
     }
@@ -126,7 +128,8 @@ public:
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
-        camera_info_ubo = graph->acquire_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
+        camera_info_ubo =
+            graph->acquire_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

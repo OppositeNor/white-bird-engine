@@ -12,12 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "utils/defs.hh"
 #include <functional>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {

@@ -12,12 +12,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "function/render/render_defs.hh"
 #include "function/render_vk/geometry_draw_data_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "utils/defs.hh"
 #include <array>
+#include <cstddef>
 #include <glm/ext/matrix_transform.hpp>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

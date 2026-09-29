@@ -15,6 +15,7 @@
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
@@ -50,8 +51,7 @@ VkDeviceSize checked_align_up(VkDeviceSize p_value, VkDeviceSize p_alignment) {
 
 } // namespace
 
-VkDeviceSize DescriptorHeapConfigurationVK::reserve_arena_bytes(
-    uint32_t p_descriptor_count, VkDeviceSize p_stride, VkDeviceSize p_alignment) {
+VkDeviceSize DescriptorHeapConfigurationVK::reserve_arena_bytes(uint32_t p_descriptor_count, VkDeviceSize p_stride, VkDeviceSize p_alignment) {
     if (p_descriptor_count == 0 || p_stride == 0 || p_alignment == 0 || p_stride % p_alignment != 0) {
         throw std::runtime_error("Failed to reserve descriptor arena: invalid count, stride, or alignment.");
     }
@@ -83,19 +83,16 @@ DescriptorHeapIDVK DescriptorHeapAllocatorVK::create_heap(const DescriptorHeapCo
         throw std::runtime_error("Failed to create descriptor heap: size or alignment is zero.");
     }
     const VkDeviceSize max_heap_size = p_configuration.type == DescriptorHeapTypeVK::RESOURCE
-        ? render_data->descriptor_heap_properties.maxResourceHeapSize
-        : render_data->descriptor_heap_properties.maxSamplerHeapSize;
+                                           ? render_data->descriptor_heap_properties.maxResourceHeapSize
+                                           : render_data->descriptor_heap_properties.maxSamplerHeapSize;
     if (checked_add(p_configuration.usable_size, p_configuration.reserved_size) > max_heap_size) {
         throw std::runtime_error("Failed to create descriptor heap: requested size exceeds the device limit.");
     }
     if (heaps.size() >= std::numeric_limits<DescriptorHeapIDVK>::max()) {
         throw std::runtime_error("Failed to create descriptor heap: heap identifier exceeds uint32.");
     }
-    auto backing = make_ref<RODescriptorHeapVK::Backing>(allocator,
-        render_data,
-        p_configuration.usable_size,
-        p_configuration.reserved_size,
-        p_configuration.alignment);
+    auto backing = make_ref<RODescriptorHeapVK::Backing>(
+        allocator, render_data, p_configuration.usable_size, p_configuration.reserved_size, p_configuration.alignment);
     DescriptorHeapIDVK heap_id = static_cast<DescriptorHeapIDVK>(heaps.size());
     heaps.emplace_back(allocator, p_configuration.type, std::move(backing), p_configuration.usable_size);
     return heap_id;
@@ -168,8 +165,7 @@ const DescriptorHeapAllocatorVK::Arena& DescriptorHeapAllocatorVK::get_arena(
     return heap.arenas[p_arena_id];
 }
 
-uint32_t DescriptorHeapAllocatorVK::allocate_descriptor(
-    DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_count) {
+uint32_t DescriptorHeapAllocatorVK::allocate_descriptor(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_count) {
     Arena& arena = get_arena(p_heap_id, p_arena_id);
     if (p_count == 0) {
         throw std::runtime_error("Failed to allocate descriptor range: count is zero.");
@@ -217,8 +213,8 @@ void DescriptorHeapAllocatorVK::deallocate_descriptor(
     for (uint32_t i = 0; i < p_count; ++i) {
         arena.view->clear_descriptor(p_first_index + i);
     }
-    auto insert_position =
-        std::lower_bound(arena.free_ranges.begin(), arena.free_ranges.end(), p_first_index, [](const FreeRange& p_range, uint32_t p_index) {
+    auto insert_position = std::lower_bound(
+        arena.free_ranges.begin(), arena.free_ranges.end(), p_first_index, [](const FreeRange& p_range, uint32_t p_index) {
             return p_range.first_index < p_index;
         });
     insert_position = arena.free_ranges.insert(insert_position, {.first_index = p_first_index, .count = p_count});
@@ -236,10 +232,8 @@ void DescriptorHeapAllocatorVK::deallocate_descriptor(
     }
 }
 
-void DescriptorHeapAllocatorVK::write_resource_descriptor(DescriptorHeapIDVK p_heap_id,
-    DescriptorArenaIDVK p_arena_id,
-    uint32_t p_index,
-    const VkResourceDescriptorInfoEXT& p_descriptor) const {
+void DescriptorHeapAllocatorVK::write_resource_descriptor(
+    DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id, uint32_t p_index, const VkResourceDescriptorInfoEXT& p_descriptor) const {
     const Heap& heap = get_heap(p_heap_id);
     const Arena& arena = get_arena(p_heap_id, p_arena_id);
     if (heap.type != DescriptorHeapTypeVK::RESOURCE || !is_allocated(arena, p_index, 1)) {

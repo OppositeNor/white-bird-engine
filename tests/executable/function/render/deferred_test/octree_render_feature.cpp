@@ -14,23 +14,39 @@
 */
 #include "octree_render_feature.hh"
 #include "../render_test.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/logging/log.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
 #include "resource/resource_manager/resource_manager.hh"
+#include "utils/defs.hh"
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <stdexcept>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {
@@ -200,8 +216,8 @@ OctreeRenderFeature::OctreeRenderFeature(RendererVK* p_renderer,
     Implementation p_implementation,
     bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_set_resources(std::move(p_static_set_resources)), debug_view_mode(p_debug_view_mode), implementation(p_implementation),
-      rebuild_static_every_frame(p_rebuild_static_every_frame) {
+      static_set_resources(std::move(p_static_set_resources)), debug_view_mode(p_debug_view_mode),
+      implementation(p_implementation), rebuild_static_every_frame(p_rebuild_static_every_frame) {
     if (renderer_vk == nullptr || static_set_resources == MEM_NULL || debug_view_mode == nullptr) {
         throw std::runtime_error("OctreeRenderFeature: renderer, scene and debug state are required.");
     }
@@ -241,9 +257,7 @@ void OctreeRenderFeature::compile_pipelines() {
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk});
     octree_build_graphics_pipeline =
-        octree_compiler
-            .compile(std::format("{}_build_static_set_pipeline", shader_prefix), octree_build_pipeline_resource)
-            .graphics_pipeline;
+        octree_compiler.compile(std::format("{}_build_static_set_pipeline", shader_prefix), octree_build_pipeline_resource).graphics_pipeline;
     ComputePipelineCompilerVK octree_compute_compiler(ComputePipelineCompilerVKContext{
         .allocator = render_allocator, .render_data = base_render_data, .render_database = renderer_vk->get_render_database()});
     dynamic_build_pipeline = octree_compiler
@@ -304,34 +318,32 @@ void OctreeRenderFeature::compile_pipelines() {
         .polygon_mode = VK_POLYGON_MODE_LINE,
     };
     octree_debug_draw_graphics_pipeline = GraphicsPipelineCompilerVK(octree_debug_draw_context)
-                                                .compile("octree_debug_draw_pipeline", octree_debug_draw_pipeline_resource)
-                                                .graphics_pipeline;
+                                              .compile("octree_debug_draw_pipeline", octree_debug_draw_pipeline_resource)
+                                              .graphics_pipeline;
     octree_pre_deferred_debug_draw_graphics_pipeline =
         GraphicsPipelineCompilerVK(octree_debug_draw_context)
             .compile("octree_pre_deferred_debug_draw_pipeline", octree_pre_deferred_debug_draw_pipeline_resource)
             .graphics_pipeline;
     if (implementation == Implementation::PASS_PUBLISHED) {
-        update_states_pipeline = octree_compute_compiler
-                                     .compile("octree_2_update_states_shader",
-                                         resource_manager->get_resource<RUShader>("octree_2_update_states_shader"))
-                                     .compute_pipeline;
+        update_states_pipeline =
+            octree_compute_compiler
+                .compile("octree_2_update_states_shader", resource_manager->get_resource<RUShader>("octree_2_update_states_shader"))
+                .compute_pipeline;
     }
 }
 
 void OctreeRenderFeature::create_resources() {
     octree_info = ROBufferVK::Builder().set_properties(sizeof(OctreeInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
-    octree_nodes = ROBufferVK::Builder()
-                         .set_properties(sizeof(OctreeNode), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                         .create_ref(base_render_data);
+    octree_nodes =
+        ROBufferVK::Builder().set_properties(sizeof(OctreeNode), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     dynamic_nodes = ROBufferVK::Builder()
                         .set_properties(sizeof(OctreeNode), OCTREE_MAX_DYNAMIC_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                         .create_ref(base_render_data);
     dynamic_leaves = ROBufferVK::Builder()
                          .set_properties(sizeof(OctreeDynamicLeafBlock), OCTREE_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                          .create_ref(base_render_data);
-    octree_leaves = ROBufferVK::Builder()
-                          .set_properties(sizeof(OctreeLeaf), OCTREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                          .create_ref(base_render_data);
+    octree_leaves =
+        ROBufferVK::Builder().set_properties(sizeof(OctreeLeaf), OCTREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     octree_deferred_list_ping =
         ROBufferVK::Builder()
             .set_properties(sizeof(OctreeDeferredListEntry), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
@@ -366,9 +378,8 @@ void OctreeRenderFeature::create_resources() {
         voxel_claims = ROBufferVK::Builder()
                            .set_properties(sizeof(uint32_t), OCTREE_CLAIM_WORD_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                            .create_ref(base_render_data);
-        pending_children = ROBufferVK::Builder()
-                               .set_properties(sizeof(uint32_t), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                               .create_ref(base_render_data);
+        pending_children =
+            ROBufferVK::Builder().set_properties(sizeof(uint32_t), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     }
     initialize();
 }
@@ -634,8 +645,7 @@ void OctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const {
     };
 
     // The frame-begin barrier orders this frame's octree mutation after the previous frame's consumers.
-    p_graph.get_task(RT_OCTREE_FRAME_BEGIN)
-        .connect(RT_RESET_OCTREE, OCTREE_INFO, RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, COMPUTE);
+    p_graph.get_task(RT_OCTREE_FRAME_BEGIN).connect(RT_RESET_OCTREE, OCTREE_INFO, RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, COMPUTE);
     if (pass_published) {
         connect_resource_chain(p_graph,
             OCTREE_INFO,
@@ -643,8 +653,11 @@ void OctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const {
         connect_resource_chain(p_graph,
             OCTREE_NODE_BUFFER,
             {reset, build, build_double_sided, state_update, static_deferred, clear, dynamic_build, publish, deferred, debug_draw, pre_deferred_draw});
-        connect_resource_chain(p_graph, OCTREE_PENDING_CHILDREN, {reset, build, build_double_sided, state_update, static_deferred, dynamic_build, deferred});
-        connect_resource_chain(p_graph, OCTREE_VOXEL_CLAIMS, {reset, build, build_double_sided, clear, dynamic_build, read(publish), read(deferred)});
+        connect_resource_chain(p_graph,
+            OCTREE_PENDING_CHILDREN,
+            {reset, build, build_double_sided, state_update, static_deferred, dynamic_build, deferred});
+        connect_resource_chain(
+            p_graph, OCTREE_VOXEL_CLAIMS, {reset, build, build_double_sided, clear, dynamic_build, read(publish), read(deferred)});
     } else {
         connect_resource_chain(p_graph,
             OCTREE_INFO,
@@ -655,12 +668,15 @@ void OctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const {
         connect_resource_chain(p_graph, OCTREE_VOXEL_CLAIMS, {clear, dynamic_build, read(publish), read(deferred)});
         connect_resource_chain(p_graph, OCTREE_PENDING_CHILDREN, {dynamic_build, deferred});
     }
+    connect_resource_chain(p_graph,
+        OCTREE_LEAF_BUFFER,
+        {build, build_double_sided, static_deferred, dynamic_build, deferred, debug_draw, pre_deferred_draw});
     connect_resource_chain(
-        p_graph, OCTREE_LEAF_BUFFER, {build, build_double_sided, static_deferred, dynamic_build, deferred, debug_draw, pre_deferred_draw});
-    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PING, {build, build_double_sided, static_deferred, dynamic_build, read(capture), deferred});
+        p_graph, OCTREE_DEFERRED_LIST_PING, {build, build_double_sided, static_deferred, dynamic_build, read(capture), deferred});
     connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {static_deferred, deferred});
     connect_resource_chain(p_graph, OCTREE_DYNAMIC_NODES, {read(clear), dynamic_build, publish, deferred, debug_draw, pre_deferred_draw});
-    connect_resource_chain(p_graph, OCTREE_DYNAMIC_LEAVES, {read(clear), dynamic_build, read(publish), deferred, debug_draw, pre_deferred_draw});
+    connect_resource_chain(
+        p_graph, OCTREE_DYNAMIC_LEAVES, {read(clear), dynamic_build, read(publish), deferred, debug_draw, pre_deferred_draw});
     connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {capture, pre_deferred_draw});
     connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, {capture, pre_deferred_draw});
     connect_resource_chain(p_graph,
@@ -703,8 +719,8 @@ RendTaskDescVK OctreeRenderFeature::get_dynamic_clear_task_desc() const {
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_CLEAR_DYNAMIC_OCTREE;
     task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_clear_pipeline]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t groups = static_cast<uint32_t>((std::max(OCTREE_MAX_NODE_COUNT, OCTREE_CLAIM_WORD_COUNT) + 127) / 128);
-        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{groups, 1, 1});
+        constexpr uint32_t GROUPS = static_cast<uint32_t>((std::max(OCTREE_MAX_NODE_COUNT, OCTREE_CLAIM_WORD_COUNT) + 127) / 128);
+        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     };
     return task;
 }
@@ -713,8 +729,8 @@ RendTaskDescVK OctreeRenderFeature::get_dynamic_publication_task_desc() const {
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_PUBLISH_DYNAMIC_OCTREE;
     task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_publication_pipeline]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t groups = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
-        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{groups, 1, 1});
+        constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
+        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     };
     return task;
 }

@@ -204,9 +204,8 @@ ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p
         .unnormalizedCoordinates = p_builder.unnormalized_coordinates};
     if (p_builder.sampler_index.has_value()) {
         if (render_data->descriptor_heap_allocator == nullptr ||
-            !render_data->descriptor_heap_allocator->owns_descriptor(render_data->sampler_descriptor_arena.heap_id,
-                render_data->sampler_descriptor_arena.arena_id,
-                *p_builder.sampler_index)) {
+            !render_data->descriptor_heap_allocator->owns_descriptor(
+                render_data->sampler_descriptor_arena.heap_id, render_data->sampler_descriptor_arena.arena_id, *p_builder.sampler_index)) {
             throw std::runtime_error("Failed to adopt sampler descriptor index: the index is not allocated by the sampler arena.");
         }
     }

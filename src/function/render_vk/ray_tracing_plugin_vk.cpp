@@ -19,11 +19,13 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_descriptor_heap_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
@@ -158,7 +160,7 @@ bool RayTracingPluginVK::supports_ray_query(
                [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                    return vkEnumerateDeviceExtensionProperties(p_physical_device, p_layer_name, p_extension_count, p_extension_properties);
                }) &&
-        check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR>(
+           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR>(
                p_physical_device, &VkPhysicalDeviceRayQueryFeaturesKHR::rayQuery);
 }
 
@@ -170,7 +172,7 @@ bool RayTracingPluginVK::supports_ray_tracing_pipeline(
                [p_physical_device](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
                    return vkEnumerateDeviceExtensionProperties(p_physical_device, p_layer_name, p_extension_count, p_extension_properties);
                }) &&
-        check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
+           check_device_feature_support<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR>(
                p_physical_device, &VkPhysicalDeviceRayTracingPipelineFeaturesKHR::rayTracingPipeline);
 }
 
@@ -342,8 +344,7 @@ void RayTracingPluginVK::configure_descriptor_heaps(
         throw std::runtime_error("Failed to reserve acceleration-structure descriptors: resource heap is missing.");
     }
     // Extend the shared resource heap with a tightly packed acceleration-structure arena.
-    acceleration_structure_descriptor_byte_offset = resource_configuration->reserve_arena_bytes(
-        ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY,
+    acceleration_structure_descriptor_byte_offset = resource_configuration->reserve_arena_bytes(ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY,
         base_ray_tracing_data->acceleration_structure_descriptor_size,
         p_render_data->descriptor_heap_properties.bufferDescriptorAlignment);
 }

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render/render_task_resource_map.hh"
+#include "function/render/render_defs.hh"
 #include <cstddef>
 #include <format>
 #include <stdexcept>
@@ -54,8 +55,8 @@ std::string_view RenderTaskResourceMap::resolve(std::string_view p_task_resource
 void RenderTaskResourceMap::validate_all_used(std::string_view p_task_id) const {
     for (size_t i = 0; i < entries.size(); ++i) {
         if (used[i] == 0) {
-            throw std::runtime_error(
-                std::format("RenderTaskResourceMap: task '{}' maps resource '{}', which the task never uses.", p_task_id, entries[i].source));
+            throw std::runtime_error(std::format(
+                "RenderTaskResourceMap: task '{}' maps resource '{}', which the task never uses.", p_task_id, entries[i].source));
         }
     }
 }

@@ -65,8 +65,8 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
     uint32_t width, height, file_channels;
     RUImage resource_unit;
     if (p_scheme.is_hdr) {
-        auto image_data = load_image_data_hdr(
-            file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
+        auto image_data =
+            load_image_data_hdr(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
         if (!image_data.has_value()) {
             throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", file_path.string()));
         }
@@ -78,8 +78,8 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
         auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count * sizeof(float), (*image_data).data());
         resource_unit.image_data = data;
     } else {
-        auto image_data = load_image_data(
-            file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
+        auto image_data =
+            load_image_data(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
         if (image_data.empty()) {
             throw std::runtime_error(std::format("Failed to load image data from file: {}", file_path.string()));
         }

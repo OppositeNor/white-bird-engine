@@ -13,11 +13,16 @@
    limitations under the License.
 */
 #include "input_manager_mocked.hh"
+#include "core/engine_core.hh"
 #include "core/parser/parser_json.hh"
+#include "function/input_manager/i_input_manager.hh"
+#include "function/input_manager/input_manager_regular.hh"
+#include "function/input_manager/key_codes.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <limits>
@@ -128,10 +133,8 @@ std::chrono::steady_clock::duration read_seconds(const JSONData& p_entry, std::s
     double seconds = p_entry.get_value<double>(p_field);
     // Also rejects NaN; the upper bound keeps the tick conversion in range.
     if (!(seconds >= 0.0 && seconds <= 1.0e6) || (!p_allow_zero && seconds == 0.0)) {
-        throw std::runtime_error(std::format("InputManagerMocked: input sequence \"{}\" must be in {}, 1e6] seconds, got {}.",
-            p_field,
-            p_allow_zero ? "[0" : "(0",
-            seconds));
+        throw std::runtime_error(std::format(
+            "InputManagerMocked: input sequence \"{}\" must be in {}, 1e6] seconds, got {}.", p_field, p_allow_zero ? "[0" : "(0", seconds));
     }
     return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(seconds));
 }
@@ -172,14 +175,13 @@ InputManagerMocked::InputManagerMocked(HeapAllocatorGlobal* p_allocator, std::st
         };
         if (entry.contains("count")) {
             int64_t count = entry.get_value<int64_t>("count");
-            if (count < 1 || count > std::numeric_limits<uint32_t>::max()) {
+            if (count < 1 || std::cmp_greater(count, std::numeric_limits<uint32_t>::max())) {
                 throw std::runtime_error(std::format("InputManagerMocked: input sequence \"count\" must be in [1, {}], got {}.",
                     std::numeric_limits<uint32_t>::max(),
                     count));
             }
             sequence_entry.remaining_count = static_cast<uint32_t>(count);
-        }
-        else {
+        } else {
             sequence_entry.duration = read_seconds(entry, "duration", false);
         }
         sequence.push_back(sequence_entry);

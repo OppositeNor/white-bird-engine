@@ -12,15 +12,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/device_memory_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/defs.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -65,7 +67,8 @@ TEST(WBEDeviceMemoryVKTest, AliasBuildersRequireMemory) {
     EXPECT_THROW(ROBufferVK(&render_data, buffer_builder), std::runtime_error);
 
     ROImageVK::AliasBuilder image_builder;
-    image_builder.set_image(ROImageVK::Builder().set_properties_2d(VK_FORMAT_R8G8B8A8_UNORM, VkExtent2D{.width = 4, .height = 4}, VK_IMAGE_USAGE_STORAGE_BIT));
+    image_builder.set_image(ROImageVK::Builder().set_properties_2d(
+        VK_FORMAT_R8G8B8A8_UNORM, VkExtent2D{.width = 4, .height = 4}, VK_IMAGE_USAGE_STORAGE_BIT));
     EXPECT_THROW(ROImageVK(&render_data, image_builder), std::runtime_error);
 }
 

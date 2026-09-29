@@ -28,8 +28,8 @@ namespace WhiteBirdEngine {
  * @brief Map from the resource identifiers one render task uses to graph resource identifiers.
  *
  * A task refers to resources by task-local identifiers: reflected shader resource ids, render targets such as
- * `render_target_colors[0]`, and ids passed to its constructor. RendTaskDescVK owns one map per task; the render graph resolves
- * every identifier the task binds or reports as an access through it. Unmapped identifiers resolve to themselves.
+ * `render_target_colors[0]`, and ids passed to its constructor. RendTaskDescVK owns one map per task; the render graph
+ * resolves every identifier the task binds or reports as an access through it. Unmapped identifiers resolve to themselves.
  *
  * The map is copyable and movable and uses an allocator that must outlive every copy. Resolution records which entries were
  * used so that the graph can reject entries that the task never uses.

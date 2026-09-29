@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
@@ -23,6 +24,8 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_fense_vk.hh"
+#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -31,9 +34,12 @@
 #include <format>
 #include <future>
 #include <limits>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -345,7 +351,8 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     finish_creation(p_builder);
 }
 
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder) : IRenderObjectVK(p_render_data) {
+ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder)
+    : IRenderObjectVK(p_render_data) {
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing buffer: device memory is null.");
     }

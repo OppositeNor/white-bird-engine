@@ -21,9 +21,9 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -33,8 +33,7 @@
 
 namespace WhiteBirdEngine {
 
-RTRunGraphicsPipelinesSequentialVK::DispatchBase::DispatchBase(RenderAllocator* p_allocator)
-    : clear_values(p_allocator) {
+RTRunGraphicsPipelinesSequentialVK::DispatchBase::DispatchBase(RenderAllocator* p_allocator) : clear_values(p_allocator) {
 }
 
 RTRunGraphicsPipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator, RegularDispatch p_dispatch)
@@ -78,12 +77,12 @@ bool RTRunGraphicsPipelinesSequentialVK::Sequence::is_indirect(size_t p_index) c
 
 RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
     : dispatch(p_dispatch), render_targets(p_render_data->allocator,
-                                 *p_dispatch.base.pipeline,
-                                 RenderTargetsVK::Config{.clear_values = p_dispatch.base.clear_values,
-                                     .color_load_op = p_dispatch.base.color_load_op,
-                                     .depth_load_op = p_dispatch.base.depth_load_op}) {
-    descriptor_bindings =
-        make_unique<PipelineDescriptorBindingsVK>(p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout());
+                                *p_dispatch.base.pipeline,
+                                RenderTargetsVK::Config{.clear_values = p_dispatch.base.clear_values,
+                                    .color_load_op = p_dispatch.base.color_load_op,
+                                    .depth_load_op = p_dispatch.base.depth_load_op}) {
+    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout());
 }
 
 RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence)

@@ -13,8 +13,15 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include <atomic>
 #include <stdexcept>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -28,8 +35,7 @@ QueueFamilyVK RTTriggeredVK::queue_family() const {
     return task->queue_family();
 }
 
-void RTTriggeredVK::append_accesses(
-    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+void RTTriggeredVK::append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     task->append_accesses(p_reads, p_writes);
 }
 

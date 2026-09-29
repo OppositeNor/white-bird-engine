@@ -13,10 +13,16 @@
    limitations under the License.
 */
 #include "function/render_vk/render_targets_vk.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
@@ -89,12 +95,14 @@ void RenderTargetsVK::bind_resources(const RendResViewVK& p_resources) {
     depth_container = has_depth ? p_resources.get(DEPTH_ID).container : MEM_NULL;
 }
 
-void RenderTargetsVK::begin_rendering(const BaseRenderDataVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const {
+void RenderTargetsVK::begin_rendering(
+    const BaseRenderDataVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const {
     WBE_DEBUG_ASSERT(color_containers.size() == color_count);
     Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(p_render_data->allocator);
     color_attachments.reserve(color_count);
     for (uint32_t i = 0; i < color_count; ++i) {
-        auto image_view = WBE_REQUIRES_VALID(color_containers[i]->get(p_render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
+        auto image_view =
+            WBE_REQUIRES_VALID(color_containers[i]->get(p_render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(image_view->get_image_view())
                 .set_load_op(color_load_op)
                 .set_clear_value(clear_values[i])
@@ -108,7 +116,8 @@ void RenderTargetsVK::begin_rendering(const BaseRenderDataVK* p_render_data, VkC
     rendering_info.pColorAttachments = color_attachments.data();
     VkRenderingAttachmentInfo depth_attachment{};
     if (has_depth) {
-        auto image_view = WBE_REQUIRES_VALID(depth_container->get(p_render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
+        auto image_view =
+            WBE_REQUIRES_VALID(depth_container->get(p_render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
         depth_attachment = ROImageViewVK::AttachmentBuilder::depth(image_view->get_image_view())
                                .set_load_op(depth_load_op)
                                .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)

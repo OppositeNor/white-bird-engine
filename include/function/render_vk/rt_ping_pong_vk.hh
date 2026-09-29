@@ -33,8 +33,8 @@ namespace WhiteBirdEngine {
  * @brief Render task that alternates between two compute pipelines for a fixed number of iterations.
  *
  * A false state selects the ping pipeline and a true state selects the pong pipeline. The task reports the reflected shader
- * accesses of every pipeline; map reflected resource ids to graph resources with RendTaskDescVK::alias(). Consecutive dispatches
- * are separated by a barrier that makes storage writes visible to sampled and storage reads.
+ * accesses of every pipeline; map reflected resource ids to graph resources with RendTaskDescVK::alias(). Consecutive
+ * dispatches are separated by a barrier that makes storage writes visible to sampled and storage reads.
  */
 struct RTPingPongVK final : public IRenderTaskVK {
     RTPingPongVK() = delete;
@@ -81,8 +81,7 @@ struct RTPingPongVK final : public IRenderTaskVK {
         return queue_family_id;
     }
 
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 

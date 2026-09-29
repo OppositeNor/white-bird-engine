@@ -55,8 +55,8 @@ RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
         if (entry.pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: compute pipeline is null.");
         }
-        descriptor_bindings.push_back(
-            make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, entry.pipeline->get_descriptor_layout()));
+        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(
+            render_data->allocator, render_data, entry.pipeline->get_descriptor_layout()));
     }
 }
 

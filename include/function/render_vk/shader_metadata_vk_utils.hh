@@ -146,8 +146,8 @@ ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
 /**
  * @brief Collect and merge explicit descriptor-heap push-data contracts from all supported graphics stages.
  *
- * Equal field paths must agree on descriptor category, resource id, and byte offset; their accesses are combined. Distinct fields must
- * not overlap in push data.
+ * Equal field paths must agree on descriptor category, resource id, and byte offset; their accesses are combined. Distinct
+ * fields must not overlap in push data.
  *
  * @throws std::runtime_error When stage contracts conflict.
  */

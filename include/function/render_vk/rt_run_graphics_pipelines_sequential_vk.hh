@@ -221,8 +221,7 @@ public:
     }
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
@@ -245,7 +244,6 @@ private:
 
     const BaseRenderDataVK* render_data = nullptr;
     Vector<BoundEntry, RenderAllocator> entries;
-
 };
 
 } // namespace WhiteBirdEngine

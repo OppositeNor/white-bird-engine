@@ -21,8 +21,8 @@
 #include "generated/label_manager.gen.hh"
 #include "generated/serializable_factory.gen.hh"
 #include "generated/type_uuid.gen.hh"
-#include "platform/file_system/path.hh"
 #include "platform/file_system/file_system.hh"
+#include "platform/file_system/path.hh"
 #include <cstdint>
 #include <iostream>
 

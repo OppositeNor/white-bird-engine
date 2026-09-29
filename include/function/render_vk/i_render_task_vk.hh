@@ -130,9 +130,9 @@ struct IRenderTaskVK : public IRenderTask {
     /**
      * @brief Append every resource access this task performs.
      *
-     * Accesses use the task-local identifiers the task binds: reflected shader resource ids, render targets, and ids passed to
-     * its constructor. The graph resolves them through the task's resource map before validating and synchronizing them. A
-     * resource that is both read and written is appended to both lists.
+     * Accesses use the task-local identifiers the task binds: reflected shader resource ids, render targets, and ids passed
+     * to its constructor. The graph resolves them through the task's resource map before validating and synchronizing them.
+     * A resource that is both read and written is appended to both lists.
      *
      * @param p_reads Receives read accesses.
      * @param p_writes Receives write accesses.

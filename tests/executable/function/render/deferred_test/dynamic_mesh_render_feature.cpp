@@ -14,11 +14,39 @@
 */
 #include "dynamic_mesh_render_feature.hh"
 #include "../render_test.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render_vk/geometry_draw_data_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/static_set_draw_batch_planner_vk.hh"
+#include "function/render_vk/static_set_resources_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "resource/resource_unit/resource_unit.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <optional>
+#include <span>
 #include <stdexcept>
+#include <string_view>
+#include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {

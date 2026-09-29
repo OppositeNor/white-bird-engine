@@ -16,14 +16,15 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/function_utils.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -45,8 +46,8 @@ public:
         return QueueFamilyVK::GRAPHICS;
     }
 
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& /*p_writes*/) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/,
+        Vector<ResAccessVK, RenderAllocator>& /*p_writes*/) const override {
     }
 
     virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
@@ -78,11 +79,7 @@ TEST(WBERenderGraphDescriptorVKTest, FluentAliasesAndConnectionsAreStored) {
     RendTaskDescVK descriptor(&allocator);
     descriptor.task_id = "run_lighting";
     descriptor.alias("render_target_colors[0]", "lighting_output")
-        .connect("run_bloom",
-            "lighting_output",
-            RendEdgeTypeVK::READ,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+        .connect("run_bloom", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 
     ASSERT_EQ(descriptor.next.size(), 1U);
     EXPECT_EQ(descriptor.next.front().next_task_id, "run_bloom");
@@ -102,8 +99,7 @@ TEST(WBERenderGraphDescriptorVKTest, GetTaskReturnsStoredDescriptorForLaterConne
     task.task_id = "producer";
     descriptor.add_task(std::move(task));
 
-    descriptor.get_task("producer").connect(
-        "consumer", "buffer", RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    descriptor.get_task("producer").connect("consumer", "buffer", RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     ASSERT_EQ(descriptor.tasks.front().next.size(), 1U);
     EXPECT_EQ(descriptor.tasks.front().next.front().type, RendEdgeTypeVK::WRITE);
@@ -128,9 +124,13 @@ TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsAreStoredForC
     RendGraphDescVK descriptor(&allocator);
 
     descriptor
-        .add_buffer("camera", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true, .initial_data = {1, 2}})
+        .add_buffer("camera",
+            {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true, .initial_data = {1, 2}})
         .add_image("albedo_image",
-            {.usage = RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 8, .height = 8, .depth = 1}, .mip_levels = 2})
+            {.usage = RendResPrimaryUsageVK::IMAGE_RENDER_TARGET,
+                .format = VK_FORMAT_R8G8B8A8_UNORM,
+                .extent = {.width = 8, .height = 8, .depth = 1},
+                .mip_levels = 2})
         .add_image_view("albedo", "albedo_image", {.mip_level_count = VK_REMAINING_MIP_LEVELS})
         .add_sampler("sampler", {.min_filter = VK_FILTER_NEAREST, .max_anisotropy = 4.0F});
 

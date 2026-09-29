@@ -19,8 +19,8 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
-#include "function/render/render_defs.hh"
 #include "function/function_utils.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
@@ -45,6 +45,7 @@
 #include <glm/glm.hpp>
 #include <limits>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -359,8 +360,7 @@ ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_properties_2d(
-    VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage) {
+ROImageVK::Builder& ROImageVK::Builder::set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage) {
     image_type = VK_IMAGE_TYPE_2D;
     format = p_format;
     extent = VkExtent3D{.width = p_extent.width, .height = p_extent.height, .depth = 1};
@@ -561,7 +561,8 @@ void ROImageVK::create_image(const Builder& p_builder, Ref<DeviceMemoryVK> p_ali
     if (p_alias_memory != MEM_NULL) {
         exposed_fields.image = p_alias_memory->create_image(create_info, p_alias_offset);
     } else {
-        VkResult result = vkCreateImage(render_data->logic_device, &create_info, render_data->allocation_callbacks, &exposed_fields.image);
+        VkResult result =
+            vkCreateImage(render_data->logic_device, &create_info, render_data->allocation_callbacks, &exposed_fields.image);
         if (result != VK_SUCCESS) {
             throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
         }
@@ -615,9 +616,10 @@ std::future<std::vector<uint8_t>> ROImageVK::acquire_image_content() const {
 }
 
 std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destination) const {
-    return schedule_image_readback(exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation p_operation) {
-        finish_image_readback(std::move(p_operation), p_destination);
-    });
+    return schedule_image_readback(
+        exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation p_operation) {
+            finish_image_readback(std::move(p_operation), p_destination);
+        });
 }
 
 } // namespace WhiteBirdEngine

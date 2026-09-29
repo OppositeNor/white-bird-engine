@@ -13,13 +13,14 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_clear_attachments_vk.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_targets_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "utils/defs.hh"
 #include <cstddef>
 #include <cstdint>
@@ -32,11 +33,8 @@
 
 namespace WhiteBirdEngine {
 
-RTClearAttachmentsVK::RTClearAttachmentsVK(const BaseRenderDataVK* p_render_data,
-    VkExtent2D p_render_extent,
-    uint32_t p_color_count,
-    bool p_has_depth,
-    const RenderTargetsVK::Config& p_config)
+RTClearAttachmentsVK::RTClearAttachmentsVK(
+    const BaseRenderDataVK* p_render_data, VkExtent2D p_render_extent, uint32_t p_color_count, bool p_has_depth, const RenderTargetsVK::Config& p_config)
     : render_data(p_render_data), render_extent(p_render_extent),
       render_targets(p_render_data->allocator, p_color_count, p_has_depth, p_config) {
     if (render_extent.width == 0 || render_extent.height == 0) {

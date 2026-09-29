@@ -23,6 +23,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
@@ -65,10 +66,10 @@ void RTPingPongVK::set_iteration_prefixes(
     ping_prefix_pipeline = std::move(p_ping_prefix_pipeline);
     pong_prefix_pipeline = std::move(p_pong_prefix_pipeline);
     prefix_dispatch_group_count = p_dispatch_group_count;
-    ping_prefix_descriptor_bindings =
-        make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, ping_prefix_pipeline->get_descriptor_layout());
-    pong_prefix_descriptor_bindings =
-        make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, pong_prefix_pipeline->get_descriptor_layout());
+    ping_prefix_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, ping_prefix_pipeline->get_descriptor_layout());
+    pong_prefix_descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
+        render_data->allocator, render_data, pong_prefix_pipeline->get_descriptor_layout());
 }
 
 void RTPingPongVK::bind_resources(const RendResViewVK& p_resources) {
@@ -81,8 +82,7 @@ void RTPingPongVK::bind_resources(const RendResViewVK& p_resources) {
     }
 }
 
-void RTPingPongVK::append_accesses(
-    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+void RTPingPongVK::append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     ping_descriptor_bindings->append_accesses(p_reads, p_writes);
     pong_descriptor_bindings->append_accesses(p_reads, p_writes);
     if (!ping_prefix_descriptor_bindings.is_null()) {
@@ -114,8 +114,7 @@ void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) 
                 .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                 .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
                 .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .dstAccessMask =
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
             };
             VkDependencyInfo dependency_info{
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -141,8 +140,7 @@ void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) 
                 .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                 .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
                 .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                .dstAccessMask =
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
             };
             VkDependencyInfo dependency_info{
                 .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

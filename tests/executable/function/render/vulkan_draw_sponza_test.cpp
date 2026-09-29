@@ -20,6 +20,7 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/function_utils.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
@@ -29,6 +30,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -150,7 +152,8 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
 class ApplicationVulkanDrawSponzaTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawSponzaTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+    }
 
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;

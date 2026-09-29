@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -25,6 +26,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -37,6 +39,7 @@
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -45,7 +48,6 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
-#include <array>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -57,7 +59,8 @@ inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "dr
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawPipelineTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+    }
 
     virtual void logic_update(double p_delta) override {
     }
@@ -126,7 +129,8 @@ public:
                 .set_pipeline(graphics_pipeline)
                 .set_render_extent(base_render_data->swap_chain_extent)
                 .set_clear_values(clear_values)
-                .set_indexed_draw(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
+                .set_indexed_draw(
+                    REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
                 .create_unique(base_render_data);
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));

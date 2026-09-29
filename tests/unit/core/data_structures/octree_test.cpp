@@ -16,6 +16,7 @@
 #include "core/data_structures/octree.hh"
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <limits>
@@ -55,10 +56,14 @@ TEST(WBEOctreeTest, DistinguishesAllEightOctantsAndLinksParents) {
     HeapAllocatorRAM allocator;
     Octree<int> tree(&allocator);
     const std::array<glm::vec3, 8> positions = {
-        glm::vec3{0.25F, 0.25F, 0.25F}, glm::vec3{0.25F, 0.25F, 0.75F},
-        glm::vec3{0.25F, 0.75F, 0.25F}, glm::vec3{0.25F, 0.75F, 0.75F},
-        glm::vec3{0.75F, 0.25F, 0.25F}, glm::vec3{0.75F, 0.25F, 0.75F},
-        glm::vec3{0.75F, 0.75F, 0.25F}, glm::vec3{0.75F, 0.75F, 0.75F},
+        glm::vec3{0.25F, 0.25F, 0.25F},
+        glm::vec3{0.25F, 0.25F, 0.75F},
+        glm::vec3{0.25F, 0.75F, 0.25F},
+        glm::vec3{0.25F, 0.75F, 0.75F},
+        glm::vec3{0.75F, 0.25F, 0.25F},
+        glm::vec3{0.75F, 0.25F, 0.75F},
+        glm::vec3{0.75F, 0.75F, 0.25F},
+        glm::vec3{0.75F, 0.75F, 0.75F},
     };
     for (size_t i = 0; i < positions.size(); ++i) {
         tree.insert(static_cast<int>(i), positions[i], 1);

@@ -13,9 +13,9 @@
    limitations under the License.
 */
 #include "platform/file_system/file_system.hh"
-#include <filesystem>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <string_view>

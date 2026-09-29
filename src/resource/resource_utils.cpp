@@ -19,6 +19,7 @@
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <limits>

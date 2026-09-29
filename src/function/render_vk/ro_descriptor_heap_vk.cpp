@@ -43,7 +43,7 @@ VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
     }
     return p_left + p_right;
 }
-}
+} // namespace
 
 RODescriptorHeapVK::Backing::Backing(
     const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment)

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "platform/file_system/file_system.hh"
+#include "platform/file_system/path.hh"
 #include <filesystem>
 #include <stdexcept>
 #include <string>

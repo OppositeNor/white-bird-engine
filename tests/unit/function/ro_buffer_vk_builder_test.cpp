@@ -12,14 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/ro_buffer_vk.hh"
+#include "core/core_utils.hh"
 #include "function/function_utils.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <limits>
 #include <span>
+#include <stdexcept>
+#include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -49,8 +53,7 @@ TEST(WBEROBufferVKBuilderTest, SetPropertiesRejectsInvalidSizes) {
 
     EXPECT_THROW(builder.set_properties(0, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
     EXPECT_THROW(builder.set_properties(1, 0, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
-    EXPECT_THROW(
-        builder.set_properties(std::numeric_limits<size_t>::max(), 2, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
+    EXPECT_THROW(builder.set_properties(std::numeric_limits<size_t>::max(), 2, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
 }
 
 TEST(WBEROBufferVKBuilderTest, InitialDataOwnsSourceBytes) {

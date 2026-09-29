@@ -52,7 +52,6 @@ public:
      */
     PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
 
-
     /**
      * @brief Append the reflected shader accesses of every descriptor field.
      *

@@ -46,6 +46,7 @@
 #include "function/render_vk/static_set_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
+#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/defs.hh"
@@ -63,6 +64,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -473,14 +475,12 @@ void RendererVK::create_instance() { // NOLINT
 void RendererVK::create_device(RendererCapabilities& p_capabilities) {
     create_physical_device();
     if (p_capabilities.conservative_rasterization) {
-        constexpr std::array<const char*, 1> CONSERVATIVE_RASTERIZATION_EXTENSIONS{
-            VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME};
+        constexpr std::array<const char*, 1> CONSERVATIVE_RASTERIZATION_EXTENSIONS{VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME};
         ExtensionSupportQueryResult extension_support = collect_unsupported_extensions(CONSERVATIVE_RASTERIZATION_EXTENSIONS,
             enabled_layers,
             "vkEnumerateDeviceExtensionProperties",
             [this](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
-                return vkEnumerateDeviceExtensionProperties(
-                    physical_device, p_layer_name, p_extension_count, p_extension_properties);
+                return vkEnumerateDeviceExtensionProperties(physical_device, p_layer_name, p_extension_count, p_extension_properties);
             });
         if (!extension_support.success) {
             throw std::runtime_error(
@@ -488,8 +488,7 @@ void RendererVK::create_device(RendererCapabilities& p_capabilities) {
         }
         if (extension_support.unsupported_extensions.empty()) {
             enabled_device_extensions.push_back(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
-        }
-        else {
+        } else {
             p_capabilities.conservative_rasterization = false;
         }
     }

@@ -15,12 +15,22 @@
 #ifndef WBE_FILE_DYNAMIC_MESH_RENDER_FEATURE_HH
 #define WBE_FILE_DYNAMIC_MESH_RENDER_FEATURE_HH
 
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/geometry_draw_data_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "resource/resource_unit/resource_unit.hh"
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 class RendererVK;

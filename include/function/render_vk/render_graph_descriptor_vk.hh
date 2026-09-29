@@ -18,14 +18,14 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/function_utils.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_list.hh"
+#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/function_utils.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include <cstddef>
@@ -300,8 +300,8 @@ struct RendTaskDescVK {
  *
  * Every resource is declared once in this graph-wide descriptor. Buffers, images, image views, and samplers declared with
  * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled;
- * resources owned elsewhere are imported with add_resource() or add_static_set(). Tasks refer to every resource by id through
- * their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
+ * resources owned elsewhere are imported with add_resource() or add_static_set(). Tasks refer to every resource by id
+ * through their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)

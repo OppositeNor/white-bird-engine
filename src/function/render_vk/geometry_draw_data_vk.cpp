@@ -13,10 +13,18 @@
    limitations under the License.
 */
 #include "function/render_vk/geometry_draw_data_vk.hh"
+#include "function/render/render_defs.hh"
+#include "glm/ext/matrix_float3x3.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
+#include "glm/matrix.hpp"
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <limits>
+#include <span>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

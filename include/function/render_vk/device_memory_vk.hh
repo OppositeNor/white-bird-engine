@@ -47,8 +47,8 @@ public:
      * @class Builder
      * @brief Configuration of a device-memory allocation.
      *
-     * Exactly one requirement source is used: a buffer, an image, or explicit memory requirements. Buffer and image sources let
-     * VMA select memory for their usage. Callers select whether the allocation is dedicated when constructing it.
+     * Exactly one requirement source is used: a buffer, an image, or explicit memory requirements. Buffer and image sources
+     * let VMA select memory for their usage. Callers select whether the allocation is dedicated when constructing it.
      */
     struct Builder {
         /** Buffer whose memory requirements the allocation satisfies. */
@@ -144,9 +144,9 @@ public:
     /**
      * @brief Create a buffer bound to this memory as an alias.
      *
-     * The buffer's memory requirements are checked against this memory before the buffer is created; VMA then creates and binds
-     * it atomically. The caller owns the returned handle and must destroy it with vkDestroyBuffer before the last reference to
-     * this memory is released.
+     * The buffer's memory requirements are checked against this memory before the buffer is created; VMA then creates and
+     * binds it atomically. The caller owns the returned handle and must destroy it with vkDestroyBuffer before the last
+     * reference to this memory is released.
      *
      * @param p_create_info Buffer creation parameters.
      * @param p_offset Offset of the buffer inside the allocation.
@@ -158,9 +158,9 @@ public:
     /**
      * @brief Create an image bound to this memory as an alias.
      *
-     * The image's memory requirements are checked against this memory before the image is created; VMA then creates and binds
-     * it atomically. The caller owns the returned handle and must destroy it with vkDestroyImage before the last reference to
-     * this memory is released.
+     * The image's memory requirements are checked against this memory before the image is created; VMA then creates and
+     * binds it atomically. The caller owns the returned handle and must destroy it with vkDestroyImage before the last
+     * reference to this memory is released.
      *
      * @param p_create_info Image creation parameters.
      * @param p_offset Offset of the image inside the allocation.

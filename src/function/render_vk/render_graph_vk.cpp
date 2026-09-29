@@ -30,11 +30,12 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "generated/type_uuid.gen.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
@@ -248,15 +249,14 @@ void validate_declared_resource(
 }
 
 // Stages that only exist on graphics-capable queues.
-constexpr VkPipelineStageFlags2 GRAPHICS_ONLY_STAGES = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT |
-                                                       VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
-                                                       VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT | VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT |
-                                                       VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                                                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                                       VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
-                                                       VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT | VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT |
-                                                       VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT |
-                                                       VK_PIPELINE_STAGE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+constexpr VkPipelineStageFlags2 GRAPHICS_ONLY_STAGES =
+    VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+    VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+    VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
+    VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+    VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT | VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT |
+    VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
 
 // Expand meta stages so that stage-set intersections can be computed bitwise.
 VkPipelineStageFlags2 expand_stages(VkPipelineStageFlags2 p_stages) {
@@ -381,7 +381,8 @@ Ref<ROImageViewVK> make_image_view(const BaseRenderDataVK* p_render_data, Ref<RO
     const RendImageViewDescVK& desc = p_view_decl.desc;
     const ROImageVK::ExposedFields& image = p_image->fields();
     if (desc.base_mip_level >= image.mipmap_levels || desc.base_array_layer >= image.layers_count) {
-        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' starts outside image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
+        throw std::runtime_error(
+            std::format("RenderGraphVK: image view '{}' starts outside image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
     }
     const uint32_t mip_level_count =
         desc.mip_level_count == VK_REMAINING_MIP_LEVELS ? image.mipmap_levels - desc.base_mip_level : desc.mip_level_count;
@@ -389,7 +390,8 @@ Ref<ROImageViewVK> make_image_view(const BaseRenderDataVK* p_render_data, Ref<RO
         desc.layer_count == VK_REMAINING_ARRAY_LAYERS ? image.layers_count - desc.base_array_layer : desc.layer_count;
     if (mip_level_count == 0 || layer_count == 0 || mip_level_count > image.mipmap_levels - desc.base_mip_level ||
         layer_count > image.layers_count - desc.base_array_layer) {
-        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
+        throw std::runtime_error(
+            std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_decl.res_id, p_view_decl.image_id));
     }
     const VkFormat format = desc.format.value_or(image.format);
     return ROImageViewVK::Builder()
@@ -486,12 +488,8 @@ Ref<RGNode> RenderGraphVK::find_node(std::string_view p_task_id) const {
     return MEM_NULL;
 }
 
-void RenderGraphVK::add_resource_edge(Ref<RGNode> p_from,
-    Ref<RGNode> p_to,
-    std::string p_resource_id,
-    RendEdgeTypeVK p_type,
-    VkPipelineStageFlags2 p_src_stage,
-    VkPipelineStageFlags2 p_dst_stage) {
+void RenderGraphVK::add_resource_edge(
+    Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id, RendEdgeTypeVK p_type, VkPipelineStageFlags2 p_src_stage, VkPipelineStageFlags2 p_dst_stage) {
     auto edge = make_ref<RGResEdge>(render_data->allocator);
     edge->from = p_from;
     edge->to = p_to;
@@ -739,9 +737,10 @@ void RenderGraphVK::allocate_resources(const RendGraphDescVK& p_desc) {
     }
     for (const RendImageDeclVK& image_decl : p_desc.images) {
         const RendImageDescVK& desc = image_decl.desc;
-        if (desc.format == VK_FORMAT_UNDEFINED || desc.extent.width == 0 || desc.extent.height == 0 || desc.extent.depth == 0 ||
-            desc.mip_levels == 0 || desc.layers == 0) {
-            throw std::runtime_error(std::format("RenderGraphVK: image '{}' has an undefined format, extent, mip count, or layer count.", image_decl.res_id));
+        if (desc.format == VK_FORMAT_UNDEFINED || desc.extent.width == 0 || desc.extent.height == 0 ||
+            desc.extent.depth == 0 || desc.mip_levels == 0 || desc.layers == 0) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: image '{}' has an undefined format, extent, mip count, or layer count.", image_decl.res_id));
         }
         ROImageVK::Builder builder;
         builder.set_image_type(desc.image_type)
@@ -758,8 +757,9 @@ void RenderGraphVK::allocate_resources(const RendGraphDescVK& p_desc) {
         auto image_resource = all_resources.find(view_decl.image_id);
         if (image_resource == all_resources.end() || image_resource->second->container == MEM_NULL ||
             image_resource->second->res_type_id != TypeUUID<ROImageVK>::UUID) {
-            throw std::runtime_error(std::format(
-                "RenderGraphVK: image view '{}' views '{}', which is not a declared image resource.", view_decl.res_id, view_decl.image_id));
+            throw std::runtime_error(std::format("RenderGraphVK: image view '{}' views '{}', which is not a declared image resource.",
+                view_decl.res_id,
+                view_decl.image_id));
         }
         Ref<RenderObjectContainerVK> image_container = image_resource->second->container;
         const bool per_frame = image_container.dynamic_cast_ref<ROCMultislotsVK>() != MEM_NULL;
@@ -1013,8 +1013,8 @@ void RenderGraphVK::validate_queue_completion() const {
     }
     for (size_t i = 0; i < nodes.size(); ++i) {
         if (reaches_graphics[i] == 0 && !is_same_queue(nodes[i]->in_queue, QueueFamilyVK::GRAPHICS)) {
-            throw std::runtime_error(
-                std::format("RenderGraphVK: task '{}' runs on another queue and has no dependency path to a graphics task.", nodes[i]->task_id));
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: task '{}' runs on another queue and has no dependency path to a graphics task.", nodes[i]->task_id));
         }
     }
 }
@@ -1218,13 +1218,14 @@ void RenderGraphVK::record_edge_barriers(VkCommandBuffer p_command_buffer, Ref<R
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = image_view->fields().image->get_image(),
-                .subresourceRange = VkImageSubresourceRange{
-                    .aspectMask = image_view->fields().subresource_range.aspectMask,
-                    .baseMipLevel = 0,
-                    .levelCount = VK_REMAINING_MIP_LEVELS,
-                    .baseArrayLayer = 0,
-                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
-                },
+                .subresourceRange =
+                    VkImageSubresourceRange{
+                        .aspectMask = image_view->fields().subresource_range.aspectMask,
+                        .baseMipLevel = 0,
+                        .levelCount = VK_REMAINING_MIP_LEVELS,
+                        .baseArrayLayer = 0,
+                        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                    },
             });
             continue;
         }

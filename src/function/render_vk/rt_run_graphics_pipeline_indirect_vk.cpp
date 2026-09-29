@@ -21,17 +21,17 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <stdexcept>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -51,7 +51,8 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
     return *this;
 }
 
-RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_clear_values(std::span<const VkClearValue> p_clear_values) {
+RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_clear_values(
+    std::span<const VkClearValue> p_clear_values) {
     clear_values.assign(p_clear_values.begin(), p_clear_values.end());
     return *this;
 }
@@ -157,8 +158,8 @@ void RTRunGraphicsPipelineIndirectVK::initialize_descriptor_bindings() {
         if (!render_targets.matches(*batch.graphics_pipeline)) {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: pipeline batches do not share one attachment layout.");
         }
-        descriptor_bindings.push_back(
-            make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, batch.graphics_pipeline->get_descriptor_layout()));
+        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(
+            render_data->allocator, render_data, batch.graphics_pipeline->get_descriptor_layout()));
     }
 }
 

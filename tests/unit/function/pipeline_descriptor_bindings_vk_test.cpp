@@ -13,8 +13,13 @@
    limitations under the License.
 */
 #include "core/allocator/i_allocator.hh"
-#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_task.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_task_resource_map.hh"
+#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -29,6 +34,8 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <string_view>
+#include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -148,21 +155,9 @@ TEST(WBEPipelineDescriptorBindingsVKTest, AppendsReflectedAccessesWithTheirRefle
     layout.size = 40;
     layout.fields = {
         {.field_path = "uniform", .type = ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER, .resource_id = "camera", .offset = 0},
-        {.field_path = "input",
-            .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER,
-            .resource_id = "input",
-            .offset = 8,
-            .access = ShaderDescriptorAccessVK::READ},
-        {.field_path = "output",
-            .type = ShaderDescriptorHeapTypeVK::STORAGE_IMAGE,
-            .resource_id = "output",
-            .offset = 16,
-            .access = ShaderDescriptorAccessVK::WRITE},
-        {.field_path = "state",
-            .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER,
-            .resource_id = "state",
-            .offset = 24,
-            .access = ShaderDescriptorAccessVK::READ_WRITE},
+        {.field_path = "input", .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER, .resource_id = "input", .offset = 8, .access = ShaderDescriptorAccessVK::READ},
+        {.field_path = "output", .type = ShaderDescriptorHeapTypeVK::STORAGE_IMAGE, .resource_id = "output", .offset = 16, .access = ShaderDescriptorAccessVK::WRITE},
+        {.field_path = "state", .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER, .resource_id = "state", .offset = 24, .access = ShaderDescriptorAccessVK::READ_WRITE},
         {.field_path = "sampler", .type = ShaderDescriptorHeapTypeVK::SAMPLER, .resource_id = "sampler", .offset = 32},
     };
     PipelineDescriptorBindingsVK bindings(&render_data, layout);

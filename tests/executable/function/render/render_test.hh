@@ -30,8 +30,8 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_targets_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -288,7 +288,8 @@ inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> m
  * @param p_resource_id Graph resource carried by the edges.
  * @param p_links Uses of the resource in execution order.
  */
-inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
+inline void connect_resource_chain(
+    RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
     connect_resource_chain(p_graph, p_resource_id, std::span<const ResourceChainLink>(p_links.begin(), p_links.size()));
 }
 
@@ -299,8 +300,9 @@ inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_
  * @param p_depth_resource_id Graph resource of the depth target, when the pipeline uses one.
  * @return p_task.
  */
-inline RendTaskDescVK& alias_render_targets(
-    RendTaskDescVK& p_task, std::span<const std::string_view> p_color_resource_ids, std::optional<std::string_view> p_depth_resource_id = std::nullopt) {
+inline RendTaskDescVK& alias_render_targets(RendTaskDescVK& p_task,
+    std::span<const std::string_view> p_color_resource_ids,
+    std::optional<std::string_view> p_depth_resource_id = std::nullopt) {
     for (size_t i = 0; i < p_color_resource_ids.size(); ++i) {
         p_task.alias(RenderTargetsVK::color_id(static_cast<uint32_t>(i)), p_color_resource_ids[i]);
     }

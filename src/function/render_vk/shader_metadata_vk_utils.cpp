@@ -69,7 +69,8 @@ bool descriptor_type_is_writable(ShaderDescriptorHeapTypeVK p_type) {
     return p_type == ShaderDescriptorHeapTypeVK::STORAGE_BUFFER || p_type == ShaderDescriptorHeapTypeVK::STORAGE_IMAGE;
 }
 
-ShaderDescriptorAccessVK descriptor_access(ShaderDescriptorHeapTypeVK p_type, const ShaderMetadataUserAttribute& p_attribute, std::string_view p_field_path) {
+ShaderDescriptorAccessVK descriptor_access(
+    ShaderDescriptorHeapTypeVK p_type, const ShaderMetadataUserAttribute& p_attribute, std::string_view p_field_path) {
     // Slang reflects an omitted access argument as its empty default value.
     if (p_attribute.arguments.size() < 3 || p_attribute.arguments[2].string_value.empty()) {
         return descriptor_type_is_writable(p_type) ? ShaderDescriptorAccessVK::READ_WRITE : ShaderDescriptorAccessVK::READ;
@@ -81,7 +82,8 @@ ShaderDescriptorAccessVK descriptor_access(ShaderDescriptorHeapTypeVK p_type, co
     } else if (name == "read_write") {
         access = ShaderDescriptorAccessVK::READ_WRITE;
     } else if (name != "read") {
-        throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has unsupported access '{}'.", p_field_path, name));
+        throw std::runtime_error(
+            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has unsupported access '{}'.", p_field_path, name));
     }
     if (access != ShaderDescriptorAccessVK::READ && !descriptor_type_is_writable(p_type)) {
         throw std::runtime_error(
@@ -205,9 +207,12 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
         }
         if (descriptor_attribute != nullptr) {
             const std::vector<ShaderMetadataUserAttributeArgument>& arguments = descriptor_attribute->arguments;
-            if (arguments.size() < 2 || arguments.size() > 3 || std::ranges::any_of(arguments, [](const ShaderMetadataUserAttributeArgument& p_argument) {
-                    return p_argument.kind != "string";
-                }) || arguments[0].string_value.empty() || arguments[1].string_value.empty()) {
+            if (arguments.size() < 2 || arguments.size() > 3 ||
+                std::ranges::any_of(arguments,
+                    [](const ShaderMetadataUserAttributeArgument& p_argument) {
+                        return p_argument.kind != "string";
+                    }) ||
+                arguments[0].string_value.empty() || arguments[1].string_value.empty()) {
                 throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments and an optional access argument.",
                     field_path));
             }

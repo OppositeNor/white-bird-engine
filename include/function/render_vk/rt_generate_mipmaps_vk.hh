@@ -64,8 +64,7 @@ struct RTGenerateMipmapsVK final : public IRenderTaskVK {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 

@@ -15,15 +15,16 @@
 #ifndef WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 #define WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 
-#include "core/memory/reference_raw.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
 #include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/engine_core.hh"
+#include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
@@ -38,11 +39,13 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include "input_manager_mocked.hh"
 #include "octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -71,7 +74,8 @@ class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
     ApplicationVulkanDeferredPBRTest()
         : ApplicationGame(RendererCapabilities{.shader_debug = true},
-              make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {}
+              make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {
+    }
 
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;

@@ -21,6 +21,7 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/function_utils.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
@@ -61,6 +62,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -81,7 +83,8 @@ constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
 class ApplicationVulkanDrawCubeTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawCubeTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+    }
 
     virtual void logic_update(double p_delta) override;
     virtual void render_update(double p_delta) override;

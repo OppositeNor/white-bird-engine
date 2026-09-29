@@ -14,12 +14,16 @@
 */
 #include "../render_test.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
+#include "core/allocator/i_allocator.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
@@ -27,10 +31,11 @@
 #include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
+#include "octree_render_feature.hh"
 #include "resource/resource_utils.hh"
 #include <algorithm>
 #include <array>
@@ -44,9 +49,9 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
-#include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -165,7 +170,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
 }
 
-void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const { // NOLINT
+void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
+    RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const { // NOLINT
     constexpr VkPipelineStageFlags2 COLOR = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     constexpr VkPipelineStageFlags2 DEPTH = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
     constexpr VkPipelineStageFlags2 COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
@@ -184,7 +190,9 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDe
     for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW}) {
         connect_resource_chain(p_pipeline_desc,
             shadow_color,
-            {writer(RT_RUN_DEFERRED_SHADOW_OPAQUE, COLOR), writer(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, COLOR), writer(RT_RUN_DYNAMIC_SHADOW, COLOR)});
+            {writer(RT_RUN_DEFERRED_SHADOW_OPAQUE, COLOR),
+                writer(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, COLOR),
+                writer(RT_RUN_DYNAMIC_SHADOW, COLOR)});
     }
     connect_resource_chain(p_pipeline_desc,
         SHADOWMAP_DEPTH_IMAGE_VIEW,
@@ -199,24 +207,30 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDe
             {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), reader(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, COMPUTE)});
         connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), direct_lighting});
         connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), indirect_lighting});
-        connect_resource_chain(
-            p_pipeline_desc, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, {writer(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, COMPUTE), direct_lighting});
+        connect_resource_chain(p_pipeline_desc,
+            SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW,
+            {writer(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, COMPUTE), direct_lighting});
     } else {
         connect_resource_chain(p_pipeline_desc,
             SHADOW_MOMENTS_IMAGE_VIEW,
             {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), writer(RT_GENERATE_SHADOW_MIPMAPS, TRANSFER), indirect_lighting});
         // Direct lighting samples the complete mip chain through a second view of the moments image.
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, {writer(RT_GENERATE_SHADOW_MIPMAPS, TRANSFER), direct_lighting});
+        connect_resource_chain(
+            p_pipeline_desc, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, {writer(RT_GENERATE_SHADOW_MIPMAPS, TRANSFER), direct_lighting});
     }
 
     // G-buffer passes.
     for (std::string_view gbuffer_color : {GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW}) {
         connect_resource_chain(p_pipeline_desc,
             gbuffer_color,
-            {writer(RT_RUN_DEFERRED_GBUFFER, COLOR), writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, COLOR), writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), direct_lighting});
+            {writer(RT_RUN_DEFERRED_GBUFFER, COLOR),
+                writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, COLOR),
+                writer(RT_RUN_DYNAMIC_GBUFFER, COLOR),
+                direct_lighting});
         connect_resource_chain(p_pipeline_desc, gbuffer_color, {writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), indirect_lighting});
     }
-    connect_resource_chain(p_pipeline_desc, GBUFFER_RMA_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), reader(RT_COMBINE_LIGHTING, COMPUTE)});
+    connect_resource_chain(
+        p_pipeline_desc, GBUFFER_RMA_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), reader(RT_COMBINE_LIGHTING, COMPUTE)});
     connect_resource_chain(p_pipeline_desc,
         GBUFFER_DEPTH_IMAGE_VIEW,
         {writer(RT_RUN_DEFERRED_GBUFFER, DEPTH), writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, DEPTH), writer(RT_RUN_DYNAMIC_GBUFFER, DEPTH), direct_lighting});
@@ -232,14 +246,22 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDe
             writer(RT_RUN_LIGHT_BILLBOARD, DEPTH)});
 
     // Lighting composition and post-processing.
-    connect_resource_chain(p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {writer(RT_RUN_DIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
-    connect_resource_chain(p_pipeline_desc, INDIRECT_LIGHTING_IMAGE_VIEW, {writer(RT_RUN_INDIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
-    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_EXTRACT_BLOOM, COMPUTE)});
-    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
+    connect_resource_chain(
+        p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {writer(RT_RUN_DIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
+    connect_resource_chain(p_pipeline_desc,
+        INDIRECT_LIGHTING_IMAGE_VIEW,
+        {writer(RT_RUN_INDIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
+    connect_resource_chain(
+        p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_EXTRACT_BLOOM, COMPUTE)});
+    connect_resource_chain(
+        p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
     // The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
     connect_resource_chain(p_pipeline_desc,
         BLOOM_PING_IMAGE_VIEW,
-        {writer(RT_EXTRACT_BLOOM, COMPUTE), writer(RT_BLUR_BLOOM, COMPUTE), reader(RT_ACQUIRE_BLOOM, TRANSFER), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
+        {writer(RT_EXTRACT_BLOOM, COMPUTE),
+            writer(RT_BLUR_BLOOM, COMPUTE),
+            reader(RT_ACQUIRE_BLOOM, TRANSFER),
+            reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
         {writer(RT_RUN_PRESENT_RESULT_IMAGE, COLOR),
@@ -280,7 +302,8 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
     constexpr std::string_view BLOOM_PING_IMAGE = "bloom_ping_image";
     constexpr std::string_view BLOOM_PONG_IMAGE = "bloom_pong_image";
     auto image = [](RendResPrimaryUsageVK p_usage, VkFormat p_format, VkExtent2D p_extent) {
-        return RendImageDescVK{.usage = p_usage, .format = p_format, .extent = {.width = p_extent.width, .height = p_extent.height, .depth = 1}};
+        return RendImageDescVK{
+            .usage = p_usage, .format = p_format, .extent = {.width = p_extent.width, .height = p_extent.height, .depth = 1}};
     };
     const VkExtent2D screen_extent = base_render_data->swap_chain_extent;
     RendImageDescVK shadow_moments = image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, SHADOW_MOMENTS_FORMAT, shadow_extent);
@@ -293,13 +316,15 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
         .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
 
     // Shadow and reflective-shadow-map targets.
-    p_pipeline_desc.add_image(SHADOWMAP_DEPTH_IMAGE, image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, shadow_extent))
+    p_pipeline_desc
+        .add_image(SHADOWMAP_DEPTH_IMAGE, image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, shadow_extent))
         .add_image(SHADOWMAP_COLOR_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_FLUX_FORMAT, shadow_extent))
         .add_image(RSM_NORMAL_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_NORMAL_FORMAT, shadow_extent))
         .add_image(SHADOW_MOMENTS_IMAGE, shadow_moments)
         .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE,
             image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, shadow_extent))
-        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, shadow_extent))
+        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE,
+            image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, shadow_extent))
         .add_image_view(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
         .add_image_view(SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
         .add_image_view(RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE)
@@ -315,7 +340,8 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
                 .max_lod = static_cast<float>(shadow_mipmap_level_count - 1)});
 
     // G-buffer targets.
-    p_pipeline_desc.add_image(GBUFFER_ALBEDO_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_ALBEDO_FORMAT, screen_extent))
+    p_pipeline_desc
+        .add_image(GBUFFER_ALBEDO_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_ALBEDO_FORMAT, screen_extent))
         .add_image(GBUFFER_NORMAL_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_NORMAL_FORMAT, screen_extent))
         .add_image(GBUFFER_RMA_IMAGE, image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_RMA_FORMAT, screen_extent))
         .add_image(GBUFFER_DEPTH_IMAGE, image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, GBUFFER_DEPTH_FORMAT, screen_extent))
@@ -331,7 +357,8 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
                 .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE});
 
     // Lighting and post-processing outputs.
-    p_pipeline_desc.add_image(DIRECT_LIGHTING_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
+    p_pipeline_desc
+        .add_image(DIRECT_LIGHTING_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
         .add_image(INDIRECT_LIGHTING_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
         .add_image(RESULT_IMAGE, image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, screen_extent))
         .add_image(BLOOM_PING_IMAGE, bloom_ping)
@@ -472,13 +499,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
         };
         // Starting from ping, even iterations blur ping into pong and odd iterations blur pong back into ping, so an even
         // iteration count leaves the result in ping.
-        return make_unique<RTPingPongVK>(task_render_allocator,
-            task_base_render_data,
-            pong_write_pipeline,
-            ping_write_pipeline,
-            false,
-            BLOOM_BLUR_PASS_COUNT,
-            dispatch_group_count);
+        return make_unique<RTPingPongVK>(
+            task_render_allocator, task_base_render_data, pong_write_pipeline, ping_write_pipeline, false, BLOOM_BLUR_PASS_COUNT, dispatch_group_count);
     };
     return task_desc;
 }
@@ -492,11 +514,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
                            this,
                            task_index = p_use_summed_area_table ? 1U : 0U,
                            task_acquire_completed = &bloom_acquire_completed]() -> Unique<IRenderTaskVK> {
-        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(task_render_allocator,
-            task_base_render_data,
-            BLOOM_PING_IMAGE_VIEW,
-            task_destination,
-            task_acquire_completed);
+        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(
+            task_render_allocator, task_base_render_data, BLOOM_PING_IMAGE_VIEW, task_destination, task_acquire_completed);
         auto task = make_unique<RTTriggeredVK>(task_render_allocator, std::move(acquire_task));
         bloom_acquire_tasks[task_index] = RefRaw<RTTriggeredVK>(task);
         return task;

@@ -29,6 +29,7 @@
 #include "generated/type_uuid.gen.hh"
 #include "ktxvulkan.h"
 #include "resource/resource_unit/resource_unit.hh"
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -108,8 +109,8 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
         VkPhysicalDeviceFeatures supported_features{};
         vkGetPhysicalDeviceFeatures(context.render_data->physical_device, &supported_features);
         if (supported_features.geometryShader != VK_TRUE) {
-            throw std::runtime_error(
-                std::format("Failed to compile graphics pipeline '{}': geometry shaders are not supported by this device.", p_resource_key));
+            throw std::runtime_error(std::format(
+                "Failed to compile graphics pipeline '{}': geometry shaders are not supported by this device.", p_resource_key));
         }
         geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
         geometry_metadata = ShaderMetadataLoader().load(p_pipeline_resource->geometry_stage);

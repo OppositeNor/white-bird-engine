@@ -15,8 +15,9 @@
 #ifndef WBE_FILE_INPUT_MANAGER_MOCKED_HH
 #define WBE_FILE_INPUT_MANAGER_MOCKED_HH
 
-#include "core/engine_core.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/engine_core.hh"
+#include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
 #include "function/input_manager/key_codes.hh"
 #include <chrono>

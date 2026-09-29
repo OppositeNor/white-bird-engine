@@ -46,9 +46,9 @@ struct IndexedDrawRegionVK {
  * @class RTRunGraphicsPipelineVK
  * @brief Render task that runs one graphics pipeline draw.
  *
- * The task renders into `render_target_colors[<index>]` and `render_target_depth` following the pipeline's attachment layout,
- * and reports those accesses, its vertex and index buffers, and its reflected shader resources. Map them to graph resources
- * with RendTaskDescVK::alias().
+ * The task renders into `render_target_colors[<index>]` and `render_target_depth` following the pipeline's attachment
+ * layout, and reports those accesses, its vertex and index buffers, and its reflected shader resources. Map them to graph
+ * resources with RendTaskDescVK::alias().
  */
 struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
     /**
@@ -152,8 +152,7 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
@@ -171,7 +170,6 @@ private:
     VertexInputDescriptionVK vertex_input;
     VkDeviceSize vertex_buffer_offset = 0;
     uint32_t draw_vertex_count = 3;
-
 };
 
 } // namespace WhiteBirdEngine

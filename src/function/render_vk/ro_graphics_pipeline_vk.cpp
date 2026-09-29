@@ -115,8 +115,7 @@ VkGraphicsPipelineCreateInfo ROGraphicsPipelineVK::make_graphics_pipeline_create
         create_info.pTessellationState = &(p_state_create_info.tessellation_state.value());
     }
     create_info.pViewportState = &(p_state_create_info.viewport_state);
-    if (p_state_create_info.conservative_rasterization_state.sType ==
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT) {
+    if (p_state_create_info.conservative_rasterization_state.sType == VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT) {
         p_state_create_info.rasterization_state.pNext = &p_state_create_info.conservative_rasterization_state;
     }
     create_info.pRasterizationState = &(p_state_create_info.rasterization_state);

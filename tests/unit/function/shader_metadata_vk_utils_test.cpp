@@ -585,8 +585,8 @@ TEST(WBEShaderMetadataVKUtilsTest, TreatsTheReflectedEmptyAccessDefaultAsOmitted
     }
     const std::array<ShaderMetadataTypeField, 2> fields{{storage, uniform}};
 
-    ShaderDescriptorHeapLayoutVK layout =
-        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", fields), "compute", "compute_main");
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(
+        make_descriptor_heap_metadata("compute", "compute_main", fields), "compute", "compute_main");
 
     ASSERT_EQ(layout.fields.size(), 2U);
     EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
@@ -595,17 +595,20 @@ TEST(WBEShaderMetadataVKUtilsTest, TreatsTheReflectedEmptyAccessDefaultAsOmitted
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidDescriptorAccess) {
     const std::array<ShaderMetadataTypeField, 1> unknown{{make_descriptor_heap_field("storage", "storage_buffer", 0, {}, "modify")}};
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", unknown), "compute", "compute_main"),
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(
+                     make_descriptor_heap_metadata("compute", "compute_main", unknown), "compute", "compute_main"),
         std::runtime_error);
-    const std::array<ShaderMetadataTypeField, 1> read_only_write{{make_descriptor_heap_field("sampled", "sampled_image", 0, {}, "write")}};
-    EXPECT_THROW(
-        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", read_only_write), "compute", "compute_main"),
+    const std::array<ShaderMetadataTypeField, 1> read_only_write{
+        {make_descriptor_heap_field("sampled", "sampled_image", 0, {}, "write")}};
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(
+                     make_descriptor_heap_metadata("compute", "compute_main", read_only_write), "compute", "compute_main"),
         std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, MergesDescriptorAccessesAcrossGraphicsStages) {
     const std::array<ShaderMetadataTypeField, 1> vertex_fields{{make_descriptor_heap_field("state", "storage_buffer", 0, {}, "read")}};
-    const std::array<ShaderMetadataTypeField, 1> fragment_fields{{make_descriptor_heap_field("state", "storage_buffer", 0, {}, "write")}};
+    const std::array<ShaderMetadataTypeField, 1> fragment_fields{
+        {make_descriptor_heap_field("state", "storage_buffer", 0, {}, "write")}};
     ShaderMetadata vertex = make_descriptor_heap_metadata("vertex", "vertex_main", vertex_fields);
     ShaderMetadata fragment = make_descriptor_heap_metadata("fragment", "fragment_main", fragment_fields);
 

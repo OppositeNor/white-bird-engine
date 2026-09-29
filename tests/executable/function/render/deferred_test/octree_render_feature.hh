@@ -15,18 +15,23 @@
 #ifndef WBE_FILE_OCTREE_RENDER_FEATURE_HH
 #define WBE_FILE_OCTREE_RENDER_FEATURE_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
+#include "glm/ext/vector_float3.hpp"
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <glm/vec3.hpp>
 #include <string_view>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 

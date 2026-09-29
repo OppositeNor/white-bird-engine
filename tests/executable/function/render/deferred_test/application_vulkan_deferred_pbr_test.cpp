@@ -18,6 +18,7 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/ecs/components.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
@@ -31,11 +32,13 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
+#include "octree_render_feature.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -100,7 +103,7 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     update_descriptors();
     dynamic_mesh_time += p_delta;
     const float angle = static_cast<float>(dynamic_mesh_time);
-    std::array<glm::mat4, 2> transforms {};
+    std::array<glm::mat4, 2> transforms{};
     transforms[0] = glm::translate(glm::mat4(1.0F), glm::vec3(0.6F * std::sin(angle * 0.5F), 0.75F, 0.0F)) *
                     glm::rotate(glm::mat4(1.0F), angle, glm::vec3(0.0F, 1.0F, 0.0F)) *
                     glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
@@ -271,8 +274,7 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
         std::filesystem::create_directories(output_directory);
         const auto timestamp =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        const Path output_path =
-            output_directory / std::format("deferred_{}_frame_{}.png", timestamp, base_render_data->current_frame);
+        const Path output_path = output_directory / std::format("deferred_{}_frame_{}.png", timestamp, base_render_data->current_frame);
         renderer_vk->request_frame_capture(output_path.string());
     } else {
         WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
@@ -307,8 +309,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     if (const char* selection = std::getenv("WBE_OCTREE_IMPLEMENTATION")) {
         if (std::string_view(selection) == "1") {
             octree_implementation = OctreeRenderFeature::Implementation::ATOMIC;
-        }
-        else if (std::string_view(selection) != "2") {
+        } else if (std::string_view(selection) != "2") {
             throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
         }
     }
@@ -316,18 +317,19 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     if (const char* selection = std::getenv("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT")) {
         if (std::string_view(selection) == "1") {
             rebuild_static_every_frame = true;
-        }
-        else if (std::string_view(selection) != "0") {
+        } else if (std::string_view(selection) != "0") {
             throw std::runtime_error("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT must be 0 or 1.");
         }
     }
-    octree = make_unique<OctreeRenderFeature>(render_allocator, renderer_vk, static_set_resources,
-        &voxel_debug_view_mode, octree_implementation, rebuild_static_every_frame);
-    stdout_log(WBE_CHANNEL_DEBUG)->message(octree_implementation == OctreeRenderFeature::Implementation::PASS_PUBLISHED
-        ? "Octree construction: octree_2 (pass publication)." : "Octree construction: octree (atomic publication).");
-    stdout_log(WBE_CHANNEL_DEBUG)->message(rebuild_static_every_frame
-        ? "Octree static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
-        : "Octree static scene: built once.");
+    octree = make_unique<OctreeRenderFeature>(
+        render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, octree_implementation, rebuild_static_every_frame);
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(octree_implementation == OctreeRenderFeature::Implementation::PASS_PUBLISHED
+                      ? "Octree construction: octree_2 (pass publication)."
+                      : "Octree construction: octree (atomic publication).");
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(rebuild_static_every_frame ? "Octree static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
+                                             : "Octree static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
@@ -433,7 +435,6 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     gbuffer_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(gbuffer_context)
                                                  .compile("deferred_gbuffer_double_sided", gbuffer_double_sided_pipeline_resource)
                                                  .graphics_pipeline;
-
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -579,10 +580,12 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto bloom_extract_compiled =
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
-    kawase_blur_pong_write_compute_pipeline =
-        ComputePipelineCompilerVK(compute_context).compile("kawase_blur_pong_write_shader", kawase_blur_pong_write_shader_resource).compute_pipeline;
-    kawase_blur_ping_write_compute_pipeline =
-        ComputePipelineCompilerVK(compute_context).compile("kawase_blur_ping_write_shader", kawase_blur_ping_write_shader_resource).compute_pipeline;
+    kawase_blur_pong_write_compute_pipeline = ComputePipelineCompilerVK(compute_context)
+                                                  .compile("kawase_blur_pong_write_shader", kawase_blur_pong_write_shader_resource)
+                                                  .compute_pipeline;
+    kawase_blur_ping_write_compute_pipeline = ComputePipelineCompilerVK(compute_context)
+                                                  .compile("kawase_blur_ping_write_shader", kawase_blur_ping_write_shader_resource)
+                                                  .compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;
