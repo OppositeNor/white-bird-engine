@@ -37,7 +37,6 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
@@ -121,8 +120,8 @@ private:
     static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
     static constexpr std::string_view GBUFFER_SAMPLER = "gbuffer_sampler";
     static constexpr std::string_view BLOOM_SAMPLER = "bloom_sampler";
-    static constexpr std::string_view KAWASE_BLUR_SOURCE = "kawase_blur_source";
-    static constexpr std::string_view KAWASE_BLUR_DESTINATION = "kawase_blur_destination";
+    static constexpr std::string_view KAWASE_BLUR_PING = "kawase_blur_ping";
+    static constexpr std::string_view KAWASE_BLUR_PONG = "kawase_blur_pong";
     static constexpr std::string_view KAWASE_BLUR_SAMPLER = "kawase_blur_sampler";
     static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
     static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
@@ -176,11 +175,10 @@ private:
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_task_desc() const;
     RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;
-    RendTaskDescVK create_indirect_lighting_task_desc(bool p_use_summed_area_table) const;
+    RendTaskDescVK create_indirect_lighting_task_desc() const;
     RendTaskDescVK create_combine_lighting_task_desc() const;
     RendTaskDescVK create_bloom_extract_task_desc() const;
-    static std::string bloom_blur_task_id(uint32_t p_pass_index);
-    RendTaskDescVK create_bloom_blur_task_desc(uint32_t p_pass_index) const;
+    RendTaskDescVK create_bloom_blur_task_desc() const;
     RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
@@ -207,7 +205,8 @@ private:
     RefRes<RUShader> indirect_lighting_rsm_debug_view_shader_resource;
     RefRes<RUShader> combine_lighting_shader_resource;
     RefRes<RUShader> bloom_extract_shader_resource;
-    RefRes<RUShader> kawase_blur_shader_resource;
+    RefRes<RUShader> kawase_blur_pong_write_shader_resource;
+    RefRes<RUShader> kawase_blur_ping_write_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
@@ -223,7 +222,8 @@ private:
     Ref<ROComputePipelineVK> indirect_lighting_debug_view_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> kawase_blur_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> kawase_blur_pong_write_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> kawase_blur_ping_write_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;

@@ -28,9 +28,7 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "glm/ext/matrix_transform.hpp"
@@ -398,7 +396,8 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         resource_manager->get_resource<RUShader>("indirect_lighting_rsm_debug_view_shader");
     combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
     bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
-    kawase_blur_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_shader");
+    kawase_blur_pong_write_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_pong_write_shader");
+    kawase_blur_ping_write_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_ping_write_shader");
 
     present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
@@ -578,8 +577,10 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     auto bloom_extract_compiled =
         ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
     bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
-    auto kawase_blur_compiled = ComputePipelineCompilerVK(compute_context).compile("kawase_blur_shader", kawase_blur_shader_resource);
-    kawase_blur_compute_pipeline = kawase_blur_compiled.compute_pipeline;
+    kawase_blur_pong_write_compute_pipeline =
+        ComputePipelineCompilerVK(compute_context).compile("kawase_blur_pong_write_shader", kawase_blur_pong_write_shader_resource).compute_pipeline;
+    kawase_blur_ping_write_compute_pipeline =
+        ComputePipelineCompilerVK(compute_context).compile("kawase_blur_ping_write_shader", kawase_blur_ping_write_shader_resource).compute_pipeline;
     auto present_compiled =
         GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
     present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;

@@ -32,8 +32,9 @@ namespace WhiteBirdEngine {
  * @class RTPingPongVK
  * @brief Render task that alternates between two compute pipelines for a fixed number of iterations.
  *
- * A false state selects the ping pipeline and a true state selects the pong pipeline. Shader resource reads and writes are
- * declared fluently on RendTaskDescVK.
+ * A false state selects the ping pipeline and a true state selects the pong pipeline. The task reports the reflected shader
+ * accesses of every pipeline; map reflected resource ids to graph resources with RendTaskDescVK::alias(). Consecutive dispatches
+ * are separated by a barrier that makes storage writes visible to sampled and storage reads.
  */
 struct RTPingPongVK final : public IRenderTaskVK {
     RTPingPongVK() = delete;

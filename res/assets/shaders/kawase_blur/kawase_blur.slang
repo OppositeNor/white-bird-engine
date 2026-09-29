@@ -17,11 +17,12 @@
 
 /**
  * @file kawase_blur.slang
- * @brief General compute pass that writes one Kawase blur iteration of a source image into a destination image.
- * @details The logical resources are placeholders; alias them to graph resources with PipelineResourceMapVK.
- * The dispatch covers the destination in 8x8 workgroups, and the source is sampled with normalized coordinates, so the
- * two images may differ in extent. Source and destination must be distinct images. Define WBE_KAWASE_BLUR_OFFSET to
- * select the tap offset in source texels; a multi-iteration blur compiles one variant per distinct offset.
+ * @brief General compute pass that writes one Kawase blur iteration between two ping-pong images.
+ * @details The logical resources are placeholders; alias them to graph resources with RendTaskDescVK::alias(). The default
+ * variant samples kawase_blur_ping and writes kawase_blur_pong; defining WBE_KAWASE_BLUR_WRITE_PING swaps them, so a
+ * multi-iteration blur alternates the two variants in one ping-pong task. The dispatch covers the destination in 8x8
+ * workgroups, and the source is sampled with normalized coordinates, so the two images may differ in extent. Define
+ * WBE_KAWASE_BLUR_OFFSET to select the tap offset in source texels.
  */
 
 #ifndef WBE_KAWASE_BLUR_OFFSET
@@ -30,10 +31,17 @@
 
 /** Descriptor indices of the resources used by one Kawase blur pass. */
 struct KawaseBlurDescriptorIndices {
+#ifdef WBE_KAWASE_BLUR_WRITE_PING
     /** Image sampled by the blur. */
-    [WBE_DESCRIPTOR("sampled_image", "kawase_blur_source")] uint2 source;
+    [WBE_DESCRIPTOR("sampled_image", "kawase_blur_pong")] uint2 source;
     /** Image receiving the blurred result. */
-    [WBE_DESCRIPTOR("storage_image", "kawase_blur_destination")] uint2 destination;
+    [WBE_DESCRIPTOR("storage_image", "kawase_blur_ping", "write")] uint2 destination;
+#else
+    /** Image sampled by the blur. */
+    [WBE_DESCRIPTOR("sampled_image", "kawase_blur_ping")] uint2 source;
+    /** Image receiving the blurred result. */
+    [WBE_DESCRIPTOR("storage_image", "kawase_blur_pong", "write")] uint2 destination;
+#endif
     /** Linear-filtering sampler used for every tap. */
     [WBE_DESCRIPTOR("sampler", "kawase_blur_sampler")] uint2 blur_sampler;
 };

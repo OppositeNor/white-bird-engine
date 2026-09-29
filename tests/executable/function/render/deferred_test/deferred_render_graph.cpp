@@ -24,6 +24,7 @@
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
+#include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -149,13 +150,10 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     octree->add_construction_render_tasks(pipeline_desc, *dynamic_mesh);
     pipeline_desc.add_task(octree->get_deferred_construction_render_task_desc());
     pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc())
-        .add_task(create_indirect_lighting_task_desc(p_use_summed_area_table))
+        .add_task(create_indirect_lighting_task_desc())
         .add_task(create_combine_lighting_task_desc())
-        .add_task(create_bloom_extract_task_desc());
-    for (uint32_t pass_index = 0; pass_index < BLOOM_BLUR_PASS_COUNT; ++pass_index) {
-        pipeline_desc.add_task(create_bloom_blur_task_desc(pass_index));
-    }
-    pipeline_desc
+        .add_task(create_bloom_extract_task_desc())
+        .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
         .add_task(octree->get_debug_draw_render_task_desc())
@@ -167,7 +165,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
 }
 
-void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const {
+void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const { // NOLINT
     constexpr VkPipelineStageFlags2 COLOR = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     constexpr VkPipelineStageFlags2 DEPTH = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
     constexpr VkPipelineStageFlags2 COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
@@ -238,22 +236,10 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(RendGraphDe
     connect_resource_chain(p_pipeline_desc, INDIRECT_LIGHTING_IMAGE_VIEW, {writer(RT_RUN_INDIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
     connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_EXTRACT_BLOOM, COMPUTE)});
     connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
-    // The blur passes alternate between reading ping and writing pong, and reading pong and writing ping.
-    std::vector<std::string> blur_task_ids;
-    for (uint32_t pass_index = 0; pass_index < BLOOM_BLUR_PASS_COUNT; ++pass_index) {
-        blur_task_ids.push_back(bloom_blur_task_id(pass_index));
-    }
-    std::vector<ResourceChainLink> ping_chain{writer(RT_EXTRACT_BLOOM, COMPUTE)};
-    std::vector<ResourceChainLink> pong_chain;
-    for (uint32_t pass_index = 0; pass_index < BLOOM_BLUR_PASS_COUNT; ++pass_index) {
-        const bool write_pong = pass_index % 2U == 0U;
-        ping_chain.push_back({.task_id = blur_task_ids[pass_index], .stage = COMPUTE, .writes = !write_pong});
-        pong_chain.push_back({.task_id = blur_task_ids[pass_index], .stage = COMPUTE, .writes = write_pong});
-    }
-    ping_chain.push_back(reader(RT_ACQUIRE_BLOOM, TRANSFER));
-    ping_chain.push_back(reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT));
-    connect_resource_chain(p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, ping_chain);
-    connect_resource_chain(p_pipeline_desc, BLOOM_PONG_IMAGE_VIEW, pong_chain);
+    // The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
+    connect_resource_chain(p_pipeline_desc,
+        BLOOM_PING_IMAGE_VIEW,
+        {writer(RT_EXTRACT_BLOOM, COMPUTE), writer(RT_BLUR_BLOOM, COMPUTE), reader(RT_ACQUIRE_BLOOM, TRANSFER), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
         {writer(RT_RUN_PRESENT_RESULT_IMAGE, COLOR),
@@ -415,7 +401,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc(bool p_use_summed_area_table) const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
     task_desc.create = [task_render_allocator = render_allocator,
@@ -470,28 +456,29 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc(
     return task_desc;
 }
 
-std::string ApplicationVulkanDeferredPBRTest::bloom_blur_task_id(uint32_t p_pass_index) {
-    return std::format("{}_{}", RT_BLUR_BLOOM, p_pass_index);
-}
-
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc(uint32_t p_pass_index) const {
-    // Even passes blur ping into pong and odd passes blur pong back into ping.
-    const bool write_pong = p_pass_index % 2U == 0U;
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = bloom_blur_task_id(p_pass_index);
-    task_desc.alias(KAWASE_BLUR_SOURCE, write_pong ? BLOOM_PING_IMAGE_VIEW : BLOOM_PONG_IMAGE_VIEW)
-        .alias(KAWASE_BLUR_DESTINATION, write_pong ? BLOOM_PONG_IMAGE_VIEW : BLOOM_PING_IMAGE_VIEW)
-        .alias(KAWASE_BLUR_SAMPLER, BLOOM_SAMPLER);
+    task_desc.task_id = RT_BLUR_BLOOM;
+    task_desc.alias(KAWASE_BLUR_PING, BLOOM_PING_IMAGE_VIEW).alias(KAWASE_BLUR_PONG, BLOOM_PONG_IMAGE_VIEW).alias(KAWASE_BLUR_SAMPLER, BLOOM_SAMPLER);
     task_desc.create = [task_render_allocator = render_allocator,
                            task_base_render_data = base_render_data,
                            task_bloom_extent = bloom_extent,
-                           blur_pipeline = kawase_blur_compute_pipeline]() -> Unique<IRenderTaskVK> {
+                           pong_write_pipeline = kawase_blur_pong_write_compute_pipeline,
+                           ping_write_pipeline = kawase_blur_ping_write_compute_pipeline]() -> Unique<IRenderTaskVK> {
         VkExtent3D dispatch_group_count{
             .width = (task_bloom_extent.width + 7U) / 8U,
             .height = (task_bloom_extent.height + 7U) / 8U,
             .depth = 1,
         };
-        return make_unique<RTRunComputePipelineVK>(task_render_allocator, task_base_render_data, blur_pipeline, dispatch_group_count);
+        // Starting from ping, even iterations blur ping into pong and odd iterations blur pong back into ping, so an even
+        // iteration count leaves the result in ping.
+        return make_unique<RTPingPongVK>(task_render_allocator,
+            task_base_render_data,
+            pong_write_pipeline,
+            ping_write_pipeline,
+            false,
+            BLOOM_BLUR_PASS_COUNT,
+            dispatch_group_count);
     };
     return task_desc;
 }
