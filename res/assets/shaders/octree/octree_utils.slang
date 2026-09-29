@@ -29,17 +29,6 @@ struct OctreeNode {
         NODE_DYNAMIC = 5,
         LEAF_DYNAMIC = 6
     };
-    enum Subregion {
-        XYZ_000,
-        XYZ_001,
-        XYZ_010,
-        XYZ_011,
-        XYZ_100,
-        XYZ_101,
-        XYZ_110,
-        XYZ_111,
-        MAX_SUBREGION
-    };
     /**
      * @brief Atomically published child description.
      * @details Bits 31:29 encode NODE=0, EMPTY=1, ALLOCATING=2, LEAF=3,
