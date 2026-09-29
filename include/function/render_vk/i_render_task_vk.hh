@@ -118,27 +118,26 @@ struct IRenderTaskVK : public IRenderTask {
      * @brief Bind stable graph resource containers before the task is first recorded.
      *
      * Tasks retain the containers they use and resolve the current render object from each container during record().
-     * Resource ids remain graph-side synchronization identities and are not looked up while recording.
+     * The view resolves the task-local identifiers through the task's resource map; identifiers are not looked up while
+     * recording.
      *
-     * @param p_resources Resources indexed by the graph descriptor during graph construction.
+     * @param p_resources The task's view of the graph resources.
      */
     virtual void bind_resources(const RendResViewVK& p_resources) {
         static_cast<void>(p_resources);
     }
 
     /**
-     * @brief The resources read intrinsically by this task.
+     * @brief Append every resource access this task performs.
      *
-     * @return The resource access declarations for reads performed by this task.
-     */
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const = 0;
-
-    /**
-     * @brief The resources written intrinsically by this task.
+     * Accesses use the task-local identifiers the task binds: reflected shader resource ids, render targets, and ids passed to
+     * its constructor. The graph resolves them through the task's resource map before validating and synchronizing them. A
+     * resource that is both read and written is appended to both lists.
      *
-     * @return The resource access declarations for writes performed by this task.
+     * @param p_reads Receives read accesses.
+     * @param p_writes Receives write accesses.
      */
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const = 0;
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const = 0;
 
     /**
      * @brief Record this task's commands into the given command buffer. The

@@ -24,7 +24,7 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct OctreeDebugDrawSetupDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     [WBE_DESCRIPTOR("storage_buffer", "octree_debug_draw_indirect_buffer")]
     uint2 indirect_draw;

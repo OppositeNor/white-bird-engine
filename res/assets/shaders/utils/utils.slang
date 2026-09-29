@@ -88,6 +88,11 @@ struct WBE_DESCRIPTORAttribute {
     string descriptor_type;
     /** Logical render-graph resource identifier resolved by the owning task. */
     string resource_id;
+    /**
+     * Shader access: "read", "write", or "read_write". Omitted means "read_write" for storage buffers and storage images and
+     * "read" for every other descriptor type, which can only be read.
+     */
+    string access = "";
 };
 
 /** Marks a push-data scalar whose value is supplied automatically by the renderer. */
@@ -277,11 +282,11 @@ struct StaticSetContractMetadata {
  * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
  */
 struct StaticSetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_submeshes")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_submeshes", "read")]
     uint2 submeshes;
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_nodes", "read")]
     uint2 nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_instances")]
+    [WBE_DESCRIPTOR("storage_buffer", "static_set_instances", "read")]
     uint2 instances;
 };
 

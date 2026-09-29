@@ -51,15 +51,12 @@ RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one compute pipeline is required.");
     }
     entries.assign(p_dispatch.entries.begin(), p_dispatch.entries.end());
-    const PipelineResourceMapVK empty_resource_map(render_data->allocator);
     for (const Entry& entry : entries) {
         if (entry.pipeline == MEM_NULL) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: compute pipeline is null.");
         }
-        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(render_data->allocator,
-            render_data,
-            entry.pipeline->get_descriptor_layout(),
-            entry.resource_map ? *entry.resource_map : empty_resource_map));
+        descriptor_bindings.push_back(
+            make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, entry.pipeline->get_descriptor_layout()));
     }
 }
 
@@ -69,12 +66,11 @@ void RTRunComputePipelinesSequentialVK::bind_resources(const RendResViewVK& p_re
     }
 }
 
-Vector<ResAccessVK, RenderAllocator> RTRunComputePipelinesSequentialVK::read_resources() const {
-    return Vector<ResAccessVK, RenderAllocator>(render_data->allocator);
-}
-
-Vector<ResAccessVK, RenderAllocator> RTRunComputePipelinesSequentialVK::write_resources() const {
-    return Vector<ResAccessVK, RenderAllocator>(render_data->allocator);
+void RTRunComputePipelinesSequentialVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    for (const Unique<PipelineDescriptorBindingsVK>& bindings : descriptor_bindings) {
+        bindings->append_accesses(p_reads, p_writes);
+    }
 }
 
 void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {

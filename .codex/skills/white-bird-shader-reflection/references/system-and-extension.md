@@ -62,7 +62,9 @@ Each annotation requires one non-empty string argument and must mark an aligned 
 
 ### `WBE_DESCRIPTOR`
 
-`collect_shader_descriptor_heap_layout()` finds the push-data parameter used by the selected entry point and recursively collects annotated `uint2` fields. Paths are relative to the push-data block; arrays expand to explicit paths such as `lights[0].shadowmap`. `collect_graphics_pipeline_descriptor_heap_layout()` merges vertex, optional geometry, and fragment contracts and combines compatible stage flags.
+`WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")` takes an optional access argument: `read`, `write`, or `read_write`. Slang reflects an omitted argument as its empty default; storage buffers and storage images then default to `read_write`, and every other type is read-only and rejects `write`. Pipeline-run tasks report the reflected accesses to the render graph, so annotate read-only storage resources with `read`.
+
+`collect_shader_descriptor_heap_layout()` finds the push-data parameter used by the selected entry point and recursively collects annotated `uint2` fields. Paths are relative to the push-data block; arrays expand to explicit paths such as `lights[0].shadowmap`. `collect_graphics_pipeline_descriptor_heap_layout()` merges vertex, optional geometry, and fragment contracts, combines compatible stage flags, and combines differing accesses into `read_write`.
 
 Production shader code accesses the global resource and sampler heaps through these indices. Declarations needed only to preserve higher-level contracts in metadata belong under `#if WBE_REFLECTION_METADATA`; ACP's second compile sees them, while the runtime SPIR-V does not.
 
@@ -79,7 +81,7 @@ RaytracingAccelerationStructure scene_acceleration_structure;
 #endif
 ```
 
-Query the metadata declaration as a `resource` / `accelerationStructure` type. Bind the runtime `scene` path to an `ROAccelerationStructureVK`; both pipeline compilation and `ROPipelineVK::set_descriptor_binding()` resolve it through `get_descriptor_index()`.
+Query the metadata declaration as a `resource` / `accelerationStructure` type. Bind the runtime `scene` field to a graph resource holding an `ROAccelerationStructureVK`; the pipeline-run task resolves it through `get_descriptor_index()`.
 
 Relevant files:
 

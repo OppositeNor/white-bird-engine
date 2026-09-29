@@ -22,7 +22,6 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
-#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <optional>
@@ -33,7 +32,8 @@ namespace WhiteBirdEngine {
 /**
  * @class RTRunComputePipelinesSequentialVK
  * @brief Render task that dispatches an ordered sequence of synchronized compute passes in one command buffer.
- * Shader resource reads and writes are declared fluently on RendTaskDescVK.
+ * The task reports every pass's reflected shader accesses; map reflected resource ids to graph resources with
+ * RendTaskDescVK::alias(). Passes that need different mappings belong in separate tasks.
  */
 struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
     /**
@@ -45,8 +45,6 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
         Ref<ROComputePipelineVK> pipeline = MEM_NULL;
         /** Workgroup count dispatched in each dimension. */
         VkExtent3D group_count{.width = 1, .height = 1, .depth = 1};
-        /** Optional invocation-local mapping, copied with this entry. */
-        std::optional<PipelineResourceMapVK> resource_map;
     };
 
     /**
@@ -103,9 +101,8 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
         return queue_family_id;
     }
 
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 

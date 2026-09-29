@@ -37,11 +37,13 @@ TEST(WBERTCPUInFlightAcquireVKTest, DirectRecordRequiresBoundSource) {
     RTCPUInFlightAcquireVK task(&render_data, "source_image", destination, &completion_semaphore);
 
     ASSERT_EQ(task.queue_family(), QueueFamilyVK::GRAPHICS);
-    Vector<ResAccessVK, RenderAllocator> reads = task.read_resources();
+    Vector<ResAccessVK, RenderAllocator> reads(&allocator);
+    Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+    task.append_accesses(reads, writes);
     ASSERT_EQ(reads.size(), 1U);
     EXPECT_EQ(reads[0].res_id, "source_image");
     EXPECT_EQ(reads[0].usage, RendResUsageVK::TRANSFER_SRC);
-    EXPECT_TRUE(task.write_resources().empty());
+    EXPECT_TRUE(writes.empty());
 
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
     EXPECT_FALSE(completion_semaphore.try_acquire());

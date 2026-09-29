@@ -21,7 +21,6 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
-#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstdint>
@@ -64,20 +63,6 @@ struct RTPingPongVK final : public IRenderTaskVK {
         QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
 
     /**
-     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
-     * @details Mapping references are borrowed only for this call and are not retained.
-     */
-    RTPingPongVK(const BaseRenderDataVK* p_render_data,
-        Ref<ROComputePipelineVK> p_ping_pipeline,
-        Ref<ROComputePipelineVK> p_pong_pipeline,
-        bool p_initial_state,
-        uint32_t p_iterations,
-        VkExtent3D p_dispatch_group_count,
-        QueueFamilyVK p_queue_family,
-        const PipelineResourceMapVK& p_ping_resource_map,
-        const PipelineResourceMapVK& p_pong_resource_map);
-
-    /**
      * @brief Configure one preparatory compute dispatch before each ping or pong dispatch.
      *
      * This supports algorithms that must clear the destination state before each alternating iteration. Both prefix
@@ -91,23 +76,12 @@ struct RTPingPongVK final : public IRenderTaskVK {
         Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
         VkExtent3D p_dispatch_group_count);
 
-    /**
-     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
-     * @details Mapping references are borrowed only for this call and are not retained.
-     */
-    void set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix_pipeline,
-        Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
-        VkExtent3D p_dispatch_group_count,
-        const PipelineResourceMapVK& p_ping_resource_map,
-        const PipelineResourceMapVK& p_pong_resource_map);
-
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
     }
 
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 

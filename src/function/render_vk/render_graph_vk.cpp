@@ -349,6 +349,20 @@ VkImageUsageFlags image_usage_flags(RendResPrimaryUsageVK p_usage, std::string_v
     throw std::runtime_error(std::format("RenderGraphVK: image '{}' has a non-image primary usage.", p_resource_id));
 }
 
+ROSamplerVK::Builder make_sampler_builder(const RendSamplerDescVK& p_desc) {
+    ROSamplerVK::Builder builder;
+    builder.set_filter(p_desc.min_filter, p_desc.mag_filter)
+        .set_mipmap_mode(p_desc.mipmap_mode)
+        .set_address_mode(p_desc.address_mode_u, p_desc.address_mode_v, p_desc.address_mode_w)
+        .set_mip_lod_bias(p_desc.mip_lod_bias)
+        .set_anisotropy(p_desc.max_anisotropy.has_value() ? VK_TRUE : VK_FALSE, p_desc.max_anisotropy.value_or(1.0F))
+        .set_compare(p_desc.compare_op.has_value() ? VK_TRUE : VK_FALSE, p_desc.compare_op.value_or(VK_COMPARE_OP_ALWAYS))
+        .set_lod_range(p_desc.min_lod, p_desc.max_lod)
+        .set_border_color(p_desc.border_color)
+        .set_unnormalized_coordinates(p_desc.unnormalized_coordinates ? VK_TRUE : VK_FALSE);
+    return builder;
+}
+
 bool is_depth_format(VkFormat p_format) {
     switch (p_format) {
     case VK_FORMAT_D16_UNORM:
@@ -404,16 +418,25 @@ RenderGraphVK::~RenderGraphVK() {
     free_command_buffers();
 }
 
+std::string_view RendResViewVK::resolve(std::string_view p_resource_id) const {
+    return resource_map != nullptr ? resource_map->resolve(p_resource_id) : p_resource_id;
+}
+
 bool RendResViewVK::contains(std::string_view p_resource_id) const {
-    auto resource = resources->find(p_resource_id);
+    auto resource = resources->find(resolve(p_resource_id));
     return resource != resources->end() && resource->second != MEM_NULL &&
            (resource->second->container != MEM_NULL || resource->second->resource_list != MEM_NULL);
 }
 
 const RendResVK& RendResViewVK::get(std::string_view p_resource_id) const {
-    auto resource = resources->find(p_resource_id);
+    const std::string_view graph_resource_id = resolve(p_resource_id);
+    auto resource = resources->find(graph_resource_id);
     if (resource == resources->end() || resource->second == MEM_NULL ||
         (resource->second->container == MEM_NULL && resource->second->resource_list == MEM_NULL)) {
+        if (graph_resource_id != p_resource_id) {
+            throw std::runtime_error(
+                std::format("Render graph resource was not declared: {} (mapped from {}).", graph_resource_id, p_resource_id));
+        }
         throw std::runtime_error(std::format("Render graph resource was not declared: {}.", p_resource_id));
     }
     return *resource->second;
@@ -749,7 +772,7 @@ void RenderGraphVK::allocate_resources(const RendGraphDescVK& p_desc) {
     }
     for (const RendSamplerDeclVK& sampler_decl : p_desc.samplers) {
         register_resource(sampler_decl.res_id, create_container(false, [this, &sampler_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
-            return sampler_decl.builder.create_ref(render_data);
+            return make_sampler_builder(sampler_decl.desc).create_ref(render_data);
         }));
     }
 }
@@ -784,12 +807,11 @@ void RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {
         }
         Ref<RGNode> node = add_node(std::move(task));
         node->task_id = task_desc.task_id;
-        node->render_task->bind_resources(RendResViewVK(&all_resources));
-        node->reads = node->render_task->read_resources();
-        node->writes = node->render_task->write_resources();
-        node->reads.insert(node->reads.end(), task_desc.reads.begin(), task_desc.reads.end());
-        node->writes.insert(node->writes.end(), task_desc.writes.begin(), task_desc.writes.end());
+        node->resource_map = task_desc.resource_map;
+        node->render_task->bind_resources(RendResViewVK(&all_resources, &node->resource_map));
+        node->render_task->append_accesses(node->reads, node->writes);
         normalize_task_accesses(node);
+        node->resource_map.validate_all_used(node->task_id);
         for (const ResAccessVK& access : node->reads) {
             validate_declared_resource(all_resources, *node, access, false);
         }
@@ -800,10 +822,11 @@ void RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {
 }
 
 void RenderGraphVK::normalize_task_accesses(Ref<RGNode> p_node) const {
-    auto normalize = [this](Vector<ResAccessVK, RenderAllocator>& p_accesses) {
+    // Resolve task-local identifiers through the task's resource map, then expand aggregate resource lists.
+    auto normalize = [this, &p_node](Vector<ResAccessVK, RenderAllocator>& p_accesses) {
         Vector<ResAccessVK, RenderAllocator> normalized(render_data->allocator);
         for (const ResAccessVK& access : p_accesses) {
-            for (std::string& resource_id : expand_resource_id(access.res_id)) {
+            for (std::string& resource_id : expand_resource_id(p_node->resource_map.resolve(access.res_id))) {
                 normalized.push_back({.res_id = std::move(resource_id), .usage = access.usage});
             }
         }

@@ -28,12 +28,9 @@ QueueFamilyVK RTTriggeredVK::queue_family() const {
     return task->queue_family();
 }
 
-Vector<ResAccessVK, RenderAllocator> RTTriggeredVK::read_resources() const {
-    return task->read_resources();
-}
-
-Vector<ResAccessVK, RenderAllocator> RTTriggeredVK::write_resources() const {
-    return task->write_resources();
+void RTTriggeredVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    task->append_accesses(p_reads, p_writes);
 }
 
 void RTTriggeredVK::bind_resources(const RendResViewVK& p_resources) {

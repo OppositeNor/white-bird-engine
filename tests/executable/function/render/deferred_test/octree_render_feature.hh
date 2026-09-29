@@ -87,11 +87,10 @@ public:
     void add_construction_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const;
     /**
      * @brief Connects every octree task through resource edges on the octree buffers.
-     * @details Call after all construction, deferred, debug-draw, and lighting tasks were added to p_graph.
+     * @details Call after all construction, deferred, and debug-draw tasks were added to p_graph.
      * @param p_graph Graph descriptor containing the octree tasks.
-     * @param p_lighting_task_id Task that samples the completed tree.
      */
-    void connect_render_tasks(RendGraphDescVK& p_graph, std::string_view p_lighting_task_id) const;
+    void connect_render_tasks(RendGraphDescVK& p_graph) const;
     /**
      * @brief Creates the per-frame reset.
      */

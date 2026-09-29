@@ -570,8 +570,9 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     const VkExtent3D shadow_image_extent{.width = shadow_extent.width, .height = shadow_extent.height, .depth = 1};
     const VkExtent3D main_image_extent{
         .width = base_render_data->swap_chain_extent.width, .height = base_render_data->swap_chain_extent.height, .depth = 1};
-    const WBE::ROSamplerVK::Builder clamped_linear_sampler =
-        WBE::ROSamplerVK::Builder().set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR).set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+    const WBE::RendSamplerDescVK clamped_linear_sampler{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
 
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
     pipeline_desc.add_static_set(static_set_resources);
@@ -589,7 +590,6 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .add_resource(CAMERA_INFO_BUFFER, camera_info_ubos)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, spot_light_info_ubos)
         .add_resource(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_ubos)
-        .add_image_view(SHADOWMAP_SAMPLED_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
         .add_sampler(SHADOW_SAMPLER, clamped_linear_sampler)
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, camera_info_ubos)
         .add_buffer(LIGHT_BILLBOARD_INFO_BUFFER,
@@ -609,32 +609,27 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .connect(RT_RUN_MAIN_OPAQUE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT)
         .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_masked_task));
-    p_main_opaque_task.read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE)
+    // The main passes sample the shadow depth through their reflected "shadowmap" resource.
+    p_main_opaque_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
         .connect(RT_RUN_MAIN_MASKED, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE)
         .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, DEPTH_STAGES, DEPTH_STAGES);
     pipeline_desc.tasks.emplace_back(std::move(p_main_opaque_task));
-    p_main_masked_task.read(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendResUsageVK::SAMPLED_IMAGE)
+    p_main_masked_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
         .connect(RT_RUN_LIGHT_BILLBOARD, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE);
     pipeline_desc.tasks.emplace_back(std::move(p_main_masked_task));
 
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
     light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
+    light_billboard_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
     light_billboard_task_desc.create = [render_allocator = render_allocator,
                                            base_render_data = base_render_data,
                                            light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::IRenderTaskVK> {
-        return WBE::make_unique<WBE::RTRunGraphicsPipelineVK>(render_allocator,
-            base_render_data,
-            glm::vec4(0.0F),
-            base_render_data->swap_chain_extent,
-            WBE::REND_RES_SWAP_CHAIN,
-            light_billboard_pipeline,
-            std::optional<std::string_view>{},
-            std::optional<std::string_view>{},
-            std::optional<WBE::IndexedDrawRegionVK>{},
-            VK_ATTACHMENT_LOAD_OP_LOAD,
-            WBE::VertexInputDescriptionVK{},
-            0,
-            6);
+        return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+            .set_pipeline(light_billboard_pipeline)
+            .set_render_extent(base_render_data->swap_chain_extent)
+            .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+            .set_draw_vertex_count(6)
+            .create_unique(base_render_data);
     };
     pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
 

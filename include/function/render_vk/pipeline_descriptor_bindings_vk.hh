@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/pipeline_resource_map_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -52,12 +52,17 @@ public:
      */
     PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
 
+
     /**
-     * @brief Construct or configure invocation-local bindings by copying the supplied mappings.
-     * @details Mapping references are borrowed only for this call and are not retained.
+     * @brief Append the reflected shader accesses of every descriptor field.
+     *
+     * Accesses use the reflected resource identifiers, which the render graph resolves through the task's resource map.
+     * Samplers are immutable and are not reported.
+     *
+     * @param p_reads Receives read accesses.
+     * @param p_writes Receives write accesses.
      */
-    PipelineDescriptorBindingsVK(
-        const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout, const PipelineResourceMapVK& p_resource_map);
+    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const;
 
     /**
      * @brief Resolve and retain every reflected logical resource from the graph resource view.

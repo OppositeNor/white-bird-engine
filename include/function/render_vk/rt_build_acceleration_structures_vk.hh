@@ -46,9 +46,8 @@ public:
         return QueueFamilyVK::GRAPHICS;
     }
 
-    Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-
-    Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
     void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 

@@ -57,6 +57,7 @@
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
 #include <semaphore>
+#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -178,7 +179,8 @@ private:
     RendTaskDescVK create_indirect_lighting_task_desc(bool p_use_summed_area_table) const;
     RendTaskDescVK create_combine_lighting_task_desc() const;
     RendTaskDescVK create_bloom_extract_task_desc() const;
-    RendTaskDescVK create_bloom_blur_task_desc() const;
+    static std::string bloom_blur_task_id(uint32_t p_pass_index);
+    RendTaskDescVK create_bloom_blur_task_desc(uint32_t p_pass_index) const;
     RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;

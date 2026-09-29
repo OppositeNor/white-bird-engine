@@ -14,6 +14,7 @@
 */
 #include "core/allocator/i_allocator.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -99,62 +100,87 @@ void add_mapping_resource(
 
 } // namespace
 
-TEST(WBEPipelineDescriptorBindingsVKTest, RejectsEmptyDuplicateAndUnknownMappingSources) {
+TEST(WBEPipelineDescriptorBindingsVKTest, ResourceMapRejectsEmptyAndDuplicateSourcesAndTracksUse) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
-    PipelineResourceMapVK map(&allocator);
+    RenderTaskResourceMap map(&allocator);
     EXPECT_THROW(map.bind("", "target"), std::runtime_error);
     EXPECT_THROW(map.bind("source", ""), std::runtime_error);
-    map.bind("source", "target");
-    EXPECT_THROW(map.bind("source", "other"), std::runtime_error);
-    map.bind("unknown", "target");
-    EXPECT_THROW(PipelineDescriptorBindingsVK(&render_data, make_mapping_layout(), map), std::runtime_error);
-}
-
-TEST(WBEPipelineDescriptorBindingsVKTest, ExactSingleStepMappingsAreIsolatedAndSnapshotConfiguration) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
-    auto layout = make_mapping_layout();
-    PipelineResourceMapVK map(&allocator);
     map.bind("source", "target").bind("target", "final");
-    PipelineDescriptorBindingsVK mapped(&render_data, layout, map);
-    PipelineDescriptorBindingsVK defaults(&render_data, layout);
-    Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
-    add_mapping_resource(&allocator, resources, "target", TypeUUID<ROBufferVK>::UUID);
-    add_mapping_resource(&allocator, resources, "final", TypeUUID<ROBufferVK>::UUID);
-    RendResViewVK view(&resources);
-    EXPECT_NO_THROW(mapped.bind_resources(view));
-    EXPECT_THROW(defaults.bind_resources(view), std::runtime_error);
-    resources.erase("target");
-    EXPECT_THROW(mapped.bind_resources(view), std::runtime_error); // source must not chain through target to final.
-    EXPECT_EQ(layout.fields[0].resource_id, "source");
-    EXPECT_EQ(layout.fields[1].resource_id, "target");
-    map.bind("unreflected_later_change", "final");
-    add_mapping_resource(&allocator, resources, "target", TypeUUID<ROBufferVK>::UUID);
-    EXPECT_NO_THROW(mapped.bind_resources(view));
-    add_mapping_resource(&allocator, resources, "source", TypeUUID<ROBufferVK>::UUID);
-    EXPECT_NO_THROW(defaults.bind_resources(view));
+    EXPECT_THROW(map.bind("source", "other"), std::runtime_error);
+
+    EXPECT_THROW(map.validate_all_used("task"), std::runtime_error);
+    // Resolution is a single exact step and does not chain through other entries.
+    EXPECT_EQ(map.resolve("source"), "target");
+    EXPECT_EQ(map.resolve("unmapped"), "unmapped");
+    EXPECT_THROW(map.validate_all_used("task"), std::runtime_error);
+    EXPECT_EQ(map.resolve("target"), "final");
+    EXPECT_NO_THROW(map.validate_all_used("task"));
 }
 
-TEST(WBEPipelineDescriptorBindingsVKTest, RejectsMissingIncompatibleAndNullMappedTargets) {
+TEST(WBEPipelineDescriptorBindingsVKTest, BindsReflectedResourcesThroughTheTaskResourceMap) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     auto layout = make_mapping_layout();
     layout.fields.resize(1);
-    PipelineResourceMapVK map(&allocator);
+    PipelineDescriptorBindingsVK bindings(&render_data, layout);
+    RenderTaskResourceMap map(&allocator);
     map.bind("source", "mapped");
-    PipelineDescriptorBindingsVK bindings(&render_data, layout, map);
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
-    RendResViewVK view(&resources);
+    RendResViewVK view(&resources, &map);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
     add_mapping_resource(&allocator, resources, "mapped", TypeUUID<ROImageViewVK>::UUID);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
     resources.at("mapped")->res_type_id = TypeUUID<ROBufferVK>::UUID;
     EXPECT_NO_THROW(bindings.bind_resources(view));
+    EXPECT_NO_THROW(map.validate_all_used("task"));
     render_data.current_frame_slot = 1;
     EXPECT_THROW(bindings.push(VK_NULL_HANDLE), std::runtime_error);
     resources.at("mapped")->container = MEM_NULL;
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
+    // Without the map the reflected identifier is looked up directly.
+    EXPECT_THROW(bindings.bind_resources(RendResViewVK(&resources)), std::runtime_error);
+}
+
+TEST(WBEPipelineDescriptorBindingsVKTest, AppendsReflectedAccessesWithTheirReflectedIdentifiers) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ShaderDescriptorHeapLayoutVK layout;
+    layout.size = 40;
+    layout.fields = {
+        {.field_path = "uniform", .type = ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER, .resource_id = "camera", .offset = 0},
+        {.field_path = "input",
+            .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER,
+            .resource_id = "input",
+            .offset = 8,
+            .access = ShaderDescriptorAccessVK::READ},
+        {.field_path = "output",
+            .type = ShaderDescriptorHeapTypeVK::STORAGE_IMAGE,
+            .resource_id = "output",
+            .offset = 16,
+            .access = ShaderDescriptorAccessVK::WRITE},
+        {.field_path = "state",
+            .type = ShaderDescriptorHeapTypeVK::STORAGE_BUFFER,
+            .resource_id = "state",
+            .offset = 24,
+            .access = ShaderDescriptorAccessVK::READ_WRITE},
+        {.field_path = "sampler", .type = ShaderDescriptorHeapTypeVK::SAMPLER, .resource_id = "sampler", .offset = 32},
+    };
+    PipelineDescriptorBindingsVK bindings(&render_data, layout);
+    Vector<ResAccessVK, RenderAllocator> reads(&allocator);
+    Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+
+    bindings.append_accesses(reads, writes);
+
+    ASSERT_EQ(reads.size(), 3U);
+    EXPECT_EQ(reads[0].res_id, "camera");
+    EXPECT_EQ(reads[0].usage, RendResUsageVK::UNIFORM_BUFFER);
+    EXPECT_EQ(reads[1].res_id, "input");
+    EXPECT_EQ(reads[1].usage, RendResUsageVK::STORAGE_BUFFER);
+    EXPECT_EQ(reads[2].res_id, "state");
+    ASSERT_EQ(writes.size(), 2U);
+    EXPECT_EQ(writes[0].res_id, "output");
+    EXPECT_EQ(writes[0].usage, RendResUsageVK::STORAGE_IMAGE);
+    EXPECT_EQ(writes[1].res_id, "state");
 }
 
 } // namespace WhiteBirdEngine

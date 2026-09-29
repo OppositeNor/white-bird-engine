@@ -11,7 +11,7 @@
 ## Core APIs
 
 - `include/function/render_vk/render_graph_descriptor_vk.hh`
-  - `RendTaskDescVK`: string `task_id`, fluent `connect()` / `read()` / `write()` declarations, and a task factory in `create`.
+  - `RendTaskDescVK`: string `task_id`, fluent `connect()` edges and `alias()` resource mappings, and a task factory in `create`.
   - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations, plus `get_task()` for connecting added tasks.
 - `include/function/render_vk/i_render_task_vk.hh`
   - `QueueFamilyVK`, `RendEdgeTypeVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
@@ -38,7 +38,7 @@ graph_desc.add_image("gbuffer_depth_image",
     .add_image_view("gbuffer_depth", "gbuffer_depth_image")
     .add_image_view("shadow_moments_sampled", "shadow_moments_image", {.mip_level_count = VK_REMAINING_MIP_LEVELS})
     .add_buffer("camera_info", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true})
-    .add_sampler("gbuffer_sampler", ROSamplerVK::Builder().set_filter(VK_FILTER_NEAREST, VK_FILTER_NEAREST));
+    .add_sampler("gbuffer_sampler", {.min_filter = VK_FILTER_NEAREST, .mag_filter = VK_FILTER_NEAREST});
 ```
 
 The primary usage selects the Vulkan usage flags (`additional_usage` adds more, such as transfer usage for mip generation or
@@ -56,7 +56,7 @@ validation and synchronization derivation. Populate the list before graph constr
 does not create a GPU object.
 
 All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
-IDs in their intrinsic or descriptor-level read and write declarations. Static-set vertex, index, opaque and masked indirect
+IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Static-set vertex, index, opaque and masked indirect
 draw-command, reflected shader, and texture-list resources follow this rule;
 `REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_SET_MASKED_DRAW_BATCHES` are also storage-buffer capable for
 explicitly ordered compute writes.
@@ -66,9 +66,8 @@ A pipeline-run task descriptor captures only construction data. The render graph
 ```cpp
 RendTaskDescVK task_desc(render_allocator);
 task_desc.task_id = "run_lighting";
-task_desc.read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
-    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE)
-    .connect("present", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+// The compute pipeline reflects gbuffer_albedo (read) and lighting_output (read_write); the task reports both.
+task_desc.connect("present", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 // The G-buffer pass was added earlier; connect it to the lighting task.
 graph_desc.get_task("run_gbuffer")
     .connect("run_lighting", "gbuffer_albedo", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
@@ -140,7 +139,7 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - For a `RenderResourceList`, confirm every entry is a render object for the active backend and populate the list before graph
   registration.
 - Confirm task IDs and `connect()` targets are valid and acyclic.
-- Confirm each compact usage describes the actual command and that reads and writes are declared on the correct side.
+- Confirm each storage `WBE_DESCRIPTOR` states its access, that tasks report their fixed-function accesses, and that every task-local id is aliased to the intended graph resource.
 - Add a chain of edges on the resource for every read-write, write-read, and write-write hazard, with stages that chain.
 - Confirm compute tasks reach a graphics task through edges.
 - Preserve concurrent sharing for resources crossing distinct queue families.

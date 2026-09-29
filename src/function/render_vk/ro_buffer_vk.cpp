@@ -336,7 +336,7 @@ void upload_initial_data(
 
 ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
-    create_buffer(p_builder);
+    create_buffer(p_builder, false);
     memory = DeviceMemoryVK::Builder().set_buffer_requirements(buffer).set_domain(exposed_fields.domain).create_ref(render_data);
     VkResult result = vmaBindBufferMemory(render_data->vma_allocator, memory->get(), buffer);
     if (result != VK_SUCCESS) {
@@ -353,31 +353,23 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder
     if (p_builder.buffer.domain.has_value() && *p_builder.buffer.domain != exposed_fields.domain) {
         throw std::runtime_error("Failed to create aliasing buffer: the buffer domain differs from the device memory domain.");
     }
-    create_buffer(p_builder.buffer);
-    VkMemoryRequirements requirements{};
-    vkGetBufferMemoryRequirements(render_data->logic_device, buffer, &requirements);
-    if (!p_builder.memory->is_compatible(requirements, p_builder.offset)) {
-        vkDestroyBuffer(render_data->logic_device, buffer, render_data->allocation_callbacks);
-        throw std::runtime_error(std::format("Failed to create aliasing buffer: device memory cannot hold {} bytes at offset {}.",
-            requirements.size,
-            p_builder.offset));
-    }
     memory = p_builder.memory;
     memory_offset = p_builder.offset;
-    VkResult result = vmaBindBufferMemory2(render_data->vma_allocator, memory->get_alias(), memory_offset, buffer, nullptr);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to bind aliasing Vulkan buffer memory: {}.", string_VkResult(result)));
-    }
+    create_buffer(p_builder.buffer, true);
     finish_creation(p_builder.buffer);
 }
 
-void ROBufferVK::create_buffer(const Builder& p_builder) {
+void ROBufferVK::create_buffer(const Builder& p_builder, bool p_alias) {
     validate_distinct_descriptor_indices(p_builder);
     usage = get_buffer_usage(p_builder, exposed_fields.domain);
     validate_adopted_descriptor_indices(render_data, p_builder, usage);
     std::vector<uint32_t> initial_queues = get_initial_queue_families(render_data, p_builder);
     exposed_fields.buffer_size = p_builder.size;
     VkBufferCreateInfo create_info = make_buffer_create_info(p_builder.size, usage, initial_queues);
+    if (p_alias) {
+        buffer = memory->create_buffer(create_info, memory_offset);
+        return;
+    }
     VkResult result = vkCreateBuffer(render_data->logic_device, &create_info, render_data->allocation_callbacks, &buffer);
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create Vulkan buffer: {}.", string_VkResult(result)));

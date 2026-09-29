@@ -32,12 +32,12 @@ struct DynamicDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_dynamic_nodes.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes", "read")]
     uint2 dynamic_nodes;
     /**
      * @brief Descriptor-heap reference to octree_dynamic_leaves.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
     /**
      * @brief Descriptor-heap reference to octree_voxel_claims.

@@ -65,6 +65,35 @@ ShaderDescriptorHeapTypeVK descriptor_heap_type_from_name(std::string_view p_nam
     throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
 }
 
+bool descriptor_type_is_writable(ShaderDescriptorHeapTypeVK p_type) {
+    return p_type == ShaderDescriptorHeapTypeVK::STORAGE_BUFFER || p_type == ShaderDescriptorHeapTypeVK::STORAGE_IMAGE;
+}
+
+ShaderDescriptorAccessVK descriptor_access(ShaderDescriptorHeapTypeVK p_type, const ShaderMetadataUserAttribute& p_attribute, std::string_view p_field_path) {
+    // Slang reflects an omitted access argument as its empty default value.
+    if (p_attribute.arguments.size() < 3 || p_attribute.arguments[2].string_value.empty()) {
+        return descriptor_type_is_writable(p_type) ? ShaderDescriptorAccessVK::READ_WRITE : ShaderDescriptorAccessVK::READ;
+    }
+    const std::string_view name = p_attribute.arguments[2].string_value;
+    ShaderDescriptorAccessVK access = ShaderDescriptorAccessVK::READ;
+    if (name == "write") {
+        access = ShaderDescriptorAccessVK::WRITE;
+    } else if (name == "read_write") {
+        access = ShaderDescriptorAccessVK::READ_WRITE;
+    } else if (name != "read") {
+        throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has unsupported access '{}'.", p_field_path, name));
+    }
+    if (access != ShaderDescriptorAccessVK::READ && !descriptor_type_is_writable(p_type)) {
+        throw std::runtime_error(
+            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' writes a descriptor type that is read-only.", p_field_path));
+    }
+    return access;
+}
+
+ShaderDescriptorAccessVK combine_accesses(ShaderDescriptorAccessVK p_first, ShaderDescriptorAccessVK p_second) {
+    return p_first == p_second ? p_first : ShaderDescriptorAccessVK::READ_WRITE;
+}
+
 const ShaderMetadataUserAttribute* find_unique_attribute(const ShaderMetadataTypeField& p_field, std::string_view p_attribute_name) {
     const ShaderMetadataUserAttribute* result = nullptr;
     for (const ShaderMetadataUserAttribute& attribute : p_field.user_attributes) {
@@ -175,10 +204,11 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                 std::format("Failed to resolve push data: field '{}' has both WBE_DESCRIPTOR and WBE_DEFAULT_PUSH.", field_path));
         }
         if (descriptor_attribute != nullptr) {
-            if (descriptor_attribute->arguments.size() != 2 || descriptor_attribute->arguments[0].kind != "string" ||
-                descriptor_attribute->arguments[0].string_value.empty() || descriptor_attribute->arguments[1].kind != "string" ||
-                descriptor_attribute->arguments[1].string_value.empty()) {
-                throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments.",
+            const std::vector<ShaderMetadataUserAttributeArgument>& arguments = descriptor_attribute->arguments;
+            if (arguments.size() < 2 || arguments.size() > 3 || std::ranges::any_of(arguments, [](const ShaderMetadataUserAttributeArgument& p_argument) {
+                    return p_argument.kind != "string";
+                }) || arguments[0].string_value.empty() || arguments[1].string_value.empty()) {
+                throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments and an optional access argument.",
                     field_path));
             }
             if (field.type.kind != "vector" || field.type.element_scalar_type != "uint32" || field.type.element_count != 2 ||
@@ -187,12 +217,14 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                 throw std::runtime_error(
                     std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' must be an aligned eight-byte uint2.", field_path));
             }
+            const ShaderDescriptorHeapTypeVK type = descriptor_heap_type_from_name(arguments[0].string_value);
             append_descriptor_field(p_layout,
                 ShaderDescriptorHeapFieldVK{
                     .field_path = field_path,
-                    .type = descriptor_heap_type_from_name(descriptor_attribute->arguments[0].string_value),
-                    .resource_id = descriptor_attribute->arguments[1].string_value,
+                    .type = type,
+                    .resource_id = arguments[1].string_value,
                     .offset = static_cast<uint32_t>(field_offset),
+                    .access = descriptor_access(type, *descriptor_attribute, field_path),
                 });
         }
         if (default_push_attribute != nullptr) {
@@ -251,6 +283,7 @@ void merge_descriptor_heap_layout(ShaderDescriptorHeapLayoutVK& p_result, const 
                 throw std::runtime_error(
                     std::format("Conflicting descriptor-heap push-data declarations for field '{}'.", field.field_path));
             }
+            existing->access = combine_accesses(existing->access, field.access);
             continue;
         }
         for (const ShaderDescriptorHeapFieldVK& other : p_result.fields) {

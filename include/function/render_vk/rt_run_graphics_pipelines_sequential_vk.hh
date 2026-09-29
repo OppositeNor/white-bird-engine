@@ -22,8 +22,8 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
-#include "function/render_vk/pipeline_resource_map_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
@@ -40,7 +40,9 @@ namespace WhiteBirdEngine {
  * @class RTRunGraphicsPipelinesSequentialVK
  * @brief Records ordered, synchronized graphics passes in one command buffer.
  *
- * Attachment and draw resources are intrinsic task resources. Shader resources are declared on RendTaskDescVK.
+ * Every pass renders into the task's render targets, `render_target_colors[<index>]` and `render_target_depth`, following its
+ * pipeline's attachment layout. The task reports those accesses, its draw buffers, and every pass's reflected shader resources;
+ * map them to graph resources with RendTaskDescVK::alias(). Passes that need different render targets belong in separate tasks.
  */
 struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
     /**
@@ -52,7 +54,7 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
     struct DispatchBase {
         /**
          * @brief Construct an empty pass configuration using the supplied allocator.
-         * @param p_allocator Allocator used by owned attachment identifiers and clear values.
+         * @param p_allocator Allocator used by owned clear values.
          */
         explicit DispatchBase(RenderAllocator* p_allocator);
         ~DispatchBase() = default;
@@ -61,22 +63,16 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         DispatchBase& operator=(const DispatchBase&) = default;
         DispatchBase& operator=(DispatchBase&&) noexcept = default;
 
-        /** Invocation-local reflected shader resource mappings. */
-        PipelineResourceMapVK resource_map;
         /** Graphics pipeline retained by the task. */
         Ref<ROGraphicsPipelineVK> pipeline = MEM_NULL;
-        /** Clear values for color attachments followed by the optional depth attachment. */
+        /** Clear values for the color targets followed by the depth target. Empty clears to zero. */
         Vector<VkClearValue, RenderAllocator> clear_values;
         /** Render area for this pass. */
         VkExtent2D render_extent{};
-        /** Color attachment graph-resource identifiers in pipeline order. */
-        Vector<std::string, RenderAllocator> color_attachment_ids;
-        /** Optional depth attachment graph-resource identifier. */
-        std::optional<std::string> depth_attachment_id;
-        /** Load operation used by every color attachment. */
-        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        /** Load operation used by the optional depth attachment. */
-        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        /** Load operation used by every color target. */
+        VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        /** Load operation used by the depth target. */
+        VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     };
 
     /**
@@ -225,8 +221,9 @@ public:
     }
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
@@ -239,8 +236,7 @@ private:
         BoundEntry& operator=(BoundEntry&&) noexcept = default;
 
         Dispatch dispatch;
-        Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
-        Ref<RenderObjectContainerVK> depth_attachment_container;
+        RenderTargetsVK render_targets;
         Ref<RenderObjectContainerVK> vertex_buffer_container;
         Ref<RenderObjectContainerVK> index_buffer_container;
         Ref<RenderObjectContainerVK> indirect_buffer_container;
@@ -249,6 +245,7 @@ private:
 
     const BaseRenderDataVK* render_data = nullptr;
     Vector<BoundEntry, RenderAllocator> entries;
+
 };
 
 } // namespace WhiteBirdEngine

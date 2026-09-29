@@ -42,14 +42,10 @@ RTBuildAccelerationStructuresVK::RTBuildAccelerationStructuresVK(
     }
 }
 
-Vector<ResAccessVK, RenderAllocator> RTBuildAccelerationStructuresVK::read_resources() const {
-    return Vector<ResAccessVK, RenderAllocator>(render_data->allocator);
-}
-
-Vector<ResAccessVK, RenderAllocator> RTBuildAccelerationStructuresVK::write_resources() const {
-    Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = acceleration_structure_resource_id, .usage = RendResUsageVK::ACCELERATION_STRUCTURE});
-    return resources;
+void RTBuildAccelerationStructuresVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    static_cast<void>(p_reads);
+    p_writes.push_back({.res_id = acceleration_structure_resource_id, .usage = RendResUsageVK::ACCELERATION_STRUCTURE});
 }
 
 void RTBuildAccelerationStructuresVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {

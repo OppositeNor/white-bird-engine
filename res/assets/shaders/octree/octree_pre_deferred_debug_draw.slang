@@ -17,24 +17,24 @@
 #include "octree/octree_dynamic_read.slang"
 
 struct OctreePreDeferredDebugDrawDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "octree_pre_deferred_debug_info_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_pre_deferred_debug_info_buffer", "read")]
     uint2 octree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer", "read")]
     uint2 tree_leaves;
     /**
      * @brief Descriptor-heap reference to octree_dynamic_nodes.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes", "read")]
     uint2 dynamic_nodes;
     /**
      * @brief Descriptor-heap reference to octree_dynamic_leaves.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
 
-    [WBE_DESCRIPTOR("storage_buffer", "octree_pre_deferred_debug_list_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_pre_deferred_debug_list_buffer", "read")]
     uint2 deferred_list;
     [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;

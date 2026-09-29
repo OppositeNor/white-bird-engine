@@ -22,7 +22,7 @@ struct DynamicDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
     uint2 info;
     /**
      * @brief Descriptor-heap reference to octree_node_buffer.
@@ -37,12 +37,12 @@ struct DynamicDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_dynamic_leaves.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
     /**
      * @brief Descriptor-heap reference to octree_voxel_claims.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims", "read")]
     uint2 claims;
 };
 [[vk::push_constant]]

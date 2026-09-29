@@ -55,8 +55,8 @@ public:
     std::atomic_bool activate{false};
 
     QueueFamilyVK queue_family() const override;
-    Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-    Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
     void bind_resources(const RendResViewVK& p_resources) override;
     void init() override;
     void record(VkCommandBuffer p_command_buffer, double p_delta) override;

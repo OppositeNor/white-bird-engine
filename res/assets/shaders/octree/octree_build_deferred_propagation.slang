@@ -23,12 +23,12 @@ struct OctreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
     uint2 tree_leaves;
 #ifdef WBE_USE_PING_WRITE
-    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "read")]
     uint2 deferred_list_read;
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
     uint2 deferred_list_write;
 #else
-    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "read")]
     uint2 deferred_list_read;
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong")]
     uint2 deferred_list_write;

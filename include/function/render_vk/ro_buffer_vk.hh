@@ -627,7 +627,7 @@ private:
     mutable std::optional<uint32_t> uniform_view_index;
     mutable std::optional<uint32_t> storage_view_index;
 
-    void create_buffer(const Builder& p_builder);
+    void create_buffer(const Builder& p_builder, bool p_alias);
     void finish_creation(const Builder& p_builder);
 };
 } // namespace WhiteBirdEngine

@@ -23,6 +23,7 @@
 #include "function/render/render_resource_list.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
@@ -66,11 +67,14 @@ public:
     /**
      * @brief Construct a view over a graph resource map.
      *
-     * The map is non-owning and must outlive this view.
+     * The maps are non-owning and must outlive this view.
      *
      * @param p_resources The resource map to view.
+     * @param p_resource_map Optional task resource map; lookups resolve task-local identifiers through it first.
      */
-    explicit RendResViewVK(const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources) : resources(p_resources) {
+    explicit RendResViewVK(
+        const Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources, const RenderTaskResourceMap* p_resource_map = nullptr)
+        : resources(p_resources), resource_map(p_resource_map) {
     }
 
     /**
@@ -102,6 +106,9 @@ public:
 
 private:
     const Map<std::string, Ref<RendResVK>, RenderAllocator>* resources;
+    const RenderTaskResourceMap* resource_map;
+
+    std::string_view resolve(std::string_view p_resource_id) const;
 };
 
 /**
@@ -161,8 +168,8 @@ struct RGSemaphoreWaitVK {
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : in_edges(p_allocator), out_edges(p_allocator), reads(p_allocator), writes(p_allocator), barriers(p_allocator),
-          semaphore_waits(p_allocator) {
+        : in_edges(p_allocator), out_edges(p_allocator), resource_map(p_allocator), reads(p_allocator), writes(p_allocator),
+          barriers(p_allocator), semaphore_waits(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
     Unique<IRenderTaskVK> render_task;
@@ -172,7 +179,9 @@ struct RGNode {
     Vector<RefWeak<RGResEdge>, RenderAllocator> in_edges;
     // Resource edges whose previous task is this node.
     Vector<RefWeak<RGResEdge>, RenderAllocator> out_edges;
-    // Compact resource declarations, including intrinsic task usage and descriptor additions.
+    // Task resource map copied from the descriptor; the graph resolves every task-local identifier through it.
+    RenderTaskResourceMap resource_map;
+    // Resource accesses reported by the task, resolved to graph resource identifiers.
     Vector<ResAccessVK, RenderAllocator> reads;
     Vector<ResAccessVK, RenderAllocator> writes;
     // Same-queue incoming dependencies, recorded as barriers before the task.

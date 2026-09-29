@@ -23,10 +23,10 @@
 #include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include <cstddef>
 #include <cstdint>
@@ -130,6 +130,39 @@ struct RendImageViewDescVK {
 };
 
 /**
+ * @class RendSamplerDescVK
+ * @brief Configuration of a sampler created by the render graph during graph compilation.
+ */
+struct RendSamplerDescVK {
+    /** Minification filter. */
+    VkFilter min_filter = VK_FILTER_LINEAR;
+    /** Magnification filter. */
+    VkFilter mag_filter = VK_FILTER_LINEAR;
+    /** Mipmap sampling mode. */
+    VkSamplerMipmapMode mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    /** Address mode for the U coordinate. */
+    VkSamplerAddressMode address_mode_u = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    /** Address mode for the V coordinate. */
+    VkSamplerAddressMode address_mode_v = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    /** Address mode for the W coordinate. */
+    VkSamplerAddressMode address_mode_w = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    /** Mipmap level-of-detail bias. */
+    float mip_lod_bias = 0.0F;
+    /** Maximum anisotropy; anisotropic filtering is disabled when unset. */
+    std::optional<float> max_anisotropy;
+    /** Depth-comparison operation; comparison sampling is disabled when unset. */
+    std::optional<VkCompareOp> compare_op;
+    /** Minimum mip level of detail. */
+    float min_lod = 0.0F;
+    /** Maximum mip level of detail. */
+    float max_lod = VK_LOD_CLAMP_NONE;
+    /** Border color used by clamp-to-border address modes. */
+    VkBorderColor border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    /** Whether texture coordinates are unnormalized. */
+    bool unnormalized_coordinates = false;
+};
+
+/**
  * @class RendBufferDeclVK
  * @brief A buffer resource declared on a graph descriptor.
  */
@@ -172,7 +205,7 @@ struct RendSamplerDeclVK {
     /** Graph resource identifier. */
     std::string res_id;
     /** Sampler configuration. */
-    ROSamplerVK::Builder builder;
+    RendSamplerDescVK desc;
 };
 
 /**
@@ -237,28 +270,25 @@ struct RendTaskDescVK {
         VkPipelineStageFlags2 p_dst_stage);
 
     /**
-     * @brief Declare an additional resource read performed through pipeline descriptors.
-     * @param p_resource_id Graph resource identifier.
-     * @param p_usage Compact task-facing usage.
+     * @brief Map a resource identifier used by the task to a graph resource.
+     *
+     * The task binds and reports its accesses with task-local identifiers: reflected shader resource ids, render targets
+     * (`render_target_colors[<index>]` and `render_target_depth`), and ids passed to its constructor. The graph resolves each
+     * of them through this map; unmapped identifiers must name graph resources directly. Every alias must be used by the task.
+     *
+     * @param p_task_resource_id Identifier used by the task.
+     * @param p_graph_resource_id Graph resource identifier it refers to.
      * @return This descriptor.
+     * @throws std::runtime_error If an identifier is empty or p_task_resource_id is already mapped.
      */
-    RendTaskDescVK& read(std::string_view p_resource_id, RendResUsageVK p_usage);
-
-    /**
-     * @brief Declare an additional resource write performed through pipeline descriptors.
-     * @param p_resource_id Graph resource identifier.
-     * @param p_usage Compact task-facing usage.
-     * @return This descriptor.
-     */
-    RendTaskDescVK& write(std::string_view p_resource_id, RendResUsageVK p_usage);
+    RendTaskDescVK& alias(std::string_view p_task_resource_id, std::string_view p_graph_resource_id);
 
     // The id of this task within the graph.
     RendTaskID task_id;
     // Resource dependencies from this task to later tasks.
     Vector<RendResEdgeDescVK, RenderAllocator> next;
-    // Additional descriptor-mediated resource reads and writes.
-    Vector<ResAccessVK, RenderAllocator> reads;
-    Vector<ResAccessVK, RenderAllocator> writes;
+    // Task-local to graph resource identifier map.
+    RenderTaskResourceMap resource_map;
     // Factory invoked at graph-build time to construct the concrete task. The
     // resulting Unique<IRenderTaskVK> is owned by the graph.
     std::function<Unique<IRenderTaskVK>()> create;
@@ -271,7 +301,7 @@ struct RendTaskDescVK {
  * Every resource is declared once in this graph-wide descriptor. Buffers, images, image views, and samplers declared with
  * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled;
  * resources owned elsewhere are imported with add_resource() or add_static_set(). Tasks refer to every resource by id through
- * their read, write, attachment, and reflected shader declarations.
+ * their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)
@@ -378,10 +408,10 @@ struct RendGraphDescVK {
     /**
      * @brief Declare a sampler created by the graph during compilation.
      * @param p_resource_id Graph resource identifier.
-     * @param p_builder Sampler configuration.
+     * @param p_desc Sampler configuration.
      * @return This graph descriptor.
      */
-    RendGraphDescVK& add_sampler(std::string_view p_resource_id, ROSamplerVK::Builder p_builder);
+    RendGraphDescVK& add_sampler(std::string_view p_resource_id, const RendSamplerDescVK& p_desc = {});
 
     /**
      * @brief Import every resource of a compiled static set under the REND_RES_STATIC_SET_* ids.

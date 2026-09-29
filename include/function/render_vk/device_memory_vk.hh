@@ -29,8 +29,9 @@ namespace WhiteBirdEngine {
  * @class DeviceMemoryVK
  * @brief One VMA-managed Vulkan device-memory allocation that buffers and images bind to.
  *
- * The resource that the allocation was made for binds it through get(). Further resources may bind the same memory as aliases
- * through get_alias(); aliasing resources share the memory contents, so callers must synchronize their use of it. Buffers and
+ * The resource that the allocation was made for binds it through get(). Further resources are created as aliases of the same
+ * memory with create_buffer() and create_image(), which validate compatibility and create and bind atomically. Aliasing resources
+ * share the memory contents, so callers must synchronize their use of it. Buffers and
  * images retain a Ref to the memory they are bound to until their own delayed destruction, so the allocation outlives every
  * bound resource.
  *
@@ -136,21 +137,32 @@ public:
     }
 
     /**
-     * @brief Acquire the allocation for binding an aliasing resource.
+     * @brief Create a buffer bound to this memory as an alias.
      *
-     * Each call records one more alias of the memory.
+     * The buffer's memory requirements are checked against this memory before the buffer is created; VMA then creates and binds
+     * it atomically. The caller owns the returned handle and must destroy it with vkDestroyBuffer before the last reference to
+     * this memory is released.
      *
-     * @return The VMA allocation.
+     * @param p_create_info Buffer creation parameters.
+     * @param p_offset Offset of the buffer inside the allocation.
+     * @return The bound buffer.
+     * @throws std::runtime_error If the memory cannot hold the buffer at the offset, or creation or binding fails.
      */
-    VmaAllocation get_alias();
+    VkBuffer create_buffer(const VkBufferCreateInfo& p_create_info, VkDeviceSize p_offset) const;
 
     /**
-     * @brief Get the number of aliases acquired through get_alias().
-     * @return The alias count.
+     * @brief Create an image bound to this memory as an alias.
+     *
+     * The image's memory requirements are checked against this memory before the image is created; VMA then creates and binds
+     * it atomically. The caller owns the returned handle and must destroy it with vkDestroyImage before the last reference to
+     * this memory is released.
+     *
+     * @param p_create_info Image creation parameters.
+     * @param p_offset Offset of the image inside the allocation.
+     * @return The bound image.
+     * @throws std::runtime_error If the memory cannot hold the image at the offset, or creation or binding fails.
      */
-    uint32_t get_alias_count() const {
-        return alias_count;
-    }
+    VkImage create_image(const VkImageCreateInfo& p_create_info, VkDeviceSize p_offset) const;
 
     /**
      * @brief Check whether a resource with the given requirements can be bound at an offset of this memory.
@@ -180,7 +192,6 @@ private:
     const BaseRenderDataVK* render_data;
     VmaAllocation allocation = VK_NULL_HANDLE;
     ExposedFields exposed_fields{};
-    uint32_t alias_count = 0;
 };
 
 } // namespace WhiteBirdEngine

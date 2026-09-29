@@ -18,7 +18,6 @@
 #include "function/function_utils.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/vma_vk.hh"
-#include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <vulkan/vk_enum_string_helper.h>
@@ -105,9 +104,44 @@ DeviceMemoryVK::~DeviceMemoryVK() {
     vmaFreeMemory(render_data->vma_allocator, allocation);
 }
 
-VmaAllocation DeviceMemoryVK::get_alias() {
-    ++alias_count;
-    return allocation;
+VkBuffer DeviceMemoryVK::create_buffer(const VkBufferCreateInfo& p_create_info, VkDeviceSize p_offset) const {
+    const VkDeviceBufferMemoryRequirements requirements_info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS,
+        .pCreateInfo = &p_create_info,
+    };
+    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    vkGetDeviceBufferMemoryRequirements(render_data->logic_device, &requirements_info, &requirements);
+    if (!is_compatible(requirements.memoryRequirements, p_offset)) {
+        throw std::runtime_error(std::format("Failed to create aliasing buffer: device memory cannot hold {} bytes at offset {}.",
+            requirements.memoryRequirements.size,
+            p_offset));
+    }
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkResult result = vmaCreateAliasingBuffer2(render_data->vma_allocator, allocation, p_offset, &p_create_info, &buffer);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create aliasing buffer: {}.", string_VkResult(result)));
+    }
+    return buffer;
+}
+
+VkImage DeviceMemoryVK::create_image(const VkImageCreateInfo& p_create_info, VkDeviceSize p_offset) const {
+    const VkDeviceImageMemoryRequirements requirements_info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS,
+        .pCreateInfo = &p_create_info,
+    };
+    VkMemoryRequirements2 requirements{.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2};
+    vkGetDeviceImageMemoryRequirements(render_data->logic_device, &requirements_info, &requirements);
+    if (!is_compatible(requirements.memoryRequirements, p_offset)) {
+        throw std::runtime_error(std::format("Failed to create aliasing image: device memory cannot hold {} bytes at offset {}.",
+            requirements.memoryRequirements.size,
+            p_offset));
+    }
+    VkImage image = VK_NULL_HANDLE;
+    VkResult result = vmaCreateAliasingImage2(render_data->vma_allocator, allocation, p_offset, &p_create_info, &image);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to create aliasing image: {}.", string_VkResult(result)));
+    }
+    return image;
 }
 
 bool DeviceMemoryVK::is_compatible(const VkMemoryRequirements& p_requirements, VkDeviceSize p_offset) const {

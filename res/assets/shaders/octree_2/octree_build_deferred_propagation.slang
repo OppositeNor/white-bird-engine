@@ -59,7 +59,7 @@ struct OctreeDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_deferred_list_pong.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to octree_deferred_list_ping.
@@ -70,7 +70,7 @@ struct OctreeDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_deferred_list_ping.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to octree_deferred_list_pong.

@@ -110,8 +110,11 @@ ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeFie
     return metadata;
 }
 
-ShaderMetadataTypeField make_descriptor_heap_field(
-    std::string_view p_name, std::string_view p_descriptor_type, int32_t p_offset, std::string_view p_resource_id = {}) {
+ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name,
+    std::string_view p_descriptor_type,
+    int32_t p_offset,
+    std::string_view p_resource_id = {},
+    std::string_view p_access = {}) {
     ShaderMetadataTypeField field;
     field.name = p_name;
     field.type.kind = "vector";
@@ -129,6 +132,10 @@ ShaderMetadataTypeField make_descriptor_heap_field(
     attribute.arguments.push_back(argument);
     argument.string_value = p_resource_id.empty() ? p_name : p_resource_id;
     attribute.arguments.push_back(argument);
+    if (!p_access.empty()) {
+        argument.string_value = p_access;
+        attribute.arguments.push_back(argument);
+    }
     field.user_attributes.push_back(attribute);
     return field;
 }
@@ -544,6 +551,69 @@ TEST(WBEShaderMetadataVKUtilsTest, BuildsEmptyStateForVertexlessEntry) {
     VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", vertex_data);
     EXPECT_TRUE(description.bindings.empty());
     EXPECT_TRUE(description.attributes.empty());
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, ReflectsDescriptorAccessFromTheOptionalThirdArgument) {
+    const std::array<ShaderMetadataTypeField, 6> fields{{
+        make_descriptor_heap_field("uniform", "uniform_buffer", 0),
+        make_descriptor_heap_field("storage_default", "storage_buffer", 8),
+        make_descriptor_heap_field("storage_read", "storage_buffer", 16, {}, "read"),
+        make_descriptor_heap_field("image_write", "storage_image", 24, {}, "write"),
+        make_descriptor_heap_field("image_read_write", "storage_image", 32, {}, "read_write"),
+        make_descriptor_heap_field("sampled_read", "sampled_image", 40, {}, "read"),
+    }};
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    ASSERT_EQ(layout.fields.size(), 6U);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ);
+    EXPECT_EQ(layout.fields[1].access, ShaderDescriptorAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[2].access, ShaderDescriptorAccessVK::READ);
+    EXPECT_EQ(layout.fields[3].access, ShaderDescriptorAccessVK::WRITE);
+    EXPECT_EQ(layout.fields[4].access, ShaderDescriptorAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[5].access, ShaderDescriptorAccessVK::READ);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, TreatsTheReflectedEmptyAccessDefaultAsOmitted) {
+    ShaderMetadataTypeField storage = make_descriptor_heap_field("storage", "storage_buffer", 0);
+    ShaderMetadataTypeField uniform = make_descriptor_heap_field("uniform", "uniform_buffer", 8);
+    for (ShaderMetadataTypeField* field : {&storage, &uniform}) {
+        ShaderMetadataUserAttributeArgument empty_access;
+        empty_access.kind = "string";
+        field->user_attributes[0].arguments.push_back(empty_access);
+    }
+    const std::array<ShaderMetadataTypeField, 2> fields{{storage, uniform}};
+
+    ShaderDescriptorHeapLayoutVK layout =
+        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", fields), "compute", "compute_main");
+
+    ASSERT_EQ(layout.fields.size(), 2U);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[1].access, ShaderDescriptorAccessVK::READ);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidDescriptorAccess) {
+    const std::array<ShaderMetadataTypeField, 1> unknown{{make_descriptor_heap_field("storage", "storage_buffer", 0, {}, "modify")}};
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", unknown), "compute", "compute_main"),
+        std::runtime_error);
+    const std::array<ShaderMetadataTypeField, 1> read_only_write{{make_descriptor_heap_field("sampled", "sampled_image", 0, {}, "write")}};
+    EXPECT_THROW(
+        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "compute_main", read_only_write), "compute", "compute_main"),
+        std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, MergesDescriptorAccessesAcrossGraphicsStages) {
+    const std::array<ShaderMetadataTypeField, 1> vertex_fields{{make_descriptor_heap_field("state", "storage_buffer", 0, {}, "read")}};
+    const std::array<ShaderMetadataTypeField, 1> fragment_fields{{make_descriptor_heap_field("state", "storage_buffer", 0, {}, "write")}};
+    ShaderMetadata vertex = make_descriptor_heap_metadata("vertex", "vertex_main", vertex_fields);
+    ShaderMetadata fragment = make_descriptor_heap_metadata("fragment", "fragment_main", fragment_fields);
+
+    ShaderDescriptorHeapLayoutVK layout =
+        collect_graphics_pipeline_descriptor_heap_layout(vertex, "vertex_main", nullptr, {}, fragment, "fragment_main");
+
+    ASSERT_EQ(layout.fields.size(), 1U);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
 }
 
 } // namespace WhiteBirdEngine

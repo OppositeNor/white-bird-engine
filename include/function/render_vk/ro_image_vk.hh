@@ -517,7 +517,7 @@ private:
     ktxVulkanTexture ktx_texture{};
     Ownership ownership = Ownership::DEVICE_MEMORY;
 
-    void create_image(const Builder& p_builder);
+    void create_image(const Builder& p_builder, Ref<DeviceMemoryVK> p_alias_memory, VkDeviceSize p_alias_offset);
 };
 } // namespace WhiteBirdEngine
 

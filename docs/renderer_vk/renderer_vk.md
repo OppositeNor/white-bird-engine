@@ -43,8 +43,10 @@ validated texture table.
 
 `ROBufferVK` and `ROImageVK` bind to a `DeviceMemoryVK`, which owns one VMA allocation. Their ordinary `Builder` creates the
 resource, allocates a `Ref<DeviceMemoryVK>` for its requirements, and binds it through `DeviceMemoryVK::get()`. An `AliasBuilder`
-instead takes an existing `Ref<DeviceMemoryVK>` and an offset and binds the new resource through `get_alias()`, which counts the
-alias; construction fails when the memory type, alignment, or remaining size cannot hold the resource. Aliasing resources share
+instead takes an existing `Ref<DeviceMemoryVK>` and an offset and creates the resource through `DeviceMemoryVK::create_buffer()` or
+`create_image()`. Those check the resource's memory requirements (from its create info) against the memory type, alignment, and
+remaining size before anything is created, then use VMA's `vmaCreateAliasingBuffer2()` / `vmaCreateAliasingImage2()` to create and
+bind atomically. Every bound resource holds a reference to its memory, so the reference count of the `Ref` tracks its users. Aliasing resources share
 their contents, so their use must be synchronized. Memory for several aliases can be allocated from explicit requirements with
 `DeviceMemoryVK::Builder::set_requirements()`, or taken from an existing resource with `acquire_memory()`.
 
@@ -59,10 +61,13 @@ sampled-image, and storage-image arenas plus a separate sampler heap. `ROBufferV
 allocated lazily by their descriptor getters or transferred through their builders, and defer release for the configured frames
 in flight.
 
-Shaders represent each resource as an aligned `uint2` field in push data marked with `WBE_DESCRIPTOR("uniform_buffer")`,
-`storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. The render graph binds both heaps before each task records, and
-`ROPipelineVK` pushes the reflected index block before dispatch or draw. Pipeline binding paths are relative to that push-data
-block and may traverse nested structs and fixed-size struct arrays.
+Shaders represent each resource as an aligned `uint2` field in push data marked with `WBE_DESCRIPTOR("TYPE", "resource_id")`,
+where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`. An
+optional third argument states the shader access: `"read"`, `"write"`, or `"read_write"`. Only storage buffers and storage images
+may be written; they default to `"read_write"` and every other type is read. Pipeline-run tasks report these reflected accesses to
+the render graph. The render graph binds both heaps before each task records, and `ROPipelineVK` pushes the reflected index block
+before dispatch or draw. Pipeline binding paths are relative to that push-data block and may traverse nested structs and fixed-size
+struct arrays.
 
 Vulkan plugins contribute creation requirements through `RenderPluginVK::on_before_instance_creation()` and
 `on_before_device_creation()`. Device-feature requests should use the protected feature helper so plugins merge an existing
@@ -113,10 +118,10 @@ state.
 
 ## Static Set Resources
 
-`StaticSetCompilerVK::compile_resources()` compiles opaque and masked geometry into one pipeline-independent
-`StaticSetRenderResourcesVK`. It owns shared vertex and index buffers, separate opaque and masked indirect command buffers,
-submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed by the generic
-`RTRunGraphicsPipelinesSequentialVK`; callers provide the graphics pipeline when constructing each regular or indirect dispatch.
+`StaticSetCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
+`StaticSetResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
+buffers with their draw batches, submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed
+by the generic `RTRunGraphicsPipelineIndirectVK`; callers provide the graphics pipeline of each draw batch.
 
 ### Loading Static Geometry
 
@@ -142,12 +147,13 @@ index view stays within its binary bounds before it creates any Vulkan buffers.
 
 1. `StaticSetBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
   also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
-2. `build_static_binary_buffer()` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
-  the index binary into a separate `ROBufferVK` with the effective index usage flags.
+2. `StaticSetBufferCompilerVK` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
+  the index binary into a separate `ROBufferVK` with the effective index usage flags (`build_static_binary_buffer()` in
+  `static_set_buffer_compiler_vk.cpp`).
 3. Each upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource identity plus Vulkan
   usage flags, so later tasks and renderer plugins can reuse compatible buffers without re-uploading identical geometry bytes.
-4. `build_static_instance_buffer_data()` assembles three CPU-side tables from the set declaration:
-  `StaticSetSubmeshGPU`, `StaticSetNodeGPU`, and `StaticSetInstanceGPU`.
+4. `build_static_instance_buffer_data()` assembles three CPU-side tables from each set declaration: `GeometrySubmeshGPU`,
+  `GeometryNodeGPU`, and `GeometryInstanceGPU`. The tables of all categories are concatenated.
 5. `build_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
   indirection.
 
@@ -157,23 +163,23 @@ use for each indirect draw.
 
 ### Feeding The Graphics Pipeline
 
-After buffer creation, `compile_static_set_pipeline()` compiles the selected graphics pipeline once for the task and binds three
-named storage buffers into the reflected shader contract:
+Static-set shaders declare the metadata tables as reflected storage buffers in `StaticSetDescriptorIndices`
+(`utils/utils.slang`), annotated as read-only:
 
-- `static_set.submeshes`
-- `static_set.nodes`
-- `static_set.instances`
+- `static_set.submeshes` (`REND_RES_STATIC_SET_SUBMESHES`)
+- `static_set.nodes` (`REND_RES_STATIC_SET_NODES`)
+- `static_set.instances` (`REND_RES_STATIC_SET_INSTANCES`)
 
-The task still uses shader reflection for material fallback textures. `get_default_image()` resolves the configured default
-material, and `GraphicsPipelineCompilerVK` binds any reflected texture and parameter resources needed by the selected pipeline.
-The compiled material image views are also returned as a CPU-side `RenderResourceList`, available through
-`CompiledStaticSetVK::acquire_texture_list()`.
+Material resources follow the pipeline's reflected material texture contract. `get_default_image()` resolves the configured
+default material, and `StaticSetMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
+image views are returned as a CPU-side `RenderResourceList` through `StaticSetResourcesVK::acquire_textures()`.
 
-The application registers each compiled static-set resource once on `RendGraphDescVK`. Tasks refer to the shared vertex, index,
-indirect-command, metadata, material, and texture resources by their graph resource identifiers. A `RenderResourceList` does not
-create GPU resources; graph construction retains the list under its aggregate key and registers its entries as
-`<resource_list_key>[<index>]`. Declaring one access to the aggregate expands to accesses on all indexed entries, so a task can
-declare one sampled-image read on `REND_RES_STATIC_SET_TEXTURES` while graph dependency validation still sees every texture.
+The application imports every compiled static-set resource once with `RendGraphDescVK::add_static_set()`, which registers them under
+the `REND_RES_STATIC_SET_*` identifiers. Graphics tasks bind the vertex, index, and indirect-command buffers by those identifiers and
+report the reflected metadata and material accesses themselves; a pipeline whose reflected identifiers differ is mapped with
+`RendTaskDescVK::alias()`. A `RenderResourceList` does not create GPU resources; graph construction retains the list under its
+aggregate key and registers its entries as `<resource_list_key>[<index>]`. An access or edge on the aggregate expands to all indexed
+entries.
 
 `StaticSetDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
 layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their
@@ -188,66 +194,85 @@ binds its minimum vertex-view byte offset, and is split at the device's `maxDraw
 - `instanceCount` from the submesh's instance count.
 
 The indirect command buffer has both `VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT` and `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`. Each
-sequential graphics entry selects a contiguous command range and records one `vkCmdDrawIndexedIndirect`; a future compute task can
-write the same graph resource as a storage buffer when a chain of edges on that resource orders it before the graphics task.
+`RTRunGraphicsPipelineIndirectVK::PipelineBatch` selects a contiguous command range and records one `vkCmdDrawIndexedIndirect`; a
+future compute task can write the same graph resource as a storage buffer when a chain of edges on that resource orders it before
+the graphics task.
 
 Before constructing the task:
 
-1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`.
-2. Declare every attachment resource referenced by the task configuration with `RendGraphDescVK::add_image()` and
-  `add_image_view()`; the graph allocates them when it is compiled. Import the renderer's swap-chain image-view container under
-  `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph renders to the swap chain, and import the compiled static set with
-  `add_static_set()`.
-3. Compile one `CompiledStaticSetVK` per set-plus-pipeline combination and order its generic graphics task with resource edges
-  declared by `RendTaskDescVK::connect()`.
+1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`, and compile the graphics
+  pipeline for the task's attachment formats with `GraphicsPipelineCompilerVK`.
+2. Compile the static set with `StaticSetCompilerVK::compile()` and import it with `RendGraphDescVK::add_static_set()`.
+3. Declare every render target with `RendGraphDescVK::add_image()` and `add_image_view()`; the graph allocates them when it is
+  compiled. Import the renderer's swap-chain image-view container under `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph
+  renders to the swap chain.
+4. Create one `RTRunGraphicsPipelineIndirectVK` per category-plus-pipeline combination, alias its render targets, and order it
+  against other tasks with resource edges declared by `RendTaskDescVK::connect()`.
 
 ```cpp
 RendererVK* renderer = RendererVK::get_singleton();
-RenderAllocator* render_allocator = renderer->get_base_render_data()->allocator;
-ResourceManager* resource_manager = ResourceManager::get_singleton();
+const BaseRenderDataVK* render_data = renderer->get_base_render_data();
+RenderAllocator* render_allocator = render_data->allocator;
 
-RefRes<RUStaticOpaqueSet> opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("scene.static_opaque_set");
-RefRes<RUGraphicsPipeline> opaque_pipeline = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
+// opaque_set and the compiled graphics pipeline come from step 1; the vertex metadata, entry, and material contract come from
+// the pipeline's shader metadata.
+Ref<StaticSetResourcesVK> static_set = StaticSetCompilerVK(renderer).compile(opaque_set,
+    MEM_NULL,
+    opaque_vertex_metadata,
+    opaque_vertex_entry,
+    ShaderMetadata{},
+    {},
+    material_contract,
+    StaticSetCompilerVK::Config{});
 
-StaticSetCompilerVK::Config compiler_config;
-compiler_config.color_attachment_formats.push_back(renderer->get_base_render_data()->swap_chain_format);
-compiler_config.depth_attachment_format = VK_FORMAT_D32_SFLOAT;
-Ref<CompiledStaticSetVK> static_set = StaticSetCompilerVK(renderer).compile(opaque_set, opaque_pipeline, compiler_config);
+RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
+task_builder.set_render_extent(render_data->swap_chain_extent)
+    .set_vertex_buffer(REND_RES_STATIC_SET_VERTICES)
+    .set_index_buffer(REND_RES_STATIC_SET_INDICES)
+    .set_indirect_buffer(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES);
+for (size_t i = 0; i < static_set->get_opaque_draw_batch_count(); ++i) {
+    const StaticSetResourcesVK::DrawBatch& batch = static_set->get_opaque_draw_batch(i);
+    task_builder.add_pipeline_batch(graphics_pipeline, batch.first_draw, batch.draw_count, batch.vertex_input, batch.vertex_buffer_offset);
+}
+RendTaskDescVK task_desc(render_allocator, "run_static_set", task_builder.create_unique(render_data));
+task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN).alias(RenderTargetsVK::DEPTH_ID, "scene_depth_view");
 
-CompiledStaticSetVK::PassConfig pass_config(render_allocator);
-pass_config.render_extent = renderer->get_base_render_data()->swap_chain_extent;
-pass_config.color_attachment_ids.emplace_back(REND_RES_SWAP_CHAIN);
-pass_config.depth_attachment_id = "scene_depth_view";
-pass_config.clear_values.resize(2);
-RendTaskDescVK task_desc(render_allocator,
-    "run_static_set",
-    static_set->create_render_task(renderer->get_base_render_data(), pass_config));
-static_set->configure_task(task_desc);
-
+const VkExtent2D extent = render_data->swap_chain_extent;
 RendGraphDescVK graph_desc(render_allocator);
-graph_desc
-   .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
-   .add_resource("scene_depth_view", depth_image_view)
-   .add_task(std::move(task_desc));
+graph_desc.add_static_set(static_set)
+    .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
+    .add_image("scene_depth_image",
+        {.usage = RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
+            .format = VK_FORMAT_D32_SFLOAT,
+            .extent = {.width = extent.width, .height = extent.height, .depth = 1}})
+    .add_image_view("scene_depth_view", "scene_depth_image")
+    .add_task(std::move(task_desc));
 
 renderer->register_render_graph("scene", std::move(graph_desc));
 renderer->activate_render_graph("scene");
 ```
 
-The application contributes all graph-visible attachments before registration. The renderer does not add or replace descriptor resources while
-building the graph. The task retains its compiled Vulkan objects directly, and the `RendTaskDescVK` move into the graph remains one-shot.
+The application contributes all graph-visible resources before registration. The renderer does not add or replace descriptor
+resources while building the graph. The task retains its graphics pipelines directly, and the `RendTaskDescVK` move into the graph
+remains one-shot. The reflected camera and light buffers of the pipeline must also be declared on the graph.
 
-### Configuring Explicit Passes
+### Render Targets
 
-- `add_color_attachment()` adds color attachments in rendering order. With no explicit color attachment, the graphics pipeline and
-  dynamic-rendering task use zero color attachments.
-- `set_depth_attachment()` requires both a graph resource id and its Vulkan format. `set_render_extent()` overrides the swap-chain
-  extent.
-- `add_clear_value()` follows attachment order: all color values first, then depth. Missing color values default to opaque black;
-  when depth is configured and only the color values are supplied, depth defaults to `0.0` and stencil to `0`.
-- `set_color_attachment_load_op()` and `set_depth_attachment_load_op()` control how a follow-up task in the same logical pass
-  reuses attachments produced by an earlier task.
-- Task ids, resource usages, and dependencies belong to `RendTaskDescVK`, not the task configuration.
+Graphics tasks render into the task-local resources `render_target_colors[<index>]` and `render_target_depth`
+(`RenderTargetsVK::color_id()` and `RenderTargetsVK::DEPTH_ID`). The number of color targets and the use of a depth target follow the
+graphics pipeline's attachment formats; every pipeline in one task must share that layout. Map the targets to graph resources on the
+task descriptor:
+
+```cpp
+task_desc.alias(RenderTargetsVK::color_id(0), "gbuffer_albedo")
+    .alias(RenderTargetsVK::color_id(1), "gbuffer_normal")
+    .alias(RenderTargetsVK::DEPTH_ID, "gbuffer_depth");
+```
+
+- `set_clear_values()` follows target order: all color values first, then depth. Empty clears every target to zero.
+- `set_color_load_op()` and `set_depth_load_op()` control how a follow-up task reuses targets produced by an earlier task; a loaded
+  target is also read.
+- Task ids, resource aliases, and dependencies belong to `RendTaskDescVK`, not the task configuration.
 
 ### Static Geometry Updates
 
@@ -269,30 +294,26 @@ The current opaque update flow is:
 
 Null, empty, and fully skipped sets clear the published acceleration structure without zero-sized allocations.
 
-### Replacing Pipeline Descriptor Bindings
+### Binding Pipeline Descriptors
 
-Material and static-set bindings are populated during construction. An application may replace a reflected binding on the task's
-compiled pipeline by field path:
+Pipeline-run tasks bind every reflected `WBE_DESCRIPTOR` field once, when the graph is built: the field's resource id, resolved
+through the task's `RendTaskDescVK::alias()` map, names a graph resource. There is no per-field binding API. The graph resource's
+type must match the field's category: buffers bind as `ROBufferVK`, image fields as `ROImageViewVK`, sampler fields as
+`ROSamplerVK`, and acceleration-structure fields as `ROAccelerationStructureVK`. A missing resource or an incompatible type makes
+graph construction fail.
 
-```cpp
-task->set_descriptor_binding("camera_info", camera_buffer);
-task->set_descriptor_binding("light.lights.shadowmap", shadow_depth_view);
-```
-
-The resource type must match the field's `WBE_DESCRIPTOR` category. Buffers bind as complete `ROBufferVK` objects; image fields
-take `ROImageViewVK`, and sampler fields take `ROSamplerVK`. The pipeline retains directly bound resources for its lifetime.
-
-`ROCMultislotsVK` is a general container for arbitrary slot-indexed resources and is widely used for frame-local resources. Pass
-the container instead of resolving one frame slot manually:
+Frame-local resources are graph resources held in an `ROCMultislotsVK`, either declared per frame on the graph or imported as a
+container. Update their contents instead of rebinding them:
 
 ```cpp
-task->set_descriptor_binding("camera_info", camera_buffers);
+graph_desc.add_buffer("camera_info", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true});
+Ref<RenderGraphVK> graph = renderer->register_render_graph("scene", std::move(graph_desc));
+Ref<ROCMultislotsVK> camera_buffers = graph->acquire_resource("camera_info").dynamic_cast_ref<ROCMultislotsVK>();
 camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
 ```
 
-At record time, the pipeline resolves the container from `current_frame_slot` and pushes that resource's descriptor index.
-Publish buffer contents and replace bindings on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
-Field lookup comes from shader reflection and throws when the requested path is absent or the resource type is incompatible.
+At record time, the task resolves each container from `current_frame_slot` and pushes that resource's descriptor index. Publish
+buffer contents on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
 
 To add a dependency, connect the earlier task to the later one through the resource they share. The edge states whether the next
 task reads or writes the resource, the stages where the earlier task last uses it, and the stages where the next task first uses
@@ -309,19 +330,18 @@ graph_desc.tasks.emplace_back(std::move(task_desc));
 ```
 
 Compute and graphics pipeline-run tasks push their pipeline-owned descriptor-index blocks automatically after the graph binds the
-global heaps. Shader resources that are not intrinsic task inputs are declared fluently on the task descriptor. These declarations
-are validated against the resource edges; they do not create edges:
+global heaps. Every task reports all of its accesses through `IRenderTaskVK::append_accesses()`: reflected shader resources, render
+targets, and fixed-function buffers. The accesses are validated against the resource edges; they do not create edges. When a task's
+identifiers differ from the graph's, alias them on the task descriptor; the graph resolves every identifier the task binds or
+reports through that map, and rejects aliases the task never uses:
 
 ```cpp
-RendTaskDescVK lighting(render_allocator);
-lighting.task_id = "run_lighting";
-lighting.read("gbuffer_albedo", RendResUsageVK::SAMPLED_IMAGE)
-    .read("gbuffer_depth", RendResUsageVK::SAMPLED_IMAGE)
-    .write("lighting_output", RendResUsageVK::STORAGE_IMAGE);
-lighting.create = [render_allocator, render_data]() -> Unique<IRenderTaskVK> {
-    return make_unique<RTRunComputePipelineVK>(render_allocator,
-        render_data,
-        "lighting_pipeline",
-        VkExtent3D{.width = 160, .height = 90, .depth = 1});
+RendTaskDescVK blur(render_allocator);
+blur.task_id = "blur_bloom_0";
+blur.alias("kawase_blur_source", "bloom_ping")
+    .alias("kawase_blur_destination", "bloom_pong")
+    .alias("kawase_blur_sampler", "bloom_sampler");
+blur.create = [render_allocator, render_data, blur_pipeline]() -> Unique<IRenderTaskVK> {
+    return make_unique<RTRunComputePipelineVK>(render_allocator, render_data, blur_pipeline, VkExtent3D{.width = 160, .height = 90, .depth = 1});
 };
 ```

@@ -21,10 +21,10 @@
 #include "function/render/render_resource_list.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include <format>
 #include <stdexcept>
@@ -57,11 +57,11 @@ struct RendTaskDescVKDirectTaskState {
     Unique<IRenderTaskVK> task;
 };
 
-RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : next(p_allocator), reads(p_allocator), writes(p_allocator) {
+RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : next(p_allocator), resource_map(p_allocator) {
 }
 
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task)
-    : task_id(p_task_id), next(p_allocator), reads(p_allocator), writes(p_allocator) {
+    : task_id(p_task_id), next(p_allocator), resource_map(p_allocator) {
     Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
     create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<IRenderTaskVK> {
         return direct_task_state->take_task();
@@ -83,13 +83,8 @@ RendTaskDescVK& RendTaskDescVK::connect(std::string_view p_next_task_id,
     return *this;
 }
 
-RendTaskDescVK& RendTaskDescVK::read(std::string_view p_resource_id, RendResUsageVK p_usage) {
-    reads.push_back({.res_id = std::string(p_resource_id), .usage = p_usage});
-    return *this;
-}
-
-RendTaskDescVK& RendTaskDescVK::write(std::string_view p_resource_id, RendResUsageVK p_usage) {
-    writes.push_back({.res_id = std::string(p_resource_id), .usage = p_usage});
+RendTaskDescVK& RendTaskDescVK::alias(std::string_view p_task_resource_id, std::string_view p_graph_resource_id) {
+    resource_map.bind(p_task_resource_id, p_graph_resource_id);
     return *this;
 }
 
@@ -186,11 +181,11 @@ RendGraphDescVK& RendGraphDescVK::add_image_view(std::string_view p_resource_id,
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_sampler(std::string_view p_resource_id, ROSamplerVK::Builder p_builder) {
+RendGraphDescVK& RendGraphDescVK::add_sampler(std::string_view p_resource_id, const RendSamplerDescVK& p_desc) {
     if (p_resource_id.empty()) {
         throw std::runtime_error("Failed to add render graph sampler: resource id is empty.");
     }
-    samplers.push_back({.res_id = std::string(p_resource_id), .builder = std::move(p_builder)});
+    samplers.push_back({.res_id = std::string(p_resource_id), .desc = p_desc});
     return *this;
 }
 

@@ -24,9 +24,9 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct OctreePreDeferredDebugCaptureDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "read")]
     uint2 deferred_list;
     [WBE_DESCRIPTOR("storage_buffer", "octree_pre_deferred_debug_info_buffer")]
     uint2 captured_octree_info;

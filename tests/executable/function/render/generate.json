@@ -24,10 +24,6 @@
                 {
                     "name" : "vulkan_draw_sponza_test",
                     "sources" : ["vulkan_draw_sponza_test.cpp"]
-                },
-                {
-                    "name" : "vulkan_draw_sponza_sot_compiler_test",
-                    "sources" : ["vulkan_draw_sponza_sot_compiler_test.cpp"]
                 }
 
             ]

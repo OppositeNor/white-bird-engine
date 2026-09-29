@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -49,6 +50,24 @@ RendResTID expected_resource_type(ShaderDescriptorHeapTypeVK p_type) {
         return TypeUUID<ROAccelerationStructureVK>::UUID;
     }
     throw std::runtime_error("Failed to resolve pipeline descriptor binding: unknown descriptor type.");
+}
+
+std::optional<RendResUsageVK> access_usage(ShaderDescriptorHeapTypeVK p_type) {
+    switch (p_type) {
+    case ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER:
+        return RendResUsageVK::UNIFORM_BUFFER;
+    case ShaderDescriptorHeapTypeVK::STORAGE_BUFFER:
+        return RendResUsageVK::STORAGE_BUFFER;
+    case ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE:
+        return RendResUsageVK::SAMPLED_IMAGE;
+    case ShaderDescriptorHeapTypeVK::STORAGE_IMAGE:
+        return RendResUsageVK::STORAGE_IMAGE;
+    case ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE:
+        return RendResUsageVK::ACCELERATION_STRUCTURE;
+    case ShaderDescriptorHeapTypeVK::SAMPLER:
+        return std::nullopt;
+    }
+    throw std::runtime_error("Failed to resolve pipeline descriptor access: unknown descriptor type.");
 }
 
 uint32_t descriptor_index(ShaderDescriptorHeapTypeVK p_type, Ref<IRenderObject> p_resource, std::string_view p_resource_id) {
@@ -112,19 +131,18 @@ PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataV
     containers.resize(layout.fields.size(), MEM_NULL);
 }
 
-PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(
-    const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout, const PipelineResourceMapVK& p_resource_map)
-    : PipelineDescriptorBindingsVK(p_render_data, p_layout) {
-    for (const auto& entry : p_resource_map.entries) {
-        bool found = false;
-        for (size_t i = 0; i < p_layout.fields.size(); ++i) {
-            if (p_layout.fields[i].resource_id == entry.source) {
-                layout.fields[i].resource_id = entry.target;
-                found = true;
-            }
+void PipelineDescriptorBindingsVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    for (const ShaderDescriptorHeapFieldVK& field : layout.fields) {
+        std::optional<RendResUsageVK> usage = access_usage(field.type);
+        if (!usage.has_value()) {
+            continue;
         }
-        if (!found) {
-            throw std::runtime_error(std::format("Unknown reflected resource mapping source '{}'.", entry.source));
+        if (field.access != ShaderDescriptorAccessVK::WRITE) {
+            p_reads.push_back({.res_id = field.resource_id, .usage = *usage});
+        }
+        if (field.access != ShaderDescriptorAccessVK::READ) {
+            p_writes.push_back({.res_id = field.resource_id, .usage = *usage});
         }
     }
 }

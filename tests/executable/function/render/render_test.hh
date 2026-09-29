@@ -31,6 +31,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -248,7 +249,7 @@ struct ResourceChainLink {
  * @param p_resource_id Graph resource carried by the edges.
  * @param p_links Uses of the resource in execution order.
  */
-inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
+inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::span<const ResourceChainLink> p_links) {
     const ResourceChainLink* previous = nullptr;
     for (const ResourceChainLink& link : p_links) {
         if (previous != nullptr) {
@@ -270,7 +271,7 @@ inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> m
         const StaticSetResourcesVK::DrawBatch& source = p_double_sided ? p_resources->get_opaque_double_sided_draw_batch(i)
                                                         : p_masked     ? p_resources->get_masked_draw_batch(i)
                                                                        : p_resources->get_opaque_draw_batch(i);
-        RTRunGraphicsPipelineIndirectVK::PipelineBatch batch(p_allocator);
+        RTRunGraphicsPipelineIndirectVK::PipelineBatch batch;
         batch.graphics_pipeline = p_pipeline;
         batch.first_draw = source.first_draw;
         batch.draw_count = source.draw_count;
@@ -281,15 +282,30 @@ inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> m
     return result;
 }
 
-inline RendTaskDescVK& declare_static_set_shader_reads(RendTaskDescVK& p_task, Ref<StaticSetResourcesVK> p_resources) {
-    p_task.read(REND_RES_STATIC_SET_SUBMESHES, RendResUsageVK::STORAGE_BUFFER)
-        .read(REND_RES_STATIC_SET_NODES, RendResUsageVK::STORAGE_BUFFER)
-        .read(REND_RES_STATIC_SET_INSTANCES, RendResUsageVK::STORAGE_BUFFER);
-    if (p_resources->acquire_material_params() != MEM_NULL) {
-        p_task.read(p_resources->get_material_params_resource_id(), RendResUsageVK::UNIFORM_BUFFER);
+/**
+ * @brief Connect consecutive uses of one resource with resource edges.
+ * @param p_graph Graph descriptor that already contains every linked task.
+ * @param p_resource_id Graph resource carried by the edges.
+ * @param p_links Uses of the resource in execution order.
+ */
+inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
+    connect_resource_chain(p_graph, p_resource_id, std::span<const ResourceChainLink>(p_links.begin(), p_links.size()));
+}
+
+/**
+ * @brief Map a graphics task's render targets to graph resources.
+ * @param p_task Descriptor of a task that renders into `render_target_colors[<index>]` and `render_target_depth`.
+ * @param p_color_resource_ids Graph resources of the color targets in pipeline order.
+ * @param p_depth_resource_id Graph resource of the depth target, when the pipeline uses one.
+ * @return p_task.
+ */
+inline RendTaskDescVK& alias_render_targets(
+    RendTaskDescVK& p_task, std::span<const std::string_view> p_color_resource_ids, std::optional<std::string_view> p_depth_resource_id = std::nullopt) {
+    for (size_t i = 0; i < p_color_resource_ids.size(); ++i) {
+        p_task.alias(RenderTargetsVK::color_id(static_cast<uint32_t>(i)), p_color_resource_ids[i]);
     }
-    if (p_resources->acquire_textures()->get_resource_count() > 0) {
-        p_task.read(REND_RES_STATIC_SET_TEXTURES, RendResUsageVK::SAMPLED_IMAGE);
+    if (p_depth_resource_id.has_value()) {
+        p_task.alias(RenderTargetsVK::DEPTH_ID, *p_depth_resource_id);
     }
     return p_task;
 }
@@ -328,28 +344,19 @@ inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator, //
     const std::string_view indirect_buffer_id = p_double_sided ? REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES
                                                 : p_masked     ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES
                                                                : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
-    const size_t required_clear_value_count = p_color_attachment_ids.size() + (p_depth_attachment_id.has_value() ? 1 : 0);
-    if (p_clear_values.size() < required_clear_value_count) {
-        throw std::runtime_error("Failed to build static-set task: insufficient clear values for attachments.");
-    }
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
     task_builder.set_render_extent(p_render_extent)
         .set_vertex_buffer(REND_RES_STATIC_SET_VERTICES)
         .set_index_buffer(REND_RES_STATIC_SET_INDICES)
         .set_indirect_buffer(indirect_buffer_id)
-        .set_color_attachment_load_op(p_color_load_op)
-        .set_depth_attachment_load_op(p_depth_load_op);
-    for (size_t i = 0; i < p_color_attachment_ids.size(); ++i) {
-        task_builder.add_color_attachment(p_color_attachment_ids[i], p_clear_values[i]);
-    }
-    if (p_depth_attachment_id.has_value()) {
-        task_builder.set_depth_attachment(*p_depth_attachment_id, p_clear_values[p_color_attachment_ids.size()]);
-    }
+        .set_clear_values(p_clear_values)
+        .set_color_load_op(p_color_load_op)
+        .set_depth_load_op(p_depth_load_op);
     for (auto& batch : batches) {
         task_builder.add_pipeline_batch(std::move(batch));
     }
     RendTaskDescVK result(p_allocator, p_task_id, task_builder.create_unique(p_render_data));
-    declare_static_set_shader_reads(result, p_resources);
+    alias_render_targets(result, p_color_attachment_ids, p_depth_attachment_id);
     return result;
 }
 } // namespace WhiteBirdEngine

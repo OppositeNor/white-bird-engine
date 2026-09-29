@@ -462,7 +462,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
 }
 
 ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
-    create_image(p_builder);
+    create_image(p_builder, MEM_NULL, 0);
     memory = DeviceMemoryVK::Builder().set_image_requirements(exposed_fields.image).set_domain(DeviceDomain::DEVICE).create_ref(render_data);
     VkResult result = vmaBindImageMemory(render_data->vma_allocator, memory->get(), exposed_fields.image);
     if (result != VK_SUCCESS) {
@@ -475,19 +475,8 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& 
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing image: device memory is null.");
     }
-    create_image(p_builder.image);
-    VkMemoryRequirements requirements{};
-    vkGetImageMemoryRequirements(render_data->logic_device, exposed_fields.image, &requirements);
-    if (!p_builder.memory->is_compatible(requirements, p_builder.offset)) {
-        vkDestroyImage(render_data->logic_device, exposed_fields.image, render_data->allocation_callbacks);
-        throw std::runtime_error(std::format(
-            "Failed to create aliasing image: device memory cannot hold {} bytes at offset {}.", requirements.size, p_builder.offset));
-    }
+    create_image(p_builder.image, p_builder.memory, p_builder.offset);
     memory = p_builder.memory;
-    VkResult result = vmaBindImageMemory2(render_data->vma_allocator, memory->get_alias(), p_builder.offset, exposed_fields.image, nullptr);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to bind aliasing Vulkan image memory: {}.", string_VkResult(result)));
-    }
     exposed_fields.image_memory = memory->fields().device_memory;
 }
 
@@ -539,7 +528,7 @@ ROImageVK::~ROImageVK() {
     }
 }
 
-void ROImageVK::create_image(const Builder& p_builder) {
+void ROImageVK::create_image(const Builder& p_builder, Ref<DeviceMemoryVK> p_alias_memory, VkDeviceSize p_alias_offset) {
     exposed_fields.queue_families = p_builder.queue_families;
     VkImageCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -569,9 +558,13 @@ void ROImageVK::create_image(const Builder& p_builder) {
         create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    VkResult result = vkCreateImage(render_data->logic_device, &create_info, render_data->allocation_callbacks, &exposed_fields.image);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
+    if (p_alias_memory != MEM_NULL) {
+        exposed_fields.image = p_alias_memory->create_image(create_info, p_alias_offset);
+    } else {
+        VkResult result = vkCreateImage(render_data->logic_device, &create_info, render_data->allocation_callbacks, &exposed_fields.image);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to create Vulkan image: {}.", string_VkResult(result)));
+        }
     }
     exposed_fields.format = WBE_REQUIRED(p_builder.format);
     exposed_fields.extent = WBE_REQUIRED(p_builder.extent);

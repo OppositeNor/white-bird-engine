@@ -24,12 +24,14 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -40,7 +42,9 @@ namespace WhiteBirdEngine {
  * @class RTRunGraphicsPipelineIndirectVK
  * @brief Render task that submits indexed draw commands from a GPU buffer in one Vulkan call.
  *
- * Pipelines are retained directly while graph resources are bound to stable containers during graph construction.
+ * Every pipeline batch renders into `render_target_colors[<index>]` and `render_target_depth` following the pipelines' shared
+ * attachment layout. The task reports those accesses, its draw buffers, and every batch's reflected shader resources; map them
+ * to graph resources with RendTaskDescVK::alias().
  */
 struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     /**
@@ -48,16 +52,13 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
      * @brief One graphics pipeline and its contiguous range of indirect commands.
      */
     struct PipelineBatch {
-        explicit PipelineBatch(RenderAllocator* p_allocator) : resource_map(p_allocator) {
-        }
+        PipelineBatch() = default;
         ~PipelineBatch() = default;
         PipelineBatch(const PipelineBatch&) = default;
         PipelineBatch(PipelineBatch&&) noexcept = default;
         PipelineBatch& operator=(const PipelineBatch&) = default;
         PipelineBatch& operator=(PipelineBatch&&) noexcept = default;
 
-        /** Invocation-local reflected shader resource mappings. */
-        PipelineResourceMapVK resource_map;
         /** Graphics pipeline retained directly by the task. */
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
         /** First tightly packed indirect command in the shared command buffer. */
@@ -74,8 +75,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
      * @class Builder
      * @brief Configures an indexed-indirect graphics task without constructor variants.
      *
-     * Attachments are optional. Leaving both attachment collections empty creates an attachment-less dynamic-rendering task.
-     * Draw buffers are identified by graph resource ids and resolved when the graph is built.
+     * The render targets follow the pipelines' attachment layout; pipelines without attachments create an attachment-less
+     * dynamic-rendering task. Draw buffers are identified by task-local resource ids and resolved when the graph is built.
      */
     struct Builder {
         Builder() = delete;
@@ -96,24 +97,19 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_render_extent(VkExtent2D p_render_extent);
 
         /**
-         * @brief Append one color attachment and its clear value in pipeline order.
+         * @brief Set clear values for the color targets followed by the depth target. Empty clears to zero.
          */
-        Builder& add_color_attachment(std::string_view p_resource_id, const VkClearValue& p_clear_value = {});
+        Builder& set_clear_values(std::span<const VkClearValue> p_clear_values);
 
         /**
-         * @brief Set the optional depth attachment and its clear value.
+         * @brief Set the load operation shared by color targets.
          */
-        Builder& set_depth_attachment(std::string_view p_resource_id, const VkClearValue& p_clear_value = {});
+        Builder& set_color_load_op(VkAttachmentLoadOp p_load_op);
 
         /**
-         * @brief Set the load operation shared by color attachments.
+         * @brief Set the load operation of the depth target.
          */
-        Builder& set_color_attachment_load_op(VkAttachmentLoadOp p_load_op);
-
-        /**
-         * @brief Set the depth attachment load operation.
-         */
-        Builder& set_depth_attachment_load_op(VkAttachmentLoadOp p_load_op);
+        Builder& set_depth_load_op(VkAttachmentLoadOp p_load_op);
 
         /**
          * @brief Resolve the optional vertex buffer from a graph resource.
@@ -164,12 +160,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
 
         RenderAllocator* allocator = nullptr;
         VkExtent2D render_extent{};
-        Vector<VkClearValue, RenderAllocator> color_clear_values;
-        Vector<std::string, RenderAllocator> color_attachment_ids;
-        std::optional<VkClearValue> depth_clear_value;
-        std::optional<std::string> depth_attachment_id;
-        VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        Vector<VkClearValue, RenderAllocator> clear_values;
+        VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
         std::string vertex_buffer_id;
         std::string index_buffer_id;
         std::string indirect_buffer_id;
@@ -194,27 +187,22 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
 
     virtual void bind_resources(const RendResViewVK& p_resources) override;
 
-    virtual Vector<ResAccessVK, RenderAllocator> read_resources() const override;
-    virtual Vector<ResAccessVK, RenderAllocator> write_resources() const override;
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
+
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    Vector<VkClearValue, RenderAllocator> clear_values;
-    VkAttachmentLoadOp color_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    VkAttachmentLoadOp depth_attachment_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     VkExtent2D render_extent{};
-    Vector<std::string, RenderAllocator> color_attachment_ids;
-    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> color_attachment_containers;
-    std::optional<std::string> depth_attachment_id;
-    Ref<RenderObjectContainerVK> depth_attachment_container;
+    Vector<PipelineBatch, RenderAllocator> pipeline_batches;
+    RenderTargetsVK render_targets;
     std::string vertex_buffer_id;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
     Ref<RenderObjectContainerVK> vertex_buffer_container = MEM_NULL;
     Ref<RenderObjectContainerVK> index_buffer_container;
     Ref<RenderObjectContainerVK> indirect_buffer_container;
-    Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
 
     void initialize_descriptor_bindings();

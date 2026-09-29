@@ -23,7 +23,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/render_targets_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -34,7 +34,7 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelinesSequentialVK::DispatchBase::DispatchBase(RenderAllocator* p_allocator)
-    : resource_map(p_allocator), clear_values(p_allocator), color_attachment_ids(p_allocator) {
+    : clear_values(p_allocator) {
 }
 
 RTRunGraphicsPipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator, RegularDispatch p_dispatch)
@@ -77,9 +77,13 @@ bool RTRunGraphicsPipelinesSequentialVK::Sequence::is_indirect(size_t p_index) c
 }
 
 RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
-    : dispatch(p_dispatch), color_attachment_containers(p_render_data->allocator) {
-    descriptor_bindings = make_unique<PipelineDescriptorBindingsVK>(
-        p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout(), dispatch.base.resource_map);
+    : dispatch(p_dispatch), render_targets(p_render_data->allocator,
+                                 *p_dispatch.base.pipeline,
+                                 RenderTargetsVK::Config{.clear_values = p_dispatch.base.clear_values,
+                                     .color_load_op = p_dispatch.base.color_load_op,
+                                     .depth_load_op = p_dispatch.base.depth_load_op}) {
+    descriptor_bindings =
+        make_unique<PipelineDescriptorBindingsVK>(p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout());
 }
 
 RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence)
@@ -96,13 +100,8 @@ RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const Bas
         if (dispatch_base.render_extent.width == 0 || dispatch_base.render_extent.height == 0) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: render extent must be non-zero.");
         }
-        if (dispatch_base.color_attachment_ids.size() != dispatch_base.pipeline->get_config().attachment_config.color_formats.size()) {
-            throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: color attachment count does not match graphics pipeline.");
-        }
-        const size_t required_clear_value_count =
-            dispatch_base.color_attachment_ids.size() + (dispatch_base.depth_attachment_id.has_value() ? 1 : 0);
-        if (dispatch_base.clear_values.size() < required_clear_value_count) {
-            throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: insufficient clear values for attachments.");
+        if (!entries.empty() && !entries.front().render_targets.matches(*dispatch_base.pipeline)) {
+            throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: passes do not share one attachment layout.");
         }
         if (dispatch.type == DispatchType::REGULAR) {
             if (dispatch.vertex_buffer_id.has_value() != dispatch.index_buffer_id.has_value()) {
@@ -123,57 +122,27 @@ RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const Bas
     }
 }
 
-Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelinesSequentialVK::read_resources() const {
-    Vector<ResAccessVK, RenderAllocator> read_accesses(render_data->allocator);
+void RTRunGraphicsPipelinesSequentialVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     for (const BoundEntry& bound_entry : entries) {
         const Dispatch& dispatch = bound_entry.dispatch;
-        const DispatchBase& dispatch_base = dispatch.base;
-        if (dispatch_base.color_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
-            for (const std::string& color_attachment_id : dispatch_base.color_attachment_ids) {
-                read_accesses.push_back({.res_id = color_attachment_id, .usage = RendResUsageVK::COLOR_ATTACHMENT});
-            }
-        }
-        if (dispatch_base.depth_attachment_id.has_value() && dispatch_base.depth_attachment_load_op == VK_ATTACHMENT_LOAD_OP_LOAD) {
-            read_accesses.push_back({.res_id = *dispatch_base.depth_attachment_id, .usage = RendResUsageVK::DEPTH_ATTACHMENT});
-        }
+        bound_entry.render_targets.append_accesses(p_reads, p_writes);
         if (dispatch.vertex_buffer_id.has_value()) {
-            read_accesses.push_back({.res_id = *dispatch.vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
-            read_accesses.push_back({.res_id = *dispatch.index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
+            p_reads.push_back({.res_id = *dispatch.vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+            p_reads.push_back({.res_id = *dispatch.index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
         }
         if (dispatch.type == DispatchType::INDIRECT) {
-            read_accesses.push_back({.res_id = dispatch.indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
+            p_reads.push_back({.res_id = dispatch.indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
         }
+        bound_entry.descriptor_bindings->append_accesses(p_reads, p_writes);
     }
-    return read_accesses;
-}
-
-Vector<ResAccessVK, RenderAllocator> RTRunGraphicsPipelinesSequentialVK::write_resources() const {
-    Vector<ResAccessVK, RenderAllocator> write_accesses(render_data->allocator);
-    for (const BoundEntry& bound_entry : entries) {
-        const DispatchBase& dispatch_base = bound_entry.dispatch.base;
-        for (const std::string& color_attachment_id : dispatch_base.color_attachment_ids) {
-            write_accesses.push_back({.res_id = color_attachment_id, .usage = RendResUsageVK::COLOR_ATTACHMENT});
-        }
-        if (dispatch_base.depth_attachment_id.has_value()) {
-            write_accesses.push_back({.res_id = *dispatch_base.depth_attachment_id, .usage = RendResUsageVK::DEPTH_ATTACHMENT});
-        }
-    }
-    return write_accesses;
 }
 
 void RTRunGraphicsPipelinesSequentialVK::bind_resources(const RendResViewVK& p_resources) {
     for (BoundEntry& bound_entry : entries) {
         const Dispatch& dispatch = bound_entry.dispatch;
-        const DispatchBase& dispatch_base = dispatch.base;
         bound_entry.descriptor_bindings->bind_resources(p_resources);
-        bound_entry.color_attachment_containers.clear();
-        bound_entry.color_attachment_containers.reserve(dispatch_base.color_attachment_ids.size());
-        for (const std::string& color_attachment_id : dispatch_base.color_attachment_ids) {
-            bound_entry.color_attachment_containers.push_back(p_resources.get(color_attachment_id).container);
-        }
-        if (dispatch_base.depth_attachment_id.has_value()) {
-            bound_entry.depth_attachment_container = p_resources.get(*dispatch_base.depth_attachment_id).container;
-        }
+        bound_entry.render_targets.bind_resources(p_resources);
         if (dispatch.vertex_buffer_id.has_value()) {
             bound_entry.vertex_buffer_container = p_resources.get(*dispatch.vertex_buffer_id).container;
             bound_entry.index_buffer_container = p_resources.get(*dispatch.index_buffer_id).container;
@@ -190,37 +159,7 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
         Dispatch& dispatch = bound_entry.dispatch;
         DispatchBase& dispatch_base = dispatch.base;
 
-        Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(render_data->allocator);
-        color_attachments.reserve(dispatch_base.color_attachment_ids.size());
-        for (size_t attachment_index = 0; attachment_index < dispatch_base.color_attachment_ids.size(); ++attachment_index) {
-            Ref<ROImageViewVK> color_attachment = WBE_REQUIRES_VALID(
-                bound_entry.color_attachment_containers[attachment_index]->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
-            color_attachments.push_back(ROImageViewVK::AttachmentBuilder::color(color_attachment->get_image_view())
-                    .set_load_op(dispatch_base.color_attachment_load_op)
-                    .set_clear_value(dispatch_base.clear_values[attachment_index])
-                    .build());
-        }
-
-        VkRenderingAttachmentInfo depth_attachment_info{};
-        VkRenderingInfo rendering_info{
-            .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-            .renderArea = {.offset = {.x = 0, .y = 0}, .extent = dispatch_base.render_extent},
-            .layerCount = 1,
-            .colorAttachmentCount = static_cast<uint32_t>(color_attachments.size()),
-            .pColorAttachments = color_attachments.data(),
-        };
-        if (dispatch_base.depth_attachment_id.has_value()) {
-            Ref<ROImageViewVK> depth_attachment = WBE_REQUIRES_VALID(
-                bound_entry.depth_attachment_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>());
-            depth_attachment_info = ROImageViewVK::AttachmentBuilder::depth(depth_attachment->get_image_view())
-                                        .set_load_op(dispatch_base.depth_attachment_load_op)
-                                        .set_store_op(VK_ATTACHMENT_STORE_OP_STORE)
-                                        .set_clear_value(dispatch_base.clear_values[color_attachments.size()])
-                                        .build();
-            rendering_info.pDepthAttachment = &depth_attachment_info;
-        }
-
-        vkCmdBeginRendering(p_command_buffer, &rendering_info);
+        bound_entry.render_targets.begin_rendering(render_data, p_command_buffer, dispatch_base.render_extent);
         vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, dispatch_base.pipeline->get_pipeline());
         VkViewport viewport = render_data->viewport;
         viewport.width = static_cast<float>(dispatch_base.render_extent.width);

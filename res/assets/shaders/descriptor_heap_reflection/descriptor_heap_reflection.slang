@@ -29,7 +29,7 @@ struct DescriptorHeapProbeIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "uniform_buffer")]
     uint2 uniform_buffer;
     DescriptorHeapProbeImages images;
-    [WBE_DESCRIPTOR("storage_buffer", "storage_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "storage_buffer", "read")]
     uint2 storage_buffer;
     [WBE_DESCRIPTOR("sampler", "sampler")]
     uint2 sampler;

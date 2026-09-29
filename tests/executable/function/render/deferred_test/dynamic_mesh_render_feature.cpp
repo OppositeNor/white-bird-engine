@@ -122,7 +122,8 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     VkExtent2D p_extent,
     std::span<const std::string_view> p_colors,
     std::optional<std::string_view> p_depth) const {
-    PipelineResourceMapVK resource_map(render_data->allocator);
+    RendTaskDescVK result(render_data->allocator);
+    result.task_id = p_task_id;
     // Some passes omit material sampling; only map identifiers present in that pipeline's reflection.
     const std::array<std::pair<std::string_view, std::string_view>, 5> mappings{{
         {REND_RES_STATIC_SET_NODES, NODES},
@@ -134,7 +135,7 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     for (const auto& [source, target] : mappings) {
         for (const auto& field : p_pipeline->get_descriptor_layout().fields) {
             if (field.resource_id == source) {
-                resource_map.bind(source, target);
+                result.alias(source, target);
                 break;
             }
         }
@@ -144,29 +145,16 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
         .set_vertex_buffer(VERTICES)
         .set_index_buffer(INDICES)
         .set_indirect_buffer(COMMANDS)
-        .set_color_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-        .set_depth_attachment_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    for (auto color : p_colors) {
-        builder.add_color_attachment(color);
-    }
-    if (p_depth) {
-        builder.set_depth_attachment(*p_depth);
-    }
+        .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+        .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
+    alias_render_targets(result, p_colors, p_depth);
     auto batches = make_static_set_pipeline_batches(render_data->allocator, geometry, p_pipeline, false, false);
     for (auto& batch : batches) {
-        batch.resource_map = resource_map;
         builder.add_pipeline_batch(std::move(batch));
     }
-    RendTaskDescVK result(render_data->allocator);
-    result.task_id = p_task_id;
     result.create = [builder, data = render_data]() -> Unique<IRenderTaskVK> {
         return builder.create_unique(data);
     };
-    result.read(NODES, RendResUsageVK::STORAGE_BUFFER)
-        .read(SUBMESHES, RendResUsageVK::STORAGE_BUFFER)
-        .read(INSTANCES, RendResUsageVK::STORAGE_BUFFER)
-        .read(MATERIAL_PARAMS, RendResUsageVK::UNIFORM_BUFFER)
-        .read(TEXTURES, RendResUsageVK::SAMPLED_IMAGE);
     return result;
 }
 

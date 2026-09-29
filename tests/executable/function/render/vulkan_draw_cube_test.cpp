@@ -295,15 +295,17 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
             {.usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, .format = SHADOWMAP_COLOR_FORMAT, .extent = shadow_image_extent})
         .add_image_view(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
         .add_image_view(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
-        .add_image_view(SHADOWMAP_SAMPLED_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
         .add_sampler(SHADOW_SAMPLER,
-            WBE::ROSamplerVK::Builder().set_filter(VK_FILTER_LINEAR, VK_FILTER_LINEAR).set_address_mode(VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE))
+            {.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
         .add_buffer(SHADOW_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_ubo(spot_light_component))))
         .add_buffer(SPOT_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_ubo(spot_light_component))))
         .add_buffer(CAMERA_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_camera_info_ubo(camera_component))))
         .add_buffer(SPOT_LIGHT_COUNT_BUFFER, make_uniform_buffer(WBE::to_initial_data(spot_light_count)));
 
-    // The main pass samples the shadow depth written by the shadow pass.
+    // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.
+    p_main_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     p_shadow_task.connect(RT_RUN_PIPELINE,
         REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
         WBE::RendEdgeTypeVK::READ,

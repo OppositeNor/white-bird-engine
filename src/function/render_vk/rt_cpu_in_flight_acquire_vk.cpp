@@ -53,14 +53,10 @@ RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(
     }
 }
 
-Vector<ResAccessVK, RenderAllocator> RTCPUInFlightAcquireVK::read_resources() const {
-    Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
-    return resources;
-}
-
-Vector<ResAccessVK, RenderAllocator> RTCPUInFlightAcquireVK::write_resources() const {
-    return Vector<ResAccessVK, RenderAllocator>(render_data->allocator);
+void RTCPUInFlightAcquireVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    static_cast<void>(p_writes);
+    p_reads.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
 }
 
 void RTCPUInFlightAcquireVK::bind_resources(const RendResViewVK& p_resources) {

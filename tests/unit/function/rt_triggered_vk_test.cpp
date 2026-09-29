@@ -35,7 +35,7 @@ struct TriggerProbeState {
 class RTTriggerProbeVK final : public IRenderTaskVK {
 public:
     RTTriggerProbeVK() = delete;
-    RTTriggerProbeVK(RenderAllocator* p_allocator, TriggerProbeState& p_state) : allocator(p_allocator), state(p_state) {
+    explicit RTTriggerProbeVK(TriggerProbeState& p_state) : state(p_state) {
     }
     ~RTTriggerProbeVK() override {
         ++state.destructions;
@@ -47,15 +47,9 @@ public:
     QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::COMPUTE;
     }
-    Vector<ResAccessVK, RenderAllocator> read_resources() const override {
-        Vector<ResAccessVK, RenderAllocator> result(allocator);
-        result.push_back({"input", RendResUsageVK::STORAGE_BUFFER});
-        return result;
-    }
-    Vector<ResAccessVK, RenderAllocator> write_resources() const override {
-        Vector<ResAccessVK, RenderAllocator> result(allocator);
-        result.push_back({"output", RendResUsageVK::STORAGE_IMAGE});
-        return result;
+    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+        p_reads.emplace_back("input", RendResUsageVK::STORAGE_BUFFER);
+        p_writes.emplace_back("output", RendResUsageVK::STORAGE_IMAGE);
     }
     void bind_resources(const RendResViewVK&) override {
         ++state.bindings;
@@ -73,7 +67,6 @@ public:
     }
 
 private:
-    RenderAllocator* allocator;
     TriggerProbeState& state;
 };
 
@@ -82,7 +75,7 @@ private:
 TEST(WBERTTriggeredVKTest, ConsumesOneActivationAndCanBeRearmed) {
     RenderAllocator allocator(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, &allocator, state));
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
     task.record(VK_NULL_HANDLE, 1.0);
     EXPECT_EQ(state.recordings, 0);
     task.activate.store(true);
@@ -102,7 +95,7 @@ TEST(WBERTTriggeredVKTest, ConsumesOneActivationAndCanBeRearmed) {
 TEST(WBERTTriggeredVKTest, ActivationDuringRecordingRemainsPending) {
     RenderAllocator allocator(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, &allocator, state), true);
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
     state.on_record = [&task]() {
         task.activate.store(true);
     };
@@ -118,15 +111,16 @@ TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
     RenderAllocator allocator(WBE_KI_B(64));
     TriggerProbeState state;
     {
-        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, &allocator, state));
+        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
         Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
         task.init();
         task.bind_resources(RendResViewVK(&resources));
         EXPECT_EQ(state.initializations, 1);
         EXPECT_EQ(state.bindings, 1);
         EXPECT_EQ(task.queue_family(), QueueFamilyVK::COMPUTE);
-        const auto reads = task.read_resources();
-        const auto writes = task.write_resources();
+        Vector<ResAccessVK, RenderAllocator> reads(&allocator);
+        Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+        task.append_accesses(reads, writes);
         ASSERT_EQ(reads.size(), 1U);
         ASSERT_EQ(writes.size(), 1U);
         EXPECT_EQ(reads[0].res_id, "input");

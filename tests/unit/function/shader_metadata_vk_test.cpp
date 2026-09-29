@@ -289,9 +289,11 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(uniform_buffer.binding.size, 8);
     ASSERT_EQ(uniform_buffer.user_attributes.size(), 1U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].name, "WBE_DESCRIPTOR");
-    ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 2U);
+    // Slang reflects the default value of the omitted access argument.
+    ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[0].string_value, "uniform_buffer");
     EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[1].string_value, "uniform_buffer");
+    EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[2].string_value, "");
 
     const ShaderMetadataTypeField& images = push_data.type.fields[1];
     EXPECT_EQ(images.name, "images");
@@ -322,7 +324,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(acceleration_structure_index.binding.size, 8);
     ASSERT_EQ(acceleration_structure_index.user_attributes.size(), 1U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "WBE_DESCRIPTOR");
-    ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 2U);
+    ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[1].string_value, "acceleration_structure");
 
@@ -403,9 +405,10 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
         EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(uint32_t) * 2));
         ASSERT_EQ(field.user_attributes.size(), 1U);
         EXPECT_EQ(field.user_attributes[0].name, "WBE_DESCRIPTOR");
-        ASSERT_EQ(field.user_attributes[0].arguments.size(), 2U);
+        ASSERT_EQ(field.user_attributes[0].arguments.size(), 3U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
         EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_resource_ids[i]);
+        EXPECT_EQ(field.user_attributes[0].arguments[2].string_value, "read");
     }
 }
 

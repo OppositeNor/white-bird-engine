@@ -94,7 +94,7 @@ struct LightParamDescriptorIndices {
 };
 
 struct LightParamsDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos")]
+    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
     [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]

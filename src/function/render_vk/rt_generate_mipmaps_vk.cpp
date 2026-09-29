@@ -63,18 +63,11 @@ RTGenerateMipmapsVK::RTGenerateMipmapsVK(
     }
 }
 
-Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::read_resources() const {
-    // Declare transfer reads from source mip levels to the render graph.
-    Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
-    return resources;
-}
-
-Vector<ResAccessVK, RenderAllocator> RTGenerateMipmapsVK::write_resources() const {
-    // Declare transfer writes to destination mip levels to the render graph.
-    Vector<ResAccessVK, RenderAllocator> resources(render_data->allocator);
-    resources.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_DST});
-    return resources;
+void RTGenerateMipmapsVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+    // Blits read the source mip levels and write the destination mip levels of the same image.
+    p_reads.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
+    p_writes.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_DST});
 }
 
 void RTGenerateMipmapsVK::bind_resources(const RendResViewVK& p_resources) {

@@ -40,6 +40,21 @@ enum class ShaderDescriptorHeapTypeVK : uint8_t {
 };
 
 /**
+ * @brief Shader access to a descriptor-heap resource, selected by the optional third WBE_DESCRIPTOR argument.
+ *
+ * Uniform buffers, sampled images, samplers, and acceleration structures are always read. Storage buffers and storage images
+ * default to READ_WRITE when the argument is omitted.
+ */
+enum class ShaderDescriptorAccessVK : uint8_t {
+    /** The shader only reads the resource. */
+    READ,
+    /** The shader only writes the resource. */
+    WRITE,
+    /** The shader reads and writes the resource. */
+    READ_WRITE,
+};
+
+/**
  * @class ShaderDescriptorHeapFieldVK
  * @brief One descriptor-heap index stored in reflected pipeline push data.
  */
@@ -52,6 +67,8 @@ struct ShaderDescriptorHeapFieldVK {
     std::string resource_id;
     /** Byte offset of the explicit uint2 inside push data. */
     uint32_t offset = 0;
+    /** How the shader accesses the resource. */
+    ShaderDescriptorAccessVK access = ShaderDescriptorAccessVK::READ;
 };
 
 /**
@@ -117,7 +134,8 @@ VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata&
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.
  *
  * A descriptor-free entry point produces an empty layout. Otherwise it may use exactly one pushConstantBuffer parameter.
- * WBE_DESCRIPTOR fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments.
+ * WBE_DESCRIPTOR fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments, and an
+ * optional access argument: `read`, `write`, or `read_write`. Only storage buffers and storage images may be written.
  * WBE_DEFAULT_PUSH fields must be four-byte scalars with a supported renderer value identifier.
  *
  * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.
@@ -128,7 +146,8 @@ ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
 /**
  * @brief Collect and merge explicit descriptor-heap push-data contracts from all supported graphics stages.
  *
- * Equal field paths must agree on descriptor category, resource id, and byte offset. Distinct fields must not overlap in push data.
+ * Equal field paths must agree on descriptor category, resource id, and byte offset; their accesses are combined. Distinct fields must
+ * not overlap in push data.
  *
  * @throws std::runtime_error When stage contracts conflict.
  */

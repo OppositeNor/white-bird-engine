@@ -72,6 +72,10 @@ For non-trivial implementation tasks:
 - The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
   `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource()` / `add_static_set()` only to import resources owned
   outside the graph.
+- Tasks report every access themselves through `IRenderTaskVK::append_accesses()` (reflected shader resources, render targets, and
+  fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
+  and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
+  the task's `RenderTaskResourceMap`; tasks do not take resource maps.
 - The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
   descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
 
@@ -186,9 +190,11 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - Static-set compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
   material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
   `rma`.
-- Vulkan shader resources are declared as aligned `uint2` fields in push data with `WBE_DESCRIPTOR("TYPE")`, where `TYPE` is
-  `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, or `sampler`. Runtime shaders access the renderer-owned
-  global heaps through those indices; metadata-only resource declarations belong under `WBE_REFLECTION_METADATA`.
+- Vulkan shader resources are declared as aligned `uint2` fields in push data with `WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`,
+  where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`, and
+  the optional `ACCESS` is `read`, `write`, or `read_write`. Storage buffers and images default to `read_write`; annotate read-only
+  ones with `read`. Runtime shaders access the renderer-owned global heaps through those indices; metadata-only resource
+  declarations belong under `WBE_REFLECTION_METADATA`.
 - `rma` is the canonical project abbreviation and texture role for the roughness, metallic, and ambient-occlusion channel pack.
   Use `rma` in project-owned identifiers instead of a spelled-out equivalent.
 

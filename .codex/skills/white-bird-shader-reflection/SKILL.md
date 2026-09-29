@@ -39,7 +39,7 @@ Treat pointers and references returned by `ShaderMetadataQuery` as views into `S
 - For vertex inputs, use `VertexInputContractResolver` and `WBE_VERTEX_INPUT`.
 - For material texture indices, use `MaterialTextureContractResolver` and `WBE_TEXTURE`.
 - For Vulkan descriptor-heap push-data layouts, use `collect_shader_descriptor_heap_layout()` and `collect_graphics_pipeline_descriptor_heap_layout()` from `function/render_vk/shader_metadata_vk_utils.*`.
-- For pipeline data binding, use reflected field paths through the pipeline compiler or `ROPipelineVK::set_descriptor_binding()` rather than writing heap indices by hand.
+- For pipeline data binding, name the graph resource in the `WBE_DESCRIPTOR` resource id, or map it with `RendTaskDescVK::alias()`, rather than writing heap indices by hand.
 
 Do not introduce a closed texture-role enum or branch on roles such as `albedo`, `normal`, or `rma`. Roles are shader-defined strings. An attribute with no explicit string argument uses the annotated field name as its role.
 

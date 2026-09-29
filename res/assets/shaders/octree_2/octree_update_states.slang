@@ -22,7 +22,7 @@ struct OctreeUpdateStatesDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Descriptor-heap reference to octree_node_buffer.
