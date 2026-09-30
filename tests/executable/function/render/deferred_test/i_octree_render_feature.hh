@@ -109,38 +109,35 @@ public:
      * @brief Creates the pre-deferred overlay after the completed-tree overlay task.
      */
     RendTaskDescVK get_pre_deferred_debug_draw_render_task_desc() const;
-    /**
-     * @brief Stable octree graph task identifier.
-     */
+
     static constexpr std::string_view RT_RUN_BUILD_OCTREE_DOUBLE_SIDED = "run_build_octree_double_sided";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_RESET_OCTREE = "reset_octree";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_RUN_BUILD_OCTREE = "run_build_octree";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_RUN_BUILD_OCTREE_DEFERRED = "run_build_octree_deferred";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG = "capture_octree_pre_deferred_debug";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_SETUP_OCTREE_DEBUG_DRAW = "setup_octree_debug_draw";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_RUN_OCTREE_DEBUG_DRAW = "run_octree_debug_draw";
-    /**
-     * @brief Stable octree graph task identifier.
-     */
     static constexpr std::string_view RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW = "run_octree_pre_deferred_debug_draw";
+    static constexpr std::string_view RT_UPDATE_OCTREE_STATES = "update_octree_states";
+    static constexpr std::string_view RT_STATIC_OCTREE_DEFERRED = "static_octree_deferred";
+    static constexpr std::string_view RT_CLEAR_DYNAMIC_OCTREE = "clear_dynamic_octree";
+    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE = "dynamic_octree";
+    static constexpr std::string_view RT_PUBLISH_DYNAMIC_OCTREE = "publish_dynamic_octree";
+
+    static constexpr std::string_view OCTREE_VOXEL_CLAIMS = "octree_voxel_claims";
+    static constexpr std::string_view OCTREE_PENDING_CHILDREN = "octree_pending_children";
+    static constexpr std::string_view OCTREE_INFO = "octree_info";
+    static constexpr std::string_view OCTREE_NODE_BUFFER = "octree_node_buffer";
+    static constexpr std::string_view OCTREE_DYNAMIC_NODES = "octree_dynamic_nodes";
+    static constexpr std::string_view OCTREE_DYNAMIC_LEAVES = "octree_dynamic_leaves";
+    static constexpr std::string_view OCTREE_LEAF_BUFFER = "octree_leaves_buffer";
+    static constexpr std::string_view OCTREE_DEFERRED_LIST_PING = "octree_deferred_list_ping";
+    static constexpr std::string_view OCTREE_DEFERRED_LIST_PONG = "octree_deferred_list_pong";
+    static constexpr std::string_view OCTREE_DEBUG_DRAW_INDEX_BUFFER = "octree_debug_draw_index_buffer";
+    static constexpr std::string_view OCTREE_DEBUG_DRAW_INDIRECT_BUFFER = "octree_debug_draw_indirect_buffer";
+    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER = "octree_pre_deferred_debug_info_buffer";
+    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER = "octree_pre_deferred_debug_list_buffer";
+    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER = "octree_pre_deferred_debug_draw_indirect_buffer";
 
 protected:
     /**
@@ -203,145 +200,32 @@ protected:
         return p_link;
     }
 
-    /**
-     * @brief Graph task identifier of the static state-publication pass.
-     */
-    static constexpr std::string_view RT_UPDATE_OCTREE_STATES = "update_octree_states";
-    /**
-     * @brief Graph task identifier of the one-time static deferred retries.
-     */
-    static constexpr std::string_view RT_STATIC_OCTREE_DEFERRED = "static_octree_deferred";
-    /**
-     * @brief Graph task identifier of the per-frame dynamic reset.
-     */
-    static constexpr std::string_view RT_CLEAR_DYNAMIC_OCTREE = "clear_dynamic_octree";
-    /**
-     * @brief Graph task identifier of the dynamic raster construction.
-     */
-    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE = "dynamic_octree";
-    /**
-     * @brief Graph task identifier of the dynamic state-publication pass.
-     */
-    static constexpr std::string_view RT_PUBLISH_DYNAMIC_OCTREE = "publish_dynamic_octree";
-    /**
-     * @brief Graph resource of the per-voxel claim bitset.
-     */
-    static constexpr std::string_view OCTREE_VOXEL_CLAIMS = "octree_voxel_claims";
-    /**
-     * @brief Graph resource of the pending child descriptions used by pass publication.
-     */
-    static constexpr std::string_view OCTREE_PENDING_CHILDREN = "octree_pending_children";
-    /**
-     * @brief Graph resource of the octree counters and configuration.
-     */
-    static constexpr std::string_view OCTREE_INFO = "octree_info";
-    /**
-     * @brief Graph resource of the static node buffer.
-     */
-    static constexpr std::string_view OCTREE_NODE_BUFFER = "octree_node_buffer";
-    /**
-     * @brief Graph resource of the dynamic node buffer.
-     */
-    static constexpr std::string_view OCTREE_DYNAMIC_NODES = "octree_dynamic_nodes";
-    /**
-     * @brief Graph resource of the copy-on-write dynamic leaf blocks.
-     */
-    static constexpr std::string_view OCTREE_DYNAMIC_LEAVES = "octree_dynamic_leaves";
-    /**
-     * @brief Depth of the leaf level; root sectors have depth one.
-     */
     static constexpr size_t OCTREE_MAX_DEPTH = 9;
-    /**
-     * @brief Number of finest-level voxels.
-     */
     static constexpr size_t OCTREE_VOXEL_COUNT = (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH);
-    /**
-     * @brief Capacity of the static node buffer.
-     */
     static constexpr size_t OCTREE_MAX_NODE_COUNT = OCTREE_VOXEL_COUNT / 64;
-    /**
-     * @brief Capacity of the dynamic node buffer.
-     */
     static constexpr size_t OCTREE_MAX_DYNAMIC_NODE_COUNT = OCTREE_MAX_NODE_COUNT;
-    /**
-     * @brief Number of 32-bit words in the voxel claim bitset.
-     */
     static constexpr size_t OCTREE_CLAIM_WORD_COUNT = (OCTREE_VOXEL_COUNT + 31U) / 32U;
-    /**
-     * @brief Capacity of each deferred list.
-     */
     static constexpr size_t OCTREE_MAX_DEFERRED_TASK_COUNT = OCTREE_MAX_NODE_COUNT * 5 / 2;
-    /**
-     * @brief Workgroup size of the deferred propagation and debug-capture shaders.
-     */
     static constexpr uint32_t OCTREE_DEFERRED_THREADS_PER_GROUP = 128;
-    /**
-     * @brief Workgroup count covering a full deferred list.
-     */
     static constexpr uint32_t OCTREE_DEFERRED_DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
         (OCTREE_MAX_DEFERRED_TASK_COUNT + OCTREE_DEFERRED_THREADS_PER_GROUP - 1) / OCTREE_DEFERRED_THREADS_PER_GROUP);
-    /**
-     * @brief Pipeline stages of compute octree tasks.
-     */
+
     static constexpr VkPipelineStageFlags2 STAGE_COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    /**
-     * @brief Pipeline stages of raster octree tasks.
-     */
     static constexpr VkPipelineStageFlags2 STAGE_RASTER = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    /**
-     * @brief Resource-chain use by the per-frame reset.
-     */
     static constexpr ResourceChainLink LINK_RESET{.task_id = RT_RESET_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the single-sided static raster construction.
-     */
     static constexpr ResourceChainLink LINK_BUILD{.task_id = RT_RUN_BUILD_OCTREE, .stage = STAGE_RASTER, .writes = true};
-    /**
-     * @brief Resource-chain use by the double-sided static raster construction.
-     */
-    static constexpr ResourceChainLink LINK_BUILD_DOUBLE_SIDED{
-        .task_id = RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, .stage = STAGE_RASTER, .writes = true};
-    /**
-     * @brief Resource-chain use by the static state publication.
-     */
+    static constexpr ResourceChainLink LINK_BUILD_DOUBLE_SIDED{.task_id = RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, .stage = STAGE_RASTER, .writes = true};
     static constexpr ResourceChainLink LINK_STATE_UPDATE{.task_id = RT_UPDATE_OCTREE_STATES, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the static deferred retries.
-     */
     static constexpr ResourceChainLink LINK_STATIC_DEFERRED{.task_id = RT_STATIC_OCTREE_DEFERRED, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the per-frame dynamic reset.
-     */
     static constexpr ResourceChainLink LINK_CLEAR{.task_id = RT_CLEAR_DYNAMIC_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the dynamic raster construction.
-     */
     static constexpr ResourceChainLink LINK_DYNAMIC_BUILD{.task_id = RT_RUN_BUILD_DYNAMIC_OCTREE, .stage = STAGE_RASTER, .writes = true};
-    /**
-     * @brief Resource-chain use by the dynamic state publication.
-     */
     static constexpr ResourceChainLink LINK_PUBLISH{.task_id = RT_PUBLISH_DYNAMIC_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the pre-deferred debug capture.
-     */
-    static constexpr ResourceChainLink LINK_CAPTURE{
-        .task_id = RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the per-frame deferred retries.
-     */
+    static constexpr ResourceChainLink LINK_CAPTURE{.task_id = RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, .stage = STAGE_COMPUTE, .writes = true};
     static constexpr ResourceChainLink LINK_DEFERRED{.task_id = RT_RUN_BUILD_OCTREE_DEFERRED, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the debug-draw setup.
-     */
     static constexpr ResourceChainLink LINK_SETUP{.task_id = RT_SETUP_OCTREE_DEBUG_DRAW, .stage = STAGE_COMPUTE, .writes = true};
-    /**
-     * @brief Resource-chain use by the completed-tree debug draw.
-     */
     static constexpr ResourceChainLink LINK_DEBUG_DRAW{.task_id = RT_RUN_OCTREE_DEBUG_DRAW, .stage = STAGE_RASTER};
-    /**
-     * @brief Resource-chain use by the pre-deferred debug draw.
-     */
     static constexpr ResourceChainLink LINK_PRE_DEFERRED_DRAW{.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, .stage = STAGE_RASTER};
+
     /**
      * @brief Borrowed renderer that owns the pipelines and graphs.
      */
@@ -393,14 +277,6 @@ private:
     static_assert(OCTREE_VOXEL_COUNT <= (0xffffffffU - OCTREE_MAX_LEAVES_COUNT) / 8U);
     static constexpr float OCTREE_WIDTH = 32.0F;
     static constexpr glm::vec3 OCTREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
-    static constexpr std::string_view OCTREE_LEAF_BUFFER = "octree_leaves_buffer";
-    static constexpr std::string_view OCTREE_DEFERRED_LIST_PING = "octree_deferred_list_ping";
-    static constexpr std::string_view OCTREE_DEFERRED_LIST_PONG = "octree_deferred_list_pong";
-    static constexpr std::string_view OCTREE_DEBUG_DRAW_INDEX_BUFFER = "octree_debug_draw_index_buffer";
-    static constexpr std::string_view OCTREE_DEBUG_DRAW_INDIRECT_BUFFER = "octree_debug_draw_indirect_buffer";
-    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER = "octree_pre_deferred_debug_info_buffer";
-    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER = "octree_pre_deferred_debug_list_buffer";
-    static constexpr std::string_view OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER = "octree_pre_deferred_debug_draw_indirect_buffer";
 
     struct OctreeInfo {
         glm::vec3 origin;
