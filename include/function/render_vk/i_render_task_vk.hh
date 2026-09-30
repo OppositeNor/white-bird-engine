@@ -66,6 +66,8 @@ enum class RendResUsageVK : uint32_t {
     VERTEX_BUFFER,
     /** Index buffer read. */
     INDEX_BUFFER,
+    /** Conservative read or write by any command at any stage, e.g. a task recording its own full memory barrier. */
+    ALL_COMMANDS,
 };
 
 /**
@@ -77,17 +79,6 @@ struct ResAccessVK {
     std::string res_id;
     /** Task-facing usage translated internally to Vulkan access and stage masks. */
     RendResUsageVK usage = RendResUsageVK::SAMPLED_IMAGE;
-};
-
-/**
- * @class RendEdgeTypeVK
- * @brief Kind of a render-graph resource dependency, described from the point of view of the next task.
- */
-enum class RendEdgeTypeVK : uint32_t {
-    /** The next task reads the resource after the previous task's use. */
-    READ,
-    /** The next task writes the resource after the previous task's use. */
-    WRITE,
 };
 
 /**

@@ -602,23 +602,16 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture_view)
         .add_sampler(LIGHT_BILLBOARD_SAMPLER, clamped_linear_sampler);
 
-    constexpr VkPipelineStageFlags2 DEPTH_STAGES = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-    constexpr VkPipelineStageFlags2 COLOR_STAGE = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    p_shadow_opaque_task
-        .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE)
-        .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, DEPTH_STAGES, DEPTH_STAGES);
+    p_shadow_opaque_task.connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW).connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_opaque_task));
-    p_shadow_masked_task
-        .connect(RT_RUN_MAIN_OPAQUE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT)
-        .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::READ, DEPTH_STAGES, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+    p_shadow_masked_task.connect(RT_RUN_MAIN_OPAQUE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW).connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_masked_task));
     // The main passes sample the shadow depth through their reflected "shadowmap" resource.
     p_main_opaque_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
-        .connect(RT_RUN_MAIN_MASKED, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE)
-        .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, WBE::RendEdgeTypeVK::WRITE, DEPTH_STAGES, DEPTH_STAGES);
+        .connect(RT_RUN_MAIN_MASKED, WBE::REND_RES_SWAP_CHAIN)
+        .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW);
     pipeline_desc.tasks.emplace_back(std::move(p_main_opaque_task));
-    p_main_masked_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
-        .connect(RT_RUN_LIGHT_BILLBOARD, WBE::REND_RES_SWAP_CHAIN, WBE::RendEdgeTypeVK::WRITE, COLOR_STAGE, COLOR_STAGE);
+    p_main_masked_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW).connect(RT_RUN_LIGHT_BILLBOARD, WBE::REND_RES_SWAP_CHAIN);
     pipeline_desc.tasks.emplace_back(std::move(p_main_masked_task));
 
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);

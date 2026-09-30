@@ -33,8 +33,10 @@ namespace WhiteBirdEngine {
  * @brief Generates a color image's mip chain with filtered Vulkan blits.
  *
  * The underlying image must contain every requested mip level and support
- * transfer-source, transfer-destination, and linear blit operations. Instances
- * are neither copyable nor movable.
+ * transfer-source, transfer-destination, and linear blit operations. The task
+ * reads mip level zero through a source view and writes the remaining levels
+ * through a mip-chain view of the same image, and reports both accesses to the
+ * render graph. Instances are neither copyable nor movable.
  */
 struct RTGenerateMipmapsVK final : public IRenderTaskVK {
     RTGenerateMipmapsVK() = delete;
@@ -48,14 +50,16 @@ struct RTGenerateMipmapsVK final : public IRenderTaskVK {
      * @brief Construct a mip-generation task.
      *
      * @param p_render_data Base Vulkan render data.
-     * @param p_image_view_id Render-graph resource id of the image view.
+     * @param p_source_view_id Render-graph resource id of a view whose range includes mip level zero.
+     * @param p_mip_chain_view_id Render-graph resource id of a view of the same image whose range includes every mip level.
      * @param p_base_extent Extent of mip level zero.
      * @param p_mipmap_level_count Total number of mip levels, including level zero.
      * @param p_format Image format used for capability validation.
      * @throws std::runtime_error If the format cannot perform filtered blits.
      */
     RTGenerateMipmapsVK(const BaseRenderDataVK* p_render_data,
-        std::string_view p_image_view_id,
+        std::string_view p_source_view_id,
+        std::string_view p_mip_chain_view_id,
         VkExtent2D p_base_extent,
         uint32_t p_mipmap_level_count,
         VkFormat p_format);
@@ -72,8 +76,10 @@ struct RTGenerateMipmapsVK final : public IRenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    std::string image_view_id;
-    Ref<RenderObjectContainerVK> image_view_container;
+    std::string source_view_id;
+    std::string mip_chain_view_id;
+    Ref<RenderObjectContainerVK> source_view_container;
+    Ref<RenderObjectContainerVK> mip_chain_view_container;
     VkExtent2D base_extent{};
     uint32_t mipmap_level_count = 1;
 };

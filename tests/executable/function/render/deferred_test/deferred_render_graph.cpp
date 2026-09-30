@@ -172,102 +172,68 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
 
 void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const { // NOLINT
-    constexpr VkPipelineStageFlags2 COLOR = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    constexpr VkPipelineStageFlags2 DEPTH = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-    constexpr VkPipelineStageFlags2 COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    constexpr VkPipelineStageFlags2 FRAGMENT = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    constexpr VkPipelineStageFlags2 TRANSFER = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-    auto writer = [](std::string_view p_task_id, VkPipelineStageFlags2 p_stage) {
-        return ResourceChainLink{.task_id = p_task_id, .stage = p_stage, .writes = true};
-    };
-    auto reader = [](std::string_view p_task_id, VkPipelineStageFlags2 p_stage) {
-        return ResourceChainLink{.task_id = p_task_id, .stage = p_stage, .writes = false};
-    };
-    const ResourceChainLink direct_lighting = reader(RT_RUN_DIRECT_LIGHTING, COMPUTE);
-    const ResourceChainLink indirect_lighting = reader(RT_RUN_INDIRECT_LIGHTING, COMPUTE);
+    constexpr std::string_view DIRECT_LIGHTING = RT_RUN_DIRECT_LIGHTING;
+    constexpr std::string_view INDIRECT_LIGHTING = RT_RUN_INDIRECT_LIGHTING;
 
     // Shadow and reflective-shadow-map passes.
     for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW}) {
-        connect_resource_chain(p_pipeline_desc,
-            shadow_color,
-            {writer(RT_RUN_DEFERRED_SHADOW_OPAQUE, COLOR),
-                writer(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, COLOR),
-                writer(RT_RUN_DYNAMIC_SHADOW, COLOR)});
+        connect_resource_chain(
+            p_pipeline_desc, shadow_color, {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW});
     }
     connect_resource_chain(p_pipeline_desc,
         SHADOWMAP_DEPTH_IMAGE_VIEW,
-        {writer(RT_RUN_DEFERRED_SHADOW_OPAQUE, DEPTH), writer(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, DEPTH), writer(RT_RUN_DYNAMIC_SHADOW, DEPTH)});
+        {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW});
     for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW}) {
-        connect_resource_chain(p_pipeline_desc, shadow_color, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), direct_lighting});
-        connect_resource_chain(p_pipeline_desc, shadow_color, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), indirect_lighting});
+        connect_resource_chain(p_pipeline_desc, shadow_color, {RT_RUN_DYNAMIC_SHADOW, DIRECT_LIGHTING});
+        connect_resource_chain(p_pipeline_desc, shadow_color, {RT_RUN_DYNAMIC_SHADOW, INDIRECT_LIGHTING});
     }
     if (p_use_summed_area_table) {
-        connect_resource_chain(p_pipeline_desc,
-            SHADOW_MOMENTS_IMAGE_VIEW,
-            {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), reader(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, COMPUTE)});
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), direct_lighting});
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), indirect_lighting});
-        connect_resource_chain(p_pipeline_desc,
-            SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW,
-            {writer(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, COMPUTE), direct_lighting});
-    } else {
-        connect_resource_chain(p_pipeline_desc,
-            SHADOW_MOMENTS_IMAGE_VIEW,
-            {writer(RT_RUN_DYNAMIC_SHADOW, COLOR), writer(RT_GENERATE_SHADOW_MIPMAPS, TRANSFER), indirect_lighting});
-        // Direct lighting samples the complete mip chain through a second view of the moments image.
         connect_resource_chain(
-            p_pipeline_desc, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, {writer(RT_GENERATE_SHADOW_MIPMAPS, TRANSFER), direct_lighting});
+            p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW, RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE});
+        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW, DIRECT_LIGHTING});
+        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW, INDIRECT_LIGHTING});
+        connect_resource_chain(
+            p_pipeline_desc, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, {RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, DIRECT_LIGHTING});
+    } else {
+        connect_resource_chain(
+            p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW, RT_GENERATE_SHADOW_MIPMAPS, INDIRECT_LIGHTING});
+        // Direct lighting samples the complete mip chain through a second view of the moments image.
+        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, {RT_GENERATE_SHADOW_MIPMAPS, DIRECT_LIGHTING});
     }
 
     // G-buffer passes.
     for (std::string_view gbuffer_color : {GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW}) {
         connect_resource_chain(p_pipeline_desc,
             gbuffer_color,
-            {writer(RT_RUN_DEFERRED_GBUFFER, COLOR),
-                writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, COLOR),
-                writer(RT_RUN_DYNAMIC_GBUFFER, COLOR),
-                direct_lighting});
-        connect_resource_chain(p_pipeline_desc, gbuffer_color, {writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), indirect_lighting});
+            {RT_RUN_DEFERRED_GBUFFER, RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, RT_RUN_DYNAMIC_GBUFFER, DIRECT_LIGHTING});
+        connect_resource_chain(p_pipeline_desc, gbuffer_color, {RT_RUN_DYNAMIC_GBUFFER, INDIRECT_LIGHTING});
     }
-    connect_resource_chain(
-        p_pipeline_desc, GBUFFER_RMA_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_GBUFFER, COLOR), reader(RT_COMBINE_LIGHTING, COMPUTE)});
+    connect_resource_chain(p_pipeline_desc, GBUFFER_RMA_IMAGE_VIEW, {RT_RUN_DYNAMIC_GBUFFER, RT_COMBINE_LIGHTING});
     connect_resource_chain(p_pipeline_desc,
         GBUFFER_DEPTH_IMAGE_VIEW,
-        {writer(RT_RUN_DEFERRED_GBUFFER, DEPTH), writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, DEPTH), writer(RT_RUN_DYNAMIC_GBUFFER, DEPTH), direct_lighting});
-    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_GBUFFER, DEPTH), indirect_lighting});
+        {RT_RUN_DEFERRED_GBUFFER, RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, RT_RUN_DYNAMIC_GBUFFER, DIRECT_LIGHTING});
+    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {RT_RUN_DYNAMIC_GBUFFER, INDIRECT_LIGHTING});
     // Overlays depth-test against the G-buffer depth after lighting has sampled it.
-    const ResourceChainLink octree_debug_depth = writer(IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, DEPTH);
-    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {direct_lighting, octree_debug_depth});
+    constexpr std::string_view OCTREE_DEBUG_DEPTH = IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW;
+    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, OCTREE_DEBUG_DEPTH});
     connect_resource_chain(p_pipeline_desc,
         GBUFFER_DEPTH_IMAGE_VIEW,
-        {indirect_lighting,
-            octree_debug_depth,
-            writer(IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, DEPTH),
-            writer(RT_RUN_LIGHT_BILLBOARD, DEPTH)});
+        {INDIRECT_LIGHTING, OCTREE_DEBUG_DEPTH, IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, RT_RUN_LIGHT_BILLBOARD});
 
     // Lighting composition and post-processing.
-    connect_resource_chain(
-        p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {writer(RT_RUN_DIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
-    connect_resource_chain(p_pipeline_desc,
-        INDIRECT_LIGHTING_IMAGE_VIEW,
-        {writer(RT_RUN_INDIRECT_LIGHTING, COMPUTE), reader(RT_COMBINE_LIGHTING, COMPUTE)});
-    connect_resource_chain(
-        p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_EXTRACT_BLOOM, COMPUTE)});
-    connect_resource_chain(
-        p_pipeline_desc, RESULT_IMAGE_VIEW, {writer(RT_COMBINE_LIGHTING, COMPUTE), reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
+    connect_resource_chain(p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_DIRECT_LIGHTING, RT_COMBINE_LIGHTING});
+    connect_resource_chain(p_pipeline_desc, INDIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_INDIRECT_LIGHTING, RT_COMBINE_LIGHTING});
+    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {RT_COMBINE_LIGHTING, RT_EXTRACT_BLOOM});
+    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {RT_COMBINE_LIGHTING, RT_RUN_PRESENT_RESULT_IMAGE});
     // The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
-    connect_resource_chain(p_pipeline_desc,
-        BLOOM_PING_IMAGE_VIEW,
-        {writer(RT_EXTRACT_BLOOM, COMPUTE),
-            writer(RT_BLUR_BLOOM, COMPUTE),
-            reader(RT_ACQUIRE_BLOOM, TRANSFER),
-            reader(RT_RUN_PRESENT_RESULT_IMAGE, FRAGMENT)});
+    connect_resource_chain(
+        p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_EXTRACT_BLOOM, RT_BLUR_BLOOM, RT_ACQUIRE_BLOOM, RT_RUN_PRESENT_RESULT_IMAGE});
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
-        {writer(RT_RUN_PRESENT_RESULT_IMAGE, COLOR),
-            writer(IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, COLOR),
-            writer(IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, COLOR),
-            writer(RT_RUN_LIGHT_BILLBOARD, COLOR)});
+        {RT_RUN_PRESENT_RESULT_IMAGE,
+            IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW,
+            IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
+            RT_RUN_LIGHT_BILLBOARD});
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
@@ -404,8 +370,13 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(
                            task_base_render_data = base_render_data,
                            task_shadow_extent = shadow_extent,
                            task_shadow_mipmap_level_count = shadow_mipmap_level_count]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTGenerateMipmapsVK>(
-            task_render_allocator, task_base_render_data, SHADOW_MOMENTS_IMAGE_VIEW, task_shadow_extent, task_shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
+        return make_unique<RTGenerateMipmapsVK>(task_render_allocator,
+            task_base_render_data,
+            SHADOW_MOMENTS_IMAGE_VIEW,
+            SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW,
+            task_shadow_extent,
+            task_shadow_mipmap_level_count,
+            SHADOW_MOMENTS_FORMAT);
     };
     return task_desc;
 }

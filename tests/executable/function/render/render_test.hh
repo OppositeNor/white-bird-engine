@@ -228,35 +228,17 @@ std::vector<uint8_t> to_initial_data(const T& p_value) {
 }
 
 /**
- * @class ResourceChainLink
- * @brief One task in an execution-ordered chain of uses of a single graph resource.
- */
-struct ResourceChainLink {
-    /** @brief Task that uses the resource. */
-    std::string_view task_id;
-    /** @brief Pipeline stages at which the task uses the resource. */
-    VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
-    /** @brief Whether the task writes the resource. */
-    bool writes = false;
-};
-
-/**
  * @brief Connect consecutive uses of one resource with resource edges.
  *
- * Every link is connected to the next one; the edge type follows whether the next task writes the resource.
+ * Every task is connected to the next one; the graph derives each edge's synchronization from the tasks' reported usages.
  *
  * @param p_graph Graph descriptor that already contains every linked task.
  * @param p_resource_id Graph resource carried by the edges.
- * @param p_links Uses of the resource in execution order.
+ * @param p_task_ids Tasks that use the resource, in execution order.
  */
-inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::span<const ResourceChainLink> p_links) {
-    const ResourceChainLink* previous = nullptr;
-    for (const ResourceChainLink& link : p_links) {
-        if (previous != nullptr) {
-            p_graph.get_task(previous->task_id)
-                .connect(link.task_id, p_resource_id, link.writes ? RendEdgeTypeVK::WRITE : RendEdgeTypeVK::READ, previous->stage, link.stage);
-        }
-        previous = &link;
+inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_resource_id, std::span<const std::string_view> p_task_ids) {
+    for (size_t i = 1; i < p_task_ids.size(); ++i) {
+        p_graph.get_task(p_task_ids[i - 1]).connect(p_task_ids[i], p_resource_id);
     }
 }
 
@@ -286,11 +268,11 @@ inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> m
  * @brief Connect consecutive uses of one resource with resource edges.
  * @param p_graph Graph descriptor that already contains every linked task.
  * @param p_resource_id Graph resource carried by the edges.
- * @param p_links Uses of the resource in execution order.
+ * @param p_task_ids Tasks that use the resource, in execution order.
  */
 inline void connect_resource_chain(
-    RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<ResourceChainLink> p_links) {
-    connect_resource_chain(p_graph, p_resource_id, std::span<const ResourceChainLink>(p_links.begin(), p_links.size()));
+    RendGraphDescVK& p_graph, std::string_view p_resource_id, std::initializer_list<std::string_view> p_task_ids) {
+    connect_resource_chain(p_graph, p_resource_id, std::span<const std::string_view>(p_task_ids.begin(), p_task_ids.size()));
 }
 
 /**

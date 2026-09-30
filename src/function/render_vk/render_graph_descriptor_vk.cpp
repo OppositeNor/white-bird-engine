@@ -68,17 +68,10 @@ RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_
     };
 }
 
-RendTaskDescVK& RendTaskDescVK::connect(std::string_view p_next_task_id,
-    std::string_view p_resource_id,
-    RendEdgeTypeVK p_edge_type,
-    VkPipelineStageFlags2 p_src_stage,
-    VkPipelineStageFlags2 p_dst_stage) {
+RendTaskDescVK& RendTaskDescVK::connect(std::string_view p_next_task_id, std::string_view p_resource_id) {
     next.push_back({
         .next_task_id = std::string(p_next_task_id),
         .res_id = std::string(p_resource_id),
-        .type = p_edge_type,
-        .src_stage = p_src_stage,
-        .dst_stage = p_dst_stage,
     });
     return *this;
 }

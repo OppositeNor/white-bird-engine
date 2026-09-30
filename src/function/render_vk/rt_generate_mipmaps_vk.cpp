@@ -34,10 +34,14 @@
 
 namespace WhiteBirdEngine {
 
-RTGenerateMipmapsVK::RTGenerateMipmapsVK(
-    const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id, VkExtent2D p_base_extent, uint32_t p_mipmap_level_count, VkFormat p_format)
-    : render_data(p_render_data), image_view_id(p_image_view_id), base_extent(p_base_extent),
-      mipmap_level_count(p_mipmap_level_count) {
+RTGenerateMipmapsVK::RTGenerateMipmapsVK(const BaseRenderDataVK* p_render_data,
+    std::string_view p_source_view_id,
+    std::string_view p_mip_chain_view_id,
+    VkExtent2D p_base_extent,
+    uint32_t p_mipmap_level_count,
+    VkFormat p_format)
+    : render_data(p_render_data), source_view_id(p_source_view_id), mip_chain_view_id(p_mip_chain_view_id),
+      base_extent(p_base_extent), mipmap_level_count(p_mipmap_level_count) {
     if (render_data == nullptr || render_data->physical_device == VK_NULL_HANDLE) {
         // Format capabilities cannot be queried without a valid physical device.
         throw std::runtime_error("RTGenerateMipmapsVK: physical device is missing.");
@@ -65,27 +69,38 @@ RTGenerateMipmapsVK::RTGenerateMipmapsVK(
 
 void RTGenerateMipmapsVK::append_accesses(
     Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
-    // Blits read the source mip levels and write the destination mip levels of the same image.
-    p_reads.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
-    p_writes.push_back({.res_id = image_view_id, .usage = RendResUsageVK::TRANSFER_DST});
+    // The first blit reads mip level zero; later blits read and write the generated levels of the mip chain.
+    p_reads.push_back({.res_id = source_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
+    p_reads.push_back({.res_id = mip_chain_view_id, .usage = RendResUsageVK::TRANSFER_SRC});
+    p_writes.push_back({.res_id = mip_chain_view_id, .usage = RendResUsageVK::TRANSFER_DST});
 }
 
 void RTGenerateMipmapsVK::bind_resources(const RendResViewVK& p_resources) {
-    image_view_container = p_resources.get(image_view_id).container;
-    if (image_view_container == MEM_NULL || image_view_container->get_resource_type_id() != TypeUUID<ROImageViewVK>::UUID) {
-        throw std::runtime_error("RTGenerateMipmapsVK: image-view resource has the wrong type.");
-    }
+    auto bind_view = [&p_resources](std::string_view p_view_id) {
+        Ref<RenderObjectContainerVK> container = p_resources.get(p_view_id).container;
+        if (container == MEM_NULL || container->get_resource_type_id() != TypeUUID<ROImageViewVK>::UUID) {
+            throw std::runtime_error("RTGenerateMipmapsVK: image-view resource has the wrong type.");
+        }
+        return container;
+    };
+    source_view_container = bind_view(source_view_id);
+    mip_chain_view_container = bind_view(mip_chain_view_id);
 }
 
 void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
     // Resolve the graph image view and its underlying image for this frame.
-    auto image_view = image_view_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
-    if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
-        // Commands cannot be recorded without a bound image view and image.
+    auto source_view = source_view_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
+    auto mip_chain_view = mip_chain_view_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
+    if (source_view == MEM_NULL || mip_chain_view == MEM_NULL || mip_chain_view->fields().image == MEM_NULL) {
+        // Commands cannot be recorded without bound image views and an image.
         throw std::runtime_error("RTGenerateMipmapsVK: image-view resource is missing.");
     }
+    if (source_view->fields().image != mip_chain_view->fields().image) {
+        // The declared accesses only describe the blits when both views reference the same image.
+        throw std::runtime_error("RTGenerateMipmapsVK: source and mip-chain views reference different images.");
+    }
     // Generate each destination mip from the preceding level at half resolution.
-    Ref<ROImageVK> image = image_view->fields().image;
+    Ref<ROImageVK> image = mip_chain_view->fields().image;
     int32_t source_width = static_cast<int32_t>(base_extent.width);
     int32_t source_height = static_cast<int32_t>(base_extent.height);
     for (uint32_t mip_level = 1; mip_level < mipmap_level_count; ++mip_level) {

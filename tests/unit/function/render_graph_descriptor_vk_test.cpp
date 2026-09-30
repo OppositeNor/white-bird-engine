@@ -78,15 +78,11 @@ TEST(WBERenderGraphDescriptorVKTest, FluentAliasesAndConnectionsAreStored) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendTaskDescVK descriptor(&allocator);
     descriptor.task_id = "run_lighting";
-    descriptor.alias("render_target_colors[0]", "lighting_output")
-        .connect("run_bloom", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+    descriptor.alias("render_target_colors[0]", "lighting_output").connect("run_bloom", "lighting_output");
 
     ASSERT_EQ(descriptor.next.size(), 1U);
     EXPECT_EQ(descriptor.next.front().next_task_id, "run_bloom");
     EXPECT_EQ(descriptor.next.front().res_id, "lighting_output");
-    EXPECT_EQ(descriptor.next.front().type, RendEdgeTypeVK::READ);
-    EXPECT_EQ(descriptor.next.front().src_stage, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-    EXPECT_EQ(descriptor.next.front().dst_stage, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
     EXPECT_EQ(descriptor.resource_map.resolve("render_target_colors[0]"), "lighting_output");
     EXPECT_EQ(descriptor.resource_map.resolve("gbuffer_albedo"), "gbuffer_albedo");
     EXPECT_THROW(descriptor.alias("render_target_colors[0]", "other"), std::runtime_error);
@@ -99,10 +95,11 @@ TEST(WBERenderGraphDescriptorVKTest, GetTaskReturnsStoredDescriptorForLaterConne
     task.task_id = "producer";
     descriptor.add_task(std::move(task));
 
-    descriptor.get_task("producer").connect("consumer", "buffer", RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    descriptor.get_task("producer").connect("consumer", "buffer");
 
     ASSERT_EQ(descriptor.tasks.front().next.size(), 1U);
-    EXPECT_EQ(descriptor.tasks.front().next.front().type, RendEdgeTypeVK::WRITE);
+    EXPECT_EQ(descriptor.tasks.front().next.front().next_task_id, "consumer");
+    EXPECT_EQ(descriptor.tasks.front().next.front().res_id, "buffer");
     EXPECT_THROW(descriptor.get_task("missing"), std::runtime_error);
 }
 

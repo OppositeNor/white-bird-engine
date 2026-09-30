@@ -14,7 +14,7 @@
   - `RendTaskDescVK`: string `task_id`, fluent `connect()` edges and `alias()` resource mappings, and a task factory in `create`.
   - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations, plus `get_task()` for connecting added tasks.
 - `include/function/render_vk/i_render_task_vk.hh`
-  - `QueueFamilyVK`, `RendEdgeTypeVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
+  - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
   - Descriptor building, resource-edge validation, synchronization derivation, execution, bind-once resource contracts, and terminal semaphore access.
 - `include/function/render/render_resource_list.hh`
@@ -67,10 +67,10 @@ A pipeline-run task descriptor captures only construction data. The render graph
 RendTaskDescVK task_desc(render_allocator);
 task_desc.task_id = "run_lighting";
 // The compute pipeline reflects gbuffer_albedo (read) and lighting_output (read_write); the task reports both.
-task_desc.connect("present", "lighting_output", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+task_desc.connect("present", "lighting_output");
 // The G-buffer pass was added earlier; connect it to the lighting task.
 graph_desc.get_task("run_gbuffer")
-    .connect("run_lighting", "gbuffer_albedo", RendEdgeTypeVK::READ, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    .connect("run_lighting", "gbuffer_albedo");
 task_desc.create = [task_render_allocator = render_allocator,
                        task_base_render_data = base_render_data]() -> Unique<RenderTaskVK> {
     return make_unique<RTRunComputePipelineVK>(task_render_allocator,
@@ -84,23 +84,22 @@ Keep task creation logic in the application class when it has meaningful setup. 
 
 ## Resource dependency model
 
-Edges are the only ordering mechanism. `connect()` on the earlier task's descriptor adds one edge carrying one resource:
+Edges are the only ordering mechanism. `connect()` on the earlier task's descriptor adds one edge carrying one resource. The graph
+derives the edge from the usages both tasks report for that resource through `append_accesses()`:
 
-- `RendEdgeTypeVK::READ`: the next task reads the resource after the previous task's use.
-- `RendEdgeTypeVK::WRITE`: the next task writes the resource after the previous task's use. An edge into a task that declares a
-  write to the resource must be `WRITE`.
-- `src_stage`: stages where the previous task last uses the resource. `dst_stage`: stages where the next task first uses it.
+- Source: the union of the previous task's usage stages; the source access is the union of its write accesses only, since a
+  previous read needs only an execution dependency.
+- Destination: the union of the next task's usage stages and read and write accesses.
+- A task whose own barrier covers everything, such as a frame-begin ordering task, reports `RendResUsageVK::ALL_COMMANDS`.
 
-Graph construction fails on cycles, self edges, unknown tasks, undeclared resources, empty stages, and graphics-only stages on
-compute tasks. After topological sorting, every read-write, write-read, or write-write pair of declared accesses on a resource
+Graph construction fails on cycles, self edges, unknown tasks, undeclared resources, edges whose previous or next task does not
+access the resource, and graphics-only usages on compute tasks. After topological sorting, every read-write, write-read, or write-write pair of declared accesses on a resource
 must be connected by a chain of edges on that same resource; a transitive chain is sufficient, but edges on other resources are
-not. Read-read accesses do not conflict. Consecutive edges of a chain must share a stage at the middle task so the dependencies
-chain. Views of the same image are separate resource ids; connect the id each task actually accesses.
+not. Read-read accesses do not conflict. Views of the same image are separate resource ids; connect the id each task actually accesses.
 
 Synchronization is derived per edge. Same-queue edges become one pipeline barrier recorded before the next task, merged per
 resource: a buffer barrier for buffers, a whole-image barrier (every mip level and layer) for image views in `GENERAL`, and a global
-memory barrier for other resources. The source access is memory write; the destination access is memory read, plus memory write
-for `WRITE` edges. Cross-queue edges signal the producer's timeline semaphore at the merged source stages and wait on it at the
+memory barrier for other resources, using the derived stages and accesses merged from its edges. Cross-queue edges signal the producer's timeline semaphore at the merged source stages and wait on it at the
 merged destination stages. Image layout transitions out of `UNDEFINED` or `PRESENT_SRC_KHR` remain automatic for written images;
 queue ownership transfers are not encoded.
 

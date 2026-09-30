@@ -217,12 +217,6 @@ struct RendResEdgeDescVK {
     RendTaskID next_task_id;
     /** Graph resource identifier carried by the edge. */
     std::string res_id;
-    /** Whether the next task reads or writes the resource. */
-    RendEdgeTypeVK type = RendEdgeTypeVK::READ;
-    /** Pipeline stages at which the previous task last uses the resource. */
-    VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
-    /** Pipeline stages at which the next task first uses the resource. */
-    VkPipelineStageFlags2 dst_stage = VK_PIPELINE_STAGE_2_NONE;
 };
 
 /**
@@ -254,20 +248,14 @@ struct RendTaskDescVK {
      *
      * The edge orders this task before the next task and synchronizes the resource between them: with a pipeline barrier
      * when both tasks run on the same queue, otherwise with a timeline semaphore. Aggregate resource-list ids apply to every
-     * indexed entry.
+     * indexed entry. The graph derives the synchronization stages and accesses from the usages both tasks report for the
+     * resource through IRenderTaskVK::append_accesses(); graph construction fails if either task does not access it.
      *
      * @param p_next_task_id Identifier of the task that uses the resource next.
      * @param p_resource_id Graph resource identifier carried by the edge.
-     * @param p_edge_type Whether the next task reads or writes the resource.
-     * @param p_src_stage Pipeline stages at which this task last uses the resource.
-     * @param p_dst_stage Pipeline stages at which the next task first uses the resource.
      * @return This descriptor.
      */
-    RendTaskDescVK& connect(std::string_view p_next_task_id,
-        std::string_view p_resource_id,
-        RendEdgeTypeVK p_edge_type,
-        VkPipelineStageFlags2 p_src_stage,
-        VkPipelineStageFlags2 p_dst_stage);
+    RendTaskDescVK& connect(std::string_view p_next_task_id, std::string_view p_resource_id);
 
     /**
      * @brief Map a resource identifier used by the task to a graph resource.

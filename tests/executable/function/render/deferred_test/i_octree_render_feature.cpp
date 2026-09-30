@@ -29,6 +29,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
@@ -105,7 +106,9 @@ public:
     QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& /*p_writes*/) const override {
+    void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+        // The full memory barrier below covers every command, which the octree reset edge synchronizes after.
+        p_writes.push_back({.res_id = std::string(IOctreeRenderFeature::OCTREE_INFO), .usage = RendResUsageVK::ALL_COMMANDS});
     }
     void record(VkCommandBuffer p_buffer, double) override {
         VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -324,9 +327,8 @@ void IOctreeRenderFeature::create_resources() {
         create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             &initial_debug_draw_command,
             sizeof(initial_debug_draw_command));
-    voxel_claims = ROBufferVK::Builder()
-                       .set_properties(sizeof(uint32_t), OCTREE_CLAIM_WORD_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                       .create_ref(base_render_data);
+    voxel_claims =
+        ROBufferVK::Builder().set_properties(sizeof(uint32_t), OCTREE_CLAIM_WORD_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     initialize();
 }
 
@@ -524,24 +526,29 @@ void IOctreeRenderFeature::add_construction_render_tasks(RendGraphDescVK& p_grap
 
 void IOctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const {
     // The frame-begin barrier orders this frame's octree mutation after the previous frame's consumers.
-    p_graph.get_task(RT_OCTREE_FRAME_BEGIN)
-        .connect(RT_RESET_OCTREE, OCTREE_INFO, RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, STAGE_COMPUTE);
+    p_graph.get_task(RT_OCTREE_FRAME_BEGIN).connect(RT_RESET_OCTREE, OCTREE_INFO);
     connect_implementation_render_tasks(p_graph);
     connect_resource_chain(p_graph,
         OCTREE_LEAF_BUFFER,
-        {LINK_BUILD, LINK_BUILD_DOUBLE_SIDED, LINK_STATIC_DEFERRED, LINK_DYNAMIC_BUILD, LINK_DEFERRED, LINK_DEBUG_DRAW, LINK_PRE_DEFERRED_DRAW});
+        {RT_RUN_BUILD_OCTREE,
+            RT_RUN_BUILD_OCTREE_DOUBLE_SIDED,
+            RT_STATIC_OCTREE_DEFERRED,
+            RT_RUN_BUILD_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_OCTREE_DEFERRED,
+            RT_RUN_OCTREE_DEBUG_DRAW,
+            RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
     connect_resource_chain(p_graph,
         OCTREE_DEFERRED_LIST_PING,
-        {LINK_BUILD, LINK_BUILD_DOUBLE_SIDED, LINK_STATIC_DEFERRED, LINK_DYNAMIC_BUILD, as_read(LINK_CAPTURE), LINK_DEFERRED});
-    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {LINK_STATIC_DEFERRED, LINK_DEFERRED});
-    connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {LINK_CAPTURE, LINK_PRE_DEFERRED_DRAW});
-    connect_resource_chain(p_graph, OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, {LINK_CAPTURE, LINK_PRE_DEFERRED_DRAW});
+        {RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCTREE_DEFERRED});
+    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_OCTREE_DEFERRED});
+    connect_resource_chain(
+        p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
+    connect_resource_chain(
+        p_graph, OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, {RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
     connect_resource_chain(p_graph,
         OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER,
-        {LINK_CAPTURE, {.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT}});
-    connect_resource_chain(p_graph,
-        OCTREE_DEBUG_DRAW_INDIRECT_BUFFER,
-        {LINK_SETUP, {.task_id = RT_RUN_OCTREE_DEBUG_DRAW, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT}});
+        {RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
+    connect_resource_chain(p_graph, OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, {RT_SETUP_OCTREE_DEBUG_DRAW, RT_RUN_OCTREE_DEBUG_DRAW});
 }
 
 RendTaskDescVK IOctreeRenderFeature::make_static_once(RendTaskDescVK p_task, bool p_finish) const {

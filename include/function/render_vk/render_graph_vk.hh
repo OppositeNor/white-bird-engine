@@ -127,12 +127,14 @@ struct RGResEdge {
     Ref<RGNode> to;
     // The graph resource id carried by the edge. Aggregate resource-list ids are expanded to their indexed entries.
     std::string res_id;
-    // Whether the next task reads or writes the resource.
-    RendEdgeTypeVK type = RendEdgeTypeVK::READ;
-    // The pipeline stages at which the previous task last uses the resource.
+    // The pipeline stages at which the previous task uses the resource, derived from its reported usages.
     VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
-    // The pipeline stages at which the next task first uses the resource.
+    // The writes of the previous task that must be made available, derived from its reported write usages.
+    VkAccessFlags2 src_access = VK_ACCESS_2_NONE;
+    // The pipeline stages at which the next task uses the resource, derived from its reported usages.
     VkPipelineStageFlags2 dst_stage = VK_PIPELINE_STAGE_2_NONE;
+    // The accesses of the next task that must see the previous task's writes, derived from its reported usages.
+    VkAccessFlags2 dst_access = VK_ACCESS_2_NONE;
 };
 
 /**
@@ -323,8 +325,7 @@ private:
     void topological_sort();
     Ref<RGNode> add_node(Unique<IRenderTaskVK> p_task);
     Ref<RGNode> find_node(std::string_view p_task_id) const;
-    void add_resource_edge(
-        Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id, RendEdgeTypeVK p_type, VkPipelineStageFlags2 p_src_stage, VkPipelineStageFlags2 p_dst_stage);
+    void add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     void allocate_resources(const RendGraphDescVK& p_desc);
@@ -334,7 +335,6 @@ private:
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
     void add_resource_edges(const RendGraphDescVK& p_desc);
-    void validate_resource_edges() const;
     void validate_resource_conflicts() const;
     void validate_queue_completion() const;
     bool has_resource_path(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string_view p_resource_id) const;

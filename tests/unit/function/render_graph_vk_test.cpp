@@ -195,8 +195,6 @@ private:
     Vector<ResAccessVK, RenderAllocator> writes;
 };
 
-constexpr VkPipelineStageFlags2 TEST_COMPUTE_STAGE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-constexpr VkPipelineStageFlags2 TEST_FRAGMENT_STAGE = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 // Graph validation succeeded when construction reaches command-buffer allocation, which needs a Vulkan device.
 constexpr std::string_view TEST_VALIDATION_PASSED_MESSAGE = "Failed to create command pool";
 
@@ -424,8 +422,8 @@ TEST(WBERenderGraphVKTest, ResourceEdgeChainOrdersConflictingAccesses) {
     descriptor.add_task(make_probe_desc(&allocator, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     descriptor.add_task(make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     descriptor.add_task(make_probe_desc(&allocator, "rewriter", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
-    descriptor.get_task("writer").connect("reader", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::READ, TEST_COMPUTE_STAGE, TEST_FRAGMENT_STAGE);
-    descriptor.get_task("reader").connect("rewriter", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_FRAGMENT_STAGE, TEST_COMPUTE_STAGE);
+    descriptor.get_task("writer").connect("reader", TEST_LOGICAL_RESOURCE);
+    descriptor.get_task("reader").connect("rewriter", TEST_LOGICAL_RESOURCE);
     RenderGraphVK graph(&render_data);
 
     EXPECT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
@@ -441,7 +439,7 @@ TEST(WBERenderGraphVKTest, EdgesOnAnotherResourceDoNotOrderAConflict) {
         make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE, TEST_SHARED_RESOURCE}));
     descriptor.add_task(
         make_probe_desc(&allocator, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE, TEST_SHARED_RESOURCE}, {}));
-    descriptor.get_task("writer").connect("reader", TEST_SHARED_RESOURCE, RendEdgeTypeVK::READ, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
+    descriptor.get_task("writer").connect("reader", TEST_SHARED_RESOURCE);
     RenderGraphVK graph(&render_data);
 
     EXPECT_NE(build_error(graph, descriptor).find("resource 'logical' without a chain of edges on that resource"), std::string::npos);
@@ -454,8 +452,8 @@ TEST(WBERenderGraphVKTest, RejectsCyclicResourceEdges) {
     descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
     descriptor.add_task(make_probe_desc(&allocator, "first", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     descriptor.add_task(make_probe_desc(&allocator, "second", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
-    descriptor.get_task("first").connect("second", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
-    descriptor.get_task("second").connect("first", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
+    descriptor.get_task("first").connect("second", TEST_LOGICAL_RESOURCE);
+    descriptor.get_task("second").connect("first", TEST_LOGICAL_RESOURCE);
     RenderGraphVK graph(&render_data);
 
     const std::string message = build_error(graph, descriptor);
@@ -477,57 +475,37 @@ TEST(WBERenderGraphVKTest, RejectsSelfEdgesUnknownTasksAndUndeclaredResources) {
     RenderGraphVK graph(&render_data);
 
     RendGraphDescVK self_edge = make_descriptor();
-    self_edge.get_task("task").connect("task", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
+    self_edge.get_task("task").connect("task", TEST_LOGICAL_RESOURCE);
     EXPECT_NE(build_error(graph, self_edge).find("connects to itself"), std::string::npos);
 
     RendGraphDescVK unknown_task = make_descriptor();
-    unknown_task.get_task("task").connect("missing", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::READ, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
+    unknown_task.get_task("task").connect("missing", TEST_LOGICAL_RESOURCE);
     EXPECT_NE(build_error(graph, unknown_task).find("connects to unknown task 'missing'"), std::string::npos);
 
     RendGraphDescVK undeclared_resource = make_descriptor();
-    undeclared_resource.get_task("task").connect("other", TEST_MISSING_RESOURCE, RendEdgeTypeVK::READ, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
+    undeclared_resource.get_task("task").connect("other", TEST_MISSING_RESOURCE);
     EXPECT_NE(build_error(graph, undeclared_resource).find("uses undeclared resource 'missing'"), std::string::npos);
 }
 
-TEST(WBERenderGraphVKTest, RejectsInvalidEdgeStagesAndTypes) {
+TEST(WBERenderGraphVKTest, RejectsEdgesWhoseTasksDoNotAccessTheResource) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     auto make_descriptor = [&]() {
         RendGraphDescVK descriptor(&allocator);
         descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
-        descriptor.add_task(make_probe_desc(&allocator, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
-        descriptor.add_task(make_probe_desc(&allocator, "consumer", QueueFamilyVK::COMPUTE, {}, {TEST_LOGICAL_RESOURCE}));
+        descriptor.add_task(make_probe_desc(&allocator, "accessor", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+        descriptor.add_task(make_probe_desc(&allocator, "bystander", QueueFamilyVK::GRAPHICS, {}, {}));
         return descriptor;
     };
     RenderGraphVK graph(&render_data);
 
-    RendGraphDescVK empty_stage = make_descriptor();
-    empty_stage.get_task("producer").connect("consumer", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, VK_PIPELINE_STAGE_2_NONE, TEST_COMPUTE_STAGE);
-    EXPECT_NE(build_error(graph, empty_stage).find("empty source stage"), std::string::npos);
+    RendGraphDescVK unused_by_source = make_descriptor();
+    unused_by_source.get_task("bystander").connect("accessor", TEST_LOGICAL_RESOURCE);
+    EXPECT_NE(build_error(graph, unused_by_source).find("but task 'bystander' does not access it"), std::string::npos);
 
-    RendGraphDescVK graphics_stage_on_compute = make_descriptor();
-    graphics_stage_on_compute.get_task("producer").connect("consumer", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_FRAGMENT_STAGE, TEST_FRAGMENT_STAGE);
-    EXPECT_NE(build_error(graph, graphics_stage_on_compute).find("graphics-only destination stages on compute task 'consumer'"),
-        std::string::npos);
-
-    RendGraphDescVK read_into_writer = make_descriptor();
-    read_into_writer.get_task("producer").connect("consumer", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::READ, TEST_FRAGMENT_STAGE, TEST_COMPUTE_STAGE);
-    EXPECT_NE(build_error(graph, read_into_writer).find("is a READ edge, but the next task writes the resource"), std::string::npos);
-}
-
-TEST(WBERenderGraphVKTest, RejectsResourceChainsWithoutSharedMiddleStage) {
-    RenderAllocator allocator(WBE_KI_B(128));
-    BaseRenderDataVK render_data(&allocator);
-    RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
-    descriptor.add_task(make_probe_desc(&allocator, "first", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
-    descriptor.add_task(make_probe_desc(&allocator, "middle", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
-    descriptor.add_task(make_probe_desc(&allocator, "last", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
-    descriptor.get_task("first").connect("middle", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::READ, TEST_COMPUTE_STAGE, TEST_FRAGMENT_STAGE);
-    descriptor.get_task("middle").connect("last", TEST_LOGICAL_RESOURCE, RendEdgeTypeVK::WRITE, TEST_COMPUTE_STAGE, TEST_COMPUTE_STAGE);
-    RenderGraphVK graph(&render_data);
-
-    EXPECT_NE(build_error(graph, descriptor).find("do not share a stage at task 'middle'"), std::string::npos);
+    RendGraphDescVK unused_by_destination = make_descriptor();
+    unused_by_destination.get_task("accessor").connect("bystander", TEST_LOGICAL_RESOURCE);
+    EXPECT_NE(build_error(graph, unused_by_destination).find("but task 'bystander' does not access it"), std::string::npos);
 }
 
 TEST(WBERenderGraphVKTest, GraphOwnedResourcesRejectDuplicateIdsBeforeAllocation) {

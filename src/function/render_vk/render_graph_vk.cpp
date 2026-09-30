@@ -234,6 +234,8 @@ ResourceScopeVK resource_scope(RendResUsageVK p_usage, bool p_write, QueueFamily
         }
         ensure_graphics_queue_usage(p_queue_family, p_usage);
         return {.access = VK_ACCESS_2_INDEX_READ_BIT, .stage = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT};
+    case RendResUsageVK::ALL_COMMANDS:
+        return {.access = p_write ? VK_ACCESS_2_MEMORY_WRITE_BIT : VK_ACCESS_2_MEMORY_READ_BIT, .stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT};
     }
     throw std::runtime_error("RenderGraphVK: resource usage is invalid for the declared read/write direction.");
 }
@@ -248,71 +250,28 @@ void validate_declared_resource(
     }
 }
 
-// Stages that only exist on graphics-capable queues.
-constexpr VkPipelineStageFlags2 GRAPHICS_ONLY_STAGES =
-    VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
-    VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
-    VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
-    VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
-    VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT | VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT |
-    VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+struct EdgeScopeVK {
+    VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_NONE;
+    VkAccessFlags2 read_access = VK_ACCESS_2_NONE;
+    VkAccessFlags2 write_access = VK_ACCESS_2_NONE;
+};
 
-// Expand meta stages so that stage-set intersections can be computed bitwise.
-VkPipelineStageFlags2 expand_stages(VkPipelineStageFlags2 p_stages) {
-    if ((p_stages & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) != 0) {
-        return ~VkPipelineStageFlags2{0};
-    }
-    if ((p_stages & VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT) != 0) {
-        p_stages |= GRAPHICS_ONLY_STAGES | VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-    }
-    if ((p_stages & VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT) != 0) {
-        p_stages |= VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
-                    VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT | VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT |
-                    VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT;
-    }
-    if ((p_stages & VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT) != 0) {
-        p_stages |= VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT | VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-    }
-    if ((p_stages & VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT) != 0) {
-        p_stages |= VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT | VK_PIPELINE_STAGE_2_RESOLVE_BIT |
-                    VK_PIPELINE_STAGE_2_CLEAR_BIT | VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_COPY_BIT_KHR;
-    }
-    return p_stages;
-}
-
-void validate_edge_stage(const RGNode& p_node, VkPipelineStageFlags2 p_stage, const RGResEdge& p_edge, std::string_view p_side) {
-    if (p_stage == VK_PIPELINE_STAGE_2_NONE) {
-        throw std::runtime_error(std::format("RenderGraphVK: edge '{}' -> '{}' on resource '{}' has an empty {} stage.",
-            p_edge.from->task_id,
-            p_edge.to->task_id,
-            p_edge.res_id,
-            p_side));
-    }
-    if (p_node.in_queue == QueueFamilyVK::COMPUTE && (p_stage & GRAPHICS_ONLY_STAGES) != 0) {
-        throw std::runtime_error(std::format("RenderGraphVK: edge '{}' -> '{}' on resource '{}' uses graphics-only {} stages on compute task '{}'.",
-            p_edge.from->task_id,
-            p_edge.to->task_id,
-            p_edge.res_id,
-            p_side,
-            p_node.task_id));
-    }
-}
-
-bool node_accesses(const Vector<ResAccessVK, RenderAllocator>& p_accesses, std::string_view p_resource_id) {
-    return std::ranges::any_of(p_accesses, [p_resource_id](const ResAccessVK& p_access) {
-        return p_access.res_id == p_resource_id;
-    });
-}
-
-VkAccessFlags2 edge_dst_access(RendEdgeTypeVK p_type) {
-    switch (p_type) {
-    case RendEdgeTypeVK::READ:
-        return VK_ACCESS_2_MEMORY_READ_BIT;
-    case RendEdgeTypeVK::WRITE:
-        return VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-    }
-    throw std::runtime_error("RenderGraphVK: unknown resource edge type.");
+// Merge the synchronization scopes of every usage the node reports for the resource.
+EdgeScopeVK node_resource_scope(const RGNode& p_node, std::string_view p_resource_id) {
+    EdgeScopeVK result;
+    auto merge = [&](const Vector<ResAccessVK, RenderAllocator>& p_accesses, bool p_write) {
+        for (const ResAccessVK& access : p_accesses) {
+            if (access.res_id != p_resource_id) {
+                continue;
+            }
+            ResourceScopeVK scope = resource_scope(access.usage, p_write, p_node.in_queue);
+            result.stage |= scope.stage;
+            (p_write ? result.write_access : result.read_access) |= scope.access;
+        }
+    };
+    merge(p_node.reads, false);
+    merge(p_node.writes, true);
+    return result;
 }
 
 VkBufferUsageFlags buffer_usage_flags(RendResPrimaryUsageVK p_usage, std::string_view p_resource_id) {
@@ -488,15 +447,29 @@ Ref<RGNode> RenderGraphVK::find_node(std::string_view p_task_id) const {
     return MEM_NULL;
 }
 
-void RenderGraphVK::add_resource_edge(
-    Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id, RendEdgeTypeVK p_type, VkPipelineStageFlags2 p_src_stage, VkPipelineStageFlags2 p_dst_stage) {
+void RenderGraphVK::add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id) {
+    EdgeScopeVK src_scope = node_resource_scope(*p_from, p_resource_id);
+    EdgeScopeVK dst_scope = node_resource_scope(*p_to, p_resource_id);
+    auto ensure_accessed = [&](const EdgeScopeVK& p_scope, const RGNode& p_node) {
+        if (p_scope.stage == VK_PIPELINE_STAGE_2_NONE) {
+            throw std::runtime_error(std::format("RenderGraphVK: edge '{}' -> '{}' carries resource '{}', but task '{}' does not access it.",
+                p_from->task_id,
+                p_to->task_id,
+                p_resource_id,
+                p_node.task_id));
+        }
+    };
+    ensure_accessed(src_scope, *p_from);
+    ensure_accessed(dst_scope, *p_to);
     auto edge = make_ref<RGResEdge>(render_data->allocator);
     edge->from = p_from;
     edge->to = p_to;
     edge->res_id = std::move(p_resource_id);
-    edge->type = p_type;
-    edge->src_stage = p_src_stage;
-    edge->dst_stage = p_dst_stage;
+    // Only the previous task's writes need to be made available; a previous read only needs an execution dependency.
+    edge->src_stage = src_scope.stage;
+    edge->src_access = src_scope.write_access;
+    edge->dst_stage = dst_scope.stage;
+    edge->dst_access = dst_scope.read_access | dst_scope.write_access;
     p_from->out_edges.emplace_back(edge);
     p_to->in_edges.emplace_back(edge);
     resource_edges.emplace_back(std::move(edge));
@@ -624,7 +597,6 @@ void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
     add_resource_edges(p_desc);
 
     topological_sort();
-    validate_resource_edges();
     validate_resource_conflicts();
     validate_queue_completion();
     build_synchronization();
@@ -870,43 +842,7 @@ void RenderGraphVK::add_resource_edges(const RendGraphDescVK& p_desc) {
                     edge_desc.res_id));
             }
             for (std::string& resource_id : expand_resource_id(edge_desc.res_id)) {
-                add_resource_edge(from, to, std::move(resource_id), edge_desc.type, edge_desc.src_stage, edge_desc.dst_stage);
-            }
-        }
-    }
-}
-
-void RenderGraphVK::validate_resource_edges() const {
-    for (const Ref<RGResEdge>& edge : resource_edges) {
-        validate_edge_stage(*edge->from, edge->src_stage, *edge, "source");
-        validate_edge_stage(*edge->to, edge->dst_stage, *edge, "destination");
-        if (edge->type == RendEdgeTypeVK::READ && node_accesses(edge->to->writes, edge->res_id)) {
-            throw std::runtime_error(std::format("RenderGraphVK: edge '{}' -> '{}' on resource '{}' is a READ edge, but the next task writes the resource.",
-                edge->from->task_id,
-                edge->to->task_id,
-                edge->res_id));
-        }
-    }
-    // A chain of edges on one resource only orders its endpoints when consecutive edges share a stage at the middle task.
-    for (Ref<RGNode> node : nodes) {
-        for (auto& weak_in_edge : node->in_edges) {
-            Ref<RGResEdge> in_edge = weak_in_edge.lock();
-            WBE_DEBUG_ASSERT(in_edge != MEM_NULL);
-            for (auto& weak_out_edge : node->out_edges) {
-                Ref<RGResEdge> out_edge = weak_out_edge.lock();
-                WBE_DEBUG_ASSERT(out_edge != MEM_NULL);
-                if (in_edge->res_id != out_edge->res_id) {
-                    continue;
-                }
-                if ((expand_stages(in_edge->dst_stage) & expand_stages(out_edge->src_stage)) == 0) {
-                    throw std::runtime_error(std::format("RenderGraphVK: edges '{}' -> '{}' and '{}' -> '{}' on resource '{}' do not share a stage at task '{}'.",
-                        in_edge->from->task_id,
-                        node->task_id,
-                        node->task_id,
-                        out_edge->to->task_id,
-                        in_edge->res_id,
-                        node->task_id));
-                }
+                add_resource_edge(from, to, std::move(resource_id));
             }
         }
     }
@@ -974,6 +910,7 @@ void RenderGraphVK::validate_resource_conflicts() const {
         for (size_t before = 0; before < accesses.size(); ++before) {
             for (size_t after = before + 1; after < accesses.size(); ++after) {
                 if (!accesses[before].writes && !accesses[after].writes) {
+                    // Both accesses are reads, no conflict.
                     continue;
                 }
                 if (!has_resource_path(accesses[before].node, accesses[after].node, resource_id)) {
@@ -1036,9 +973,9 @@ void RenderGraphVK::build_synchronization() {
                 barrier = to->barriers.end() - 1;
             }
             barrier->src_stage |= edge->src_stage;
-            barrier->src_access |= VK_ACCESS_2_MEMORY_WRITE_BIT;
+            barrier->src_access |= edge->src_access;
             barrier->dst_stage |= edge->dst_stage;
-            barrier->dst_access |= edge_dst_access(edge->type);
+            barrier->dst_access |= edge->dst_access;
             continue;
         }
         if (from->signal_semaphore == MEM_NULL) {

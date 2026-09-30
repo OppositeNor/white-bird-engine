@@ -192,16 +192,9 @@ protected:
      * @param p_finish Whether recording this stage completes the one-time static construction.
      */
     RendTaskDescVK make_static_once(RendTaskDescVK p_task, bool p_finish = false) const;
-    /**
-     * @brief Returns p_link as a read of its resource.
-     */
-    static constexpr ResourceChainLink as_read(ResourceChainLink p_link) {
-        p_link.writes = false;
-        return p_link;
-    }
-
     static constexpr size_t OCTREE_MAX_DEPTH = 9;
-    static constexpr size_t OCTREE_VOXEL_COUNT = (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH);
+    static constexpr size_t OCTREE_VOXEL_COUNT =
+        (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH);
     static constexpr size_t OCTREE_MAX_NODE_COUNT = OCTREE_VOXEL_COUNT / 64;
     static constexpr size_t OCTREE_MAX_DYNAMIC_NODE_COUNT = OCTREE_MAX_NODE_COUNT;
     static constexpr size_t OCTREE_CLAIM_WORD_COUNT = (OCTREE_VOXEL_COUNT + 31U) / 32U;
@@ -209,22 +202,6 @@ protected:
     static constexpr uint32_t OCTREE_DEFERRED_THREADS_PER_GROUP = 128;
     static constexpr uint32_t OCTREE_DEFERRED_DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
         (OCTREE_MAX_DEFERRED_TASK_COUNT + OCTREE_DEFERRED_THREADS_PER_GROUP - 1) / OCTREE_DEFERRED_THREADS_PER_GROUP);
-
-    static constexpr VkPipelineStageFlags2 STAGE_COMPUTE = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    static constexpr VkPipelineStageFlags2 STAGE_RASTER = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    static constexpr ResourceChainLink LINK_RESET{.task_id = RT_RESET_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_BUILD{.task_id = RT_RUN_BUILD_OCTREE, .stage = STAGE_RASTER, .writes = true};
-    static constexpr ResourceChainLink LINK_BUILD_DOUBLE_SIDED{.task_id = RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, .stage = STAGE_RASTER, .writes = true};
-    static constexpr ResourceChainLink LINK_STATE_UPDATE{.task_id = RT_UPDATE_OCTREE_STATES, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_STATIC_DEFERRED{.task_id = RT_STATIC_OCTREE_DEFERRED, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_CLEAR{.task_id = RT_CLEAR_DYNAMIC_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_DYNAMIC_BUILD{.task_id = RT_RUN_BUILD_DYNAMIC_OCTREE, .stage = STAGE_RASTER, .writes = true};
-    static constexpr ResourceChainLink LINK_PUBLISH{.task_id = RT_PUBLISH_DYNAMIC_OCTREE, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_CAPTURE{.task_id = RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_DEFERRED{.task_id = RT_RUN_BUILD_OCTREE_DEFERRED, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_SETUP{.task_id = RT_SETUP_OCTREE_DEBUG_DRAW, .stage = STAGE_COMPUTE, .writes = true};
-    static constexpr ResourceChainLink LINK_DEBUG_DRAW{.task_id = RT_RUN_OCTREE_DEBUG_DRAW, .stage = STAGE_RASTER};
-    static constexpr ResourceChainLink LINK_PRE_DEFERRED_DRAW{.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, .stage = STAGE_RASTER};
 
     /**
      * @brief Borrowed renderer that owns the pipelines and graphs.

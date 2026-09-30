@@ -315,17 +315,12 @@ camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
 At record time, the task resolves each container from `current_frame_slot` and pushes that resource's descriptor index. Publish
 buffer contents on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
 
-To add a dependency, connect the earlier task to the later one through the resource they share. The edge states whether the next
-task reads or writes the resource, the stages where the earlier task last uses it, and the stages where the next task first uses
-it:
+To add a dependency, connect the earlier task to the later one through the resource they share. The graph derives the edge's
+stages and accesses from the usages both tasks report for that resource, so both tasks must access it:
 
 ```cpp
 RendTaskDescVK task_desc(render_allocator, "run_shadow", std::move(task));
-task_desc.connect("run_gbuffer",
-    "shadow_moments",
-    RendEdgeTypeVK::READ,
-    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+task_desc.connect("run_gbuffer", "shadow_moments");
 graph_desc.tasks.emplace_back(std::move(task_desc));
 ```
 

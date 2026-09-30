@@ -309,11 +309,7 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
 
     // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.
     p_main_task.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-    p_shadow_task.connect(RT_RUN_PIPELINE,
-        REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-        WBE::RendEdgeTypeVK::READ,
-        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+    p_shadow_task.connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_task));
     pipeline_desc.tasks.emplace_back(std::move(p_main_task));
 

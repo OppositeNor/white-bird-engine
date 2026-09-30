@@ -65,8 +65,9 @@ For non-trivial implementation tasks:
 
 ## Vulkan Render Graph
 
-- Render graphs are built only from resource dependency edges declared with `RendTaskDescVK::connect(next_task_id, resource_id,
-  edge_type, src_stage, dst_stage)`; the graph must be a DAG. Declared reads and writes do not create edges. Every read-write,
+- Render graphs are built only from resource dependency edges declared with `RendTaskDescVK::connect(next_task_id, resource_id)`;
+  the graph must be a DAG. Edge stages and accesses are derived from the `RendResUsageVK` usages both tasks report for the
+  resource, and both tasks must access it. Declared reads and writes do not create edges. Every read-write,
   write-read, and write-write conflict on a resource must be ordered by a chain of edges on that same resource; unordered conflicts
   make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
 - The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
@@ -108,7 +109,8 @@ python validation.py -t debug -- --gtest_filter='WBESomeTest*'
 
 When gtest arguments are forwarded after `--`, the requested gtest run is executed first. If it passes, validation still runs the full unit test binary afterward.
 
-Do not include lint in validation. The user performs lint checks manually.
+Do not include lint in validation. The user performs lint checks manually. Do not make lint or formatting fixes unless the
+user explicitly asks for them.
 
 ## Build
 
