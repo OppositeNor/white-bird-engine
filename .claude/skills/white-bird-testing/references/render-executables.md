@@ -75,7 +75,12 @@ From the repository root:
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 1
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2 --mode stability --duration 25
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 1 --full-scene-reconstruct
 ```
+
+`--full-scene-reconstruct` sets `WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1`, which rebuilds the static octree every frame
+instead of once. Use it for octree construction races, which otherwise run only on the first build. Without it the helper
+forces the variable to `0`.
 
 Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
 

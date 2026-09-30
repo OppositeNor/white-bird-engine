@@ -938,6 +938,13 @@ void RendererVK::create_logical_device() { // NOLINT
     vertex_input_dynamic_state_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT;
     vertex_input_dynamic_state_features.vertexInputDynamicState = VK_TRUE;
     descriptor_heap_features.pNext = &vertex_input_dynamic_state_features;
+
+    // Shaders are compiled against the Vulkan memory model and use device-scope barriers and atomics.
+    VkPhysicalDeviceVulkanMemoryModelFeatures memory_model_features{};
+    memory_model_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
+    memory_model_features.vulkanMemoryModel = VK_TRUE;
+    memory_model_features.vulkanMemoryModelDeviceScope = VK_TRUE;
+    vertex_input_dynamic_state_features.pNext = &memory_model_features;
     for (auto& plugin : registered_plugins) {
         plugin->on_before_device_creation(physical_device, &create_info, &device_features);
     }

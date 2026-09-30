@@ -202,7 +202,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
         cmd = [
             slangc_path,
             "-target", "spirv",
-            "-profile", "spirv_1_6+spvDescriptorHeapEXT",
+            "-profile", "spirv_1_6+spvDescriptorHeapEXT+vk_mem_model",
         ]
         if entry_name is not None:
             cmd.extend(["-entry", entry_name])
