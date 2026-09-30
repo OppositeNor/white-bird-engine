@@ -145,7 +145,8 @@ protected:
      * @details The renderer and debug-mode state must outlive this object and its registered graphs. The feature retains
      * shared ownership of the static scene. Invalid dependencies throw.
      * @param p_shader_prefix Resource-key prefix of the static construction shaders.
-     * @param p_dynamic_shader_prefix Resource-key prefix of the dynamic construction shaders.
+     * @param p_dynamic_shader_prefix Resource-key prefix of the implementation's own dynamic update shaders: clear, raster
+     * construction, and deferred retries.
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once,
      * for observing its per-frame cost. Dynamic construction is unaffected either way.
      */
@@ -328,14 +329,7 @@ private:
     static_assert(offsetof(OctreeNode, original_children_data) == 12);
     static_assert(OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
 
-    struct OctreeDeferredListEntry {
-        uint32_t node_index;
-        uint32_t packed_depth;
-        uint32_t local_voxel_index;
-    };
-
-    static_assert(sizeof(OctreeDeferredListEntry) == 12);
-    // local_voxel_index packs max_depth bits per axis into 32 bits.
+    // Deferred-list entries are uint32_t voxel indices packing max_depth bits per axis.
     static_assert(OCTREE_MAX_DEPTH <= 10);
 
     void create_resources();

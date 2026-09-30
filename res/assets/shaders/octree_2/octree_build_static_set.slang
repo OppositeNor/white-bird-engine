@@ -18,7 +18,7 @@
 #include "utils/utils.slang"
 #include "octree_2/octree_utils.slang"
 #ifdef WBE_DYNAMIC_BUILD
-#include "octree/octree_dynamic_build.slang"
+#include "octree_2/octree_dynamic_build.slang"
 #endif
 
 /**
@@ -247,7 +247,7 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
 }
 
 /**
- * @brief Allocates a covered cell, retaining unfinished traversal in the deferred queue on contention.
+ * @brief Allocates a covered cell, queueing the voxel for a retry from the root on contention.
  */
 void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
@@ -266,13 +266,9 @@ void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<uint> pending_children = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWStructuredBuffer<OctreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
-    OctreeNodeTraceInfo trace_info;
-    trace_info.node_index = get_octree_node_subregion(p_svo_position);
-    trace_info.curr_depth = 1;
-    trace_info.remain_depth = int(octree_info[0].max_depth) - 1;
-    trace_info.svo_position = frac(p_svo_position * 2.0);
+    OctreeNodeTraceInfo trace_info = get_octree_root_trace_info(p_svo_position, octree_info[0].max_depth);
     // Try to allocate the node.
 #ifdef WBE_DYNAMIC_BUILD
     RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
@@ -286,7 +282,7 @@ void allocate_covered_voxel(float3 p_svo_position) {
         InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list[new_task_index] = to_deferred_list_entry(trace_info, octree_info[0].max_depth);
+        deferred_list[new_task_index] = to_deferred_list_entry(p_svo_position, octree_info[0].max_depth);
     }
 }
 

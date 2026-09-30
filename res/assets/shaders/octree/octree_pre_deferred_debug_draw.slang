@@ -59,48 +59,6 @@ struct OctreePreDeferredDebugDrawVertexOutput {
 [[vk::push_constant]]
 ConstantBuffer<OctreePreDeferredDebugDrawDescriptorIndices> descriptor_indices;
 
-uint3 get_node_grid_position(uint p_node_index,
-    uint p_depth,
-    StructuredBuffer<OctreeNode> p_nodes,
-    StructuredBuffer<OctreeNode> p_dynamic_nodes,
-    OctreeInfo p_tree_info,
-    uint p_frame_slot) {
-    uint3 result = uint3(0);
-    WBE_SHADER_DEBUG_ASSERT(p_node_index < p_tree_info.max_node_count + p_tree_info.dynamic_node_count,
-        ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-    uint child_index = p_node_index;
-    int parent_index = read_incremental_node(p_nodes, p_dynamic_nodes, p_tree_info, p_node_index).parent_index;
-    uint traversed_depth = 0;
-    for (; traversed_depth < p_depth && parent_index >= 0; ++traversed_depth) {
-        WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < p_tree_info.max_node_count + p_tree_info.dynamic_node_count,
-            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        OctreeNode parent = read_incremental_node(p_nodes, p_dynamic_nodes, p_tree_info, uint(parent_index));
-        WBE_SHADER_DEBUG_ASSERT(child_index >= get_octree_children_index(parent) &&
-            child_index - get_octree_children_index(parent) < 8,
-            ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-        uint subregion = child_index % 8;
-        result.x |= ((subregion >> 2) & 1) << traversed_depth;
-        result.y |= ((subregion >> 1) & 1) << traversed_depth;
-        result.z |= (subregion & 1) << traversed_depth;
-        child_index = uint(parent_index);
-        parent_index = parent.parent_index;
-    }
-    if (parent_index < 0) {
-        WBE_SHADER_DEBUG_ASSERT(child_index < 8 && traversed_depth < 32,
-            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        // The remaining node is one of the eight sectors of the implicit root.
-        result.x |= ((child_index >> 2) & 1) << traversed_depth;
-        result.y |= ((child_index >> 1) & 1) << traversed_depth;
-        result.z |= (child_index & 1) << traversed_depth;
-        ++traversed_depth;
-    }
-    WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && traversed_depth <= p_depth,
-        ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-    WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 || traversed_depth >= p_depth,
-        ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-    return result;
-}
-
 uint3 get_leaf_grid_position(uint p_leaf_index,
     StructuredBuffer<OctreeNode> p_nodes,
     StructuredBuffer<OctreeNode> p_dynamic_nodes,
@@ -144,20 +102,8 @@ uint3 get_leaf_grid_position(uint p_leaf_index,
     return result;
 }
 
-uint3 get_deferred_task_grid_position(OctreeDeferredListEntry p_task,
-    StructuredBuffer<OctreeNode> p_nodes,
-    StructuredBuffer<OctreeNode> p_dynamic_nodes,
-    OctreeInfo p_tree_info,
-    uint p_frame_slot) {
-    OctreeNodeTraceInfo trace_info = to_trace_info(p_task, p_tree_info.max_depth);
-    WBE_SHADER_DEBUG_ASSERT(trace_info.curr_depth <= p_tree_info.max_depth,
-        ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-    uint3 node_grid_position =
-        get_node_grid_position(trace_info.node_index, trace_info.curr_depth, p_nodes, p_dynamic_nodes, p_tree_info, p_frame_slot);
-    uint remaining_depth = p_tree_info.max_depth - trace_info.curr_depth;
-    uint local_extent = 1u << remaining_depth;
-    uint3 local_grid_position = min(uint3(trace_info.svo_position * float(local_extent)), uint3(local_extent - 1));
-    return node_grid_position * local_extent + local_grid_position;
+uint3 get_deferred_task_grid_position(uint p_task, OctreeInfo p_tree_info) {
+    return get_deferred_list_entry_voxel(p_task, p_tree_info.max_depth);
 }
 
 /**
@@ -168,7 +114,7 @@ OctreePreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanV
     StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     StructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<OctreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     StructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
@@ -184,7 +130,7 @@ OctreePreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanV
     }
     uint3 grid_position = is_deferred_task
         ? get_deferred_task_grid_position(
-              deferred_list[p_instance_id - (octree_info.leaves_count + octree_info.dynamic_leaves_count)], tree_nodes, dynamic_nodes, octree_info, descriptor_indices.shader_debug_frame_slot)
+              deferred_list[p_instance_id - (octree_info.leaves_count + octree_info.dynamic_leaves_count)], octree_info)
         : get_leaf_grid_position(
               p_instance_id, tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, octree_info, descriptor_indices.shader_debug_frame_slot);
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);

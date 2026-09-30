@@ -34,7 +34,7 @@ OctreeRenderFeatureAtomic::OctreeRenderFeatureAtomic(RendererVK* p_renderer,
     Ref<StaticSetResourcesVK> p_static_set_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     bool p_rebuild_static_every_frame)
-    : IOctreeRenderFeature(p_renderer, std::move(p_static_set_resources), p_debug_view_mode, "octree", "octree_atomic_dynamic", p_rebuild_static_every_frame) {
+    : IOctreeRenderFeature(p_renderer, std::move(p_static_set_resources), p_debug_view_mode, "octree", "octree_dynamic", p_rebuild_static_every_frame) {
 }
 
 std::string_view OctreeRenderFeatureAtomic::get_name() const {

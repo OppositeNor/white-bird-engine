@@ -15,7 +15,7 @@
 #include "utils/utils.slang"
 #include "octree_2/octree_utils.slang"
 #ifdef WBE_DYNAMIC_BUILD
-#include "octree/octree_dynamic_build.slang"
+#include "octree_2/octree_dynamic_build.slang"
 #endif
 
 /**
@@ -89,7 +89,7 @@ struct OctreeDescriptorIndices {
 ConstantBuffer<OctreeDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Advances each retained voxel once and queues unfinished work in the opposite list.
+ * @brief Retraces each retained voxel from the root and queues it again in the opposite list on contention.
  */
 [shader("compute")]
 [numthreads(128, 1, 1)]
@@ -107,9 +107,9 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<uint> pending_children = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<OctreeDeferredListEntry> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
-    RWStructuredBuffer<OctreeDeferredListEntry> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
-    OctreeDeferredListEntry task = deferred_list_read[p_dispatch_thread_id.x];
+    StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
+    RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
+    uint task = deferred_list_read[p_dispatch_thread_id.x];
 
     OctreeNodeTraceInfo trace_info = to_trace_info(task, octree_info[0].max_depth);
     // Try to allocate the node.
@@ -129,6 +129,6 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #endif
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list_write[new_task_index] = to_deferred_list_entry(trace_info, octree_info[0].max_depth);
+        deferred_list_write[new_task_index] = task;
     }
 }

@@ -36,9 +36,9 @@ OctreeRenderFeaturePassPublished::OctreeRenderFeaturePassPublished(RendererVK* p
     Ref<StaticSetResourcesVK> p_static_set_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     bool p_rebuild_static_every_frame)
-    : IOctreeRenderFeature(p_renderer, std::move(p_static_set_resources), p_debug_view_mode, "octree_2", "octree_dynamic", p_rebuild_static_every_frame) {
+    : IOctreeRenderFeature(p_renderer, std::move(p_static_set_resources), p_debug_view_mode, "octree_2", "octree_2_dynamic", p_rebuild_static_every_frame) {
     update_states_pipeline = compile_compute_pipeline("octree_2_update_states_shader");
-    dynamic_publication_pipeline = compile_compute_pipeline("octree_dynamic_update_states_shader");
+    dynamic_publication_pipeline = compile_compute_pipeline("octree_2_dynamic_update_states_shader");
     pending_children =
         ROBufferVK::Builder().set_properties(sizeof(uint32_t), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
 }

@@ -251,7 +251,7 @@ void IOctreeRenderFeature::compile_pipelines(std::string_view p_shader_prefix, s
         octree_compiler
             .compile(dynamic_build_pipeline_id, resource_manager->get_resource<RUGraphicsPipeline>(dynamic_build_pipeline_id))
             .graphics_pipeline;
-    dynamic_clear_pipeline = compile_compute_pipeline("octree_clear_dynamic_shader");
+    dynamic_clear_pipeline = compile_compute_pipeline(std::format("{}_clear_shader", p_dynamic_shader_prefix));
     dynamic_ping_pipeline =
         compile_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_dynamic_shader_prefix));
     dynamic_pong_pipeline =
@@ -299,11 +299,11 @@ void IOctreeRenderFeature::create_resources() {
         ROBufferVK::Builder().set_properties(sizeof(OctreeLeaf), OCTREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     octree_deferred_list_ping =
         ROBufferVK::Builder()
-            .set_properties(sizeof(OctreeDeferredListEntry), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .set_properties(sizeof(uint32_t), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
             .create_ref(base_render_data);
     octree_deferred_list_pong =
         ROBufferVK::Builder()
-            .set_properties(sizeof(OctreeDeferredListEntry), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .set_properties(sizeof(uint32_t), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
             .create_ref(base_render_data);
     octree_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, OCTREE_DEBUG_CUBE_INDICES.data(), sizeof(OCTREE_DEBUG_CUBE_INDICES));
@@ -321,7 +321,7 @@ void IOctreeRenderFeature::create_resources() {
         ROBufferVK::Builder().set_properties(sizeof(OctreeInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     octree_pre_deferred_debug_list_buffer =
         ROBufferVK::Builder()
-            .set_properties(sizeof(OctreeDeferredListEntry), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .set_properties(sizeof(uint32_t), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
             .create_ref(base_render_data);
     octree_pre_deferred_debug_draw_indirect_buffer =
         create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,

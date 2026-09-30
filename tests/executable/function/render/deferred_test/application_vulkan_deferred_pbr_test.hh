@@ -59,7 +59,6 @@
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
 #include <semaphore>
-#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>

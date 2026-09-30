@@ -39,11 +39,6 @@ struct DynamicDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
-    /**
-     * @brief Descriptor-heap reference to octree_voxel_claims.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
-    uint2 claims;
 };
 [[vk::push_constant]]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
@@ -59,12 +54,7 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
     RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
     StructuredBuffer<OctreeDynamicLeafBlock> leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    RWStructuredBuffer<uint> claims = ResourceDescriptorHeap[descriptor_indices.claims.x];
     uint index = p_id.x;
-    uint extent = 1u << info[0].max_depth;
-    if (index < (extent * extent * extent + 31u) / 32u) {
-        claims[index] = 0;
-    }
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
         uint state = description >> OCTREE_CHILDREN_STATE_SHIFT;

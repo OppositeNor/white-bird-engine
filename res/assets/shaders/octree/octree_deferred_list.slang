@@ -38,62 +38,48 @@ struct OctreeNodeTraceInfo {
 };
 
 /**
- * @brief Compact traversal state registered in the deferred list.
+ * @brief Starts a traversal at the root sector containing a voxel.
+ * @param p_svo_position Voxel position in the octree's unit cube.
+ * @param p_max_depth The octree's max_depth.
  */
-[WBE_DATA_TYPE]
-struct OctreeDeferredListEntry {
-    static const uint CURR_DEPTH_MASK = 0xffff0000;
-    static const uint REMAIN_DEPTH_MASK = 0x0000ffff;
-    static const uint CURR_DEPTH_SHIFT = 16;
-    /**
-     * @brief Index of the node where traversal resumes.
-     */
-    uint node_index;
-    /**
-     * @brief The packed depth. The upper 16 bits store the current depth, and the lower 16 bits store the remaining
-     * depth as a signed 16-bit value; negative means unbounded traversal.
-     */
-    uint packed_depth;
-    /**
-     * @brief Flattened voxel coordinate in the current node's local grid of extent 2^(max_depth - curr_depth).
-     * @details Each axis occupies max_depth bits, x in the lowest bits and z in the highest, so max_depth must not
-     * exceed 10.
-     */
-    uint local_voxel_index;
-};
-
-/**
- * @brief Packs traversal state into a deferred-list entry.
- * @param p_max_depth The octree's max_depth; p_trace_info.curr_depth must not exceed it.
- */
-OctreeDeferredListEntry to_deferred_list_entry(OctreeNodeTraceInfo p_trace_info, uint p_max_depth) {
-    OctreeDeferredListEntry result;
-    result.node_index = p_trace_info.node_index;
-    result.packed_depth = ((p_trace_info.curr_depth << OctreeDeferredListEntry::CURR_DEPTH_SHIFT) & OctreeDeferredListEntry::CURR_DEPTH_MASK)
-        | (uint(p_trace_info.remain_depth) & OctreeDeferredListEntry::REMAIN_DEPTH_MASK);
-    // Truncation keeps every remaining subregion bit of the node-local position.
-    uint3 local_voxel = uint3(p_trace_info.svo_position * float(1u << (p_max_depth - p_trace_info.curr_depth)));
-    result.local_voxel_index = local_voxel.x | (local_voxel.y << p_max_depth) | (local_voxel.z << (2 * p_max_depth));
+OctreeNodeTraceInfo get_octree_root_trace_info(float3 p_svo_position, uint p_max_depth) {
+    OctreeNodeTraceInfo result;
+    result.node_index = (uint(p_svo_position.x >= 0.5) << 2) | (uint(p_svo_position.y >= 0.5) << 1) | uint(p_svo_position.z >= 0.5);
+    result.curr_depth = 1;
+    result.remain_depth = int(p_max_depth) - 1;
+    result.svo_position = frac(p_svo_position * 2.0);
     return result;
 }
 
 /**
- * @brief Unpacks a deferred-list entry into traversal state.
- * @details The position is restored to the center of its local voxel.
+ * @brief Packs a voxel into a deferred-list entry, its flattened coordinate in the octree's grid of extent 2^max_depth.
+ * @details Each axis occupies max_depth bits, x in the lowest bits and z in the highest, so max_depth must not exceed 10.
+ * Retries trace the entry again from the root.
+ * @param p_svo_position Voxel position in the octree's unit cube.
+ * @param p_max_depth The octree's max_depth.
+ */
+uint to_deferred_list_entry(float3 p_svo_position, uint p_max_depth) {
+    uint extent = 1u << p_max_depth;
+    uint3 voxel = min(uint3(p_svo_position * float(extent)), uint3(extent - 1));
+    return voxel.x | (voxel.y << p_max_depth) | (voxel.z << (2 * p_max_depth));
+}
+
+/**
+ * @brief Unpacks a deferred-list entry into its voxel's grid coordinate.
  * @param p_max_depth The octree's max_depth used when packing p_entry.
  */
-OctreeNodeTraceInfo to_trace_info(OctreeDeferredListEntry p_entry, uint p_max_depth) {
-    OctreeNodeTraceInfo result;
-    result.node_index = p_entry.node_index;
-    result.curr_depth = (p_entry.packed_depth & OctreeDeferredListEntry::CURR_DEPTH_MASK) >> OctreeDeferredListEntry::CURR_DEPTH_SHIFT;
-    // Sign-extend the lower 16 bits so negative remaining depths survive the round trip.
-    result.remain_depth = int(p_entry.packed_depth << OctreeDeferredListEntry::CURR_DEPTH_SHIFT) >> OctreeDeferredListEntry::CURR_DEPTH_SHIFT;
+uint3 get_deferred_list_entry_voxel(uint p_entry, uint p_max_depth) {
     uint axis_mask = (1u << p_max_depth) - 1;
-    uint3 local_voxel = uint3(p_entry.local_voxel_index & axis_mask,
-        (p_entry.local_voxel_index >> p_max_depth) & axis_mask,
-        p_entry.local_voxel_index >> (2 * p_max_depth));
-    result.svo_position = (float3(local_voxel) + 0.5) / float(1u << (p_max_depth - result.curr_depth));
-    return result;
+    return uint3(p_entry & axis_mask, (p_entry >> p_max_depth) & axis_mask, p_entry >> (2 * p_max_depth));
+}
+
+/**
+ * @brief Creates a root traversal to the center of a deferred-list entry's voxel.
+ * @param p_max_depth The octree's max_depth used when packing p_entry.
+ */
+OctreeNodeTraceInfo to_trace_info(uint p_entry, uint p_max_depth) {
+    float3 svo_position = (float3(get_deferred_list_entry_voxel(p_entry, p_max_depth)) + 0.5) / float(1u << p_max_depth);
+    return get_octree_root_trace_info(svo_position, p_max_depth);
 }
 
 #endif

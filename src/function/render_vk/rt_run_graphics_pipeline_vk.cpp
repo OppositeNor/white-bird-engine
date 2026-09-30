@@ -27,12 +27,10 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
@@ -127,6 +125,8 @@ void RTRunGraphicsPipelineVK::append_accesses(
     render_targets.append_accesses(p_reads, p_writes);
     if (vertex_buffer_id.has_value()) {
         p_reads.push_back({.res_id = *vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    }
+    if (index_buffer_id.has_value()) {
         p_reads.push_back({.res_id = *index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
     }
     descriptor_bindings->append_accesses(p_reads, p_writes);
@@ -137,6 +137,8 @@ void RTRunGraphicsPipelineVK::bind_resources(const RendResViewVK& p_resources) {
     render_targets.bind_resources(p_resources);
     if (vertex_buffer_id.has_value()) {
         vertex_buffer_container = p_resources.get(*vertex_buffer_id).container;
+    }
+    if (index_buffer_id.has_value()) {
         index_buffer_container = p_resources.get(*index_buffer_id).container;
     }
 }

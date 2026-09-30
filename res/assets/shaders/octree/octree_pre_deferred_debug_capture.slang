@@ -46,9 +46,9 @@ ConstantBuffer<OctreePreDeferredDebugCaptureDescriptorIndices> descriptor_indice
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     StructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-    StructuredBuffer<OctreeDeferredListEntry> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     RWStructuredBuffer<OctreeInfo> captured_octree_info = ResourceDescriptorHeap[descriptor_indices.captured_octree_info.x];
-    RWStructuredBuffer<OctreeDeferredListEntry> captured_deferred_list =
+    RWStructuredBuffer<uint> captured_deferred_list =
         ResourceDescriptorHeap[descriptor_indices.captured_deferred_list.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
 

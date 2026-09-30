@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "octree/octree_utils.slang"
+#include "octree_2/octree_utils.slang"
 #include "octree/octree_dynamic_types.slang"
 /**
  * @brief Descriptor-heap resources used by incremental maintenance.
