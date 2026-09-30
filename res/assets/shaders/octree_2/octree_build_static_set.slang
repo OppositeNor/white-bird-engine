@@ -274,7 +274,7 @@ void allocate_covered_voxel(float3 p_svo_position) {
     trace_info.remain_depth = int(octree_info[0].max_depth) - 1;
     trace_info.svo_position = frac(p_svo_position * 2.0);
     // Try to allocate the node.
-    #ifdef WBE_DYNAMIC_BUILD
+#ifdef WBE_DYNAMIC_BUILD
     RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
@@ -286,7 +286,7 @@ void allocate_covered_voxel(float3 p_svo_position) {
         InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list[new_task_index].unfinished_trace_info = trace_info;
+        deferred_list[new_task_index] = to_deferred_list_entry(trace_info, octree_info[0].max_depth);
     }
 }
 

@@ -38,7 +38,9 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
-#include "octree_render_feature.hh"
+#include "i_octree_render_feature.hh"
+#include "octree_render_feature_atomic.hh"
+#include "octree_render_feature_pass_published.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -305,10 +307,10 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         2);
     setup_spot_light();
     setup_bloom_acquisition();
-    OctreeRenderFeature::Implementation octree_implementation = OctreeRenderFeature::Implementation::PASS_PUBLISHED;
+    bool use_atomic_octree = false;
     if (const char* selection = std::getenv("WBE_OCTREE_IMPLEMENTATION")) {
         if (std::string_view(selection) == "1") {
-            octree_implementation = OctreeRenderFeature::Implementation::ATOMIC;
+            use_atomic_octree = true;
         } else if (std::string_view(selection) != "2") {
             throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
         }
@@ -321,12 +323,14 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
             throw std::runtime_error("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT must be 0 or 1.");
         }
     }
-    octree = make_unique<OctreeRenderFeature>(
-        render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, octree_implementation, rebuild_static_every_frame);
-    stdout_log(WBE_CHANNEL_DEBUG)
-        ->message(octree_implementation == OctreeRenderFeature::Implementation::PASS_PUBLISHED
-                      ? "Octree construction: octree_2 (pass publication)."
-                      : "Octree construction: octree (atomic publication).");
+    if (use_atomic_octree) {
+        octree = make_unique<OctreeRenderFeatureAtomic>(
+            render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+    } else {
+        octree = make_unique<OctreeRenderFeaturePassPublished>(
+            render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+    }
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Octree construction: {}.", octree->get_name()));
     stdout_log(WBE_CHANNEL_DEBUG)
         ->message(rebuild_static_every_frame ? "Octree static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
                                              : "Octree static scene: built once.");

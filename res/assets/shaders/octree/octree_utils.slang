@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_OCTREE_UTILS_SLANG
 #define WBE_FILE_OCTREE_UTILS_SLANG
 
+#include "octree/octree_deferred_list.slang"
+
 /**
  * @brief Four scalar fields with a 16-byte storage-buffer array stride.
  */
@@ -151,10 +153,6 @@ struct OctreeInfo {
     uint dynamic_leaves_count;
 };
 
-[WBE_DATA_TYPE]
-struct OctreeDeferredListEntry {
-    OctreeNodeTraceInfo unfinished_trace_info;
-};
 
 uint get_octree_node_subregion(float3 p_position)
 {
@@ -163,16 +161,6 @@ uint get_octree_node_subregion(float3 p_position)
         uint(p_position.z >= 0.5);
 }
 
-struct OctreeNodeTraceInfo {
-    // The index of the node.
-    uint node_index;
-    // The current depth.
-    uint curr_depth;
-    // The remain depth.
-    int remain_depth;
-    // The position in the node's svo space.
-    float3 svo_position;
-};
 
 /**
  * @brief Decodes the state from an atomic snapshot of a node's child description.

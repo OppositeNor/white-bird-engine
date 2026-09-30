@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_OCTREE_2_UTILS_SLANG
 #define WBE_FILE_OCTREE_2_UTILS_SLANG
 
+#include "octree/octree_deferred_list.slang"
+
 /**
  * @brief Four scalar fields with a 16-byte storage-buffer array stride.
  */
@@ -159,17 +161,6 @@ struct OctreeInfo {
 };
 
 /**
- * @brief One voxel traversal retained until the next publication boundary.
- */
-[WBE_DATA_TYPE]
-struct OctreeDeferredListEntry {
-    /**
-     * @brief Parent-local traversal state to resume after publication.
-     */
-    OctreeNodeTraceInfo unfinished_trace_info;
-};
-
-/**
  * @brief Selects one of eight sectors in parent-local coordinates.
  */
 uint get_octree_node_subregion(float3 p_position)
@@ -178,28 +169,6 @@ uint get_octree_node_subregion(float3 p_position)
         (uint(p_position.y >= 0.5) << 1) |
         uint(p_position.z >= 0.5);
 }
-
-/**
- * @brief Traversal position retained across deferred construction rounds.
- */
-struct OctreeNodeTraceInfo {
-    /**
-     * @brief Index of the node where traversal resumes.
-     */
-    uint node_index;
-    /**
-     * @brief Depth of the current stored node; root sectors have depth one.
-     */
-    uint curr_depth;
-    /**
-     * @brief Remaining traversal steps; negative means unbounded traversal.
-     */
-    int remain_depth;
-    /**
-     * @brief Voxel position in the current node's local unit cube.
-     */
-    float3 svo_position;
-};
 
 /**
  * @brief Decodes the state from a pass-stable node description.

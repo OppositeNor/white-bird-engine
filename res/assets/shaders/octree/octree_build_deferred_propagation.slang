@@ -14,6 +14,9 @@
 */
 #include "utils/utils.slang"
 #include "octree/octree_utils.slang"
+#ifdef WBE_DYNAMIC_BUILD
+#include "octree/octree_dynamic_build.slang"
+#endif
 
 struct OctreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
@@ -22,6 +25,18 @@ struct OctreeDescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
     uint2 tree_leaves;
+#ifdef WBE_DYNAMIC_BUILD
+    /**
+     * @brief Descriptor-heap reference to octree_dynamic_nodes.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_nodes")]
+    uint2 dynamic_nodes;
+    /**
+     * @brief Descriptor-heap reference to octree_dynamic_leaves.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
+    uint2 dynamic_leaves;
+#endif
 #ifdef WBE_USE_PING_WRITE
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "read")]
     uint2 deferred_list_read;
@@ -59,9 +74,15 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeDeferredListEntry> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
     OctreeDeferredListEntry task = deferred_list_read[p_dispatch_thread_id.x];
 
-    OctreeNodeTraceInfo trace_info = task.unfinished_trace_info;
+    OctreeNodeTraceInfo trace_info = to_trace_info(task, octree_info[0].max_depth);
     // Try to allocate the node.
+#ifdef WBE_DYNAMIC_BUILD
+    RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
+    RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+    if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+#else
     if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+#endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
 #ifdef WBE_USE_PING_WRITE
@@ -71,6 +92,6 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #endif
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list_write[new_task_index].unfinished_trace_info = trace_info;
+        deferred_list_write[new_task_index] = to_deferred_list_entry(trace_info, octree_info[0].max_depth);
     }
 }

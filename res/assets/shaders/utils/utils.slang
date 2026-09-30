@@ -388,6 +388,36 @@ float3 srgb_to_linear(float3 p_color) {
     return pow(max(p_color, float3(0.0)), float3(2.2));
 }
 
+/**
+ * @brief Packs a non-negative float3 into unsigned 11/11/10-bit floats.
+ * @param p_rgb The value to pack; negative components clamp to zero.
+ * @return The packed value, with x in the lowest 11 bits and z in the highest 10 bits.
+ */
+uint pack_r11g11b10(float3 p_rgb) {
+    p_rgb = max(p_rgb, 0.0);
+    // Prevent becomming infinity after rounding.
+    p_rgb = min(p_rgb, asfloat(0x477C0000));
+
+    uint r = ((f32tof16(p_rgb.x) + 8)  >> 4)  & 0x000007FF;
+    uint g = ((f32tof16(p_rgb.y) + 8)  << 7)  & 0x003FF800;
+    uint b = ((f32tof16(p_rgb.z) + 16) << 17) & 0xFFC00000;
+
+    return r | g | b;
+}
+
+/**
+ * @brief Unpacks a value produced by pack_r11g11b10().
+ * @param p_value The packed value.
+ * @return The unpacked float3.
+ */
+float3 unpack_r11g11b10(uint p_value) {
+    float r = f16tof32((p_value << 4)  & 0x7FF0);
+    float g = f16tof32((p_value >> 7)  & 0x7FF0);
+    float b = f16tof32((p_value >> 17) & 0x7FE0);
+
+    return float3(r, g, b);
+}
+
 uint2 z_order_swizzle_8x8(uint2 p_group_id, uint2 p_group_thread_id) {
     uint linear_index = p_group_thread_id.y * 8 + p_group_thread_id.x;
     uint swizzled_x = ((linear_index >> 0) & 0x1) | ((linear_index >> 1) & 0x2) | ((linear_index >> 2) & 0x4);

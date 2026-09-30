@@ -149,7 +149,7 @@ uint3 get_deferred_task_grid_position(OctreeDeferredListEntry p_task,
     StructuredBuffer<OctreeNode> p_dynamic_nodes,
     OctreeInfo p_tree_info,
     uint p_frame_slot) {
-    OctreeNodeTraceInfo trace_info = p_task.unfinished_trace_info;
+    OctreeNodeTraceInfo trace_info = to_trace_info(p_task, p_tree_info.max_depth);
     WBE_SHADER_DEBUG_ASSERT(trace_info.curr_depth <= p_tree_info.max_depth,
         ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
     uint3 node_grid_position =

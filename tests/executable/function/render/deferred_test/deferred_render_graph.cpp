@@ -35,7 +35,7 @@
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
-#include "octree_render_feature.hh"
+#include "i_octree_render_feature.hh"
 #include "resource/resource_utils.hh"
 #include <algorithm>
 #include <array>
@@ -236,13 +236,13 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
         {writer(RT_RUN_DEFERRED_GBUFFER, DEPTH), writer(RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, DEPTH), writer(RT_RUN_DYNAMIC_GBUFFER, DEPTH), direct_lighting});
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {writer(RT_RUN_DYNAMIC_GBUFFER, DEPTH), indirect_lighting});
     // Overlays depth-test against the G-buffer depth after lighting has sampled it.
-    const ResourceChainLink octree_debug_depth = writer(OctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, DEPTH);
+    const ResourceChainLink octree_debug_depth = writer(IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, DEPTH);
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {direct_lighting, octree_debug_depth});
     connect_resource_chain(p_pipeline_desc,
         GBUFFER_DEPTH_IMAGE_VIEW,
         {indirect_lighting,
             octree_debug_depth,
-            writer(OctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, DEPTH),
+            writer(IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, DEPTH),
             writer(RT_RUN_LIGHT_BILLBOARD, DEPTH)});
 
     // Lighting composition and post-processing.
@@ -265,8 +265,8 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
         {writer(RT_RUN_PRESENT_RESULT_IMAGE, COLOR),
-            writer(OctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, COLOR),
-            writer(OctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, COLOR),
+            writer(IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW, COLOR),
+            writer(IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, COLOR),
             writer(RT_RUN_LIGHT_BILLBOARD, COLOR)});
 }
 

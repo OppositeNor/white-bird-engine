@@ -43,7 +43,7 @@
 #include "function/render_vk/static_set_compiler_vk.hh"
 #include "function/render_vk/static_set_resources_vk.hh"
 #include "input_manager_mocked.hh"
-#include "octree_render_feature.hh"
+#include "i_octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
 #include <atomic>
@@ -191,7 +191,7 @@ private:
 
     Unique<DynamicMeshRenderFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
-    Unique<OctreeRenderFeature> octree;
+    Unique<IOctreeRenderFeature> octree;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
