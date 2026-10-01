@@ -18,7 +18,7 @@
 struct OctreeResetDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
     uint2 octree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer", "read")]
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
@@ -43,6 +43,7 @@ void main() {
     octree_info[0].deferred_task_count_pong = 0;
 
     [unroll] for (uint i = 0; i < 8; ++i) {
+        // Reset the top most portion of the tree.
         tree_nodes[i].children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
         tree_nodes[i].data_index = i;
         tree_nodes[i].parent_index = -1;

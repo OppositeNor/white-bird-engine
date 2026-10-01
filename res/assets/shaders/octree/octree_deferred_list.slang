@@ -20,9 +20,36 @@
  */
 struct OctreeNodeTraceInfo {
     /**
+     * @brief Storage node_index refers to.
+     */
+    enum class IndexType {
+        /**
+         * @brief Index into the static node buffer.
+         */
+        STATIC_NODE = 0,
+        /**
+         * @brief Index into the dynamic node buffer, without the max_node_count virtual offset.
+         */
+        DYNAMIC_NODE = 1,
+        /**
+         * @brief Index into the static leaf buffer.
+         */
+        STATIC_LEAF = 2,
+        /**
+         * @brief Leaf slot in the dynamic leaf blocks; block local_index / 8, leaf local_index % 8.
+         */
+        DYNAMIC_LEAF = 3
+    };
+    /**
      * @brief Index of the node where traversal resumes.
+     * @details traverse_octree() indexes the storage selected by index_type. Construction passes ignore index_type and
+     * store a static or virtual node index.
      */
     uint node_index;
+    /**
+     * @brief Storage node_index refers to during traverse_octree().
+     */
+    IndexType index_type;
     /**
      * @brief Depth of the current stored node; root sectors have depth one.
      */
@@ -45,6 +72,7 @@ struct OctreeNodeTraceInfo {
 OctreeNodeTraceInfo get_octree_root_trace_info(float3 p_svo_position, uint p_max_depth) {
     OctreeNodeTraceInfo result;
     result.node_index = (uint(p_svo_position.x >= 0.5) << 2) | (uint(p_svo_position.y >= 0.5) << 1) | uint(p_svo_position.z >= 0.5);
+    result.index_type = OctreeNodeTraceInfo::IndexType::STATIC_NODE;
     result.curr_depth = 1;
     result.remain_depth = int(p_max_depth) - 1;
     result.svo_position = frac(p_svo_position * 2.0);

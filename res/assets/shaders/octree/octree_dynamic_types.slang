@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_OCTREE_DYNAMIC_TYPES_SLANG
 #define WBE_FILE_OCTREE_DYNAMIC_TYPES_SLANG
 
+#include "octree/octree_common.slang"
+
 /**
  * @brief Copy-on-write leaf block: the original packed parent state followed by its eight leaves.
  */
