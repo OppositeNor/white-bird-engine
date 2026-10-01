@@ -15,21 +15,28 @@
 #ifndef WBE_FILE_RENDER_OBJECT_CONTAINER_VK_HH
 #define WBE_FILE_RENDER_OBJECT_CONTAINER_VK_HH
 
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/i_render_object_container.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
 /**
  * @class RenderObjectContainerVK
  * @brief Abstract container that resolves the render object bound to one graph resource.
+ *
+ * Containers created with make_ref() bind themselves under the requested graph resource id.
  */
-class RenderObjectContainerVK : public IRenderObjectContainer {
+class RenderObjectContainerVK : public IRenderObjectContainer,
+                                public ThisRef<RenderObjectContainerVK>,
+                                public IBindableRenderResourceVK {
 public:
     virtual ~RenderObjectContainerVK() = default;
     RenderObjectContainerVK(const RenderObjectContainerVK&) = delete;
@@ -89,6 +96,12 @@ public:
      * @return Compact JSON array string.
      */
     std::string to_string() const;
+
+    /**
+     * @brief Import this container under p_resource_id.
+     * @throws std::runtime_error If the container was not created with make_ref() or p_resource_id is empty.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 protected:
     RenderObjectContainerVK() = default;

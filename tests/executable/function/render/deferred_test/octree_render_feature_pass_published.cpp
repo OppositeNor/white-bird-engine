@@ -53,7 +53,7 @@ uint32_t OctreeRenderFeaturePassPublished::get_reset_group_count() const {
 }
 
 void OctreeRenderFeaturePassPublished::register_implementation_render_graph_data(RendGraphDescVK& p_graph) const {
-    p_graph.add_resource(OCTREE_PENDING_CHILDREN, pending_children);
+    p_graph.add_resource(OCTREE_PENDING_CHILDREN, *pending_children);
 }
 
 void OctreeRenderFeaturePassPublished::add_static_publication_render_tasks(RendGraphDescVK& p_graph) const {

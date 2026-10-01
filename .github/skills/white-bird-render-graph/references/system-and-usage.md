@@ -17,7 +17,7 @@
   - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
 - `include/function/render_vk/render_graph_vk.hh`
   - Descriptor building, resource-edge validation, synchronization derivation, execution, bind-once resource contracts, and terminal semaphore access.
-- `include/function/render/render_resource_list.hh`
+- `include/function/render_vk/render_resource_list_vk.hh`
   - CPU-side aggregate of render objects that can be bound once and accessed through one graph resource key.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
   - General compute dispatch task with compute-queue default and additional resource accesses.
@@ -47,10 +47,11 @@ viewed image, and depth formats default to the depth aspect. After registration,
 container of any resource. Invalid usages, sizes, formats, and views of undeclared images make graph construction fail.
 
 Imported resources pair the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null
-`RenderObjectContainerVK`; `add_static_mesh()` imports every compiled static-mesh resource under the `REND_RES_STATIC_MESH_*` ids.
+`RenderObjectContainerVK`. Every import goes through `add_resource(id, const IBindableRenderResourceVK&)`: render objects and
+containers bind themselves under `id`, and composites such as `StaticMeshResourcesVK` bind each member under `<id>.<member>`.
 `RenderGraphVK::build_from_descriptor()` rejects null containers, so descriptor construction must be complete before registration.
 
-`RenderResourceList` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
+`RenderResourceListVK` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
 as `<resource_list_key>[<index>]`. A task read or write, or an edge, on the aggregate expands to all indexed entries before
 validation and synchronization derivation. Populate the list before graph construction; the list itself is CPU-only and
 does not create a GPU object.
@@ -58,7 +59,7 @@ does not create a GPU object.
 All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
 IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Static-mesh vertex, index, opaque and masked indirect
 draw-command, reflected shader, and texture-list resources follow this rule;
-`REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_MESH_MASKED_DRAW_BATCHES` are also storage-buffer capable for
+the `<id>.opaque_draw_batches` and `<id>.masked_draw_batches` members are also storage-buffer capable for
 explicitly ordered compute writes.
 
 A pipeline-run task descriptor captures only construction data. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:
@@ -135,7 +136,7 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 
 - Confirm every read ID appears in the graph resource declarations.
 - Confirm every `RendResVK` is bound to a non-null container before registration and that container UUIDs match their declarations.
-- For a `RenderResourceList`, confirm every entry is a render object for the active backend and populate the list before graph
+- For a `RenderResourceListVK`, confirm every entry is a render object for the active backend and populate the list before graph
   registration.
 - Confirm task IDs and `connect()` targets are valid and acyclic.
 - Confirm each storage `WBE_DESCRIPTOR` states its access, that tasks report their fixed-function accesses, and that every task-local id is aliased to the intended graph resource.

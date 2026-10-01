@@ -18,7 +18,7 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
@@ -306,8 +306,8 @@ TEST(WBERenderGraphVKTest, RejectsDuplicateGraphResourceRegistration) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     RenderGraphVK graph(&render_data);
 
     EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
@@ -327,7 +327,7 @@ TEST(WBERenderGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     descriptor.add_task("first", make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
     descriptor.add_task("second", make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
     RenderGraphVK graph(&render_data);
@@ -345,7 +345,7 @@ TEST(WBERenderGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) 
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     descriptor.add_task("first", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true)));
     descriptor.add_task("second", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true)));
     RenderGraphVK graph(&render_data);
@@ -362,11 +362,11 @@ TEST(WBERenderGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) 
 TEST(WBERenderGraphVKTest, ResourceListAccessExpandsToIndexedResourcesForConflictValidation) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
-    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
+    auto resource_list = make_ref<RenderResourceListVK>(&allocator, &allocator);
     resource_list->add_resource(
         make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObject>());
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource("textures", resource_list);
+    descriptor.add_resource("textures", *resource_list);
     descriptor.add_task("writer", make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", true));
     descriptor.add_task("reader", make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", false));
     RenderGraphVK graph(&render_data);
@@ -387,7 +387,7 @@ TEST(WBERenderGraphVKTest, AliasedTaskAccessesResolveToGraphResourcesForValidati
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource("dynamic_nodes", make_test_container(&allocator, &render_data));
+    descriptor.add_resource("dynamic_nodes", *make_test_container(&allocator, &render_data));
     // Both tasks access the task-local "nodes" identifier, which their descriptors map to the same graph resource.
     RendTaskDescVK writer = make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {"nodes"});
     writer.alias("nodes", "dynamic_nodes");
@@ -404,7 +404,7 @@ TEST(WBERenderGraphVKTest, RejectsAliasesThatTheTaskNeverUses) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     RendTaskDescVK task = make_probe_desc(&allocator, "task", QueueFamilyVK::GRAPHICS, {"input"}, {});
     task.alias("input", TEST_LOGICAL_RESOURCE).alias("unused", TEST_LOGICAL_RESOURCE);
     descriptor.add_task(std::move(task));
@@ -417,7 +417,7 @@ TEST(WBERenderGraphVKTest, ResourceEdgeChainOrdersConflictingAccesses) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     // Declared out of execution order to exercise topological sorting.
     descriptor.add_task(make_probe_desc(&allocator, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     descriptor.add_task(make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
@@ -433,8 +433,8 @@ TEST(WBERenderGraphVKTest, EdgesOnAnotherResourceDoNotOrderAConflict) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
-    descriptor.add_resource(TEST_SHARED_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_SHARED_RESOURCE, *make_test_container(&allocator, &render_data));
     descriptor.add_task(
         make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE, TEST_SHARED_RESOURCE}));
     descriptor.add_task(
@@ -449,7 +449,7 @@ TEST(WBERenderGraphVKTest, RejectsCyclicResourceEdges) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     descriptor.add_task(make_probe_desc(&allocator, "first", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     descriptor.add_task(make_probe_desc(&allocator, "second", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     descriptor.get_task("first").connect("second", TEST_LOGICAL_RESOURCE);
@@ -467,7 +467,7 @@ TEST(WBERenderGraphVKTest, RejectsSelfEdgesUnknownTasksAndUndeclaredResources) {
     BaseRenderDataVK render_data(&allocator);
     auto make_descriptor = [&]() {
         RendGraphDescVK descriptor(&allocator);
-        descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+        descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
         descriptor.add_task(make_probe_desc(&allocator, "task", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
         descriptor.add_task(make_probe_desc(&allocator, "other", QueueFamilyVK::GRAPHICS, {}, {}));
         return descriptor;
@@ -492,7 +492,7 @@ TEST(WBERenderGraphVKTest, RejectsEdgesWhoseTasksDoNotAccessTheResource) {
     BaseRenderDataVK render_data(&allocator);
     auto make_descriptor = [&]() {
         RendGraphDescVK descriptor(&allocator);
-        descriptor.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+        descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
         descriptor.add_task(make_probe_desc(&allocator, "accessor", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
         descriptor.add_task(make_probe_desc(&allocator, "bystander", QueueFamilyVK::GRAPHICS, {}, {}));
         return descriptor;
@@ -514,7 +514,7 @@ TEST(WBERenderGraphVKTest, GraphOwnedResourcesRejectDuplicateIdsBeforeAllocation
     RenderGraphVK graph(&render_data);
 
     RendGraphDescVK imported_duplicate(&allocator);
-    imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     imported_duplicate.add_buffer(TEST_LOGICAL_RESOURCE, {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = 16});
     EXPECT_NE(build_error(graph, imported_duplicate).find("duplicate resource id: logical"), std::string::npos);
 
@@ -563,7 +563,7 @@ TEST(WBERenderGraphVKTest, ImageViewsMustViewDeclaredImages) {
         std::string::npos);
 
     RendGraphDescVK non_image(&allocator);
-    non_image.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&allocator, &render_data));
+    non_image.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     non_image.add_image_view("view", TEST_LOGICAL_RESOURCE);
     EXPECT_NE(build_error(graph, non_image).find("which is not a declared image resource"), std::string::npos);
 }

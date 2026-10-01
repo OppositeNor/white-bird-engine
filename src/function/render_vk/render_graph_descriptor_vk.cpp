@@ -18,16 +18,14 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "function/render_vk/dynamic_mesh_resources_vk.hh"
-#include "function/render_vk/i_mesh_compiler_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -94,39 +92,13 @@ RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource) {
-    if (p_resource == MEM_NULL) {
-        throw std::runtime_error(std::format("Failed to add render graph resource: render object for slot: {} is null.", p_resource_id));
-    }
-    return add_resource(p_resource_id, make_ref<ROCSingleVK>(allocator, std::move(p_resource)));
-}
-
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, RendResTID p_resource_type_id) {
     return add_resource(RendResVK{.res_id = std::string(p_resource_id), .res_type_id = p_resource_type_id, .container = MEM_NULL});
 }
 
-RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_resource_container) {
-    if (p_resource_container == MEM_NULL) {
-        throw std::runtime_error("Failed to add render graph resource: resource container is null.");
-    }
-    return add_resource(RendResVK{
-        .res_id = std::string(p_resource_id),
-        .res_type_id = p_resource_container->get_resource_type_id(),
-        .container = std::move(p_resource_container),
-    });
-}
-
-RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<RenderResourceList> p_resource_list) {
-    if (p_resource_id.empty()) {
-        throw std::runtime_error("Failed to add render graph resource list: resource id is empty.");
-    }
-    if (p_resource_list == MEM_NULL) {
-        throw std::runtime_error("Failed to add render graph resource list: resource list is null.");
-    }
-    return add_resource(RendResVK{
-        .res_id = std::string(p_resource_id),
-        .resource_list = std::move(p_resource_list),
-    });
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, const IBindableRenderResourceVK& p_resource) {
+    p_resource.bind(*this, p_resource_id);
+    return *this;
 }
 
 RendGraphDescVK& RendGraphDescVK::add_buffer(std::string_view p_resource_id, RendBufferDescVK p_desc) {
@@ -158,54 +130,6 @@ RendGraphDescVK& RendGraphDescVK::add_sampler(std::string_view p_resource_id, co
         throw std::runtime_error("Failed to add render graph sampler: resource id is empty.");
     }
     samplers.push_back({.res_id = std::string(p_resource_id), .desc = p_desc});
-    return *this;
-}
-
-RendGraphDescVK& RendGraphDescVK::add_static_mesh(Ref<StaticMeshResourcesVK> p_static_mesh) {
-    if (p_static_mesh == MEM_NULL) {
-        throw std::runtime_error("Failed to add static mesh to render graph: static mesh is null.");
-    }
-    add_resource(REND_RES_STATIC_MESH_VERTICES, p_static_mesh->acquire_vertices())
-        .add_resource(REND_RES_STATIC_MESH_INDICES, p_static_mesh->acquire_indices())
-        .add_resource(REND_RES_STATIC_MESH_SUBMESHES, p_static_mesh->acquire_submeshes())
-        .add_resource(REND_RES_STATIC_MESH_NODES, p_static_mesh->acquire_nodes())
-        .add_resource(REND_RES_STATIC_MESH_INSTANCES, p_static_mesh->acquire_instances())
-        .add_resource(REND_RES_STATIC_MESH_TEXTURES, p_static_mesh->acquire_textures());
-    if (p_static_mesh->acquire_opaque_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES, p_static_mesh->acquire_opaque_draw_batches());
-    }
-    if (p_static_mesh->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_MESH_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_static_mesh->acquire_opaque_double_sided_draw_batches());
-    }
-    if (p_static_mesh->acquire_masked_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_MESH_MASKED_DRAW_BATCHES, p_static_mesh->acquire_masked_draw_batches());
-    }
-    if (p_static_mesh->acquire_material_params() != MEM_NULL) {
-        add_resource(p_static_mesh->get_material_params_resource_id(), p_static_mesh->acquire_material_params());
-    }
-    if (p_static_mesh->acquire_material_sampler() != MEM_NULL) {
-        add_resource(REND_RES_MESH_MATERIAL_SAMPLER, p_static_mesh->acquire_material_sampler());
-    }
-    return *this;
-}
-
-RendGraphDescVK& RendGraphDescVK::add_dynamic_mesh(Ref<DynamicMeshResourcesVK> p_dynamic_mesh) {
-    if (p_dynamic_mesh == MEM_NULL) {
-        throw std::runtime_error("Failed to add dynamic mesh to render graph: dynamic mesh is null.");
-    }
-    add_resource(REND_RES_DYNAMIC_MESH_VERTICES, p_dynamic_mesh->acquire_vertices())
-        .add_resource(REND_RES_DYNAMIC_MESH_INDICES, p_dynamic_mesh->acquire_indices())
-        .add_resource(REND_RES_DYNAMIC_MESH_DRAW_BATCHES, p_dynamic_mesh->acquire_draw_batches())
-        .add_resource(REND_RES_DYNAMIC_MESH_SUBMESHES, p_dynamic_mesh->acquire_submeshes())
-        .add_resource(REND_RES_DYNAMIC_MESH_NODES, p_dynamic_mesh->acquire_nodes())
-        .add_resource(REND_RES_DYNAMIC_MESH_INSTANCES, p_dynamic_mesh->acquire_instances())
-        .add_resource(REND_RES_DYNAMIC_MESH_TEXTURES, p_dynamic_mesh->acquire_textures());
-    if (p_dynamic_mesh->acquire_material_params() != MEM_NULL) {
-        add_resource(REND_RES_DYNAMIC_MESH_MATERIAL_PARAMS, p_dynamic_mesh->acquire_material_params());
-    }
-    if (p_dynamic_mesh->acquire_material_sampler() != MEM_NULL) {
-        add_resource(REND_RES_DYNAMIC_MESH_MATERIAL_SAMPLER, p_dynamic_mesh->acquire_material_sampler());
-    }
     return *this;
 }
 

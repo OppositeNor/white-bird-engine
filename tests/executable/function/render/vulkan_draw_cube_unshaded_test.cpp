@@ -119,8 +119,8 @@ public:
             base_render_data->swap_chain_extent,
             color_attachments);
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_static_mesh(static_mesh_resources);
-        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
+        pipeline_desc.add_resource(WBE::STATIC_MESH_KEY, *static_mesh_resources);
+        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add_buffer(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER,
                 {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
                     .domain = WBE::DeviceDomain::HOST_DEVICE,

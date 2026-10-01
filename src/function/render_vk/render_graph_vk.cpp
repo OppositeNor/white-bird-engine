@@ -19,7 +19,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -59,7 +59,7 @@ namespace {
 void register_resource_list(Map<std::string, Ref<RendResVK>, RenderAllocator>* p_resources,
     RenderAllocator* p_allocator,
     std::string_view p_resource_id,
-    Ref<RenderResourceList> p_resource_list) {
+    Ref<RenderResourceListVK> p_resource_list) {
     if (p_resources == nullptr || p_allocator == nullptr || p_resource_id.empty() || p_resource_list == MEM_NULL) {
         throw std::runtime_error("RenderGraphVK: invalid render resource list registration.");
     }
@@ -68,7 +68,7 @@ void register_resource_list(Map<std::string, Ref<RendResVK>, RenderAllocator>* p
     }
     Ref<RendResVK> aggregate = make_ref<RendResVK>(p_allocator);
     aggregate->res_id = p_resource_id;
-    aggregate->res_type_id = static_hash("RenderResourceList");
+    aggregate->res_type_id = static_hash("RenderResourceListVK");
     aggregate->resource_list = p_resource_list;
     p_resources->emplace(std::string(p_resource_id), std::move(aggregate));
 

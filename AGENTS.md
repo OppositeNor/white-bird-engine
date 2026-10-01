@@ -71,8 +71,8 @@ For non-trivial implementation tasks:
   write-read, and write-write conflict on a resource must be ordered by a chain of edges on that same resource; unordered conflicts
   make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
 - The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
-  `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource()` / `add_static_mesh()` / `add_dynamic_mesh()` only to
-  import resources owned outside the graph.
+  `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource(id, *bindable)` only to import resources owned outside
+  the graph; every import is an `IBindableRenderResourceVK`, and composites register their members under `<id>.<member>`.
 - Tasks report every access themselves through `IRenderTaskVK::append_accesses()` (reflected shader resources, render targets, and
   fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
   and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by

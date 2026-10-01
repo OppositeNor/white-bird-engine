@@ -20,6 +20,7 @@
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/dynamic_mesh_compiler_vk.hh"
 #include "function/render_vk/dynamic_mesh_resources_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -49,7 +50,7 @@ DynamicMeshRenderFeature::DynamicMeshRenderFeature(
 }
 
 void DynamicMeshRenderFeature::register_resources(RendGraphDescVK& p_graph) const {
-    p_graph.add_dynamic_mesh(resources);
+    p_graph.add_resource(DYNAMIC_MESH_KEY, *resources);
 }
 
 void DynamicMeshRenderFeature::publish_visible_transforms(std::span<const glm::mat4> p_transforms) {
@@ -63,12 +64,13 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     std::optional<std::string_view> p_depth) const {
     RendTaskDescVK result(render_data->allocator);
     result.task_id = p_task_id;
-    alias_mesh_resources(result, *p_pipeline, DYNAMIC_MESH_RESOURCE_KEYS);
+    alias_mesh_resources(result, *p_pipeline, make_dynamic_mesh_resource_keys(DYNAMIC_MESH_KEY));
     RTRunGraphicsPipelineIndirectVK::Builder builder(render_data->allocator);
     builder.set_render_extent(p_extent)
-        .set_vertex_buffer(REND_RES_DYNAMIC_MESH_VERTICES)
-        .set_index_buffer(REND_RES_DYNAMIC_MESH_INDICES)
-        .set_indirect_buffer(REND_RES_DYNAMIC_MESH_DRAW_BATCHES)
+        .set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::VERTICES))
+        .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::INDICES))
+        .set_indirect_buffer(
+            IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::DRAW_BATCHES))
         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     alias_render_targets(result, p_colors, p_depth);

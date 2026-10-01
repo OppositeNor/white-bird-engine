@@ -41,6 +41,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "function/render_vk/static_mesh_compiler_vk.hh"
+#include "function/render_vk/static_mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/static_mesh_resources_vk.hh"
 #include "input_manager_mocked.hh"
 #include "i_octree_render_feature.hh"
@@ -72,7 +73,7 @@ namespace WhiteBirdEngine {
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
     ApplicationVulkanDeferredPBRTest()
-        : ApplicationGame(RendererCapabilities{.shader_debug = true},
+        : ApplicationGame(RendererCapabilities{.shader_debug = true, .ray_query = exec_test_ray_tracing_requested()},
               make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {
     }
 
@@ -130,6 +131,8 @@ private:
     static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
     static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 
+    static constexpr std::string_view RT_BUILD_STATIC_MESH_ACCELERATION_STRUCTURE = "build_static_mesh_acceleration_structure";
+    static constexpr std::string_view STATIC_MESH_ACCELERATION_STRUCTURE_KEY = "static_mesh_acceleration_structure";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED = "run_gbuffer_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
@@ -213,6 +216,7 @@ private:
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
     Ref<StaticMeshResourcesVK> static_mesh_resources = MEM_NULL;
+    Ref<StaticMeshAccelerationStructureVK> static_mesh_acceleration_structure = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;

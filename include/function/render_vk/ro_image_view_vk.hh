@@ -21,12 +21,14 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -36,7 +38,7 @@ namespace WhiteBirdEngine {
  * @brief Vulkan image view object.
  *
  */
-class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public IRenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public IRenderObjectVK, public IBindableRenderResourceVK {
 public:
     // Builder for ROImageViewVK
     struct Builder {
@@ -341,6 +343,13 @@ public:
     const ExposedFields& fields() const {
         return exposed_fields;
     }
+
+
+    /**
+     * @brief Import this object under p_resource_id.
+     * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     VkImageView image_view = VK_NULL_HANDLE;

@@ -134,11 +134,6 @@ public:
      */
     virtual void update_render_graph_resources(
         std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) = 0;
-
-    /**
-     * @brief Rebuild renderer-owned derived state from the currently published static meshes.
-     */
-    virtual void update_static_meshes() = 0;
 };
 
 } // namespace WhiteBirdEngine

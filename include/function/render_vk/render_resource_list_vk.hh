@@ -12,39 +12,43 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RENDER_RESOURCE_LIST_HH
-#define WBE_FILE_RENDER_RESOURCE_LIST_HH
+#ifndef WBE_FILE_RENDER_RESOURCE_LIST_VK_HH
+#define WBE_FILE_RENDER_RESOURCE_LIST_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include <cstddef>
+#include <string_view>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class RenderResourceList
+ * @class RenderResourceListVK
  * @brief CPU-side ordered group of render objects that can be bound to a render graph as one aggregate resource.
  *
  * The list retains shared ownership of its entries but does not create GPU resources. It is neither copyable nor movable;
- * share it through `Ref<RenderResourceList>`.
+ * share it through `Ref<RenderResourceListVK>`. Binding registers the aggregate under the requested id and every entry as
+ * `<id>[<index>]`.
  */
-class RenderResourceList final {
+class RenderResourceListVK final : public ThisRef<RenderResourceListVK>, public IBindableRenderResourceVK {
 public:
-    RenderResourceList() = delete;
-    ~RenderResourceList() = default;
-    RenderResourceList(const RenderResourceList&) = delete;
-    RenderResourceList(RenderResourceList&&) noexcept = delete;
-    RenderResourceList& operator=(const RenderResourceList&) = delete;
-    RenderResourceList& operator=(RenderResourceList&&) noexcept = delete;
+    RenderResourceListVK() = delete;
+    ~RenderResourceListVK() = default;
+    RenderResourceListVK(const RenderResourceListVK&) = delete;
+    RenderResourceListVK(RenderResourceListVK&&) noexcept = delete;
+    RenderResourceListVK& operator=(const RenderResourceListVK&) = delete;
+    RenderResourceListVK& operator=(RenderResourceListVK&&) noexcept = delete;
 
     /**
      * @brief Construct an empty resource list.
      * @param p_allocator Allocator retained by the internal vector; it must outlive this list.
      * @throws std::runtime_error If the allocator is null.
      */
-    explicit RenderResourceList(RenderAllocator* p_allocator);
+    explicit RenderResourceListVK(RenderAllocator* p_allocator);
 
     /**
      * @brief Append one render object.
@@ -52,7 +56,7 @@ public:
      * @return This resource list.
      * @throws std::runtime_error If the resource is null.
      */
-    RenderResourceList& add_resource(Ref<IRenderObject> p_resource);
+    RenderResourceListVK& add_resource(Ref<IRenderObject> p_resource);
 
     /**
      * @brief Get the number of retained resources.
@@ -67,6 +71,12 @@ public:
      * @throws std::runtime_error If the index is out of bounds.
      */
     Ref<IRenderObject> acquire_resource(size_t p_index) const;
+
+    /**
+     * @brief Import this list under p_resource_id.
+     * @throws std::runtime_error If the list was not created with make_ref() or p_resource_id is empty.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     Vector<Ref<IRenderObject>, RenderAllocator> resources;

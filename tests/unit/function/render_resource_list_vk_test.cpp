@@ -17,7 +17,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
@@ -27,27 +27,27 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-class RenderResourceListTestObject final : public IRenderObject {
+class RenderResourceListVKTestObject final : public IRenderObject {
 public:
-    RenderResourceListTestObject() = default;
-    ~RenderResourceListTestObject() override = default;
-    RenderResourceListTestObject(const RenderResourceListTestObject&) = delete;
-    RenderResourceListTestObject(RenderResourceListTestObject&&) noexcept = delete;
-    RenderResourceListTestObject& operator=(const RenderResourceListTestObject&) = delete;
-    RenderResourceListTestObject& operator=(RenderResourceListTestObject&&) noexcept = delete;
+    RenderResourceListVKTestObject() = default;
+    ~RenderResourceListVKTestObject() override = default;
+    RenderResourceListVKTestObject(const RenderResourceListVKTestObject&) = delete;
+    RenderResourceListVKTestObject(RenderResourceListVKTestObject&&) noexcept = delete;
+    RenderResourceListVKTestObject& operator=(const RenderResourceListVKTestObject&) = delete;
+    RenderResourceListVKTestObject& operator=(RenderResourceListVKTestObject&&) noexcept = delete;
 
     TypeID get_type_uuid() const override {
-        return static_hash("RenderResourceListTestObject");
+        return static_hash("RenderResourceListVKTestObject");
     }
 };
 
 } // namespace
 
-TEST(WBERenderResourceListTest, RetainsResourcesInInsertionOrder) {
+TEST(WBERenderResourceListVKTest, RetainsResourcesInInsertionOrder) {
     RenderAllocator allocator(WBE_KI_B(64));
-    auto first = make_ref<RenderResourceListTestObject>(&allocator).dynamic_cast_ref<IRenderObject>();
-    auto second = make_ref<RenderResourceListTestObject>(&allocator).dynamic_cast_ref<IRenderObject>();
-    RenderResourceList resources(&allocator);
+    auto first = make_ref<RenderResourceListVKTestObject>(&allocator).dynamic_cast_ref<IRenderObject>();
+    auto second = make_ref<RenderResourceListVKTestObject>(&allocator).dynamic_cast_ref<IRenderObject>();
+    RenderResourceListVK resources(&allocator);
 
     resources.add_resource(first).add_resource(second);
 
@@ -56,9 +56,9 @@ TEST(WBERenderResourceListTest, RetainsResourcesInInsertionOrder) {
     EXPECT_EQ(resources.acquire_resource(1), second);
 }
 
-TEST(WBERenderResourceListTest, RejectsInvalidResourceAccess) {
+TEST(WBERenderResourceListVKTest, RejectsInvalidResourceAccess) {
     RenderAllocator allocator(WBE_KI_B(64));
-    RenderResourceList resources(&allocator);
+    RenderResourceListVK resources(&allocator);
 
     EXPECT_THROW(resources.add_resource(MEM_NULL), std::runtime_error);
     EXPECT_THROW(resources.acquire_resource(0), std::runtime_error);

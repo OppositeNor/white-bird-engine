@@ -37,17 +37,7 @@
 
 namespace WhiteBirdEngine {
 
-class ROBufferVK;
 class RendererVK;
-
-/**
- * @class StaticGeometryBufferUsageVK
- * @brief Additional Vulkan usage bits required for shared static-geometry vertex and index buffers.
- */
-struct StaticGeometryBufferUsageVK {
-    VkBufferUsageFlags vertex_buffer_usage = 0;
-    VkBufferUsageFlags index_buffer_usage = 0;
-};
 
 /**
  * @class RenderPluginVK
@@ -155,27 +145,6 @@ public:
      * @brief Register plugin-owned arenas after the renderer has created the physical heaps.
      */
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) = 0;
-
-    /**
-     * @brief Add extra usage bits required by this plugin for shared static-geometry buffers.
-     */
-    virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const = 0;
-
-    /**
-     * @brief React to an explicit static opaque set update.
-     *
-     * @param p_render_data Renderer state shared with render objects.
-     * @param p_set Published static opaque set, or null to clear derived state.
-     * @param p_vertex_buffer Shared static-opaque vertex buffer.
-     * @param p_index_buffer Shared static-opaque index buffer.
-     * @param p_double_sided_set Additional opaque geometry without raster face culling, or null.
-     * @return An optional GPU job to enqueue after the shared buffers are updated.
-     */
-    virtual GPUJobVK on_static_opaque_mesh_updated(BaseRenderDataVK* p_render_data,
-        RefRes<RUStaticOpaqueMesh> p_set,
-        Ref<ROBufferVK> p_vertex_buffer,
-        Ref<ROBufferVK> p_index_buffer,
-        RefRes<RUStaticOpaqueDoubleSidedMesh> p_double_sided_set = MEM_NULL) = 0;
 
 protected:
     friend class RendererVK;

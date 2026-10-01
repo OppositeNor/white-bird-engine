@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
@@ -367,13 +366,6 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 VertexInputDescriptionVK build_vertex_input_description_vk(
     const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) {
     const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_data);
-    return VertexInputDescriptionVK::from_contract(contract);
-}
-
-VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
-    std::string_view p_entry_name,
-    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout) {
-    const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_layout);
     return VertexInputDescriptionVK::from_contract(contract);
 }
 

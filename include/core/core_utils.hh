@@ -63,6 +63,23 @@ public:
     }
 
 protected:
+    /**
+     * @brief Return the strong reference owning this instance.
+     *
+     * The result grants the same access as the Ref its owners already hold, so it is available from const members, for
+     * example to share the instance with another owner.
+     *
+     * @return The reference set by make_ref().
+     * @throws std::runtime_error If the instance was not created with make_ref() or is being destroyed.
+     */
+    Ref<T> acquire_this_ref() const {
+        Ref<T> result = const_cast<RefWeak<T>&>(this_ref).lock();
+        if (result == MEM_NULL) {
+            throw std::runtime_error("Instance is not owned by a Ref.");
+        }
+        return result;
+    }
+
     RefWeak<T> this_ref;
 };
 

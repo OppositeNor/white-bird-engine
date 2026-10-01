@@ -19,7 +19,7 @@
 #include "function/render/mesh_node_contract.hh"
 #include "function/render/mesh_node_contract_resolver.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
@@ -181,12 +181,18 @@ Ref<ROBufferVK> IMeshCompilerVK::create_indirect_buffer(std::span<const VkDrawIn
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 }
 
-MeshBufferCompilerVK::BuildResult IMeshCompilerVK::compile_geometry_buffers(RefRes<RUStaticMesh> p_mesh) const {
-    return MeshBufferCompilerVK(get_render_data()).build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+MeshBufferCompilerVK::BuildResult IMeshCompilerVK::compile_geometry_buffers(RefRes<RUStaticMesh> p_mesh, const Config& p_config) const {
+    return MeshBufferCompilerVK(get_render_data())
+        .build(p_mesh,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | p_config.vertex_buffer_usage,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | p_config.index_buffer_usage);
 }
 
-MeshBufferCompilerVK::BuildResult IMeshCompilerVK::compile_geometry_buffers(RefRes<RUMesh3D> p_mesh) const {
-    return MeshBufferCompilerVK(get_render_data()).build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+MeshBufferCompilerVK::BuildResult IMeshCompilerVK::compile_geometry_buffers(RefRes<RUMesh3D> p_mesh, const Config& p_config) const {
+    return MeshBufferCompilerVK(get_render_data())
+        .build(p_mesh,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | p_config.vertex_buffer_usage,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | p_config.index_buffer_usage);
 }
 
 IMeshCompilerVK::DrawPlan IMeshCompilerVK::plan_draws(
@@ -213,7 +219,7 @@ IMeshCompilerVK::MaterialBuild IMeshCompilerVK::compile_materials(const std::opt
     std::span<const RefRes<RUMaterial>> p_materials) const {
     const BaseRenderDataVK* render_data = get_render_data();
     MaterialBuild result;
-    result.textures = make_ref<RenderResourceList>(render_data->allocator, render_data->allocator);
+    result.textures = make_ref<RenderResourceListVK>(render_data->allocator, render_data->allocator);
     result.material_sampler = create_material_sampler(render_data, p_material_contract.has_value());
     if (!p_material_contract.has_value()) {
         return result;

@@ -261,4 +261,8 @@ DebugDataRows ROImageViewVK::descriptor_debug_data() const {
     return rows;
 }
 
+void ROImageViewVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+    bind_render_object(p_graph, p_resource_id, acquire_this_ref());
+}
+
 } // namespace WhiteBirdEngine

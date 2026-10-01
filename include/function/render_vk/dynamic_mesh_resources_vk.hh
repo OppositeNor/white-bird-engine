@@ -19,8 +19,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/geometry_draw_data_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
@@ -33,26 +34,36 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_VERTICES = "dynamic_mesh_vertices";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_INDICES = "dynamic_mesh_indices";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_DRAW_BATCHES = "dynamic_mesh_draw_batches";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_SUBMESHES = "dynamic_mesh_submeshes";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_NODES = "dynamic_mesh_nodes";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_INSTANCES = "dynamic_mesh_instances";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_MATERIAL_PARAMS = "dynamic_mesh_material_params";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_MATERIAL_SAMPLER = "dynamic_mesh_material_sampler";
-inline constexpr std::string_view REND_RES_DYNAMIC_MESH_TEXTURES = "dynamic_mesh_textures";
-
 /**
  * @class DynamicMeshResourcesVK
  * @brief Pipeline-independent Vulkan resources of one mesh drawn with per-frame instance transforms.
  *
  * Geometry, submesh, instance-link, and material resources are immutable. Node transforms and indirect commands live in
  * one buffer per frame in flight and change through publish_visible_transforms(). The object is neither copyable nor
- * movable, is shared through Ref, and is confined to the rendering thread.
+ * movable, is shared through Ref, and is confined to the rendering thread. bind() imports each present member under
+ * `<key>.<member>`, using the member names below.
  */
-class DynamicMeshResourcesVK final {
+class DynamicMeshResourcesVK final : public IBindableRenderResourceVK {
 public:
+    /** Member name of the shared vertex buffer. */
+    static constexpr std::string_view VERTICES = "vertices";
+    /** Member name of the shared uint32 index buffer. */
+    static constexpr std::string_view INDICES = "indices";
+    /** Member name of the per-frame indirect commands. */
+    static constexpr std::string_view DRAW_BATCHES = "draw_batches";
+    /** Member name of the submesh table. */
+    static constexpr std::string_view SUBMESHES = "submeshes";
+    /** Member name of the per-frame node-transform table. */
+    static constexpr std::string_view NODES = "nodes";
+    /** Member name of the instance-link table. */
+    static constexpr std::string_view INSTANCES = "instances";
+    /** Member name of the material parameter table. */
+    static constexpr std::string_view MATERIAL_PARAMS = "material_params";
+    /** Member name of the material sampler. */
+    static constexpr std::string_view MATERIAL_SAMPLER = "material_sampler";
+    /** Member name of the material texture list. */
+    static constexpr std::string_view TEXTURES = "textures";
+
     DynamicMeshResourcesVK() = delete;
     ~DynamicMeshResourcesVK() = default;
     DynamicMeshResourcesVK(const DynamicMeshResourcesVK&) = delete;
@@ -107,7 +118,7 @@ public:
     }
 
     /** @brief Acquire every sampled image retained by the material table. */
-    Ref<RenderResourceList> acquire_textures() const {
+    Ref<RenderResourceListVK> acquire_textures() const {
         return textures;
     }
 
@@ -135,6 +146,12 @@ public:
      */
     void publish_visible_transforms(std::span<const glm::mat4> p_transforms);
 
+    /**
+     * @brief Import every present member under `<p_resource_id>.<member>`.
+     * @throws std::runtime_error If p_resource_id is empty or a required member is missing.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+
 private:
     friend class DynamicMeshCompilerVK;
 
@@ -148,7 +165,7 @@ private:
     Ref<ROBufferVK> instances = MEM_NULL;
     Ref<ROBufferVK> material_params = MEM_NULL;
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
-    Ref<RenderResourceList> textures = MEM_NULL;
+    Ref<RenderResourceListVK> textures = MEM_NULL;
     Vector<MeshDrawBatchVK, RenderAllocator> batches;
     Unique<GeometryDrawDataVK> draw_data = MEM_NULL;
 };

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_sampler_vk.hh"
+#include <string_view>
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -248,6 +249,10 @@ DebugDataRows ROSamplerVK::descriptor_debug_data() const {
         rows.emplace_back(make_descriptor_row(*sampler_index));
     }
     return rows;
+}
+
+void ROSamplerVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+    bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
 } // namespace WhiteBirdEngine

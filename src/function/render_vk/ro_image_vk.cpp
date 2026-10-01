@@ -13,6 +13,7 @@
    limitations under the License.
    */
 #include "function/render_vk/ro_image_vk.hh"
+#include <string_view>
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/async/worker.hh"
@@ -620,6 +621,10 @@ std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destinat
         exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation p_operation) {
             finish_image_readback(std::move(p_operation), p_destination);
         });
+}
+
+void ROImageVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+    bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
 } // namespace WhiteBirdEngine

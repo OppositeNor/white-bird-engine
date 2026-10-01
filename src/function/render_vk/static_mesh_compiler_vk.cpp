@@ -250,16 +250,19 @@ Ref<StaticMeshResourcesVK> StaticMeshCompilerVK::compile(RefRes<RUStaticOpaqueMe
     const BaseRenderDataVK* render_data = get_render_data();
     Ref<StaticMeshResourcesVK> result = make_ref<StaticMeshResourcesVK>(render_data->allocator, render_data->allocator);
     result->material_params_resource_id = p_config.material_params_variable_name;
+    result->opaque_mesh = p_opaque_mesh;
+    result->opaque_double_sided_mesh = p_opaque_double_sided_mesh;
+    result->masked_mesh = p_masked_mesh;
 
     MeshBufferCompilerVK::BuildResult geometry_buffers;
     if (has_opaque_draws) {
-        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_opaque_mesh));
+        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_opaque_mesh, p_config));
     }
     if (has_masked_draws) {
-        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_masked_mesh));
+        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_masked_mesh, p_config));
     }
     if (has_opaque_double_sided_draws) {
-        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_opaque_double_sided_mesh));
+        merge_geometry_buffers(geometry_buffers, compile_geometry_buffers(p_opaque_double_sided_mesh, p_config));
     }
     if (geometry_buffers.vertex_buffer == MEM_NULL || geometry_buffers.index_buffer == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh resources: shared vertex or index buffer is missing.");

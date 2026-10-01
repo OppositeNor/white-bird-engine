@@ -19,14 +19,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render/shader_role.hh"
 #include "render_defs.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/i_singleton.hh"
 #include "utils/utils.hh"
-#include <cstddef>
-#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -41,147 +36,10 @@ namespace WhiteBirdEngine {
 class RenderDatabase final : public ISingleton<RenderDatabase> {
 private:
     using AllocType = RenderAllocator;
-    template <typename T, typename Allocator = AllocType>
-    using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
-    template <typename T>
-    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
     template <typename TKey, typename TVal>
     using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
 
 public:
-    // Represents a subregion.
-    struct Subregion {
-        // The starting index of the subregion.
-        size_t starting_index;
-        // The number of elements of the subregion.
-        size_t size;
-    };
-
-    /**
-     * @class OpaqueTrianglesInfo
-     * @brief Information of chunk of opaque triangles.
-     */
-    struct OpaqueTrianglesInfo {
-        /** Tightly interleaved vertex bytes for every draw group. */
-        Vector<uint8_t> vertices;
-        /** Local indices for every draw group. */
-        Vector<uint32_t> indices;
-        /** A unique id for each appended submesh. */
-        Vector<uint32_t> obj_id;
-
-        /**
-         * @brief One unique material referenced by draw groups.
-         */
-        struct MaterialUnit {
-            /** Material resource. */
-            RefRes<RUMaterial> material;
-        };
-        /** Unique materials in stable draw order. */
-        Vector<MaterialUnit> materials;
-
-        /**
-         * @brief One copied vertex attribute used to compare and retain layouts.
-         */
-        struct VertexAttribute {
-            /** Exact shader-defined open role. */
-            ShaderRole role;
-            /** Exact 32-bit scalar or vector format. */
-            RUVertexAttributeFormat format = RUVertexAttributeFormat::FLOAT;
-            /** Byte offset inside one interleaved vertex. */
-            size_t offset = 0;
-            /** Byte size inside one interleaved vertex. */
-            size_t size = 0;
-        };
-
-        /**
-         * @brief Fixed vertex layout copied from a resource draw group.
-         */
-        struct VertexLayout {
-            VertexLayout() = delete;
-            ~VertexLayout() = default;
-            VertexLayout(const VertexLayout&) = default;
-            VertexLayout(VertexLayout&&) noexcept = default;
-            VertexLayout& operator=(const VertexLayout&) = default;
-            VertexLayout& operator=(VertexLayout&&) noexcept = default;
-
-            /**
-             * @brief Construct an empty layout using the render allocator.
-             */
-            explicit VertexLayout(AllocType* p_allocator) : attributes(p_allocator) {
-            }
-
-            /** Ordered attributes in resource declaration order. */
-            Vector<VertexAttribute> attributes;
-            /** Byte stride between vertices. */
-            size_t vertex_stride = 0;
-        };
-
-        /**
-         * @brief Contiguous geometry rendered with one material and vertex layout.
-         */
-        struct DrawGroup {
-            DrawGroup() = delete;
-            ~DrawGroup() = default;
-            DrawGroup(const DrawGroup&) = default;
-            DrawGroup(DrawGroup&&) noexcept = default;
-            DrawGroup& operator=(const DrawGroup&) = default;
-            DrawGroup& operator=(DrawGroup&&) noexcept = default;
-
-            /**
-             * @brief Construct an empty group using the render allocator.
-             */
-            explicit DrawGroup(AllocType* p_allocator) : vertex_layout(p_allocator) {
-            }
-
-            /** Byte offset bound for this group's first vertex. */
-            size_t vertex_buffer_byte_offset = 0;
-            /** Contiguous local-index range belonging to this group. */
-            Subregion index_sub_region{};
-            /** Index into materials. */
-            size_t material_index = 0;
-            /** Fixed layout of the group's interleaved vertices. */
-            VertexLayout vertex_layout;
-            /** Contiguous indirect-command range generated for this group. */
-            Subregion indirect_command_sub_region{};
-        };
-        /** Draw groups in pipeline, material, and layout order. */
-        Vector<DrawGroup> draw_groups;
-
-        /**
-         * @brief One graphics pipeline and its contiguous draw-group range.
-         */
-        struct GraphicsPipelineUnit {
-            /** Graphics pipeline used by every draw group in the range. */
-            RefRes<RUGraphicsPipeline> graphics_pipeline;
-            /** Subregion of draw_groups rendered with this pipeline. */
-            Subregion draw_group_sub_region;
-        };
-        /** Graphics-pipeline batches in draw order. */
-        Vector<GraphicsPipelineUnit> graphics_pipelines;
-
-        /**
-         * @brief Constructor.
-         *
-         * @param p_allocator The allocator to allocate resource on.
-         */
-        OpaqueTrianglesInfo(AllocType* p_allocator)
-            : vertices(p_allocator), indices(p_allocator), obj_id(p_allocator), materials(p_allocator),
-              draw_groups(p_allocator), graphics_pipelines(p_allocator) {
-        }
-
-        /**
-         * @brief Clear all the data.
-         */
-        void reset() {
-            vertices.clear();
-            indices.clear();
-            obj_id.clear();
-            materials.clear();
-            draw_groups.clear();
-            graphics_pipelines.clear();
-        }
-    };
-
     static constexpr size_t CLEAN_DEAD_RO_WEAK_REFS_THREASHOLD = 128;
 
     /**
@@ -223,69 +81,6 @@ public:
     RenderDatabase(AllocType* p_allocator);
 
     /**
-     * @brief Set or clear the published static opaque geometry set.
-     * @param p_set Static opaque set resource, or null to clear the publication.
-     */
-    void set_static_opaque_mesh(RefRes<RUStaticOpaqueMesh> p_set) {
-        static_opaque_mesh = p_set;
-    }
-
-    /**
-     * @brief Set or clear the published static opaque double-sided geometry set.
-     * @param p_set Static opaque double-sided set resource, or null to clear the publication.
-     */
-    void set_static_opaque_double_sided_mesh(RefRes<RUStaticOpaqueDoubleSidedMesh> p_set) {
-        static_opaque_double_sided_mesh = p_set;
-    }
-
-    /**
-     * @brief Set or clear the published static masked geometry set.
-     * @param p_set Static masked set resource, or null to clear the publication.
-     */
-    void set_static_masked_mesh(RefRes<RUStaticMaskedMesh> p_set) {
-        static_masked_mesh = p_set;
-    }
-
-    /**
-     * @brief Set the dynamic opaque triangles.
-     *
-     * @param p_mesh The mesh containing the triangles' data.
-     */
-    void set_dynamic_opaque_triangles(RUMesh3D* p_mesh) {
-        set_opaque_triangles_linear(dynamic_opaque, p_mesh, nullptr, 0);
-    }
-
-    /**
-     * @brief Get the current static opaque set resource.
-     */
-    RefRes<RUStaticOpaqueMesh> get_static_opaque_mesh() const {
-        return static_opaque_mesh;
-    }
-
-    /**
-     * @brief Get the current static opaque double-sided set resource.
-     */
-    RefRes<RUStaticOpaqueDoubleSidedMesh> get_static_opaque_double_sided_mesh() const {
-        return static_opaque_double_sided_mesh;
-    }
-
-    /**
-     * @brief Get the current static masked set resource.
-     */
-    RefRes<RUStaticMaskedMesh> get_static_masked_mesh() const {
-        return static_masked_mesh;
-    }
-
-    /**
-     * @brief Get the dynamic opaque triangles' info.
-     *
-     * @return The dynamic opaque triangles' info.
-     */
-    const OpaqueTrianglesInfo& get_dynamic_opaque_triangle_vertices() const {
-        return dynamic_opaque;
-    }
-
-    /**
      * @brief Register or replace a compiled render object for a resource key.
      *
      * @param p_resource_key The source resource key or a derived compiler key.
@@ -321,12 +116,6 @@ private:
 
     Map<CompiledRenderResourceKey, RefWeak<IRenderObject>> compiled_render_resources;
 
-    OpaqueTrianglesInfo dynamic_opaque;
-    RefRes<RUStaticOpaqueMesh> static_opaque_mesh;
-    RefRes<RUStaticOpaqueDoubleSidedMesh> static_opaque_double_sided_mesh;
-    RefRes<RUStaticMaskedMesh> static_masked_mesh;
-    void set_opaque_triangles_linear(
-        OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh, const uint32_t* p_preserved_object_ids, size_t p_preserved_object_id_count);
 };
 
 } // namespace WhiteBirdEngine

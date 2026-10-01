@@ -87,10 +87,6 @@ struct BaseRayTracingDataVK {
      */
     PFN_vkGetAccelerationStructureDeviceAddressKHR get_acceleration_structure_device_address = nullptr;
     /**
-     * @brief Non-owning handle for the current static-opaque top-level acceleration structure.
-     */
-    VkAccelerationStructureKHR static_opaque_acceleration_structure = VK_NULL_HANDLE;
-    /**
      * @brief Required device-address alignment for acceleration-structure scratch storage.
      */
     VkDeviceSize min_acceleration_structure_scratch_offset_alignment = 1;

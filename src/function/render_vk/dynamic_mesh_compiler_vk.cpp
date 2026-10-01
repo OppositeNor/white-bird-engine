@@ -100,7 +100,7 @@ Ref<DynamicMeshResourcesVK> DynamicMeshCompilerVK::compile(RefRes<RUMesh3D> p_me
         draws.push_back(std::move(draw));
     }
 
-    MeshBufferCompilerVK::BuildResult geometry_buffers = compile_geometry_buffers(p_mesh);
+    MeshBufferCompilerVK::BuildResult geometry_buffers = compile_geometry_buffers(p_mesh, p_config);
     if (geometry_buffers.vertex_buffer == MEM_NULL || geometry_buffers.index_buffer == MEM_NULL) {
         throw std::runtime_error("Failed to compile dynamic-mesh resources: shared vertex or index buffer is missing.");
     }

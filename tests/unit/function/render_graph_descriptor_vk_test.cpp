@@ -18,9 +18,13 @@
 #include "core/memory/unique.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
+#include "function/render_vk/dynamic_mesh_resources_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -113,9 +117,9 @@ TEST(WBERenderGraphDescriptorVKTest, GetTaskReturnsStoredDescriptorForLaterConne
 TEST(WBERenderGraphDescriptorVKTest, ResourceListIsStoredAsAnAggregateBinding) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendGraphDescVK descriptor(&allocator);
-    auto resource_list = make_ref<RenderResourceList>(&allocator, &allocator);
+    auto resource_list = make_ref<RenderResourceListVK>(&allocator, &allocator);
 
-    descriptor.add_resource("textures", resource_list);
+    descriptor.add_resource("textures", *resource_list);
 
     ASSERT_EQ(descriptor.resources.size(), 1U);
     EXPECT_EQ(descriptor.resources.front().res_id, "textures");
@@ -163,8 +167,30 @@ TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsRejectEmptyId
     EXPECT_THROW(descriptor.add_image("", {}), std::runtime_error);
     EXPECT_THROW(descriptor.add_image_view("view", ""), std::runtime_error);
     EXPECT_THROW(descriptor.add_sampler(""), std::runtime_error);
-    EXPECT_THROW(descriptor.add_static_mesh(MEM_NULL), std::runtime_error);
-    EXPECT_THROW(descriptor.add_dynamic_mesh(MEM_NULL), std::runtime_error);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, ComposesMemberResourceIds) {
+    EXPECT_EQ(IBindableRenderResourceVK::make_member_resource_id("sponza", StaticMeshResourcesVK::NODES), "sponza.nodes");
+}
+
+TEST(WBERenderGraphDescriptorVKTest, IncompleteMeshResourcesRefuseToBind) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+    StaticMeshResourcesVK static_mesh(&allocator);
+    DynamicMeshResourcesVK dynamic_mesh(&allocator);
+
+    EXPECT_THROW(descriptor.add_resource("static_mesh", static_mesh), std::runtime_error);
+    EXPECT_THROW(descriptor.add_resource("dynamic_mesh", dynamic_mesh), std::runtime_error);
+    EXPECT_TRUE(descriptor.resources.empty());
+}
+
+TEST(WBERenderGraphDescriptorVKTest, ContainerNotOwnedByRefRefusesToBindItself) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RendGraphDescVK descriptor(&allocator);
+    ROCMultislotsVK container(&allocator, 1);
+
+    EXPECT_THROW(descriptor.add_resource("container", container), std::runtime_error);
+    EXPECT_TRUE(descriptor.resources.empty());
 }
 
 } // namespace WhiteBirdEngine

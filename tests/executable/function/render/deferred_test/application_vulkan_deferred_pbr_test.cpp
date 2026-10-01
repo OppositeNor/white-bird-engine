@@ -31,6 +31,8 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/ray_tracing_plugin_vk.hh"
+#include "function/render_vk/static_mesh_acceleration_structure_compiler_vk.hh"
 #include "function/render_vk/static_mesh_compiler_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -414,8 +416,25 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
-    static_mesh_resources = create_static_mesh_resources(
-        renderer_vk, sponza_opaque_set, MEM_NULL, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, sponza_opaque_double_sided_set);
+    RayTracingPluginVK* ray_tracing = RayTracingPluginVK::get_singleton();
+    const bool build_acceleration_structure = ray_tracing != nullptr && ray_tracing->is_enabled();
+    StaticMeshCompilerVK::Config static_mesh_config;
+    if (build_acceleration_structure) {
+        static_mesh_config.vertex_buffer_usage = StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+        static_mesh_config.index_buffer_usage = StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+    }
+    static_mesh_resources = create_static_mesh_resources(renderer_vk,
+        sponza_opaque_set,
+        MEM_NULL,
+        gbuffer_opaque_pipeline_resource,
+        MEM_NULL,
+        gbuffer_opaque_pipeline_resource,
+        sponza_opaque_double_sided_set,
+        static_mesh_config);
+    if (build_acceleration_structure) {
+        static_mesh_acceleration_structure =
+            StaticMeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data()).compile(static_mesh_resources);
+    }
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
         .render_data = base_render_data,

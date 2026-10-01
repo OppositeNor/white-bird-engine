@@ -13,7 +13,6 @@
    limitations under the License.
 */
 #include "function/render/vertex_input_contract_resolver.hh"
-#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
@@ -57,20 +56,6 @@ static VertexLayoutView make_vertex_layout_view(const RUVertexView& p_vertex_dat
         const RUVertexView::Attribute& attribute = p_vertex_data.attributes.get()[i];
         result.attributes.push_back(VertexAttributeLayoutView{.role_name = attribute.role.get_name(),
             .role_hash = attribute.role.hash,
-            .format = attribute.format,
-            .offset = attribute.offset,
-            .size = attribute.size});
-    }
-    return result;
-}
-
-static VertexLayoutView make_vertex_layout_view(const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout) {
-    VertexLayoutView result;
-    result.vertex_stride = p_vertex_layout.vertex_stride;
-    result.attributes.reserve(p_vertex_layout.attributes.size());
-    for (const RenderDatabase::OpaqueTrianglesInfo::VertexAttribute& attribute : p_vertex_layout.attributes) {
-        result.attributes.push_back(VertexAttributeLayoutView{.role_name = attribute.role.get_name(),
-            .role_hash = attribute.role.get_hash(),
             .format = attribute.format,
             .offset = attribute.offset,
             .size = attribute.size});
@@ -223,12 +208,6 @@ static VertexInputContract resolve_vertex_input_contract(
 VertexInputContract VertexInputContractResolver::resolve(
     const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const {
     return resolve_vertex_input_contract(p_metadata, p_entry_name, make_vertex_layout_view(p_vertex_data));
-}
-
-VertexInputContract VertexInputContractResolver::resolve(const ShaderMetadata& p_metadata,
-    std::string_view p_entry_name,
-    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout) const {
-    return resolve_vertex_input_contract(p_metadata, p_entry_name, make_vertex_layout_view(p_vertex_layout));
 }
 
 } // namespace WhiteBirdEngine

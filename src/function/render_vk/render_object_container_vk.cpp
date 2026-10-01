@@ -13,9 +13,12 @@
    limitations under the License.
 */
 #include "function/render_vk/render_object_container_vk.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include <sstream>
+#include <stdexcept>
+#include <string_view>
 #include <string>
 #include <utility>
 
@@ -40,6 +43,10 @@ std::string descriptor_rows_to_string(const DebugDataRows& p_rows) {
 
 std::string RenderObjectContainerVK::to_string() const {
     return descriptor_rows_to_string(descriptor_debug_data());
+}
+
+void RenderObjectContainerVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+    bind_container(p_graph, p_resource_id, acquire_this_ref());
 }
 
 } // namespace WhiteBirdEngine

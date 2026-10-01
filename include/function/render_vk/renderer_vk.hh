@@ -120,7 +120,6 @@ public:
         return render_database;
     }
 
-    virtual void update_static_meshes() override;
 
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
@@ -379,9 +378,6 @@ private:
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
         // The staging buffer for data transfer.
         Ref<ROStagingBufferVK> staging_buffer;
-        // Shared static-opaque mesh GPU buffers used by plugin-owned features such as ray tracing.
-        Ref<ROBufferVK> static_opaque_vertices;
-        Ref<ROBufferVK> static_opaque_indices;
     };
     Unique<RenderObjects> render_objects;
 

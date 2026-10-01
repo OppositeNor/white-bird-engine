@@ -19,11 +19,14 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
+#include "function/render/render_resource_unit.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -31,25 +34,39 @@
 
 namespace WhiteBirdEngine {
 
-inline constexpr std::string_view REND_RES_STATIC_MESH_VERTICES = "static_mesh_vertices";
-inline constexpr std::string_view REND_RES_STATIC_MESH_INDICES = "static_mesh_indices";
-inline constexpr std::string_view REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES = "static_mesh_opaque_draw_batches";
-inline constexpr std::string_view REND_RES_STATIC_MESH_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES = "static_mesh_opaque_double_sided_draw_batches";
-inline constexpr std::string_view REND_RES_STATIC_MESH_MASKED_DRAW_BATCHES = "static_mesh_masked_draw_batches";
-inline constexpr std::string_view REND_RES_STATIC_MESH_SUBMESHES = "static_mesh_submeshes";
-inline constexpr std::string_view REND_RES_STATIC_MESH_NODES = "static_mesh_nodes";
-inline constexpr std::string_view REND_RES_STATIC_MESH_INSTANCES = "static_mesh_instances";
-inline constexpr std::string_view REND_RES_STATIC_MESH_TEXTURES = "static_mesh_textures";
-
 /**
  * @class StaticMeshResourcesVK
- * @brief Pipeline-independent Vulkan resources compiled from static geometry categories.
+ * @brief Pipeline-independent Vulkan resources compiled from static mesh categories, with the source meshes they came from.
  *
  * The object owns no pipeline or render-task state. It is neither copyable nor movable and is shared through Ref. Every
- * contained render object is rendering-thread-confined and must be registered explicitly with each graph that uses it.
+ * contained render object is rendering-thread-confined. bind() imports each present member under `<key>.<member>`, using
+ * the member names below; absent optional categories and material resources are not declared.
  */
-class StaticMeshResourcesVK final {
+class StaticMeshResourcesVK final : public IBindableRenderResourceVK {
 public:
+    /** Member name of the shared vertex buffer. */
+    static constexpr std::string_view VERTICES = "vertices";
+    /** Member name of the shared uint32 index buffer. */
+    static constexpr std::string_view INDICES = "indices";
+    /** Member name of the opaque indirect commands. */
+    static constexpr std::string_view OPAQUE_DRAW_BATCHES = "opaque_draw_batches";
+    /** Member name of the opaque double-sided indirect commands. */
+    static constexpr std::string_view OPAQUE_DOUBLE_SIDED_DRAW_BATCHES = "opaque_double_sided_draw_batches";
+    /** Member name of the masked indirect commands. */
+    static constexpr std::string_view MASKED_DRAW_BATCHES = "masked_draw_batches";
+    /** Member name of the submesh table. */
+    static constexpr std::string_view SUBMESHES = "submeshes";
+    /** Member name of the node-transform table. */
+    static constexpr std::string_view NODES = "nodes";
+    /** Member name of the instance-link table. */
+    static constexpr std::string_view INSTANCES = "instances";
+    /** Member name of the material parameter table. */
+    static constexpr std::string_view MATERIAL_PARAMS = "material_params";
+    /** Member name of the material sampler. */
+    static constexpr std::string_view MATERIAL_SAMPLER = "material_sampler";
+    /** Member name of the material texture list. */
+    static constexpr std::string_view TEXTURES = "textures";
+
     StaticMeshResourcesVK() = delete;
     ~StaticMeshResourcesVK() = default;
     StaticMeshResourcesVK(const StaticMeshResourcesVK&) = delete;
@@ -113,11 +130,26 @@ public:
     }
 
     /** @brief Acquire every sampled image retained by the material table. */
-    Ref<RenderResourceList> acquire_textures() const {
+    Ref<RenderResourceListVK> acquire_textures() const {
         return textures;
     }
 
-    /** @brief Return the graph-resource id expected by the material parameter reflection contract. */
+    /** @brief Return the opaque source mesh, or null when the category was not compiled. */
+    RefRes<RUStaticOpaqueMesh> get_opaque_mesh() const {
+        return opaque_mesh;
+    }
+
+    /** @brief Return the opaque double-sided source mesh, or null when the category was not compiled. */
+    RefRes<RUStaticOpaqueDoubleSidedMesh> get_opaque_double_sided_mesh() const {
+        return opaque_double_sided_mesh;
+    }
+
+    /** @brief Return the masked source mesh, or null when the category was not compiled. */
+    RefRes<RUStaticMaskedMesh> get_masked_mesh() const {
+        return masked_mesh;
+    }
+
+    /** @brief Return the shader resource id of the material parameter table configured at compilation. */
     std::string_view get_material_params_resource_id() const {
         return material_params_resource_id;
     }
@@ -150,10 +182,19 @@ public:
     /** @brief Return one masked draw batch. */
     const MeshDrawBatchVK& get_masked_draw_batch(size_t p_index) const;
 
+    /**
+     * @brief Import every present member under `<p_resource_id>.<member>`.
+     * @throws std::runtime_error If p_resource_id is empty or a required member is missing.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+
 private:
     friend class StaticMeshCompilerVK;
 
     RenderAllocator* allocator = nullptr;
+    RefRes<RUStaticOpaqueMesh> opaque_mesh = MEM_NULL;
+    RefRes<RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh = MEM_NULL;
+    RefRes<RUStaticMaskedMesh> masked_mesh = MEM_NULL;
     Ref<ROBufferVK> vertices = MEM_NULL;
     Ref<ROBufferVK> indices = MEM_NULL;
     Ref<ROBufferVK> opaque_draw_batches = MEM_NULL;
@@ -164,7 +205,7 @@ private:
     Ref<ROBufferVK> instances = MEM_NULL;
     Ref<ROBufferVK> material_params = MEM_NULL;
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
-    Ref<RenderResourceList> textures = MEM_NULL;
+    Ref<RenderResourceListVK> textures = MEM_NULL;
     Vector<MeshDrawBatchVK, RenderAllocator> opaque_batches;
     Vector<MeshDrawBatchVK, RenderAllocator> opaque_double_sided_batches;
     Vector<MeshDrawBatchVK, RenderAllocator> masked_batches;

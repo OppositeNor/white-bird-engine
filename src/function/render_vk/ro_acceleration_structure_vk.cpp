@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
+#include <string_view>
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/debug_data_vk.hh"
@@ -120,6 +121,10 @@ DebugDataRows ROAccelerationStructureVK::descriptor_debug_data() const {
         rows.emplace_back(make_descriptor_row(*descriptor_index, get_device_address()));
     }
     return rows;
+}
+
+void ROAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+    bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
 } // namespace WhiteBirdEngine

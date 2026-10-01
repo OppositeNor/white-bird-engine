@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 #define WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 
-#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -125,10 +124,6 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
  */
 VertexInputDescriptionVK build_vertex_input_description_vk(
     const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data);
-
-VertexInputDescriptionVK build_vertex_input_description_vk(const ShaderMetadata& p_metadata,
-    std::string_view p_entry_name,
-    const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout);
 
 /**
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.

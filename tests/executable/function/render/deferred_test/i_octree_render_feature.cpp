@@ -369,6 +369,7 @@ RendTaskDescVK IOctreeRenderFeature::get_reset_render_task_desc() const {
         base_render_data,
         octree_reset_compute_pipeline,
         VkExtent3D{.width = get_reset_group_count(), .height = 1, .depth = 1});
+    alias_mesh_resources(task_desc, *octree_reset_compute_pipeline, make_static_mesh_resource_keys(STATIC_MESH_KEY));
     return task_desc;
 }
 
@@ -465,18 +466,18 @@ Ref<ROBufferVK> IOctreeRenderFeature::create_initialized_buffer(VkBufferUsageFla
 }
 
 void IOctreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) const {
-    p_graph.add_resource(OCTREE_DYNAMIC_NODES, dynamic_nodes).add_resource(OCTREE_DYNAMIC_LEAVES, dynamic_leaves);
-    p_graph.add_resource(OCTREE_INFO, octree_info)
-        .add_resource(OCTREE_NODE_BUFFER, octree_nodes)
-        .add_resource(OCTREE_LEAF_BUFFER, octree_leaves)
-        .add_resource(OCTREE_DEFERRED_LIST_PING, octree_deferred_list_ping)
-        .add_resource(OCTREE_DEFERRED_LIST_PONG, octree_deferred_list_pong)
-        .add_resource(OCTREE_DEBUG_DRAW_INDEX_BUFFER, octree_debug_draw_index_buffer)
-        .add_resource(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, octree_debug_draw_indirect_buffer)
-        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, octree_pre_deferred_debug_info_buffer)
-        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, octree_pre_deferred_debug_list_buffer)
-        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, octree_pre_deferred_debug_draw_indirect_buffer);
-    p_graph.add_resource(OCTREE_VOXEL_CLAIMS, voxel_claims);
+    p_graph.add_resource(OCTREE_DYNAMIC_NODES, *dynamic_nodes).add_resource(OCTREE_DYNAMIC_LEAVES, *dynamic_leaves);
+    p_graph.add_resource(OCTREE_INFO, *octree_info)
+        .add_resource(OCTREE_NODE_BUFFER, *octree_nodes)
+        .add_resource(OCTREE_LEAF_BUFFER, *octree_leaves)
+        .add_resource(OCTREE_DEFERRED_LIST_PING, *octree_deferred_list_ping)
+        .add_resource(OCTREE_DEFERRED_LIST_PONG, *octree_deferred_list_pong)
+        .add_resource(OCTREE_DEBUG_DRAW_INDEX_BUFFER, *octree_debug_draw_index_buffer)
+        .add_resource(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, *octree_debug_draw_indirect_buffer)
+        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, *octree_pre_deferred_debug_info_buffer)
+        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, *octree_pre_deferred_debug_list_buffer)
+        .add_resource(OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, *octree_pre_deferred_debug_draw_indirect_buffer);
+    p_graph.add_resource(OCTREE_VOXEL_CLAIMS, *voxel_claims);
     register_implementation_render_graph_data(p_graph);
 }
 

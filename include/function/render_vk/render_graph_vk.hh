@@ -20,7 +20,7 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_list.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -58,7 +58,7 @@ struct RendResVK {
     // The resource container bound during graph construction.
     Ref<RenderObjectContainerVK> container;
     // Aggregate CPU-side resource list. Aggregate accesses expand to its indexed graph resources.
-    Ref<RenderResourceList> resource_list;
+    Ref<RenderResourceListVK> resource_list;
 };
 
 /**

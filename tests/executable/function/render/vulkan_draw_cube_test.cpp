@@ -290,8 +290,8 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
     const uint32_t spot_light_count = 1;
 
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    pipeline_desc.add_static_mesh(static_mesh_resources);
-    pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
+    pipeline_desc.add_resource(WBE::STATIC_MESH_KEY, *static_mesh_resources);
+    pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
         .add_image(SHADOWMAP_DEPTH_IMAGE,
             {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = SHADOWMAP_DEPTH_FORMAT, .extent = shadow_image_extent})
         .add_image(SHADOWMAP_COLOR_IMAGE,

@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_VERTEX_INPUT_CONTRACT_RESOLVER_HH
 #define WBE_FILE_VERTEX_INPUT_CONTRACT_RESOLVER_HH
 
-#include "function/render/render_database.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/vertex_input_contract.hh"
@@ -59,14 +58,6 @@ public:
      * @throws std::runtime_error When shader annotations or the resource layout are malformed or incompatible.
      */
     VertexInputContract resolve(const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const;
-
-    /**
-     * @brief Resolve a vertex shader entry against a copied render-database layout.
-     * @throws std::runtime_error When shader annotations or the resource layout are malformed or incompatible.
-     */
-    VertexInputContract resolve(const ShaderMetadata& p_metadata,
-        std::string_view p_entry_name,
-        const RenderDatabase::OpaqueTrianglesInfo::VertexLayout& p_vertex_layout) const;
 };
 
 } // namespace WhiteBirdEngine

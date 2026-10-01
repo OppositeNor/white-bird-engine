@@ -22,6 +22,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -37,6 +38,7 @@
 #include <span>
 #include <utility>
 #include <vector>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -44,7 +46,7 @@ namespace WhiteBirdEngine {
  * @class ROBufferVK
  * @brief Buffer render object.
  */
-class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public IRenderObjectVK {
+class WBE_META(WBE_RENDER_OBJECT) ROBufferVK final : public IRenderObjectVK, public IBindableRenderResourceVK {
 public:
     /**
      * @class ExposedFields
@@ -616,6 +618,19 @@ public:
     const ExposedFields& fields() const {
         return exposed_fields;
     }
+
+    /**
+     * @brief Return the Vulkan usage flags the buffer was created with.
+     */
+    VkBufferUsageFlags get_usage() const {
+        return usage;
+    }
+
+    /**
+     * @brief Import this object under p_resource_id.
+     * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     void* mapped_memory = nullptr;

@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_I_RENDER_OBJECT_VK_HH
 #define WBE_FILE_I_RENDER_OBJECT_VK_HH
 
+#include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -27,10 +29,10 @@ namespace WhiteBirdEngine {
  * @brief Vulkan render object.
  *
  * All methods are confined to the rendering thread and do not provide internal synchronization. Callers on other threads
- * must submit operations through the renderer job buffer.
- *
+ * must submit operations through the renderer job buffer. Objects created with make_ref() know their owning Ref, which
+ * bindable render objects use to import themselves into render graphs.
  */
-class IRenderObjectVK : public IRenderObject {
+class IRenderObjectVK : public IRenderObject, public ThisRef<IRenderObjectVK> {
 public:
     IRenderObjectVK() = delete;
     virtual ~IRenderObjectVK() override = default;
