@@ -31,17 +31,13 @@ struct RSMVSOutput {
     float material_index : TEXCOORD5;
 };
 
-struct MaterialSamplerDescriptorIndices {
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
-    uint2 material_sampler;
-};
-
 struct RSMDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
     [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
-    MaterialSamplerDescriptorIndices material_textures;
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
+    uint2 material_sampler;
     StaticSetDescriptorIndices static_set;
 };
 
@@ -108,7 +104,7 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
 RSMFragmentOutput shade_fragment(RSMVSOutput p_input, bool p_front_face) {
     ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);

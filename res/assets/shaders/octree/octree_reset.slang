@@ -20,6 +20,8 @@ struct OctreeResetDescriptorIndices {
     uint2 octree_info;
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
+    uint2 material_sampler;
 };
 
 [[vk::push_constant]]

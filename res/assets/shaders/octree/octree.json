@@ -6,9 +6,7 @@
             "source_type": "shader",
             "src": "assets/shaders/octree/octree_build_static_set.slang",
             "dst": "assets/shaders/octree/octree_build_static_set.spv",
-            "metadata": "assets/shaders/octree/octree_build_static_set.json",
-            "depth_test": false,
-            "cull_backfaces": false
+            "metadata": "assets/shaders/octree/octree_build_static_set.json"
         },
         {
             "id": "octree_build_static_set_pipeline",
@@ -68,8 +66,6 @@
             "src": "assets/shaders/octree/octree_build_static_set.slang",
             "dst": "assets/shaders/octree/octree_dynamic_build_static_set.spv",
             "metadata": "assets/shaders/octree/octree_dynamic_build_static_set.json",
-            "depth_test": false,
-            "cull_backfaces": false,
             "macros": [
                 {"name": "WBE_DYNAMIC_BUILD"}
             ]
@@ -82,8 +78,7 @@
             "fragment_stage_id": "octree_dynamic_build_static_set",
             "depth_test": false,
             "depth_write": false,
-            "cull_backfaces": false,
-            "conservative_rasterization": false
+            "cull_backfaces": false
         },
         {
             "id": "octree_dynamic_build_deferred_propagation_pong_write_shader",

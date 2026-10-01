@@ -20,20 +20,13 @@ ParameterBlock<MaterialTextureContractMetadata> material_textures;
 ParameterBlock<StaticSetContractMetadata> static_set;
 #endif
 
-/**
- * @brief Constant buffer providing the per-frame view and projection matrices.
- */
-struct MaterialSamplerDescriptorIndices {
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
-    uint2 material_sampler;
-};
-
 struct DeferredGBufferDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
     [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
-    MaterialSamplerDescriptorIndices material_textures;
+    [WBE_DESCRIPTOR("sampler", "material_sampler")]
+    uint2 material_sampler;
     StaticSetDescriptorIndices static_set;
 };
 
@@ -98,7 +91,7 @@ struct GBufferOutput {
 static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     GBufferOutput output;
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_textures.material_sampler.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
 
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];
