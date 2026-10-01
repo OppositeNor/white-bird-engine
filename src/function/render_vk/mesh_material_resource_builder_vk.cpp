@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/static_set_material_resource_builder_vk.hh"
+#include "function/render_vk/mesh_material_resource_builder_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/material_texture_contract.hh"
@@ -43,11 +43,11 @@ std::string material_label(RefRes<RUMaterial> p_material, size_t p_material_inde
 
 std::span<const RUMaterial::TextureSlot> get_texture_slots(RefRes<RUMaterial> p_material, std::string_view p_material_name) {
     if (p_material == nullptr) {
-        throw std::runtime_error(std::format("Failed to build static-set material bindings: '{}' is missing.", p_material_name));
+        throw std::runtime_error(std::format("Failed to build mesh material bindings: '{}' is missing.", p_material_name));
     }
     if (p_material->texture_count > 0 && p_material->textures == nullptr) {
         throw std::runtime_error(
-            std::format("Failed to build static-set material bindings: '{}' texture slots are missing.", p_material_name));
+            std::format("Failed to build mesh material bindings: '{}' texture slots are missing.", p_material_name));
     }
     return std::span<const RUMaterial::TextureSlot>(p_material->textures.get(), p_material->texture_count);
 }
@@ -62,11 +62,11 @@ const RUMaterial::TextureSlot* find_texture_slot(
         }
         if (texture_slot.texture == nullptr) {
             throw std::runtime_error(std::format(
-                "Failed to build static-set material bindings: '{}' role '{}' has no texture.", p_material_name, p_role.get_name()));
+                "Failed to build mesh material bindings: '{}' role '{}' has no texture.", p_material_name, p_role.get_name()));
         }
         if (matched_slot != nullptr) {
             throw std::runtime_error(std::format(
-                "Failed to build static-set material bindings: '{}' repeats role '{}'.", p_material_name, p_role.get_name()));
+                "Failed to build mesh material bindings: '{}' repeats role '{}'.", p_material_name, p_role.get_name()));
         }
         matched_slot = &texture_slot;
     }
@@ -84,7 +84,7 @@ uint32_t get_or_append_texture_descriptor_index(std::vector<RefRes<RUTexture>>& 
         }
     }
     if (p_textures.size() >= p_max_texture_descriptor_count) {
-        throw std::runtime_error(std::format("Failed to build static-set material bindings: runtime texture table exceeds descriptor limit {} while adding role '{}' from '{}'.",
+        throw std::runtime_error(std::format("Failed to build mesh material bindings: runtime texture table exceeds descriptor limit {} while adding role '{}' from '{}'.",
             p_max_texture_descriptor_count,
             p_role_name,
             p_material_name));
@@ -100,7 +100,7 @@ void write_texture_index(std::vector<uint8_t>& p_buffer, size_t p_offset, uint32
 
 } // namespace
 
-StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std::optional<MaterialTextureContract>& p_material_contract,
+MeshMaterialResourcesVK MeshMaterialResourceBuilderVK::build(const std::optional<MaterialTextureContract>& p_material_contract,
     std::span<const RefRes<RUMaterial>> p_materials,
     RefRes<RUMaterial> p_default_material,
     uint32_t p_max_texture_descriptor_count,
@@ -112,7 +112,7 @@ StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std
 
     const MaterialTextureContract& material_contract = *p_material_contract;
     if (p_materials.size() > material_contract.material_count) {
-        throw std::runtime_error(std::format("Failed to build static-set material bindings: material row count {} exceeds shader capacity {}.",
+        throw std::runtime_error(std::format("Failed to build mesh material bindings: material row count {} exceeds shader capacity {}.",
             p_materials.size(),
             material_contract.material_count));
     }
@@ -126,7 +126,7 @@ StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std
     for (const MaterialTextureContract::TextureField& texture_field : material_contract.texture_fields) {
         const RUMaterial::TextureSlot* default_slot = find_texture_slot(default_texture_slots, texture_field.role, "default material");
         if (default_slot == nullptr) {
-            throw std::runtime_error(std::format("Failed to build static-set material bindings: default material is missing required role '{}'.",
+            throw std::runtime_error(std::format("Failed to build mesh material bindings: default material is missing required role '{}'.",
                 texture_field.role.get_name()));
         }
         default_texture_indices.push_back(get_or_append_texture_descriptor_index(
@@ -166,7 +166,7 @@ StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std
                 int32_t texture_index = 0;
                 std::memcpy(&texture_index, material_params_data.data() + row_offset + texture_field.offset, sizeof(texture_index));
                 if (texture_index < 0 || static_cast<size_t>(texture_index) >= unique_textures.size()) {
-                    throw std::runtime_error("Failed to build static-set material bindings: generated texture index is invalid.");
+                    throw std::runtime_error("Failed to build mesh material bindings: generated texture index is invalid.");
                 }
                 write_texture_index(material_params_data,
                     row_offset + texture_field.offset,
@@ -175,7 +175,7 @@ StaticSetMaterialResourcesVK StaticSetMaterialResourceBuilderVK::build(const std
         }
     }
 
-    return StaticSetMaterialResourcesVK{.material_params_data = std::move(material_params_data),
+    return MeshMaterialResourcesVK{.material_params_data = std::move(material_params_data),
         .material_textures = std::move(unique_textures),
         .material_sampler = std::move(p_material_sampler)};
 }

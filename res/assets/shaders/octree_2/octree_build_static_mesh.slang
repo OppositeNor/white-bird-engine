@@ -16,9 +16,9 @@
 #define WBE_OCTREE_BUILD_SLANG
 
 #include "utils/utils.slang"
-#include "octree/octree_utils.slang"
+#include "octree_2/octree_utils.slang"
 #ifdef WBE_DYNAMIC_BUILD
-#include "octree/octree_dynamic_build.slang"
+#include "octree_2/octree_dynamic_build.slang"
 #endif
 
 /**
@@ -80,12 +80,37 @@ struct GSOutput {
 
 // Closed-cell overlap includes surfaces on cell boundaries. This tolerance is in voxel units.
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
+// Voxel claims are a bitset packed into 32-bit words.
+static const uint VOXEL_CLAIM_WORD_SHIFT = 5;
+static const uint VOXEL_CLAIM_BIT_MASK = 31u;
 
+/**
+ * @brief Reflected descriptor-heap bindings for this construction stage.
+ */
 struct OctreeDescriptorIndices {
+    /**
+     * @brief Descriptor-heap reference to octree_info.
+     */
     [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
     uint2 octree_info;
+    /**
+     * @brief Descriptor-heap reference to octree_node_buffer.
+     */
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
+    /**
+     * @brief Descriptor-heap reference to octree_pending_children.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "octree_pending_children")]
+    uint2 pending_children;
+    /**
+     * @brief Descriptor-heap reference to octree_voxel_claims.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
+    uint2 voxel_claims;
+    /**
+     * @brief Descriptor-heap reference to octree_leaf_buffer.
+     */
     [WBE_DESCRIPTOR("storage_buffer", "octree_leaf_buffer")]
     uint2 tree_leaves;
 #ifdef WBE_DYNAMIC_BUILD
@@ -100,30 +125,37 @@ struct OctreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves")]
     uint2 dynamic_leaves;
 #endif
+
+    /**
+     * @brief Descriptor-heap reference to octree_deferred_list_ping.
+     */
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping")]
     uint2 deferred_list;
+    /**
+     * @brief Renderer frame slot used for shader validation reports.
+     */
     [WBE_DEFAULT_PUSH("frame_slot")]
     uint shader_debug_frame_slot;
 
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<OctreeDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-set vertex for the octree.
+ * @brief Transform a static-mesh vertex for the octree.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Vertex output in clip space.
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     RWStructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     OctreeInfo octree_info = octree_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
 
     InstanceData instance = instances[p_instance_id];
     NodeData node = nodes[instance.node_index];
@@ -219,7 +251,20 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  */
 void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
+    // Construction currently records occupancy only: all triangle hits on the same voxel are equivalent.
+    // Keep exactly one retry chain per voxel so the phase boundary cannot overflow the deferred queue with duplicates.
+    uint extent = 1u << octree_info[0].max_depth;
+    uint3 voxel = uint3(p_svo_position * float(extent));
+    uint voxel_index = voxel.x + extent * (voxel.y + extent * voxel.z);
+    RWStructuredBuffer<uint> voxel_claims = ResourceDescriptorHeap[descriptor_indices.voxel_claims.x];
+    uint bit = 1u << (voxel_index & VOXEL_CLAIM_BIT_MASK);
+    uint original_claims;
+    InterlockedOr(voxel_claims[voxel_index >> VOXEL_CLAIM_WORD_SHIFT], bit, original_claims);
+    if ((original_claims & bit) != 0) {
+        return;
+    }
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<uint> pending_children = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
@@ -228,9 +273,9 @@ void allocate_covered_voxel(float3 p_svo_position) {
 #ifdef WBE_DYNAMIC_BUILD
     RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #else
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, pending_children, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;

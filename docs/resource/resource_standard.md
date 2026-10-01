@@ -82,7 +82,7 @@ Materials do not declare a `material_type`; their graphics pipeline and reflecte
   as identity. Resource units do not use closed role enums.
 - A texture role may appear at most once in a material.
 - Each slot must provide exactly one of `texture` for an inline image or `texture_id` for an existing image resource.
-- Regular materials may omit slots; static-set compilation uses the corresponding shader-selected role from the configured default material.
+- Regular materials may omit slots; static-mesh compilation uses the corresponding shader-selected role from the configured default material.
 - The default material must provide every texture role selected by each material shader used by the pass.
 - `rma` is the canonical texture role and project abbreviation for the roughness, metallic, and ambient-occlusion channel pack.
 

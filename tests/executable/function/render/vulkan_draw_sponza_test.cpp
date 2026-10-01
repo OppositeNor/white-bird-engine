@@ -38,8 +38,8 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/static_set_compiler_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/static_mesh_compiler_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
@@ -175,13 +175,13 @@ private:
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
-    WBE::RefRes<WBE::RUStaticOpaqueSet> sponza_opaque_set;
-    WBE::RefRes<WBE::RUStaticMaskedSet> sponza_masked_set;
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> sponza_opaque_set;
+    WBE::RefRes<WBE::RUStaticMaskedMesh> sponza_masked_set;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_opaque_pipeline;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_masked_pipeline;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_opaque_pipeline;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_masked_pipeline;
-    WBE::Ref<WBE::StaticSetResourcesVK> static_set_resources;
+    WBE::Ref<WBE::StaticMeshResourcesVK> static_mesh_resources;
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline;
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_masked_graphics_pipeline;
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_opaque_graphics_pipeline;
@@ -398,8 +398,8 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
         const std::array<VkClearValue, 2> clear_values{shadow_color_clear, shadow_depth_clear};
         const std::array<std::string_view, 1> color_attachments{p_color_attachment};
         const VkAttachmentLoadOp load_op = p_load ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
-        return WBE::make_static_set_task_desc(
-            render_allocator, base_render_data, p_task_id, static_set_resources, p_pipeline, p_masked, clear_values, p_extent, color_attachments, p_depth_attachment, load_op, load_op);
+        return WBE::make_static_mesh_task_desc(
+            render_allocator, base_render_data, p_task_id, static_mesh_resources, p_pipeline, p_masked, clear_values, p_extent, color_attachments, p_depth_attachment, load_op, load_op);
     };
     WBE::RendTaskDescVK shadow_opaque_task = create_task(RT_RUN_SHADOWMAP_OPAQUE,
         shadow_opaque_graphics_pipeline,
@@ -451,11 +451,11 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
     auto resource_chunk = make_ref<WBE::ResourceChunkLoadFile>(
         WBE::global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
-    sponza_opaque_set = resource_manager->get_resource<WBE::RUStaticOpaqueSet>("sponza.static_opaque_set");
+    sponza_opaque_set = resource_manager->get_resource<WBE::RUStaticOpaqueMesh>("sponza.static_opaque_mesh");
     if (sponza_opaque_set == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: static opaque set resource was not found.");
     }
-    sponza_masked_set = resource_manager->get_resource<WBE::RUStaticMaskedSet>("sponza.static_masked_set");
+    sponza_masked_set = resource_manager->get_resource<WBE::RUStaticMaskedMesh>("sponza.static_masked_mesh");
     if (sponza_masked_set == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: static masked set resource was not found.");
     }
@@ -478,7 +478,7 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
-    static_set_resources = WBE::create_static_set_resources(
+    static_mesh_resources = WBE::create_static_mesh_resources(
         renderer_vk, sponza_opaque_set, sponza_masked_set, main_opaque_pipeline, main_masked_pipeline, main_opaque_pipeline);
     const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
     shadow_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
@@ -576,7 +576,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
 
     WBE::RendGraphDescVK pipeline_desc(render_allocator);
-    pipeline_desc.add_static_set(static_set_resources);
+    pipeline_desc.add_static_mesh(static_mesh_resources);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_image(SHADOWMAP_DEPTH_IMAGE,
             {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = SHADOWMAP_DEPTH_FORMAT, .extent = shadow_image_extent})

@@ -20,7 +20,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/rt_ping_pong_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "i_octree_render_feature.hh"
 #include <atomic>
 #include <cstdint>
@@ -31,10 +31,10 @@
 namespace WhiteBirdEngine {
 
 OctreeRenderFeatureAtomic::OctreeRenderFeatureAtomic(RendererVK* p_renderer,
-    Ref<StaticSetResourcesVK> p_static_set_resources,
+    Ref<StaticMeshResourcesVK> p_static_mesh_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     bool p_rebuild_static_every_frame)
-    : IOctreeRenderFeature(p_renderer, std::move(p_static_set_resources), p_debug_view_mode, "octree", "octree_dynamic", p_rebuild_static_every_frame) {
+    : IOctreeRenderFeature(p_renderer, std::move(p_static_mesh_resources), p_debug_view_mode, "octree", "octree_dynamic", p_rebuild_static_every_frame) {
 }
 
 std::string_view OctreeRenderFeatureAtomic::get_name() const {

@@ -47,7 +47,7 @@ viewed image, and depth formats default to the depth aspect. After registration,
 container of any resource. Invalid usages, sizes, formats, and views of undeclared images make graph construction fail.
 
 Imported resources pair the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null
-`RenderObjectContainerVK`; `add_static_set()` imports every compiled static-set resource under the `REND_RES_STATIC_SET_*` ids.
+`RenderObjectContainerVK`; `add_static_mesh()` imports every compiled static-mesh resource under the `REND_RES_STATIC_MESH_*` ids.
 `RenderGraphVK::build_from_descriptor()` rejects null containers, so descriptor construction must be complete before registration.
 
 `RenderResourceList` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry
@@ -56,9 +56,9 @@ validation and synchronization derivation. Populate the list before graph constr
 does not create a GPU object.
 
 All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
-IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Static-set vertex, index, opaque and masked indirect
+IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Static-mesh vertex, index, opaque and masked indirect
 draw-command, reflected shader, and texture-list resources follow this rule;
-`REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_SET_MASKED_DRAW_BATCHES` are also storage-buffer capable for
+`REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES` and `REND_RES_STATIC_MESH_MASKED_DRAW_BATCHES` are also storage-buffer capable for
 explicitly ordered compute writes.
 
 A pipeline-run task descriptor captures only construction data. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:

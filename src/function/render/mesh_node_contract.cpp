@@ -12,11 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render/static_set_node_contract.hh"
+#include "function/render/mesh_node_contract.hh"
 
 namespace WhiteBirdEngine {
 
-bool StaticSetNodeContract::matches(const StaticSetNodeContract& p_other) const {
+bool MeshNodeContract::matches(const MeshNodeContract& p_other) const {
     return element_stride == p_other.element_stride && transform_offset == p_other.transform_offset &&
            normal_transform_offset == p_other.normal_transform_offset;
 }

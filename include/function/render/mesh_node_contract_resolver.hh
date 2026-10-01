@@ -12,51 +12,51 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_SET_NODE_CONTRACT_RESOLVER_HH
-#define WBE_FILE_STATIC_SET_NODE_CONTRACT_RESOLVER_HH
+#ifndef WBE_FILE_MESH_NODE_CONTRACT_RESOLVER_HH
+#define WBE_FILE_MESH_NODE_CONTRACT_RESOLVER_HH
 
 #include "function/render/shader_metadata.hh"
-#include "function/render/static_set_node_contract.hh"
+#include "function/render/mesh_node_contract.hh"
 #include <string_view>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class StaticSetNodeContractResolver
- * @brief Resolves the reflected byte layout of the shader-side static-set node buffer.
+ * @class MeshNodeContractResolver
+ * @brief Resolves the reflected byte layout of the shader-side mesh node buffer.
  */
-class StaticSetNodeContractResolver final {
+class MeshNodeContractResolver final {
 public:
     /**
      * @brief Construct a stateless resolver.
      */
-    StaticSetNodeContractResolver() = default;
+    MeshNodeContractResolver() = default;
     /**
      * @brief Destroy a resolver.
      */
-    ~StaticSetNodeContractResolver() = default;
+    ~MeshNodeContractResolver() = default;
     /**
      * @brief Copy a resolver.
      */
-    StaticSetNodeContractResolver(const StaticSetNodeContractResolver&) = default;
+    MeshNodeContractResolver(const MeshNodeContractResolver&) = default;
     /**
      * @brief Move a resolver.
      */
-    StaticSetNodeContractResolver(StaticSetNodeContractResolver&&) noexcept = default;
+    MeshNodeContractResolver(MeshNodeContractResolver&&) noexcept = default;
     /**
      * @brief Copy a resolver.
      */
-    StaticSetNodeContractResolver& operator=(const StaticSetNodeContractResolver&) = default;
+    MeshNodeContractResolver& operator=(const MeshNodeContractResolver&) = default;
     /**
      * @brief Move a resolver.
      */
-    StaticSetNodeContractResolver& operator=(StaticSetNodeContractResolver&&) noexcept = default;
+    MeshNodeContractResolver& operator=(MeshNodeContractResolver&&) noexcept = default;
 
     /**
      * @brief Resolve the shader-side byte layout of one `NodeData` element.
      * @throws std::runtime_error When the reflection metadata is missing or malformed.
      */
-    StaticSetNodeContract resolve(const ShaderMetadata& p_metadata, std::string_view p_static_set_parameter_name) const;
+    MeshNodeContract resolve(const ShaderMetadata& p_metadata, std::string_view p_mesh_parameter_name) const;
 };
 
 } // namespace WhiteBirdEngine

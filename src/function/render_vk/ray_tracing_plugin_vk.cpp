@@ -384,9 +384,9 @@ void RayTracingPluginVK::reset_static_opaque_acceleration_structures() {
     }
 }
 
-void RayTracingPluginVK::validate_static_opaque_set(RefRes<RUStaticGeometrySet> p_set) const {
+void RayTracingPluginVK::validate_static_opaque_mesh(RefRes<RUStaticMesh> p_set) const {
     if (p_set == nullptr) {
-        throw std::runtime_error("Failed to build static-opaque acceleration structure: static set is missing.");
+        throw std::runtime_error("Failed to build static-opaque acceleration structure: static mesh is missing.");
     }
     if (p_set->submesh_count > 0 && p_set->submeshes == nullptr) {
         throw std::runtime_error("Failed to build static-opaque acceleration structure: submesh storage is missing.");
@@ -435,7 +435,7 @@ const RUVertexView::Attribute& RayTracingPluginVK::get_static_opaque_position_at
 
 RayTracingPluginVK::StaticOpaqueBottomLevelBuild RayTracingPluginVK::create_static_opaque_bottom_level_build(
     const RUStaticGeometrySubmesh& p_submesh,
-    RefRes<RUStaticGeometrySet> p_set,
+    RefRes<RUStaticMesh> p_set,
     VkDeviceAddress p_vertex_buffer_address,
     VkDeviceAddress p_index_buffer_address) const {
     validate_static_opaque_submesh(p_submesh, p_set->instance_count);
@@ -512,7 +512,7 @@ void RayTracingPluginVK::initialize_bottom_level_builds(StaticOpaqueBuildData& p
 
 RayTracingPluginVK::StaticOpaqueTopLevelBuild RayTracingPluginVK::create_top_level_build(
     StaticOpaqueBuildData& p_build_data, VkDeviceSize p_scratch_alignment) const {
-    // Expand each BLAS reference into one TLAS instance per static-set transform.
+    // Expand each BLAS reference into one TLAS instance per static-mesh transform.
     std::vector<VkAccelerationStructureInstanceKHR> top_level_instances;
     size_t total_instance_count = 0;
     for (const StaticOpaqueBottomLevelBuild& build : p_build_data.bottom_level_builds) {
@@ -590,8 +590,8 @@ VkTransformMatrixKHR build_vk_transform(const glm::mat4& p_transform) {
 }
 
 RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaque_data(
-    RefRes<RUStaticGeometrySet> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const {
-    validate_static_opaque_set(p_set);
+    RefRes<RUStaticMesh> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const {
+    validate_static_opaque_mesh(p_set);
 
     StaticOpaqueBuildData result;
     result.bottom_level_builds.reserve(p_set->submesh_count);
@@ -609,7 +609,7 @@ RayTracingPluginVK::StaticOpaqueBuildData RayTracingPluginVK::build_static_opaqu
 
 GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data) {
     if (p_build_data.bottom_level_builds.empty()) {
-        // An empty static set clears the scene AS without submitting a build.
+        // An empty static mesh clears the scene AS without submitting a build.
         reset_static_opaque_acceleration_structures();
         return nullptr;
     }
@@ -641,7 +641,7 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_build_job(StaticOpaqueBuildDat
     static_opaque_top_level_acceleration_structure = stored_top_level_acceleration_structure;
     static_opaque_top_level_instance_buffer = stored_top_level_instance_buffer;
     if (static_opaque_top_level_acceleration_structure_container == MEM_NULL) {
-        // Create the container on the first nonempty static set.
+        // Create the container on the first nonempty static mesh.
         static_opaque_top_level_acceleration_structure_container =
             make_ref<ROCSingleVK>(render_data->allocator, static_opaque_top_level_acceleration_structure);
     } else {
@@ -738,10 +738,10 @@ GPUJobVK RayTracingPluginVK::create_static_opaque_record_job(std::vector<Ref<ROA
     };
 }
 
-GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(RefRes<RUStaticGeometrySet> p_set,
+GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(RefRes<RUStaticMesh> p_set,
     Ref<ROBufferVK> p_vertex_buffer,
     Ref<ROBufferVK> p_index_buffer,
-    RefRes<RUStaticOpaqueDoubleSidedSet> p_double_sided_set) {
+    RefRes<RUStaticOpaqueDoubleSidedMesh> p_double_sided_set) {
     if ((p_set == MEM_NULL && p_double_sided_set == MEM_NULL) || p_vertex_buffer == MEM_NULL || p_index_buffer == MEM_NULL) {
         // Missing static geometry removes the old AS and requires no GPU work.
         reset_static_opaque_acceleration_structures();
@@ -767,11 +767,11 @@ GPUJobVK RayTracingPluginVK::update_static_opaque_acceleration_structure(RefRes<
     return create_static_opaque_build_job(std::move(build_data));
 }
 
-GPUJobVK RayTracingPluginVK::on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
-    RefRes<RUStaticOpaqueSet> p_set,
+GPUJobVK RayTracingPluginVK::on_static_opaque_mesh_updated(BaseRenderDataVK* p_render_data,
+    RefRes<RUStaticOpaqueMesh> p_set,
     Ref<ROBufferVK> p_vertex_buffer,
     Ref<ROBufferVK> p_index_buffer,
-    RefRes<RUStaticOpaqueDoubleSidedSet> p_double_sided_set) {
+    RefRes<RUStaticOpaqueDoubleSidedMesh> p_double_sided_set) {
     WBE_DEBUG_ASSERT(enabled);
 
     render_data = p_render_data;

@@ -13,8 +13,8 @@
    limitations under the License.
 */
 #include "function/render/shader_metadata.hh"
-#include "function/render/static_set_node_contract.hh"
-#include "function/render/static_set_node_contract_resolver.hh"
+#include "function/render/mesh_node_contract.hh"
+#include "function/render/mesh_node_contract_resolver.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -33,11 +33,11 @@ ShaderMetadataTypeField make_node_field(std::string_view p_name, int32_t p_offse
     return result;
 }
 
-ShaderMetadata make_static_set_node_metadata(bool p_include_normal_transform = true) {
+ShaderMetadata make_mesh_node_metadata(bool p_include_normal_transform = true) {
     ShaderMetadata metadata;
-    ShaderMetadataParameter static_set_parameter;
-    static_set_parameter.name = "static_set";
-    static_set_parameter.type.kind = "parameterBlock";
+    ShaderMetadataParameter mesh_parameter;
+    mesh_parameter.name = "mesh";
+    mesh_parameter.type.kind = "parameterBlock";
 
     ShaderMetadataTypeField nodes_field;
     nodes_field.name = "nodes";
@@ -47,23 +47,23 @@ ShaderMetadata make_static_set_node_metadata(bool p_include_normal_transform = t
     if (p_include_normal_transform) {
         nodes_field.fields.push_back(make_node_field("normal_transform", 64, 64));
     }
-    static_set_parameter.type.fields.push_back(std::move(nodes_field));
-    metadata.parameters.push_back(std::move(static_set_parameter));
+    mesh_parameter.type.fields.push_back(std::move(nodes_field));
+    metadata.parameters.push_back(std::move(mesh_parameter));
     return metadata;
 }
 
 } // namespace
 
-TEST(WBEStaticSetNodeContractResolverTest, ResolvesNodeStrideAndFieldOffsets) {
-    const StaticSetNodeContract contract = StaticSetNodeContractResolver().resolve(make_static_set_node_metadata(), "static_set");
+TEST(WBEMeshNodeContractResolverTest, ResolvesNodeStrideAndFieldOffsets) {
+    const MeshNodeContract contract = MeshNodeContractResolver().resolve(make_mesh_node_metadata(), "mesh");
 
     EXPECT_EQ(contract.element_stride, 128U);
     EXPECT_EQ(contract.transform_offset, 0U);
     EXPECT_EQ(contract.normal_transform_offset, 64U);
 }
 
-TEST(WBEStaticSetNodeContractResolverTest, RejectsMissingNormalTransformField) {
-    EXPECT_THROW(StaticSetNodeContractResolver().resolve(make_static_set_node_metadata(false), "static_set"), std::runtime_error);
+TEST(WBEMeshNodeContractResolverTest, RejectsMissingNormalTransformField) {
+    EXPECT_THROW(MeshNodeContractResolver().resolve(make_mesh_node_metadata(false), "mesh"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

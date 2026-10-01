@@ -83,7 +83,7 @@ public:
             std::string("RendererDummy does not support render graph resource updates: ") + std::string(p_resource_key));
     }
 
-    virtual void update_static_geometry_sets() override {
+    virtual void update_static_meshes() override {
     }
 
     virtual std::future<void> add_job(std::function<void()> p_job) override {

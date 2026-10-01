@@ -78,7 +78,7 @@ python ./build.py -t deploy         # 使用 GCC 的部署构建
 ### 静态模型分类
 
 `res/assets/models/models.json` 中的静态模型通过 `source_files` 将多个模型合并到共享几何缓冲区。
-编译器输出 `.static_opaque_set`、`.static_masked_set` 和 `.static_opaque_double_sided_set`。
+编译器输出 `.static_opaque_mesh`、`.static_masked_mesh` 和 `.static_opaque_double_sided_mesh`。
 glTF 中标记 `doubleSided: true` 的不透明材质属于第三类，可通过 `double_sided_graphics_pipeline_ids` 指定材质管线。
 延迟渲染测试使用不剔除背面的管线绘制此类几何，并翻转背面的光照法线。
 详细配置见[模型编译器文档](dependencies/wbe-utils-model-compiler/README.md)。

@@ -194,9 +194,9 @@ protected:
         return WBE::RefRes<T>(mem_id, &p_stack_allocator);
     }
 
-    template <typename StaticSet>
-    std::unique_ptr<MockResourceChunk> create_static_set_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<StaticSet>& p_captured_set) {
+    template <typename StaticMesh>
+    std::unique_ptr<MockResourceChunk> create_static_mesh_test_chunk(
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<StaticMesh>& p_captured_set) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -210,8 +210,8 @@ protected:
                 [&p_stack_allocator, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
-                    if (p_id == "loaded_static_set") {
-                        p_captured_set = resource.force_cast<StaticSet>();
+                    if (p_id == "loaded_static_mesh") {
+                        p_captured_set = resource.force_cast<StaticMesh>();
                     }
                     return resource;
                 })
@@ -233,8 +233,8 @@ protected:
             .build(p_stream);
     }
 
-    std::unique_ptr<MockResourceChunk> create_split_static_set_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUStaticOpaqueSet>& p_captured_set) {
+    std::unique_ptr<MockResourceChunk> create_split_static_mesh_test_chunk(
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUStaticOpaqueMesh>& p_captured_set) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -248,8 +248,8 @@ protected:
                 [&p_stack_allocator, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
-                    if (p_id == "loaded_static_set") {
-                        p_captured_set = resource.force_cast<WBE::RUStaticOpaqueSet>();
+                    if (p_id == "loaded_static_mesh") {
+                        p_captured_set = resource.force_cast<WBE::RUStaticOpaqueMesh>();
                     }
                     return resource;
                 })
@@ -348,9 +348,9 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderMaterial material_loader;
     WBE::ResourceUnitLoaderMesh mesh_loader;
     WBE::ResourceUnitLoaderSubmesh submesh_loader;
-    WBE::ResourceUnitLoaderStaticOpaqueSet static_opaque_set_loader;
-    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedSet static_opaque_double_sided_set_loader;
-    WBE::ResourceUnitLoaderStaticMaskedSet static_masked_set_loader;
+    WBE::ResourceUnitLoaderStaticOpaqueMesh static_opaque_mesh_loader;
+    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedMesh static_opaque_double_sided_mesh_loader;
+    WBE::ResourceUnitLoaderStaticMaskedMesh static_masked_mesh_loader;
     WBE::ResourceUnitLoaderComponent component_loader;
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
@@ -368,9 +368,9 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &material_loader,
         &mesh_loader,
         &submesh_loader,
-        &static_opaque_set_loader,
-        &static_opaque_double_sided_set_loader,
-        &static_masked_set_loader,
+        &static_opaque_mesh_loader,
+        &static_opaque_double_sided_mesh_loader,
+        &static_masked_mesh_loader,
         &component_loader,
         &prefab_loader,
         &world_loader,
@@ -388,9 +388,9 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         "material",
         "mesh",
         "submesh",
-        "static_opaque_set",
-        "static_opaque_double_sided_set",
-        "static_masked_set",
+        "static_opaque_mesh",
+        "static_opaque_double_sided_mesh",
+        "static_masked_mesh",
         "component",
         "prefab",
         "world",
@@ -720,21 +720,21 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
         {.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 2}});
 }
 
-TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSubmeshViewsAndInstances) {
+TEST_F(ResourcePopulatorTest, StaticOpaqueMeshLoadsSubmeshViewsAndInstances) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueSet> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_static_set_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueSet scheme;
-    scheme.id = "loaded_static_set";
-    scheme.type = "static_opaque_set";
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> captured_set = WBE::MEM_NULL;
+    auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_set);
+    WBE::RUSchemaStaticOpaqueMesh scheme;
+    scheme.id = "loaded_static_mesh";
+    scheme.type = "static_opaque_mesh";
     scheme.submeshes = {make_static_geometry_submesh_scheme()};
     scheme.instances = {
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
         {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
     };
-    WBE::ResourceUnitLoaderStaticOpaqueSet loader;
+    WBE::ResourceUnitLoaderStaticOpaqueMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
@@ -763,21 +763,21 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSubmeshViewsAndInstances) {
     scheme.submeshes[0].instance_count = 2;
 }
 
-TEST_F(ResourcePopulatorTest, StaticOpaqueDoubleSidedSetLoadsSubmeshViewsAndInstances) {
+TEST_F(ResourcePopulatorTest, StaticOpaqueDoubleSidedMeshLoadsSubmeshViewsAndInstances) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedSet> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_static_set_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueDoubleSidedSet scheme;
-    scheme.id = "loaded_static_set";
-    scheme.type = "static_opaque_double_sided_set";
+    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> captured_set = WBE::MEM_NULL;
+    auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_set);
+    WBE::RUSchemaStaticOpaqueDoubleSidedMesh scheme;
+    scheme.id = "loaded_static_mesh";
+    scheme.type = "static_opaque_double_sided_mesh";
     scheme.submeshes = {make_static_geometry_submesh_scheme()};
     scheme.instances = {
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
         {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
     };
-    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedSet loader;
+    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
@@ -806,21 +806,21 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueDoubleSidedSetLoadsSubmeshViewsAndInst
     scheme.submeshes[0].instance_count = 2;
 }
 
-TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSeparateVertexAndIndexBinaries) {
+TEST_F(ResourcePopulatorTest, StaticOpaqueMeshLoadsSeparateVertexAndIndexBinaries) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueSet> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_split_static_set_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueSet scheme;
-    scheme.id = "loaded_static_set";
-    scheme.type = "static_opaque_set";
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> captured_set = WBE::MEM_NULL;
+    auto resource_chunk = create_split_static_mesh_test_chunk(stack_allocator, stream, captured_set);
+    WBE::RUSchemaStaticOpaqueMesh scheme;
+    scheme.id = "loaded_static_mesh";
+    scheme.type = "static_opaque_mesh";
     scheme.submeshes = {make_static_geometry_submesh_scheme("loaded_vertices", "loaded_indices")};
     scheme.instances = {
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
         {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
         {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
     };
-    WBE::ResourceUnitLoaderStaticOpaqueSet loader;
+    WBE::ResourceUnitLoaderStaticOpaqueMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
@@ -836,25 +836,25 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueSetLoadsSeparateVertexAndIndexBinaries
     EXPECT_EQ(submesh.indices.binary.start, 0U);
 }
 
-TEST_F(ResourcePopulatorTest, StaticMaskedSetLoadsEmptyCategory) {
+TEST_F(ResourcePopulatorTest, StaticMaskedMeshLoadsEmptyCategory) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticMaskedSet> captured_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUStaticMaskedMesh> captured_set = WBE::MEM_NULL;
     auto resource_chunk = MockResourceChunk::Builder()
                               .set_reserve_res_unit_storage_callback(
                                   [&stack_allocator, &captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                                       WBE::MemID mem_id = stack_allocator.allocate(p_size);
                                       WBE::RefRes<char> resource(mem_id, &stack_allocator);
                                       if (p_id == "empty_masked_set") {
-                                          captured_set = resource.force_cast<WBE::RUStaticMaskedSet>();
+                                          captured_set = resource.force_cast<WBE::RUStaticMaskedMesh>();
                                       }
                                       return resource;
                                   })
                               .build(stream);
-    WBE::RUSchemaStaticMaskedSet scheme;
+    WBE::RUSchemaStaticMaskedMesh scheme;
     scheme.id = "empty_masked_set";
-    scheme.type = "static_masked_set";
-    WBE::ResourceUnitLoaderStaticMaskedSet loader;
+    scheme.type = "static_masked_mesh";
+    WBE::ResourceUnitLoaderStaticMaskedMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
@@ -865,7 +865,7 @@ TEST_F(ResourcePopulatorTest, StaticMaskedSetLoadsEmptyCategory) {
     EXPECT_EQ(captured_set->instances, nullptr);
 }
 
-TEST_F(ResourcePopulatorTest, WorldLoadsStaticSetRenderId) {
+TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUWorld> captured_world = WBE::MEM_NULL;
@@ -890,7 +890,7 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticSetRenderId) {
             "id": "test_world",
             "type": "world",
             "static_component": {
-                "static_set_render": "model_cube_static.static_opaque_set"
+                "static_mesh_render": "model_cube_static.static_opaque_mesh"
             }
         }
     )";
@@ -901,11 +901,11 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticSetRenderId) {
     loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
 
     ASSERT_NE(captured_world, nullptr);
-    ASSERT_NE(captured_world->static_component.static_set_render, nullptr);
-    EXPECT_STREQ(captured_world->static_component.static_set_render.get(), "model_cube_static.static_opaque_set");
+    ASSERT_NE(captured_world->static_component.static_mesh_render, nullptr);
+    EXPECT_STREQ(captured_world->static_component.static_mesh_render.get(), "model_cube_static.static_opaque_mesh");
 }
 
-TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticSetRenderId) {
+TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticMeshRenderId) {
     std::stringstream stream;
     auto resource_chunk = MockResourceChunk::Builder().build(stream);
     WBE::RUSchemaWorld scheme;

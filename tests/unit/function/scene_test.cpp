@@ -145,11 +145,11 @@ public:
         (void)p_binding_count;
     }
 
-    void update_static_geometry_sets() override {
+    void update_static_meshes() override {
         ++static_geometry_update_count;
-        published_opaque_set = render_database->get_static_opaque_set();
-        published_opaque_double_sided_set = render_database->get_static_opaque_double_sided_set();
-        published_masked_set = render_database->get_static_masked_set();
+        published_opaque_set = render_database->get_static_opaque_mesh();
+        published_opaque_double_sided_set = render_database->get_static_opaque_double_sided_mesh();
+        published_masked_set = render_database->get_static_masked_mesh();
     }
 
     std::future<void> add_job(std::function<void()> p_job) override {
@@ -161,9 +161,9 @@ public:
     std::vector<std::string> unregistered_graphs;
     std::vector<std::string> activated_graphs;
     size_t static_geometry_update_count = 0;
-    WBE::RefRes<WBE::RUStaticOpaqueSet> published_opaque_set = WBE::MEM_NULL;
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedSet> published_opaque_double_sided_set = WBE::MEM_NULL;
-    WBE::RefRes<WBE::RUStaticMaskedSet> published_masked_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> published_opaque_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> published_opaque_double_sided_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUStaticMaskedMesh> published_masked_set = WBE::MEM_NULL;
 
 private:
     WBE::Ref<WBE::RenderDatabase> render_database;
@@ -207,21 +207,21 @@ TEST_F(WBEWorldTest, WorldOwnsRenderGraphResourceKey) {
     EXPECT_EQ(world.get_render_graph_resource_key(), "main_graph");
 }
 
-TEST_F(WBEWorldTest, WorldOwnsStaticGeometrySetReferences) {
+TEST_F(WBEWorldTest, WorldOwnsStaticMeshReferences) {
     WBE::World world(get_allocator());
     WBE::StackAllocator storage(WBE_KI_B(1));
-    WBE::RefRes<WBE::RUStaticOpaqueSet> opaque_set(storage.allocate(sizeof(WBE::RUStaticOpaqueSet)), &storage);
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedSet> opaque_double_sided_set(
-        storage.allocate(sizeof(WBE::RUStaticOpaqueDoubleSidedSet)), &storage);
-    WBE::RefRes<WBE::RUStaticMaskedSet> masked_set(storage.allocate(sizeof(WBE::RUStaticMaskedSet)), &storage);
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> opaque_mesh(storage.allocate(sizeof(WBE::RUStaticOpaqueMesh)), &storage);
+    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh(
+        storage.allocate(sizeof(WBE::RUStaticOpaqueDoubleSidedMesh)), &storage);
+    WBE::RefRes<WBE::RUStaticMaskedMesh> masked_mesh(storage.allocate(sizeof(WBE::RUStaticMaskedMesh)), &storage);
 
-    world.set_static_opaque_set(opaque_set);
-    world.set_static_opaque_double_sided_set(opaque_double_sided_set);
-    world.set_static_masked_set(masked_set);
+    world.set_static_opaque_mesh(opaque_mesh);
+    world.set_static_opaque_double_sided_mesh(opaque_double_sided_mesh);
+    world.set_static_masked_mesh(masked_mesh);
 
-    EXPECT_EQ(world.get_static_opaque_set(), opaque_set);
-    EXPECT_EQ(world.get_static_opaque_double_sided_set(), opaque_double_sided_set);
-    EXPECT_EQ(world.get_static_masked_set(), masked_set);
+    EXPECT_EQ(world.get_static_opaque_mesh(), opaque_mesh);
+    EXPECT_EQ(world.get_static_opaque_double_sided_mesh(), opaque_double_sided_mesh);
+    EXPECT_EQ(world.get_static_masked_mesh(), masked_mesh);
 }
 
 TEST_F(WBEWorldTest, WorldCachesComponentListsByComponentTypeId) {
@@ -429,14 +429,14 @@ TEST_F(WBEWorldTest, ScenePublishesStaticGeometryChangesAndClearsThem) {
     auto populated_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
     auto empty_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
     WBE::StackAllocator storage(WBE_KI_B(1));
-    WBE::RefRes<WBE::RUStaticOpaqueSet> opaque_set(storage.allocate(sizeof(WBE::RUStaticOpaqueSet)), &storage);
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedSet> opaque_double_sided_set(
-        storage.allocate(sizeof(WBE::RUStaticOpaqueDoubleSidedSet)), &storage);
-    WBE::RefRes<WBE::RUStaticMaskedSet> masked_set(storage.allocate(sizeof(WBE::RUStaticMaskedSet)), &storage);
+    WBE::RefRes<WBE::RUStaticOpaqueMesh> opaque_mesh(storage.allocate(sizeof(WBE::RUStaticOpaqueMesh)), &storage);
+    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh(
+        storage.allocate(sizeof(WBE::RUStaticOpaqueDoubleSidedMesh)), &storage);
+    WBE::RefRes<WBE::RUStaticMaskedMesh> masked_mesh(storage.allocate(sizeof(WBE::RUStaticMaskedMesh)), &storage);
 
-    populated_world->set_static_opaque_set(opaque_set);
-    populated_world->set_static_opaque_double_sided_set(opaque_double_sided_set);
-    populated_world->set_static_masked_set(masked_set);
+    populated_world->set_static_opaque_mesh(opaque_mesh);
+    populated_world->set_static_opaque_double_sided_mesh(opaque_double_sided_mesh);
+    populated_world->set_static_masked_mesh(masked_mesh);
     scene->add_world(populated_world);
     scene->add_world(empty_world);
 
@@ -446,18 +446,18 @@ TEST_F(WBEWorldTest, ScenePublishesStaticGeometryChangesAndClearsThem) {
     scene->set_active_world(0);
     scene->update(0.0);
     EXPECT_EQ(renderer->static_geometry_update_count, 1U);
-    EXPECT_EQ(renderer->published_opaque_set, opaque_set);
-    EXPECT_EQ(renderer->published_opaque_double_sided_set, opaque_double_sided_set);
-    EXPECT_EQ(renderer->published_masked_set, masked_set);
+    EXPECT_EQ(renderer->published_opaque_set, opaque_mesh);
+    EXPECT_EQ(renderer->published_opaque_double_sided_set, opaque_double_sided_mesh);
+    EXPECT_EQ(renderer->published_masked_set, masked_mesh);
 
     scene->update(0.0);
     EXPECT_EQ(renderer->static_geometry_update_count, 1U);
 
-    populated_world->set_static_opaque_double_sided_set(WBE::MEM_NULL);
+    populated_world->set_static_opaque_double_sided_mesh(WBE::MEM_NULL);
     scene->update(0.0);
     EXPECT_EQ(renderer->static_geometry_update_count, 2U);
     EXPECT_EQ(renderer->published_opaque_double_sided_set, WBE::MEM_NULL);
-    populated_world->set_static_opaque_double_sided_set(opaque_double_sided_set);
+    populated_world->set_static_opaque_double_sided_mesh(opaque_double_sided_mesh);
     scene->update(0.0);
     EXPECT_EQ(renderer->static_geometry_update_count, 3U);
 
@@ -471,9 +471,9 @@ TEST_F(WBEWorldTest, ScenePublishesStaticGeometryChangesAndClearsThem) {
     scene->set_active_world(0);
     scene->update(0.0);
     EXPECT_EQ(renderer->static_geometry_update_count, 5U);
-    EXPECT_EQ(renderer->published_opaque_set, opaque_set);
-    EXPECT_EQ(renderer->published_opaque_double_sided_set, opaque_double_sided_set);
-    EXPECT_EQ(renderer->published_masked_set, masked_set);
+    EXPECT_EQ(renderer->published_opaque_set, opaque_mesh);
+    EXPECT_EQ(renderer->published_opaque_double_sided_set, opaque_double_sided_mesh);
+    EXPECT_EQ(renderer->published_masked_set, masked_mesh);
 
     scene->teardown();
     EXPECT_EQ(renderer->static_geometry_update_count, 6U);

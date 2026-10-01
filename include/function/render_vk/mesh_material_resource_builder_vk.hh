@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_SET_MATERIAL_RESOURCE_BUILDER_VK_HH
-#define WBE_FILE_STATIC_SET_MATERIAL_RESOURCE_BUILDER_VK_HH
+#ifndef WBE_FILE_MESH_MATERIAL_RESOURCE_BUILDER_VK_HH
+#define WBE_FILE_MESH_MATERIAL_RESOURCE_BUILDER_VK_HH
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
@@ -30,47 +30,47 @@
 namespace WhiteBirdEngine {
 
 /**
- * @struct StaticSetMaterialResourcesVK
- * @brief Packed material-table data and resources retained by one static-set task.
+ * @struct MeshMaterialResourcesVK
+ * @brief Packed material-table data and resources retained by one mesh task.
  */
-struct StaticSetMaterialResourcesVK {
+struct MeshMaterialResourcesVK {
     std::vector<uint8_t> material_params_data;
     std::vector<RefRes<RUTexture>> material_textures;
     Ref<IRenderObject> material_sampler = MEM_NULL;
 };
 
 /**
- * @class StaticSetMaterialResourceBuilderVK
- * @brief Builds static-set material parameter data and retained resources for one graphics pipeline.
+ * @class MeshMaterialResourceBuilderVK
+ * @brief Builds mesh material parameter data and retained resources for one graphics pipeline.
  */
-class StaticSetMaterialResourceBuilderVK final {
+class MeshMaterialResourceBuilderVK final {
 public:
     using TextureDescriptorIndexResolver = std::function<uint32_t(RefRes<RUTexture>)>;
 
     /**
      * @brief Construct a stateless builder.
      */
-    StaticSetMaterialResourceBuilderVK() = default;
+    MeshMaterialResourceBuilderVK() = default;
     /**
      * @brief Destroy a stateless builder.
      */
-    ~StaticSetMaterialResourceBuilderVK() = default;
+    ~MeshMaterialResourceBuilderVK() = default;
     /**
      * @brief Copy a stateless builder.
      */
-    StaticSetMaterialResourceBuilderVK(const StaticSetMaterialResourceBuilderVK&) = default;
+    MeshMaterialResourceBuilderVK(const MeshMaterialResourceBuilderVK&) = default;
     /**
      * @brief Move a stateless builder.
      */
-    StaticSetMaterialResourceBuilderVK(StaticSetMaterialResourceBuilderVK&&) noexcept = default;
+    MeshMaterialResourceBuilderVK(MeshMaterialResourceBuilderVK&&) noexcept = default;
     /**
      * @brief Copy a stateless builder.
      */
-    StaticSetMaterialResourceBuilderVK& operator=(const StaticSetMaterialResourceBuilderVK&) = default;
+    MeshMaterialResourceBuilderVK& operator=(const MeshMaterialResourceBuilderVK&) = default;
     /**
      * @brief Move a stateless builder.
      */
-    StaticSetMaterialResourceBuilderVK& operator=(StaticSetMaterialResourceBuilderVK&&) noexcept = default;
+    MeshMaterialResourceBuilderVK& operator=(MeshMaterialResourceBuilderVK&&) noexcept = default;
 
     /**
      * @brief Build resources for one reflected material contract.
@@ -85,7 +85,7 @@ public:
      * @param p_texture_descriptor_index_resolver Optional resolver that replaces table-local texture indices with resource-heap indices.
      * @throws std::runtime_error When reflected limits are exceeded or material role data is malformed.
      */
-    StaticSetMaterialResourcesVK build(const std::optional<MaterialTextureContract>& p_material_contract,
+    MeshMaterialResourcesVK build(const std::optional<MaterialTextureContract>& p_material_contract,
         std::span<const RefRes<RUMaterial>> p_materials,
         RefRes<RUMaterial> p_default_material,
         uint32_t p_max_texture_descriptor_count,

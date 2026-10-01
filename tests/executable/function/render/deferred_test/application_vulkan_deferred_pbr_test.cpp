@@ -31,7 +31,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/static_set_compiler_vk.hh"
+#include "function/render_vk/static_mesh_compiler_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -325,10 +325,10 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     }
     if (use_atomic_octree) {
         octree = make_unique<OctreeRenderFeatureAtomic>(
-            render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+            render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
     } else {
         octree = make_unique<OctreeRenderFeaturePassPublished>(
-            render_allocator, renderer_vk, static_set_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+            render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
     }
     stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Octree construction: {}.", octree->get_name()));
     stdout_log(WBE_CHANNEL_DEBUG)
@@ -357,10 +357,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{color_clear, color_clear, color_clear, depth_clear};
     std::array<std::string_view, 3> color_attachments{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
-    RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
+    RendTaskDescVK descriptor = make_static_mesh_task_desc(render_allocator,
         base_render_data,
         p_double_sided ? RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED : RT_RUN_DEFERRED_GBUFFER,
-        static_set_resources,
+        static_mesh_resources,
         p_double_sided ? gbuffer_double_sided_graphics_pipeline : gbuffer_opaque_graphics_pipeline,
         false,
         clear_values,
@@ -387,9 +387,9 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
-    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueSet>("intel_sponza_with_curtains.static_opaque_set");
+    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueMesh>("intel_sponza_with_curtains.static_opaque_mesh");
     sponza_opaque_double_sided_set =
-        resource_manager->get_resource<RUStaticOpaqueDoubleSidedSet>("intel_sponza_with_curtains.static_opaque_double_sided_set");
+        resource_manager->get_resource<RUStaticOpaqueDoubleSidedMesh>("intel_sponza_with_curtains.static_opaque_double_sided_mesh");
     shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided_static");
     gbuffer_double_sided_pipeline_resource =
         resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided_static");
@@ -414,7 +414,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
-    static_set_resources = create_static_set_resources(
+    static_mesh_resources = create_static_mesh_resources(
         renderer_vk, sponza_opaque_set, MEM_NULL, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, sponza_opaque_double_sided_set);
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
@@ -504,10 +504,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{shadow_color_clear, shadow_normal_clear, shadow_moments_clear, shadow_depth_clear};
     std::array<std::string_view, 3> color_attachments{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
-    RendTaskDescVK descriptor = make_static_set_task_desc(render_allocator,
+    RendTaskDescVK descriptor = make_static_mesh_task_desc(render_allocator,
         base_render_data,
         p_double_sided ? RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED : RT_RUN_DEFERRED_SHADOW_OPAQUE,
-        static_set_resources,
+        static_mesh_resources,
         p_double_sided ? shadow_double_sided_graphics_pipeline : shadow_opaque_graphics_pipeline,
         false,
         clear_values,

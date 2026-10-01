@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render/static_set_node_contract_resolver.hh"
+#include "function/render/mesh_node_contract_resolver.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
-#include "function/render/static_set_node_contract.hh"
+#include "function/render/mesh_node_contract.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +31,7 @@ const ShaderMetadataTypeField& require_field(
     const std::vector<ShaderMetadataTypeField>& p_fields, std::string_view p_name, std::string_view p_context) {
     const ShaderMetadataTypeField* field = ShaderMetadataQuery().find_field(p_fields, p_name);
     if (field == nullptr) {
-        throw std::runtime_error(std::format("Failed to resolve static-set node contract: {} field '{}' is missing.", p_context, p_name));
+        throw std::runtime_error(std::format("Failed to resolve mesh node contract: {} field '{}' is missing.", p_context, p_name));
     }
     return *field;
 }
@@ -39,36 +39,36 @@ const ShaderMetadataTypeField& require_field(
 size_t resolve_field_extent(const ShaderMetadataTypeField& p_field) {
     if (p_field.binding.offset < 0 || p_field.binding.size <= 0) {
         throw std::runtime_error(
-            std::format("Failed to resolve static-set node contract: field '{}' has an invalid reflected layout.", p_field.name));
+            std::format("Failed to resolve mesh node contract: field '{}' has an invalid reflected layout.", p_field.name));
     }
     return static_cast<size_t>(p_field.binding.offset) + static_cast<size_t>(p_field.binding.size);
 }
 
 } // namespace
 
-StaticSetNodeContract StaticSetNodeContractResolver::resolve(
-    const ShaderMetadata& p_metadata, std::string_view p_static_set_parameter_name) const {
-    if (p_static_set_parameter_name.empty()) {
-        throw std::runtime_error("Failed to resolve static-set node contract: parameter name is empty.");
+MeshNodeContract MeshNodeContractResolver::resolve(
+    const ShaderMetadata& p_metadata, std::string_view p_mesh_parameter_name) const {
+    if (p_mesh_parameter_name.empty()) {
+        throw std::runtime_error("Failed to resolve mesh node contract: parameter name is empty.");
     }
 
     ShaderMetadataQuery metadata_query;
-    const ShaderMetadataParameter* static_set_parameter = metadata_query.find_parameter(p_metadata, p_static_set_parameter_name);
-    if (static_set_parameter == nullptr) {
+    const ShaderMetadataParameter* mesh_parameter = metadata_query.find_parameter(p_metadata, p_mesh_parameter_name);
+    if (mesh_parameter == nullptr) {
         throw std::runtime_error(
-            std::format("Failed to resolve static-set node contract: parameter '{}' is missing.", p_static_set_parameter_name));
+            std::format("Failed to resolve mesh node contract: parameter '{}' is missing.", p_mesh_parameter_name));
     }
-    if (static_set_parameter->type.kind != "parameterBlock") {
+    if (mesh_parameter->type.kind != "parameterBlock") {
         throw std::runtime_error(std::format(
-            "Failed to resolve static-set node contract: parameter '{}' must be a parameterBlock.", p_static_set_parameter_name));
+            "Failed to resolve mesh node contract: parameter '{}' must be a parameterBlock.", p_mesh_parameter_name));
     }
 
-    const ShaderMetadataTypeField& nodes_field = require_field(static_set_parameter->type.fields, "nodes", "static_set parameter");
+    const ShaderMetadataTypeField& nodes_field = require_field(mesh_parameter->type.fields, "nodes", "mesh parameter");
     if (nodes_field.type.kind != "resource" || nodes_field.type.scalar_type != "structuredBuffer") {
-        throw std::runtime_error("Failed to resolve static-set node contract: static_set.nodes must be a StructuredBuffer resource.");
+        throw std::runtime_error("Failed to resolve mesh node contract: mesh.nodes must be a StructuredBuffer resource.");
     }
     if (nodes_field.fields.empty()) {
-        throw std::runtime_error("Failed to resolve static-set node contract: static_set.nodes is missing reflected NodeData fields.");
+        throw std::runtime_error("Failed to resolve mesh node contract: mesh.nodes is missing reflected NodeData fields.");
     }
 
     const ShaderMetadataTypeField& transform_field = require_field(nodes_field.fields, "transform", "NodeData");
@@ -79,7 +79,7 @@ StaticSetNodeContract StaticSetNodeContractResolver::resolve(
         element_stride = std::max(element_stride, resolve_field_extent(field));
     }
 
-    StaticSetNodeContract result;
+    MeshNodeContract result;
     result.element_stride = element_stride;
     result.transform_offset = static_cast<size_t>(transform_field.binding.offset);
     result.normal_transform_offset = static_cast<size_t>(normal_transform_field.binding.offset);

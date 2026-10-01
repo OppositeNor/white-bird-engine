@@ -17,7 +17,7 @@
 #ifdef WBE_REFLECTION_METADATA
 ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<MaterialTextureContractMetadata> material_textures;
-ParameterBlock<StaticSetContractMetadata> static_set;
+ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 struct ForwardDescriptorIndices {
@@ -30,24 +30,24 @@ struct ForwardDescriptorIndices {
     uint2 light_count;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<ForwardDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-set vertex and resolve its bindless material identifier.
+ * @brief Transform a static-mesh vertex and resolve its bindless material identifier.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Vertex output in world and clip space.
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
     ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light_count.x];
     InstanceData instance = instances[p_instance_id];
     NodeData node = nodes[instance.node_index];

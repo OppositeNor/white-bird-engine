@@ -33,7 +33,7 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <algorithm>
@@ -213,15 +213,15 @@ private:
 } // namespace
 
 IOctreeRenderFeature::IOctreeRenderFeature(RendererVK* p_renderer,
-    Ref<StaticSetResourcesVK> p_static_set_resources,
+    Ref<StaticMeshResourcesVK> p_static_mesh_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     std::string_view p_shader_prefix,
     std::string_view p_dynamic_shader_prefix,
     bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_set_resources(std::move(p_static_set_resources)), debug_view_mode(p_debug_view_mode),
+      static_mesh_resources(std::move(p_static_mesh_resources)), debug_view_mode(p_debug_view_mode),
       rebuild_static_every_frame(p_rebuild_static_every_frame) {
-    if (renderer_vk == nullptr || static_set_resources == MEM_NULL || debug_view_mode == nullptr) {
+    if (renderer_vk == nullptr || static_mesh_resources == MEM_NULL || debug_view_mode == nullptr) {
         throw std::runtime_error("IOctreeRenderFeature: renderer, scene and debug state are required.");
     }
     base_render_data = renderer_vk->get_base_render_data();
@@ -243,10 +243,10 @@ void IOctreeRenderFeature::compile_pipelines(std::string_view p_shader_prefix, s
         .render_data = base_render_data,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk});
-    const std::string build_pipeline_id = std::format("{}_build_static_set_pipeline", p_shader_prefix);
+    const std::string build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_shader_prefix);
     octree_build_graphics_pipeline =
         octree_compiler.compile(build_pipeline_id, resource_manager->get_resource<RUGraphicsPipeline>(build_pipeline_id)).graphics_pipeline;
-    const std::string dynamic_build_pipeline_id = std::format("{}_build_static_set_pipeline", p_dynamic_shader_prefix);
+    const std::string dynamic_build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_dynamic_shader_prefix);
     dynamic_build_pipeline =
         octree_compiler
             .compile(dynamic_build_pipeline_id, resource_manager->get_resource<RUGraphicsPipeline>(dynamic_build_pipeline_id))
@@ -379,10 +379,10 @@ RendTaskDescVK IOctreeRenderFeature::get_construction_render_task_desc(
     RendTaskDescVK task_desc =
         p_dynamic_mesh != nullptr
             ? p_dynamic_mesh->make_task(p_task_id, dynamic_build_pipeline, VkExtent2D{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT})
-            : make_static_set_task_desc(render_allocator,
+            : make_static_mesh_task_desc(render_allocator,
                   base_render_data,
                   p_task_id,
-                  static_set_resources,
+                  static_mesh_resources,
                   octree_build_graphics_pipeline,
                   false,
                   CLEAR_VALUES,

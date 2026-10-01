@@ -226,24 +226,24 @@ public:
      * @brief Set or clear the published static opaque geometry set.
      * @param p_set Static opaque set resource, or null to clear the publication.
      */
-    void set_static_opaque_set(RefRes<RUStaticOpaqueSet> p_set) {
-        static_opaque_set = p_set;
+    void set_static_opaque_mesh(RefRes<RUStaticOpaqueMesh> p_set) {
+        static_opaque_mesh = p_set;
     }
 
     /**
      * @brief Set or clear the published static opaque double-sided geometry set.
      * @param p_set Static opaque double-sided set resource, or null to clear the publication.
      */
-    void set_static_opaque_double_sided_set(RefRes<RUStaticOpaqueDoubleSidedSet> p_set) {
-        static_opaque_double_sided_set = p_set;
+    void set_static_opaque_double_sided_mesh(RefRes<RUStaticOpaqueDoubleSidedMesh> p_set) {
+        static_opaque_double_sided_mesh = p_set;
     }
 
     /**
      * @brief Set or clear the published static masked geometry set.
      * @param p_set Static masked set resource, or null to clear the publication.
      */
-    void set_static_masked_set(RefRes<RUStaticMaskedSet> p_set) {
-        static_masked_set = p_set;
+    void set_static_masked_mesh(RefRes<RUStaticMaskedMesh> p_set) {
+        static_masked_mesh = p_set;
     }
 
     /**
@@ -258,22 +258,22 @@ public:
     /**
      * @brief Get the current static opaque set resource.
      */
-    RefRes<RUStaticOpaqueSet> get_static_opaque_set() const {
-        return static_opaque_set;
+    RefRes<RUStaticOpaqueMesh> get_static_opaque_mesh() const {
+        return static_opaque_mesh;
     }
 
     /**
      * @brief Get the current static opaque double-sided set resource.
      */
-    RefRes<RUStaticOpaqueDoubleSidedSet> get_static_opaque_double_sided_set() const {
-        return static_opaque_double_sided_set;
+    RefRes<RUStaticOpaqueDoubleSidedMesh> get_static_opaque_double_sided_mesh() const {
+        return static_opaque_double_sided_mesh;
     }
 
     /**
      * @brief Get the current static masked set resource.
      */
-    RefRes<RUStaticMaskedSet> get_static_masked_set() const {
-        return static_masked_set;
+    RefRes<RUStaticMaskedMesh> get_static_masked_mesh() const {
+        return static_masked_mesh;
     }
 
     /**
@@ -322,9 +322,9 @@ private:
     Map<CompiledRenderResourceKey, RefWeak<IRenderObject>> compiled_render_resources;
 
     OpaqueTrianglesInfo dynamic_opaque;
-    RefRes<RUStaticOpaqueSet> static_opaque_set;
-    RefRes<RUStaticOpaqueDoubleSidedSet> static_opaque_double_sided_set;
-    RefRes<RUStaticMaskedSet> static_masked_set;
+    RefRes<RUStaticOpaqueMesh> static_opaque_mesh;
+    RefRes<RUStaticOpaqueDoubleSidedMesh> static_opaque_double_sided_mesh;
+    RefRes<RUStaticMaskedMesh> static_masked_mesh;
     void set_opaque_triangles_linear(
         OpaqueTrianglesInfo& p_triangles_info, RUMesh3D* p_mesh, const uint32_t* p_preserved_object_ids, size_t p_preserved_object_id_count);
 };

@@ -27,7 +27,8 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/dynamic_mesh_resources_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -286,8 +287,9 @@ struct RendTaskDescVK {
  *
  * Every resource is declared once in this graph-wide descriptor. Buffers, images, image views, and samplers declared with
  * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled;
- * resources owned elsewhere are imported with add_resource() or add_static_set(). Tasks refer to every resource by id
- * through their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
+ * resources owned elsewhere are imported with add_resource(), add_static_mesh(), or add_dynamic_mesh(). Tasks refer to
+ * every resource by id through their reflected shader, attachment, and fixed-function accesses, resolved through each
+ * task's resource map.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)
@@ -400,15 +402,26 @@ struct RendGraphDescVK {
     RendGraphDescVK& add_sampler(std::string_view p_resource_id, const RendSamplerDescVK& p_desc = {});
 
     /**
-     * @brief Import every resource of a compiled static set under the REND_RES_STATIC_SET_* ids.
+     * @brief Import every resource of a compiled static mesh under the REND_RES_STATIC_MESH_* ids.
      *
-     * Optional categories that the static set does not contain are not declared.
+     * Optional categories that the static mesh does not contain are not declared.
      *
-     * @param p_static_set Compiled static-set resources, retained by the graph descriptor.
+     * @param p_static_mesh Compiled static-mesh resources, retained by the graph descriptor.
      * @return This graph descriptor.
-     * @throws std::runtime_error If p_static_set is null.
+     * @throws std::runtime_error If p_static_mesh is null.
      */
-    RendGraphDescVK& add_static_set(Ref<StaticSetResourcesVK> p_static_set);
+    RendGraphDescVK& add_static_mesh(Ref<StaticMeshResourcesVK> p_static_mesh);
+
+    /**
+     * @brief Import every resource of a compiled dynamic mesh under the REND_RES_DYNAMIC_MESH_* ids.
+     *
+     * Material resources are declared only when the mesh was compiled with a material contract.
+     *
+     * @param p_dynamic_mesh Compiled dynamic-mesh resources, retained by the graph descriptor.
+     * @return This graph descriptor.
+     * @throws std::runtime_error If p_dynamic_mesh is null.
+     */
+    RendGraphDescVK& add_dynamic_mesh(Ref<DynamicMeshResourcesVK> p_dynamic_mesh);
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-

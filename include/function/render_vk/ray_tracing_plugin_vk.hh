@@ -93,11 +93,11 @@ public:
         const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
     virtual StaticGeometryBufferUsageVK get_static_geometry_buffer_usage() const override;
-    virtual GPUJobVK on_static_opaque_set_updated(BaseRenderDataVK* p_render_data,
-        RefRes<RUStaticOpaqueSet> p_set,
+    virtual GPUJobVK on_static_opaque_mesh_updated(BaseRenderDataVK* p_render_data,
+        RefRes<RUStaticOpaqueMesh> p_set,
         Ref<ROBufferVK> p_vertex_buffer,
         Ref<ROBufferVK> p_index_buffer,
-        RefRes<RUStaticOpaqueDoubleSidedSet> p_double_sided_set = MEM_NULL) override;
+        RefRes<RUStaticOpaqueDoubleSidedMesh> p_double_sided_set = MEM_NULL) override;
 
     /**
      * @brief Get the prepared static-opaque top-level acceleration structure.
@@ -152,11 +152,11 @@ private:
         VkPhysicalDevice p_physical_device, const char* const* p_enabled_layers, size_t p_enabled_layer_count) const;
     void prepare_device_features(const RendererCapabilities& p_capabilities);
     void reset_static_opaque_acceleration_structures();
-    void validate_static_opaque_set(RefRes<RUStaticGeometrySet> p_set) const;
+    void validate_static_opaque_mesh(RefRes<RUStaticMesh> p_set) const;
     void validate_static_opaque_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instance_count) const;
     const RUVertexView::Attribute& get_static_opaque_position_attribute(const RUStaticGeometrySubmesh& p_submesh) const;
     StaticOpaqueBottomLevelBuild create_static_opaque_bottom_level_build(const RUStaticGeometrySubmesh& p_submesh,
-        RefRes<RUStaticGeometrySet> p_set,
+        RefRes<RUStaticMesh> p_set,
         VkDeviceAddress p_vertex_buffer_address,
         VkDeviceAddress p_index_buffer_address) const;
     Ref<ROBufferVK> create_aligned_scratch_buffer(
@@ -167,17 +167,17 @@ private:
         size_t& p_total_instance_count) const;
     StaticOpaqueTopLevelBuild create_top_level_build(StaticOpaqueBuildData& p_build_data, VkDeviceSize p_scratch_alignment) const;
     StaticOpaqueBuildData build_static_opaque_data(
-        RefRes<RUStaticGeometrySet> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const;
+        RefRes<RUStaticMesh> p_set, VkDeviceAddress p_vertex_buffer_address, VkDeviceAddress p_index_buffer_address) const;
     GPUJobVK create_static_opaque_record_job(std::vector<Ref<ROAccelerationStructureVK>>&& p_bottom_level_acceleration_structures,
         Ref<ROBufferVK> p_bottom_level_scratch_buffer,
         StaticOpaqueBuildData&& p_build_data,
         VkDeviceAddress p_aligned_bottom_level_scratch_buffer_address,
         StaticOpaqueTopLevelBuild&& p_top_level_build) const;
     GPUJobVK create_static_opaque_build_job(StaticOpaqueBuildData&& p_build_data);
-    GPUJobVK update_static_opaque_acceleration_structure(RefRes<RUStaticGeometrySet> p_set,
+    GPUJobVK update_static_opaque_acceleration_structure(RefRes<RUStaticMesh> p_set,
         Ref<ROBufferVK> p_vertex_buffer,
         Ref<ROBufferVK> p_index_buffer,
-        RefRes<RUStaticOpaqueDoubleSidedSet> p_double_sided_set);
+        RefRes<RUStaticOpaqueDoubleSidedMesh> p_double_sided_set);
 
     inline static RayTracingPluginVK* singleton = nullptr;
 };

@@ -291,7 +291,7 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
 
 /**
  * @class RUSchemaStaticGeometrySubmesh
- * @brief One material and geometry draw range in a static geometry set.
+ * @brief One material and geometry draw range in a static mesh.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometrySubmesh {
     /** Inline material for this submesh. */
@@ -325,11 +325,11 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometryInstance {
 };
 
 /**
- * @class RUSchemaStaticOpaqueSet
+ * @class RUSchemaStaticOpaqueMesh
  * @brief Resource schema for opaque static geometry.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueSet : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueSet)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueMesh : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueMesh)
     /** Static submeshes in declared draw order. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
@@ -339,11 +339,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueSet : public RUSchema {
 };
 
 /**
- * @class RUSchemaStaticOpaqueDoubleSidedSet
+ * @class RUSchemaStaticOpaqueDoubleSidedMesh
  * @brief Resource schema for opaque double-sided static geometry.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueDoubleSidedSet : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueDoubleSidedSet)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueDoubleSidedMesh : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueDoubleSidedMesh)
     /**
      * @brief Static submeshes in declared draw order.
      */
@@ -357,11 +357,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueDoubleSidedSet : public RU
 };
 
 /**
- * @class RUSchemaStaticMaskedSet
+ * @class RUSchemaStaticMaskedMesh
  * @brief Resource schema for masked static geometry.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticMaskedSet : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticMaskedSet)
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticMaskedMesh : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaStaticMaskedMesh)
     /** Static submeshes in declared draw order. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
@@ -684,7 +684,7 @@ struct RUMesh3D : public ResourceUnit {
 
 /**
  * @class RUStaticGeometrySubmesh
- * @brief One material, geometry range, and instance range in a static geometry set.
+ * @brief One material, geometry range, and instance range in a static mesh.
  */
 struct RUStaticGeometrySubmesh {
     /** Referenced material. */
@@ -709,10 +709,10 @@ struct RUStaticGeometryInstance {
 };
 
 /**
- * @class RUStaticGeometrySet
- * @brief Shared representation for static geometry set resources.
+ * @class RUStaticMesh
+ * @brief Shared representation for static mesh resources.
  */
-struct RUStaticGeometrySet : public ResourceUnit {
+struct RUStaticMesh : public ResourceUnit {
     /** Static submeshes in declared draw order. */
     RefRes<RUStaticGeometrySubmesh> submeshes;
     /** Number of entries in submeshes. */
@@ -724,22 +724,22 @@ struct RUStaticGeometrySet : public ResourceUnit {
 };
 
 /**
- * @class RUStaticOpaqueSet
- * @brief Opaque static geometry set resource.
+ * @class RUStaticOpaqueMesh
+ * @brief Opaque static mesh resource.
  */
-struct RUStaticOpaqueSet : public RUStaticGeometrySet {};
+struct RUStaticOpaqueMesh : public RUStaticMesh {};
 
 /**
- * @class RUStaticOpaqueDoubleSidedSet
+ * @class RUStaticOpaqueDoubleSidedMesh
  * @brief Opaque geometry rendered without face culling; payload lifetime belongs to its resource chunk.
  */
-struct RUStaticOpaqueDoubleSidedSet : public RUStaticGeometrySet {};
+struct RUStaticOpaqueDoubleSidedMesh : public RUStaticMesh {};
 
 /**
- * @class RUStaticMaskedSet
- * @brief Masked static geometry set resource.
+ * @class RUStaticMaskedMesh
+ * @brief Masked static mesh resource.
  */
-struct RUStaticMaskedSet : public RUStaticGeometrySet {};
+struct RUStaticMaskedMesh : public RUStaticMesh {};
 
 } // namespace WhiteBirdEngine
 

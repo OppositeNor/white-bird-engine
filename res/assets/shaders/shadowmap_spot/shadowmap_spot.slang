@@ -15,7 +15,7 @@
 #include "utils.slang"
 
 #ifdef WBE_REFLECTION_METADATA
-ParameterBlock<StaticSetContractMetadata> static_set;
+ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 /**
@@ -32,23 +32,23 @@ struct ShadowVSOutput {
 struct ShadowDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<ShadowDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-set vertex into spot-light clip space.
+ * @brief Transform a static-mesh vertex into spot-light clip space.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Clip-space vertex output.
  */
 [shader("vertex")]
 ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
     InstanceData instance = instances[p_instance_id];
     float4 world_position = mul(nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
     ShadowVSOutput output;

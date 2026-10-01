@@ -71,8 +71,8 @@ For non-trivial implementation tasks:
   write-read, and write-write conflict on a resource must be ordered by a chain of edges on that same resource; unordered conflicts
   make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
 - The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
-  `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource()` / `add_static_set()` only to import resources owned
-  outside the graph.
+  `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource()` / `add_static_mesh()` / `add_dynamic_mesh()` only to
+  import resources owned outside the graph.
 - Tasks report every access themselves through `IRenderTaskVK::append_accesses()` (reflected shader resources, render targets, and
   fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
   and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
@@ -189,7 +189,7 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - `MaterialTextureContractMetadata.material_sampler` and `MaterialTextureContractMetadata.textures` are fixed metadata-only
   members; `MaterialParamsBuffer.materials` is the fixed runtime material-table member. Applications may configure only the
   `material_textures` and `material_params` base variable names and the `default_material` resource key.
-- Static-set compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
+- Static-mesh compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
   material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
   `rma`.
 - Vulkan shader resources are declared as aligned `uint2` fields in push data with `WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`,

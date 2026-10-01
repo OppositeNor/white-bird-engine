@@ -103,28 +103,28 @@ void Scene::update(double p_delta) {
     }
 
     Ref<World> active_world = get_active_world();
-    RefRes<RUStaticOpaqueSet> static_opaque_set = MEM_NULL;
-    RefRes<RUStaticOpaqueDoubleSidedSet> static_opaque_double_sided_set = MEM_NULL;
-    RefRes<RUStaticMaskedSet> static_masked_set = MEM_NULL;
+    RefRes<RUStaticOpaqueMesh> static_opaque_mesh = MEM_NULL;
+    RefRes<RUStaticOpaqueDoubleSidedMesh> static_opaque_double_sided_mesh = MEM_NULL;
+    RefRes<RUStaticMaskedMesh> static_masked_mesh = MEM_NULL;
     if (active_world != MEM_NULL) {
         std::string_view graph_key = active_world->get_render_graph_resource_key();
         if (!graph_key.empty()) {
             renderer->activate_render_graph(graph_key);
         }
-        static_opaque_set = active_world->get_static_opaque_set();
-        static_opaque_double_sided_set = active_world->get_static_opaque_double_sided_set();
-        static_masked_set = active_world->get_static_masked_set();
+        static_opaque_mesh = active_world->get_static_opaque_mesh();
+        static_opaque_double_sided_mesh = active_world->get_static_opaque_double_sided_mesh();
+        static_masked_mesh = active_world->get_static_masked_mesh();
     }
 
-    if (static_opaque_set != published_static_opaque_set || static_masked_set != published_static_masked_set ||
-        static_opaque_double_sided_set != published_static_opaque_double_sided_set) {
-        renderer->get_render_database()->set_static_opaque_set(static_opaque_set);
-        renderer->get_render_database()->set_static_opaque_double_sided_set(static_opaque_double_sided_set);
-        renderer->get_render_database()->set_static_masked_set(static_masked_set);
-        renderer->update_static_geometry_sets();
-        published_static_opaque_set = static_opaque_set;
-        published_static_opaque_double_sided_set = static_opaque_double_sided_set;
-        published_static_masked_set = static_masked_set;
+    if (static_opaque_mesh != published_static_opaque_mesh || static_masked_mesh != published_static_masked_mesh ||
+        static_opaque_double_sided_mesh != published_static_opaque_double_sided_mesh) {
+        renderer->get_render_database()->set_static_opaque_mesh(static_opaque_mesh);
+        renderer->get_render_database()->set_static_opaque_double_sided_mesh(static_opaque_double_sided_mesh);
+        renderer->get_render_database()->set_static_masked_mesh(static_masked_mesh);
+        renderer->update_static_meshes();
+        published_static_opaque_mesh = static_opaque_mesh;
+        published_static_opaque_double_sided_mesh = static_opaque_double_sided_mesh;
+        published_static_masked_mesh = static_masked_mesh;
     }
 
     for (auto& world : worlds) {
@@ -145,15 +145,15 @@ void Scene::teardown() {
             renderer->unregister_render_graph(graph_key);
         }
     }
-    if (published_static_opaque_set != MEM_NULL || published_static_masked_set != MEM_NULL ||
-        published_static_opaque_double_sided_set != MEM_NULL) {
-        renderer->get_render_database()->set_static_opaque_set(MEM_NULL);
-        renderer->get_render_database()->set_static_opaque_double_sided_set(MEM_NULL);
-        renderer->get_render_database()->set_static_masked_set(MEM_NULL);
-        renderer->update_static_geometry_sets();
-        published_static_opaque_set = MEM_NULL;
-        published_static_opaque_double_sided_set = MEM_NULL;
-        published_static_masked_set = MEM_NULL;
+    if (published_static_opaque_mesh != MEM_NULL || published_static_masked_mesh != MEM_NULL ||
+        published_static_opaque_double_sided_mesh != MEM_NULL) {
+        renderer->get_render_database()->set_static_opaque_mesh(MEM_NULL);
+        renderer->get_render_database()->set_static_opaque_double_sided_mesh(MEM_NULL);
+        renderer->get_render_database()->set_static_masked_mesh(MEM_NULL);
+        renderer->update_static_meshes();
+        published_static_opaque_mesh = MEM_NULL;
+        published_static_opaque_double_sided_mesh = MEM_NULL;
+        published_static_masked_mesh = MEM_NULL;
     }
     lifecycle_state = LifecycleState::TORN_DOWN;
 }

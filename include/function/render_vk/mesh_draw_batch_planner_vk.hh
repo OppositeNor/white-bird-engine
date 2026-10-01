@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_SET_DRAW_BATCH_PLANNER_VK_HH
-#define WBE_FILE_STATIC_SET_DRAW_BATCH_PLANNER_VK_HH
+#ifndef WBE_FILE_MESH_DRAW_BATCH_PLANNER_VK_HH
+#define WBE_FILE_MESH_DRAW_BATCH_PLANNER_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
@@ -28,12 +28,12 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class StaticSetDrawBatchPlannerVK
- * @brief Groups one pipeline's static draws by compatible reflected vertex input and buffer offsets.
+ * @class MeshDrawBatchPlannerVK
+ * @brief Groups one pipeline's mesh draws by compatible reflected vertex input and buffer offsets.
  *
  * Stateless and copyable. Planning preserves supplied instance indices when reordering draws.
  */
-class StaticSetDrawBatchPlannerVK final {
+class MeshDrawBatchPlannerVK final {
 public:
     /**
      * @class Batch
@@ -83,6 +83,35 @@ public:
     };
 
     /**
+     * @struct Draw
+     * @brief One indexed draw of a submesh view; copyable and movable.
+     */
+    struct Draw {
+        Draw() = default;
+        ~Draw() = default;
+        Draw(const Draw&) = default;
+        Draw(Draw&&) noexcept = default;
+        Draw& operator=(const Draw&) = default;
+        Draw& operator=(Draw&&) noexcept = default;
+        /**
+         * @brief Interleaved vertices drawn by the command.
+         */
+        RUVertexView vertices;
+        /**
+         * @brief Uint32 indices drawn by the command.
+         */
+        RUIndexView indices;
+        /**
+         * @brief Number of instances drawn; zero skips the draw.
+         */
+        uint32_t instance_count = 0;
+        /**
+         * @brief firstInstance value addressing the draw's instance records.
+         */
+        uint32_t first_instance = 0;
+    };
+
+    /**
      * @class BuildResult
      * @brief Move-only command and batch storage; its allocator must outlive the result.
      */
@@ -119,27 +148,40 @@ public:
     /**
      * @brief Construct a stateless planner.
      */
-    StaticSetDrawBatchPlannerVK() = default;
+    MeshDrawBatchPlannerVK() = default;
     /**
      * @brief Destroy the stateless planner.
      */
-    ~StaticSetDrawBatchPlannerVK() = default;
+    ~MeshDrawBatchPlannerVK() = default;
     /**
      * @brief Copy the stateless planner.
      */
-    StaticSetDrawBatchPlannerVK(const StaticSetDrawBatchPlannerVK&) = default;
+    MeshDrawBatchPlannerVK(const MeshDrawBatchPlannerVK&) = default;
     /**
      * @brief Move the stateless planner.
      */
-    StaticSetDrawBatchPlannerVK(StaticSetDrawBatchPlannerVK&&) noexcept = default;
+    MeshDrawBatchPlannerVK(MeshDrawBatchPlannerVK&&) noexcept = default;
     /**
      * @brief Copy the stateless planner.
      */
-    StaticSetDrawBatchPlannerVK& operator=(const StaticSetDrawBatchPlannerVK&) = default;
+    MeshDrawBatchPlannerVK& operator=(const MeshDrawBatchPlannerVK&) = default;
     /**
      * @brief Move the stateless planner.
      */
-    StaticSetDrawBatchPlannerVK& operator=(StaticSetDrawBatchPlannerVK&&) noexcept = default;
+    MeshDrawBatchPlannerVK& operator=(MeshDrawBatchPlannerVK&&) noexcept = default;
+
+    /**
+     * @brief Plan draws sharing prevalidated vertex and index binaries for one pipeline.
+     *
+     * Draws without indices or instances are skipped. Compatible groups preserve source order internally and split at
+     * the device's maximum indirect draw count.
+     * @throws std::runtime_error When the draw limit is zero, or Vulkan draw/layout limits are exceeded.
+     */
+    BuildResult build(RenderAllocator* p_allocator,
+        std::span<const Draw> p_draws,
+        const ShaderMetadata& p_vertex_metadata,
+        std::string_view p_vertex_entry_name,
+        uint32_t p_max_draw_count) const;
 
     /**
      * @brief Plan drawable submeshes sharing prevalidated vertex and index binaries for one pipeline.

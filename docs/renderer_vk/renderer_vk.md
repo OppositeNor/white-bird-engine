@@ -24,7 +24,7 @@ Material texture semantics are shader metadata, not renderer-wide enums. Integer
 argument uses the annotated field name. `rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel
 pack.
 
-The static-set task reflects this contract independently for every graphics pipeline. It resolves each texture to a global
+The static-mesh task reflects this contract independently for every graphics pipeline. It resolves each texture to a global
 sampled-image descriptor-heap index, initializes missing roles from the configured default material, and writes those indices into
 `MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture roles.
 
@@ -83,11 +83,11 @@ supplies an open string role, a byte offset within the stride, and a reflected s
 
 Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `ivec3`, `ivec4`, `uint`, `uvec2`, `uvec3`, and
 `uvec4`. The resulting attribute offsets, byte sizes, stride, and vertex count are fixed after loading. Attribute values may be
-changed through `RUSubmesh3D`, but mutation is not thread-safe. Publish the updated `RUStaticOpaqueSet` or `RUStaticMaskedSet`
-through the scene/render database and call `RendererVK::update_static_geometry_sets()` only when derived geometry state such as
+changed through `RUSubmesh3D`, but mutation is not thread-safe. Publish the updated `RUStaticOpaqueMesh` or `RUStaticMaskedMesh`
+through the scene/render database and call `RendererVK::update_static_meshes()` only when derived geometry state such as
 ray tracing must be rebuilt.
 
-Static geometry resources use `RUStaticGeometrySet`, with distinct `RUStaticOpaqueSet` and `RUStaticMaskedSet` resource types.
+Static geometry resources use `RUStaticMesh`, with distinct `RUStaticOpaqueMesh` and `RUStaticMaskedMesh` resource types.
 Each set stores declared submeshes and shared instance transforms. A submesh references a material, a vertex view, an index view,
 and a `[first_instance, instance_count)` range into the set's transform array. Instance transforms are exactly 16 column-major
 floats in the serialized resource and are loaded as `glm::mat4`.
@@ -116,45 +116,57 @@ extension and feature are rejected; there is no static vertex-input fallback. Di
 reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
 state.
 
-## Static Set Resources
+## Mesh Resources
 
-`StaticSetCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
-`StaticSetResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
+Mesh compilers derive from `IMeshCompilerVK`, which owns the shared steps as protected helpers: geometry buffer upload through
+`MeshBufferCompilerVK`, mesh-node layout validation, draw planning through `MeshDrawBatchPlannerVK`, and material compilation
+through `MeshMaterialResourceBuilderVK`.
+
+- `StaticMeshCompilerVK` compiles the static mesh categories into `StaticMeshResourcesVK` (below).
+- `DynamicMeshCompilerVK` compiles one `RUMesh3D` with a fixed instance capacity into `DynamicMeshResourcesVK`. Its geometry,
+  submesh, instance-link, and material resources are immutable; node transforms and indirect commands live in one buffer per frame
+  in flight and change through `DynamicMeshResourcesVK::publish_visible_transforms()`. Import it with
+  `RendGraphDescVK::add_dynamic_mesh()`, which registers it under the `REND_RES_DYNAMIC_MESH_*` identifiers.
+
+### Static Mesh Resources
+
+`StaticMeshCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
+`StaticMeshResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
 buffers with their draw batches, submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed
 by the generic `RTRunGraphicsPipelineIndirectVK`; callers provide the graphics pipeline of each draw batch.
 
 ### Loading Static Geometry
 
 Static geometry resources are loaded through the normal chunk pipeline. `ResourceUnitLoaderBinary` loads the shared `RUBinary`
-payload, and `register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderStaticOpaqueSet` and
-`ResourceUnitLoaderStaticMaskedSet` so `static_opaque_set` and `static_masked_set` schemas resolve into `RUStaticOpaqueSet` and
-`RUStaticMaskedSet` resources.
+payload, and `register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderStaticOpaqueMesh` and
+`ResourceUnitLoaderStaticMaskedMesh` so `static_opaque_mesh` and `static_masked_mesh` schemas resolve into `RUStaticOpaqueMesh` and
+`RUStaticMaskedMesh` resources.
 
-Each static set stores:
+Each static mesh stores:
 
 - A list of submeshes.
 - For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
 - One shared instance array containing `glm::mat4` transforms.
 
-All drawable submeshes in one compiled static set must reference the same vertex `RUBinary` resource and the same index
+All drawable submeshes in one compiled static mesh must reference the same vertex `RUBinary` resource and the same index
 `RUBinary` resource. Vertex and index binaries may be distinct from each other. The task validates that each vertex view and
 index view stays within its binary bounds before it creates any Vulkan buffers.
 
 ### Vertex Assembly And Upload
 
-`StaticSetCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
-`src/function/render_vk/static_set_compiler_vk.cpp`:
+`StaticMeshCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
+`src/function/render_vk/static_mesh_compiler_vk.cpp`:
 
-1. `StaticSetBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
+1. `MeshBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
   also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
-2. `StaticSetBufferCompilerVK` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
-  the index binary into a separate `ROBufferVK` with the effective index usage flags (`build_static_binary_buffer()` in
-  `static_set_buffer_compiler_vk.cpp`).
+2. `MeshBufferCompilerVK` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
+  the index binary into a separate `ROBufferVK` with the effective index usage flags (`build_binary_buffer()` in
+  `mesh_buffer_compiler_vk.cpp`).
 3. Each upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource identity plus Vulkan
   usage flags, so later tasks and renderer plugins can reuse compatible buffers without re-uploading identical geometry bytes.
 4. `build_static_instance_buffer_data()` assembles three CPU-side tables from each set declaration: `GeometrySubmeshGPU`,
   `GeometryNodeGPU`, and `GeometryInstanceGPU`. The tables of all categories are concatenated.
-5. `build_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
+5. `IMeshCompilerVK::create_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
   indirection.
 
 The important distinction is that vertex and index bytes stay in their original binary layouts. The task uploads those binaries
@@ -163,25 +175,28 @@ use for each indirect draw.
 
 ### Feeding The Graphics Pipeline
 
-Static-set shaders declare the metadata tables as reflected storage buffers in `StaticSetDescriptorIndices`
-(`utils/utils.slang`), annotated as read-only:
+Mesh shaders declare the metadata tables as reflected storage buffers in `MeshDescriptorIndices` (`utils/utils.slang`),
+annotated as read-only, under shader resource ids shared by every mesh kind:
 
-- `static_set.submeshes` (`REND_RES_STATIC_SET_SUBMESHES`)
-- `static_set.nodes` (`REND_RES_STATIC_SET_NODES`)
-- `static_set.instances` (`REND_RES_STATIC_SET_INSTANCES`)
+- `mesh.submeshes` (`REND_RES_MESH_SUBMESHES`)
+- `mesh.nodes` (`REND_RES_MESH_NODES`)
+- `mesh.instances` (`REND_RES_MESH_INSTANCES`)
+
+The node layout is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
 
 Material resources follow the pipeline's reflected material texture contract. `get_default_image()` resolves the configured
-default material, and `StaticSetMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
-image views are returned as a CPU-side `RenderResourceList` through `StaticSetResourcesVK::acquire_textures()`.
+default material, and `MeshMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
+image views are returned as a CPU-side `RenderResourceList` through `StaticMeshResourcesVK::acquire_textures()`.
 
-The application imports every compiled static-set resource once with `RendGraphDescVK::add_static_set()`, which registers them under
-the `REND_RES_STATIC_SET_*` identifiers. Graphics tasks bind the vertex, index, and indirect-command buffers by those identifiers and
-report the reflected metadata and material accesses themselves; a pipeline whose reflected identifiers differ is mapped with
-`RendTaskDescVK::alias()`. A `RenderResourceList` does not create GPU resources; graph construction retains the list under its
+The application imports every compiled static-mesh resource once with `RendGraphDescVK::add_static_mesh()`, which registers them under
+the `REND_RES_STATIC_MESH_*` identifiers. Graphics tasks bind the vertex, index, and indirect-command buffers by those identifiers and
+report the reflected metadata and material accesses themselves. Because the shader ids are shared, each task maps them to the drawn
+mesh's resources with `RendTaskDescVK::alias()`, for example `REND_RES_MESH_NODES` to `REND_RES_STATIC_MESH_NODES` or
+`REND_RES_DYNAMIC_MESH_NODES`. Only ids the pipeline reflects may be aliased, since every alias must be used by the task. A `RenderResourceList` does not create GPU resources; graph construction retains the list under its
 aggregate key and registers its entries as `<resource_list_key>[<index>]`. An access or edge on the aggregate expands to all indexed
 entries.
 
-`StaticSetDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
+`MeshDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
 layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their
 relative vertex offsets fit `int32_t`. Groups follow first appearance and retain source order within each group. Each group
 binds its minimum vertex-view byte offset, and is split at the device's `maxDrawIndirectCount` limit. Each submesh retains one
@@ -200,13 +215,14 @@ the graphics task.
 
 Before constructing the task:
 
-1. Load the static sets, materials, images, shaders, and graphics pipelines through `ResourceManager`, and compile the graphics
+1. Load the static meshes, materials, images, shaders, and graphics pipelines through `ResourceManager`, and compile the graphics
   pipeline for the task's attachment formats with `GraphicsPipelineCompilerVK`.
-2. Compile the static set with `StaticSetCompilerVK::compile()` and import it with `RendGraphDescVK::add_static_set()`.
+2. Compile the static mesh with `StaticMeshCompilerVK::compile()` and import it with `RendGraphDescVK::add_static_mesh()`.
 3. Declare every render target with `RendGraphDescVK::add_image()` and `add_image_view()`; the graph allocates them when it is
   compiled. Import the renderer's swap-chain image-view container under `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph
   renders to the swap chain.
-4. Create one `RTRunGraphicsPipelineIndirectVK` per category-plus-pipeline combination, alias its render targets, and order it
+4. Create one `RTRunGraphicsPipelineIndirectVK` per category-plus-pipeline combination, alias its render targets and mesh
+  resources, and order it
   against other tasks with resource edges declared by `RendTaskDescVK::connect()`.
 
 ```cpp
@@ -214,32 +230,36 @@ RendererVK* renderer = RendererVK::get_singleton();
 const BaseRenderDataVK* render_data = renderer->get_base_render_data();
 RenderAllocator* render_allocator = render_data->allocator;
 
-// opaque_set and the compiled graphics pipeline come from step 1; the vertex metadata, entry, and material contract come from
+// opaque_mesh and the compiled graphics pipeline come from step 1; the vertex metadata, entry, and material contract come from
 // the pipeline's shader metadata.
-Ref<StaticSetResourcesVK> static_set = StaticSetCompilerVK(renderer).compile(opaque_set,
+Ref<StaticMeshResourcesVK> static_mesh = StaticMeshCompilerVK(renderer).compile(opaque_mesh,
     MEM_NULL,
     opaque_vertex_metadata,
     opaque_vertex_entry,
     ShaderMetadata{},
     {},
     material_contract,
-    StaticSetCompilerVK::Config{});
+    StaticMeshCompilerVK::Config{});
 
 RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
 task_builder.set_render_extent(render_data->swap_chain_extent)
-    .set_vertex_buffer(REND_RES_STATIC_SET_VERTICES)
-    .set_index_buffer(REND_RES_STATIC_SET_INDICES)
-    .set_indirect_buffer(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES);
-for (size_t i = 0; i < static_set->get_opaque_draw_batch_count(); ++i) {
-    const StaticSetResourcesVK::DrawBatch& batch = static_set->get_opaque_draw_batch(i);
+    .set_vertex_buffer(REND_RES_STATIC_MESH_VERTICES)
+    .set_index_buffer(REND_RES_STATIC_MESH_INDICES)
+    .set_indirect_buffer(REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES);
+for (size_t i = 0; i < static_mesh->get_opaque_draw_batch_count(); ++i) {
+    const MeshDrawBatchVK& batch = static_mesh->get_opaque_draw_batch(i);
     task_builder.add_pipeline_batch(graphics_pipeline, batch.first_draw, batch.draw_count, batch.vertex_input, batch.vertex_buffer_offset);
 }
-RendTaskDescVK task_desc(render_allocator, "run_static_set", task_builder.create_unique(render_data));
+RendTaskDescVK task_desc(render_allocator, "run_static_mesh", task_builder.create_unique(render_data));
 task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN).alias(RenderTargetsVK::DEPTH_ID, "scene_depth_view");
+// Map the shader-side mesh ids this pipeline reflects to the static mesh's resources.
+task_desc.alias(REND_RES_MESH_SUBMESHES, REND_RES_STATIC_MESH_SUBMESHES)
+    .alias(REND_RES_MESH_NODES, REND_RES_STATIC_MESH_NODES)
+    .alias(REND_RES_MESH_INSTANCES, REND_RES_STATIC_MESH_INSTANCES);
 
 const VkExtent2D extent = render_data->swap_chain_extent;
 RendGraphDescVK graph_desc(render_allocator);
-graph_desc.add_static_set(static_set)
+graph_desc.add_static_mesh(static_mesh)
     .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
     .add_image("scene_depth_image",
         {.usage = RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
@@ -276,18 +296,18 @@ task_desc.alias(RenderTargetsVK::color_id(0), "gbuffer_albedo")
 
 ### Static Geometry Updates
 
-`RendererVK::update_static_geometry_sets()` no longer rebuilds raster draw tasks or flatten `RUMesh3D` data. Raster passes stay
-application-owned through compiled static sets and generic graphics tasks. The renderer-side update path exists only for derived shared state
-that is keyed by the published static sets.
+`RendererVK::update_static_meshes()` no longer rebuilds raster draw tasks or flatten `RUMesh3D` data. Raster passes stay
+application-owned through compiled static meshes and generic graphics tasks. The renderer-side update path exists only for derived shared state
+that is keyed by the published static meshes.
 
 The current opaque update flow is:
 
-1. `Scene::update()` publishes `RUStaticOpaqueSet` and `RUStaticMaskedSet` references into `RenderDatabase`, including null clears.
-2. `RendererVK::update_static_geometry_sets()` reads the published opaque set and asks each enabled Vulkan plugin for any extra
+1. `Scene::update()` publishes `RUStaticOpaqueMesh` and `RUStaticMaskedMesh` references into `RenderDatabase`, including null clears.
+2. `RendererVK::update_static_meshes()` reads the published opaque set and asks each enabled Vulkan plugin for any extra
   shared-buffer usage bits.
-3. `StaticSetBufferCompilerVK` validates the set's shared binaries, caches vertex/index uploads by binary identity plus effective
+3. `MeshBufferCompilerVK` validates the set's shared binaries, caches vertex/index uploads by binary identity plus effective
   Vulkan usage flags, and returns reusable `ROBufferVK` objects.
-4. The renderer invokes `RenderPluginVK::on_static_opaque_set_updated()` once with the explicit set and the shared vertex/index
+4. The renderer invokes `RenderPluginVK::on_static_opaque_mesh_updated()` once with the explicit set and the shared vertex/index
   buffers.
 5. `RayTracingPluginVK` builds one BLAS per drawable submesh and one TLAS instance per published transform, then publishes the
   resulting `VkAccelerationStructureKHR` through `BaseRenderDataVK::static_opaque_acceleration_structure`.

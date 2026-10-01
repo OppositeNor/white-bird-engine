@@ -183,25 +183,25 @@ TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObject
     EXPECT_EQ(render_database.get_compiled_render_resource("test_resource", render_object->get_type_uuid()), render_object);
 }
 
-TEST_F(WBERenderDatabaseTest, StoresStaticGeometrySetReferences) {
-    RefRes<RUStaticOpaqueSet> opaque_set = resource_storage.make_object<RUStaticOpaqueSet>();
-    RefRes<RUStaticOpaqueDoubleSidedSet> opaque_double_sided_set = resource_storage.make_object<RUStaticOpaqueDoubleSidedSet>();
-    RefRes<RUStaticMaskedSet> masked_set = resource_storage.make_object<RUStaticMaskedSet>();
+TEST_F(WBERenderDatabaseTest, StoresStaticMeshReferences) {
+    RefRes<RUStaticOpaqueMesh> opaque_mesh = resource_storage.make_object<RUStaticOpaqueMesh>();
+    RefRes<RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh = resource_storage.make_object<RUStaticOpaqueDoubleSidedMesh>();
+    RefRes<RUStaticMaskedMesh> masked_mesh = resource_storage.make_object<RUStaticMaskedMesh>();
 
-    render_database.set_static_opaque_set(opaque_set);
-    render_database.set_static_opaque_double_sided_set(opaque_double_sided_set);
-    render_database.set_static_masked_set(masked_set);
+    render_database.set_static_opaque_mesh(opaque_mesh);
+    render_database.set_static_opaque_double_sided_mesh(opaque_double_sided_mesh);
+    render_database.set_static_masked_mesh(masked_mesh);
 
-    EXPECT_EQ(render_database.get_static_opaque_set(), opaque_set);
-    EXPECT_EQ(render_database.get_static_opaque_double_sided_set(), opaque_double_sided_set);
-    EXPECT_EQ(render_database.get_static_masked_set(), masked_set);
+    EXPECT_EQ(render_database.get_static_opaque_mesh(), opaque_mesh);
+    EXPECT_EQ(render_database.get_static_opaque_double_sided_mesh(), opaque_double_sided_mesh);
+    EXPECT_EQ(render_database.get_static_masked_mesh(), masked_mesh);
 
-    render_database.set_static_opaque_set(MEM_NULL);
-    render_database.set_static_opaque_double_sided_set(MEM_NULL);
-    render_database.set_static_masked_set(MEM_NULL);
-    EXPECT_EQ(render_database.get_static_opaque_set(), MEM_NULL);
-    EXPECT_EQ(render_database.get_static_opaque_double_sided_set(), MEM_NULL);
-    EXPECT_EQ(render_database.get_static_masked_set(), MEM_NULL);
+    render_database.set_static_opaque_mesh(MEM_NULL);
+    render_database.set_static_opaque_double_sided_mesh(MEM_NULL);
+    render_database.set_static_masked_mesh(MEM_NULL);
+    EXPECT_EQ(render_database.get_static_opaque_mesh(), MEM_NULL);
+    EXPECT_EQ(render_database.get_static_opaque_double_sided_mesh(), MEM_NULL);
+    EXPECT_EQ(render_database.get_static_masked_mesh(), MEM_NULL);
 }
 
 TEST_F(WBERenderDatabaseTest, FlattensDynamicLayoutAwareDrawGroupsAndReusesMaterials) {

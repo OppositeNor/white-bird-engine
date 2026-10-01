@@ -163,7 +163,8 @@ TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsRejectEmptyId
     EXPECT_THROW(descriptor.add_image("", {}), std::runtime_error);
     EXPECT_THROW(descriptor.add_image_view("view", ""), std::runtime_error);
     EXPECT_THROW(descriptor.add_sampler(""), std::runtime_error);
-    EXPECT_THROW(descriptor.add_static_set(MEM_NULL), std::runtime_error);
+    EXPECT_THROW(descriptor.add_static_mesh(MEM_NULL), std::runtime_error);
+    EXPECT_THROW(descriptor.add_dynamic_mesh(MEM_NULL), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

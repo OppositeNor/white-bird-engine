@@ -25,7 +25,9 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/dynamic_mesh_resources_vk.hh"
+#include "function/render_vk/i_mesh_compiler_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -159,30 +161,50 @@ RendGraphDescVK& RendGraphDescVK::add_sampler(std::string_view p_resource_id, co
     return *this;
 }
 
-RendGraphDescVK& RendGraphDescVK::add_static_set(Ref<StaticSetResourcesVK> p_static_set) {
-    if (p_static_set == MEM_NULL) {
-        throw std::runtime_error("Failed to add static set to render graph: static set is null.");
+RendGraphDescVK& RendGraphDescVK::add_static_mesh(Ref<StaticMeshResourcesVK> p_static_mesh) {
+    if (p_static_mesh == MEM_NULL) {
+        throw std::runtime_error("Failed to add static mesh to render graph: static mesh is null.");
     }
-    add_resource(REND_RES_STATIC_SET_VERTICES, p_static_set->acquire_vertices())
-        .add_resource(REND_RES_STATIC_SET_INDICES, p_static_set->acquire_indices())
-        .add_resource(REND_RES_STATIC_SET_SUBMESHES, p_static_set->acquire_submeshes())
-        .add_resource(REND_RES_STATIC_SET_NODES, p_static_set->acquire_nodes())
-        .add_resource(REND_RES_STATIC_SET_INSTANCES, p_static_set->acquire_instances())
-        .add_resource(REND_RES_STATIC_SET_TEXTURES, p_static_set->acquire_textures());
-    if (p_static_set->acquire_opaque_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES, p_static_set->acquire_opaque_draw_batches());
+    add_resource(REND_RES_STATIC_MESH_VERTICES, p_static_mesh->acquire_vertices())
+        .add_resource(REND_RES_STATIC_MESH_INDICES, p_static_mesh->acquire_indices())
+        .add_resource(REND_RES_STATIC_MESH_SUBMESHES, p_static_mesh->acquire_submeshes())
+        .add_resource(REND_RES_STATIC_MESH_NODES, p_static_mesh->acquire_nodes())
+        .add_resource(REND_RES_STATIC_MESH_INSTANCES, p_static_mesh->acquire_instances())
+        .add_resource(REND_RES_STATIC_MESH_TEXTURES, p_static_mesh->acquire_textures());
+    if (p_static_mesh->acquire_opaque_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_MESH_OPAQUE_DRAW_BATCHES, p_static_mesh->acquire_opaque_draw_batches());
     }
-    if (p_static_set->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_static_set->acquire_opaque_double_sided_draw_batches());
+    if (p_static_mesh->acquire_opaque_double_sided_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_MESH_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES, p_static_mesh->acquire_opaque_double_sided_draw_batches());
     }
-    if (p_static_set->acquire_masked_draw_batches() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_SET_MASKED_DRAW_BATCHES, p_static_set->acquire_masked_draw_batches());
+    if (p_static_mesh->acquire_masked_draw_batches() != MEM_NULL) {
+        add_resource(REND_RES_STATIC_MESH_MASKED_DRAW_BATCHES, p_static_mesh->acquire_masked_draw_batches());
     }
-    if (p_static_set->acquire_material_params() != MEM_NULL) {
-        add_resource(p_static_set->get_material_params_resource_id(), p_static_set->acquire_material_params());
+    if (p_static_mesh->acquire_material_params() != MEM_NULL) {
+        add_resource(p_static_mesh->get_material_params_resource_id(), p_static_mesh->acquire_material_params());
     }
-    if (p_static_set->acquire_material_sampler() != MEM_NULL) {
-        add_resource(REND_RES_STATIC_SET_MATERIAL_SAMPLER, p_static_set->acquire_material_sampler());
+    if (p_static_mesh->acquire_material_sampler() != MEM_NULL) {
+        add_resource(REND_RES_MESH_MATERIAL_SAMPLER, p_static_mesh->acquire_material_sampler());
+    }
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_dynamic_mesh(Ref<DynamicMeshResourcesVK> p_dynamic_mesh) {
+    if (p_dynamic_mesh == MEM_NULL) {
+        throw std::runtime_error("Failed to add dynamic mesh to render graph: dynamic mesh is null.");
+    }
+    add_resource(REND_RES_DYNAMIC_MESH_VERTICES, p_dynamic_mesh->acquire_vertices())
+        .add_resource(REND_RES_DYNAMIC_MESH_INDICES, p_dynamic_mesh->acquire_indices())
+        .add_resource(REND_RES_DYNAMIC_MESH_DRAW_BATCHES, p_dynamic_mesh->acquire_draw_batches())
+        .add_resource(REND_RES_DYNAMIC_MESH_SUBMESHES, p_dynamic_mesh->acquire_submeshes())
+        .add_resource(REND_RES_DYNAMIC_MESH_NODES, p_dynamic_mesh->acquire_nodes())
+        .add_resource(REND_RES_DYNAMIC_MESH_INSTANCES, p_dynamic_mesh->acquire_instances())
+        .add_resource(REND_RES_DYNAMIC_MESH_TEXTURES, p_dynamic_mesh->acquire_textures());
+    if (p_dynamic_mesh->acquire_material_params() != MEM_NULL) {
+        add_resource(REND_RES_DYNAMIC_MESH_MATERIAL_PARAMS, p_dynamic_mesh->acquire_material_params());
+    }
+    if (p_dynamic_mesh->acquire_material_sampler() != MEM_NULL) {
+        add_resource(REND_RES_DYNAMIC_MESH_MATERIAL_SAMPLER, p_dynamic_mesh->acquire_material_sampler());
     }
     return *this;
 }

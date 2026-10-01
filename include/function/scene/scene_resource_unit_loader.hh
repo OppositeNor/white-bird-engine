@@ -53,7 +53,7 @@ public:
  * @class ResourceUnitLoaderWorld
  * @brief Unregistered loader that populates RUWorld resources.
  *
- * Population throws std::runtime_error when the scheme is not an RUSchemaWorld or the static set id is empty.
+ * Population throws std::runtime_error when the scheme is not an RUSchemaWorld or the static mesh id is empty.
  */
 class ResourceUnitLoaderWorld final : public IResourceUnitLoader {
 public:

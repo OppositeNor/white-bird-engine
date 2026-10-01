@@ -238,7 +238,7 @@ struct MaterialParamsBuffer {
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
-/** Per-submesh metadata for one static-set draw entry. */
+/** Per-submesh metadata for one static-mesh draw entry. */
 [WBE_DATA_TYPE]
 struct SubmeshData {
     /** Material table entry used by this submesh. */
@@ -248,7 +248,7 @@ struct SubmeshData {
     uint padding_2;
 };
 
-/** Per-node transform payload referenced by static-set instances. */
+/** Per-node transform payload referenced by static-mesh instances. */
 [WBE_DATA_TYPE]
 struct NodeData {
     /** Engine-space column-major global transform. */
@@ -260,18 +260,18 @@ struct NodeData {
 /** Per-drawn-instance metadata linking one submesh to one node transform. */
 [WBE_DATA_TYPE]
 struct InstanceData {
-    /** Index into the static_set.submeshes storage buffer. */
+    /** Index into the mesh.submeshes storage buffer. */
     uint submesh_index;
-    /** Index into the static_set.nodes storage buffer. */
+    /** Index into the mesh.nodes storage buffer. */
     uint node_index;
     uint padding_0;
     uint padding_1;
 };
 
 #ifdef WBE_REFLECTION_METADATA
-/** Reflection-only view of the static-set storage-buffer contract. */
+/** Reflection-only view of the static-mesh storage-buffer contract. */
 [WBE_DATA_TYPE]
-struct StaticSetContractMetadata {
+struct MeshContractMetadata {
     StructuredBuffer<SubmeshData> submeshes;
     StructuredBuffer<NodeData> nodes;
     StructuredBuffer<InstanceData> instances;
@@ -279,14 +279,14 @@ struct StaticSetContractMetadata {
 #endif
 
 /**
- * @brief Static geometry storage buffers matching the renderer's static_set binding contract.
+ * @brief Static geometry storage buffers matching the renderer's mesh binding contract.
  */
-struct StaticSetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_submeshes", "read")]
+struct MeshDescriptorIndices {
+    [WBE_DESCRIPTOR("storage_buffer", "mesh_submeshes", "read")]
     uint2 submeshes;
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_nodes", "read")]
+    [WBE_DESCRIPTOR("storage_buffer", "mesh_nodes", "read")]
     uint2 nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "static_set_instances", "read")]
+    [WBE_DESCRIPTOR("storage_buffer", "mesh_instances", "read")]
     uint2 instances;
 };
 

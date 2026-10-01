@@ -40,8 +40,8 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/static_set_compiler_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/static_mesh_compiler_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "input_manager_mocked.hh"
 #include "i_octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -194,8 +194,8 @@ private:
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
-    RefRes<RUStaticOpaqueSet> sponza_opaque_set;
-    RefRes<RUStaticOpaqueDoubleSidedSet> sponza_opaque_double_sided_set;
+    RefRes<RUStaticOpaqueMesh> sponza_opaque_set;
+    RefRes<RUStaticOpaqueDoubleSidedMesh> sponza_opaque_double_sided_set;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
     RefRes<RUGraphicsPipeline> shadow_double_sided_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
@@ -212,7 +212,7 @@ private:
     RefRes<RUShader> kawase_blur_ping_write_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
-    Ref<StaticSetResourcesVK> static_set_resources = MEM_NULL;
+    Ref<StaticMeshResourcesVK> static_mesh_resources = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;

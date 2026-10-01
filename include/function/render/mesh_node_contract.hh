@@ -12,48 +12,48 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_SET_NODE_CONTRACT_HH
-#define WBE_FILE_STATIC_SET_NODE_CONTRACT_HH
+#ifndef WBE_FILE_MESH_NODE_CONTRACT_HH
+#define WBE_FILE_MESH_NODE_CONTRACT_HH
 
 #include <cstddef>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class StaticSetNodeContract
- * @brief Reflected byte layout of one shader-side static-set node element.
+ * @class MeshNodeContract
+ * @brief Reflected byte layout of one shader-side mesh node element.
  */
-class StaticSetNodeContract final {
+class MeshNodeContract final {
 public:
     /**
      * @brief Construct an empty contract.
      */
-    StaticSetNodeContract() = default;
+    MeshNodeContract() = default;
     /**
      * @brief Destroy a contract.
      */
-    ~StaticSetNodeContract() = default;
+    ~MeshNodeContract() = default;
     /**
      * @brief Copy a contract.
      */
-    StaticSetNodeContract(const StaticSetNodeContract&) = default;
+    MeshNodeContract(const MeshNodeContract&) = default;
     /**
      * @brief Move a contract.
      */
-    StaticSetNodeContract(StaticSetNodeContract&&) noexcept = default;
+    MeshNodeContract(MeshNodeContract&&) noexcept = default;
     /**
      * @brief Copy a contract.
      */
-    StaticSetNodeContract& operator=(const StaticSetNodeContract&) = default;
+    MeshNodeContract& operator=(const MeshNodeContract&) = default;
     /**
      * @brief Move a contract.
      */
-    StaticSetNodeContract& operator=(StaticSetNodeContract&&) noexcept = default;
+    MeshNodeContract& operator=(MeshNodeContract&&) noexcept = default;
 
     /**
      * @brief Test exact byte-layout compatibility with another contract.
      */
-    bool matches(const StaticSetNodeContract& p_other) const;
+    bool matches(const MeshNodeContract& p_other) const;
 
     /** Byte stride between reflected node elements. */
     size_t element_stride = 0;

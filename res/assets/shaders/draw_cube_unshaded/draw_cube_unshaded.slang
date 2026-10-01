@@ -16,7 +16,7 @@
 #include "utils.slang"
 
 #ifdef WBE_REFLECTION_METADATA
-ParameterBlock<StaticSetContractMetadata> static_set;
+ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 /**
@@ -46,23 +46,23 @@ struct Vertex3DUnshadedInput {
 struct DrawCubeUnshadedDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform an unshaded static-set vertex into clip space.
+ * @brief Transform an unshaded static-mesh vertex into clip space.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Vertex output for the unshaded fragment stage.
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
     InstanceData instance = instances[p_instance_id];
     NodeData node = nodes[instance.node_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));

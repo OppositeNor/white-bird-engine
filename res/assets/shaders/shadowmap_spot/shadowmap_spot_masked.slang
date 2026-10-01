@@ -18,7 +18,7 @@
 #ifdef WBE_REFLECTION_METADATA
 ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<MaterialTextureContractMetadata> material_textures;
-ParameterBlock<StaticSetContractMetadata> static_set;
+ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 struct MaskedShadowVSOutput {
@@ -34,24 +34,24 @@ struct MaskedShadowDescriptorIndices {
     uint2 material_params;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<MaskedShadowDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a masked static-set vertex and resolve its material identifier.
+ * @brief Transform a masked static-mesh vertex and resolve its material identifier.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Clip-space vertex output with material metadata.
  */
 [shader("vertex")]
 MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
     float4 world_position = mul(nodes[instance.node_index].transform, float4(p_input.position.xyz, 1.0));
     MaskedShadowVSOutput output;

@@ -236,7 +236,7 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    p_pipeline_desc.add_static_set(static_set_resources);
+    p_pipeline_desc.add_static_mesh(static_mesh_resources);
     dynamic_mesh->register_resources(p_pipeline_desc);
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, gbuffer_camera_info_ubos)

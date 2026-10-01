@@ -48,10 +48,10 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaPrefab : public RUSchema {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaWorldStaticComponent {
     /**
-     * @brief Non-empty resource id of the static set rendered by the world.
+     * @brief Non-empty resource id of the static mesh rendered by the world.
      */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string static_set_render;
+    std::string static_mesh_render;
 };
 
 /**
@@ -102,8 +102,8 @@ struct RUPrefab : public ResourceUnit {};
  * Non-owning view into its resource chunk; copyable and movable with shallow chunk references.
  */
 struct RUWorldStaticComponent {
-    /** Chunk-owned, non-empty, NUL-terminated resource id of the static set rendered by the world. */
-    RefRes<char> static_set_render;
+    /** Chunk-owned, non-empty, NUL-terminated resource id of the static mesh rendered by the world. */
+    RefRes<char> static_mesh_render;
 };
 
 /**

@@ -92,7 +92,7 @@ protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
-class ResourceUnitLoaderStaticOpaqueSet final : public IResourceUnitLoader {
+class ResourceUnitLoaderStaticOpaqueMesh final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
@@ -104,7 +104,7 @@ protected:
 /**
  * @brief Loads opaque double-sided static geometry.
  */
-class ResourceUnitLoaderStaticOpaqueDoubleSidedSet final : public IResourceUnitLoader {
+class ResourceUnitLoaderStaticOpaqueDoubleSidedMesh final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
@@ -113,7 +113,7 @@ protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
-class ResourceUnitLoaderStaticMaskedSet final : public IResourceUnitLoader {
+class ResourceUnitLoaderStaticMaskedMesh final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
     virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;

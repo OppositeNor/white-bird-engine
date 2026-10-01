@@ -43,7 +43,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/static_set_buffer_compiler_vk.hh"
+#include "function/render_vk/mesh_buffer_compiler_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
 #include "platform/file_system/path.hh"
@@ -1704,13 +1704,13 @@ void RendererVK::update_render_graph_resources(
         "RendererVK: late render-graph resource updates are not supported for '{}'. Bind resources before graph build.", p_resource_key));
 }
 
-void RendererVK::update_static_geometry_sets() {
+void RendererVK::update_static_meshes() {
     WBE_DEBUG_ASSERT(render_database != MEM_NULL);
     synchronize_gpu_and_flush_delayed_calls();
 
-    RefRes<RUStaticOpaqueSet> static_opaque_set = render_database->get_static_opaque_set();
-    RefRes<RUStaticOpaqueDoubleSidedSet> double_sided_set = render_database->get_static_opaque_double_sided_set();
-    RefRes<RUStaticGeometrySet> geometry_set = static_opaque_set;
+    RefRes<RUStaticOpaqueMesh> static_opaque_mesh = render_database->get_static_opaque_mesh();
+    RefRes<RUStaticOpaqueDoubleSidedMesh> double_sided_set = render_database->get_static_opaque_double_sided_mesh();
+    RefRes<RUStaticMesh> geometry_set = static_opaque_mesh;
     if (geometry_set == MEM_NULL || geometry_set->submesh_count == 0) {
         geometry_set = double_sided_set;
     }
@@ -1722,10 +1722,10 @@ void RendererVK::update_static_geometry_sets() {
             vertex_usage |= buffer_usage.vertex_buffer_usage;
             index_usage |= buffer_usage.index_buffer_usage;
         }
-        StaticSetBufferCompilerVK::BuildResult geometry_buffers =
-            StaticSetBufferCompilerVK(&base_render_data).build(geometry_set, vertex_usage, index_usage);
+        MeshBufferCompilerVK::BuildResult geometry_buffers =
+            MeshBufferCompilerVK(&base_render_data).build(geometry_set, vertex_usage, index_usage);
         if (double_sided_set != MEM_NULL && double_sided_set->submesh_count > 0) {
-            auto double_sided_buffers = StaticSetBufferCompilerVK(&base_render_data).build(double_sided_set, vertex_usage, index_usage);
+            auto double_sided_buffers = MeshBufferCompilerVK(&base_render_data).build(double_sided_set, vertex_usage, index_usage);
             if (geometry_buffers.vertex_buffer != double_sided_buffers.vertex_buffer ||
                 geometry_buffers.index_buffer != double_sided_buffers.index_buffer) {
                 throw std::runtime_error("Static opaque categories must share vertex and index buffers.");
@@ -1734,8 +1734,8 @@ void RendererVK::update_static_geometry_sets() {
         render_objects->static_opaque_vertices = geometry_buffers.vertex_buffer;
         render_objects->static_opaque_indices = geometry_buffers.index_buffer;
         for (auto& plugin : registered_plugins) {
-            auto plugin_job = plugin->on_static_opaque_set_updated(
-                &base_render_data, static_opaque_set, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer, double_sided_set);
+            auto plugin_job = plugin->on_static_opaque_mesh_updated(
+                &base_render_data, static_opaque_mesh, geometry_buffers.vertex_buffer, geometry_buffers.index_buffer, double_sided_set);
             if (plugin_job) {
                 register_gpu_job(std::move(plugin_job));
             }
@@ -1746,7 +1746,7 @@ void RendererVK::update_static_geometry_sets() {
     render_objects->static_opaque_vertices = MEM_NULL;
     render_objects->static_opaque_indices = MEM_NULL;
     for (auto& plugin : registered_plugins) {
-        auto plugin_job = plugin->on_static_opaque_set_updated(&base_render_data, MEM_NULL, MEM_NULL, MEM_NULL);
+        auto plugin_job = plugin->on_static_opaque_mesh_updated(&base_render_data, MEM_NULL, MEM_NULL, MEM_NULL);
         if (plugin_job) {
             register_gpu_job(std::move(plugin_job));
         }

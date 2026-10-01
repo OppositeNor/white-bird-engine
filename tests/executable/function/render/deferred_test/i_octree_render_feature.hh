@@ -24,7 +24,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/static_set_resources_vk.hh"
+#include "function/render_vk/static_mesh_resources_vk.hh"
 #include "glm/ext/vector_float3.hpp"
 #include <atomic>
 #include <cstddef>
@@ -150,7 +150,7 @@ protected:
      * for observing its per-frame cost. Dynamic construction is unaffected either way.
      */
     IOctreeRenderFeature(RendererVK* p_renderer,
-        Ref<StaticSetResourcesVK> p_static_set_resources,
+        Ref<StaticMeshResourcesVK> p_static_mesh_resources,
         const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
         std::string_view p_shader_prefix,
         std::string_view p_dynamic_shader_prefix,
@@ -338,7 +338,7 @@ private:
     RendTaskDescVK get_debug_capture_render_task_desc(std::string_view p_task_id, VoxelDebugViewMode p_mode) const;
     RendTaskDescVK get_dynamic_clear_task_desc() const;
 
-    Ref<StaticSetResourcesVK> static_set_resources;
+    Ref<StaticMeshResourcesVK> static_mesh_resources;
     const std::atomic<VoxelDebugViewMode>* debug_view_mode;
     // Skips the run-once wrappers so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;

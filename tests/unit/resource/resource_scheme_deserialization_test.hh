@@ -377,20 +377,20 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshEmpty) {
     ASSERT_TRUE(scheme.submeshes_id.empty());
 }
 
-TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueMeshGeneral) {
     std::string json_buffer = R"(
     {
-        "id": "static_set_01",
-        "type": "static_opaque_set",
+        "id": "static_mesh_01",
+        "type": "static_opaque_mesh",
         "submeshes": [
             {
                 "material_id": "material_01",
                 "vertices": {
-                    "binary": {"binary_id": "static_set_01.vertices", "start": 0, "size": 36},
+                    "binary": {"binary_id": "static_mesh_01.vertices", "start": 0, "size": 36},
                     "stride": 12,
                     "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
                 },
-                "indices": {"binary": {"binary_id": "static_set_01.indices", "start": 0, "size": 12}},
+                "indices": {"binary": {"binary_id": "static_mesh_01.indices", "start": 0, "size": 12}},
                 "first_instance": 1,
                 "instance_count": 2
             }
@@ -403,17 +403,17 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemaStaticOpaqueSet scheme;
+    WBE::RUSchemaStaticOpaqueMesh scheme;
     scheme.deserialize(parser.get_data());
-    ASSERT_EQ(scheme.id, "static_set_01");
-    ASSERT_EQ(scheme.type, "static_opaque_set");
+    ASSERT_EQ(scheme.id, "static_mesh_01");
+    ASSERT_EQ(scheme.type, "static_opaque_mesh");
     ASSERT_EQ(scheme.submeshes.size(), 1U);
     ASSERT_TRUE(scheme.submeshes[0].material_id.has_value());
     ASSERT_EQ(scheme.submeshes[0].material_id.value(), "material_01");
-    ASSERT_EQ(scheme.submeshes[0].vertices.binary.binary_id, "static_set_01.vertices");
+    ASSERT_EQ(scheme.submeshes[0].vertices.binary.binary_id, "static_mesh_01.vertices");
     ASSERT_EQ(scheme.submeshes[0].vertices.stride, 12U);
     ASSERT_EQ(scheme.submeshes[0].vertices.attributes[0].role, "position");
-    ASSERT_EQ(scheme.submeshes[0].indices.binary.binary_id, "static_set_01.indices");
+    ASSERT_EQ(scheme.submeshes[0].indices.binary.binary_id, "static_mesh_01.indices");
     ASSERT_EQ(scheme.submeshes[0].indices.binary.start, 0U);
     ASSERT_EQ(scheme.submeshes[0].first_instance, 1U);
     ASSERT_EQ(scheme.submeshes[0].instance_count, 2U);
@@ -423,21 +423,21 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticOpaqueSetGeneral) {
     ASSERT_EQ(scheme.instances[1].global_transform[3][2], 4.0F);
 }
 
-TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticMaskedSetEmpty) {
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaStaticMaskedMeshEmpty) {
     std::string json_buffer = R"(
     {
-        "id": "static_masked_set_01",
-        "type": "static_masked_set",
+        "id": "static_masked_mesh_01",
+        "type": "static_masked_mesh",
         "submeshes": [],
         "instances": []
     }
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
-    WBE::RUSchemaStaticMaskedSet scheme;
+    WBE::RUSchemaStaticMaskedMesh scheme;
     scheme.deserialize(parser.get_data());
-    ASSERT_EQ(scheme.id, "static_masked_set_01");
-    ASSERT_EQ(scheme.type, "static_masked_set");
+    ASSERT_EQ(scheme.id, "static_masked_mesh_01");
+    ASSERT_EQ(scheme.type, "static_masked_mesh");
     ASSERT_TRUE(scheme.submeshes.empty());
     ASSERT_TRUE(scheme.instances.empty());
 }

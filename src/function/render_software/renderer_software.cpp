@@ -66,7 +66,7 @@ void RendererSoftware::update_render_graph_resources(
     // TODO
     throw std::runtime_error("Not implemented.");
 }
-void RendererSoftware::update_static_geometry_sets() {
+void RendererSoftware::update_static_meshes() {
     // TODO
 }
 std::future<void> RendererSoftware::add_job(std::function<void()> p_job) {

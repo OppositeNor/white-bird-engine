@@ -18,7 +18,7 @@
 #ifdef WBE_REFLECTION_METADATA
 ConstantBuffer<MaterialParamsBuffer> material_params;
 ParameterBlock<MaterialTextureContractMetadata> material_textures;
-ParameterBlock<StaticSetContractMetadata> static_set;
+ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 struct RSMVSOutput {
@@ -38,7 +38,7 @@ struct RSMDescriptorIndices {
     uint2 material_params;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
-    StaticSetDescriptorIndices static_set;
+    MeshDescriptorIndices mesh;
 };
 
 [[vk::push_constant]]
@@ -68,17 +68,17 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
 }
 
 /**
- * @brief Transform a static-set vertex for reflective shadow-map rendering.
+ * @brief Transform a static-mesh vertex for reflective shadow-map rendering.
  * @param p_input Incoming vertex attributes.
- * @param p_instance_id Index into static_set.instances.
+ * @param p_instance_id Index into mesh.instances.
  * @return Reflective shadow-map vertex output.
  */
 [shader("vertex")]
 RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
     NodeData node = nodes[instance.node_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));

@@ -15,8 +15,8 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
-#include "function/render/static_set_node_contract.hh"
-#include "function/render/static_set_node_contract_resolver.hh"
+#include "function/render/mesh_node_contract.hh"
+#include "function/render/mesh_node_contract_resolver.hh"
 #include "platform/file_system/path.hh"
 #include <algorithm>
 #include <array>
@@ -132,10 +132,10 @@ TEST(WBEShaderMetadataVKTest, PreservesWrappedTypeAttributesAndNames) {
     {
         "parameters": [
             {
-                "name": "static_set",
+                "name": "mesh",
                 "type": {
                     "kind": "parameterBlock",
-                    "name": "StaticSetContractMetadata",
+                    "name": "MeshContractMetadata",
                     "user_attributes": [{"name": "WBE_DATA_TYPE", "arguments": []}],
                     "fields": [
                         {
@@ -171,7 +171,7 @@ TEST(WBEShaderMetadataVKTest, PreservesWrappedTypeAttributesAndNames) {
     ASSERT_EQ(metadata.parameters.size(), 1U);
     const ShaderMetadataParameter& parameter = metadata.parameters[0];
     EXPECT_EQ(parameter.type.kind, "parameterBlock");
-    EXPECT_EQ(parameter.type.name, "StaticSetContractMetadata");
+    EXPECT_EQ(parameter.type.name, "MeshContractMetadata");
     ASSERT_EQ(parameter.type.user_attributes.size(), 1U);
     EXPECT_EQ(parameter.type.user_attributes[0].name, "WBE_DATA_TYPE");
     EXPECT_TRUE(parameter.type.user_attributes[0].arguments.empty());
@@ -373,7 +373,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
     }
 }
 
-TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetadata) {
+TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) {
     ParserJSON parser;
     parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
@@ -386,17 +386,17 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
     EXPECT_EQ(parameter->type.kind, "constantBuffer");
     EXPECT_EQ(parameter->binding.kind, "pushConstantBuffer");
 
-    auto static_set = std::ranges::find_if(parameter->type.fields, [](const ShaderMetadataTypeField& p_field) {
-        return p_field.name == "static_set";
+    auto mesh = std::ranges::find_if(parameter->type.fields, [](const ShaderMetadataTypeField& p_field) {
+        return p_field.name == "mesh";
     });
-    ASSERT_NE(static_set, parameter->type.fields.end());
-    EXPECT_EQ(static_set->type.kind, "struct");
+    ASSERT_NE(mesh, parameter->type.fields.end());
+    EXPECT_EQ(mesh->type.kind, "struct");
 
     const std::array<std::string_view, 3> expected_names{"submeshes", "nodes", "instances"};
-    const std::array<std::string_view, 3> expected_resource_ids{"static_set_submeshes", "static_set_nodes", "static_set_instances"};
-    ASSERT_EQ(static_set->fields.size(), expected_names.size());
+    const std::array<std::string_view, 3> expected_resource_ids{"mesh_submeshes", "mesh_nodes", "mesh_instances"};
+    ASSERT_EQ(mesh->fields.size(), expected_names.size());
     for (size_t i = 0; i < expected_names.size(); ++i) {
-        const ShaderMetadataTypeField& field = static_set->fields[i];
+        const ShaderMetadataTypeField& field = mesh->fields[i];
         EXPECT_EQ(field.name, expected_names[i]);
         EXPECT_EQ(field.type.kind, "vector");
         EXPECT_EQ(field.type.element_scalar_type, "uint32");
@@ -412,13 +412,13 @@ TEST(WBEShaderMetadataVKTest, LoadsStaticSetStorageBuffersFromCompiledSlangMetad
     }
 }
 
-TEST(WBEShaderMetadataVKTest, LoadsStaticSetNodeContractFromCompiledSlangMetadata) {
+TEST(WBEShaderMetadataVKTest, LoadsMeshNodeContractFromCompiledSlangMetadata) {
     ParserJSON parser;
     parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
-    const StaticSetNodeContract contract = StaticSetNodeContractResolver().resolve(metadata, "static_set");
+    const MeshNodeContract contract = MeshNodeContractResolver().resolve(metadata, "mesh");
     EXPECT_EQ(contract.element_stride, 128U);
     EXPECT_EQ(contract.transform_offset, 0U);
     EXPECT_EQ(contract.normal_transform_offset, 64U);

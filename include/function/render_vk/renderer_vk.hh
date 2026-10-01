@@ -120,7 +120,7 @@ public:
         return render_database;
     }
 
-    virtual void update_static_geometry_sets() override;
+    virtual void update_static_meshes() override;
 
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
