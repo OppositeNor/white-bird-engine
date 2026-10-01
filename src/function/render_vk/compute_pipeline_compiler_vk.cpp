@@ -29,21 +29,6 @@
 #include <string_view>
 
 namespace WhiteBirdEngine {
-namespace {
-
-std::string get_stage_entry(RefRes<char> p_stage_entry) {
-    if (p_stage_entry == nullptr || p_stage_entry.get()[0] == '\0') {
-        return {};
-    }
-    return std::string(p_stage_entry.get());
-}
-
-std::string resolve_compute_stage_entry(RefRes<RUShader> p_shader_resource, const ShaderMetadata& p_metadata) {
-    std::string compute_entry = get_stage_entry(p_shader_resource->compute_entry);
-    return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, "compute", compute_entry).name);
-}
-
-} // namespace
 
 ComputePipelineCompilerVK::ComputePipelineCompilerVK(const ComputePipelineCompilerVKContext& p_context)
     : PipelineCompilerVK(
@@ -63,7 +48,8 @@ ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
     }
     Ref<ROShaderVK> compute_shader = compile_shader(p_shader_resource);
     ShaderMetadata shader_metadata = ShaderMetadataLoader().load(p_shader_resource);
-    std::string compute_entry = resolve_compute_stage_entry(p_shader_resource, shader_metadata);
+    // Compute shaders are compiled from shader resources directly, so the shader must reflect exactly one compute entry point.
+    std::string compute_entry(ShaderMetadataQuery().resolve_entry_point(shader_metadata, "compute", {}).name);
     ShaderDescriptorHeapLayoutVK descriptor_layout = collect_shader_descriptor_heap_layout(shader_metadata, "compute", compute_entry);
     Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry);
     compute_pipeline->set_descriptor_layout(descriptor_layout);

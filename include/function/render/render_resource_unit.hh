@@ -51,36 +51,6 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaShader : public RUSchema {
     // The path to the shader's metadata file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string metadata;
-    // Default vertex entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> vertex_entry;
-    // Default tessellation entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> tessellation_entry;
-    // Default geometry entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> geometry_entry;
-    // Default fragment entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> fragment_entry;
-    // Default compute entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> compute_entry;
-    // Default ray-generation entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> raygen_entry;
-    // Default miss entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> miss_entry;
-    // Default closest-hit entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> closest_hit_entry;
-    // Default any-hit entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> any_hit_entry;
-    // Default intersection-shader entry discovered for this shader module.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> intersection_shader_entry;
 };
 
 /**
@@ -418,26 +388,6 @@ struct RUShader : public ResourceUnit {
     size_t size;
     // The path to the metadata. Ending with an NUL terminater.
     RefRes<char> metadata_path;
-    // Default vertex entry for this shader module.
-    RefRes<char> vertex_entry;
-    // Default tessellation entry for this shader module.
-    RefRes<char> tessellation_entry;
-    // Default geometry entry for this shader module.
-    RefRes<char> geometry_entry;
-    // Default fragment entry for this shader module.
-    RefRes<char> fragment_entry;
-    // Default compute entry for this shader module.
-    RefRes<char> compute_entry;
-    // Default ray-generation entry for this shader module.
-    RefRes<char> raygen_entry;
-    // Default miss entry for this shader module.
-    RefRes<char> miss_entry;
-    // Default closest-hit entry for this shader module.
-    RefRes<char> closest_hit_entry;
-    // Default any-hit entry for this shader module.
-    RefRes<char> any_hit_entry;
-    // Default intersection-shader entry for this shader module.
-    RefRes<char> intersection_shader_entry;
 };
 
 /**

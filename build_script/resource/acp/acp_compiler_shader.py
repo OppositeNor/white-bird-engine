@@ -71,7 +71,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
             source_file_path, _ = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
             dst_rel = self._normalize_resource_path(destination_rel_path, manifest_path)
             self._compile_resource(
-                source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions, result
+                source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions
             )
             result["path"] = dst_rel.as_posix()
             result["metadata"] = metadata_rel.as_posix()
@@ -125,7 +125,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
     def _compile_resource(self, source_file_path: Path, destination_rel_path: Path,
                           metadata_rel_path: Path, res_output_dir: Path,
                           stage: str | None, entry: str | None,
-                          macro_definitions: list[str], resource: ManifestResource) -> None:
+                          macro_definitions: list[str]) -> None:
         output_file_path = Path.joinpath(res_output_dir, destination_rel_path)
         shader_metadata_file_path = Path.joinpath(res_output_dir, metadata_rel_path)
 
@@ -136,7 +136,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
         os.makedirs(shader_metadata_file_path.parent, exist_ok=True)
         if source_file_path.suffix == ".slang":
             self._compile_slang(
-                source_file_path, output_file_path, shader_metadata_file_path, stage, entry, macro_definitions, resource
+                source_file_path, output_file_path, shader_metadata_file_path, stage, entry, macro_definitions
             )
         else:
             raise RuntimeError(f"Unsupported shader file type: {source_file_path.suffix}.")
@@ -156,7 +156,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
 
     def _compile_slang(self, shader_file: Path, output_file: Path,
                        shader_metadata_file_path: Path, stage: str | None, entry: str | None,
-                       macro_definitions: list[str], resource: ManifestResource) -> None:
+                       macro_definitions: list[str]) -> None:
         shader_stage = stage
         entry_name = entry
 
@@ -190,7 +190,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
                 shader_stage,
                 entry_name,
                 macro_definitions,
-                resource,
             )
             return
         raise RuntimeError("Failed to find valid slang compiler.")
@@ -198,7 +197,7 @@ class WBEACPCompilerShader(WBEACPCompiler):
     def _compile_slangc_slang(self, slangc_path: str, shader_file: Path,
                               output_file: Path, shader_metadata_file: Path,
                               shader_stage: str | None, entry_name: str | None,
-                              macro_definitions: list[str], resource: ManifestResource) -> None:
+                              macro_definitions: list[str]) -> None:
         cmd = [
             slangc_path,
             "-target", "spirv",
@@ -241,7 +240,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
         reflection_output_file.unlink(missing_ok=True)
         with open(shader_metadata_file, "r", encoding="utf-8") as metadata_file:
             raw_metadata = json.load(metadata_file)
-        self._apply_discovered_stage_entries(resource, raw_metadata)
         self._write_normalized_shader_metadata(shader_metadata_file, raw_metadata)
 
     def _validate_spirv_shader(self, shader_file: Path, output_file: Path) -> None:
@@ -269,38 +267,6 @@ class WBEACPCompilerShader(WBEACPCompiler):
         if result.stderr:
             print(result.stderr)
         raise RuntimeError("Failed to validate compiled shader SPIR-V.")
-
-    def _apply_discovered_stage_entries(self, resource: ManifestResource, raw_metadata: dict[str, Any]) -> None:
-
-        stage_entry_keys: dict[str, str] = {
-            "vertex": "vertex_entry",
-            "vert": "vertex_entry",
-            "tesscontrol": "tessellation_entry",
-            "tesc": "tessellation_entry",
-            "tesseval": "tessellation_entry",
-            "tese": "tessellation_entry",
-            "geometry": "geometry_entry",
-            "geom": "geometry_entry",
-            "fragment": "fragment_entry",
-            "frag": "fragment_entry",
-            "compute": "compute_entry",
-            "comp": "compute_entry",
-        }
-        discovered_entries: dict[str, str] = {}
-        for raw_entry_point in raw_metadata.get("entryPoints", []):
-            if not isinstance(raw_entry_point, dict):
-                continue
-            entry_stage = raw_entry_point.get("stage")
-            entry_name = raw_entry_point.get("name")
-            if not isinstance(entry_stage, str) or not isinstance(entry_name, str):
-                continue
-            entry_key = stage_entry_keys.get(entry_stage)
-            if entry_key is None or entry_key in discovered_entries:
-                continue
-            discovered_entries[entry_key] = entry_name
-
-        for entry_key, entry_name in discovered_entries.items():
-            resource[entry_key] = entry_name
 
     def _write_normalized_shader_metadata(self, shader_metadata_file: Path, raw_metadata: dict[str, Any]) -> None:
         normalized_metadata = self._transform_shader_metadata(raw_metadata)

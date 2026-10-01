@@ -46,6 +46,7 @@
             "type": "graphics_pipeline",
             "vertex_stage_id": "rsm_spot_shader",
             "fragment_stage_id": "rsm_spot_shader",
+            "fragment_stage_entry": "fragment_main",
             "depth_test": true,
             "depth_write": true,
             "color_blend": false
@@ -91,6 +92,7 @@
             "type": "graphics_pipeline",
             "vertex_stage_id": "rsm_spot_shader",
             "fragment_stage_id": "rsm_spot_shader",
+            "fragment_stage_entry": "fragment_main",
             "depth_test": true,
             "depth_write": true,
             "color_blend": false

@@ -40,6 +40,10 @@
 namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
+struct RendBufferDeclVK;
+struct RendImageDeclVK;
+struct RendImageViewDeclVK;
+struct RendSamplerDeclVK;
 struct RGNode;
 
 /**
@@ -330,6 +334,11 @@ private:
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
     void allocate_resources(const RendGraphDescVK& p_desc);
+    void validate_graph_resource_ids(const RendGraphDescVK& p_desc) const;
+    void allocate_buffer(const RendBufferDeclVK& p_buffer_decl);
+    void allocate_image(const RendImageDeclVK& p_image_decl);
+    void allocate_image_view(const RendImageViewDeclVK& p_view_decl);
+    void allocate_sampler(const RendSamplerDeclVK& p_sampler_decl);
     void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
     Ref<RenderObjectContainerVK> create_container(bool p_per_frame, const std::function<Ref<IRenderObjectVK>(uint32_t)>& p_factory) const;
     void instantiate_tasks(RendGraphDescVK& p_desc);

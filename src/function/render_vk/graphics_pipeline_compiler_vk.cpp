@@ -49,28 +49,9 @@ std::string get_stage_entry(RefRes<char> p_stage_entry) {
     return std::string(p_stage_entry.get());
 }
 
-std::string get_shader_resource_stage_entry(RefRes<RUShader> p_shader, std::string_view p_stage) {
-    if (p_shader == nullptr) {
-        return {};
-    }
-    RefRes<char> stage_entry;
-    if (p_stage == "vertex") {
-        stage_entry = p_shader->vertex_entry;
-    } else if (p_stage == "fragment") {
-        stage_entry = p_shader->fragment_entry;
-    } else if (p_stage == "geometry") {
-        stage_entry = p_shader->geometry_entry;
-    }
-    return get_stage_entry(stage_entry);
-}
-
-std::string resolve_pipeline_stage_entry(
-    RefRes<RUShader> p_shader, const ShaderMetadata& p_metadata, std::string_view p_stage, RefRes<char> p_stage_entry) {
-    std::string resolved_stage_entry = get_stage_entry(p_stage_entry);
-    if (resolved_stage_entry.empty()) {
-        resolved_stage_entry = get_shader_resource_stage_entry(p_shader, p_stage);
-    }
-    return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, resolved_stage_entry).name);
+std::string resolve_pipeline_stage_entry(const ShaderMetadata& p_metadata, std::string_view p_stage, RefRes<char> p_stage_entry) {
+    // An empty entry resolves to the stage's only reflected entry point; a stage with several must be named by the pipeline.
+    return std::string(ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, get_stage_entry(p_stage_entry)).name);
 }
 
 } // namespace
@@ -102,8 +83,7 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
     ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline_resource->vertex_stage);
     std::optional<ShaderMetadata> geometry_metadata;
     ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline_resource->fragment_stage);
-    std::string vertex_entry = resolve_pipeline_stage_entry(
-        p_pipeline_resource->vertex_stage, vertex_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
+    std::string vertex_entry = resolve_pipeline_stage_entry(vertex_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
     std::string geometry_entry;
     if (p_pipeline_resource->geometry_stage != nullptr) {
         VkPhysicalDeviceFeatures supported_features{};
@@ -114,11 +94,9 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
         }
         geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
         geometry_metadata = ShaderMetadataLoader().load(p_pipeline_resource->geometry_stage);
-        geometry_entry = resolve_pipeline_stage_entry(
-            p_pipeline_resource->geometry_stage, *geometry_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
+        geometry_entry = resolve_pipeline_stage_entry(*geometry_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
     }
-    std::string fragment_entry = resolve_pipeline_stage_entry(
-        p_pipeline_resource->fragment_stage, fragment_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
+    std::string fragment_entry = resolve_pipeline_stage_entry(fragment_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
     ShaderDescriptorHeapLayoutVK descriptor_layout = collect_graphics_pipeline_descriptor_heap_layout(
         vertex_metadata, vertex_entry, geometry_metadata.has_value() ? &*geometry_metadata : nullptr, geometry_entry, fragment_metadata, fragment_entry);
     Ref<ROGraphicsPipelineVK> graphics_pipeline = compile_graphics_pipeline(

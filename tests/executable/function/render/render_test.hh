@@ -28,7 +28,6 @@
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -165,9 +164,7 @@ inline std::string_view static_set_vertex_entry(RefRes<RUGraphicsPipeline> p_pip
     if (p_pipeline->vertex_stage_entry != MEM_NULL && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
         return p_pipeline->vertex_stage_entry.get();
     }
-    if (p_pipeline->vertex_stage->vertex_entry != MEM_NULL && p_pipeline->vertex_stage->vertex_entry.get()[0] != '\0') {
-        return p_pipeline->vertex_stage->vertex_entry.get();
-    }
+    // An empty entry resolves to the vertex shader's only reflected vertex entry point.
     return {};
 }
 
@@ -245,14 +242,20 @@ inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_
 inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_static_set_pipeline_batches(
     RenderAllocator* p_allocator, Ref<StaticSetResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
     Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
-    const size_t batch_count = p_double_sided ? p_resources->get_opaque_double_sided_draw_batch_count()
-                               : p_masked     ? p_resources->get_masked_draw_batch_count()
-                                              : p_resources->get_opaque_draw_batch_count();
+    size_t batch_count = [&p_resources, p_double_sided, p_masked]() {
+        if (p_double_sided) {
+            return p_resources->get_opaque_double_sided_draw_batch_count();
+        }
+        return p_masked ? p_resources->get_masked_draw_batch_count() : p_resources->get_opaque_draw_batch_count();
+    }();
     result.reserve(batch_count);
     for (size_t i = 0; i < batch_count; ++i) {
-        const StaticSetResourcesVK::DrawBatch& source = p_double_sided ? p_resources->get_opaque_double_sided_draw_batch(i)
-                                                        : p_masked     ? p_resources->get_masked_draw_batch(i)
-                                                                       : p_resources->get_opaque_draw_batch(i);
+        const StaticSetResourcesVK::DrawBatch& source = [i, p_double_sided, p_masked, &p_resources]() {
+            if (p_double_sided) {
+                return p_resources->get_opaque_double_sided_draw_batch(i);
+            }
+            return p_masked ? p_resources->get_masked_draw_batch(i) : p_resources->get_opaque_draw_batch(i);
+        }();
         RTRunGraphicsPipelineIndirectVK::PipelineBatch batch;
         batch.graphics_pipeline = p_pipeline;
         batch.first_draw = source.first_draw;
@@ -325,9 +328,12 @@ inline RendTaskDescVK make_static_set_task_desc(RenderAllocator* p_allocator, //
     VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
     bool p_double_sided = false) {
     auto batches = make_static_set_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
-    const std::string_view indirect_buffer_id = p_double_sided ? REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES
-                                                : p_masked     ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES
-                                                               : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
+    std::string_view indirect_buffer_id = [p_double_sided, p_masked]() {
+        if (p_double_sided) {
+            return REND_RES_STATIC_SET_OPAQUE_DOUBLE_SIDED_DRAW_BATCHES;
+        }
+        return p_masked ? REND_RES_STATIC_SET_MASKED_DRAW_BATCHES : REND_RES_STATIC_SET_OPAQUE_DRAW_BATCHES;
+    }();
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
     task_builder.set_render_extent(p_render_extent)
         .set_vertex_buffer(REND_RES_STATIC_SET_VERTICES)

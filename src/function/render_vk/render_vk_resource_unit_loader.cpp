@@ -211,16 +211,6 @@ RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUS
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
     RUShader resource_unit;
     resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
-    resource_unit.vertex_entry = populate_text(p_res_chunk, p_scheme.vertex_entry.value_or(""));
-    resource_unit.tessellation_entry = populate_text(p_res_chunk, p_scheme.tessellation_entry.value_or(""));
-    resource_unit.geometry_entry = populate_text(p_res_chunk, p_scheme.geometry_entry.value_or(""));
-    resource_unit.fragment_entry = populate_text(p_res_chunk, p_scheme.fragment_entry.value_or(""));
-    resource_unit.compute_entry = populate_text(p_res_chunk, p_scheme.compute_entry.value_or(""));
-    resource_unit.raygen_entry = populate_text(p_res_chunk, p_scheme.raygen_entry.value_or(""));
-    resource_unit.miss_entry = populate_text(p_res_chunk, p_scheme.miss_entry.value_or(""));
-    resource_unit.closest_hit_entry = populate_text(p_res_chunk, p_scheme.closest_hit_entry.value_or(""));
-    resource_unit.any_hit_entry = populate_text(p_res_chunk, p_scheme.any_hit_entry.value_or(""));
-    resource_unit.intersection_shader_entry = populate_text(p_res_chunk, p_scheme.intersection_shader_entry.value_or(""));
     resource_unit.data = data.force_cast<uint32_t>();
     resource_unit.size = file_content.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
@@ -347,7 +337,7 @@ void validate_material_texture_role(std::string_view p_texture_role) {
     }
 }
 
-RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) {
+RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) { // NOLINT
     const bool has_inline_pipeline = p_material.graphics_pipeline.has_value();
     if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
         throw std::runtime_error("Failed to populate material resource: graphics_pipeline_ids or inline graphics_pipeline is required.");
