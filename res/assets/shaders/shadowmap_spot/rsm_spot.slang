@@ -77,10 +77,9 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
 RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
     StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
     StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
-    NodeData node = nodes[instance.node_index];
+    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
 

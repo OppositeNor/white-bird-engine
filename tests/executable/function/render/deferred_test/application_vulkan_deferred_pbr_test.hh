@@ -40,9 +40,9 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/static_mesh_compiler_vk.hh"
-#include "function/render_vk/static_mesh_acceleration_structure_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "input_manager_mocked.hh"
 #include "i_octree_render_feature.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -131,8 +131,8 @@ private:
     static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
     static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 
-    static constexpr std::string_view RT_BUILD_STATIC_MESH_ACCELERATION_STRUCTURE = "build_static_mesh_acceleration_structure";
-    static constexpr std::string_view STATIC_MESH_ACCELERATION_STRUCTURE_KEY = "static_mesh_acceleration_structure";
+    static constexpr std::string_view RT_BUILD_MESH_ACCELERATION_STRUCTURE = "build_mesh_acceleration_structure";
+    static constexpr std::string_view MESH_ACCELERATION_STRUCTURE_KEY = "mesh_acceleration_structure";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED = "run_gbuffer_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
@@ -197,8 +197,7 @@ private:
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
-    RefRes<RUStaticOpaqueMesh> sponza_opaque_set;
-    RefRes<RUStaticOpaqueDoubleSidedMesh> sponza_opaque_double_sided_set;
+    RefRes<RUMesh3D> sponza_mesh;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
     RefRes<RUGraphicsPipeline> shadow_double_sided_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
@@ -215,8 +214,8 @@ private:
     RefRes<RUShader> kawase_blur_ping_write_shader_resource;
     RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
 
-    Ref<StaticMeshResourcesVK> static_mesh_resources = MEM_NULL;
-    Ref<StaticMeshAccelerationStructureVK> static_mesh_acceleration_structure = MEM_NULL;
+    Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;
+    Ref<MeshAccelerationStructureVK> mesh_acceleration_structure = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;

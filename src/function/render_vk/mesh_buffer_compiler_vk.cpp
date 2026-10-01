@@ -39,10 +39,6 @@ struct MeshDrawBinaries {
     RefRes<RUBinary> index_binary = MEM_NULL;
 };
 
-bool is_drawable_submesh(const RUStaticGeometrySubmesh& p_submesh) {
-    return p_submesh.indices.index_count > 0 && p_submesh.instance_count > 0;
-}
-
 void validate_binary_view(const RUBinaryView& p_view, std::string_view p_context) {
     if (p_view.binary == nullptr) {
         throw std::runtime_error(std::format("Failed to compile mesh buffer: {} binary is missing.", p_context));
@@ -81,43 +77,24 @@ void accumulate_shared_binaries(MeshDrawBinaries& p_binaries, const RUVertexView
     }
 }
 
-MeshDrawBinaries validate_static_mesh_and_get_binaries(const RUStaticMesh& p_mesh) {
-    if (p_mesh.submesh_count > 0 && p_mesh.submeshes == nullptr) {
+void accumulate_category_binaries(MeshDrawBinaries& p_binaries, const RUSubmeshInstance3D& p_category) {
+    if (p_category.submesh_count > 0 && p_category.submeshes == nullptr) {
         throw std::runtime_error("Failed to compile mesh buffer: submesh storage is missing.");
     }
-    if (p_mesh.instance_count > 0 && p_mesh.instances == nullptr) {
+    if (p_category.instance_count > 0 && p_category.instances == nullptr) {
         throw std::runtime_error("Failed to compile mesh buffer: instance storage is missing.");
     }
-    MeshDrawBinaries binaries;
-    for (size_t i = 0; i < p_mesh.submesh_count; ++i) {
-        const RUStaticGeometrySubmesh& submesh = p_mesh.submeshes.get()[i];
+    for (size_t i = 0; i < p_category.submesh_count; ++i) {
+        const RUSubmesh3D& submesh = p_category.submeshes.get()[i];
         validate_submesh_views(submesh.vertices, submesh.indices);
-        if (submesh.first_instance > p_mesh.instance_count || submesh.instance_count > p_mesh.instance_count - submesh.first_instance) {
+        if (submesh.first_instance > p_category.instance_count ||
+            submesh.instance_count > p_category.instance_count - submesh.first_instance) {
             throw std::runtime_error("Failed to compile mesh buffer: submesh instance range is out of bounds.");
         }
-        if (is_drawable_submesh(submesh)) {
-            accumulate_shared_binaries(binaries, submesh.vertices, submesh.indices);
+        if (submesh.indices.index_count > 0) {
+            accumulate_shared_binaries(p_binaries, submesh.vertices, submesh.indices);
         }
     }
-    return binaries;
-}
-
-MeshDrawBinaries validate_mesh_3d_and_get_binaries(const RUMesh3D& p_mesh) {
-    if (p_mesh.submesh_count > 0 && p_mesh.submeshes == nullptr) {
-        throw std::runtime_error("Failed to compile mesh buffer: submesh storage is missing.");
-    }
-    MeshDrawBinaries binaries;
-    for (size_t i = 0; i < p_mesh.submesh_count; ++i) {
-        RefRes<RUSubmesh3D> submesh = p_mesh.submeshes.get()[i];
-        if (submesh == nullptr) {
-            throw std::runtime_error("Failed to compile mesh buffer: submesh is missing.");
-        }
-        validate_submesh_views(submesh->vertices, submesh->indices);
-        if (submesh->indices.index_count > 0) {
-            accumulate_shared_binaries(binaries, submesh->vertices, submesh->indices);
-        }
-    }
-    return binaries;
 }
 
 std::string build_buffer_cache_key(RefRes<RUBinary> p_binary, VkBufferUsageFlags p_usage) {
@@ -183,19 +160,15 @@ MeshBufferCompilerVK::MeshBufferCompilerVK(const BaseRenderDataVK* p_render_data
 }
 
 MeshBufferCompilerVK::BuildResult MeshBufferCompilerVK::build(
-    RefRes<RUStaticMesh> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const {
-    if (p_mesh == nullptr) {
-        return {};
-    }
-    return build_shared_buffers(render_data, validate_static_mesh_and_get_binaries(*p_mesh), p_vertex_usage, p_index_usage);
-}
-
-MeshBufferCompilerVK::BuildResult MeshBufferCompilerVK::build(
     RefRes<RUMesh3D> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const {
     if (p_mesh == nullptr) {
         return {};
     }
-    return build_shared_buffers(render_data, validate_mesh_3d_and_get_binaries(*p_mesh), p_vertex_usage, p_index_usage);
+    MeshDrawBinaries binaries;
+    accumulate_category_binaries(binaries, p_mesh->opaque_instances);
+    accumulate_category_binaries(binaries, p_mesh->masked_instances);
+    accumulate_category_binaries(binaries, p_mesh->double_sided_opaque_instances);
+    return build_shared_buffers(render_data, binaries, p_vertex_usage, p_index_usage);
 }
 
 } // namespace WhiteBirdEngine

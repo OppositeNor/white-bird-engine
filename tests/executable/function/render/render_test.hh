@@ -27,10 +27,8 @@
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render_vk/debug_data_vk.hh"
-#include "function/render_vk/dynamic_mesh_resources_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
-#include "function/render_vk/i_mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -40,8 +38,8 @@
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/static_mesh_compiler_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -196,35 +194,28 @@ inline std::optional<MaterialTextureContract> load_mesh_material_contract(RefRes
         vertex_metadata, geometry_metadata.has_value() ? &*geometry_metadata : nullptr, fragment_metadata, "material_textures", REND_RES_MESH_MATERIAL_PARAMS);
 }
 
-inline Ref<StaticMeshResourcesVK> create_static_mesh_resources(RendererVK* p_renderer,
-    RefRes<RUStaticOpaqueMesh> p_opaque_mesh,
-    RefRes<RUStaticMaskedMesh> p_masked_mesh,
+/**
+ * @brief Compile p_mesh into static-mesh resources with the given pipelines' vertex inputs and material contract.
+ * @details A null masked pipeline reuses the opaque pipeline's vertex input for planning masked draws.
+ */
+inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
+    RefRes<RUMesh3D> p_mesh,
     RefRes<RUGraphicsPipeline> p_opaque_pipeline,
     RefRes<RUGraphicsPipeline> p_masked_pipeline,
     RefRes<RUGraphicsPipeline> p_material_pipeline,
-    RefRes<RUStaticOpaqueDoubleSidedMesh> p_opaque_double_sided_mesh = MEM_NULL,
-    const StaticMeshCompilerVK::Config& p_config = {}) {
-    ShaderMetadata opaque_metadata;
-    ShaderMetadata masked_metadata;
-    if (p_opaque_mesh != MEM_NULL || p_opaque_double_sided_mesh != MEM_NULL) {
-        opaque_metadata = ShaderMetadataLoader().load(p_opaque_pipeline->vertex_stage);
-    }
-    if (p_masked_mesh != MEM_NULL) {
-        masked_metadata = ShaderMetadataLoader().load(p_masked_pipeline->vertex_stage);
-    }
+    const MeshCompilerVK::Config& p_config = {}) {
+    RefRes<RUGraphicsPipeline> masked_pipeline = p_masked_pipeline != MEM_NULL ? p_masked_pipeline : p_opaque_pipeline;
+    const ShaderMetadata opaque_metadata = ShaderMetadataLoader().load(p_opaque_pipeline->vertex_stage);
+    const ShaderMetadata masked_metadata = ShaderMetadataLoader().load(masked_pipeline->vertex_stage);
     const std::optional<MaterialTextureContract> material_contract =
         p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
-    return StaticMeshCompilerVK(p_renderer)
-        .compile(p_opaque_mesh,
-            p_masked_mesh,
-            opaque_metadata,
-            (p_opaque_mesh != MEM_NULL || p_opaque_double_sided_mesh != MEM_NULL) ? mesh_vertex_entry(p_opaque_pipeline)
-                                                                                : std::string_view{},
-            masked_metadata,
-            p_masked_mesh != MEM_NULL ? mesh_vertex_entry(p_masked_pipeline) : std::string_view{},
-            material_contract,
-            p_config,
-            p_opaque_double_sided_mesh);
+    return MeshCompilerVK(p_renderer).compile(p_mesh,
+        opaque_metadata,
+        mesh_vertex_entry(p_opaque_pipeline),
+        masked_metadata,
+        mesh_vertex_entry(masked_pipeline),
+        material_contract,
+        p_config);
 }
 
 /**
@@ -260,7 +251,7 @@ inline void connect_resource_chain(RendGraphDescVK& p_graph, std::string_view p_
 inline constexpr std::string_view STATIC_MESH_KEY = "static_mesh";
 
 /**
- * @brief Graph key under which the render tests import their compiled dynamic mesh.
+ * @brief Graph key under which the deferred test imports its moving mesh.
  */
 inline constexpr std::string_view DYNAMIC_MESH_KEY = "dynamic_mesh";
 
@@ -274,6 +265,8 @@ struct MeshResourceKeys {
     std::string nodes;
     /** Graph id bound to REND_RES_MESH_INSTANCES. */
     std::string instances;
+    /** Graph id bound to REND_RES_MESH_TRANSFORM. */
+    std::string transform;
     /** Graph id bound to REND_RES_MESH_MATERIAL_PARAMS. */
     std::string material_params;
     /** Graph id bound to REND_RES_MESH_MATERIAL_SAMPLER. */
@@ -283,26 +276,14 @@ struct MeshResourceKeys {
 /**
  * @brief Resource ids of a static mesh imported under p_key.
  */
-inline MeshResourceKeys make_static_mesh_resource_keys(std::string_view p_key) {
+inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_key) {
     return MeshResourceKeys{
-        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_key, StaticMeshResourcesVK::SUBMESHES),
-        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_key, StaticMeshResourcesVK::NODES),
-        .instances = IBindableRenderResourceVK::make_member_resource_id(p_key, StaticMeshResourcesVK::INSTANCES),
-        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_key, StaticMeshResourcesVK::MATERIAL_PARAMS),
-        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_key, StaticMeshResourcesVK::MATERIAL_SAMPLER),
-    };
-}
-
-/**
- * @brief Resource ids of a dynamic mesh imported under p_key.
- */
-inline MeshResourceKeys make_dynamic_mesh_resource_keys(std::string_view p_key) {
-    return MeshResourceKeys{
-        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_key, DynamicMeshResourcesVK::SUBMESHES),
-        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_key, DynamicMeshResourcesVK::NODES),
-        .instances = IBindableRenderResourceVK::make_member_resource_id(p_key, DynamicMeshResourcesVK::INSTANCES),
-        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_key, DynamicMeshResourcesVK::MATERIAL_PARAMS),
-        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_key, DynamicMeshResourcesVK::MATERIAL_SAMPLER),
+        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::SUBMESHES),
+        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::NODES),
+        .instances = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::INSTANCES),
+        .transform = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::TRANSFORM),
+        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::MATERIAL_PARAMS),
+        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::MATERIAL_SAMPLER),
     };
 }
 
@@ -315,10 +296,11 @@ inline MeshResourceKeys make_dynamic_mesh_resource_keys(std::string_view p_key) 
  * @return p_task.
  */
 inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipelineVK& p_pipeline, const MeshResourceKeys& p_keys) {
-    const std::array<std::pair<std::string_view, std::string_view>, 5> mappings{{
+    const std::array<std::pair<std::string_view, std::string_view>, 6> mappings{{
         {REND_RES_MESH_SUBMESHES, p_keys.submeshes},
         {REND_RES_MESH_NODES, p_keys.nodes},
         {REND_RES_MESH_INSTANCES, p_keys.instances},
+        {REND_RES_MESH_TRANSFORM, p_keys.transform},
         {REND_RES_MESH_MATERIAL_PARAMS, p_keys.material_params},
         {REND_RES_MESH_MATERIAL_SAMPLER, p_keys.material_sampler},
     }};
@@ -346,21 +328,8 @@ inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(const Me
     return batch;
 }
 
-/**
- * @brief Convert every draw batch of a dynamic mesh into pipeline batches drawn with p_pipeline.
- */
-inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_dynamic_mesh_pipeline_batches(
-    RenderAllocator* p_allocator, const DynamicMeshResourcesVK& p_resources, Ref<ROGraphicsPipelineVK> p_pipeline) {
-    Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
-    result.reserve(p_resources.get_draw_batch_count());
-    for (size_t i = 0; i < p_resources.get_draw_batch_count(); ++i) {
-        result.push_back(to_pipeline_batch(p_resources.get_draw_batch(i), p_pipeline));
-    }
-    return result;
-}
-
-inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_static_mesh_pipeline_batches(
-    RenderAllocator* p_allocator, Ref<StaticMeshResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
+inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_mesh_pipeline_batches(
+    RenderAllocator* p_allocator, Ref<MeshResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
     Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
     size_t batch_count = [&p_resources, p_double_sided, p_masked]() {
         if (p_double_sided) {
@@ -428,10 +397,10 @@ inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererV
     return GraphicsPipelineCompilerVK(context).compile(p_key, p_pipeline).graphics_pipeline;
 }
 
-inline RendTaskDescVK make_static_mesh_task_desc(RenderAllocator* p_allocator, // NOLINT
+inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLINT
     const BaseRenderDataVK* p_render_data,
     std::string_view p_task_id,
-    Ref<StaticMeshResourcesVK> p_resources,
+    Ref<MeshResourcesVK> p_resources,
     Ref<ROGraphicsPipelineVK> p_pipeline,
     bool p_masked,
     std::span<const VkClearValue> p_clear_values,
@@ -440,19 +409,20 @@ inline RendTaskDescVK make_static_mesh_task_desc(RenderAllocator* p_allocator, /
     std::optional<std::string_view> p_depth_attachment_id = std::nullopt,
     VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
     VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    bool p_double_sided = false) {
-    auto batches = make_static_mesh_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
+    bool p_double_sided = false,
+    std::string_view p_mesh_key = STATIC_MESH_KEY) {
+    auto batches = make_mesh_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
     std::string_view indirect_buffer_member = [p_double_sided, p_masked]() {
         if (p_double_sided) {
-            return StaticMeshResourcesVK::OPAQUE_DOUBLE_SIDED_DRAW_BATCHES;
+            return MeshResourcesVK::OPAQUE_DOUBLE_SIDED_DRAW_BATCHES;
         }
-        return p_masked ? StaticMeshResourcesVK::MASKED_DRAW_BATCHES : StaticMeshResourcesVK::OPAQUE_DRAW_BATCHES;
+        return p_masked ? MeshResourcesVK::MASKED_DRAW_BATCHES : MeshResourcesVK::OPAQUE_DRAW_BATCHES;
     }();
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
     task_builder.set_render_extent(p_render_extent)
-        .set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(STATIC_MESH_KEY, StaticMeshResourcesVK::VERTICES))
-        .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(STATIC_MESH_KEY, StaticMeshResourcesVK::INDICES))
-        .set_indirect_buffer(IBindableRenderResourceVK::make_member_resource_id(STATIC_MESH_KEY, indirect_buffer_member))
+        .set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::VERTICES))
+        .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INDICES))
+        .set_indirect_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, indirect_buffer_member))
         .set_clear_values(p_clear_values)
         .set_color_load_op(p_color_load_op)
         .set_depth_load_op(p_depth_load_op);
@@ -461,7 +431,7 @@ inline RendTaskDescVK make_static_mesh_task_desc(RenderAllocator* p_allocator, /
     }
     RendTaskDescVK result(p_allocator, p_task_id, task_builder.create_unique(p_render_data));
     alias_render_targets(result, p_color_attachment_ids, p_depth_attachment_id);
-    alias_mesh_resources(result, *p_pipeline, make_static_mesh_resource_keys(STATIC_MESH_KEY));
+    alias_mesh_resources(result, *p_pipeline, make_mesh_resource_keys(p_mesh_key));
     return result;
 }
 } // namespace WhiteBirdEngine

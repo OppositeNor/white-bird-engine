@@ -28,8 +28,8 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/static_mesh_compiler_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -80,10 +80,9 @@ public:
         auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
             WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
         resource_manager->register_chunk(resource_chunk);
-        WBE::RefRes<WBE::RUStaticOpaqueMesh> cube_set =
-            resource_manager->get_resource<WBE::RUStaticOpaqueMesh>("model_cube_static.static_opaque_mesh");
-        if (cube_set == nullptr) {
-            throw std::runtime_error("Failed to setup draw cube unshaded test: static opaque set resource was not found.");
+        WBE::RefRes<WBE::RUMesh3D> cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh");
+        if (cube_mesh == nullptr) {
+            throw std::runtime_error("Failed to setup draw cube unshaded test: static mesh resource was not found.");
         }
 
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
@@ -99,8 +98,8 @@ public:
             throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }
 
-        WBE::Ref<WBE::StaticMeshResourcesVK> static_mesh_resources =
-            WBE::create_static_mesh_resources(renderer, cube_set, WBE::MEM_NULL, pipeline_resource, WBE::MEM_NULL, WBE::MEM_NULL);
+        WBE::Ref<WBE::MeshResourcesVK> static_mesh_resources =
+            WBE::create_mesh_resources(renderer, cube_mesh, pipeline_resource, WBE::MEM_NULL, WBE::MEM_NULL);
         if (static_mesh_resources->acquire_textures() == WBE::MEM_NULL) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: static-mesh texture list was not compiled.");
         }
@@ -109,7 +108,7 @@ public:
             WBE::compile_render_test_graphics_pipeline(renderer, "draw_cube_unshaded_pipeline", pipeline_resource, color_formats);
         const std::array<VkClearValue, 1> clear_values{};
         const std::array<std::string_view, 1> color_attachments{WBE::REND_RES_SWAP_CHAIN};
-        WBE::RendTaskDescVK task_desc = WBE::make_static_mesh_task_desc(render_allocator,
+        WBE::RendTaskDescVK task_desc = WBE::make_mesh_task_desc(render_allocator,
             base_render_data,
             "run_static_mesh",
             static_mesh_resources,

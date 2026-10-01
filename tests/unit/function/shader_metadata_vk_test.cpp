@@ -392,8 +392,8 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) 
     ASSERT_NE(mesh, parameter->type.fields.end());
     EXPECT_EQ(mesh->type.kind, "struct");
 
-    const std::array<std::string_view, 3> expected_names{"submeshes", "nodes", "instances"};
-    const std::array<std::string_view, 3> expected_resource_ids{"mesh_submeshes", "mesh_nodes", "mesh_instances"};
+    const std::array<std::string_view, 4> expected_names{"submeshes", "nodes", "instances", "transform"};
+    const std::array<std::string_view, 4> expected_resource_ids{"mesh_submeshes", "mesh_nodes", "mesh_instances", "mesh_transform"};
     ASSERT_EQ(mesh->fields.size(), expected_names.size());
     for (size_t i = 0; i < expected_names.size(); ++i) {
         const ShaderMetadataTypeField& field = mesh->fields[i];

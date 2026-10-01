@@ -142,57 +142,21 @@ public:
     }
 
     /**
-     * @brief Set the non-owning static opaque set resource.
+     * @brief Set the non-owning static mesh resource rendered by the world.
      *
-     * @param p_set The non-owning static opaque set resource to publish for rendering.
+     * @param p_mesh The non-owning mesh resource, or null to clear it.
      */
-    void set_static_opaque_mesh(RefRes<RUStaticOpaqueMesh> p_set) {
-        static_opaque_mesh = p_set;
+    void set_static_mesh(RefRes<RUMesh3D> p_mesh) {
+        static_mesh = p_mesh;
     }
 
     /**
-     * @brief Set the non-owning static opaque double-sided set resource.
+     * @brief Get the non-owning static mesh resource rendered by the world.
      *
-     * @param p_set The non-owning static opaque double-sided set resource to publish for rendering.
+     * @return The non-owning mesh resource, or null when none is set.
      */
-    void set_static_opaque_double_sided_mesh(RefRes<RUStaticOpaqueDoubleSidedMesh> p_set) {
-        static_opaque_double_sided_mesh = p_set;
-    }
-
-    /**
-     * @brief Get the non-owning static opaque set resource.
-     *
-     * @return The non-owning static opaque set resource, or null when no set is set.
-     */
-    RefRes<RUStaticOpaqueMesh> get_static_opaque_mesh() const {
-        return static_opaque_mesh;
-    }
-
-    /**
-     * @brief Get the non-owning static opaque double-sided set resource.
-     *
-     * @return The non-owning static opaque double-sided set resource, or null when no set is set.
-     */
-    RefRes<RUStaticOpaqueDoubleSidedMesh> get_static_opaque_double_sided_mesh() const {
-        return static_opaque_double_sided_mesh;
-    }
-
-    /**
-     * @brief Set the non-owning static masked set resource.
-     *
-     * @param p_set The non-owning static masked set resource to publish for rendering.
-     */
-    void set_static_masked_mesh(RefRes<RUStaticMaskedMesh> p_set) {
-        static_masked_mesh = p_set;
-    }
-
-    /**
-     * @brief Get the non-owning static masked set resource.
-     *
-     * @return The non-owning static masked set resource, or null when no set is set.
-     */
-    RefRes<RUStaticMaskedMesh> get_static_masked_mesh() const {
-        return static_masked_mesh;
+    RefRes<RUMesh3D> get_static_mesh() const {
+        return static_mesh;
     }
 
 private:
@@ -203,9 +167,7 @@ private:
     HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
     HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
     String<HeapAllocatorDefault> render_graph_resource_key;
-    RefRes<RUStaticOpaqueMesh> static_opaque_mesh;
-    RefRes<RUStaticOpaqueDoubleSidedMesh> static_opaque_double_sided_mesh;
-    RefRes<RUStaticMaskedMesh> static_masked_mesh;
+    RefRes<RUMesh3D> static_mesh;
 };
 
 } // namespace WhiteBirdEngine

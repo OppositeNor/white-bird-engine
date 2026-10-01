@@ -196,21 +196,15 @@ TEST_F(WBEWorldTest, WorldOwnsRenderGraphResourceKey) {
     EXPECT_EQ(world.get_render_graph_resource_key(), "main_graph");
 }
 
-TEST_F(WBEWorldTest, WorldOwnsStaticMeshReferences) {
+TEST_F(WBEWorldTest, WorldOwnsStaticMeshReference) {
     WBE::World world(get_allocator());
     WBE::StackAllocator storage(WBE_KI_B(1));
-    WBE::RefRes<WBE::RUStaticOpaqueMesh> opaque_mesh(storage.allocate(sizeof(WBE::RUStaticOpaqueMesh)), &storage);
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh(
-        storage.allocate(sizeof(WBE::RUStaticOpaqueDoubleSidedMesh)), &storage);
-    WBE::RefRes<WBE::RUStaticMaskedMesh> masked_mesh(storage.allocate(sizeof(WBE::RUStaticMaskedMesh)), &storage);
+    WBE::RefRes<WBE::RUMesh3D> mesh(storage.allocate(sizeof(WBE::RUMesh3D)), &storage);
 
-    world.set_static_opaque_mesh(opaque_mesh);
-    world.set_static_opaque_double_sided_mesh(opaque_double_sided_mesh);
-    world.set_static_masked_mesh(masked_mesh);
-
-    EXPECT_EQ(world.get_static_opaque_mesh(), opaque_mesh);
-    EXPECT_EQ(world.get_static_opaque_double_sided_mesh(), opaque_double_sided_mesh);
-    EXPECT_EQ(world.get_static_masked_mesh(), masked_mesh);
+    world.set_static_mesh(mesh);
+    EXPECT_EQ(world.get_static_mesh(), mesh);
+    world.set_static_mesh(WBE::MEM_NULL);
+    EXPECT_EQ(world.get_static_mesh(), WBE::MEM_NULL);
 }
 
 TEST_F(WBEWorldTest, WorldCachesComponentListsByComponentTypeId) {

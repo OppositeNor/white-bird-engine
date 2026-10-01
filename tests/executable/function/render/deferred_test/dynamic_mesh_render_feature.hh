@@ -17,7 +17,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/dynamic_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -34,17 +34,16 @@ class RendererVK;
 
 /**
  * @class DynamicMeshRenderFeature
- * @brief Draws one dynamic mesh compiled by DynamicMeshCompilerVK. Neither copyable nor movable.
- * All methods run on the rendering thread. Geometry and capacity require reconstruction to change.
+ * @brief Draws one moving mesh compiled by MeshCompilerVK. Neither copyable nor movable.
+ * All methods run on the rendering thread. Geometry requires reconstruction to change; set_transform() moves the mesh.
  */
 class DynamicMeshRenderFeature {
 public:
     DynamicMeshRenderFeature() = delete;
     /**
-     * @brief Compile p_mesh for p_capacity instances against p_material_pipeline's vertex input and material contract.
+     * @brief Compile p_mesh against p_material_pipeline's vertex input and material contract.
      */
-    DynamicMeshRenderFeature(
-        RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, uint32_t p_capacity);
+    DynamicMeshRenderFeature(RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline);
     ~DynamicMeshRenderFeature() = default;
     DynamicMeshRenderFeature(const DynamicMeshRenderFeature&) = delete;
     DynamicMeshRenderFeature(DynamicMeshRenderFeature&&) = delete;
@@ -55,11 +54,11 @@ public:
      */
     void register_resources(RendGraphDescVK& p_graph) const;
     /**
-     * @brief Publish a complete dense list of visible transforms to all slots. Capacity overflow throws.
+     * @brief Place the whole mesh; every frame slot applies the latest transform.
      */
-    void publish_visible_transforms(std::span<const glm::mat4> p_transforms);
+    void set_transform(const glm::mat4& p_transform);
     /**
-     * @brief Construct an indirect pass that maps the pipeline's mesh resource ids to the dynamic mesh's resources.
+     * @brief Construct an indirect pass drawing the mesh's opaque category with its resources mapped to the pipeline.
      * Existing attachments are loaded; the caller declares pass-specific shader reads and dependencies.
      */
     RendTaskDescVK make_task(std::string_view p_task_id,
@@ -70,7 +69,7 @@ public:
 
 private:
     const BaseRenderDataVK* render_data;
-    Ref<DynamicMeshResourcesVK> resources;
+    Ref<MeshResourcesVK> resources;
 };
 
 } // namespace WhiteBirdEngine

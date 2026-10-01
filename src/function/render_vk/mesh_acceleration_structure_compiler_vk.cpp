@@ -12,14 +12,14 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/static_mesh_acceleration_structure_compiler_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/static_mesh_acceleration_structure_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <array>
@@ -78,7 +78,7 @@ VkTransformMatrixKHR to_vk_transform(const glm::mat4& p_transform) {
     return result;
 }
 
-const RUVertexView::Attribute& get_position_attribute(const RUStaticGeometrySubmesh& p_submesh) {
+const RUVertexView::Attribute& get_position_attribute(const RUSubmesh3D& p_submesh) {
     std::span<const RUVertexView::Attribute> attributes(p_submesh.vertices.attributes.get(), p_submesh.vertices.attribute_count);
     auto position_attribute = std::ranges::find_if(attributes, [](const RUVertexView::Attribute& p_attribute) {
         return p_attribute.role.get_name() == "position";
@@ -92,7 +92,7 @@ const RUVertexView::Attribute& get_position_attribute(const RUStaticGeometrySubm
     return *position_attribute;
 }
 
-void validate_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instance_count) {
+void validate_submesh(const RUSubmesh3D& p_submesh, size_t p_instance_count) {
     if (p_submesh.indices.index_count % 3 != 0) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: index count must form complete triangles.");
     }
@@ -116,22 +116,20 @@ void validate_submesh(const RUStaticGeometrySubmesh& p_submesh, size_t p_instanc
 }
 
 void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
-    RefRes<RUStaticMesh> p_mesh,
+    const RUSubmeshInstance3D& p_mesh,
+    const glm::mat4& p_mesh_transform,
     VkDeviceAddress p_vertex_buffer_address,
     VkDeviceAddress p_index_buffer_address) {
-    if (p_mesh == MEM_NULL) {
-        return;
-    }
-    if ((p_mesh->submesh_count > 0 && p_mesh->submeshes == nullptr) || (p_mesh->instance_count > 0 && p_mesh->instances == nullptr)) {
+    if ((p_mesh.submesh_count > 0 && p_mesh.submeshes == nullptr) || (p_mesh.instance_count > 0 && p_mesh.instances == nullptr)) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: mesh storage is missing.");
     }
-    for (size_t submesh_index = 0; submesh_index < p_mesh->submesh_count; ++submesh_index) {
-        const RUStaticGeometrySubmesh& submesh = p_mesh->submeshes.get()[submesh_index];
+    for (size_t submesh_index = 0; submesh_index < p_mesh.submesh_count; ++submesh_index) {
+        const RUSubmesh3D& submesh = p_mesh.submeshes.get()[submesh_index];
         if (submesh.indices.index_count == 0 || submesh.instance_count == 0) {
             // Empty geometry contributes no bottom-level structure or instances.
             continue;
         }
-        validate_submesh(submesh, p_mesh->instance_count);
+        validate_submesh(submesh, p_mesh.instance_count);
         const RUVertexView::Attribute& position_attribute = get_position_attribute(submesh);
         BottomLevelInput input;
         input.geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -149,7 +147,7 @@ void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
         input.instance_transforms.reserve(submesh.instance_count);
         for (size_t instance_index = 0; instance_index < submesh.instance_count; ++instance_index) {
             input.instance_transforms.push_back(
-                to_vk_transform(p_mesh->instances.get()[submesh.first_instance + instance_index].global_transform));
+                to_vk_transform(p_mesh_transform * p_mesh.instances.get()[submesh.first_instance + instance_index].global_transform));
         }
         p_inputs.push_back(std::move(input));
     }
@@ -170,7 +168,7 @@ Ref<ROBufferVK> create_scratch_buffer(
 }
 
 void require_build_input_usage(Ref<ROBufferVK> p_buffer, const char* p_message) {
-    constexpr VkBufferUsageFlags REQUIRED_USAGE = StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+    constexpr VkBufferUsageFlags REQUIRED_USAGE = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
     if (p_buffer == MEM_NULL || (p_buffer->get_usage() & REQUIRED_USAGE) != REQUIRED_USAGE) {
         throw std::runtime_error(p_message);
     }
@@ -178,7 +176,7 @@ void require_build_input_usage(Ref<ROBufferVK> p_buffer, const char* p_message) 
 
 } // namespace
 
-StaticMeshAccelerationStructureCompilerVK::StaticMeshAccelerationStructureCompilerVK(
+MeshAccelerationStructureCompilerVK::MeshAccelerationStructureCompilerVK(
     const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data)
     : render_data(p_render_data), ray_tracing_data(p_ray_tracing_data) {
     if (render_data == nullptr || render_data->allocator == nullptr || ray_tracing_data == nullptr ||
@@ -188,7 +186,7 @@ StaticMeshAccelerationStructureCompilerVK::StaticMeshAccelerationStructureCompil
     }
 }
 
-Ref<StaticMeshAccelerationStructureVK> StaticMeshAccelerationStructureCompilerVK::compile(Ref<StaticMeshResourcesVK> p_static_mesh) const {
+Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(Ref<MeshResourcesVK> p_static_mesh) const {
     if (p_static_mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: static mesh is null.");
     }
@@ -204,14 +202,19 @@ Ref<StaticMeshAccelerationStructureVK> StaticMeshAccelerationStructureCompilerVK
     const VkDeviceAddress vertex_buffer_address = p_static_mesh->acquire_vertices()->get_device_address();
     const VkDeviceAddress index_buffer_address = p_static_mesh->acquire_indices()->get_device_address();
     std::vector<BottomLevelInput> inputs;
-    append_bottom_level_inputs(inputs, p_static_mesh->get_opaque_mesh(), vertex_buffer_address, index_buffer_address);
-    append_bottom_level_inputs(inputs, p_static_mesh->get_opaque_double_sided_mesh(), vertex_buffer_address, index_buffer_address);
+    RefRes<RUMesh3D> mesh = p_static_mesh->get_mesh();
+    if (mesh == MEM_NULL) {
+        throw std::runtime_error("Failed to compile static-mesh acceleration structure: the source mesh is missing.");
+    }
+    const glm::mat4& mesh_transform = p_static_mesh->get_transform();
+    append_bottom_level_inputs(inputs, mesh->opaque_instances, mesh_transform, vertex_buffer_address, index_buffer_address);
+    append_bottom_level_inputs(inputs, mesh->double_sided_opaque_instances, mesh_transform, vertex_buffer_address, index_buffer_address);
     if (inputs.empty()) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: the mesh has no drawable opaque geometry.");
     }
 
-    Ref<StaticMeshAccelerationStructureVK> result =
-        make_ref<StaticMeshAccelerationStructureVK>(render_data->allocator, render_data->allocator);
+    Ref<MeshAccelerationStructureVK> result =
+        make_ref<MeshAccelerationStructureVK>(render_data->allocator, render_data->allocator);
     result->command_build_acceleration_structures = ray_tracing_data->command_build_acceleration_structures;
     result->static_mesh = p_static_mesh;
 
@@ -225,7 +228,7 @@ Ref<StaticMeshAccelerationStructureVK> StaticMeshAccelerationStructureCompilerVK
         }
         const VkAccelerationStructureBuildSizesInfoKHR sizes = get_build_sizes(
             render_data, ray_tracing_data, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &input.geometry, input.primitive_count);
-        StaticMeshAccelerationStructureVK::BottomLevelBuild build;
+        MeshAccelerationStructureVK::BottomLevelBuild build;
         build.geometry = input.geometry;
         build.build_range = VkAccelerationStructureBuildRangeInfoKHR{.primitiveCount = input.primitive_count};
         build.acceleration_structure = ROAccelerationStructureVK::Builder()

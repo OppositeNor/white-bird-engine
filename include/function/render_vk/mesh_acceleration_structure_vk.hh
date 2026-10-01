@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_MESH_ACCELERATION_STRUCTURE_VK_HH
-#define WBE_FILE_STATIC_MESH_ACCELERATION_STRUCTURE_VK_HH
+#ifndef WBE_FILE_MESH_ACCELERATION_STRUCTURE_VK_HH
+#define WBE_FILE_MESH_ACCELERATION_STRUCTURE_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
@@ -22,7 +22,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include <cstddef>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -30,16 +30,16 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class StaticMeshAccelerationStructureVK
+ * @class MeshAccelerationStructureVK
  * @brief Ray-tracing acceleration structures of a compiled static mesh, with every resource their build needs.
  *
  * Holds one bottom-level acceleration structure per drawable opaque or opaque double-sided submesh, the top-level
  * acceleration structure instancing them with the mesh's instance transforms, the instance buffer, scratch storage, and the
- * source static mesh whose geometry buffers the build reads. Created by StaticMeshAccelerationStructureCompilerVK; the
+ * source static mesh whose geometry buffers the build reads. Created by MeshAccelerationStructureCompilerVK; the
  * structures hold no data until record_build() has executed on the GPU. bind() imports the top-level structure under
  * `<key>.top_level`. Neither copyable nor movable, shared through Ref, and confined to the rendering thread.
  */
-class StaticMeshAccelerationStructureVK final : public IBindableRenderResourceVK {
+class MeshAccelerationStructureVK final : public IBindableRenderResourceVK {
 public:
     /** Member name of the top-level acceleration structure. */
     static constexpr std::string_view TOP_LEVEL = "top_level";
@@ -47,18 +47,18 @@ public:
     static constexpr VkBufferUsageFlags GEOMETRY_BUFFER_USAGE =
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    StaticMeshAccelerationStructureVK() = delete;
-    ~StaticMeshAccelerationStructureVK() override = default;
-    StaticMeshAccelerationStructureVK(const StaticMeshAccelerationStructureVK&) = delete;
-    StaticMeshAccelerationStructureVK(StaticMeshAccelerationStructureVK&&) noexcept = delete;
-    StaticMeshAccelerationStructureVK& operator=(const StaticMeshAccelerationStructureVK&) = delete;
-    StaticMeshAccelerationStructureVK& operator=(StaticMeshAccelerationStructureVK&&) noexcept = delete;
+    MeshAccelerationStructureVK() = delete;
+    ~MeshAccelerationStructureVK() override = default;
+    MeshAccelerationStructureVK(const MeshAccelerationStructureVK&) = delete;
+    MeshAccelerationStructureVK(MeshAccelerationStructureVK&&) noexcept = delete;
+    MeshAccelerationStructureVK& operator=(const MeshAccelerationStructureVK&) = delete;
+    MeshAccelerationStructureVK& operator=(MeshAccelerationStructureVK&&) noexcept = delete;
 
     /**
      * @brief Construct empty storage owned by p_allocator.
      * @throws std::runtime_error If p_allocator is null.
      */
-    explicit StaticMeshAccelerationStructureVK(RenderAllocator* p_allocator);
+    explicit MeshAccelerationStructureVK(RenderAllocator* p_allocator);
 
     /** @brief Acquire the top-level acceleration structure. */
     Ref<ROAccelerationStructureVK> acquire_top_level() const {
@@ -77,7 +77,7 @@ public:
     Ref<ROAccelerationStructureVK> acquire_bottom_level(size_t p_index) const;
 
     /** @brief Acquire the static mesh whose geometry the structures were built from. */
-    Ref<StaticMeshResourcesVK> acquire_static_mesh() const {
+    Ref<MeshResourcesVK> acquire_static_mesh() const {
         return static_mesh;
     }
 
@@ -96,7 +96,7 @@ public:
     void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
-    friend class StaticMeshAccelerationStructureCompilerVK;
+    friend class MeshAccelerationStructureCompilerVK;
 
     struct BottomLevelBuild {
         VkAccelerationStructureGeometryKHR geometry{};
@@ -106,7 +106,7 @@ private:
 
     RenderAllocator* allocator = nullptr;
     PFN_vkCmdBuildAccelerationStructuresKHR command_build_acceleration_structures = nullptr;
-    Ref<StaticMeshResourcesVK> static_mesh = MEM_NULL;
+    Ref<MeshResourcesVK> static_mesh = MEM_NULL;
     Vector<BottomLevelBuild, RenderAllocator> bottom_level_builds;
     Vector<Ref<ROAccelerationStructureVK>, RenderAllocator> bottom_levels;
     Ref<ROBufferVK> bottom_level_scratch_buffer = MEM_NULL;

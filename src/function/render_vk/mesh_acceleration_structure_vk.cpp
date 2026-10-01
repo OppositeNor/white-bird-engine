@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/static_mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
@@ -53,21 +53,21 @@ void record_build_barrier(VkCommandBuffer p_command_buffer, VkPipelineStageFlags
 
 } // namespace
 
-StaticMeshAccelerationStructureVK::StaticMeshAccelerationStructureVK(RenderAllocator* p_allocator)
+MeshAccelerationStructureVK::MeshAccelerationStructureVK(RenderAllocator* p_allocator)
     : allocator(p_allocator), bottom_level_builds(p_allocator), bottom_levels(p_allocator) {
     if (allocator == nullptr) {
         throw std::runtime_error("Failed to construct static-mesh acceleration structure: allocator is null.");
     }
 }
 
-Ref<ROAccelerationStructureVK> StaticMeshAccelerationStructureVK::acquire_bottom_level(size_t p_index) const {
+Ref<ROAccelerationStructureVK> MeshAccelerationStructureVK::acquire_bottom_level(size_t p_index) const {
     if (p_index >= bottom_levels.size()) {
         throw std::runtime_error("Failed to get static-mesh bottom-level acceleration structure: index is out of bounds.");
     }
     return bottom_levels[p_index];
 }
 
-void StaticMeshAccelerationStructureVK::record_build(VkCommandBuffer p_command_buffer) const {
+void MeshAccelerationStructureVK::record_build(VkCommandBuffer p_command_buffer) const {
     WBE_DEBUG_ASSERT(command_build_acceleration_structures != nullptr && top_level != MEM_NULL);
     for (size_t i = 0; i < bottom_level_builds.size(); ++i) {
         const BottomLevelBuild& build = bottom_level_builds[i];
@@ -99,7 +99,7 @@ void StaticMeshAccelerationStructureVK::record_build(VkCommandBuffer p_command_b
     record_build_barrier(p_command_buffer, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
 }
 
-void StaticMeshAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
+void MeshAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     if (top_level == MEM_NULL) {
         throw std::runtime_error("Failed to bind static-mesh acceleration structure: top-level structure is missing.");
     }

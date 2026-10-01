@@ -36,8 +36,8 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
-#include "function/render_vk/static_mesh_compiler_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
@@ -100,10 +100,10 @@ private:
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
-    WBE::RefRes<WBE::RUStaticOpaqueMesh> cube_set;
+    WBE::RefRes<WBE::RUMesh3D> cube_mesh;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
     WBE::RefRes<WBE::RUGraphicsPipeline> main_pipeline_resource;
-    WBE::Ref<WBE::StaticMeshResourcesVK> static_mesh_resources;
+    WBE::Ref<WBE::MeshResourcesVK> static_mesh_resources;
     // Graph-owned camera buffer, updated from the logic thread through render jobs.
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::ComponentSpotLight spot_light_component{};
@@ -205,14 +205,14 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     load_resources();
     setup_spot_light();
 
-    static_mesh_resources = WBE::create_static_mesh_resources(
-        renderer_vk, cube_set, WBE::MEM_NULL, main_pipeline_resource, WBE::MEM_NULL, main_pipeline_resource);
+    static_mesh_resources = WBE::create_mesh_resources(
+        renderer_vk, cube_mesh, main_pipeline_resource, WBE::MEM_NULL, main_pipeline_resource);
     const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "draw_cube_shadow_pipeline", shadow_pipeline_resource, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
     const std::array<VkClearValue, 2> shadow_clear_values{VkClearValue{}, VkClearValue{.depthStencil = {.depth = 0.0F, .stencil = 0}}};
     const std::array<std::string_view, 1> shadow_color_attachments{REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
-    WBE::RendTaskDescVK shadow_task = WBE::make_static_mesh_task_desc(render_allocator,
+    WBE::RendTaskDescVK shadow_task = WBE::make_mesh_task_desc(render_allocator,
         base_render_data,
         RT_RUN_PIPELINE_SHADOWMAP,
         static_mesh_resources,
@@ -228,7 +228,7 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
         WBE::compile_render_test_graphics_pipeline(renderer_vk, "draw_cube_main_pipeline", main_pipeline_resource, main_formats);
     const std::array<VkClearValue, 1> main_clear_values{};
     const std::array<std::string_view, 1> main_color_attachments{WBE::REND_RES_SWAP_CHAIN};
-    WBE::RendTaskDescVK main_task = WBE::make_static_mesh_task_desc(render_allocator,
+    WBE::RendTaskDescVK main_task = WBE::make_mesh_task_desc(render_allocator,
         base_render_data,
         RT_RUN_PIPELINE,
         static_mesh_resources,
@@ -254,9 +254,9 @@ void ApplicationVulkanDrawCubeTest::load_resources() {
         WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
 
-    cube_set = resource_manager->get_resource<WBE::RUStaticOpaqueMesh>("model_cube_static.static_opaque_mesh");
-    if (cube_set == nullptr) {
-        throw std::runtime_error("Failed to setup draw cube test: static opaque set resource was not found.");
+    cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh");
+    if (cube_mesh == nullptr) {
+        throw std::runtime_error("Failed to setup draw cube test: static mesh resource was not found.");
     }
     shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_static");
     if (shadow_pipeline_resource == nullptr) {

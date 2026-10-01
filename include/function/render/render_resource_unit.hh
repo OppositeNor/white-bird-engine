@@ -259,41 +259,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaIndexView {
  * @class RUSchemaSubmesh3D
  * @brief The scheme of RUSubmesh3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaSubmesh3D : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaSubmesh3D)
-    // The material if it could be populated in place.
-    WBE_META(WBE_REFLECT)
-    std::optional<RUSchemaMaterial> material;
-    // A string referencing unpopulated material.
-    WBE_META(WBE_REFLECT)
-    std::optional<std::string> material_id;
-    /** Binary-backed vertex data. */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    RUSchemaVertexView vertices;
-    /** Binary-backed uint32 indices. */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    RUSchemaIndexView indices;
-};
-
-/**
- * @class RUSchemaMesh3D
- * @brief The scheme of RUMesh3D.
- */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaMesh3D)
-    // Submeshes that could be populated in place.
-    WBE_META(WBE_REFLECT)
-    std::vector<RUSchemaSubmesh3D> submeshes;
-    // Submesh ids referencing unpopulated submeshes.
-    WBE_META(WBE_REFLECT)
-    std::vector<std::string> submeshes_id;
-};
-
-/**
- * @class RUSchemaStaticGeometrySubmesh
- * @brief One material and geometry draw range in a static mesh.
- */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometrySubmesh {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3D {
     /** Inline material for this submesh. */
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaMaterial> material;
@@ -315,59 +281,43 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometrySubmesh {
 };
 
 /**
- * @class RUSchemaStaticGeometryInstance
- * @brief One static geometry instance transform.
+ * @class RUSchemaInstance3D
+ * @brief The scheme of RUInstance3D.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaStaticGeometryInstance {
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaInstance3D {
     /** Column-major global transform. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     glm::mat4 global_transform{1.0F};
 };
 
 /**
- * @class RUSchemaStaticOpaqueMesh
- * @brief Resource schema for opaque static geometry.
+ * @class RUSchemaSubmeshInstance3D
+ * @brief The scheme of RUSubmeshInstance3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueMesh : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueMesh)
-    /** Static submeshes in declared draw order. */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmeshInstance3D {
+    /** Submeshes in declared draw order. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
-    /** Shared static instance transforms. */
+    std::vector<RUSchemaSubmesh3D> submeshes;
+    /** Instance transforms shared by the submeshes. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometryInstance> instances;
+    std::vector<RUSchemaInstance3D> instances;
 };
 
 /**
- * @class RUSchemaStaticOpaqueDoubleSidedMesh
- * @brief Resource schema for opaque double-sided static geometry.
+ * @class RUSchemaMesh3D
+ * @brief The scheme of RUMesh3D.
  */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticOpaqueDoubleSidedMesh : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticOpaqueDoubleSidedMesh)
-    /**
-     * @brief Static submeshes in declared draw order.
-     */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaMesh3D)
+    /** Opaque submeshes drawn with face culling. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
-    /**
-     * @brief Shared static instance transforms.
-     */
+    RUSchemaSubmeshInstance3D opaque_instances;
+    /** Alpha-tested submeshes. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometryInstance> instances;
-};
-
-/**
- * @class RUSchemaStaticMaskedMesh
- * @brief Resource schema for masked static geometry.
- */
-struct WBE_META(WBE_SERIALIZABLE) RUSchemaStaticMaskedMesh : public RUSchema {
-    WBE_DECL_SERIALIZABLE(RUSchemaStaticMaskedMesh)
-    /** Static submeshes in declared draw order. */
+    RUSchemaSubmeshInstance3D masked_instances;
+    /** Opaque submeshes drawn without face culling. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometrySubmesh> submeshes;
-    /** Shared static instance transforms. */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::vector<RUSchemaStaticGeometryInstance> instances;
+    RUSchemaSubmeshInstance3D double_sided_opaque_instances;
 };
 
 /**
@@ -619,20 +569,22 @@ struct RUIndexView {
 
 /**
  * @class RUSubmesh3D
- * @brief 3D submesh resource unit.
+ * @brief One material, geometry range, and instance range of a mesh category.
  *
- * Push any chunk-owned geometry payload before emplacing this unit so the
- * stored references remain valid. Chunk teardown now runs registered
- * resource-unit destructors before releasing the allocator storage behind the
- * unit and its payload.
+ * A non-owning view into its resource chunk; copyable and movable with shallow chunk references. Vertex mutation is not
+ * thread-safe and requires recompiling the mesh's render resources to reach the GPU.
  */
-struct RUSubmesh3D : public ResourceUnit {
-    // A reference to the material.
+struct RUSubmesh3D {
+    /** Referenced material. */
     RefRes<RUMaterial> material;
     /** Binary-backed interleaved vertices and fixed layout. */
     RUVertexView vertices;
     /** Binary-backed uint32 indices. */
     RUIndexView indices;
+    /** First transform entry used by this submesh. */
+    size_t first_instance = 0;
+    /** Number of transform entries used by this submesh. */
+    size_t instance_count = 0;
 
     void swap_vertices(size_t p_first, size_t p_second);
     /** Set an exact float scalar attribute. */
@@ -672,74 +624,44 @@ struct RUSubmesh3D : public ResourceUnit {
 };
 
 /**
- * @class RUMesh3D
- * @brief 3D mesh resource unit.
+ * @class RUInstance3D
+ * @brief One instance transform of a mesh category.
  */
-struct RUMesh3D : public ResourceUnit {
-    // Number of submeshes.
-    size_t submesh_count;
-    // The submeshes.
-    RefRes<RefRes<RUSubmesh3D>> submeshes;
-};
-
-/**
- * @class RUStaticGeometrySubmesh
- * @brief One material, geometry range, and instance range in a static mesh.
- */
-struct RUStaticGeometrySubmesh {
-    /** Referenced material. */
-    RefRes<RUMaterial> material;
-    /** Binary-backed interleaved vertices and fixed layout. */
-    RUVertexView vertices;
-    /** Binary-backed uint32 indices. */
-    RUIndexView indices;
-    /** First transform entry used by this submesh. */
-    size_t first_instance = 0;
-    /** Number of transform entries used by this submesh. */
-    size_t instance_count = 0;
-};
-
-/**
- * @class RUStaticGeometryInstance
- * @brief One global static geometry transform.
- */
-struct RUStaticGeometryInstance {
+struct RUInstance3D {
     /** Column-major global transform. */
     glm::mat4 global_transform{1.0F};
 };
 
 /**
- * @class RUStaticMesh
- * @brief Shared representation for static mesh resources.
+ * @class RUSubmeshInstance3D
+ * @brief Submeshes of one mesh category and the instance transforms their instance ranges index.
  */
-struct RUStaticMesh : public ResourceUnit {
-    /** Static submeshes in declared draw order. */
-    RefRes<RUStaticGeometrySubmesh> submeshes;
+struct RUSubmeshInstance3D {
+    /** Submeshes in declared draw order. */
+    RefRes<RUSubmesh3D> submeshes;
     /** Number of entries in submeshes. */
     size_t submesh_count = 0;
-    /** Shared static instance transforms. */
-    RefRes<RUStaticGeometryInstance> instances;
+    /** Instance transforms shared by the submeshes. */
+    RefRes<RUInstance3D> instances;
     /** Number of entries in instances. */
     size_t instance_count = 0;
 };
 
 /**
- * @class RUStaticOpaqueMesh
- * @brief Opaque static mesh resource.
+ * @class RUMesh3D
+ * @brief 3D mesh resource unit: opaque, masked, and double-sided opaque submesh categories.
+ *
+ * Static and dynamic meshes share this representation; the categories may share vertex and index binaries. The payload
+ * lifetime belongs to the resource chunk.
  */
-struct RUStaticOpaqueMesh : public RUStaticMesh {};
-
-/**
- * @class RUStaticOpaqueDoubleSidedMesh
- * @brief Opaque geometry rendered without face culling; payload lifetime belongs to its resource chunk.
- */
-struct RUStaticOpaqueDoubleSidedMesh : public RUStaticMesh {};
-
-/**
- * @class RUStaticMaskedMesh
- * @brief Masked static mesh resource.
- */
-struct RUStaticMaskedMesh : public RUStaticMesh {};
+struct RUMesh3D : public ResourceUnit {
+    /** Opaque submeshes drawn with face culling. */
+    RUSubmeshInstance3D opaque_instances;
+    /** Alpha-tested submeshes. */
+    RUSubmeshInstance3D masked_instances;
+    /** Opaque submeshes drawn without face culling. */
+    RUSubmeshInstance3D double_sided_opaque_instances;
+};
 
 } // namespace WhiteBirdEngine
 

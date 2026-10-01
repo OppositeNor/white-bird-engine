@@ -19,12 +19,11 @@
 #include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
-#include "function/render_vk/dynamic_mesh_resources_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -170,17 +169,15 @@ TEST(WBERenderGraphDescriptorVKTest, GraphOwnedResourceDeclarationsRejectEmptyId
 }
 
 TEST(WBERenderGraphDescriptorVKTest, ComposesMemberResourceIds) {
-    EXPECT_EQ(IBindableRenderResourceVK::make_member_resource_id("sponza", StaticMeshResourcesVK::NODES), "sponza.nodes");
+    EXPECT_EQ(IBindableRenderResourceVK::make_member_resource_id("sponza", MeshResourcesVK::NODES), "sponza.nodes");
 }
 
 TEST(WBERenderGraphDescriptorVKTest, IncompleteMeshResourcesRefuseToBind) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendGraphDescVK descriptor(&allocator);
-    StaticMeshResourcesVK static_mesh(&allocator);
-    DynamicMeshResourcesVK dynamic_mesh(&allocator);
+    MeshResourcesVK static_mesh(&allocator);
 
     EXPECT_THROW(descriptor.add_resource("static_mesh", static_mesh), std::runtime_error);
-    EXPECT_THROW(descriptor.add_resource("dynamic_mesh", dynamic_mesh), std::runtime_error);
     EXPECT_TRUE(descriptor.resources.empty());
 }
 

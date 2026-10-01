@@ -32,8 +32,8 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
-#include "function/render_vk/static_mesh_acceleration_structure_compiler_vk.hh"
-#include "function/render_vk/static_mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -107,13 +107,11 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     update_descriptors();
     dynamic_mesh_time += p_delta;
     const float angle = static_cast<float>(dynamic_mesh_time);
-    std::array<glm::mat4, 2> transforms{};
-    transforms[0] = glm::translate(glm::mat4(1.0F), glm::vec3(0.6F * std::sin(angle * 0.5F), 0.75F, 0.0F)) *
-                    glm::rotate(glm::mat4(1.0F), angle, glm::vec3(0.0F, 1.0F, 0.0F)) *
-                    glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
-    transforms[1] = glm::translate(glm::mat4(1.0F), glm::vec3(-1.2F, 0.0F, -0.5F)) * transforms[0];
-    add_render_job([this, transforms]() {
-        dynamic_mesh->publish_visible_transforms(transforms);
+    const glm::mat4 transform = glm::translate(glm::mat4(1.0F), glm::vec3(0.6F * std::sin(angle * 0.5F), 0.75F, 0.0F)) *
+                                glm::rotate(glm::mat4(1.0F), angle, glm::vec3(0.0F, 1.0F, 0.0F)) *
+                                glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
+    add_render_job([this, transform]() {
+        dynamic_mesh->set_transform(transform);
     });
 }
 
@@ -305,8 +303,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     dynamic_mesh = make_unique<DynamicMeshRenderFeature>(render_allocator,
         renderer_vk,
         ResourceManager::get_singleton()->get_resource<RUMesh3D>("model_cube.mesh"),
-        gbuffer_opaque_pipeline_resource,
-        2);
+        gbuffer_opaque_pipeline_resource);
     setup_spot_light();
     setup_bloom_acquisition();
     bool use_atomic_octree = false;
@@ -359,7 +356,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
     VkClearValue depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{color_clear, color_clear, color_clear, depth_clear};
     std::array<std::string_view, 3> color_attachments{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
-    RendTaskDescVK descriptor = make_static_mesh_task_desc(render_allocator,
+    RendTaskDescVK descriptor = make_mesh_task_desc(render_allocator,
         base_render_data,
         p_double_sided ? RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED : RT_RUN_DEFERRED_GBUFFER,
         static_mesh_resources,
@@ -389,9 +386,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
-    sponza_opaque_set = resource_manager->get_resource<RUStaticOpaqueMesh>("intel_sponza_with_curtains.static_opaque_mesh");
-    sponza_opaque_double_sided_set =
-        resource_manager->get_resource<RUStaticOpaqueDoubleSidedMesh>("intel_sponza_with_curtains.static_opaque_double_sided_mesh");
+    sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
     shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided_static");
     gbuffer_double_sided_pipeline_resource =
         resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided_static");
@@ -418,22 +413,16 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     RayTracingPluginVK* ray_tracing = RayTracingPluginVK::get_singleton();
     const bool build_acceleration_structure = ray_tracing != nullptr && ray_tracing->is_enabled();
-    StaticMeshCompilerVK::Config static_mesh_config;
+    MeshCompilerVK::Config static_mesh_config;
     if (build_acceleration_structure) {
-        static_mesh_config.vertex_buffer_usage = StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
-        static_mesh_config.index_buffer_usage = StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+        static_mesh_config.vertex_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+        static_mesh_config.index_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
     }
-    static_mesh_resources = create_static_mesh_resources(renderer_vk,
-        sponza_opaque_set,
-        MEM_NULL,
-        gbuffer_opaque_pipeline_resource,
-        MEM_NULL,
-        gbuffer_opaque_pipeline_resource,
-        sponza_opaque_double_sided_set,
-        static_mesh_config);
+    static_mesh_resources = create_mesh_resources(
+        renderer_vk, sponza_mesh, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, static_mesh_config);
     if (build_acceleration_structure) {
-        static_mesh_acceleration_structure =
-            StaticMeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data()).compile(static_mesh_resources);
+        mesh_acceleration_structure =
+            MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data()).compile(static_mesh_resources);
     }
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
@@ -523,7 +512,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{shadow_color_clear, shadow_normal_clear, shadow_moments_clear, shadow_depth_clear};
     std::array<std::string_view, 3> color_attachments{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
-    RendTaskDescVK descriptor = make_static_mesh_task_desc(render_allocator,
+    RendTaskDescVK descriptor = make_mesh_task_desc(render_allocator,
         base_render_data,
         p_double_sided ? RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED : RT_RUN_DEFERRED_SHADOW_OPAQUE,
         static_mesh_resources,

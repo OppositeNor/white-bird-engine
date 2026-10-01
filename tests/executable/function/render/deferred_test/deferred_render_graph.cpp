@@ -15,7 +15,7 @@
 #include "../render_test.hh"
 #include "function/render_vk/rt_build_acceleration_structures_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/static_mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
@@ -136,17 +136,17 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
-    if (static_mesh_acceleration_structure != MEM_NULL) {
+    if (mesh_acceleration_structure != MEM_NULL) {
         // Build the acceleration structures once, on the graph's first recording.
         auto build = make_unique<RTBuildAccelerationStructuresVK>(render_allocator,
             base_render_data,
             IBindableRenderResourceVK::make_member_resource_id(
-                STATIC_MESH_ACCELERATION_STRUCTURE_KEY, StaticMeshAccelerationStructureVK::TOP_LEVEL),
-            [acceleration_structure = static_mesh_acceleration_structure](VkCommandBuffer p_command_buffer) {
+                MESH_ACCELERATION_STRUCTURE_KEY, MeshAccelerationStructureVK::TOP_LEVEL),
+            [acceleration_structure = mesh_acceleration_structure](VkCommandBuffer p_command_buffer) {
                 acceleration_structure->record_build(p_command_buffer);
             });
         pipeline_desc.add_task(RendTaskDescVK(render_allocator,
-            RT_BUILD_STATIC_MESH_ACCELERATION_STRUCTURE,
+            RT_BUILD_MESH_ACCELERATION_STRUCTURE,
             make_unique<RTTriggeredVK>(render_allocator, std::move(build), true)));
     }
     pipeline_desc.add_task(std::move(p_shadow_opaque_task));
@@ -253,8 +253,8 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
     p_pipeline_desc.add_resource(STATIC_MESH_KEY, *static_mesh_resources);
-    if (static_mesh_acceleration_structure != MEM_NULL) {
-        p_pipeline_desc.add_resource(STATIC_MESH_ACCELERATION_STRUCTURE_KEY, *static_mesh_acceleration_structure);
+    if (mesh_acceleration_structure != MEM_NULL) {
+        p_pipeline_desc.add_resource(MESH_ACCELERATION_STRUCTURE_KEY, *mesh_acceleration_structure);
     }
     dynamic_mesh->register_resources(p_pipeline_desc);
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())

@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "i_octree_render_feature.hh"
 #include <atomic>
 #include <cstdint>
@@ -41,7 +41,7 @@ public:
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once.
      */
     OctreeRenderFeatureAtomic(RendererVK* p_renderer,
-        Ref<StaticMeshResourcesVK> p_static_mesh_resources,
+        Ref<MeshResourcesVK> p_static_mesh_resources,
         const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
         bool p_rebuild_static_every_frame = false);
     ~OctreeRenderFeatureAtomic() override = default;

@@ -33,7 +33,7 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <algorithm>
@@ -213,7 +213,7 @@ private:
 } // namespace
 
 IOctreeRenderFeature::IOctreeRenderFeature(RendererVK* p_renderer,
-    Ref<StaticMeshResourcesVK> p_static_mesh_resources,
+    Ref<MeshResourcesVK> p_static_mesh_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     std::string_view p_shader_prefix,
     std::string_view p_dynamic_shader_prefix,
@@ -369,7 +369,7 @@ RendTaskDescVK IOctreeRenderFeature::get_reset_render_task_desc() const {
         base_render_data,
         octree_reset_compute_pipeline,
         VkExtent3D{.width = get_reset_group_count(), .height = 1, .depth = 1});
-    alias_mesh_resources(task_desc, *octree_reset_compute_pipeline, make_static_mesh_resource_keys(STATIC_MESH_KEY));
+    alias_mesh_resources(task_desc, *octree_reset_compute_pipeline, make_mesh_resource_keys(STATIC_MESH_KEY));
     return task_desc;
 }
 
@@ -380,7 +380,7 @@ RendTaskDescVK IOctreeRenderFeature::get_construction_render_task_desc(
     RendTaskDescVK task_desc =
         p_dynamic_mesh != nullptr
             ? p_dynamic_mesh->make_task(p_task_id, dynamic_build_pipeline, VkExtent2D{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT})
-            : make_static_mesh_task_desc(render_allocator,
+            : make_mesh_task_desc(render_allocator,
                   base_render_data,
                   p_task_id,
                   static_mesh_resources,

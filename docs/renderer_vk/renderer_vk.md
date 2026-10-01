@@ -86,9 +86,10 @@ Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `
 changed through `RUSubmesh3D`, but mutation is not thread-safe. Recompile the affected mesh resources, and any acceleration
 structures built from them, after changing geometry.
 
-Static geometry resources use `RUStaticMesh`, with distinct `RUStaticOpaqueMesh` and `RUStaticMaskedMesh` resource types.
-Each set stores declared submeshes and shared instance transforms. A submesh references a material, a vertex view, an index view,
-and a `[first_instance, instance_count)` range into the set's transform array. Instance transforms are exactly 16 column-major
+Static and dynamic meshes share one resource type, `RUMesh3D` (manifest type `mesh`). It holds three `RUSubmeshInstance3D`
+categories: `opaque_instances`, `masked_instances`, and `double_sided_opaque_instances`. Each category stores its `RUSubmesh3D`
+submeshes and its `RUInstance3D` transforms. A submesh references a material, a vertex view, an index view, and a
+`[first_instance, instance_count)` range into its category's transform array. Instance transforms are exactly 16 column-major
 floats in the serialized resource and are loaded as `glm::mat4`.
 
 Vertex shader fields opt into resource matching with `WBE_VERTEX_INPUT`. An explicit string selects a resource role, while an
@@ -117,36 +118,30 @@ state.
 
 ## Mesh Resources
 
-Mesh compilers derive from `IMeshCompilerVK`, which owns the shared steps as protected helpers: geometry buffer upload through
-`MeshBufferCompilerVK`, mesh-node layout validation, draw planning through `MeshDrawBatchPlannerVK`, and material compilation
-through `MeshMaterialResourceBuilderVK`.
+`MeshCompilerVK` compiles every category of one `RUMesh3D` into one `MeshResourcesVK`, whether the mesh never moves or moves
+every frame. Shaders place each instance at the mesh transform × its instance-local transform. Instance-local transforms come from
+the resource and are immutable. The mesh transform lives in one small buffer per frame in flight, starts as identity, and changes
+through `MeshResourcesVK::set_transform()`, so moving a whole mesh costs one matrix regardless of its instance count.
 
-- `StaticMeshCompilerVK` compiles the static mesh categories into `StaticMeshResourcesVK` (below).
-- `DynamicMeshCompilerVK` compiles one `RUMesh3D` with a fixed instance capacity into `DynamicMeshResourcesVK`. Its geometry,
-  submesh, instance-link, and material resources are immutable; node transforms and indirect commands live in one buffer per frame
-  in flight and change through `DynamicMeshResourcesVK::publish_visible_transforms()`. Import it with
-  `RendGraphDescVK::add_resource(key, *dynamic_mesh)`, which registers each member under `<key>.<member>` using the
-  `DynamicMeshResourcesVK` member names.
+### Compiled Mesh Resources
 
-### Static Mesh Resources
-
-`StaticMeshCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
-`StaticMeshResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
+`MeshCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
+`MeshResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
 buffers with their draw batches, submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed
 by the generic `RTRunGraphicsPipelineIndirectVK`; callers provide the graphics pipeline of each draw batch.
 
-### Loading Static Geometry
+### Loading Meshes
 
-Static geometry resources are loaded through the normal chunk pipeline. `ResourceUnitLoaderBinary` loads the shared `RUBinary`
-payload, and `register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderStaticOpaqueMesh` and
-`ResourceUnitLoaderStaticMaskedMesh` so `static_opaque_mesh` and `static_masked_mesh` schemas resolve into `RUStaticOpaqueMesh` and
-`RUStaticMaskedMesh` resources.
+Meshes are loaded through the normal chunk pipeline. `ResourceUnitLoaderBinary` loads the shared `RUBinary` payload, and
+`register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderMesh`, which resolves `mesh` schemas into `RUMesh3D`.
 
-Each static mesh stores:
+Each mesh category stores:
 
 - A list of submeshes.
 - For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
-- One shared instance array containing `glm::mat4` transforms.
+- One instance array containing `glm::mat4` transforms.
+
+Each submesh is drawn once per instance in its range, at the mesh transform × that instance's transform.
 
 All drawable submeshes in one compiled static mesh must reference the same vertex `RUBinary` resource and the same index
 `RUBinary` resource. Vertex and index binaries may be distinct from each other. The task validates that each vertex view and
@@ -154,8 +149,8 @@ index view stays within its binary bounds before it creates any Vulkan buffers.
 
 ### Vertex Assembly And Upload
 
-`StaticMeshCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
-`src/function/render_vk/static_mesh_compiler_vk.cpp`:
+`MeshCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
+`src/function/render_vk/mesh_compiler_vk.cpp`:
 
 1. `MeshBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
   also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
@@ -166,7 +161,7 @@ index view stays within its binary bounds before it creates any Vulkan buffers.
   usage flags, so later tasks and renderer plugins can reuse compatible buffers without re-uploading identical geometry bytes.
 4. `build_static_instance_buffer_data()` assembles three CPU-side tables from each set declaration: `GeometrySubmeshGPU`,
   `GeometryNodeGPU`, and `GeometryInstanceGPU`. The tables of all categories are concatenated.
-5. `IMeshCompilerVK::create_storage_buffer()` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
+5. `MeshCompilerVK` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
   indirection.
 
 The important distinction is that vertex and index bytes stay in their original binary layouts. The task uploads those binaries
@@ -176,21 +171,23 @@ use for each indirect draw.
 ### Feeding The Graphics Pipeline
 
 Mesh shaders declare the metadata tables as reflected storage buffers in `MeshDescriptorIndices` (`utils/utils.slang`),
-annotated as read-only, under shader resource ids shared by every mesh kind:
+annotated as read-only, under shader resource ids shared by every mesh:
 
 - `mesh.submeshes` (`REND_RES_MESH_SUBMESHES`)
 - `mesh.nodes` (`REND_RES_MESH_NODES`)
 - `mesh.instances` (`REND_RES_MESH_INSTANCES`)
+- `mesh.transform` (`REND_RES_MESH_TRANSFORM`), the whole-mesh transform
 
-The node layout is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
+Shaders read world transforms through `load_mesh_node()`, which applies the mesh transform after the instance-local node. The node
+layout is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
 
 Material resources follow the pipeline's reflected material texture contract. `get_default_image()` resolves the configured
 default material, and `MeshMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
-image views are returned as a CPU-side `RenderResourceListVK` through `StaticMeshResourcesVK::acquire_textures()`.
+image views are returned as a CPU-side `RenderResourceListVK` through `MeshResourcesVK::acquire_textures()`.
 
 The application imports a compiled static mesh once with `RendGraphDescVK::add_resource(key, *static_mesh)`. Like every import, this
 goes through `IBindableRenderResourceVK::bind()`; the composite registers each member under `<key>.<member>`, using the
-`StaticMeshResourcesVK` member names (`VERTICES`, `NODES`, `MATERIAL_PARAMS`, ...). Graphics tasks bind the vertex, index, and
+`MeshResourcesVK` member names (`VERTICES`, `NODES`, `MATERIAL_PARAMS`, ...). Graphics tasks bind the vertex, index, and
 indirect-command buffers by those identifiers and
 report the reflected metadata and material accesses themselves. Because the shader ids are shared, each task maps them to the drawn
 mesh's resources with `RendTaskDescVK::alias()`, for example `REND_RES_MESH_NODES` to `sponza.nodes`. This includes the material
@@ -219,7 +216,7 @@ Before constructing the task:
 
 1. Load the static meshes, materials, images, shaders, and graphics pipelines through `ResourceManager`, and compile the graphics
   pipeline for the task's attachment formats with `GraphicsPipelineCompilerVK`.
-2. Compile the static mesh with `StaticMeshCompilerVK::compile()` and import it with `RendGraphDescVK::add_resource(key, *static_mesh)`.
+2. Compile the static mesh with `MeshCompilerVK::compile()` and import it with `RendGraphDescVK::add_resource(key, *static_mesh)`.
 3. Declare every render target with `RendGraphDescVK::add_image()` and `add_image_view()`; the graph allocates them when it is
   compiled. Import the renderer's swap-chain image-view container under `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph
   renders to the swap chain.
@@ -234,14 +231,14 @@ RenderAllocator* render_allocator = render_data->allocator;
 
 // opaque_mesh and the compiled graphics pipeline come from step 1; the vertex metadata, entry, and material contract come from
 // the pipeline's shader metadata.
-Ref<StaticMeshResourcesVK> static_mesh = StaticMeshCompilerVK(renderer).compile(opaque_mesh,
+Ref<MeshResourcesVK> static_mesh = MeshCompilerVK(renderer).compile(opaque_mesh,
     MEM_NULL,
     opaque_vertex_metadata,
     opaque_vertex_entry,
     ShaderMetadata{},
     {},
     material_contract,
-    StaticMeshCompilerVK::Config{});
+    MeshCompilerVK::Config{});
 
 RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
 task_builder.set_render_extent(render_data->swap_chain_extent)
@@ -298,18 +295,19 @@ task_desc.alias(RenderTargetsVK::color_id(0), "gbuffer_albedo")
   target is also read.
 - Task ids, resource aliases, and dependencies belong to `RendTaskDescVK`, not the task configuration.
 
-### Static Mesh Acceleration Structures
+### Mesh Acceleration Structures
 
 Ray-tracing acceleration structures are explicit resources; the renderer keeps no published scene geometry.
 
-1. Compile the static mesh with `StaticMeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE` added to
-  `StaticMeshCompilerVK::Config::vertex_buffer_usage` and `index_buffer_usage`. The compiled `StaticMeshResourcesVK` keeps its
-  source `RUStatic*Mesh` units.
-2. Create `StaticMeshAccelerationStructureCompilerVK` from the base render data and `RayTracingPluginVK::get_base_ray_tracing_data()`,
-  then call `compile()` with the static mesh. The result holds one BLAS per drawable opaque or opaque double-sided submesh, one
-  TLAS instance per instance transform, the instance buffer, scratch buffers, and the build inputs.
+1. Compile the mesh with `MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE` added to
+  `MeshCompilerVK::Config::vertex_buffer_usage` and `index_buffer_usage`. The compiled `MeshResourcesVK` keeps its
+  source `RUMesh3D`.
+2. Create `MeshAccelerationStructureCompilerVK` from the base render data and `RayTracingPluginVK::get_base_ray_tracing_data()`,
+  then call `compile()` with the mesh. The result holds one BLAS per drawable opaque or opaque double-sided submesh, one
+  TLAS instance per instance at the mesh transform × instance transform current at compilation, the instance buffer, scratch
+  buffers, and the build inputs. Moving the mesh afterwards requires compiling the acceleration structure again.
 3. Import it with `add_resource(key, *acceleration_structure)`, which registers the TLAS as `<key>.top_level`, and record its build
-  with `StaticMeshAccelerationStructureVK::record_build()`, for example in an `RTBuildAccelerationStructuresVK` task writing
+  with `MeshAccelerationStructureVK::record_build()`, for example in an `RTBuildAccelerationStructuresVK` task writing
   `<key>.top_level` and wrapped in `RTTriggeredVK` to run once. Consumers order after that task with `connect()`.
 
 ### Binding Pipeline Descriptors

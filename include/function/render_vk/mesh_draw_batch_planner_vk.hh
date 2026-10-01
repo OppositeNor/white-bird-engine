@@ -191,7 +191,7 @@ public:
      * @throws std::runtime_error When spans differ, the draw limit is zero, or Vulkan draw/layout limits are exceeded.
      */
     BuildResult build(RenderAllocator* p_allocator,
-        std::span<const RUStaticGeometrySubmesh> p_submeshes,
+        std::span<const RUSubmesh3D> p_submeshes,
         std::span<const uint32_t> p_first_instances,
         const ShaderMetadata& p_vertex_metadata,
         std::string_view p_vertex_entry_name,

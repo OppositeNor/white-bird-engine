@@ -48,7 +48,7 @@ container of any resource. Invalid usages, sizes, formats, and views of undeclar
 
 Imported resources pair the stable string ID used by tasks with the UUID of its concrete render-object type and a non-null
 `RenderObjectContainerVK`. Every import goes through `add_resource(id, const IBindableRenderResourceVK&)`: render objects and
-containers bind themselves under `id`, and composites such as `StaticMeshResourcesVK` bind each member under `<id>.<member>`.
+containers bind themselves under `id`, and composites such as `MeshResourcesVK` bind each member under `<id>.<member>`.
 `RenderGraphVK::build_from_descriptor()` rejects null containers, so descriptor construction must be complete before registration.
 
 `RenderResourceListVK` is the aggregate exception to the container rule. Binding a list registers the aggregate key and each entry

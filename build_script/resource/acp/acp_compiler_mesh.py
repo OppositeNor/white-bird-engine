@@ -20,7 +20,10 @@ from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompi
 
 
 class WBEACPCompilerMesh(WBEACPCompiler):
-    """Compile mesh and submesh source geometry into runtime binary sections."""
+    """Compile hand-authored mesh source geometry into a runtime mesh and its binary sections.
+
+    Source submeshes have no instance data, so they are emitted as opaque submeshes drawn with one identity instance.
+    """
 
     _SOURCE_ONLY_FIELDS = {"vertices_data", "indices_data", "geometry_output_dir", "_geometry_output_name", "source_type", "source_file"}
     _SECTION_TYPES = {
@@ -32,6 +35,8 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         "index": "uint32",
     }
     _OPTIONAL_VERTEX_SLOTS = ["normal", "tangent", "bitangent", "uv"]
+    _MESH_CATEGORIES = ("opaque_instances", "masked_instances", "double_sided_opaque_instances")
+    _IDENTITY_TRANSFORM = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
     _RUNTIME_VERTEX_TYPES = {
         "float", "vec2", "vec3", "vec4",
         "int", "ivec2", "ivec3", "ivec4",
@@ -40,7 +45,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
 
     @override
     def get_supported_resource_types(self) -> list[str]:
-        return ["mesh", "submesh"]
+        return ["mesh"]
 
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
@@ -48,8 +53,6 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         resource_type = resource.get("source_type", resource.get("type"))
         if resource_type == "mesh":
             return self._compile_mesh(resource, manifest_path, res_output_dir)
-        if resource_type == "submesh":
-            return self._compile_submesh(resource, manifest_path, res_output_dir)
         raise RuntimeError(
             f"WBEACPCompilerMesh does not support resource type '{resource_type}' in {manifest_path}."
         )
@@ -63,9 +66,11 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         result = self._copy_runtime_fields(resource)
         result.setdefault("type", "mesh")
         geometry_output_dir = resource.get("geometry_output_dir")
-        submeshes = result.get("submeshes")
+        submeshes = result.pop("submeshes", None)
         if submeshes is None:
-            return [result]
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: mesh resources must declare submeshes in {manifest_path}."
+            )
         if not isinstance(submeshes, list):
             raise RuntimeError(
                 f"WBEACPCompilerMesh: mesh submeshes must be an array in {manifest_path}."
@@ -76,8 +81,9 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         sibling_resources: list[ManifestResource] = []
         for submesh_index, submesh in enumerate(submeshes):
             if not isinstance(submesh, dict):
-                result_submeshes.append(submesh)
-                continue
+                raise RuntimeError(
+                    f"WBEACPCompilerMesh: mesh submeshes must be objects in {manifest_path}."
+                )
             result_submesh = dict(submesh)
             if geometry_output_dir is not None and "geometry_output_dir" not in result_submesh:
                 result_submesh["geometry_output_dir"] = geometry_output_dir
@@ -89,12 +95,24 @@ class WBEACPCompilerMesh(WBEACPCompiler):
                     raise RuntimeError(
                         f"WBEACPCompilerMesh: nested source submesh must compile to one submesh and one binary in {manifest_path}."
                     )
-                result_submeshes.append(compiled_submesh_entries[0])
+                result_submeshes.append(self._to_mesh_submesh(compiled_submesh_entries[0]))
                 sibling_resources.append(compiled_submesh_entries[1])
             else:
-                result_submeshes.append(result_submesh)
-        result["submeshes"] = result_submeshes
+                result_submeshes.append(self._to_mesh_submesh(self._compile_submesh(result_submesh, manifest_path, res_output_dir)[0]))
+        for category in self._MESH_CATEGORIES:
+            result[category] = {"submeshes": [], "instances": []}
+        if result_submeshes:
+            result["opaque_instances"] = {
+                "submeshes": result_submeshes,
+                "instances": [{"global_transform": list(self._IDENTITY_TRANSFORM)}],
+            }
         return [result, *sibling_resources]
+
+    def _to_mesh_submesh(self, submesh: ManifestResource) -> ManifestResource:
+        result = {key: value for key, value in submesh.items() if key not in ("id", "type")}
+        result["first_instance"] = 0
+        result["instance_count"] = 1
+        return result
 
     def _compile_submesh(self, resource: ManifestResource, manifest_path: Path, res_output_dir: Path) -> list[ManifestResource]:
         has_inline_vertices = "vertices_data" in resource

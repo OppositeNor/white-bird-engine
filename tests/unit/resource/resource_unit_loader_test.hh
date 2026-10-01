@@ -128,7 +128,7 @@ protected:
     }
 
     std::unique_ptr<MockResourceChunk> create_submesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUSubmesh3D>& p_captured_submesh) {
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_mesh) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -139,11 +139,11 @@ protected:
                 return WBE::RefRes<char>(mem_id, &p_stack_allocator);
             })
             .set_reserve_res_unit_storage_callback(
-                [&p_stack_allocator, &p_captured_submesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                [&p_stack_allocator, &p_captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
-                    if (p_id == "loaded_submesh") {
-                        p_captured_submesh = resource.force_cast<WBE::RUSubmesh3D>();
+                    if (p_id == "loaded_mesh") {
+                        p_captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
@@ -173,8 +173,6 @@ protected:
 
     WBE::RUSchemaSubmesh3D make_triangle_submesh_scheme() {
         WBE::RUSchemaSubmesh3D scheme;
-        scheme.id = "loaded_submesh";
-        scheme.type = "submesh";
         scheme.material_id = "unused_material";
         scheme.vertices.binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 15};
         scheme.vertices.stride = sizeof(float) * 5;
@@ -183,6 +181,17 @@ protected:
             {.role = "uv", .type = "vec2", .offset = sizeof(float) * 3},
         };
         scheme.indices.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 3};
+        scheme.first_instance = 0;
+        scheme.instance_count = 1;
+        return scheme;
+    }
+
+    WBE::RUSchemaMesh3D make_single_submesh_mesh_scheme(WBE::RUSchemaSubmesh3D p_submesh) {
+        WBE::RUSchemaMesh3D scheme;
+        scheme.id = "loaded_mesh";
+        scheme.type = "mesh";
+        scheme.opaque_instances.submeshes = {std::move(p_submesh)};
+        scheme.opaque_instances.instances = {WBE::RUSchemaInstance3D{}};
         return scheme;
     }
 
@@ -194,9 +203,8 @@ protected:
         return WBE::RefRes<T>(mem_id, &p_stack_allocator);
     }
 
-    template <typename StaticMesh>
     std::unique_ptr<MockResourceChunk> create_static_mesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<StaticMesh>& p_captured_set) {
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -211,7 +219,7 @@ protected:
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
                     if (p_id == "loaded_static_mesh") {
-                        p_captured_set = resource.force_cast<StaticMesh>();
+                        p_captured_set = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
@@ -234,7 +242,7 @@ protected:
     }
 
     std::unique_ptr<MockResourceChunk> create_split_static_mesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUStaticOpaqueMesh>& p_captured_set) {
+        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
         return MockResourceChunk::Builder()
             .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
@@ -249,7 +257,7 @@ protected:
                     WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
                     WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
                     if (p_id == "loaded_static_mesh") {
-                        p_captured_set = resource.force_cast<WBE::RUStaticOpaqueMesh>();
+                        p_captured_set = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
@@ -279,9 +287,9 @@ protected:
             .build(p_stream);
     }
 
-    WBE::RUSchemaStaticGeometrySubmesh make_static_geometry_submesh_scheme(
+    WBE::RUSchemaSubmesh3D make_static_geometry_submesh_scheme(
         std::string_view p_vertex_binary_id = "loaded_geometry", std::string_view p_index_binary_id = "loaded_geometry") {
-        WBE::RUSchemaStaticGeometrySubmesh scheme;
+        WBE::RUSchemaSubmesh3D scheme;
         scheme.material_id = "loaded_material";
         scheme.vertices.binary = {.binary_id = std::string(p_vertex_binary_id), .start = 0, .size = sizeof(float) * 9};
         scheme.vertices.stride = sizeof(float) * 3;
@@ -347,15 +355,11 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderRayTracingPipeline ray_tracing_pipeline_loader;
     WBE::ResourceUnitLoaderMaterial material_loader;
     WBE::ResourceUnitLoaderMesh mesh_loader;
-    WBE::ResourceUnitLoaderSubmesh submesh_loader;
-    WBE::ResourceUnitLoaderStaticOpaqueMesh static_opaque_mesh_loader;
-    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedMesh static_opaque_double_sided_mesh_loader;
-    WBE::ResourceUnitLoaderStaticMaskedMesh static_masked_mesh_loader;
     WBE::ResourceUnitLoaderComponent component_loader;
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 20> loaders = {&audio_loader,
+    const std::array<const WBE::IResourceUnitLoader*, 16> loaders = {&audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
@@ -367,15 +371,11 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &ray_tracing_pipeline_loader,
         &material_loader,
         &mesh_loader,
-        &submesh_loader,
-        &static_opaque_mesh_loader,
-        &static_opaque_double_sided_mesh_loader,
-        &static_masked_mesh_loader,
         &component_loader,
         &prefab_loader,
         &world_loader,
         &scene_loader};
-    const std::array<std::string_view, 20> expected_resource_types = {"audio",
+    const std::array<std::string_view, 16> expected_resource_types = {"audio",
         "binary",
         "font",
         "image",
@@ -387,10 +387,6 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         "ray_tracing_pipeline",
         "material",
         "mesh",
-        "submesh",
-        "static_opaque_mesh",
-        "static_opaque_double_sided_mesh",
-        "static_masked_mesh",
         "component",
         "prefab",
         "world",
@@ -500,14 +496,21 @@ TEST_F(ResourcePopulatorTest, TextureResourceOwnershipContract) {
 TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
-    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
     WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
-    WBE::ResourceUnitLoaderSubmesh loader;
+    WBE::ResourceUnitLoaderMesh loader;
 
-    loader.populate_scheme(*resource_chunk, scheme);
+    loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme));
 
-    ASSERT_NE(captured_submesh, nullptr);
+    ASSERT_NE(captured_mesh, nullptr);
+    ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
+    ASSERT_EQ(captured_mesh->opaque_instances.instance_count, 1U);
+    EXPECT_EQ(captured_mesh->masked_instances.submesh_count, 0U);
+    EXPECT_EQ(captured_mesh->double_sided_opaque_instances.submesh_count, 0U);
+    WBE::RUSubmesh3D* captured_submesh = captured_mesh->opaque_instances.submeshes.get();
+    EXPECT_EQ(captured_submesh->first_instance, 0U);
+    EXPECT_EQ(captured_submesh->instance_count, 1U);
     const WBE::RUVertexView& vertex_data = captured_submesh->vertices;
     ASSERT_NE(vertex_data.binary.binary, nullptr);
     EXPECT_EQ(vertex_data.vertex_count, 3U);
@@ -592,22 +595,23 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
         {.type = "uvec3", .format = WBE::RUVertexAttributeFormat::UINT3, .element_size = 12, .section_start = 0},
         {.type = "uvec4", .format = WBE::RUVertexAttributeFormat::UINT4, .element_size = 16, .section_start = 0},
     }};
-    WBE::ResourceUnitLoaderSubmesh loader;
+    WBE::ResourceUnitLoaderMesh loader;
 
     for (const FormatCase& format_case : format_cases) {
         WBE::StackAllocator stack_allocator(8192);
         std::stringstream stream;
-        WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+        WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
         scheme.vertices.binary.start = format_case.section_start;
         scheme.vertices.binary.size = format_case.element_size * 3;
         scheme.vertices.stride = format_case.element_size;
         scheme.vertices.attributes = {{.role = "custom_role", .type = std::string(format_case.type), .offset = 0}};
 
-        loader.populate_scheme(*resource_chunk, scheme);
+        loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme));
 
-        ASSERT_NE(captured_submesh, nullptr);
+        ASSERT_NE(captured_mesh, nullptr);
+        WBE::RUSubmesh3D* captured_submesh = captured_mesh->opaque_instances.submeshes.get();
         ASSERT_EQ(captured_submesh->vertices.attribute_count, 1U);
         EXPECT_EQ(captured_submesh->vertices.attributes->format, format_case.format);
         EXPECT_EQ(captured_submesh->vertices.attributes->size, format_case.element_size);
@@ -656,16 +660,16 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
-    WBE::ResourceUnitLoaderSubmesh loader;
+    WBE::ResourceUnitLoaderMesh loader;
     auto expect_invalid = [this, &loader](WBE::RUSchemaVertexView p_vertices, WBE::RUSchemaIndexView p_indices) {
         WBE::StackAllocator stack_allocator(8192);
         std::stringstream stream;
-        WBE::RefRes<WBE::RUSubmesh3D> captured_submesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_submesh);
+        WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
         scheme.vertices = std::move(p_vertices);
         scheme.indices = std::move(p_indices);
-        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme)), std::runtime_error);
     };
     WBE::RUSchemaIndexView valid_indices{
         .binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 3}};
@@ -720,113 +724,82 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
         {.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 2}});
 }
 
-TEST_F(ResourcePopulatorTest, StaticOpaqueMeshLoadsSubmeshViewsAndInstances) {
-    WBE::StackAllocator stack_allocator(8192);
-    std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueMesh> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueMesh scheme;
-    scheme.id = "loaded_static_mesh";
-    scheme.type = "static_opaque_mesh";
-    scheme.submeshes = {make_static_geometry_submesh_scheme()};
-    scheme.instances = {
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
-        {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
-    };
-    WBE::ResourceUnitLoaderStaticOpaqueMesh loader;
+TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {
+    using CategorySchema = WBE::RUSchemaSubmeshInstance3D WBE::RUSchemaMesh3D::*;
+    using Category = WBE::RUSubmeshInstance3D WBE::RUMesh3D::*;
+    const std::array<std::pair<CategorySchema, Category>, 3> categories{{
+        {&WBE::RUSchemaMesh3D::opaque_instances, &WBE::RUMesh3D::opaque_instances},
+        {&WBE::RUSchemaMesh3D::masked_instances, &WBE::RUMesh3D::masked_instances},
+        {&WBE::RUSchemaMesh3D::double_sided_opaque_instances, &WBE::RUMesh3D::double_sided_opaque_instances},
+    }};
+    for (const auto& [schema_category, category] : categories) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+        auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_mesh);
+        WBE::RUSchemaMesh3D scheme;
+        scheme.id = "loaded_static_mesh";
+        scheme.type = "mesh";
+        (scheme.*schema_category).submeshes = {make_static_geometry_submesh_scheme()};
+        (scheme.*schema_category).instances = {
+            {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
+            {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
+            {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
+        };
+        WBE::ResourceUnitLoaderMesh loader;
 
-    loader.populate_scheme(*resource_chunk, scheme);
+        loader.populate_scheme(*resource_chunk, scheme);
 
-    ASSERT_NE(captured_set, nullptr);
-    ASSERT_EQ(captured_set->submesh_count, 1U);
-    ASSERT_NE(captured_set->submeshes, nullptr);
-    ASSERT_EQ(captured_set->instance_count, 3U);
-    ASSERT_NE(captured_set->instances, nullptr);
-    const WBE::RUStaticGeometrySubmesh& submesh = captured_set->submeshes.get()[0];
-    ASSERT_NE(submesh.material, nullptr);
-    ASSERT_NE(submesh.vertices.binary.binary, nullptr);
-    ASSERT_NE(submesh.indices.binary.binary, nullptr);
-    EXPECT_EQ(submesh.vertices.vertex_count, 3U);
-    EXPECT_EQ(submesh.vertices.vertex_stride, sizeof(float) * 3);
-    ASSERT_EQ(submesh.vertices.attribute_count, 1U);
-    EXPECT_STREQ(submesh.vertices.attributes->role.name.get(), "position");
-    EXPECT_EQ(submesh.indices.index_count, 3U);
-    EXPECT_EQ(submesh.first_instance, 1U);
-    EXPECT_EQ(submesh.instance_count, 2U);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][0], 2.0F);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][1], 3.0F);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][2], 4.0F);
+        ASSERT_NE(captured_mesh, nullptr);
+        for (const auto& [unused_schema_category, other_category] : categories) {
+            static_cast<void>(unused_schema_category);
+            if (other_category != category) {
+                EXPECT_EQ(((*captured_mesh).*other_category).submesh_count, 0U);
+                EXPECT_EQ(((*captured_mesh).*other_category).instance_count, 0U);
+            }
+        }
+        const WBE::RUSubmeshInstance3D& loaded = (*captured_mesh).*category;
+        ASSERT_EQ(loaded.submesh_count, 1U);
+        ASSERT_NE(loaded.submeshes, nullptr);
+        ASSERT_EQ(loaded.instance_count, 3U);
+        ASSERT_NE(loaded.instances, nullptr);
+        const WBE::RUSubmesh3D& submesh = loaded.submeshes.get()[0];
+        ASSERT_NE(submesh.material, nullptr);
+        ASSERT_NE(submesh.vertices.binary.binary, nullptr);
+        ASSERT_NE(submesh.indices.binary.binary, nullptr);
+        EXPECT_EQ(submesh.vertices.vertex_count, 3U);
+        EXPECT_EQ(submesh.vertices.vertex_stride, sizeof(float) * 3);
+        ASSERT_EQ(submesh.vertices.attribute_count, 1U);
+        EXPECT_STREQ(submesh.vertices.attributes->role.name.get(), "position");
+        EXPECT_EQ(submesh.indices.index_count, 3U);
+        EXPECT_EQ(submesh.first_instance, 1U);
+        EXPECT_EQ(submesh.instance_count, 2U);
+        EXPECT_EQ(loaded.instances.get()[1].global_transform[3][0], 2.0F);
+        EXPECT_EQ(loaded.instances.get()[1].global_transform[3][1], 3.0F);
+        EXPECT_EQ(loaded.instances.get()[1].global_transform[3][2], 4.0F);
 
-    scheme.submeshes[0].instance_count = 3;
-    EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
-    scheme.submeshes[0].instance_count = 2;
+        (scheme.*schema_category).submeshes[0].instance_count = 3;
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+    }
 }
 
-TEST_F(ResourcePopulatorTest, StaticOpaqueDoubleSidedMeshLoadsSubmeshViewsAndInstances) {
+TEST_F(ResourcePopulatorTest, MeshLoadsSeparateVertexAndIndexBinaries) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueDoubleSidedMesh> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueDoubleSidedMesh scheme;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    auto resource_chunk = create_split_static_mesh_test_chunk(stack_allocator, stream, captured_mesh);
+    WBE::RUSchemaMesh3D scheme;
     scheme.id = "loaded_static_mesh";
-    scheme.type = "static_opaque_double_sided_mesh";
-    scheme.submeshes = {make_static_geometry_submesh_scheme()};
-    scheme.instances = {
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
-        {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
-    };
-    WBE::ResourceUnitLoaderStaticOpaqueDoubleSidedMesh loader;
+    scheme.type = "mesh";
+    scheme.opaque_instances.submeshes = {make_static_geometry_submesh_scheme("loaded_vertices", "loaded_indices")};
+    scheme.opaque_instances.instances = {WBE::RUSchemaInstance3D{}, WBE::RUSchemaInstance3D{}, WBE::RUSchemaInstance3D{}};
+    WBE::ResourceUnitLoaderMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
-    ASSERT_NE(captured_set, nullptr);
-    ASSERT_EQ(captured_set->submesh_count, 1U);
-    ASSERT_NE(captured_set->submeshes, nullptr);
-    ASSERT_EQ(captured_set->instance_count, 3U);
-    ASSERT_NE(captured_set->instances, nullptr);
-    const WBE::RUStaticGeometrySubmesh& submesh = captured_set->submeshes.get()[0];
-    ASSERT_NE(submesh.material, nullptr);
-    ASSERT_NE(submesh.vertices.binary.binary, nullptr);
-    ASSERT_NE(submesh.indices.binary.binary, nullptr);
-    EXPECT_EQ(submesh.vertices.vertex_count, 3U);
-    EXPECT_EQ(submesh.vertices.vertex_stride, sizeof(float) * 3);
-    ASSERT_EQ(submesh.vertices.attribute_count, 1U);
-    EXPECT_STREQ(submesh.vertices.attributes->role.name.get(), "position");
-    EXPECT_EQ(submesh.indices.index_count, 3U);
-    EXPECT_EQ(submesh.first_instance, 1U);
-    EXPECT_EQ(submesh.instance_count, 2U);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][0], 2.0F);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][1], 3.0F);
-    EXPECT_EQ(captured_set->instances.get()[1].global_transform[3][2], 4.0F);
-
-    scheme.submeshes[0].instance_count = 3;
-    EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
-    scheme.submeshes[0].instance_count = 2;
-}
-
-TEST_F(ResourcePopulatorTest, StaticOpaqueMeshLoadsSeparateVertexAndIndexBinaries) {
-    WBE::StackAllocator stack_allocator(8192);
-    std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticOpaqueMesh> captured_set = WBE::MEM_NULL;
-    auto resource_chunk = create_split_static_mesh_test_chunk(stack_allocator, stream, captured_set);
-    WBE::RUSchemaStaticOpaqueMesh scheme;
-    scheme.id = "loaded_static_mesh";
-    scheme.type = "static_opaque_mesh";
-    scheme.submeshes = {make_static_geometry_submesh_scheme("loaded_vertices", "loaded_indices")};
-    scheme.instances = {
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F}},
-        {.global_transform = {1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 2.0F, 3.0F, 4.0F, 1.0F}},
-        {.global_transform = {2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 0.0F, 0.0F, 0.0F, 2.0F, 0.0F, 5.0F, 6.0F, 7.0F, 1.0F}},
-    };
-    WBE::ResourceUnitLoaderStaticOpaqueMesh loader;
-
-    loader.populate_scheme(*resource_chunk, scheme);
-
-    ASSERT_NE(captured_set, nullptr);
-    ASSERT_EQ(captured_set->submesh_count, 1U);
-    const WBE::RUStaticGeometrySubmesh& submesh = captured_set->submeshes.get()[0];
+    ASSERT_NE(captured_mesh, nullptr);
+    ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
+    const WBE::RUSubmesh3D& submesh = captured_mesh->opaque_instances.submeshes.get()[0];
     ASSERT_NE(submesh.vertices.binary.binary, nullptr);
     ASSERT_NE(submesh.indices.binary.binary, nullptr);
     EXPECT_NE(submesh.vertices.binary.binary, submesh.indices.binary.binary);
@@ -836,33 +809,36 @@ TEST_F(ResourcePopulatorTest, StaticOpaqueMeshLoadsSeparateVertexAndIndexBinarie
     EXPECT_EQ(submesh.indices.binary.start, 0U);
 }
 
-TEST_F(ResourcePopulatorTest, StaticMaskedMeshLoadsEmptyCategory) {
+TEST_F(ResourcePopulatorTest, MeshLoadsEmptyCategories) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUStaticMaskedMesh> captured_set = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
     auto resource_chunk = MockResourceChunk::Builder()
                               .set_reserve_res_unit_storage_callback(
-                                  [&stack_allocator, &captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                  [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                                       WBE::MemID mem_id = stack_allocator.allocate(p_size);
                                       WBE::RefRes<char> resource(mem_id, &stack_allocator);
-                                      if (p_id == "empty_masked_set") {
-                                          captured_set = resource.force_cast<WBE::RUStaticMaskedMesh>();
+                                      if (p_id == "empty_mesh") {
+                                          captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                                       }
                                       return resource;
                                   })
                               .build(stream);
-    WBE::RUSchemaStaticMaskedMesh scheme;
-    scheme.id = "empty_masked_set";
-    scheme.type = "static_masked_mesh";
-    WBE::ResourceUnitLoaderStaticMaskedMesh loader;
+    WBE::RUSchemaMesh3D scheme;
+    scheme.id = "empty_mesh";
+    scheme.type = "mesh";
+    WBE::ResourceUnitLoaderMesh loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
-    ASSERT_NE(captured_set, nullptr);
-    EXPECT_EQ(captured_set->submesh_count, 0U);
-    EXPECT_EQ(captured_set->instance_count, 0U);
-    EXPECT_EQ(captured_set->submeshes, nullptr);
-    EXPECT_EQ(captured_set->instances, nullptr);
+    ASSERT_NE(captured_mesh, nullptr);
+    for (const WBE::RUSubmeshInstance3D* category :
+        {&captured_mesh->opaque_instances, &captured_mesh->masked_instances, &captured_mesh->double_sided_opaque_instances}) {
+        EXPECT_EQ(category->submesh_count, 0U);
+        EXPECT_EQ(category->instance_count, 0U);
+        EXPECT_EQ(category->submeshes, nullptr);
+        EXPECT_EQ(category->instances, nullptr);
+    }
 }
 
 TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
@@ -890,7 +866,7 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
             "id": "test_world",
             "type": "world",
             "static_component": {
-                "static_mesh_render": "model_cube_static.static_opaque_mesh"
+                "static_mesh_render": "model_cube_static.mesh"
             }
         }
     )";
@@ -902,7 +878,7 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
 
     ASSERT_NE(captured_world, nullptr);
     ASSERT_NE(captured_world->static_component.static_mesh_render, nullptr);
-    EXPECT_STREQ(captured_world->static_component.static_mesh_render.get(), "model_cube_static.static_opaque_mesh");
+    EXPECT_STREQ(captured_world->static_component.static_mesh_render.get(), "model_cube_static.mesh");
 }
 
 TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticMeshRenderId) {

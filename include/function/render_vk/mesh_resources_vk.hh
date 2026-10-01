@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_STATIC_MESH_RESOURCES_VK_HH
-#define WBE_FILE_STATIC_MESH_RESOURCES_VK_HH
+#ifndef WBE_FILE_MESH_RESOURCES_VK_HH
+#define WBE_FILE_MESH_RESOURCES_VK_HH
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
@@ -22,10 +22,11 @@
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
-#include "function/render_vk/i_mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
+#include "function/render_vk/roc_multislots_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
@@ -34,15 +35,30 @@
 
 namespace WhiteBirdEngine {
 
+/** Shader resource id of the submesh table declared by MeshDescriptorIndices. */
+inline constexpr std::string_view REND_RES_MESH_SUBMESHES = "mesh_submeshes";
+/** Shader resource id of the instance-local node-transform table declared by MeshDescriptorIndices. */
+inline constexpr std::string_view REND_RES_MESH_NODES = "mesh_nodes";
+/** Shader resource id of the instance-link table declared by MeshDescriptorIndices. */
+inline constexpr std::string_view REND_RES_MESH_INSTANCES = "mesh_instances";
+/** Shader resource id of the whole-mesh transform declared by MeshDescriptorIndices. */
+inline constexpr std::string_view REND_RES_MESH_TRANSFORM = "mesh_transform";
+/** Default shader resource id of the reflected material parameter table. */
+inline constexpr std::string_view REND_RES_MESH_MATERIAL_PARAMS = "material_params";
+/** Shader resource id of the material sampler. */
+inline constexpr std::string_view REND_RES_MESH_MATERIAL_SAMPLER = "material_sampler";
+
 /**
- * @class StaticMeshResourcesVK
- * @brief Pipeline-independent Vulkan resources compiled from static mesh categories, with the source meshes they came from.
+ * @class MeshResourcesVK
+ * @brief Pipeline-independent Vulkan resources compiled from a mesh's categories, with the source mesh they came from.
  *
- * The object owns no pipeline or render-task state. It is neither copyable nor movable and is shared through Ref. Every
+ * Shaders place each instance at mesh transform × instance-local transform. The instance-local transforms are immutable;
+ * the mesh transform lives in one buffer per frame in flight and changes through set_transform(), so moving the whole mesh
+ * costs one matrix regardless of its instance count. The object owns no pipeline or render-task state. It is neither copyable nor movable and is shared through Ref. Every
  * contained render object is rendering-thread-confined. bind() imports each present member under `<key>.<member>`, using
  * the member names below; absent optional categories and material resources are not declared.
  */
-class StaticMeshResourcesVK final : public IBindableRenderResourceVK {
+class MeshResourcesVK final : public IBindableRenderResourceVK {
 public:
     /** Member name of the shared vertex buffer. */
     static constexpr std::string_view VERTICES = "vertices";
@@ -56,8 +72,10 @@ public:
     static constexpr std::string_view MASKED_DRAW_BATCHES = "masked_draw_batches";
     /** Member name of the submesh table. */
     static constexpr std::string_view SUBMESHES = "submeshes";
-    /** Member name of the node-transform table. */
+    /** Member name of the instance-local node-transform table. */
     static constexpr std::string_view NODES = "nodes";
+    /** Member name of the per-frame whole-mesh transform. */
+    static constexpr std::string_view TRANSFORM = "transform";
     /** Member name of the instance-link table. */
     static constexpr std::string_view INSTANCES = "instances";
     /** Member name of the material parameter table. */
@@ -67,15 +85,15 @@ public:
     /** Member name of the material texture list. */
     static constexpr std::string_view TEXTURES = "textures";
 
-    StaticMeshResourcesVK() = delete;
-    ~StaticMeshResourcesVK() = default;
-    StaticMeshResourcesVK(const StaticMeshResourcesVK&) = delete;
-    StaticMeshResourcesVK(StaticMeshResourcesVK&&) noexcept = delete;
-    StaticMeshResourcesVK& operator=(const StaticMeshResourcesVK&) = delete;
-    StaticMeshResourcesVK& operator=(StaticMeshResourcesVK&&) noexcept = delete;
+    MeshResourcesVK() = delete;
+    ~MeshResourcesVK() = default;
+    MeshResourcesVK(const MeshResourcesVK&) = delete;
+    MeshResourcesVK(MeshResourcesVK&&) noexcept = delete;
+    MeshResourcesVK& operator=(const MeshResourcesVK&) = delete;
+    MeshResourcesVK& operator=(MeshResourcesVK&&) noexcept = delete;
 
     /** @brief Construct empty allocator-owned static-mesh resource storage. */
-    explicit StaticMeshResourcesVK(RenderAllocator* p_allocator);
+    explicit MeshResourcesVK(RenderAllocator* p_allocator);
 
     /** @brief Acquire the shared vertex buffer. */
     Ref<ROBufferVK> acquire_vertices() const {
@@ -134,19 +152,27 @@ public:
         return textures;
     }
 
-    /** @brief Return the opaque source mesh, or null when the category was not compiled. */
-    RefRes<RUStaticOpaqueMesh> get_opaque_mesh() const {
-        return opaque_mesh;
+    /** @brief Return the source mesh the resources were compiled from. */
+    /** @brief Acquire the per-frame whole-mesh transform buffers. */
+    Ref<ROCMultislotsVK> acquire_transform_buffers() const {
+        return transform_buffers;
     }
 
-    /** @brief Return the opaque double-sided source mesh, or null when the category was not compiled. */
-    RefRes<RUStaticOpaqueDoubleSidedMesh> get_opaque_double_sided_mesh() const {
-        return opaque_double_sided_mesh;
+    /** @brief Return the current whole-mesh transform; identity after compilation. */
+    const glm::mat4& get_transform() const {
+        return transform;
     }
 
-    /** @brief Return the masked source mesh, or null when the category was not compiled. */
-    RefRes<RUStaticMaskedMesh> get_masked_mesh() const {
-        return masked_mesh;
+    /**
+     * @brief Replace the whole-mesh transform for every frame slot.
+     *
+     * Each slot applies the latest transform when it is next resolved.
+     * @throws std::runtime_error If p_transform is not finite or its linear part has no inverse.
+     */
+    void set_transform(const glm::mat4& p_transform);
+
+    RefRes<RUMesh3D> get_mesh() const {
+        return mesh;
     }
 
     /** @brief Return the shader resource id of the material parameter table configured at compilation. */
@@ -189,12 +215,10 @@ public:
     void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
-    friend class StaticMeshCompilerVK;
+    friend class MeshCompilerVK;
 
     RenderAllocator* allocator = nullptr;
-    RefRes<RUStaticOpaqueMesh> opaque_mesh = MEM_NULL;
-    RefRes<RUStaticOpaqueDoubleSidedMesh> opaque_double_sided_mesh = MEM_NULL;
-    RefRes<RUStaticMaskedMesh> masked_mesh = MEM_NULL;
+    RefRes<RUMesh3D> mesh = MEM_NULL;
     Ref<ROBufferVK> vertices = MEM_NULL;
     Ref<ROBufferVK> indices = MEM_NULL;
     Ref<ROBufferVK> opaque_draw_batches = MEM_NULL;
@@ -202,6 +226,8 @@ private:
     Ref<ROBufferVK> masked_draw_batches = MEM_NULL;
     Ref<ROBufferVK> submeshes = MEM_NULL;
     Ref<ROBufferVK> nodes = MEM_NULL;
+    Ref<ROCMultislotsVK> transform_buffers = MEM_NULL;
+    glm::mat4 transform{1.0F};
     Ref<ROBufferVK> instances = MEM_NULL;
     Ref<ROBufferVK> material_params = MEM_NULL;
     Ref<ROSamplerVK> material_sampler = MEM_NULL;

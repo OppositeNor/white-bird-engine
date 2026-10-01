@@ -170,7 +170,7 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
 }
 
 MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocator* p_allocator,
-    std::span<const RUStaticGeometrySubmesh> p_submeshes,
+    std::span<const RUSubmesh3D> p_submeshes,
     std::span<const uint32_t> p_first_instances,
     const ShaderMetadata& p_vertex_metadata,
     std::string_view p_vertex_entry_name,
@@ -181,7 +181,7 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
     Vector<Draw, RenderAllocator> draws(p_allocator);
     draws.reserve(p_submeshes.size());
     for (size_t i = 0; i < p_submeshes.size(); ++i) {
-        const RUStaticGeometrySubmesh& submesh = p_submeshes[i];
+        const RUSubmesh3D& submesh = p_submeshes[i];
         if (submesh.instance_count > std::numeric_limits<uint32_t>::max() ||
             submesh.first_instance > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error("Failed to plan mesh draws: draw command exceeds Vulkan uint32 limits.");

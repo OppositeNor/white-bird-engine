@@ -18,8 +18,6 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
-#include "function/render_vk/dynamic_mesh_compiler_vk.hh"
-#include "function/render_vk/dynamic_mesh_resources_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -39,22 +37,17 @@
 namespace WhiteBirdEngine {
 
 DynamicMeshRenderFeature::DynamicMeshRenderFeature(
-    RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, uint32_t p_capacity)
+    RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline)
     : render_data(p_renderer->get_base_render_data()) {
-    resources = DynamicMeshCompilerVK(p_renderer).compile(p_mesh,
-        p_capacity,
-        ShaderMetadataLoader().load(p_material_pipeline->vertex_stage),
-        mesh_vertex_entry(p_material_pipeline),
-        load_mesh_material_contract(p_material_pipeline),
-        DynamicMeshCompilerVK::Config{});
+    resources = create_mesh_resources(p_renderer, p_mesh, p_material_pipeline, MEM_NULL, p_material_pipeline);
 }
 
 void DynamicMeshRenderFeature::register_resources(RendGraphDescVK& p_graph) const {
     p_graph.add_resource(DYNAMIC_MESH_KEY, *resources);
 }
 
-void DynamicMeshRenderFeature::publish_visible_transforms(std::span<const glm::mat4> p_transforms) {
-    resources->publish_visible_transforms(p_transforms);
+void DynamicMeshRenderFeature::set_transform(const glm::mat4& p_transform) {
+    resources->set_transform(p_transform);
 }
 
 RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
@@ -62,23 +55,20 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     VkExtent2D p_extent,
     std::span<const std::string_view> p_colors,
     std::optional<std::string_view> p_depth) const {
-    RendTaskDescVK result(render_data->allocator);
-    result.task_id = p_task_id;
-    alias_mesh_resources(result, *p_pipeline, make_dynamic_mesh_resource_keys(DYNAMIC_MESH_KEY));
-    RTRunGraphicsPipelineIndirectVK::Builder builder(render_data->allocator);
-    builder.set_render_extent(p_extent)
-        .set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::VERTICES))
-        .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::INDICES))
-        .set_indirect_buffer(
-            IBindableRenderResourceVK::make_member_resource_id(DYNAMIC_MESH_KEY, DynamicMeshResourcesVK::DRAW_BATCHES))
-        .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-        .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    alias_render_targets(result, p_colors, p_depth);
-    for (auto& batch : make_dynamic_mesh_pipeline_batches(render_data->allocator, *resources, p_pipeline)) {
-        builder.add_pipeline_batch(std::move(batch));
-    }
-    result.task = builder.create_unique(render_data);
-    return result;
+    return make_mesh_task_desc(render_data->allocator,
+        render_data,
+        p_task_id,
+        resources,
+        std::move(p_pipeline),
+        false,
+        {},
+        p_extent,
+        p_colors,
+        p_depth,
+        VK_ATTACHMENT_LOAD_OP_LOAD,
+        VK_ATTACHMENT_LOAD_OP_LOAD,
+        false,
+        DYNAMIC_MESH_KEY);
 }
 
 } // namespace WhiteBirdEngine

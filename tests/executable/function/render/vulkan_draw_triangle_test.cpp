@@ -75,12 +75,12 @@ public:
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
         auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
-        if (triangle_mesh == nullptr || triangle_mesh->submesh_count != 1 || triangle_mesh->submeshes == nullptr) {
-            throw std::runtime_error("Failed to setup draw triangle test: expected exactly one triangle submesh.");
+        if (triangle_mesh == nullptr || triangle_mesh->opaque_instances.submesh_count != 1 ||
+            triangle_mesh->opaque_instances.submeshes == nullptr) {
+            throw std::runtime_error("Failed to setup draw triangle test: expected exactly one opaque triangle submesh.");
         }
-        WBE::RefRes<WBE::RUSubmesh3D> triangle_submesh = triangle_mesh->submeshes.get()[0];
-        if (triangle_submesh == nullptr || triangle_submesh->vertices.binary.binary == nullptr ||
-            triangle_submesh->indices.binary.binary == nullptr) {
+        const WBE::RUSubmesh3D* triangle_submesh = triangle_mesh->opaque_instances.submeshes.get();
+        if (triangle_submesh->vertices.binary.binary == nullptr || triangle_submesh->indices.binary.binary == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: triangle geometry storage is missing.");
         }
 

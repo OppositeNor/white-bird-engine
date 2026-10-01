@@ -53,18 +53,11 @@ public:
     explicit MeshBufferCompilerVK(const BaseRenderDataVK* p_render_data);
 
     /**
-     * @brief Compile or reuse shared draw buffers for one static mesh.
+     * @brief Compile or reuse the vertex and index buffers shared by every category of one mesh.
      *
-     * Returns empty references when the mesh has no drawable submeshes.
-     * @throws std::runtime_error When views are malformed or drawable submeshes use different binaries.
-     */
-    BuildResult build(RefRes<RUStaticMesh> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const;
-
-    /**
-     * @brief Compile or reuse shared draw buffers for one 3D mesh.
-     *
-     * Returns empty references when the mesh has no submesh with indices.
-     * @throws std::runtime_error When a submesh is missing, views are malformed, or indexed submeshes use different binaries.
+     * Returns empty references when the mesh is null or has no submesh with indices.
+     * @throws std::runtime_error When storage is missing, views or instance ranges are malformed, or indexed submeshes use
+     * different binaries.
      */
     BuildResult build(RefRes<RUMesh3D> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const;
 

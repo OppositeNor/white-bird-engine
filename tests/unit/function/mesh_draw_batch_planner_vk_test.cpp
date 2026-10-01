@@ -53,7 +53,7 @@ static ShaderMetadata make_batch_metadata() {
     return metadata;
 }
 
-static RUStaticGeometrySubmesh make_batch_submesh(
+static RUSubmesh3D make_batch_submesh(
     StackAllocator& p_storage, size_t p_vertex_start, size_t p_index_start, bool p_extended = false, bool p_position_last = false) {
     const size_t attribute_count = p_extended ? 2 : 1;
     MemID attributes_memory = p_storage.allocate(sizeof(RUVertexView::Attribute) * attribute_count);
@@ -72,7 +72,7 @@ static RUStaticGeometrySubmesh make_batch_submesh(
                 .size = 12,
             });
     }
-    RUStaticGeometrySubmesh submesh;
+    RUSubmesh3D submesh;
     submesh.vertices.attributes = RefRes<RUVertexView::Attribute>(attributes_memory, &p_storage);
     submesh.vertices.attribute_count = attribute_count;
     submesh.vertices.vertex_stride = attribute_count * 12;

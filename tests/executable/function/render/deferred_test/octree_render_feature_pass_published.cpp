@@ -22,7 +22,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
-#include "function/render_vk/static_mesh_resources_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "i_octree_render_feature.hh"
 #include <atomic>
 #include <cstdint>
@@ -33,7 +33,7 @@
 namespace WhiteBirdEngine {
 
 OctreeRenderFeaturePassPublished::OctreeRenderFeaturePassPublished(RendererVK* p_renderer,
-    Ref<StaticMeshResourcesVK> p_static_mesh_resources,
+    Ref<MeshResourcesVK> p_static_mesh_resources,
     const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
     bool p_rebuild_static_every_frame)
     : IOctreeRenderFeature(p_renderer, std::move(p_static_mesh_resources), p_debug_view_mode, "octree_2", "octree_2_dynamic", p_rebuild_static_every_frame) {

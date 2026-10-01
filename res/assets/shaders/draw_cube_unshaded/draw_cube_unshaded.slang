@@ -62,9 +62,8 @@ ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
 VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.mesh.nodes.x];
     InstanceData instance = instances[p_instance_id];
-    NodeData node = nodes[instance.node_index];
+    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     VSOutput output;
     float4 view_position =

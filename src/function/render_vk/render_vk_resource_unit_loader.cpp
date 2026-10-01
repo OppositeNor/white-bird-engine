@@ -405,28 +405,7 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
 void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
     if (!p_scheme.material_id.has_value()) {
         if (!p_scheme.material.has_value()) {
-            throw std::runtime_error("Failed to populate submesh resource unit: material_id or inline material is required.");
-        }
-        p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material.value());
-    }
-
-    populate_vertex_view(p_res_chunk, p_scheme.vertices, p_resource_unit.vertices);
-    populate_index_view(p_scheme.indices, p_resource_unit.indices);
-}
-
-void create_submesh_material_ref(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemaSubmesh3D& p_scheme) {
-    if (p_scheme.material_id.has_value()) {
-        p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id.value());
-    }
-    p_res_chunk.create_ref_to(p_resource_unit.vertices.binary.binary, p_scheme.vertices.binary.binary_id);
-    p_res_chunk.create_ref_to(p_resource_unit.indices.binary.binary, p_scheme.indices.binary.binary_id);
-}
-
-void resolve_static_geometry_submesh_data(
-    IResourceChunk& p_res_chunk, const RUSchemaStaticGeometrySubmesh& p_scheme, RUStaticGeometrySubmesh& p_resource_unit) {
-    if (!p_scheme.material_id.has_value()) {
-        if (!p_scheme.material.has_value()) {
-            throw std::runtime_error("Failed to populate static mesh: material_id or inline material is required.");
+            throw std::runtime_error("Failed to populate mesh: submesh material_id or inline material is required.");
         }
         p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material.value());
     }
@@ -436,8 +415,7 @@ void resolve_static_geometry_submesh_data(
     p_resource_unit.instance_count = p_scheme.instance_count;
 }
 
-void create_static_geometry_submesh_refs(
-    IResourceChunk& p_res_chunk, RUStaticGeometrySubmesh& p_resource_unit, const RUSchemaStaticGeometrySubmesh& p_scheme) {
+void create_submesh_refs(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_unit, const RUSchemaSubmesh3D& p_scheme) {
     if (p_scheme.material_id.has_value()) {
         p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id.value());
     }
@@ -445,47 +423,38 @@ void create_static_geometry_submesh_refs(
     p_res_chunk.create_ref_to(p_resource_unit.indices.binary.binary, p_scheme.indices.binary.binary_id);
 }
 
-RUStaticGeometryInstance populate_static_geometry_instance(const RUSchemaStaticGeometryInstance& p_scheme) {
-    return RUStaticGeometryInstance{.global_transform = p_scheme.global_transform};
-}
-
-template <typename RuntimeType, typename SchemaType>
-RefRes<RuntimeType> populate_static_mesh(IResourceChunk& p_res_chunk, const SchemaType& p_scheme) {
-    RuntimeType resource_unit;
-
-    std::vector<RUStaticGeometrySubmesh> submeshes;
+RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, const RUSchemaSubmeshInstance3D& p_scheme) {
+    RUSubmeshInstance3D result;
+    std::vector<RUSubmesh3D> submeshes;
     submeshes.reserve(p_scheme.submeshes.size());
-    for (const RUSchemaStaticGeometrySubmesh& submesh_scheme : p_scheme.submeshes) {
+    for (const RUSchemaSubmesh3D& submesh_scheme : p_scheme.submeshes) {
         if (submesh_scheme.first_instance > p_scheme.instances.size() ||
             submesh_scheme.instance_count > p_scheme.instances.size() - submesh_scheme.first_instance) {
-            throw std::runtime_error("Failed to populate static mesh: submesh instance range is out of bounds.");
+            throw std::runtime_error("Failed to populate mesh: submesh instance range is out of bounds.");
         }
-        RUStaticGeometrySubmesh submesh;
-        resolve_static_geometry_submesh_data(p_res_chunk, submesh_scheme, submesh);
+        RUSubmesh3D submesh;
+        resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
         submeshes.push_back(submesh);
     }
     if (!submeshes.empty()) {
-        resource_unit.submeshes =
-            p_res_chunk.push_data(submeshes.size() * sizeof(RUStaticGeometrySubmesh), submeshes.data()).force_cast<RUStaticGeometrySubmesh>();
+        result.submeshes = p_res_chunk.push_data(submeshes.size() * sizeof(RUSubmesh3D), submeshes.data()).force_cast<RUSubmesh3D>();
+        // The chunk-owned submesh array is stable, so references can be resolved into it directly.
+        for (size_t i = 0; i < p_scheme.submeshes.size(); ++i) {
+            create_submesh_refs(p_res_chunk, result.submeshes.get()[i], p_scheme.submeshes[i]);
+        }
     }
-    resource_unit.submesh_count = submeshes.size();
+    result.submesh_count = submeshes.size();
 
-    std::vector<RUStaticGeometryInstance> instances;
+    std::vector<RUInstance3D> instances;
     instances.reserve(p_scheme.instances.size());
-    for (const RUSchemaStaticGeometryInstance& instance_scheme : p_scheme.instances) {
-        instances.push_back(populate_static_geometry_instance(instance_scheme));
+    for (const RUSchemaInstance3D& instance_scheme : p_scheme.instances) {
+        instances.push_back(RUInstance3D{.global_transform = instance_scheme.global_transform});
     }
     if (!instances.empty()) {
-        resource_unit.instances =
-            p_res_chunk.push_data(instances.size() * sizeof(RUStaticGeometryInstance), instances.data()).force_cast<RUStaticGeometryInstance>();
+        result.instances = p_res_chunk.push_data(instances.size() * sizeof(RUInstance3D), instances.data()).force_cast<RUInstance3D>();
     }
-    resource_unit.instance_count = instances.size();
-
-    auto saved_resource = p_res_chunk.push_res_unit(p_scheme.id, resource_unit).template force_cast<RuntimeType>();
-    for (size_t i = 0; i < p_scheme.submeshes.size(); ++i) {
-        create_static_geometry_submesh_refs(p_res_chunk, saved_resource->submeshes.get()[i], p_scheme.submeshes[i]);
-    }
-    return saved_resource;
+    result.instance_count = instances.size();
+    return result;
 }
 
 } // namespace
@@ -564,97 +533,14 @@ std::span<const std::string> ResourceUnitLoaderMesh::get_supported_resource_type
 std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemaMesh3D>(p_scheme, "mesh");
     RUMesh3D resource_unit;
-    std::vector<RefRes<RUSubmesh3D>> submeshes;
-    submeshes.reserve(typed_scheme.submeshes.size() + typed_scheme.submeshes_id.size());
-    for (const auto& submesh_scheme : typed_scheme.submeshes) {
-        RUSubmesh3D submesh;
-        resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
-        auto saved_resource = p_res_chunk.push_res_unit("", submesh).force_cast<RUSubmesh3D>();
-        WBE_DEBUG_ASSERT(saved_resource != nullptr);
-        create_submesh_material_ref(p_res_chunk, *saved_resource, submesh_scheme);
-        submeshes.push_back(saved_resource);
-    }
-    // TODO: resolve submesh id
-    size_t submesh_index_array_size_bytes = submeshes.size() * sizeof(RefRes<RUSubmesh3D>);
-    auto submesh_array = p_res_chunk.push_data(submesh_index_array_size_bytes, submeshes.data()).force_cast<RefRes<RUSubmesh3D>>();
-    resource_unit.submeshes = submesh_array;
-    resource_unit.submesh_count = submeshes.size();
+    resource_unit.opaque_instances = populate_submesh_instances(p_res_chunk, typed_scheme.opaque_instances);
+    resource_unit.masked_instances = populate_submesh_instances(p_res_chunk, typed_scheme.masked_instances);
+    resource_unit.double_sided_opaque_instances = populate_submesh_instances(p_res_chunk, typed_scheme.double_sided_opaque_instances);
     return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUMesh3D>();
 }
 
 void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
     RUSchemaMesh3D scheme;
-    scheme.deserialize(p_scheme_data);
-    populate_scheme_ptr(p_res_chunk, scheme);
-}
-
-std::span<const std::string> ResourceUnitLoaderSubmesh::get_supported_resource_types() const {
-    static const std::array<std::string, 1> supported_resource_types = {"submesh"};
-    return supported_resource_types;
-}
-
-std::any ResourceUnitLoaderSubmesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemaSubmesh3D>(p_scheme, "submesh");
-    RUSubmesh3D resource_unit;
-    resolve_submesh_data(p_res_chunk, typed_scheme, resource_unit);
-    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUSubmesh3D>();
-    create_submesh_material_ref(p_res_chunk, *saved_resource, typed_scheme);
-    return saved_resource;
-}
-
-void ResourceUnitLoaderSubmesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemaSubmesh3D scheme;
-    scheme.deserialize(p_scheme_data);
-    populate_scheme_ptr(p_res_chunk, scheme);
-}
-
-std::span<const std::string> ResourceUnitLoaderStaticOpaqueMesh::get_supported_resource_types() const {
-    static const std::array<std::string, 1> supported_resource_types = {"static_opaque_mesh"};
-    return supported_resource_types;
-}
-
-std::any ResourceUnitLoaderStaticOpaqueMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemaStaticOpaqueMesh>(p_scheme, "static_opaque_mesh");
-    return populate_static_mesh<RUStaticOpaqueMesh>(p_res_chunk, typed_scheme);
-}
-
-void ResourceUnitLoaderStaticOpaqueMesh::populate_scheme_from_data(
-    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemaStaticOpaqueMesh scheme;
-    scheme.deserialize(p_scheme_data);
-    populate_scheme_ptr(p_res_chunk, scheme);
-}
-
-std::span<const std::string> ResourceUnitLoaderStaticOpaqueDoubleSidedMesh::get_supported_resource_types() const {
-    static const std::array<std::string, 1> supported_resource_types = {"static_opaque_double_sided_mesh"};
-    return supported_resource_types;
-}
-
-std::any ResourceUnitLoaderStaticOpaqueDoubleSidedMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemaStaticOpaqueDoubleSidedMesh>(p_scheme, "static_opaque_double_sided_mesh");
-    return populate_static_mesh<RUStaticOpaqueDoubleSidedMesh>(p_res_chunk, typed_scheme);
-}
-
-void ResourceUnitLoaderStaticOpaqueDoubleSidedMesh::populate_scheme_from_data(
-    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemaStaticOpaqueDoubleSidedMesh scheme;
-    scheme.deserialize(p_scheme_data);
-    populate_scheme_ptr(p_res_chunk, scheme);
-}
-
-std::span<const std::string> ResourceUnitLoaderStaticMaskedMesh::get_supported_resource_types() const {
-    static const std::array<std::string, 1> supported_resource_types = {"static_masked_mesh"};
-    return supported_resource_types;
-}
-
-std::any ResourceUnitLoaderStaticMaskedMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
-    const auto& typed_scheme = get_typed_scheme<RUSchemaStaticMaskedMesh>(p_scheme, "static_masked_mesh");
-    return populate_static_mesh<RUStaticMaskedMesh>(p_res_chunk, typed_scheme);
-}
-
-void ResourceUnitLoaderStaticMaskedMesh::populate_scheme_from_data(
-    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    RUSchemaStaticMaskedMesh scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
 }
@@ -666,10 +552,6 @@ void register_renderer_vk_resource_unit_loaders() {
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderRayTracingPipeline>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
-    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSubmesh>(global_allocator()));
-    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticOpaqueMesh>(global_allocator()));
-    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticOpaqueDoubleSidedMesh>(global_allocator()));
-    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderStaticMaskedMesh>(global_allocator()));
 }
 
 } // namespace WhiteBirdEngine
