@@ -365,13 +365,10 @@ void IOctreeRenderFeature::initialize() {
 RendTaskDescVK IOctreeRenderFeature::get_reset_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RESET_OCTREE;
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = octree_reset_compute_pipeline,
-                           group_count = get_reset_group_count()]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTRunComputePipelineVK>(
-            task_render_allocator, task_base_render_data, task_pipeline, VkExtent3D{.width = group_count, .height = 1, .depth = 1});
-    };
+    task_desc.task = make_unique<RTRunComputePipelineVK>(render_allocator,
+        base_render_data,
+        octree_reset_compute_pipeline,
+        VkExtent3D{.width = get_reset_group_count(), .height = 1, .depth = 1});
     return task_desc;
 }
 
@@ -407,30 +404,19 @@ RendTaskDescVK IOctreeRenderFeature::get_deferred_construction_render_task_desc(
 RendTaskDescVK IOctreeRenderFeature::get_debug_capture_render_task_desc(std::string_view p_task_id, VoxelDebugViewMode p_mode) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = p_task_id;
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = octree_pre_deferred_debug_capture_compute_pipeline,
-                           task_debug_view_mode = debug_view_mode,
-                           task_required_mode = p_mode]() -> Unique<IRenderTaskVK> {
-        Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(task_render_allocator,
-            task_base_render_data,
-            task_pipeline,
-            VkExtent3D{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1});
-        return make_unique<RTVoxelDebugView>(
-            task_render_allocator, std::move(task), task_debug_view_mode, task_required_mode, task_required_mode);
-    };
+    Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(render_allocator,
+        base_render_data,
+        octree_pre_deferred_debug_capture_compute_pipeline,
+        VkExtent3D{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1});
+    task_desc.task = make_unique<RTVoxelDebugView>(render_allocator, std::move(task), debug_view_mode, p_mode, p_mode);
     return task_desc;
 }
 
 RendTaskDescVK IOctreeRenderFeature::get_debug_draw_setup_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_SETUP_OCTREE_DEBUG_DRAW;
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = octree_debug_draw_setup_compute_pipeline]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTRunComputePipelineVK>(
-            task_render_allocator, task_base_render_data, task_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1});
-    };
+    task_desc.task = make_unique<RTRunComputePipelineVK>(
+        render_allocator, base_render_data, octree_debug_draw_setup_compute_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1});
     return task_desc;
 }
 
@@ -439,23 +425,18 @@ RendTaskDescVK IOctreeRenderFeature::get_debug_draw_render_task_desc() const {
     task_desc.task_id = RT_RUN_OCTREE_DEBUG_DRAW;
     const std::array<std::string_view, 1> color_targets{REND_RES_SWAP_CHAIN};
     alias_render_targets(task_desc, color_targets, GBUFFER_DEPTH_IMAGE_VIEW);
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = octree_debug_draw_graphics_pipeline,
-                           task_debug_view_mode = debug_view_mode]() -> Unique<IRenderTaskVK> {
-        RTRunGraphicsPipelineIndirectVK::Builder task_builder(task_render_allocator);
-        task_builder.set_render_extent(task_base_render_data->swap_chain_extent)
-            .set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
-            .set_indirect_buffer(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER)
-            .set_pipeline(task_pipeline, 1, VertexInputDescriptionVK{})
-            .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-            .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-        return make_unique<RTVoxelDebugView>(task_render_allocator,
-            task_builder.create_unique(task_base_render_data),
-            task_debug_view_mode,
-            VoxelDebugViewMode::POST_OCTREE_BUILD,
-            VoxelDebugViewMode::POST_OCTREE_BUILD);
-    };
+    RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
+    task_builder.set_render_extent(base_render_data->swap_chain_extent)
+        .set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
+        .set_indirect_buffer(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER)
+        .set_pipeline(octree_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+        .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
+    task_desc.task = make_unique<RTVoxelDebugView>(render_allocator,
+        task_builder.create_unique(base_render_data),
+        debug_view_mode,
+        VoxelDebugViewMode::POST_OCTREE_BUILD,
+        VoxelDebugViewMode::POST_OCTREE_BUILD);
     return task_desc;
 }
 
@@ -464,23 +445,18 @@ RendTaskDescVK IOctreeRenderFeature::get_pre_deferred_debug_draw_render_task_des
     task_desc.task_id = RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW;
     const std::array<std::string_view, 1> color_targets{REND_RES_SWAP_CHAIN};
     alias_render_targets(task_desc, color_targets, GBUFFER_DEPTH_IMAGE_VIEW);
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = octree_pre_deferred_debug_draw_graphics_pipeline,
-                           task_debug_view_mode = debug_view_mode]() -> Unique<IRenderTaskVK> {
-        RTRunGraphicsPipelineIndirectVK::Builder task_builder(task_render_allocator);
-        task_builder.set_render_extent(task_base_render_data->swap_chain_extent)
-            .set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
-            .set_indirect_buffer(OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER)
-            .set_pipeline(task_pipeline, 1, VertexInputDescriptionVK{})
-            .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-            .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-        return make_unique<RTVoxelDebugView>(task_render_allocator,
-            task_builder.create_unique(task_base_render_data),
-            task_debug_view_mode,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
-    };
+    RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
+    task_builder.set_render_extent(base_render_data->swap_chain_extent)
+        .set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
+        .set_indirect_buffer(OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER)
+        .set_pipeline(octree_pre_deferred_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+        .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
+    task_desc.task = make_unique<RTVoxelDebugView>(render_allocator,
+        task_builder.create_unique(base_render_data),
+        debug_view_mode,
+        VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+        VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
     return task_desc;
 }
 
@@ -507,9 +483,7 @@ void IOctreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) 
 void IOctreeRenderFeature::add_construction_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
     RendTaskDescVK begin(render_allocator);
     begin.task_id = RT_OCTREE_FRAME_BEGIN;
-    begin.create = [allocator = render_allocator]() -> Unique<IRenderTaskVK> {
-        return make_unique<RTOctreeFrameBeginVK>(allocator);
-    };
+    begin.task = make_unique<RTOctreeFrameBeginVK>(render_allocator);
     p_graph.add_task(std::move(begin));
     p_graph.add_task(make_static_once(get_reset_render_task_desc()))
         .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE)))
@@ -556,24 +530,17 @@ RendTaskDescVK IOctreeRenderFeature::make_static_once(RendTaskDescVK p_task, boo
         // The reset stage clears the counters and root nodes, so every frame rebuilds from an empty tree.
         return p_task;
     }
-    auto create = std::move(p_task.create);
-    p_task.create = [create = std::move(create),
-                        allocator = render_allocator,
-                        completed = static_build_completed,
-                        finish = p_finish]() -> Unique<IRenderTaskVK> {
-        auto stage = make_unique<RTOctreeStaticStageVK>(allocator, create(), completed, finish);
-        return make_unique<RTTriggeredVK>(allocator, std::move(stage), true);
-    };
+    auto stage = make_unique<RTOctreeStaticStageVK>(render_allocator, std::move(p_task.task), static_build_completed, p_finish);
+    p_task.task = make_unique<RTTriggeredVK>(render_allocator, std::move(stage), true);
     return p_task;
 }
 
 RendTaskDescVK IOctreeRenderFeature::get_dynamic_clear_task_desc() const {
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_CLEAR_DYNAMIC_OCTREE;
-    task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_clear_pipeline]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t GROUPS = static_cast<uint32_t>((std::max(OCTREE_MAX_NODE_COUNT, OCTREE_CLAIM_WORD_COUNT) + 127) / 128);
-        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
-    };
+    constexpr uint32_t GROUPS = static_cast<uint32_t>((std::max(OCTREE_MAX_NODE_COUNT, OCTREE_CLAIM_WORD_COUNT) + 127) / 128);
+    task.task = make_unique<RTRunComputePipelineVK>(
+        render_allocator, base_render_data, dynamic_clear_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     return task;
 }
 

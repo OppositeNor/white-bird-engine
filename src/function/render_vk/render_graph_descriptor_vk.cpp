@@ -35,37 +35,14 @@
 
 namespace WhiteBirdEngine {
 
-struct RendTaskDescVKDirectTaskState {
-    explicit RendTaskDescVKDirectTaskState(Unique<IRenderTaskVK> p_task) : task(std::move(p_task)) {
-        if (task.is_null()) {
-            throw std::runtime_error("Failed to construct render task descriptor: direct task is null.");
-        }
-    }
-    ~RendTaskDescVKDirectTaskState() = default;
-    RendTaskDescVKDirectTaskState(const RendTaskDescVKDirectTaskState&) = delete;
-    RendTaskDescVKDirectTaskState(RendTaskDescVKDirectTaskState&&) noexcept = delete;
-    RendTaskDescVKDirectTaskState& operator=(const RendTaskDescVKDirectTaskState&) = delete;
-    RendTaskDescVKDirectTaskState& operator=(RendTaskDescVKDirectTaskState&&) noexcept = delete;
-
-    Unique<IRenderTaskVK> take_task() {
-        if (task.is_null()) {
-            throw std::runtime_error("Failed to build render graph: direct task descriptor was already consumed.");
-        }
-        return std::move(task);
-    }
-
-    Unique<IRenderTaskVK> task;
-};
-
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator) : next(p_allocator), resource_map(p_allocator) {
 }
 
 RendTaskDescVK::RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task)
-    : task_id(p_task_id), next(p_allocator), resource_map(p_allocator) {
-    Ref<RendTaskDescVKDirectTaskState> direct_task_state = make_ref<RendTaskDescVKDirectTaskState>(p_allocator, std::move(p_task));
-    create = [direct_task_state = std::move(direct_task_state)]() mutable -> Unique<IRenderTaskVK> {
-        return direct_task_state->take_task();
-    };
+    : task_id(p_task_id), next(p_allocator), resource_map(p_allocator), task(std::move(p_task)) {
+    if (task.is_null()) {
+        throw std::runtime_error("Failed to construct render task descriptor: task is null.");
+    }
 }
 
 RendTaskDescVK& RendTaskDescVK::connect(std::string_view p_next_task_id, std::string_view p_resource_id) {

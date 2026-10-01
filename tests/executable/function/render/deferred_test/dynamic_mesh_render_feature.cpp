@@ -180,9 +180,7 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     for (auto& batch : batches) {
         builder.add_pipeline_batch(std::move(batch));
     }
-    result.create = [builder, data = render_data]() -> Unique<IRenderTaskVK> {
-        return builder.create_unique(data);
-    };
+    result.task = builder.create_unique(render_data);
     return result;
 }
 

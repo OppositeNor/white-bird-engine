@@ -108,55 +108,48 @@ void OctreeRenderFeaturePassPublished::connect_implementation_render_tasks(RendG
 
 RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_render_task_desc(bool p_dynamic) const {
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           reset_ping_pipeline = octree_deferred_count_reset_pong_compute_pipeline,
-                           reset_pong_pipeline = octree_deferred_count_reset_ping_compute_pipeline,
-                           ping_pipeline = p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline,
-                           pong_pipeline = p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline,
-                           publication_pipeline = p_dynamic ? dynamic_publication_pipeline : update_states_pipeline,
-                           dynamic = p_dynamic]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t THREADS_PER_GROUP = 64;
-        constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
-        constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
-        RTRunComputePipelinesSequentialVK::Dispatch dispatch(task_render_allocator);
-        const VkExtent3D publication_group_count{
-            .width = static_cast<uint32_t>(dynamic ? (OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128
-                                                   : (OCTREE_MAX_NODE_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP),
-            .height = 1,
-            .depth = 1};
-        // Rasterization allocates depth one's children. Each round publishes one further level;
-        // an extra retry consumes leaf occupancy and drains the remaining deferred entries.
-        for (uint32_t iteration = 0; iteration < OCTREE_MAX_DEPTH; ++iteration) {
-            bool write_pong = iteration % 2U == 0;
-            dispatch.add_entry(write_pong ? reset_ping_pipeline : reset_pong_pipeline, RESET_GROUP_COUNT)
-                .add_entry(write_pong ? ping_pipeline : pong_pipeline, PROPAGATION_GROUP_COUNT)
-                .add_entry(publication_pipeline, publication_group_count);
-        }
-        return make_unique<RTRunComputePipelinesSequentialVK>(task_render_allocator, task_base_render_data, dispatch);
-    };
+    const Ref<ROComputePipelineVK>& reset_ping_pipeline = octree_deferred_count_reset_pong_compute_pipeline;
+    const Ref<ROComputePipelineVK>& reset_pong_pipeline = octree_deferred_count_reset_ping_compute_pipeline;
+    const Ref<ROComputePipelineVK>& ping_pipeline =
+        p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline;
+    const Ref<ROComputePipelineVK>& pong_pipeline =
+        p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline;
+    const Ref<ROComputePipelineVK>& publication_pipeline = p_dynamic ? dynamic_publication_pipeline : update_states_pipeline;
+    constexpr uint32_t THREADS_PER_GROUP = 64;
+    constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
+    constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
+    RTRunComputePipelinesSequentialVK::Dispatch dispatch(render_allocator);
+    const VkExtent3D publication_group_count{
+        .width = static_cast<uint32_t>(p_dynamic ? (OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128
+                                                 : (OCTREE_MAX_NODE_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP),
+        .height = 1,
+        .depth = 1};
+    // Rasterization allocates depth one's children. Each round publishes one further level;
+    // an extra retry consumes leaf occupancy and drains the remaining deferred entries.
+    for (uint32_t iteration = 0; iteration < OCTREE_MAX_DEPTH; ++iteration) {
+        bool write_pong = iteration % 2U == 0;
+        dispatch.add_entry(write_pong ? reset_ping_pipeline : reset_pong_pipeline, RESET_GROUP_COUNT)
+            .add_entry(write_pong ? ping_pipeline : pong_pipeline, PROPAGATION_GROUP_COUNT)
+            .add_entry(publication_pipeline, publication_group_count);
+    }
+    task_desc.task = make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
     return task_desc;
 }
 
 RendTaskDescVK OctreeRenderFeaturePassPublished::get_state_update_render_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_UPDATE_OCTREE_STATES;
-    task_desc.create = [task_render_allocator = render_allocator,
-                           task_base_render_data = base_render_data,
-                           task_pipeline = update_states_pipeline]() -> Unique<IRenderTaskVK> {
-        constexpr VkExtent3D GROUP_COUNT{.width = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 63) / 64), .height = 1, .depth = 1};
-        return make_unique<RTRunComputePipelineVK>(task_render_allocator, task_base_render_data, task_pipeline, GROUP_COUNT);
-    };
+    constexpr VkExtent3D GROUP_COUNT{.width = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 63) / 64), .height = 1, .depth = 1};
+    task_desc.task = make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT);
     return task_desc;
 }
 
 RendTaskDescVK OctreeRenderFeaturePassPublished::get_dynamic_publication_task_desc() const {
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_PUBLISH_DYNAMIC_OCTREE;
-    task.create = [allocator = render_allocator, data = base_render_data, pipeline = dynamic_publication_pipeline]() -> Unique<IRenderTaskVK> {
-        constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
-        return make_unique<RTRunComputePipelineVK>(allocator, data, pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
-    };
+    constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
+    task.task = make_unique<RTRunComputePipelineVK>(
+        render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     return task;
 }
 

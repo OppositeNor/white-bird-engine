@@ -27,7 +27,6 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -37,7 +36,6 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/static_set_compiler_vk.hh"
@@ -617,16 +615,12 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
     light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
     light_billboard_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-    light_billboard_task_desc.create = [render_allocator = render_allocator,
-                                           base_render_data = base_render_data,
-                                           light_billboard_pipeline = light_billboard_pipeline]() -> WBE::Unique<WBE::IRenderTaskVK> {
-        return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-            .set_pipeline(light_billboard_pipeline)
-            .set_render_extent(base_render_data->swap_chain_extent)
-            .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-            .set_draw_vertex_count(6)
-            .create_unique(base_render_data);
-    };
+    light_billboard_task_desc.task = WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                                         .set_pipeline(light_billboard_pipeline)
+                                         .set_render_extent(base_render_data->swap_chain_extent)
+                                         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+                                         .set_draw_vertex_count(6)
+                                         .create_unique(base_render_data);
     pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
 
     WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));

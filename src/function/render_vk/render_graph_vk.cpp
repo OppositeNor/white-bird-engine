@@ -585,7 +585,7 @@ DebugData RenderGraphVK::list_descriptors() const {
     return make_descriptor_data(RendResViewVK(&all_resources).descriptor_debug_data());
 }
 
-void RenderGraphVK::build_from_descriptor(const RendGraphDescVK& p_desc) {
+void RenderGraphVK::build_from_descriptor(RendGraphDescVK& p_desc) {
     free_command_buffers();
     nodes.clear();
     resource_edges.clear();
@@ -757,7 +757,7 @@ Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_
     return resource->second->container;
 }
 
-void RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {
+void RenderGraphVK::instantiate_tasks(RendGraphDescVK& p_desc) {
     Vector<RendTaskID, RenderAllocator> task_ids(render_data->allocator);
     task_ids.reserve(p_desc.tasks.size());
     for (const auto& task_desc : p_desc.tasks) {
@@ -769,15 +769,11 @@ void RenderGraphVK::instantiate_tasks(const RendGraphDescVK& p_desc) {
         }
         task_ids.emplace_back(task_desc.task_id);
     }
-    for (const auto& task_desc : p_desc.tasks) {
-        if (!task_desc.create) {
-            throw std::runtime_error(std::format("RenderGraphVK: task factory is missing for: {}.", task_desc.task_id));
+    for (auto& task_desc : p_desc.tasks) {
+        if (task_desc.task.is_null()) {
+            throw std::runtime_error(std::format("RenderGraphVK: task is missing or was already consumed for: {}.", task_desc.task_id));
         }
-        auto task = task_desc.create();
-        if (task.is_null()) {
-            throw std::runtime_error("RenderGraphVK: task factory returned null.");
-        }
-        Ref<RGNode> node = add_node(std::move(task));
+        Ref<RGNode> node = add_node(std::move(task_desc.task));
         node->task_id = task_desc.task_id;
         node->resource_map = task_desc.resource_map;
         node->render_task->bind_resources(RendResViewVK(&all_resources, &node->resource_map));

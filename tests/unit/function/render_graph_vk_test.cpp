@@ -207,7 +207,7 @@ RendTaskDescVK make_probe_desc(RenderAllocator* p_allocator,
         p_allocator, p_task_id, make_unique<RTGraphEdgeProbeVK>(p_allocator, p_allocator, p_queue_family, p_reads, p_writes));
 }
 
-std::string build_error(RenderGraphVK& p_graph, const RendGraphDescVK& p_descriptor) {
+std::string build_error(RenderGraphVK& p_graph, RendGraphDescVK& p_descriptor) {
     try {
         p_graph.build_from_descriptor(p_descriptor);
     } catch (const std::runtime_error& error) {

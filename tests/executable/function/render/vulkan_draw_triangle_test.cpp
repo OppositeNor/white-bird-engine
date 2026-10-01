@@ -122,17 +122,17 @@ public:
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        task_desc.create =
-            [render_allocator, base_render_data, graphics_pipeline, vertex_input, indexed_draw_region]() -> WBE::Unique<WBE::IRenderTaskVK> {
-            const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-            return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                .set_pipeline(graphics_pipeline)
-                .set_render_extent(base_render_data->swap_chain_extent)
-                .set_clear_values(clear_values)
-                .set_indexed_draw(
-                    REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
-                .create_unique(base_render_data);
-        };
+        const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
+        task_desc.task = WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                             .set_pipeline(graphics_pipeline)
+                             .set_render_extent(base_render_data->swap_chain_extent)
+                             .set_clear_values(clear_values)
+                             .set_indexed_draw(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
+                                 REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
+                                 vertex_input,
+                                 0,
+                                 indexed_draw_region)
+                             .create_unique(base_render_data);
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));

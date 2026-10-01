@@ -343,9 +343,12 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     write_dynamic_camera_descriptors();
     write_dynamic_light_descriptors();
     setup_light_billboard_overlay_resources();
-    register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, mipmap_shadow_opaque_task, mipmap_gbuffer_opaque_task);
     register_deferred_render_graph(
-        DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true, summed_area_table_shadow_opaque_task, summed_area_table_gbuffer_opaque_task);
+        DEFERRED_MIPMAP_RENDER_GRAPH, false, std::move(mipmap_shadow_opaque_task), std::move(mipmap_gbuffer_opaque_task));
+    register_deferred_render_graph(DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH,
+        true,
+        std::move(summed_area_table_shadow_opaque_task),
+        std::move(summed_area_table_gbuffer_opaque_task));
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 

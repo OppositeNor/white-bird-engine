@@ -30,7 +30,6 @@
 #include "function/render_vk/static_set_resources_vk.hh"
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -221,26 +220,26 @@ struct RendResEdgeDescVK {
 
 /**
  * @class RendTaskDescVK
- * @brief A high-level Vulkan render task descriptor. A single std::function
- * defers the concrete IRenderTaskVK instantiation until the graph is built.
+ * @brief A high-level Vulkan render task descriptor that owns its concrete IRenderTaskVK until the graph is built.
+ *
+ * Movable but not copyable, because it solely owns the task. Building a graph from the descriptor transfers the task into
+ * the graph.
  */
 struct RendTaskDescVK {
     /** @brief Construct an empty task descriptor backed by the supplied allocator. */
     explicit RendTaskDescVK(RenderAllocator* p_allocator);
     /**
-     * @brief Construct a descriptor that transfers one prebuilt task into the graph.
+     * @brief Construct a descriptor that owns a prebuilt task.
      *
-     * The resulting factory is one-shot and throws if invoked more than once. Descriptor copies share that one-shot state.
-     *
-     * @param p_allocator Allocator used by the dependency list and direct-task holder.
+     * @param p_allocator Allocator used by the dependency list and resource map.
      * @param p_task_id Task id used for graph dependencies.
      * @param p_task Task transferred to the graph when the descriptor is built.
      */
     RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
     ~RendTaskDescVK() = default;
-    RendTaskDescVK(const RendTaskDescVK&) = default;
+    RendTaskDescVK(const RendTaskDescVK&) = delete;
     RendTaskDescVK(RendTaskDescVK&&) noexcept = default;
-    RendTaskDescVK& operator=(const RendTaskDescVK&) = default;
+    RendTaskDescVK& operator=(const RendTaskDescVK&) = delete;
     RendTaskDescVK& operator=(RendTaskDescVK&&) noexcept = default;
 
     /**
@@ -277,9 +276,8 @@ struct RendTaskDescVK {
     Vector<RendResEdgeDescVK, RenderAllocator> next;
     // Task-local to graph resource identifier map.
     RenderTaskResourceMap resource_map;
-    // Factory invoked at graph-build time to construct the concrete task. The
-    // resulting Unique<IRenderTaskVK> is owned by the graph.
-    std::function<Unique<IRenderTaskVK>()> create;
+    // The concrete task, moved into the graph when the graph is built.
+    Unique<IRenderTaskVK> task;
 };
 
 /**

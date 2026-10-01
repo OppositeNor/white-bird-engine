@@ -57,21 +57,28 @@ private:
     bool* destroyed;
 };
 
-TEST(WBERenderGraphDescriptorVKTest, DescriptorCopiesShareOneDirectTaskTransfer) {
+TEST(WBERenderGraphDescriptorVKTest, DescriptorOwnsDirectTaskUntilMovedOut) {
     RenderAllocator allocator(WBE_KI_B(64));
     bool destroyed = false;
     RendTaskDescVK descriptor(&allocator, "direct_task", make_unique<RTDirectDescriptorVK>(&allocator, &destroyed));
-    const RendTaskDescVK& descriptor_copy = descriptor;
+    RendTaskDescVK moved_descriptor = std::move(descriptor);
 
-    Unique<IRenderTaskVK> task = descriptor_copy.create();
+    EXPECT_EQ(moved_descriptor.task_id, "direct_task");
+    EXPECT_FALSE(moved_descriptor.task.is_null());
+
+    Unique<IRenderTaskVK> task = std::move(moved_descriptor.task);
 
     EXPECT_FALSE(task.is_null());
-    EXPECT_EQ(descriptor.task_id, "direct_task");
-    EXPECT_THROW(descriptor.create(), std::runtime_error);
-    EXPECT_THROW(descriptor_copy.create(), std::runtime_error);
+    EXPECT_TRUE(moved_descriptor.task.is_null());
     EXPECT_FALSE(destroyed);
     task.reset();
     EXPECT_TRUE(destroyed);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, DirectTaskConstructorRejectsNullTask) {
+    RenderAllocator allocator(WBE_KI_B(64));
+
+    EXPECT_THROW(RendTaskDescVK(&allocator, "null_task", Unique<IRenderTaskVK>()), std::runtime_error);
 }
 
 TEST(WBERenderGraphDescriptorVKTest, FluentAliasesAndConnectionsAreStored) {

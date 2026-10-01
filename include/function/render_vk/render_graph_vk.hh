@@ -232,8 +232,8 @@ public:
     RenderGraphVK(const BaseRenderDataVK* p_render_data);
 
     /**
-     * @brief Build the graph from a high-level descriptor: instantiate every
-     * task, add the resource dependency edges, reject cycles, validate that
+     * @brief Build the graph from a high-level descriptor: take ownership of
+     * every task, add the resource dependency edges, reject cycles, validate that
      * every conflicting declared resource access is ordered by edges on that
      * resource, derive barriers and semaphores, and allocate the command
      * buffers. After this call, the graph is ready to execute().
@@ -241,9 +241,10 @@ public:
      * @throws std::runtime_error If the descriptor is invalid, cyclic, or
      * leaves a resource conflict unordered.
      *
-     * @param p_desc The render graph descriptor.
+     * @param p_desc The render graph descriptor. Its tasks are moved into the
+     * graph, so the descriptor cannot build another graph afterward.
      */
-    void build_from_descriptor(const RendGraphDescVK& p_desc);
+    void build_from_descriptor(RendGraphDescVK& p_desc);
 
     /**
      * @brief Execute every node in topological order, submitting each to the
@@ -331,7 +332,7 @@ private:
     void allocate_resources(const RendGraphDescVK& p_desc);
     void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
     Ref<RenderObjectContainerVK> create_container(bool p_per_frame, const std::function<Ref<IRenderObjectVK>(uint32_t)>& p_factory) const;
-    void instantiate_tasks(const RendGraphDescVK& p_desc);
+    void instantiate_tasks(RendGraphDescVK& p_desc);
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
     void add_resource_edges(const RendGraphDescVK& p_desc);
