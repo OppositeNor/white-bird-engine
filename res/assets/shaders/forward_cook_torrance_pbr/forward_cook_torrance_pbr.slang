@@ -25,7 +25,9 @@ struct ForwardDescriptorIndices {
     uint2 camera_info;
     [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
-    LightParamsDescriptorIndices light;
+    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
+    uint2 light_count;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
     StaticSetDescriptorIndices static_set;
@@ -46,7 +48,7 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.static_set.instances.x];
     StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[descriptor_indices.static_set.nodes.x];
     StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.static_set.submeshes.x];
-    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light_count.x];
     InstanceData instance = instances[p_instance_id];
     NodeData node = nodes[instance.node_index];
     SubmeshData submesh = submeshes[instance.submesh_index];
@@ -63,7 +65,7 @@ VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_Vulk
     output.bitangent = normalize(mul(direction_transform, p_input.bitangent));
     output.uv = p_input.uv;
     if (light_count > 0) {
-        ConstantBuffer<SpotLightInfo> light_info = ResourceDescriptorHeap[descriptor_indices.light.lights[0].info.x];
+        ConstantBuffer<SpotLightInfo> light_info = ResourceDescriptorHeap[descriptor_indices.lights[0].info.x];
         float4 light_view_position =
             software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(light_info.view), world_position);
         output.light_space_pos =
@@ -134,7 +136,7 @@ float shadow_depth_to_light_distance(float4 p_inv_view_proj_row_0,
  * @return The reversed depth stored in the selected texel.
  */
 float load_shadow_depth(uint p_spot_light_index, float2 p_uv, uint2 p_shadow_size, out float2 p_sample_uv) {
-    Texture2D<float> shadowmap = ResourceDescriptorHeap[descriptor_indices.light.lights[p_spot_light_index].shadowmap.x];
+    Texture2D<float> shadowmap = ResourceDescriptorHeap[descriptor_indices.lights[p_spot_light_index].shadowmap.x];
     int2 maximum_texel = int2(p_shadow_size) - 1;
     int2 sample_texel = clamp(int2(p_uv * float2(p_shadow_size)), int2(0), maximum_texel);
     p_sample_uv = (float2(sample_texel) + 0.5) / float2(p_shadow_size);
@@ -148,7 +150,7 @@ float load_shadow_depth(uint p_spot_light_index, float2 p_uv, uint2 p_shadow_siz
  * @return The percentage-closer visibility in [0, 1].
  */
 float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
-    Texture2D<float> shadowmap = ResourceDescriptorHeap[descriptor_indices.light.lights[p_spot_light_index].shadowmap.x];
+    Texture2D<float> shadowmap = ResourceDescriptorHeap[descriptor_indices.lights[p_spot_light_index].shadowmap.x];
     float3 ndc = p_light_space_pos.xyz / max(p_light_space_pos.w, 0.0001);
     float2 uv = ndc.xy * 0.5 + 0.5;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || ndc.z < 0.0 || ndc.z > 1.0) {
@@ -161,7 +163,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
     shadowmap.GetDimensions(shadow_width, shadow_height);
     uint2 shadow_size = uint2(shadow_width, shadow_height);
     ConstantBuffer<SpotLightInfo> spot_light_info =
-        ResourceDescriptorHeap[descriptor_indices.light.lights[p_spot_light_index].info.x];
+        ResourceDescriptorHeap[descriptor_indices.lights[p_spot_light_index].info.x];
     float receiver_distance = max(abs(p_light_space_pos.w), 0.0001);
     float light_near_distance = shadow_depth_to_light_distance(WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.inv_view_proj),
         WBE_SOFTWARE_MATRIX_ROWS(spot_light_info.view),
@@ -221,7 +223,7 @@ float compute_spot_shadow(uint p_spot_light_index, float4 p_light_space_pos) {
 float4 shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light_count.x];
     SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
     // The submesh material id crosses the rasterizer in world_position.w. Round before using it as a table index.
     uint material_index = uint(round(p_input.world_position.w));
@@ -257,7 +259,7 @@ float4 shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
         ConstantBuffer<SpotLightInfo> spot_light_info =
-            ResourceDescriptorHeap[descriptor_indices.light.lights[spot_light_index].info.x];
+            ResourceDescriptorHeap[descriptor_indices.lights[spot_light_index].info.x];
         float3 to_light = spot_light_info.position - p_input.world_position.xyz;
         float light_distance = length(to_light);
         float3 l = to_light / max(light_distance, 0.0001);

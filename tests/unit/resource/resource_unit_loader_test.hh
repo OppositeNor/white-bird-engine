@@ -21,6 +21,7 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
+#include "function/scene/scene_resource_unit.hh"
 #include "function/scene/scene_resource_unit_loader.hh"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/ext/vector_int2.hpp"
@@ -862,6 +863,57 @@ TEST_F(ResourcePopulatorTest, StaticMaskedSetLoadsEmptyCategory) {
     EXPECT_EQ(captured_set->instance_count, 0U);
     EXPECT_EQ(captured_set->submeshes, nullptr);
     EXPECT_EQ(captured_set->instances, nullptr);
+}
+
+TEST_F(ResourcePopulatorTest, WorldLoadsStaticSetRenderId) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUWorld> captured_world = WBE::MEM_NULL;
+    auto resource_chunk = MockResourceChunk::Builder()
+                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
+                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
+                              })
+                              .set_reserve_res_unit_storage_callback(
+                                  [&stack_allocator, &captured_world](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                                      if (p_id == "test_world") {
+                                          captured_world = resource.force_cast<WBE::RUWorld>();
+                                      }
+                                      return resource;
+                                  })
+                              .build(stream);
+    constexpr std::string_view JSON_BUFFER = R"(
+        {
+            "id": "test_world",
+            "type": "world",
+            "static_component": {
+                "static_set_render": "model_cube_static.static_opaque_set"
+            }
+        }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(JSON_BUFFER);
+    WBE::ResourceUnitLoaderWorld loader;
+
+    loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
+
+    ASSERT_NE(captured_world, nullptr);
+    ASSERT_NE(captured_world->static_component.static_set_render, nullptr);
+    EXPECT_STREQ(captured_world->static_component.static_set_render.get(), "model_cube_static.static_opaque_set");
+}
+
+TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticSetRenderId) {
+    std::stringstream stream;
+    auto resource_chunk = MockResourceChunk::Builder().build(stream);
+    WBE::RUSchemaWorld scheme;
+    scheme.id = "empty_world";
+    scheme.type = "world";
+    WBE::ResourceUnitLoaderWorld loader;
+
+    EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, EmplaceResUnitRegistersDestructorForNonTrivialResourceUnit) {

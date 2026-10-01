@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -42,13 +43,30 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaPrefab : public RUSchema {
 };
 
 /**
+ * @class RUSchemaWorldStaticComponent
+ * @brief Static, non-simulated content of a world.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaWorldStaticComponent {
+    /**
+     * @brief Non-empty resource id of the static set rendered by the world.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string static_set_render;
+};
+
+/**
  * @class RUSchemaWorld
- * @brief Placeholder scheme for a world resource.
+ * @brief The scheme of RUWorld.
  *
  * @todo Define render-graph, mesh, prefab, and component references.
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaWorld : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaWorld)
+    /**
+     * @brief Static content of the world.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaWorldStaticComponent static_component;
 };
 
 /**
@@ -78,12 +96,28 @@ struct RUComponent : public ResourceUnit {};
 struct RUPrefab : public ResourceUnit {};
 
 /**
- * @class RUWorld
- * @brief Runtime marker for a world resource.
+ * @class RUWorldStaticComponent
+ * @brief Static, non-simulated content of a world resource.
  *
- * @todo Define the runtime world representation.
+ * Non-owning view into its resource chunk; copyable and movable with shallow chunk references.
  */
-struct RUWorld : public ResourceUnit {};
+struct RUWorldStaticComponent {
+    /** Chunk-owned, non-empty, NUL-terminated resource id of the static set rendered by the world. */
+    RefRes<char> static_set_render;
+};
+
+/**
+ * @class RUWorld
+ * @brief World resource unit containing the data of a world.
+ *
+ * Non-owning view into its resource chunk; copyable and movable with shallow chunk references.
+ *
+ * @todo Define render-graph, mesh, prefab, and component references.
+ */
+struct RUWorld : public ResourceUnit {
+    /** Static content of the world. */
+    RUWorldStaticComponent static_component;
+};
 
 /**
  * @class RUScene

@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/scene/scene_resource_unit_loader.hh"
+#include "function/scene/scene_resource_unit.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -73,15 +74,23 @@ std::span<const std::string> ResourceUnitLoaderWorld::get_supported_resource_typ
 }
 
 void ResourceUnitLoaderWorld::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
-    (void)p_res_chunk;
-    (void)p_scheme_data;
-    throw_loader_not_implemented("world");
+    RUSchemaWorld scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
 }
 
 std::any ResourceUnitLoaderWorld::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
-    (void)p_res_chunk;
-    (void)p_scheme;
-    throw_loader_not_implemented("world");
+    const auto* typed_scheme = dynamic_cast<const RUSchemaWorld*>(&p_scheme);
+    if (typed_scheme == nullptr) {
+        throw std::runtime_error("Failed to populate world resource unit: expected world scheme but got type " + p_scheme.type + ".");
+    }
+    const std::string& static_set_render = typed_scheme->static_component.static_set_render;
+    if (static_set_render.empty()) {
+        throw std::runtime_error("Failed to populate world resource unit " + typed_scheme->id + ": static_component.static_set_render must not be empty.");
+    }
+    RUWorld resource_unit;
+    resource_unit.static_component.static_set_render = p_res_chunk.push_data(static_set_render.size() + 1, static_set_render.c_str());
+    return p_res_chunk.push_res_unit(typed_scheme->id, resource_unit).force_cast<RUWorld>();
 }
 
 std::span<const std::string> ResourceUnitLoaderScene::get_supported_resource_types() const {

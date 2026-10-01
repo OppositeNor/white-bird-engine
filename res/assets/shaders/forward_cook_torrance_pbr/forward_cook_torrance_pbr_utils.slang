@@ -15,9 +15,8 @@
 #ifndef WBE_FILE_FORWARD_COOK_TORRANCE_PBR_UTILS_SLANG
 #define WBE_FILE_FORWARD_COOK_TORRANCE_PBR_UTILS_SLANG
 
+#include "light/light_utils.slang"
 #include "utils.slang"
-
-static const uint WBE_MAX_SPOT_LIGHT_COUNT = 4;
 
 /**
  * @brief Vertex shader output / fragment shader input for the forward Cook-Torrance PBR pass.
@@ -53,44 +52,6 @@ struct VSOutput {
     float4 light_space_pos  : TEXCOORD5;
 };
 
-/**
- * @brief Spot light parameters consumed by the forward Cook-Torrance PBR pass. Cone angles are stored as cosines for cheap evaluation.
- */
-struct SpotLightInfo {
-    /// World-to-light view matrix used to sample the shadow map.
-    float4x4 view;
-    /// Light-space projection matrix used to sample the shadow map.
-    float4x4 proj;
-    /// Inverse light-space view-projection used to reconstruct world positions from shadow-map depth.
-    float4x4 inv_view_proj;
-    /// World-space position of the spot light.
-    float3 position;
-    /// Scalar intensity multiplier.
-    float intensity;
-    /// World-space direction the spot is pointing (unit vector).
-    float3 direction;
-    /// Cosine of the inner cone half-angle (full intensity inside).
-    float inner_cone_cos;
-    /// Linear-space color of the spot light.
-    float3 color;
-    /// Cosine of the outer cone half-angle (zero intensity outside).
-    float outer_cone_cos;
-    /// Maximum effective light distance.
-    float range;
-    /// Projected emitter width in world units.
-    float emitter_width;
-};
-
-/**
- * @brief Spot light uniform payload consumed by the forward Cook-Torrance PBR pass.
- */
-struct SpotLightInfoBuffer {
-    /// Active spot lights. Entries beyond spot_light_count are ignored.
-    SpotLightInfo spot_light_info[WBE_MAX_SPOT_LIGHT_COUNT];
-    /// Number of active spot light entries in spot_light_info.
-    uint spot_light_count;
-};
-
 struct LightParamDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "spot_light_info")]
     uint2 info;
@@ -98,12 +59,6 @@ struct LightParamDescriptorIndices {
     uint2 shadowmap;
     [WBE_DESCRIPTOR("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
-};
-
-struct LightParamsDescriptorIndices {
-    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
-    uint2 light_count;
 };
 
 /**

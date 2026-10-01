@@ -18,7 +18,11 @@
 struct IndirectLightingDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "composition_camera_info")]
     uint2 camera_info;
-    LightParamsDescriptorIndices light;
+    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
+    uint2 light_infos;
+    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
+    uint2 light_count;
     [WBE_DESCRIPTOR("sampled_image", "gbuffer_albedo")]
     uint2 gbuffer_albedo;
     [WBE_DESCRIPTOR("sampled_image", "gbuffer_normal")]
@@ -40,7 +44,7 @@ ConstantBuffer<IndirectLightingDescriptorIndices> descriptor_indices;
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light.light_count.x];
+    ConstantBuffer<uint> light_count = ResourceDescriptorHeap[descriptor_indices.light_count.x];
     Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[descriptor_indices.gbuffer_albedo.x];
     Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[descriptor_indices.gbuffer_octa_normal.x];
     Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
@@ -70,7 +74,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 indirect_irradiance = float3(0.0);
     uint spot_light_count = min(light_count, WBE_MAX_SPOT_LIGHT_COUNT);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        indirect_irradiance += compute_rsm_indirect(descriptor_indices.light, spot_light_index, uv, world_pos, normal);
+        indirect_irradiance += compute_rsm_indirect(descriptor_indices.light_infos,
+            descriptor_indices.lights[spot_light_index],
+            spot_light_index, uv, world_pos, normal);
     }
     float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
 #if WBE_VOXEL_DEBUG_VIEW
