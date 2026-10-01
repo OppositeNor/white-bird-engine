@@ -21,7 +21,7 @@ struct OctreePreDeferredDebugDrawDescriptorIndices {
     uint2 octree_info;
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer", "read")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_leaf_buffer", "read")]
     uint2 tree_leaves;
     /**
      * @brief Descriptor-heap reference to octree_dynamic_nodes.
@@ -58,49 +58,6 @@ struct OctreePreDeferredDebugDrawVertexOutput {
 
 [[vk::push_constant]]
 ConstantBuffer<OctreePreDeferredDebugDrawDescriptorIndices> descriptor_indices;
-
-uint3 get_leaf_grid_position(uint p_leaf_index,
-    StructuredBuffer<OctreeNode> p_nodes,
-    StructuredBuffer<OctreeNode> p_dynamic_nodes,
-    StructuredBuffer<OctreeLeaf> p_leaves,
-    StructuredBuffer<OctreeDynamicLeafBlock> p_dynamic_leaves,
-    OctreeInfo p_tree_info,
-    uint p_frame_slot) {
-    WBE_SHADER_DEBUG_ASSERT(p_leaf_index < p_tree_info.leaves_count + p_tree_info.dynamic_leaves_count,
-        ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-    uint child_index = p_leaf_index < p_tree_info.leaves_count ? p_leaf_index : p_leaf_index - p_tree_info.leaves_count;
-    int parent_index = read_incremental_leaf(p_leaves, p_dynamic_leaves, p_tree_info, p_leaf_index).parent_index;
-    uint3 result = uint3(0);
-    uint traversed_depth = 0;
-    for (; traversed_depth < p_tree_info.max_depth && parent_index >= 0; ++traversed_depth) {
-        WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < p_tree_info.max_node_count + p_tree_info.dynamic_node_count,
-            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        OctreeNode parent = read_incremental_node(p_nodes, p_dynamic_nodes, p_tree_info, uint(parent_index));
-        WBE_SHADER_DEBUG_ASSERT(child_index >= get_octree_children_index(parent) &&
-            child_index - get_octree_children_index(parent) < 8,
-            ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-        uint subregion = child_index % 8;
-        result.x |= ((subregion >> 2) & 1) << traversed_depth;
-        result.y |= ((subregion >> 1) & 1) << traversed_depth;
-        result.z |= (subregion & 1) << traversed_depth;
-        child_index = uint(parent_index);
-        parent_index = parent.parent_index;
-    }
-    if (parent_index < 0) {
-        WBE_SHADER_DEBUG_ASSERT(child_index < 8 && traversed_depth < 32,
-            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
-        // The remaining node is one of the eight sectors of the implicit root.
-        result.x |= ((child_index >> 2) & 1) << traversed_depth;
-        result.y |= ((child_index >> 1) & 1) << traversed_depth;
-        result.z |= (child_index & 1) << traversed_depth;
-        ++traversed_depth;
-    }
-    WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && traversed_depth <= p_tree_info.max_depth,
-        ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
-    WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 || traversed_depth >= p_tree_info.max_depth,
-        ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
-    return result;
-}
 
 uint3 get_deferred_task_grid_position(uint p_task, OctreeInfo p_tree_info) {
     return get_deferred_list_entry_voxel(p_task, p_tree_info.max_depth);

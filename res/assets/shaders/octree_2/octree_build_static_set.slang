@@ -109,9 +109,9 @@ struct OctreeDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
     uint2 voxel_claims;
     /**
-     * @brief Descriptor-heap reference to octree_leaves_buffer.
+     * @brief Descriptor-heap reference to octree_leaf_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_leaf_buffer")]
     uint2 tree_leaves;
 #ifdef WBE_DYNAMIC_BUILD
     /**

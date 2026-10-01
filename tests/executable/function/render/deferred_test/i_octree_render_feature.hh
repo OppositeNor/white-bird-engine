@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_I_OCTREE_RENDER_FEATURE_HH
 #define WBE_FILE_I_OCTREE_RENDER_FEATURE_HH
 
-#include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -130,7 +129,7 @@ public:
     static constexpr std::string_view OCTREE_NODE_BUFFER = "octree_node_buffer";
     static constexpr std::string_view OCTREE_DYNAMIC_NODES = "octree_dynamic_nodes";
     static constexpr std::string_view OCTREE_DYNAMIC_LEAVES = "octree_dynamic_leaves";
-    static constexpr std::string_view OCTREE_LEAF_BUFFER = "octree_leaves_buffer";
+    static constexpr std::string_view OCTREE_LEAF_BUFFER = "octree_leaf_buffer";
     static constexpr std::string_view OCTREE_DEFERRED_LIST_PING = "octree_deferred_list_ping";
     static constexpr std::string_view OCTREE_DEFERRED_LIST_PONG = "octree_deferred_list_pong";
     static constexpr std::string_view OCTREE_DEBUG_DRAW_INDEX_BUFFER = "octree_debug_draw_index_buffer";

@@ -23,7 +23,7 @@ struct OctreeDescriptorIndices {
     uint2 octree_info;
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_leaves_buffer")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_leaf_buffer")]
     uint2 tree_leaves;
 #ifdef WBE_DYNAMIC_BUILD
     /**

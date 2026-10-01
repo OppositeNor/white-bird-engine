@@ -60,4 +60,57 @@ bool is_incremental_leaf_occupied(uint p_index,
     }
     return (parent.children_data & (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + local % 8))) != 0;
 }
+/**
+ * @brief Reconstructs one leaf's grid position by walking from the leaf to the root.
+ * @param p_leaf_index Virtual leaf index covering static leaves followed by dynamic leaves.
+ * @param p_nodes Static octree node storage.
+ * @param p_dynamic_nodes Dynamic octree node storage following the static nodes.
+ * @param p_leaves Static octree leaf storage.
+ * @param p_dynamic_leaves Dynamic octree leaf blocks following the static leaves.
+ * @param p_tree_info Tree bounds and maximum depth.
+ * @param p_frame_slot Renderer frame slot whose report region receives validation errors.
+ * @return Integer position of the leaf in the finest octree grid.
+ */
+uint3 get_leaf_grid_position(uint p_leaf_index,
+    StructuredBuffer<OctreeNode> p_nodes,
+    StructuredBuffer<OctreeNode> p_dynamic_nodes,
+    StructuredBuffer<OctreeLeaf> p_leaves,
+    StructuredBuffer<OctreeDynamicLeafBlock> p_dynamic_leaves,
+    OctreeInfo p_tree_info,
+    uint p_frame_slot) {
+    uint3 result = uint3(0);
+    WBE_SHADER_DEBUG_ASSERT(p_leaf_index < p_tree_info.leaves_count + p_tree_info.dynamic_leaves_count,
+        ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
+    uint child_index = p_leaf_index < p_tree_info.leaves_count ? p_leaf_index : p_leaf_index - p_tree_info.leaves_count;
+    int parent_index = read_incremental_leaf(p_leaves, p_dynamic_leaves, p_tree_info, p_leaf_index).parent_index;
+    uint traversed_depth = 0;
+    for (; traversed_depth < p_tree_info.max_depth && parent_index >= 0; ++traversed_depth) {
+        WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < p_tree_info.max_node_count + p_tree_info.dynamic_node_count,
+            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        OctreeNode parent = read_incremental_node(p_nodes, p_dynamic_nodes, p_tree_info, uint(parent_index));
+        WBE_SHADER_DEBUG_ASSERT(child_index >= get_octree_children_index(parent) &&
+            child_index - get_octree_children_index(parent) < 8,
+            ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+        uint subregion = child_index % 8;
+        result.x |= ((subregion >> 2) & 1) << traversed_depth;
+        result.y |= ((subregion >> 1) & 1) << traversed_depth;
+        result.z |= (subregion & 1) << traversed_depth;
+        child_index = uint(parent_index);
+        parent_index = parent.parent_index;
+    }
+    if (parent_index < 0) {
+        WBE_SHADER_DEBUG_ASSERT(child_index < 8 && traversed_depth < 32,
+            ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
+        // The remaining node is one of the eight sectors of the implicit root.
+        result.x |= ((child_index >> 2) & 1) << traversed_depth;
+        result.y |= ((child_index >> 1) & 1) << traversed_depth;
+        result.z |= (child_index & 1) << traversed_depth;
+        ++traversed_depth;
+    }
+    WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && traversed_depth <= p_tree_info.max_depth,
+        ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED, p_frame_slot);
+    WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 || traversed_depth >= p_tree_info.max_depth,
+        ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED, p_frame_slot);
+    return result;
+}
 #endif
