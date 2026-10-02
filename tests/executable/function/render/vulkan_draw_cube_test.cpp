@@ -17,7 +17,6 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
@@ -26,19 +25,15 @@
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "generated/type_uuid.gen.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
@@ -59,7 +54,6 @@
 #include <glm/vec3.hpp>
 #include <memory>
 #include <stdexcept>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>

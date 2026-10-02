@@ -119,9 +119,15 @@ state.
 ## Mesh Resources
 
 `MeshCompilerVK` compiles every category of one `RUMesh3D` into one `MeshResourcesVK`, whether the mesh never moves or moves
-every frame. Shaders place each instance at the mesh transform × its instance-local transform. Instance-local transforms come from
-the resource and are immutable. The mesh transform lives in one small buffer per frame in flight, starts as identity, and changes
-through `MeshResourcesVK::set_transform()`, so moving a whole mesh costs one matrix regardless of its instance count.
+every frame. Instance-local transforms come from the resource and are immutable. Static meshes are drawn exactly where their
+instance-local transforms put them, with shaders that do not declare a mesh transform. Placed (dynamic) meshes are drawn with
+shader variants compiled with the `WBE_MESH_TRANSFORM` macro: `MeshDescriptorIndices` then also declares
+`REND_RES_MESH_TRANSFORM`, and `load_mesh_node()` places each instance at the mesh transform × its instance-local transform. The
+mesh transform is not part of `MeshResourcesVK`: each such draw aliases `REND_RES_MESH_TRANSFORM` to a one-`GeometryNodeGPU`
+buffer owned by whatever places the mesh, so one compiled mesh can be drawn at several places and moving a whole copy costs one
+matrix regardless of its instance count. The render tests use their local `EntityDrawData`
+(`tests/executable/function/render/entity_draw_data.hh`), which owns one such buffer per frame in flight and imports it as
+`<entity key>.transform`.
 
 ### Compiled Mesh Resources
 
@@ -304,7 +310,7 @@ Ray-tracing acceleration structures are explicit resources; the renderer keeps n
   source `RUMesh3D`.
 2. Create `MeshAccelerationStructureCompilerVK` from the base render data and `RayTracingPluginVK::get_base_ray_tracing_data()`,
   then call `compile()` with the mesh. The result holds one BLAS per drawable opaque or opaque double-sided submesh, one
-  TLAS instance per instance at the mesh transform × instance transform current at compilation, the instance buffer, scratch
+  TLAS instance per instance at the given mesh transform × instance transform, the instance buffer, scratch
   buffers, and the build inputs. Moving the mesh afterwards requires compiling the acceleration structure again.
 3. Import it with `add_resource(key, *acceleration_structure)`, which registers the TLAS as `<key>.top_level`, and record its build
   with `MeshAccelerationStructureVK::record_build()`, for example in an `RTBuildAccelerationStructuresVK` task writing

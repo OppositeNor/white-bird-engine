@@ -186,7 +186,8 @@ MeshAccelerationStructureCompilerVK::MeshAccelerationStructureCompilerVK(
     }
 }
 
-Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(Ref<MeshResourcesVK> p_static_mesh) const {
+Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(
+    Ref<MeshResourcesVK> p_static_mesh, const glm::mat4& p_mesh_transform) const {
     if (p_static_mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: static mesh is null.");
     }
@@ -206,9 +207,8 @@ Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(Re
     if (mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: the source mesh is missing.");
     }
-    const glm::mat4& mesh_transform = p_static_mesh->get_transform();
-    append_bottom_level_inputs(inputs, mesh->opaque_instances, mesh_transform, vertex_buffer_address, index_buffer_address);
-    append_bottom_level_inputs(inputs, mesh->double_sided_opaque_instances, mesh_transform, vertex_buffer_address, index_buffer_address);
+    append_bottom_level_inputs(inputs, mesh->opaque_instances, p_mesh_transform, vertex_buffer_address, index_buffer_address);
+    append_bottom_level_inputs(inputs, mesh->double_sided_opaque_instances, p_mesh_transform, vertex_buffer_address, index_buffer_address);
     if (inputs.empty()) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: the mesh has no drawable opaque geometry.");
     }

@@ -67,7 +67,8 @@
             "dst": "assets/shaders/octree/octree_dynamic_build_static_mesh.spv",
             "metadata": "assets/shaders/octree/octree_dynamic_build_static_mesh.json",
             "macros": [
-                {"name": "WBE_DYNAMIC_BUILD"}
+                {"name": "WBE_DYNAMIC_BUILD"},
+                {"name": "WBE_MESH_TRANSFORM"}
             ]
         },
         {

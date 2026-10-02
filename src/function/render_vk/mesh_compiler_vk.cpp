@@ -25,8 +25,6 @@
 #include "function/render_vk/mesh_draw_batch_planner_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/roc_multislots_vk.hh"
 #include "glm/common.hpp"
 #include "glm/matrix.hpp"
 #include "resource/resource_unit/resource_unit.hh"
@@ -468,13 +466,6 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
     result->nodes = create_storage_buffer(render_data, instance_data.nodes.data(), instance_data.nodes.size() * sizeof(GeometryNodeGPU));
     result->instances =
         create_storage_buffer(render_data, instance_data.instances.data(), instance_data.instances.size() * sizeof(GeometryInstanceGPU));
-    result->transform_buffers = make_ref<ROCMultislotsVK>(render_data->allocator,
-        render_data->allocator,
-        render_data->frames_in_flight,
-        [render_data](uint32_t) -> Ref<IRenderObjectVK> {
-            return ROBufferVK::Builder().set_properties(sizeof(GeometryNodeGPU), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(render_data);
-        });
-    result->set_transform(glm::mat4(1.0F));
 
     const auto compile_category = [render_data](const RUSubmeshInstance3D& p_category,
                                       std::span<const uint32_t> p_first_instances,

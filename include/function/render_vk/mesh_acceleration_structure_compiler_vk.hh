@@ -19,6 +19,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 
 namespace WhiteBirdEngine {
 
@@ -27,8 +28,8 @@ namespace WhiteBirdEngine {
  * @brief Creates the ray-tracing acceleration structures of a compiled static mesh. Copyable and movable.
  *
  * Covers the opaque and opaque double-sided categories: one bottom-level structure per drawable submesh, instanced by the
- * top-level structure once per instance at the mesh transform × instance-local transform current at compilation. Moving the
- * mesh afterwards requires compiling the acceleration structure again. Compilation allocates every structure, input, and scratch buffer but
+ * top-level structure once per instance at p_mesh_transform × the instance-local transform. Placing the mesh elsewhere
+ * requires compiling the acceleration structure again. Compilation allocates every structure, input, and scratch buffer but
  * records no GPU work; MeshAccelerationStructureVK::record_build() performs the build. Rendering-thread only.
  */
 class MeshAccelerationStructureCompilerVK final {
@@ -51,11 +52,13 @@ public:
      *
      * The mesh must have been compiled with MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE added to its vertex and
      * index buffer usage.
+     * @param p_static_mesh Compiled mesh whose opaque categories are built.
+     * @param p_mesh_transform Whole-mesh placement baked into every top-level instance.
      *
      * @throws std::runtime_error If the mesh is null, has no drawable opaque geometry, lacks the required buffer usage, has
      * submeshes without a FLOAT3 position attribute or complete triangles, or exceeds device limits.
      */
-    Ref<MeshAccelerationStructureVK> compile(Ref<MeshResourcesVK> p_static_mesh) const;
+    Ref<MeshAccelerationStructureVK> compile(Ref<MeshResourcesVK> p_static_mesh, const glm::mat4& p_mesh_transform) const;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

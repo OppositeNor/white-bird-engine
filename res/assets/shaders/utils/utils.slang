@@ -289,25 +289,33 @@ struct MeshDescriptorIndices {
     uint2 nodes;
     [WBE_DESCRIPTOR("storage_buffer", "mesh_instances", "read")]
     uint2 instances;
-    /** One NodeData holding the whole mesh's transform and normal transform. */
+#ifdef WBE_MESH_TRANSFORM
+    /** One NodeData holding the whole mesh's transform and normal transform. Only declared by shader variants that
+     * define WBE_MESH_TRANSFORM, i.e. variants drawing placed (entity) meshes. */
     [WBE_DESCRIPTOR("storage_buffer", "mesh_transform", "read")]
     uint2 transform;
+#endif
 };
 
 /**
- * @brief Load one instance's world transform: the mesh transform applied after the instance-local transform.
+ * @brief Load one instance's world transform. With WBE_MESH_TRANSFORM this is the mesh transform applied after the
+ * instance-local transform; without it the instance-local transform is already the world transform.
  * @param p_mesh Mesh descriptor indices of the drawn mesh.
  * @param p_node_index Index into the mesh's node table, from InstanceData::node_index.
  */
 NodeData load_mesh_node(MeshDescriptorIndices p_mesh, uint p_node_index) {
     StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[p_mesh.nodes.x];
-    StructuredBuffer<NodeData> mesh_transform = ResourceDescriptorHeap[p_mesh.transform.x];
     NodeData local_node = nodes[p_node_index];
+#ifdef WBE_MESH_TRANSFORM
+    StructuredBuffer<NodeData> mesh_transform = ResourceDescriptorHeap[p_mesh.transform.x];
     NodeData mesh_node = mesh_transform[0];
     NodeData result;
     result.transform = mul(mesh_node.transform, local_node.transform);
     result.normal_transform = mul(mesh_node.normal_transform, local_node.normal_transform);
     return result;
+#else
+    return local_node;
+#endif
 }
 
 /**

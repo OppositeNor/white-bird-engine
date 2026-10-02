@@ -374,12 +374,13 @@ RendTaskDescVK IOctreeRenderFeature::get_reset_render_task_desc() const {
 }
 
 RendTaskDescVK IOctreeRenderFeature::get_construction_render_task_desc(
-    std::string_view p_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh) const {
+    std::string_view p_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh, size_t p_dynamic_entity_index) const {
     constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
     constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
     RendTaskDescVK task_desc =
         p_dynamic_mesh != nullptr
-            ? p_dynamic_mesh->make_task(p_task_id, dynamic_build_pipeline, VkExtent2D{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT})
+            ? p_dynamic_mesh->make_task(
+                  p_task_id, p_dynamic_entity_index, dynamic_build_pipeline, VkExtent2D{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT})
             : make_mesh_task_desc(render_allocator,
                   base_render_data,
                   p_task_id,
@@ -494,7 +495,8 @@ void IOctreeRenderFeature::add_construction_render_tasks(RendGraphDescVK& p_grap
     static_deferred.task_id = RT_STATIC_OCTREE_DEFERRED;
     p_graph.add_task(make_static_once(std::move(static_deferred), true));
     p_graph.add_task(get_dynamic_clear_task_desc());
-    p_graph.add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE, false, &p_dynamic_mesh));
+    p_graph.add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE, false, &p_dynamic_mesh, 0))
+        .add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, false, &p_dynamic_mesh, 1));
     add_dynamic_publication_render_tasks(p_graph);
     p_graph.add_task(get_debug_capture_render_task_desc(RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
 }
@@ -509,12 +511,13 @@ void IOctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const 
             RT_RUN_BUILD_OCTREE_DOUBLE_SIDED,
             RT_STATIC_OCTREE_DEFERRED,
             RT_RUN_BUILD_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND,
             RT_RUN_BUILD_OCTREE_DEFERRED,
             RT_RUN_OCTREE_DEBUG_DRAW,
             RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
     connect_resource_chain(p_graph,
         OCTREE_DEFERRED_LIST_PING,
-        {RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCTREE_DEFERRED});
+        {RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCTREE_DEFERRED});
     connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_OCTREE_DEFERRED});
     connect_resource_chain(
         p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});

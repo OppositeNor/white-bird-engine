@@ -65,6 +65,9 @@
             "macros": [
                 {
                     "name": "WBE_DYNAMIC_BUILD"
+                },
+                {
+                    "name": "WBE_MESH_TRANSFORM"
                 }
             ]
         },

@@ -110,8 +110,11 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
     const glm::mat4 transform = glm::translate(glm::mat4(1.0F), glm::vec3(0.6F * std::sin(angle * 0.5F), 0.75F, 0.0F)) *
                                 glm::rotate(glm::mat4(1.0F), angle, glm::vec3(0.0F, 1.0F, 0.0F)) *
                                 glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
-    add_render_job([this, transform]() {
-        dynamic_mesh->set_transform(transform);
+    // The second cube is a second entity of the same compiled mesh, offset from the first.
+    const glm::mat4 second_transform = glm::translate(glm::mat4(1.0F), glm::vec3(-1.2F, 0.0F, -0.5F)) * transform;
+    add_render_job([this, transform, second_transform]() {
+        dynamic_mesh->set_transform(0, transform);
+        dynamic_mesh->set_transform(1, second_transform);
     });
 }
 
@@ -303,7 +306,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     dynamic_mesh = make_unique<DynamicMeshRenderFeature>(render_allocator,
         renderer_vk,
         ResourceManager::get_singleton()->get_resource<RUMesh3D>("model_cube.mesh"),
-        gbuffer_opaque_pipeline_resource);
+        gbuffer_dynamic_pipeline_resource,
+        2);
     setup_spot_light();
     setup_bloom_acquisition();
     bool use_atomic_octree = false;
@@ -392,6 +396,9 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
         resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided_static");
     shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_static");
     gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
+    // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
+    shadow_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_dynamic");
+    gbuffer_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_dynamic");
     shadow_moments_summed_area_table_horizontal_shader_resource =
         resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_horizontal_shader");
     shadow_moments_summed_area_table_vertical_shader_resource =
@@ -422,7 +429,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
         renderer_vk, sponza_mesh, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, static_mesh_config);
     if (build_acceleration_structure) {
         mesh_acceleration_structure =
-            MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data()).compile(static_mesh_resources);
+            MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data())
+                .compile(static_mesh_resources, glm::mat4(1.0F));
     }
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
@@ -437,6 +445,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     shadow_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(shadow_context)
                                                 .compile("deferred_shadow_double_sided", shadow_double_sided_pipeline_resource)
                                                 .graphics_pipeline;
+    shadow_dynamic_graphics_pipeline =
+        GraphicsPipelineCompilerVK(shadow_context).compile("deferred_shadow_dynamic", shadow_dynamic_pipeline_resource).graphics_pipeline;
     GraphicsPipelineCompilerVKContext gbuffer_context{
         .allocator = render_allocator,
         .render_data = base_render_data,
@@ -450,6 +460,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     gbuffer_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(gbuffer_context)
                                                  .compile("deferred_gbuffer_double_sided", gbuffer_double_sided_pipeline_resource)
                                                  .graphics_pipeline;
+    gbuffer_dynamic_graphics_pipeline =
+        GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_dynamic", gbuffer_dynamic_pipeline_resource).graphics_pipeline;
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {

@@ -14,6 +14,7 @@
 */
 #ifndef WBE_FILE_RENDER_TEST_HH
 #define WBE_FILE_RENDER_TEST_HH
+
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
@@ -256,7 +257,12 @@ inline constexpr std::string_view STATIC_MESH_KEY = "static_mesh";
 inline constexpr std::string_view DYNAMIC_MESH_KEY = "dynamic_mesh";
 
 /**
- * @brief Graph resource ids of one imported mesh that back the shader-side mesh resource ids.
+ * @brief Graph key under which the deferred test imports the entity placing its moving mesh.
+ */
+inline constexpr std::string_view DYNAMIC_MESH_ENTITY_KEY = "dynamic_mesh_entity";
+
+/**
+ * @brief Graph resource ids of one drawn entity's mesh and transform that back the shader-side mesh resource ids.
  */
 struct MeshResourceKeys {
     /** Graph id bound to REND_RES_MESH_SUBMESHES. */
@@ -265,7 +271,7 @@ struct MeshResourceKeys {
     std::string nodes;
     /** Graph id bound to REND_RES_MESH_INSTANCES. */
     std::string instances;
-    /** Graph id bound to REND_RES_MESH_TRANSFORM. */
+    /** Graph id bound to REND_RES_MESH_TRANSFORM; empty for static meshes, whose shaders do not declare it. */
     std::string transform;
     /** Graph id bound to REND_RES_MESH_MATERIAL_PARAMS. */
     std::string material_params;
@@ -274,22 +280,24 @@ struct MeshResourceKeys {
 };
 
 /**
- * @brief Resource ids of a static mesh imported under p_key.
+ * @brief Resource ids of a mesh imported under p_mesh_key, drawn with the whole-mesh transform imported as p_transform_id.
+ * @details Leave p_transform_id empty for static meshes drawn with shader variants that do not declare a mesh transform.
  */
-inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_key) {
+inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_mesh_key, std::string_view p_transform_id = {}) {
     return MeshResourceKeys{
-        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::SUBMESHES),
-        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::NODES),
-        .instances = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::INSTANCES),
-        .transform = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::TRANSFORM),
-        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::MATERIAL_PARAMS),
-        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::MATERIAL_SAMPLER),
+        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::SUBMESHES),
+        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::NODES),
+        .instances = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INSTANCES),
+        .transform = std::string(p_transform_id),
+        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::MATERIAL_PARAMS),
+        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::MATERIAL_SAMPLER),
     };
 }
 
 /**
  * @brief Map the shader-side mesh resource ids a pipeline reflects to one mesh's graph resources.
  * @details Ids the pipeline does not declare are skipped because every alias must be used by the task.
+ * @throws std::runtime_error If the pipeline declares an id that p_keys leaves empty.
  * @param p_task Task drawing the mesh with p_pipeline.
  * @param p_pipeline Pipeline whose reflected descriptor layout selects the aliased ids.
  * @param p_keys Graph keys of the drawn mesh.
@@ -306,11 +314,15 @@ inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipe
     }};
     const auto& fields = p_pipeline.get_descriptor_layout().fields;
     for (const auto& [shader_id, graph_id] : mappings) {
-        if (std::ranges::any_of(fields, [shader_id](const auto& p_field) {
+        if (!std::ranges::any_of(fields, [shader_id](const auto& p_field) {
                 return p_field.resource_id == shader_id;
             })) {
-            p_task.alias(shader_id, graph_id);
+            continue;
         }
+        if (graph_id.empty()) {
+            throw std::runtime_error("Pipeline declares mesh resource \"" + std::string(shader_id) + "\" but no graph resource is provided for it.");
+        }
+        p_task.alias(shader_id, graph_id);
     }
     return p_task;
 }
@@ -410,7 +422,8 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
     VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
     VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
     bool p_double_sided = false,
-    std::string_view p_mesh_key = STATIC_MESH_KEY) {
+    std::string_view p_mesh_key = STATIC_MESH_KEY,
+    std::string_view p_transform_id = {}) {
     auto batches = make_mesh_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
     std::string_view indirect_buffer_member = [p_double_sided, p_masked]() {
         if (p_double_sided) {
@@ -431,7 +444,7 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
     }
     RendTaskDescVK result(p_allocator, p_task_id, task_builder.create_unique(p_render_data));
     alias_render_targets(result, p_color_attachment_ids, p_depth_attachment_id);
-    alias_mesh_resources(result, *p_pipeline, make_mesh_resource_keys(p_mesh_key));
+    alias_mesh_resources(result, *p_pipeline, make_mesh_resource_keys(p_mesh_key, p_transform_id));
     return result;
 }
 } // namespace WhiteBirdEngine

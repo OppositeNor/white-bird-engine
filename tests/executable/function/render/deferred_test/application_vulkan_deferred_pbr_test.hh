@@ -138,7 +138,9 @@ private:
     static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
     static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
     static constexpr std::string_view RT_RUN_DYNAMIC_SHADOW = "dynamic_shadow";
+    static constexpr std::string_view RT_RUN_DYNAMIC_SHADOW_SECOND = "dynamic_shadow_second";
     static constexpr std::string_view RT_RUN_DYNAMIC_GBUFFER = "dynamic_gbuffer";
+    static constexpr std::string_view RT_RUN_DYNAMIC_GBUFFER_SECOND = "dynamic_gbuffer_second";
     static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
     static constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE = "build_shadow_sat";
     static constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
@@ -202,6 +204,8 @@ private:
     RefRes<RUGraphicsPipeline> shadow_double_sided_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
     RefRes<RUGraphicsPipeline> gbuffer_double_sided_pipeline_resource;
+    RefRes<RUGraphicsPipeline> shadow_dynamic_pipeline_resource;
+    RefRes<RUGraphicsPipeline> gbuffer_dynamic_pipeline_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_horizontal_shader_resource;
     RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
     RefRes<RUShader> direct_lighting_shader_resource;
@@ -220,6 +224,8 @@ private:
     Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> gbuffer_double_sided_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> shadow_dynamic_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> gbuffer_dynamic_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_horizontal_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> shadow_moments_summed_area_table_vertical_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> direct_lighting_compute_pipeline = MEM_NULL;

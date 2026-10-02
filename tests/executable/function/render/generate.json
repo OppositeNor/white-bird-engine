@@ -11,7 +11,7 @@
                 },
                 {
                     "name" : "vulkan_draw_sponza_deferred_test",
-                    "sources" : ["deferred_test/*"]
+                    "sources" : ["deferred_test/*", "entity_draw_data.cpp"]
                 },
                 {
                     "name" : "vulkan_draw_cube_test",

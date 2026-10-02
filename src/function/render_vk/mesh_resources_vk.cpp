@@ -13,12 +13,6 @@
    limitations under the License.
 */
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/mesh_gpu_data_vk.hh"
-#include "glm/ext/matrix_float3x3.hpp"
-#include "glm/matrix.hpp"
-#include "utils/defs.hh"
-#include <cmath>
-#include <glm/gtc/matrix_inverse.hpp>
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -65,11 +59,7 @@ void MeshResourcesVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource
     const auto member = [p_resource_id](std::string_view p_member) {
         return make_member_resource_id(p_resource_id, p_member);
     };
-    if (transform_buffers == MEM_NULL) {
-        throw std::runtime_error("Failed to bind mesh resources: transform buffers are missing.");
-    }
     vertices->bind(p_graph, member(VERTICES));
-    transform_buffers->bind(p_graph, member(TRANSFORM));
     indices->bind(p_graph, member(INDICES));
     submeshes->bind(p_graph, member(SUBMESHES));
     nodes->bind(p_graph, member(NODES));
@@ -90,27 +80,6 @@ void MeshResourcesVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource
     if (material_sampler != MEM_NULL) {
         material_sampler->bind(p_graph, member(MATERIAL_SAMPLER));
     }
-}
-
-void MeshResourcesVK::set_transform(const glm::mat4& p_transform) {
-    WBE_DEBUG_ASSERT(transform_buffers != MEM_NULL);
-    for (size_t column = 0; column < 4; ++column) {
-        for (size_t row = 0; row < 4; ++row) {
-            if (!std::isfinite(p_transform[column][row])) {
-                throw std::runtime_error("Failed to set mesh transform: transform contains a non-finite value.");
-            }
-        }
-    }
-    const float determinant = glm::determinant(glm::mat3(p_transform));
-    if (!std::isfinite(determinant) || std::abs(determinant) < 0.000001F) {
-        throw std::runtime_error("Failed to set mesh transform: transform has no valid inverse normal matrix.");
-    }
-    transform = p_transform;
-    const GeometryNodeGPU node{
-        .transform = p_transform,
-        .normal_transform = glm::mat4(glm::inverseTranspose(glm::mat3(p_transform))),
-    };
-    transform_buffers->publish_buffer_update(&node, 0, sizeof(node));
 }
 
 } // namespace WhiteBirdEngine

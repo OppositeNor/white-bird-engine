@@ -90,7 +90,10 @@ public:
      * @brief Creates one raster construction pass over the retained scene.
      */
     RendTaskDescVK get_construction_render_task_desc(
-        std::string_view p_task_id, bool p_double_sided = false, const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr) const;
+        std::string_view p_task_id,
+        bool p_double_sided = false,
+        const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr,
+        size_t p_dynamic_entity_index = 0) const;
     /**
      * @brief Creates bounded deferred retries with the implementation's allocator.
      * @param p_dynamic Whether the retries continue dynamic construction rather than the static scene.
@@ -121,6 +124,7 @@ public:
     static constexpr std::string_view RT_STATIC_OCTREE_DEFERRED = "static_octree_deferred";
     static constexpr std::string_view RT_CLEAR_DYNAMIC_OCTREE = "clear_dynamic_octree";
     static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE = "dynamic_octree";
+    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND = "dynamic_octree_second";
     static constexpr std::string_view RT_PUBLISH_DYNAMIC_OCTREE = "publish_dynamic_octree";
 
     static constexpr std::string_view OCTREE_VOXEL_CLAIMS = "octree_voxel_claims";

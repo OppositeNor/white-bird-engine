@@ -35,8 +35,8 @@ class RendererVK;
  * @class MeshCompilerVK
  * @brief Compiles a mesh's categories into pipeline-independent Vulkan resources. Neither copyable nor movable.
  *
- * Runs on the rendering thread. The same compiled resources serve meshes that never move and meshes moved every frame:
- * MeshResourcesVK::set_transform() places the whole mesh.
+ * Runs on the rendering thread. The same compiled resources serve meshes that never move and meshes moved every frame;
+ * the whole-mesh transform is supplied per draw (see REND_RES_MESH_TRANSFORM).
  */
 class MeshCompilerVK final {
 public:
@@ -80,8 +80,7 @@ public:
      *
      * Every non-empty category is compiled; at least one must contain a drawable submesh. Vertex metadata supplies layout
      * and mesh-node contracts only, and the result owns no pipeline or render-task behavior. Double-sided draws use the opaque
-     * vertex metadata and entry, with a separately selected no-culling graphics pipeline. The mesh transform starts as
-     * identity. The returned object is neither copyable nor movable and must be shared through Ref.
+     * vertex metadata and entry, with a separately selected no-culling graphics pipeline. The returned object is neither copyable nor movable and must be shared through Ref.
      *
      * @throws std::runtime_error If the mesh is null, resource data or reflected contracts are invalid or incompatible.
      */
