@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from pathlib import Path
+from typing import Callable
 
 import pytest
 import slangpy as spy
@@ -20,6 +21,7 @@ import build_config
 
 
 SHADER_INCLUDE_DIR = Path(build_config.root_dir) / build_config.resource_dir / "assets" / "shaders"
+KERNEL_DIR = Path(__file__).parent / "kernels"
 
 
 @pytest.fixture(scope="session")
@@ -32,3 +34,19 @@ def shader_include_dir() -> Path:
 def device(shader_include_dir: Path) -> spy.Device:
     """Vulkan device shared by all shader tests, with the engine shader root as its include path."""
     return spy.create_device(type=spy.DeviceType.vulkan, include_paths=[shader_include_dir])
+
+
+@pytest.fixture(scope="session")
+def load_kernel(device: spy.Device, shader_include_dir: Path) -> Callable[[str, dict[str, str | int]], spy.ComputeKernel]:
+    """
+    Loader for the test kernels under tests/shader/kernels.
+
+    Each call compiles the kernel's `main` entry point in a new Slang session whose preprocessor defines are the given
+    ones, so kernels can be specialized per test.
+    """
+    def load(p_kernel_name: str, p_defines: dict[str, str | int]) -> spy.ComputeKernel:
+        session = device.create_slang_session(compiler_options={"include_paths": [shader_include_dir, KERNEL_DIR],
+            "defines": {name: str(value) for name, value in p_defines.items()}})
+        module = session.load_module(p_kernel_name)
+        return device.create_compute_kernel(session.link_program([module], [module.entry_point("main")]))
+    return load

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pytest
@@ -22,6 +22,7 @@ import slangpy as spy
 RANDOM_SEED = 20251003
 SAMPLE_COUNT = 1024
 
+KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
 @pytest.fixture(scope="module")
 def utils(device: spy.Device, shader_include_dir: Path) -> spy.Module:
@@ -184,31 +185,10 @@ def test_random_range(utils: spy.Module, rng: np.random.Generator) -> None:
     np.testing.assert_array_equal(call(utils.random, seeds), result)
 
 
-PREFIX_SUM_KERNEL_SOURCE = """
-#include "utils/utils.slang"
-
-RWStructuredBuffer<uint> data;
-groupshared uint shared_data[ELEMENT_COUNT];
-
-[shader("compute")]
-[numthreads(WORKGROUP_SIZE, 1, 1)]
-void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    for (uint i = p_group_thread_id.x; i < ELEMENT_COUNT; i += WORKGROUP_SIZE) {
-        shared_data[i] = data[i];
-    }
-    PREFIX_SUM(shared_data, p_group_thread_id.x, WORKGROUP_SIZE);
-    for (uint i = p_group_thread_id.x; i < ELEMENT_COUNT; i += WORKGROUP_SIZE) {
-        data[i] = shared_data[i];
-    }
-}
-"""
-
-
-def run_prefix_sum(p_device: spy.Device, p_function: str, p_values: np.ndarray, p_workgroup_size: int) -> np.ndarray:
-    source = (f"#define ELEMENT_COUNT {len(p_values)}\n#define WORKGROUP_SIZE {p_workgroup_size}\n"
-        f"#define PREFIX_SUM {p_function}\n{PREFIX_SUM_KERNEL_SOURCE}")
-    module = p_device.load_module_from_source(f"{p_function}_{len(p_values)}_{p_workgroup_size}", source)
-    kernel = p_device.create_compute_kernel(p_device.link_program([module], [module.entry_point("main")]))
+def run_prefix_sum(p_device: spy.Device, p_load_kernel: KernelLoader, p_function: str, p_values: np.ndarray,
+        p_workgroup_size: int) -> np.ndarray:
+    kernel = p_load_kernel("workgroup_prefix_sum.slang", {"PREFIX_SUM": p_function, "ELEMENT_COUNT": len(p_values),
+        "KERNEL_WORKGROUP_SIZE": p_workgroup_size})
     buffer = p_device.create_buffer(element_count=len(p_values), struct_size=4,
         usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access, data=p_values)
     kernel.dispatch(thread_count=[p_workgroup_size, 1, 1], vars={"data": buffer})
@@ -219,16 +199,16 @@ PREFIX_SUM_SHAPES = [(1, 32), (31, 32), (32, 32), (100, 32), (256, 64), (1000, 6
 
 
 @pytest.mark.parametrize(("p_element_count", "p_workgroup_size"), PREFIX_SUM_SHAPES)
-def test_workgroup_inclusive_prefix_sum(device: spy.Device, rng: np.random.Generator, p_element_count: int,
-        p_workgroup_size: int) -> None:
+def test_workgroup_inclusive_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
+        p_element_count: int, p_workgroup_size: int) -> None:
     values = rng.integers(0, 1000, p_element_count, dtype=np.uint32)
-    result = run_prefix_sum(device, "workgroup_inclusive_prefix_sum", values, p_workgroup_size)
+    result = run_prefix_sum(device, load_kernel, "workgroup_inclusive_prefix_sum", values, p_workgroup_size)
     np.testing.assert_array_equal(result, np.cumsum(values, dtype=np.uint32))
 
 
 @pytest.mark.parametrize(("p_element_count", "p_workgroup_size"), PREFIX_SUM_SHAPES)
-def test_workgroup_exclusive_prefix_sum(device: spy.Device, rng: np.random.Generator, p_element_count: int,
-        p_workgroup_size: int) -> None:
+def test_workgroup_exclusive_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
+        p_element_count: int, p_workgroup_size: int) -> None:
     values = rng.integers(0, 1000, p_element_count, dtype=np.uint32)
-    result = run_prefix_sum(device, "workgroup_exclusive_prefix_sum", values, p_workgroup_size)
+    result = run_prefix_sum(device, load_kernel, "workgroup_exclusive_prefix_sum", values, p_workgroup_size)
     np.testing.assert_array_equal(result, np.concatenate([[0], np.cumsum(values, dtype=np.uint32)[:-1]]))

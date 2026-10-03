@@ -1,7 +1,21 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 #include "radix_sort/sort.slang"
 
 struct BufferInfo {
-    uint buffer_size;
+    uint element_count;
 };
 
 struct DescriptorIndices {
@@ -16,5 +30,8 @@ ConstantBuffer<DescriptorIndices> decriptor_indices;
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     RWStructuredBuffer<uint> buffer = decriptor_indices.buffer.x;
     ConstantBuffer<BufferInfo> buffer_info = decriptor_indices.buffer_info.x;
-    // TODO
+    uint data_start = p_group_id.x * 64;
+    groupshared uint histogram[64];
+    // Each group holds a shared memory to calculate workgroup_scope_radix_sort_histogram
+    workgroup_scope_radix_sort_histogram<uint, 64>(buffer, data_start, buffer_info.element_count, histogram, p_group_thread_id.x, BIT_REGION);
 }

@@ -21,13 +21,12 @@
 #include <cstddef>
 #include <cstdlib>
 #include <format>
-#include <memory>
 
 namespace WBE = WhiteBirdEngine;
 
 int main(int p_argc, char* p_argv[]) {
     WBE::on_exec_test_start();
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(p_argc, p_argv, WBE::Path("test_env"));
+    WBE::Global global = WBE::Global(p_argc, p_argv, WBE::Path("test_env"));
     {
         WBE::ApplicationVulkanDeferredPBRTest game_application;
         {
@@ -43,7 +42,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }
-    const auto& global_profiles = global->engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
+    const auto& global_profiles = global.engine_core->profiling_manager->get_profile_data(WBE::WBE_CHANNEL_GLOBAL);
     for (const auto& profile : global_profiles) {
         WBE::stdout_log(WBE::WBE_CHANNEL_GLOBAL)->message(std::format("{}: Delta: {} seconds", profile.message, profile.delta));
     }
