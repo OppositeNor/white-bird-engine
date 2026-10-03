@@ -18,6 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/vertex_attribute_format_info.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -43,31 +44,30 @@
 namespace WhiteBirdEngine {
 namespace {
 
-struct GeometryFormatInfo {
+struct VertexAttributeTypeName {
     std::string_view type;
     RUVertexAttributeFormat format;
-    size_t size;
 };
 
-constexpr std::array<GeometryFormatInfo, 12> GEOMETRY_ATTRIBUTE_FORMAT_INFOS{{
-    {.type = "float", .format = RUVertexAttributeFormat::FLOAT, .size = sizeof(float)},
-    {.type = "vec2", .format = RUVertexAttributeFormat::FLOAT2, .size = sizeof(float) * 2},
-    {.type = "vec3", .format = RUVertexAttributeFormat::FLOAT3, .size = sizeof(float) * 3},
-    {.type = "vec4", .format = RUVertexAttributeFormat::FLOAT4, .size = sizeof(float) * 4},
-    {.type = "int", .format = RUVertexAttributeFormat::INT, .size = sizeof(int32_t)},
-    {.type = "ivec2", .format = RUVertexAttributeFormat::INT2, .size = sizeof(int32_t) * 2},
-    {.type = "ivec3", .format = RUVertexAttributeFormat::INT3, .size = sizeof(int32_t) * 3},
-    {.type = "ivec4", .format = RUVertexAttributeFormat::INT4, .size = sizeof(int32_t) * 4},
-    {.type = "uint", .format = RUVertexAttributeFormat::UINT, .size = sizeof(uint32_t)},
-    {.type = "uvec2", .format = RUVertexAttributeFormat::UINT2, .size = sizeof(uint32_t) * 2},
-    {.type = "uvec3", .format = RUVertexAttributeFormat::UINT3, .size = sizeof(uint32_t) * 3},
-    {.type = "uvec4", .format = RUVertexAttributeFormat::UINT4, .size = sizeof(uint32_t) * 4},
+constexpr std::array<VertexAttributeTypeName, 12> VERTEX_ATTRIBUTE_TYPE_NAMES{{
+    {.type = "float", .format = RUVertexAttributeFormat::FLOAT},
+    {.type = "vec2", .format = RUVertexAttributeFormat::FLOAT2},
+    {.type = "vec3", .format = RUVertexAttributeFormat::FLOAT3},
+    {.type = "vec4", .format = RUVertexAttributeFormat::FLOAT4},
+    {.type = "int", .format = RUVertexAttributeFormat::INT},
+    {.type = "ivec2", .format = RUVertexAttributeFormat::INT2},
+    {.type = "ivec3", .format = RUVertexAttributeFormat::INT3},
+    {.type = "ivec4", .format = RUVertexAttributeFormat::INT4},
+    {.type = "uint", .format = RUVertexAttributeFormat::UINT},
+    {.type = "uvec2", .format = RUVertexAttributeFormat::UINT2},
+    {.type = "uvec3", .format = RUVertexAttributeFormat::UINT3},
+    {.type = "uvec4", .format = RUVertexAttributeFormat::UINT4},
 }};
 
-const GeometryFormatInfo* get_geometry_format_info(std::string_view p_type) {
-    for (const auto& format_info : GEOMETRY_ATTRIBUTE_FORMAT_INFOS) {
-        if (format_info.type == p_type) {
-            return &format_info;
+const VertexAttributeTypeName* find_vertex_attribute_type_name(std::string_view p_type) {
+    for (const auto& type_name : VERTEX_ATTRIBUTE_TYPE_NAMES) {
+        if (type_name.type == p_type) {
+            return &type_name;
         }
     }
     return nullptr;
@@ -100,13 +100,14 @@ void validate_vertex_view_schema(const RUSchemaVertexView& p_vertices) {
             throw std::runtime_error(
                 "Failed to populate submesh resource unit: vertex attribute role must be non-empty and must not contain NUL.");
         }
-        const GeometryFormatInfo* format_info = get_geometry_format_info(attribute.type);
-        if (format_info == nullptr) {
+        const VertexAttributeTypeName* type_name = find_vertex_attribute_type_name(attribute.type);
+        if (type_name == nullptr) {
             throw std::runtime_error(std::format("Failed to populate submesh resource unit: unsupported vertex attribute type '{}' for role '{}'.",
                 attribute.type,
                 attribute.role));
         }
-        if (attribute.offset > p_vertices.stride || format_info->size > p_vertices.stride - attribute.offset) {
+        const size_t attribute_size = VertexAttributeFormatInfo::get_size(type_name->format);
+        if (attribute.offset > p_vertices.stride || attribute_size > p_vertices.stride - attribute.offset) {
             throw std::runtime_error(std::format(
                 "Failed to populate submesh resource unit: vertex attribute '{}' exceeds the vertex stride.", attribute.role));
         }
@@ -159,12 +160,12 @@ void populate_vertex_view(IResourceChunk& p_res_chunk, const RUSchemaVertexView&
     std::vector<RUVertexView::Attribute> attributes;
     attributes.reserve(p_scheme.attributes.size());
     for (const RUSchemaVertexAttribute& attribute_scheme : p_scheme.attributes) {
-        const GeometryFormatInfo* format_info = get_geometry_format_info(attribute_scheme.type);
-        WBE_DEBUG_ASSERT(format_info != nullptr);
+        const VertexAttributeTypeName* type_name = find_vertex_attribute_type_name(attribute_scheme.type);
+        WBE_DEBUG_ASSERT(type_name != nullptr);
         attributes.push_back(RUVertexView::Attribute{.role = populate_shader_role(p_res_chunk, attribute_scheme.role),
-            .format = format_info->format,
+            .format = type_name->format,
             .offset = attribute_scheme.offset,
-            .size = format_info->size});
+            .size = VertexAttributeFormatInfo::get_size(type_name->format)});
     }
     p_vertex_view.attributes =
         p_res_chunk.push_data(attributes.size() * sizeof(RUVertexView::Attribute), attributes.data()).force_cast<RUVertexView::Attribute>();
@@ -338,18 +339,7 @@ void validate_material_texture_role(std::string_view p_texture_role) {
 }
 
 RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaMaterial& p_material) { // NOLINT
-    const bool has_inline_pipeline = p_material.graphics_pipeline.has_value();
-    if (p_material.graphics_pipeline_ids.empty() && !has_inline_pipeline) {
-        throw std::runtime_error("Failed to populate material resource: graphics_pipeline_ids or inline graphics_pipeline is required.");
-    }
-    if (!p_material.graphics_pipeline_ids.empty() && has_inline_pipeline) {
-        throw std::runtime_error("Failed to populate material resource: graphics pipeline is declared more than once.");
-    }
-
     RUMaterial resource_unit;
-    if (has_inline_pipeline) {
-        resource_unit.graphics_pipeline = populate_graphics_pipeline_resource(p_res_chunk, p_material.graphics_pipeline.value());
-    }
     std::vector<RUMaterial::TextureSlot> texture_slots;
     std::vector<std::string> texture_ids;
     texture_slots.reserve(p_material.textures.size());
@@ -390,9 +380,6 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
     }
 
     auto saved_resource = p_res_chunk.push_res_unit(p_material.id, resource_unit).force_cast<RUMaterial>();
-    if (!p_material.graphics_pipeline_ids.empty()) {
-        p_res_chunk.create_ref_to(saved_resource->graphics_pipeline, p_material.graphics_pipeline_ids.front());
-    }
     RUMaterial::TextureSlot* saved_texture_slots = saved_resource->textures.get();
     for (size_t i = 0; i < texture_ids.size(); ++i) {
         if (!texture_ids[i].empty()) {

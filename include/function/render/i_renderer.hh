@@ -19,9 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_database.hh"
-#include "function/render/render_graph_resource_binding.hh"
 #include "utils/interface/i_singleton.hh"
-#include <cstddef>
 #include <cstdint>
 #include <string_view>
 namespace WhiteBirdEngine {
@@ -121,19 +119,6 @@ public:
      * @param p_resource_key The resource key of the graph to activate.
      */
     virtual void activate_render_graph(std::string_view p_resource_key) = 0;
-
-    /**
-     * @brief Apply transient named resources to a registered graph.
-     *
-     * Overrides remain active until that graph completes one frame, then its
-     * descriptor defaults are restored.
-     *
-     * @param p_resource_key The registered render graph resource key.
-     * @param p_bindings The contiguous binding array, or nullptr when p_binding_count is zero.
-     * @param p_binding_count Number of entries in the binding array.
-     */
-    virtual void update_render_graph_resources(
-        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) = 0;
 };
 
 } // namespace WhiteBirdEngine

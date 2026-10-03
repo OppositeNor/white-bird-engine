@@ -186,12 +186,6 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaMaterialTextureSlot {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaMaterial)
-    /** The graphics pipelines that can render this material. */
-    WBE_META(WBE_REFLECT)
-    std::vector<std::string> graphics_pipeline_ids;
-    /** The inline graphics pipeline used to render this material. */
-    WBE_META(WBE_REFLECT)
-    std::optional<RUSchemaGraphicsPipeline> graphics_pipeline;
     /** Shader-defined texture slots used by the material. Texture roles must not be empty or duplicated. */
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemaMaterialTextureSlot> textures;
@@ -463,8 +457,6 @@ struct RUShaderRole {
  * @brief Typed material resource unit.
  */
 struct RUMaterial : public ResourceUnit {
-    /** The graphics pipeline used to render this material. */
-    RefRes<RUGraphicsPipeline> graphics_pipeline;
     /** One resolved texture-role slot. */
     struct TextureSlot {
         /** Exact shader-defined texture role. */

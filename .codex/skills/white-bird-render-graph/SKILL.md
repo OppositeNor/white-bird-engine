@@ -10,12 +10,12 @@ Treat a render graph as a statically built DAG of `IRenderTaskVK` nodes connecte
 ## Build a graph descriptor
 
 1. Declare every resource tasks use. The graph compiler allocates and owns resources declared with `add_buffer()`, `add_image()`, `add_image_view(view_id, image_id, ...)`, and `add_sampler()`: each takes a primary usage (`RendResPrimaryUsageVK`, such as `IMAGE_READ_WRITE`, `IMAGE_RENDER_TARGET`, `IMAGE_DEPTH_TARGET`, or `BUFFER_UNIFORM`) plus format, extent, mip levels, memory domain, per-frame allocation, and initial data as applicable. Import resources owned elsewhere (the swap chain, loaded textures, buffers shared between graphs, compiled static or dynamic meshes, acceleration structures) with `add_resource(id, *bindable)`; composites register members under `<id>.<member>`. Mesh shaders use the shared `REND_RES_MESH_*` ids, so alias them to the drawn mesh's `<id>.<member>` resources.
-2. Add task descriptors with unique lower-snake-case string `task_id` values and factories that return `Unique<IRenderTaskVK>`.
+2. Add task descriptors with unique lower-snake-case string `task_id` values, each owning its concrete `Unique<IRenderTaskVK>` (construct `RendTaskDescVK(allocator, task_id, task)`, assign `task`, or use `RendGraphDescVK::add_task(task_id, task)`).
 3. Connect tasks with `connect(next_task_id, resource_id)` on the earlier task's descriptor. The graph derives the edge's stages and accesses from the `RendResUsageVK` usages both tasks report for the resource; both tasks must access it. Use `RendGraphDescVK::get_task()` to connect a task that was already added. Declared resource accesses never create edges, and there is no other ordering mechanism.
 4. Map task-local resource identifiers to graph resources with `RendTaskDescVK::alias()`: reflected shader ids that differ from the graph's, and the render targets `render_target_colors[<index>]` / `render_target_depth` of graphics tasks. The graph rejects aliases the task never uses.
 5. Register and activate the graph through `RendererVK`; do not manually drive graph execution from application code.
 
-Task factories run while the graph is built. Capture only data that remains valid through construction, and allocate tasks with the render allocator. A descriptor holding a direct task rather than a recreatable factory has one-shot ownership semantics, including across descriptor copies.
+Allocate tasks with the render allocator. `RendTaskDescVK` solely owns its task and is movable but not copyable; building the graph moves the task into it, so a task descriptor builds one graph.
 
 ## Declare task access precisely
 
@@ -41,7 +41,7 @@ The swap-chain path uses this pattern: the application binds `REND_RES_SWAP_CHAI
 
 Do not rely on post-build `set_resource()` or transient graph-resource overrides; those late-binding paths are no longer supported. `ROCBindingVK` was removed from the codebase; if a resource must vary, represent that variation inside the bound container itself.
 
-Graph rebuild frees existing command buffers and waits for the device to become idle. Unregistration defers destruction for the configured frames in flight. Preserve recreatable task factories when a descriptor may be rebuilt.
+Graph rebuild frees existing command buffers and waits for the device to become idle. Unregistration defers destruction for the configured frames in flight. Tasks are moved out of their descriptors at build, so create new tasks for a new graph instead of rebuilding from a used descriptor.
 
 Render objects and Vulkan backend helpers are confined to the rendering thread. Submit cross-thread updates through `IRenderer::add_job()`; do not add locks to these objects merely to permit direct cross-thread access.
 

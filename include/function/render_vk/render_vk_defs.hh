@@ -196,8 +196,6 @@ struct BaseRenderDataVK {
     uint64_t current_frame = 0;
     /** Elapsed renderer update time in seconds. */
     double time = 0.0;
-    /** The maximum depth of the render graph in the current pipeline. */
-    uint64_t max_depth = 0;
 
     /** The queue family indices. */
     Set<uint32_t, RenderAllocator> queue_family_indices;
@@ -290,16 +288,6 @@ struct SpotLightInfosVKUBO {
      * @brief Number of active entries in spot_light_info.
      */
     uint32_t spot_light_count = 0;
-};
-
-/**
- * @brief Time information.
- */
-struct TimeVKUBO {
-    /**
-     * @brief The duration from the start of the application until now.
-     */
-    float duration_sec = 0.0F;
 };
 
 } // namespace WhiteBirdEngine

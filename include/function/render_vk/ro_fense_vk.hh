@@ -22,7 +22,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class ROFenseVK
- * @brief RAII wrapper for a Vulkan fence used to observe GPU-job completion.
+ * @brief RAII wrapper for a Vulkan fence used to observe GPU-job and frame-in-flight completion.
  *
  * Waiting is thread-safe and may be performed by an engine worker. The fence must not outlive the renderer that created it.
  * Copying and moving are disabled; share ownership with Ref.
@@ -37,16 +37,26 @@ public:
     ROFenseVK& operator=(ROFenseVK&&) noexcept = delete;
 
     /**
-     * @brief Create an unsignaled fence.
+     * @brief Create a fence.
      * @param p_render_data Renderer data that owns the Vulkan device and delayed-destruction queue.
+     * @param p_signaled Whether the fence starts in the signaled state.
      */
-    explicit ROFenseVK(const BaseRenderDataVK* p_render_data);
+    explicit ROFenseVK(const BaseRenderDataVK* p_render_data, bool p_signaled = false);
 
     /**
      * @brief Wait indefinitely for the submitted GPU job to finish.
      * @throws std::runtime_error if Vulkan cannot complete the wait.
      */
     void wait() const;
+
+    /**
+     * @brief Return the fence to the unsignaled state.
+     *
+     * The fence must not be pending in a queue submission.
+     *
+     * @throws std::runtime_error if Vulkan cannot reset the fence.
+     */
+    void reset();
 
     /**
      * @brief Get the wrapped Vulkan fence for queue submission.

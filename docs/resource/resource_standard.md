@@ -31,16 +31,19 @@ Source manifests live under `res/`. ACP writes deployment resources under
 
 ## Manifest Entry Rules
 
-- Every resource entry must contain a `type` field.
+- Every resource entry must declare its type: `source_type` for entries ACP compiles or copies from source files (for example
+  `shader`, `image_texture`, `model`, or `text`), or `type` for runtime entries such as `graphics_pipeline` and `material`.
 - Type-specific fields are allowed and preserved.
 - For shader resources, use:
     - `src`: source shader file in `res`.
     - `dst`: compiled shader output path in runtime resources.
     - `metadata`: reflection metadata output path.
     - `macros`: optional compile-time Slang macro definitions. Each entry requires a non-empty `name` and may provide a string `value`.
-- For direct-copy resources, use:
-    - `file`: source file path in `res`.
-- Missing files referenced by `file` are treated as build errors.
+    - `stage` and `entry`: optional Slang stage and entry-point name; declare both or neither. Without them, every
+      `[shader(...)]` entry point in the module is compiled.
+- For file-backed resources, use:
+    - `source_file`: source file path in `res`.
+- Missing files referenced by `source_file` are treated as build errors.
 
 Shader macros are compile-only and are not emitted into the runtime resource manifest:
 
@@ -60,13 +63,12 @@ Shader macros are compile-only and are not emitted into the runtime resource man
 
 ## Material Resources
 
-Material resources associate graphics pipelines with shader-defined texture slots:
+Material resources fill shader-defined texture slots:
 
 ```json
 {
     "id": "example_material",
     "type": "material",
-    "graphics_pipeline_ids": ["forward_cook_torrance_pbr"],
     "textures": [
         {"texture_role": "albedo", "texture_id": "example_albedo"},
         {"texture_role": "normal", "texture_id": "example_normal"},
@@ -75,14 +77,15 @@ Material resources associate graphics pipelines with shader-defined texture slot
 }
 ```
 
-Materials do not declare a `material_type`; their graphics pipeline and reflected shader metadata define the rendering contract.
+Materials do not declare a `material_type` or graphics pipelines; the graphics pipeline the application draws them with and its
+reflected shader metadata define the rendering contract.
 
 - Each texture slot requires a non-empty `texture_role`. Shaders select roles through reflected `WBE_TEXTURE` attributes.
 - The loader retains each exact texture role name together with its runtime hash; consumers use both and never treat a hash alone
   as identity. Resource units do not use closed role enums.
 - A texture role may appear at most once in a material.
 - Each slot must provide exactly one of `texture` for an inline image or `texture_id` for an existing image resource.
-- Regular materials may omit slots; static-mesh compilation uses the corresponding shader-selected role from the configured default material.
+- Regular materials may omit slots; mesh compilation uses the corresponding shader-selected role from the configured default material.
 - The default material must provide every texture role selected by each material shader used by the pass.
 - `rma` is the canonical texture role and project abbreviation for the roughness, metallic, and ambient-occlusion channel pack.
 
@@ -97,8 +100,8 @@ int albedo_index; // Selects texture_role "albedo".
 int detail_index; // Selects texture_role "detail_index".
 ```
 
-The static opaque pipeline reflects these attributes independently for each graphics pipeline, resolves each texture to its global
-sampled-image descriptor-heap index, and writes that index at the reflected material-field offset. The metadata-only
+`MaterialTextureContractResolver` reflects these attributes independently for each graphics pipeline. `MeshCompilerVK` resolves
+each texture to its global sampled-image descriptor-heap index and writes that index at the reflected material-field offset. The metadata-only
 `material_sampler` and `textures` members and runtime `materials` table remain fixed contracts in `utils/utils.slang`; applications
 may configure only the base variable names for `material_textures` and `material_params`, plus the `default_material` resource key. Runtime shaders receive
 the material parameter buffer and sampler through `WBE_DESCRIPTOR` push-data fields and access textures through the global heap.

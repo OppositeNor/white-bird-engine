@@ -29,7 +29,7 @@ struct CombineLightingDescriptorIndices {
 ConstantBuffer<CombineLightingDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Combine direct and indirect lighting using the G-buffer ambient occlusion.
+ * @brief Combine direct lighting with indirect lighting attenuated by the G-buffer ambient occlusion.
  * @param p_group_id Dispatched workgroup index.
  * @param p_group_thread_id Thread index within the workgroup.
  */
@@ -50,5 +50,5 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float ambient_occlusion = clamp(gbuffer_rma.Load(int3(dispatch_thread_id, 0)).b, 0.0, 1.0);
     float3 direct = direct_lighting.Load(int3(dispatch_thread_id, 0)).rgb;
     float3 indirect = indirect_lighting.Load(int3(dispatch_thread_id, 0)).rgb;
-    result_image[dispatch_thread_id] = float4((direct + indirect) * ambient_occlusion, 1.0);
+    result_image[dispatch_thread_id] = float4(direct + indirect * ambient_occlusion, 1.0);
 }

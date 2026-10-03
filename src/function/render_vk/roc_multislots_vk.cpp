@@ -21,7 +21,6 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "utils/defs.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

@@ -471,7 +471,6 @@ void RenderGraphVK::add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std:
     edge->dst_stage = dst_scope.stage;
     edge->dst_access = dst_scope.read_access | dst_scope.write_access;
     p_from->out_edges.emplace_back(edge);
-    p_to->in_edges.emplace_back(edge);
     resource_edges.emplace_back(std::move(edge));
 }
 

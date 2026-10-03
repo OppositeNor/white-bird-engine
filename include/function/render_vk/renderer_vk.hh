@@ -24,9 +24,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_graph_resource_binding.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -36,7 +34,6 @@
 #include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "function/render_vk/vma_vk.hh"
@@ -112,9 +109,6 @@ public:
     virtual void unregister_render_graph(std::string_view p_resource_key) override;
 
     virtual void activate_render_graph(std::string_view p_resource_key) override;
-
-    virtual void update_render_graph_resources(
-        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override;
 
     virtual Ref<RenderDatabase> get_render_database() override {
         return render_database;
@@ -272,7 +266,7 @@ private:
     Ref<ROCMultislotsVK> swap_chain_image_view_container;
     Ref<ROBufferVK> shader_debug_buffer;
 
-    Vector<VkFence> in_flight_fences;
+    Vector<Ref<ROFenseVK>> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
@@ -352,13 +346,6 @@ private:
         }
     };
 
-    std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-
-    struct TaskInfo {
-        RendTaskID task_id;
-        Ref<IRenderTaskVK> render_task;
-    };
-
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
     Vector<Ref<RenderPluginVK>> registered_plugins;
@@ -376,8 +363,6 @@ private:
         Vector<Ref<ROImageVK>> swap_chain_images;
         // Swap chain image views.
         Vector<Ref<ROImageViewVK>> swap_chain_image_views;
-        // The staging buffer for data transfer.
-        Ref<ROStagingBufferVK> staging_buffer;
     };
     Unique<RenderObjects> render_objects;
 
@@ -399,7 +384,6 @@ private:
 
     void init_vulkan(RendererCapabilities& p_capabilities);
     void setup_base_render_data();
-    void init_swap_chain_images();
     void init_swap_chain_image_views();
     void recreate_swap_chain();
 

@@ -24,7 +24,6 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/scene/scene.hh"
 #include "function/scene/scene_manager.hh"
@@ -136,13 +135,6 @@ public:
 
     void activate_render_graph(std::string_view p_resource_key) override {
         activated_graphs.emplace_back(p_resource_key);
-    }
-
-    void update_render_graph_resources(
-        std::string_view p_resource_key, const WBE::RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override {
-        (void)p_resource_key;
-        (void)p_bindings;
-        (void)p_binding_count;
     }
 
     std::future<void> add_job(std::function<void()> p_job) override {

@@ -30,7 +30,6 @@ namespace {
 
 struct TriggerProbeState {
     int recordings = 0;
-    int initializations = 0;
     int bindings = 0;
     int destructions = 0;
     double delta = 0.0;
@@ -59,9 +58,6 @@ public:
     }
     void bind_resources(const RendResViewVK&) override {
         ++state.bindings;
-    }
-    void init() override {
-        ++state.initializations;
     }
     void record(VkCommandBuffer p_command_buffer, double p_delta) override {
         ++state.recordings;
@@ -119,9 +115,7 @@ TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
     {
         RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
         Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
-        task.init();
         task.bind_resources(RendResViewVK(&resources));
-        EXPECT_EQ(state.initializations, 1);
         EXPECT_EQ(state.bindings, 1);
         EXPECT_EQ(task.queue_family(), QueueFamilyVK::COMPUTE);
         Vector<ResAccessVK, RenderAllocator> reads(&allocator);

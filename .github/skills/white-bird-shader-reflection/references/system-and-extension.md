@@ -94,7 +94,7 @@ The fixed material contract is split between reflection-only metadata and a runt
 - `MaterialTextureContractMetadata.textures` is an array of texture resources;
 - `MaterialParamsBuffer.materials` is a runtime sized array with a valid element stride.
 
-Across the merged pipeline metadata, stages must agree on the reflected layout, and the aggregate contract must expose material textures and material parameters together. Applications may configure only the two base variable names and the default-material resource key. Static-mesh compilation resolves each material texture to its global sampled-image heap index and stores that value in `MaterialParamsBuffer`; it does not allocate a per-pipeline descriptor array.
+Across the merged pipeline metadata, stages must agree on the reflected layout, and the aggregate contract must expose material textures and material parameters together. Applications may configure only the two base variable names and the default-material resource key. Mesh compilation (`MeshCompilerVK`) resolves each material texture to its global sampled-image heap index and stores that value in `MaterialParamsBuffer`; it does not allocate a per-pipeline descriptor array.
 
 Relevant files:
 

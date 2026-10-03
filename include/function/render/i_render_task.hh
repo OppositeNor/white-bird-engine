@@ -17,14 +17,11 @@
 
 #include "utils/utils.hh"
 #include <string>
-#include <string_view>
 
 namespace WhiteBirdEngine {
 
 using RendResTID = HashCode;
 using RendTaskID = std::string;
-
-inline constexpr std::string_view RT_UNDEFINED = "undefined";
 
 /**
  * @class IRenderTask
@@ -38,16 +35,6 @@ public:
     IRenderTask(IRenderTask&&) noexcept = default;
     IRenderTask& operator=(const IRenderTask&) = default;
     IRenderTask& operator=(IRenderTask&&) noexcept = default;
-
-    /**
-     * @brief Initialize the render task.
-     */
-    virtual void init() = 0;
-
-    /**
-     * @brief Perform the render task.
-     */
-    virtual void perform(double p_delta) = 0;
 };
 
 } // namespace WhiteBirdEngine

@@ -19,7 +19,6 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_graph_resource_binding.hh"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -73,14 +72,6 @@ public:
 
     virtual void activate_render_graph(std::string_view p_resource_key) override {
         throw std::runtime_error(std::string("RendererDummy does not support render graph activation: ") + std::string(p_resource_key));
-    }
-
-    virtual void update_render_graph_resources(
-        std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) override {
-        (void)p_bindings;
-        (void)p_binding_count;
-        throw std::runtime_error(
-            std::string("RendererDummy does not support render graph resource updates: ") + std::string(p_resource_key));
     }
 
     virtual std::future<void> add_job(std::function<void()> p_job) override {

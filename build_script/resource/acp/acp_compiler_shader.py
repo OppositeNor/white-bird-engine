@@ -141,44 +141,17 @@ class WBEACPCompilerShader(WBEACPCompiler):
         else:
             raise RuntimeError(f"Unsupported shader file type: {source_file_path.suffix}.")
 
-    def _read_shader_stage(self, shader_file: Path) -> str:
-        with open(shader_file, "r", encoding="utf-8") as f:
-            first_line = f.readline().strip()
-        # The shader stage is marked at the beginning of the file starting with a "//"
-        if first_line.startswith("//"):
-            shader_stage = first_line[2:].strip()
-            if shader_stage not in ["vertex", "vert", "fragment", "frag", "tesscontrol",
-                    "tesc", "tesseval", "tese", "geometry", "geom", "compute", "comp"]:
-                raise RuntimeError(f"Unsupported shader stage for {shader_file} : {shader_stage}.")
-        else:
-            raise RuntimeError(f"File {shader_file} missing a stage header.")
-        return shader_stage
-
     def _compile_slang(self, shader_file: Path, output_file: Path,
                        shader_metadata_file_path: Path, stage: str | None, entry: str | None,
                        macro_definitions: list[str]) -> None:
         shader_stage = stage
         entry_name = entry
 
-        if shader_stage is None and entry_name is not None:
+        # Without an explicit stage and entry, slangc compiles every [shader(...)] entry point in the module.
+        if (shader_stage is None) != (entry_name is None):
             raise RuntimeError(
-                f"Shader resource for {shader_file.as_posix()} declares an entry but no stage."
+                f"Shader resource for {shader_file.as_posix()} must declare both stage and entry, or neither."
             )
-
-        if shader_stage is None and entry_name is None:
-            try:
-                shader_stage = self._read_shader_stage(shader_file)
-                entry_name = "main"
-            except RuntimeError:
-                shader_stage = None
-                entry_name = None
-        elif shader_stage is not None and entry_name is None:
-            try:
-                self._read_shader_stage(shader_file)
-                entry_name = "main"
-            except RuntimeError:
-                shader_stage = None
-                entry_name = None
 
         slangc_path = shutil.which("slangc")
         if slangc_path is not None:

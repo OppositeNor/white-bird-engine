@@ -387,7 +387,6 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     {
         "id": "test_material_01",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline", "shadow_pipeline"],
         "textures": [
             {
                 "texture_role": "albedo",
@@ -410,9 +409,6 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMaterial) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_material_01");
     ASSERT_EQ(scheme.type, "material");
-    ASSERT_EQ(scheme.graphics_pipeline_ids.size(), 2U);
-    ASSERT_EQ(scheme.graphics_pipeline_ids[0], "main_pipeline");
-    ASSERT_EQ(scheme.graphics_pipeline_ids[1], "shadow_pipeline");
     ASSERT_EQ(scheme.textures.size(), 2U);
     ASSERT_EQ(scheme.textures[0].texture_role, "albedo");
     ASSERT_TRUE(scheme.textures[0].texture_id.has_value());

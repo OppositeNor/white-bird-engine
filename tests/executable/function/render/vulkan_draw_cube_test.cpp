@@ -252,11 +252,11 @@ void ApplicationVulkanDrawCubeTest::load_resources() {
     if (cube_mesh == nullptr) {
         throw std::runtime_error("Failed to setup draw cube test: static mesh resource was not found.");
     }
-    shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_static");
+    shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
     if (shadow_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup draw cube test: static shadow graphics pipeline resource not found.");
     }
-    main_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
+    main_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
     if (main_pipeline_resource == nullptr) {
         throw std::runtime_error("Failed to setup draw cube test: static main graphics pipeline resource not found.");
     }

@@ -43,10 +43,6 @@ void RTTriggeredVK::bind_resources(const RendResViewVK& p_resources) {
     task->bind_resources(p_resources);
 }
 
-void RTTriggeredVK::init() {
-    task->init();
-}
-
 void RTTriggeredVK::record(VkCommandBuffer p_command_buffer, double p_delta) {
     if (activate.exchange(false, std::memory_order_acq_rel)) {
         task->record(p_command_buffer, p_delta);

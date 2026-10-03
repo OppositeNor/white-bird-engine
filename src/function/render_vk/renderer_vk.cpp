@@ -25,7 +25,6 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_graph_resource_binding.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
@@ -41,7 +40,6 @@
 #include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -147,36 +145,6 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
     return result;
 }
 
-template <typename T>
-void update_buffer(const BaseRenderDataVK* p_render_data,
-    DeviceDomain p_domain,
-    Ref<ROBufferVK>& p_buffer,
-    const Vector<T, RenderAllocator>& p_from_buffer,
-    VkBufferUsageFlags p_buffer_usage,
-    Ref<ROStagingBufferVK> p_staging_buffer) {
-    size_t size_in_bytes = p_from_buffer.size() * sizeof(T);
-    if (p_buffer == MEM_NULL || size_in_bytes > p_buffer->fields().buffer_size) {
-        // If res not initialized, or size exceeds buffer capacity, create a new
-        // buffer.
-        ROBufferVK::Builder builder;
-        builder.set_domain(p_domain).set_usage(p_buffer_usage).set_size(size_in_bytes);
-        p_buffer = builder.create_ref(p_render_data);
-    }
-    switch (p_domain) {
-    case DeviceDomain::HOST_DEVICE:
-    case DeviceDomain::HOST:
-        p_buffer->update_buffer(p_from_buffer.data(), size_in_bytes);
-        break;
-    case DeviceDomain::DEVICE: {
-        // Setup a temporary host buffer for copying the data.
-        ROBufferVK::Builder temp_buffer_builder;
-        temp_buffer_builder.set_domain(DeviceDomain::HOST).add_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT).set_size(size_in_bytes);
-        void* data = p_staging_buffer->allocate(size_in_bytes);
-        memcpy(data, p_from_buffer.data(), size_in_bytes);
-        p_buffer->update_buffer(p_staging_buffer, data, size_in_bytes);
-    } break;
-    }
-}
 } // namespace
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
@@ -236,7 +204,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     }
     uint32_t image_index = *next_image_index;
 
-    vkResetFences(logical_device, 1, &(base_render_data.in_flight_fence));
+    in_flight_fences[frame_counter]->reset();
 
     // Update the current frame slot so the graph-bound swap-chain image-view container
     // resolves to the correct image view during task recording.
@@ -259,9 +227,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         capture_png_path.clear();
     }
     present(image_index, p_graph);
-    if (base_render_data.in_flight_fence != VK_NULL_HANDLE) {
-        vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
-    }
+    in_flight_fences[frame_counter]->wait();
 
     ++(base_render_data.current_frame);
 }
@@ -280,6 +246,8 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     init_vulkan(p_capabilities);
     base_render_data.renderer_capabilities = p_capabilities;
     setup_base_render_data();
+    // Fence creation needs the device and delayed-destruction callback published by setup_base_render_data().
+    create_async_objects();
     create_descriptor_heap_allocator();
     create_shader_debug_buffer();
     // current_frame is a monotonic counter that drives the per-frame timeline
@@ -318,12 +286,13 @@ void RendererVK::terminate() {
     shader_debug_buffer = MEM_NULL;
 
     synchronize_gpu_and_flush_delayed_calls();
+    // The in-flight fences are released after the synchronization waits on them; their destruction is delayed, so flush again.
+    base_render_data.in_flight_fence = VK_NULL_HANDLE;
+    in_flight_fences.clear();
+    flush_delayed_calls();
     base_render_data.descriptor_heap_allocator = nullptr;
     descriptor_heap_allocator.reset();
     ktx_vulkan_device_info.reset();
-    for (auto* fence : in_flight_fences) {
-        vkDestroyFence(logical_device, fence, get_allocation_callbacks());
-    }
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
     vkDestroyCommandPool(logical_device, graphics_command_pool, get_allocation_callbacks());
     vkDestroySwapchainKHR(logical_device, swap_chain, get_allocation_callbacks());
@@ -346,7 +315,6 @@ void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
     create_command_pools();
     create_ktx_vulkan_device_info();
     create_gpu_job_command_buffer();
-    create_async_objects();
 }
 
 void RendererVK::recreate_swap_chain() {
@@ -388,7 +356,7 @@ void RendererVK::setup_base_render_data() {
         plugin->update_base_render_data(&base_render_data, physical_device);
     }
     if (!in_flight_fences.empty()) {
-        base_render_data.in_flight_fence = in_flight_fences[0];
+        base_render_data.in_flight_fence = in_flight_fences[0]->get_fense();
     } else {
         base_render_data.in_flight_fence = VK_NULL_HANDLE;
     }
@@ -819,19 +787,10 @@ void RendererVK::create_shader_debug_buffer() {
 }
 
 void RendererVK::create_async_objects() {
-    VkFenceCreateInfo fence_create_info{};
-    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    // Set the initial state of the fence to "signaled", since we don't have a
-    // "previous frame" at the first frame.
-    fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     in_flight_fences.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
-        VkFence fence = VK_NULL_HANDLE;
-        auto result = vkCreateFence(logical_device, &fence_create_info, get_allocation_callbacks(), &fence);
-        if (result != VK_SUCCESS) {
-            throw std::runtime_error(std::format("Failed to create in flight fence: {}.", string_VkResult(result)));
-        }
-        in_flight_fences.push_back(fence);
+        // Start signaled, since there is no previous frame to wait for at the first frame.
+        in_flight_fences.push_back(make_ref<ROFenseVK>(allocator, &base_render_data, true));
     }
 }
 
@@ -1345,10 +1304,10 @@ std::optional<uint32_t> RendererVK::acquire_swapchain_next_image(VkSemaphore p_i
 std::optional<uint32_t> RendererVK::tick_setup_pipeline() {
     static uint32_t frame_counter = 0;
     frame_counter = (frame_counter + 1) % frames_in_flight;
-    base_render_data.in_flight_fence = in_flight_fences[frame_counter];
+    base_render_data.in_flight_fence = in_flight_fences[frame_counter]->get_fense();
     base_render_data.current_frame_slot = frame_counter;
 
-    vkWaitForFences(logical_device, 1, &(base_render_data.in_flight_fence), VK_TRUE, UINT64_MAX);
+    in_flight_fences[frame_counter]->wait();
     return frame_counter;
 }
 
@@ -1546,12 +1505,8 @@ void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>>& p_c
 }
 
 void RendererVK::synchronize_gpu_and_flush_delayed_calls() {
-    for (VkFence fence : in_flight_fences) {
-        auto result = vkWaitForFences(logical_device, 1, &fence, VK_TRUE, UINT64_MAX);
-        if (result != VK_SUCCESS) {
-            throw std::runtime_error(
-                std::format("Failed to synchronize GPU work before flushing delayed calls: {}.", string_VkResult(result)));
-        }
+    for (const Ref<ROFenseVK>& fence : in_flight_fences) {
+        fence->wait();
     }
     run_gpu_jobs();
     wait_for_running_gpu_jobs();
@@ -1693,14 +1648,6 @@ void RendererVK::activate_render_graph(std::string_view p_resource_key) {
     }
 
     active_graph = graph_entry->second.graph;
-}
-
-void RendererVK::update_render_graph_resources(
-    std::string_view p_resource_key, const RenderGraphResourceBinding* p_bindings, size_t p_binding_count) {
-    static_cast<void>(p_bindings);
-    static_cast<void>(p_binding_count);
-    throw std::runtime_error(std::format(
-        "RendererVK: late render-graph resource updates are not supported for '{}'. Bind resources before graph build.", p_resource_key));
 }
 
 } // namespace WhiteBirdEngine

@@ -2,7 +2,7 @@
 
 ## Pipeline map
 
-1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` factories.
+1. Application code constructs a `RendGraphDescVK` containing named resources and `RendTaskDescVK` entries that own their tasks.
 2. `RendererVK::register_render_graph` stores the descriptor and immediately builds a `RenderGraphVK`.
 3. `RenderGraphVK::build_from_descriptor` instantiates tasks, adds resource edges, rejects cycles while topologically sorting nodes, validates that edges on each resource order every conflict on it, derives same-queue barriers and cross-queue semaphores, allocates per-node command buffers, and creates terminal semaphores.
 4. Each frame, the renderer acquires a swap-chain image, updates the explicitly bound swap-chain image-view container for the current frame slot, executes the graph, and presents.
@@ -11,7 +11,7 @@
 ## Core APIs
 
 - `include/function/render_vk/render_graph_descriptor_vk.hh`
-  - `RendTaskDescVK`: string `task_id`, fluent `connect()` edges and `alias()` resource mappings, and a task factory in `create`.
+  - `RendTaskDescVK`: string `task_id`, fluent `connect()` edges and `alias()` resource mappings, and the owned task in `task`.
   - `RendGraphDescVK`: allocator-aware vectors of task and resource declarations, plus `get_task()` for connecting added tasks.
 - `include/function/render_vk/i_render_task_vk.hh`
   - `QueueFamilyVK`, compact `RendResUsageVK` / `ResAccessVK`, and the `IRenderTaskVK` contract.
@@ -20,7 +20,7 @@
 - `include/function/render_vk/render_resource_list_vk.hh`
   - CPU-side aggregate of render objects that can be bound once and accessed through one graph resource key.
 - `include/function/render_vk/rt_run_compute_pipeline_vk.hh`
-  - General compute dispatch task with compute-queue default and additional resource accesses.
+  - General compute dispatch task with compute-queue default; it reports the pipeline's reflected shader accesses.
 - `include/function/render_vk/rt_generate_mipmaps_vk.hh`
   - Graphics-queue color mip generation with filtered blits and per-level image synchronization.
 
@@ -57,12 +57,12 @@ validation and synchronization derivation. Populate the list before graph constr
 does not create a GPU object.
 
 All resources belong on `RendGraphDescVK` and are registered once for the graph. Tasks refer to those resources by the same public
-IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Static-mesh vertex, index, opaque and masked indirect
+IDs, directly or through `RendTaskDescVK::alias()`, in the accesses they report. Mesh vertex, index, opaque and masked indirect
 draw-command, reflected shader, and texture-list resources follow this rule;
 the `<id>.opaque_draw_batches` and `<id>.masked_draw_batches` members are also storage-buffer capable for
 explicitly ordered compute writes.
 
-A pipeline-run task descriptor captures only construction data. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:
+A pipeline-run task descriptor owns its constructed task. The render graph binds the renderer-owned resource and sampler heaps for every command buffer, and the pipeline pushes its reflected descriptor indices when it records:
 
 ```cpp
 RendTaskDescVK task_desc(render_allocator);
@@ -72,16 +72,11 @@ task_desc.connect("present", "lighting_output");
 // The G-buffer pass was added earlier; connect it to the lighting task.
 graph_desc.get_task("run_gbuffer")
     .connect("run_lighting", "gbuffer_albedo");
-task_desc.create = [task_render_allocator = render_allocator,
-                       task_base_render_data = base_render_data]() -> Unique<RenderTaskVK> {
-    return make_unique<RTRunComputePipelineVK>(task_render_allocator,
-        task_base_render_data,
-        "lighting_pipeline",
-        dispatch_group_count);
-};
+task_desc.task = make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, lighting_pipeline, dispatch_group_count);
+graph_desc.add_task(std::move(task_desc));
 ```
 
-Keep task creation logic in the application class when it has meaningful setup. Preserve `RendTaskDescVK`'s one-shot direct-task ownership rule: copies share the same transfer state, so prefer factories for reusable or rebuildable descriptors.
+Keep task creation logic in the application class when it has meaningful setup. `RendTaskDescVK` is movable but not copyable; building the graph moves its task into the graph.
 
 ## Resource dependency model
 
@@ -143,12 +138,12 @@ Rebuilding a graph with allocated command buffers waits for device idle, frees t
 - Add a chain of edges on the resource for every read-write, write-read, and write-write hazard, with stages that chain.
 - Confirm compute tasks reach a graphics task through edges.
 - Preserve concurrent sharing for resources crossing distinct queue families.
-- Check factory captures remain alive and recreate tasks when rebuilding.
+- Confirm every task descriptor owns a non-null task when the graph is built, and create new tasks for a new graph.
 
 ## Canonical examples
 
 - `tests/executable/function/render/vulkan_draw_cube_test.cpp`: compact graphics graph construction with one resource edge.
 - `tests/executable/function/render/deferred_test/deferred_render_graph.cpp`: graphics-to-compute deferred pipeline wired with `connect_resource_chain()` from `render_test.hh`.
-- `tests/unit/function/render_graph_descriptor_vk_test.cpp`: direct-task ownership and descriptor-copy behavior.
+- `tests/unit/function/render_graph_descriptor_vk_test.cpp`: task ownership and move behavior.
 - `src/function/render_vk/render_graph_vk.cpp`: authoritative build, edge validation, heap binding, barrier, and submission behavior.
 - `src/function/render_vk/renderer_vk.cpp`: graph registration, swap-chain image-view container acquisition and per-frame updates, execution, presentation, and delayed destruction.

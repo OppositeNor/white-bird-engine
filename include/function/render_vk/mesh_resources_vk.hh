@@ -27,7 +27,6 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -40,7 +39,7 @@ inline constexpr std::string_view REND_RES_MESH_NODES = "mesh_nodes";
 inline constexpr std::string_view REND_RES_MESH_INSTANCES = "mesh_instances";
 /** Shader resource id of the whole-mesh transform declared by MeshDescriptorIndices; it holds one GeometryNodeGPU. */
 inline constexpr std::string_view REND_RES_MESH_TRANSFORM = "mesh_transform";
-/** Default shader resource id of the reflected material parameter table. */
+/** Shader resource id of the reflected material parameter table. */
 inline constexpr std::string_view REND_RES_MESH_MATERIAL_PARAMS = "material_params";
 /** Shader resource id of the material sampler. */
 inline constexpr std::string_view REND_RES_MESH_MATERIAL_SAMPLER = "material_sampler";
@@ -152,11 +151,6 @@ public:
         return mesh;
     }
 
-    /** @brief Return the shader resource id of the material parameter table configured at compilation. */
-    std::string_view get_material_params_resource_id() const {
-        return material_params_resource_id;
-    }
-
     /** @brief Return the number of opaque draw batches. */
     size_t get_opaque_draw_batch_count() const {
         return opaque_batches.size();
@@ -210,7 +204,6 @@ private:
     Vector<MeshDrawBatchVK, RenderAllocator> opaque_batches;
     Vector<MeshDrawBatchVK, RenderAllocator> opaque_double_sided_batches;
     Vector<MeshDrawBatchVK, RenderAllocator> masked_batches;
-    std::string material_params_resource_id = std::string(REND_RES_MESH_MATERIAL_PARAMS);
 };
 
 } // namespace WhiteBirdEngine

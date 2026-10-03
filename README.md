@@ -80,8 +80,8 @@ python ./build.py -t deploy         # Deploy target with GCC compiler
 
 Static models in `res/assets/models/models.json` use `source_files` to combine models into shared geometry.
 The compiler emits one `<id>.mesh` resource with `opaque_instances`, `masked_instances`, and `double_sided_opaque_instances`
-categories. Opaque glTF materials with `doubleSided: true` enter the third category; configure their material pipelines with
-`double_sided_graphics_pipeline_ids`. The deferred test draws this category without face culling and reverses back-face
+categories. Opaque glTF materials with `doubleSided: true` enter the third category. The deferred test draws this category
+with its own pipeline, without face culling, and reverses back-face
 lighting normals. See the [model compiler documentation](dependencies/wbe-utils-model-compiler/README.md) for the manifest contract.
 
 ## Contribution

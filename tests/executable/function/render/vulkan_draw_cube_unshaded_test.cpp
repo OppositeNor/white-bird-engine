@@ -93,7 +93,7 @@ public:
         };
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
-        auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("draw_cube_unshaded_static_pipeline");
+        auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("draw_cube_unshaded_pipeline");
         if (pipeline_resource == nullptr) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }

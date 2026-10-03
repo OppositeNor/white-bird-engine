@@ -54,8 +54,6 @@ public:
 
         /** Default material resource used to fill missing shader texture roles. */
         std::string default_material_resource_key = "default_material";
-        /** Reflected material parameter-buffer base name. */
-        std::string material_params_variable_name = std::string(REND_RES_MESH_MATERIAL_PARAMS);
         /** Usage added to the shared vertex buffer, e.g. MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE. */
         VkBufferUsageFlags vertex_buffer_usage = 0;
         /** Usage added to the shared index buffer, e.g. MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE. */

@@ -391,11 +391,11 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
-    shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided_static");
+    shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided");
     gbuffer_double_sided_pipeline_resource =
-        resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided_static");
-    shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_static");
-    gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_static");
+        resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided");
+    shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot");
+    gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer");
     // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
     shadow_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_dynamic");
     gbuffer_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_dynamic");

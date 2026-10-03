@@ -24,8 +24,8 @@ Material texture semantics are shader metadata, not renderer-wide enums. Integer
 argument uses the annotated field name. `rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel
 pack.
 
-The static-mesh task reflects this contract independently for every graphics pipeline. It resolves each texture to a global
-sampled-image descriptor-heap index, initializes missing roles from the configured default material, and writes those indices into
+The caller resolves this contract from each graphics pipeline's reflected metadata with `MaterialTextureContractResolver` and
+passes it to `MeshCompilerVK::compile()`. The mesh compiler resolves each texture to a global sampled-image descriptor-heap index, initializes missing roles from the configured default material, and writes those indices into
 `MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture roles.
 
 The contract member names are fixed in `utils/utils.slang`: the reflection-only
@@ -187,8 +187,8 @@ annotated as read-only, under shader resource ids shared by every mesh:
 Shaders read world transforms through `load_mesh_node()`, which applies the mesh transform after the instance-local node. The node
 layout is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
 
-Material resources follow the pipeline's reflected material texture contract. `get_default_image()` resolves the configured
-default material, and `MeshMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
+Material resources follow the pipeline's reflected material texture contract. `MeshCompilerVK` resolves the configured default
+material, and `MeshMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
 image views are returned as a CPU-side `RenderResourceListVK` through `MeshResourcesVK::acquire_textures()`.
 
 The application imports a compiled static mesh once with `RendGraphDescVK::add_resource(key, *static_mesh)`. Like every import, this
@@ -353,12 +353,10 @@ identifiers differ from the graph's, alias them on the task descriptor; the grap
 reports through that map, and rejects aliases the task never uses:
 
 ```cpp
-RendTaskDescVK blur(render_allocator);
-blur.task_id = "blur_bloom_0";
+RendTaskDescVK blur(render_allocator,
+    "blur_bloom_0",
+    make_unique<RTRunComputePipelineVK>(render_allocator, render_data, blur_pipeline, VkExtent3D{.width = 160, .height = 90, .depth = 1}));
 blur.alias("kawase_blur_source", "bloom_ping")
     .alias("kawase_blur_destination", "bloom_pong")
     .alias("kawase_blur_sampler", "bloom_sampler");
-blur.create = [render_allocator, render_data, blur_pipeline]() -> Unique<IRenderTaskVK> {
-    return make_unique<RTRunComputePipelineVK>(render_allocator, render_data, blur_pipeline, VkExtent3D{.width = 160, .height = 90, .depth = 1});
-};
 ```

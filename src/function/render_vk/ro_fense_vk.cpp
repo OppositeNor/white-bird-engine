@@ -23,13 +23,16 @@
 
 namespace WhiteBirdEngine {
 
-ROFenseVK::ROFenseVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
+ROFenseVK::ROFenseVK(const BaseRenderDataVK* p_render_data, bool p_signaled) : render_data(p_render_data) {
     WBE_DEBUG_ASSERT(p_render_data != nullptr);
     VkFenceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    if (p_signaled) {
+        create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    }
     VkResult result = vkCreateFence(render_data->logic_device, &create_info, render_data->allocation_callbacks, &fense);
     if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to create GPU-job fense: {}.", string_VkResult(result)));
+        throw std::runtime_error(std::format("Failed to create fense: {}.", string_VkResult(result)));
     }
 }
 
@@ -44,7 +47,14 @@ ROFenseVK::~ROFenseVK() {
 void ROFenseVK::wait() const {
     VkResult result = vkWaitForFences(render_data->logic_device, 1, &fense, VK_TRUE, UINT64_MAX);
     if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to wait for GPU-job fense: {}.", string_VkResult(result)));
+        throw std::runtime_error(std::format("Failed to wait for fense: {}.", string_VkResult(result)));
+    }
+}
+
+void ROFenseVK::reset() {
+    VkResult result = vkResetFences(render_data->logic_device, 1, &fense);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error(std::format("Failed to reset fense: {}.", string_VkResult(result)));
     }
 }
 

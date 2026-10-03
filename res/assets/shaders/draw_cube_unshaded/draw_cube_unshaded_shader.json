@@ -16,15 +16,6 @@
             "depth_test": false,
             "depth_write": false,
             "color_blend": false
-        },
-        {
-            "id": "draw_cube_unshaded_static_pipeline",
-            "type": "graphics_pipeline",
-            "vertex_stage_id": "draw_cube_unshaded_shader",
-            "fragment_stage_id": "draw_cube_unshaded_shader",
-            "depth_test": false,
-            "depth_write": false,
-            "color_blend": false
         }
     ]
 }

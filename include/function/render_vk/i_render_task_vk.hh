@@ -142,47 +142,6 @@ struct IRenderTaskVK : public IRenderTask {
      * @param p_delta     The frame delta in seconds.
      */
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) = 0;
-
-    /**
-     * @brief Default no-op for the cross-API perform() entry point. The
-     * Vulkan render graph drives execution via record(); perform() is kept
-     * only to satisfy the abstract interface.
-     */
-    virtual void perform(double p_delta) override {
-        (void)p_delta;
-    }
-
-    /**
-     * @brief Default no-op init.
-     */
-    virtual void init() override {
-    }
-
-    /**
-     * @class RecordCommandBufferGuard
-     * @brief RAII guard for recording a Vulkan command buffer. Begins on
-     * construction and ends on destruction.
-     */
-    class RecordCommandBufferGuard {
-    public:
-        RecordCommandBufferGuard() = delete;
-        ~RecordCommandBufferGuard();
-        RecordCommandBufferGuard(const RecordCommandBufferGuard&) = delete;
-        RecordCommandBufferGuard(RecordCommandBufferGuard&&) noexcept = delete;
-        RecordCommandBufferGuard& operator=(const RecordCommandBufferGuard&) = delete;
-        RecordCommandBufferGuard& operator=(RecordCommandBufferGuard&&) noexcept = delete;
-
-        /**
-         * @brief Constructor.
-         *
-         * @param p_command_buffer   The command buffer to record into.
-         * @param p_inheritance_info The inheritance info, used for secondary
-         *                           command buffers; nullptr for primary.
-         */
-        RecordCommandBufferGuard(VkCommandBuffer p_command_buffer, VkCommandBufferInheritanceInfo* p_inheritance_info = nullptr);
-
-        VkCommandBuffer command_buffer;
-    };
 };
 
 } // namespace WhiteBirdEngine

@@ -1159,13 +1159,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
         return WBE::RefRes<char>(mem_id, &stack_allocator);
     };
 
-    WBE::RUGraphicsPipeline graphics_pipeline;
-    auto graphics_pipeline_ref = push_to_stack(sizeof(graphics_pipeline), &graphics_pipeline).force_cast<WBE::RUGraphicsPipeline>();
     std::array<std::byte, sizeof(WBE::RUTexture)> referenced_texture{};
     auto referenced_texture_ref = push_to_stack(referenced_texture.size(), referenced_texture.data()).force_cast<WBE::RUTexture>();
     std::unordered_map<std::string, WBE::RefRes<char>> reference_resources{
-        {"main_pipeline", graphics_pipeline_ref.force_cast<char>()},
-        {"shadow_pipeline", graphics_pipeline_ref.force_cast<char>()},
         {"normal_texture", referenced_texture_ref.force_cast<char>()},
     };
 
@@ -1194,7 +1190,6 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     {
         "id": "test_material",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline", "shadow_pipeline"],
         "textures": [
             {
                 "texture_role": "normal",
@@ -1215,7 +1210,6 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_material->resource_key, nullptr);
     EXPECT_STREQ(captured_material->resource_key, "test_material");
-    EXPECT_EQ(captured_material->graphics_pipeline.get(), graphics_pipeline_ref.get());
     ASSERT_EQ(captured_material->texture_count, 2U);
     ASSERT_NE(captured_material->textures, nullptr);
     EXPECT_STREQ(captured_material->textures.get()[0].role.name.get(), "normal");
@@ -1224,17 +1218,15 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     EXPECT_STREQ(captured_material->textures.get()[1].role.name.get(), "albedo");
     EXPECT_EQ(captured_material->textures.get()[1].role.hash, WBE::dynam_hash("albedo"));
     EXPECT_EQ(captured_material->textures.get()[1].texture.get(), referenced_texture_ref.get());
-    ASSERT_EQ(created_ref_keys.size(), 3U);
-    EXPECT_EQ(created_ref_keys[0], "main_pipeline");
+    ASSERT_EQ(created_ref_keys.size(), 2U);
+    EXPECT_EQ(created_ref_keys[0], "normal_texture");
     EXPECT_EQ(created_ref_keys[1], "normal_texture");
-    EXPECT_EQ(created_ref_keys[2], "normal_texture");
 }
 
-TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
-    WBE::ResourceUnitLoaderMaterial loader;
+TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
+    WBE::ResourceUnitLoaderGraphicsPipeline loader;
     WBE::StackAllocator stack_allocator(64 * 1024);
     std::stringstream stream;
-    WBE::RefRes<WBE::RUMaterial> captured_material;
     WBE::RefRes<WBE::RUGraphicsPipeline> captured_pipeline;
     std::vector<std::string> created_ref_keys;
 
@@ -1257,13 +1249,10 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
         MockResourceChunk::Builder()
             .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
             .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                [&captured_material, &captured_pipeline, &stack_allocator](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
+                [&captured_pipeline, &stack_allocator](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
                     WBE::MemID mem_id = stack_allocator.allocate(p_size);
                     WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
-                    if (p_res_key == "test_material_inline_pipeline") {
-                        captured_material = saved_resource.force_cast<WBE::RUMaterial>();
-                    }
-                    if (p_res_key == "inline_pipeline") {
+                    if (p_res_key == "test_pipeline") {
                         captured_pipeline = saved_resource.force_cast<WBE::RUGraphicsPipeline>();
                     }
                     return saved_resource;
@@ -1279,20 +1268,16 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
 
     std::string json_buffer = R"(
     {
-        "id": "test_material_inline_pipeline",
-        "type": "material",
-        "graphics_pipeline": {
-            "id": "inline_pipeline",
-            "type": "graphics_pipeline",
-            "vertex_stage_id": "vertex_shader",
-            "vertex_stage_entry": "vertex_main",
-            "fragment_stage_id": "fragment_shader",
-            "fragment_stage_entry": "fragment_main",
-            "depth_test": false,
-            "depth_write": false,
-            "cull_backfaces": false,
-            "conservative_rasterization": true
-        }
+        "id": "test_pipeline",
+        "type": "graphics_pipeline",
+        "vertex_stage_id": "vertex_shader",
+        "vertex_stage_entry": "vertex_main",
+        "fragment_stage_id": "fragment_shader",
+        "fragment_stage_entry": "fragment_main",
+        "depth_test": false,
+        "depth_write": false,
+        "cull_backfaces": false,
+        "conservative_rasterization": true
     }
     )";
     WBE::ParserJSON parser;
@@ -1300,15 +1285,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceInlineGraphicsPipeline) {
 
     loader.populate_scheme_from_data(*res_chunk, parser.get_data());
 
-    ASSERT_NE(captured_material, nullptr);
     ASSERT_NE(captured_pipeline, nullptr);
-    ASSERT_NE(captured_material->resource_key, nullptr);
     ASSERT_NE(captured_pipeline->resource_key, nullptr);
-    EXPECT_STREQ(captured_material->resource_key, "test_material_inline_pipeline");
-    EXPECT_STREQ(captured_pipeline->resource_key, "inline_pipeline");
-    EXPECT_EQ(captured_material->graphics_pipeline.get(), captured_pipeline.get());
-    EXPECT_EQ(captured_material->textures, nullptr);
-    EXPECT_EQ(captured_material->texture_count, 0U);
+    EXPECT_STREQ(captured_pipeline->resource_key, "test_pipeline");
     EXPECT_EQ(captured_pipeline->vertex_stage.get(), vertex_shader_ref.get());
     EXPECT_EQ(captured_pipeline->fragment_stage.get(), fragment_shader_ref.get());
     EXPECT_STREQ(captured_pipeline->vertex_stage_entry.get(), "vertex_main");
@@ -1346,7 +1325,6 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     {
         "id": "test_material_missing_texture_binding",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [{"texture_role": "albedo"}]
     }
     )";
@@ -1359,7 +1337,6 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     {
         "id": "test_arbitrary_texture_role",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [{"texture_role": "height", "texture_id": "height_texture"}]
     }
     )";
@@ -1371,7 +1348,6 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     {
         "id": "test_empty_texture_role",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [{"texture_role": "", "texture_id": "empty_texture"}]
     }
     )";
@@ -1383,7 +1359,6 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     {
         "id": "test_duplicate_texture_role",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [
             {"texture_role": "albedo", "texture_id": "first_albedo"},
             {"texture_role": "albedo", "texture_id": "second_albedo"}
@@ -1398,7 +1373,6 @@ TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     {
         "id": "test_colliding_texture_role",
         "type": "material",
-        "graphics_pipeline_ids": ["main_pipeline"],
         "textures": [
             {"texture_role": "role_002876ae4c05a223", "texture_id": "first_texture"},
             {"texture_role": "role_2ffa43e2b7d24f56", "texture_id": "second_texture"}

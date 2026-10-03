@@ -246,7 +246,6 @@ float4 shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;
     float roughness = clamp(rma.r, 0.04, 1.0);
     float metallic = clamp(rma.g, 0.0, 1.0);
-    float ambient_occlusion = clamp(rma.b, 0.0, 1.0);
 
     float3 n = normal_from_texture(sampled_normal, p_input.normal, p_input.tangent, p_input.bitangent);
     n = p_front_face ? n : -n;
@@ -283,7 +282,6 @@ float4 shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
         float shadow = spot_light_index == 0 ? compute_spot_shadow(spot_light_index, p_input.light_space_pos) : 1.0;
         color += (diffuse + specular) * radiance * ndotl * shadow;
     }
-    color *= ambient_occlusion;
     color = color / (color + float3(1.0));
     return float4(color, 1.0);
 }

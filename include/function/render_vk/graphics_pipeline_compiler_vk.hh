@@ -63,10 +63,6 @@ struct GraphicsPipelineCompilerVKContext {
      */
     RendererVK* renderer = nullptr;
     /**
-     * @brief Optional valid image used for sampled-image descriptors that the caller leaves unset.
-     */
-    RefRes<RUTexture> default_texture_resource = MEM_NULL;
-    /**
      * @brief Dynamic-rendering color attachment formats.
      */
     std::vector<VkFormat> color_attachment_formats;

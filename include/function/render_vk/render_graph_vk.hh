@@ -175,15 +175,13 @@ struct RGSemaphoreWaitVK {
  */
 struct RGNode {
     RGNode(RenderAllocator* p_allocator)
-        : in_edges(p_allocator), out_edges(p_allocator), resource_map(p_allocator), reads(p_allocator), writes(p_allocator),
+        : out_edges(p_allocator), resource_map(p_allocator), reads(p_allocator), writes(p_allocator),
           barriers(p_allocator), semaphore_waits(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
     Unique<IRenderTaskVK> render_task;
     // String identifier copied from the graph descriptor for diagnostics.
     RendTaskID task_id;
-    // Resource edges whose next task is this node.
-    Vector<RefWeak<RGResEdge>, RenderAllocator> in_edges;
     // Resource edges whose previous task is this node.
     Vector<RefWeak<RGResEdge>, RenderAllocator> out_edges;
     // Task resource map copied from the descriptor; the graph resolves every task-local identifier through it.

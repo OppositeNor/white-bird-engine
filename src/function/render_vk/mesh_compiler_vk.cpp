@@ -71,14 +71,6 @@ RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key)
     return resource_manager->get_resource<RUMaterial>(std::string(p_default_material_key));
 }
 
-RefRes<RUTexture> get_default_image(std::string_view p_default_material_key) {
-    RefRes<RUMaterial> material = get_default_material(p_default_material_key);
-    if (material == nullptr || material->texture_count == 0 || material->textures == nullptr) {
-        return MEM_NULL;
-    }
-    return material->textures.get()[0].texture;
-}
-
 Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data, bool p_has_material_contract) {
     if (!p_has_material_contract) {
         return MEM_NULL;
@@ -237,7 +229,6 @@ MaterialBuild compile_materials(RendererVK* p_renderer,
         .render_data = render_data,
         .render_database = p_renderer->get_render_database(),
         .renderer = p_renderer,
-        .default_texture_resource = get_default_image(p_config.default_material_resource_key),
     };
     GraphicsPipelineCompilerVK texture_compiler(compiler_context);
     std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> material_texture_views;
@@ -446,7 +437,6 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
 
     const BaseRenderDataVK* render_data = renderer->get_base_render_data();
     Ref<MeshResourcesVK> result = make_ref<MeshResourcesVK>(render_data->allocator, render_data->allocator);
-    result->material_params_resource_id = p_config.material_params_variable_name;
     result->mesh = p_mesh;
 
     MeshBufferCompilerVK::BuildResult geometry_buffers = compile_geometry_buffers(render_data, p_mesh, p_config);

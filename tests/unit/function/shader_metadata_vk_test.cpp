@@ -427,13 +427,13 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshNodeContractFromCompiledSlangMetadata) {
 
 namespace {
 
-void expect_deferred_masked_static_pipeline_resource(const Path& p_directory) {
+void expect_deferred_masked_pipeline_resource(const Path& p_directory) {
     ParserJSON parser;
     parser.parse((p_directory / "deferred_gbuffer_shader.json"));
 
     std::vector<JSONData> resources = parser.get_value<std::vector<JSONData>>("resources");
     auto resource = std::ranges::find_if(resources, [](const JSONData& p_resource) {
-        return p_resource.contains("id") && p_resource.get_value<std::string>("id") == "deferred_gbuffer_masked_static";
+        return p_resource.contains("id") && p_resource.get_value<std::string>("id") == "deferred_gbuffer_masked";
     });
     ASSERT_NE(resource, resources.end());
     EXPECT_EQ(resource->get_value<std::string>("type"), "graphics_pipeline");
@@ -448,8 +448,8 @@ void expect_deferred_masked_static_pipeline_resource(const Path& p_directory) {
 
 } // namespace
 
-TEST(WBEShaderMetadataVKTest, DeferredMaskedStaticPipelineResourceUsesMaskedFragmentEntry) {
-    expect_deferred_masked_static_pipeline_resource(Path("res/assets/shaders/deferred_gbuffer"));
+TEST(WBEShaderMetadataVKTest, DeferredMaskedPipelineResourceUsesMaskedFragmentEntry) {
+    expect_deferred_masked_pipeline_resource(Path("res/assets/shaders/deferred_gbuffer"));
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {

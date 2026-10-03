@@ -40,8 +40,6 @@ private:
     using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
 
 public:
-    static constexpr size_t CLEAN_DEAD_RO_WEAK_REFS_THREASHOLD = 128;
-
     /**
      * @class CompiledRenderResourceKey
      * @brief Key for a backend-neutral compiled render resource registry entry.

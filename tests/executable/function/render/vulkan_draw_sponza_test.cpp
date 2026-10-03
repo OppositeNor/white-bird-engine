@@ -454,19 +454,19 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
     if (sponza_mesh == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: static mesh resource was not found.");
     }
-    shadow_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_static");
+    shadow_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
     if (shadow_opaque_pipeline == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: shadow opaque graphics pipeline resource was not found.");
     }
-    shadow_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_masked_static");
+    shadow_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_masked");
     if (shadow_masked_pipeline == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: shadow masked graphics pipeline resource was not found.");
     }
-    main_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_static");
+    main_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
     if (main_opaque_pipeline == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: main opaque graphics pipeline resource was not found.");
     }
-    main_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_masked_static");
+    main_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_masked");
     if (main_masked_pipeline == nullptr) {
         throw std::runtime_error("Failed to setup draw sponza test: main masked graphics pipeline resource was not found.");
     }
