@@ -38,8 +38,8 @@ struct OctreeNode {
      * LEAF uses bits 28:21 for occupancy (bit 21 is sector zero) and bits 20:0 for an eight-leaf block index.
      * NODE uses bits 20:0 for an eight-node block index; bits 28:21 are unused.
      * NODE_DYNAMIC stores a virtual block index offset by max_node_count; LEAF_DYNAMIC indexes a dynamic leaf block.
-     * EMPTY, ALLOCATING and ALLOCATING_DYNAMIC ignore the lower twenty-nine bits in the node buffer. octree_2 never
-     * publishes ALLOCATING there; its pending buffer keeps the block index and occupancy with ALLOCATING, where zero
+     * EMPTY, ALLOCATING and ALLOCATING_DYNAMIC ignore the lower twenty-nine bits during traversal. In octree_2,
+     * ALLOCATING and ALLOCATING_DYNAMIC carry the new block index and occupancy until the publication pass, where zero
      * occupancy identifies a node block and nonzero occupancy identifies a leaf block.
      */
     uint children_data;
@@ -132,15 +132,7 @@ struct OctreeInfo {
      */
     uint data_count;
     /**
-     * @brief The number of deferred tasks in the ping list.
-     */
-    uint deferred_task_count_ping;
-    /**
-     * @brief The number of deferred tasks in the pong list.
-     */
-    uint deferred_task_count_pong;
-    /**
-     * @brief The maximum number of deferred tasks the list can hold.
+     * @brief The maximum number of entries each deferred list can hold, excluding its count element.
      */
     uint max_deferred_task_count;
     /**

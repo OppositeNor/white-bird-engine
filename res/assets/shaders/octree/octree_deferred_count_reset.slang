@@ -16,8 +16,13 @@
 #include "octree/octree_utils.slang"
 
 struct OctreeDeferredCountResetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
-    uint2 octree_info;
+#ifdef WBE_RESET_PING_COUNT
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "write")]
+    uint2 deferred_list;
+#else
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "write")]
+    uint2 deferred_list;
+#endif
 };
 
 [[vk::push_constant]]
@@ -29,10 +34,6 @@ ConstantBuffer<OctreeDeferredCountResetDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-#ifdef WBE_RESET_PING_COUNT
-    octree_info[0].deferred_task_count_ping = 0;
-#else
-    octree_info[0].deferred_task_count_pong = 0;
-#endif
+    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    deferred_list[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
 }

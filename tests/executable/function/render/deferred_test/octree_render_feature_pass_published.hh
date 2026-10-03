@@ -38,7 +38,7 @@ class OctreeRenderFeaturePassPublished final : public IOctreeRenderFeature {
 public:
     OctreeRenderFeaturePassPublished() = delete;
     /**
-     * @brief Compiles the pass-published octree shaders and creates the shared and pending-children buffers on the rendering thread.
+     * @brief Compiles the pass-published octree shaders and creates the shared buffers on the rendering thread.
      * @details The renderer and debug-mode state must outlive this object and its registered graphs. Invalid dependencies throw.
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once.
      */
@@ -66,7 +66,6 @@ private:
 
     Ref<ROComputePipelineVK> update_states_pipeline;
     Ref<ROComputePipelineVK> dynamic_publication_pipeline;
-    Ref<ROBufferVK> pending_children;
 };
 
 } // namespace WhiteBirdEngine

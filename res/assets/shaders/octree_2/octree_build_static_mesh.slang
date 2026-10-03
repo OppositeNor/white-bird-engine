@@ -80,9 +80,6 @@ struct GSOutput {
 
 // Closed-cell overlap includes surfaces on cell boundaries. This tolerance is in voxel units.
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
-// Voxel claims are a bitset packed into 32-bit words.
-static const uint VOXEL_CLAIM_WORD_SHIFT = 5;
-static const uint VOXEL_CLAIM_BIT_MASK = 31u;
 
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
@@ -98,16 +95,6 @@ struct OctreeDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
-    /**
-     * @brief Descriptor-heap reference to octree_pending_children.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_pending_children")]
-    uint2 pending_children;
-    /**
-     * @brief Descriptor-heap reference to octree_voxel_claims.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
-    uint2 voxel_claims;
     /**
      * @brief Descriptor-heap reference to octree_leaf_buffer.
      */
@@ -250,20 +237,7 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  */
 void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-    // Construction currently records occupancy only: all triangle hits on the same voxel are equivalent.
-    // Keep exactly one retry chain per voxel so the phase boundary cannot overflow the deferred queue with duplicates.
-    uint extent = 1u << octree_info[0].max_depth;
-    uint3 voxel = uint3(p_svo_position * float(extent));
-    uint voxel_index = voxel.x + extent * (voxel.y + extent * voxel.z);
-    RWStructuredBuffer<uint> voxel_claims = ResourceDescriptorHeap[descriptor_indices.voxel_claims.x];
-    uint bit = 1u << (voxel_index & VOXEL_CLAIM_BIT_MASK);
-    uint original_claims;
-    InterlockedOr(voxel_claims[voxel_index >> VOXEL_CLAIM_WORD_SHIFT], bit, original_claims);
-    if ((original_claims & bit) != 0) {
-        return;
-    }
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<uint> pending_children = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
     RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     // Trace to the bottom-most node
@@ -274,14 +248,15 @@ void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #else
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, pending_children, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
-        InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
+        InterlockedAdd(deferred_list[OCTREE_DEFERRED_LIST_COUNT_INDEX], 1, new_task_index);
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list[new_task_index] = to_deferred_list_entry(p_svo_position, octree_info[0].max_depth);
+        deferred_list[OCTREE_DEFERRED_LIST_ENTRY_OFFSET + new_task_index] =
+            to_deferred_list_entry(p_svo_position, octree_info[0].max_depth);
     }
 }
 

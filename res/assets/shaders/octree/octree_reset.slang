@@ -22,6 +22,10 @@ struct OctreeResetDescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]
     uint2 material_sampler;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "write")]
+    uint2 deferred_list_ping;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "write")]
+    uint2 deferred_list_pong;
 };
 
 [[vk::push_constant]]
@@ -39,8 +43,10 @@ void main() {
     octree_info[0].node_count = 8;
     octree_info[0].leaves_count = 0;
     octree_info[0].data_count = 8;
-    octree_info[0].deferred_task_count_ping = 0;
-    octree_info[0].deferred_task_count_pong = 0;
+    RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[descriptor_indices.deferred_list_ping.x];
+    RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[descriptor_indices.deferred_list_pong.x];
+    deferred_list_ping[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
+    deferred_list_pong[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
 
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Reset the top most portion of the tree.

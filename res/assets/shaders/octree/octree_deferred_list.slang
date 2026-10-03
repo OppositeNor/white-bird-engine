@@ -16,6 +16,15 @@
 #define WBE_FILE_OCTREE_DEFERRED_LIST_SLANG
 
 /**
+ * @brief Element of a deferred-list buffer holding the number of queued entries.
+ */
+static const uint OCTREE_DEFERRED_LIST_COUNT_INDEX = 0;
+/**
+ * @brief Element of a deferred-list buffer holding the first queued entry; entry i is stored at this offset plus i.
+ */
+static const uint OCTREE_DEFERRED_LIST_ENTRY_OFFSET = 1;
+
+/**
  * @brief Traversal position retained across deferred construction rounds.
  */
 struct OctreeNodeTraceInfo {

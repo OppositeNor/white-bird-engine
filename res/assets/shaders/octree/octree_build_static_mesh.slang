@@ -233,10 +233,11 @@ void allocate_covered_voxel(float3 p_svo_position) {
 #endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
-        InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
+        InterlockedAdd(deferred_list[OCTREE_DEFERRED_LIST_COUNT_INDEX], 1, new_task_index);
         WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
             ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list[new_task_index] = to_deferred_list_entry(p_svo_position, octree_info[0].max_depth);
+        deferred_list[OCTREE_DEFERRED_LIST_ENTRY_OFFSET + new_task_index] =
+            to_deferred_list_entry(p_svo_position, octree_info[0].max_depth);
     }
 }
 

@@ -18,19 +18,20 @@
 #include "octree/octree_common.slang"
 
 /**
- * @brief Reads a description that remains immutable throughout a construction pass.
- * @details Newly initialized children become reachable only after the state-update dispatch and its memory dependency.
+ * @brief Reads a description whose state and block index remain stable throughout a construction pass.
+ * @details Only EMPTY changes within a pass, to ALLOCATING; leaf occupancy bits may also grow. Newly initialized children
+ * become reachable only after the state-update dispatch and its memory dependency.
  */
 OctreeNode load_octree_node(RWStructuredBuffer<OctreeNode> p_nodes, uint p_node_index) {
     return p_nodes[p_node_index];
 }
 
 /**
- * @brief Marks occupancy in pending storage without modifying the published traversal description.
+ * @brief Marks occupancy on a published leaf without changing its state or block index.
  */
-void occupy_octree_leaf(RWStructuredBuffer<uint> p_pending, uint p_node_index, float3 p_position) {
+void occupy_octree_leaf(RWStructuredBuffer<OctreeNode> p_nodes, uint p_node_index, float3 p_position) {
     uint original_data;
-    InterlockedOr(p_pending[p_node_index],
+    InterlockedOr(p_nodes[p_node_index].children_data,
         1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + get_octree_node_subregion(p_position)),
         original_data);
 }
@@ -51,10 +52,9 @@ bool try_reserve_octree_nodes(RWStructuredBuffer<OctreeInfo> p_tree_info, uint p
 }
 
 /**
- * @brief Initializes an unreachable eight-node block and its pending descriptions.
+ * @brief Initializes an unreachable eight-node block.
  */
 bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
-    RWStructuredBuffer<uint> p_pending,
     RWStructuredBuffer<OctreeInfo> p_tree_info,
     uint p_parent_node_index,
     uint p_frame_slot,
@@ -66,7 +66,6 @@ bool create_octree_children_node(RWStructuredBuffer<OctreeNode> p_nodes,
         // Initialize all of the children to empty
         uint child_index = p_children_index + i;
         p_nodes[child_index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
-        p_pending[child_index] = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
         p_nodes[child_index].parent_index = p_parent_node_index;
     }
     uint new_data_index;
@@ -117,14 +116,14 @@ bool create_octree_children_leaf(RWStructuredBuffer<OctreeLeaf> p_leaves,
 
 /**
  * @brief Claims an empty node and prepares children for the next state-update pass.
- * @details Only the CAS winner initializes children. Contenders never inspect pending payloads.
- * A leaf payload includes the creator's occupancy bit so zero occupancy unambiguously means a node block.
+ * @details Only the CAS winner initializes children. Traversal treats ALLOCATING as a retry and never inspects its
+ * payload. A leaf payload includes the creator's occupancy bit so zero occupancy unambiguously means a node block.
  */
 bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuffer<OctreeLeaf> p_leaves,
-    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctreeInfo> p_tree_info,
+    RWStructuredBuffer<OctreeInfo> p_tree_info,
     uint p_node_index, bool p_is_leaf, float3 p_position, uint p_frame_slot) {
     uint original;
-    InterlockedCompareExchange(p_pending[p_node_index],
+    InterlockedCompareExchange(p_nodes[p_node_index].children_data,
         uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT,
         uint(OctreeNode::ChildrenState::ALLOCATING) << OCTREE_CHILDREN_STATE_SHIFT, original);
     if (original != (uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT)) {
@@ -136,18 +135,18 @@ bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructure
         allocated = create_octree_children_leaf(p_leaves, p_tree_info, p_node_index, p_frame_slot, children_index);
     }
     else {
-        allocated = create_octree_children_node(p_nodes, p_pending, p_tree_info, p_node_index, p_frame_slot, children_index);
+        allocated = create_octree_children_node(p_nodes, p_tree_info, p_node_index, p_frame_slot, children_index);
     }
     if (!allocated) {
         InterlockedExchange(
-            p_pending[p_node_index], uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT, original);
+            p_nodes[p_node_index].children_data, uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT, original);
         return false;
     }
     uint occupancy = p_is_leaf ? (1u << (OCTREE_CHILDREN_OCCUPANCY_SHIFT + get_octree_node_subregion(p_position))) : 0;
     uint pending_data =
         (uint(OctreeNode::ChildrenState::ALLOCATING) << OCTREE_CHILDREN_STATE_SHIFT) | occupancy | (children_index / 8);
     // Other invocations may still CAS this word. Publication and visibility are provided by the later dispatch boundary.
-    InterlockedExchange(p_pending[p_node_index], pending_data, original);
+    InterlockedExchange(p_nodes[p_node_index].children_data, pending_data, original);
     return true;
 }
 
@@ -155,7 +154,7 @@ bool try_create_octree_entry(RWStructuredBuffer<OctreeNode> p_nodes, RWStructure
  * @brief Marks a published leaf occupied or saves traversal for the next construction round.
  */
 bool try_voxel_allocate(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuffer<OctreeLeaf> p_leaves,
-    RWStructuredBuffer<uint> p_pending, RWStructuredBuffer<OctreeInfo> p_tree_info,
+    RWStructuredBuffer<OctreeInfo> p_tree_info,
     inout OctreeNodeTraceInfo p_trace_info, uint p_frame_slot) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
@@ -170,7 +169,7 @@ bool try_voxel_allocate(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuff
             ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW, p_frame_slot);
         OctreeNode node = load_octree_node(p_nodes, node_index);
         if (get_octree_children_state(node) == OctreeNode::ChildrenState::EMPTY) {
-            try_create_octree_entry(p_nodes, p_leaves, p_pending, p_tree_info, node_index,
+            try_create_octree_entry(p_nodes, p_leaves, p_tree_info, node_index,
                 curr_depth == p_tree_info[0].max_depth - 1, p_trace_info.svo_position, p_frame_slot);
             // Even the owner retries from this node after publication; no invocation descends into new children this pass.
             p_trace_info.node_index = node_index;
@@ -197,7 +196,7 @@ bool try_voxel_allocate(RWStructuredBuffer<OctreeNode> p_nodes, RWStructuredBuff
             WBE_SHADER_DEBUG_ASSERT(get_octree_children_index(node) <= p_tree_info[0].max_leaves_count &&
                 p_tree_info[0].max_leaves_count - get_octree_children_index(node) >= 8,
                 ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW, p_frame_slot);
-            occupy_octree_leaf(p_pending, node_index, p_trace_info.svo_position);
+            occupy_octree_leaf(p_nodes, node_index, p_trace_info.svo_position);
             return true;
         case OctreeNode::ChildrenState::ALLOCATING:
             // Traced to an empty/allocating/leaf node, set p_state and return.

@@ -53,7 +53,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
 
     OctreeInfo info = octree_info[0];
-    uint deferred_task_count = info.deferred_task_count_ping;
+    uint deferred_task_count = deferred_list[OCTREE_DEFERRED_LIST_COUNT_INDEX];
     if (p_dispatch_thread_id.x == 0) {
         captured_octree_info[0] = info;
         DrawIndexedIndirectCommand command;
@@ -64,7 +64,9 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         command.first_instance = 0;
         indirect_draw[0] = command;
     }
-    if (p_dispatch_thread_id.x < deferred_task_count) {
-        captured_deferred_list[p_dispatch_thread_id.x] = deferred_list[p_dispatch_thread_id.x];
+    // The list may exceed one dispatch's thread count, so each invocation strides over the whole dispatch.
+    uint task_stride = WorkgroupCount().x * 128;
+    for (uint task_index = p_dispatch_thread_id.x; task_index < deferred_task_count; task_index += task_stride) {
+        captured_deferred_list[task_index] = deferred_list[OCTREE_DEFERRED_LIST_ENTRY_OFFSET + task_index];
     }
 }

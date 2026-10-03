@@ -29,18 +29,13 @@ struct OctreeUpdateStatesDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
-    /**
-     * @brief Descriptor-heap reference to octree_pending_children.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_pending_children")]
-    uint2 pending_children;
 };
 
 [[vk::push_constant]]
 ConstantBuffer<OctreeUpdateStatesDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Publishes completed allocations and accumulated leaf occupancy between construction passes.
+ * @brief Publishes completed allocations between construction passes.
  * @details The producer must finish and make all child initialization visible before this dispatch.
  * Each invocation exclusively updates one node. A memory dependency must precede the next consumer.
  */
@@ -53,14 +48,11 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         return;
     }
     RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<uint> pending = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
-    uint children_data = pending[node_index];
-    if ((children_data >> OCTREE_CHILDREN_STATE_SHIFT) == uint(OctreeNode::ChildrenState::ALLOCATING)) {
-        uint state = (children_data & OCTREE_CHILDREN_OCCUPANCY_MASK) != 0 ? uint(OctreeNode::ChildrenState::LEAF)
-                                                                   : uint(OctreeNode::ChildrenState::NODE);
-        children_data = (children_data & OCTREE_CHILDREN_PAYLOAD_MASK) | (state << OCTREE_CHILDREN_STATE_SHIFT);
-        pending[node_index] = children_data;
+    uint children_data = nodes[node_index].children_data;
+    if ((children_data >> OCTREE_CHILDREN_STATE_SHIFT) != uint(OctreeNode::ChildrenState::ALLOCATING)) {
+        return;
     }
-    // Existing leaves also need their newly accumulated occupancy published.
-    nodes[node_index].children_data = children_data;
+    uint state = (children_data & OCTREE_CHILDREN_OCCUPANCY_MASK) != 0 ? uint(OctreeNode::ChildrenState::LEAF)
+                                                               : uint(OctreeNode::ChildrenState::NODE);
+    nodes[node_index].children_data = (children_data & OCTREE_CHILDREN_PAYLOAD_MASK) | (state << OCTREE_CHILDREN_STATE_SHIFT);
 }

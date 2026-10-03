@@ -453,6 +453,10 @@ uint2 z_order_swizzle_8x8(uint2 p_group_id, uint2 p_group_thread_id) {
     return p_group_id * 8 + uint2(swizzled_x, swizzled_y);
 }
 
+uint morton_delta(uint p_code1, uint p_code2) {
+    return firstbithigh(p_code1 ^ p_code2);
+}
+
 float random(float2 p_seed) {
     return frac(sin(dot(p_seed, float2(12.9898, 78.233))) * 43758.5453123);
 }

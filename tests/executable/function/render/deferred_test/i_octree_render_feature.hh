@@ -26,6 +26,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/vector_float3.hpp"
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -127,8 +128,6 @@ public:
     static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND = "dynamic_octree_second";
     static constexpr std::string_view RT_PUBLISH_DYNAMIC_OCTREE = "publish_dynamic_octree";
 
-    static constexpr std::string_view OCTREE_VOXEL_CLAIMS = "octree_voxel_claims";
-    static constexpr std::string_view OCTREE_PENDING_CHILDREN = "octree_pending_children";
     static constexpr std::string_view OCTREE_INFO = "octree_info";
     static constexpr std::string_view OCTREE_NODE_BUFFER = "octree_node_buffer";
     static constexpr std::string_view OCTREE_DYNAMIC_NODES = "octree_dynamic_nodes";
@@ -201,11 +200,13 @@ protected:
         (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH) * (size_t{1} << OCTREE_MAX_DEPTH);
     static constexpr size_t OCTREE_MAX_NODE_COUNT = OCTREE_VOXEL_COUNT / 64;
     static constexpr size_t OCTREE_MAX_DYNAMIC_NODE_COUNT = OCTREE_MAX_NODE_COUNT;
-    static constexpr size_t OCTREE_CLAIM_WORD_COUNT = (OCTREE_VOXEL_COUNT + 31U) / 32U;
-    static constexpr size_t OCTREE_MAX_DEFERRED_TASK_COUNT = OCTREE_MAX_NODE_COUNT * 5 / 2;
+    static constexpr size_t OCTREE_MAX_DEFERRED_TASK_COUNT = OCTREE_VOXEL_COUNT / 8;
+    // Each deferred list stores its entry count in element zero, followed by up to OCTREE_MAX_DEFERRED_TASK_COUNT entries.
+    static constexpr size_t OCTREE_DEFERRED_LIST_ELEMENT_COUNT = OCTREE_MAX_DEFERRED_TASK_COUNT + 1;
     static constexpr uint32_t OCTREE_DEFERRED_THREADS_PER_GROUP = 128;
-    static constexpr uint32_t OCTREE_DEFERRED_DISPATCH_GROUP_COUNT = static_cast<uint32_t>(
-        (OCTREE_MAX_DEFERRED_TASK_COUNT + OCTREE_DEFERRED_THREADS_PER_GROUP - 1) / OCTREE_DEFERRED_THREADS_PER_GROUP);
+    // Deferred-list shaders stride over the whole dispatch, so lists larger than one dispatch remain covered.
+    static constexpr uint32_t OCTREE_DEFERRED_DISPATCH_GROUP_COUNT = static_cast<uint32_t>(std::min<size_t>(
+        (OCTREE_MAX_DEFERRED_TASK_COUNT + OCTREE_DEFERRED_THREADS_PER_GROUP - 1) / OCTREE_DEFERRED_THREADS_PER_GROUP, 65535));
 
     /**
      * @brief Borrowed renderer that owns the pipelines and graphs.
@@ -251,8 +252,6 @@ private:
     static constexpr size_t OCTREE_EXTENT = size_t{1} << OCTREE_MAX_DEPTH;
     static constexpr size_t OCTREE_MAX_LEAVES_COUNT = OCTREE_VOXEL_COUNT / 8;
     static constexpr size_t OCTREE_MAX_DYNAMIC_LEAVES_COUNT = OCTREE_MAX_LEAVES_COUNT;
-    // Keeps the expanded lists within 65535 workgroups.
-    static_assert(OCTREE_DEFERRED_DISPATCH_GROUP_COUNT <= 65535);
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(OCTREE_VOXEL_COUNT <= (0xffffffffU - OCTREE_MAX_NODE_COUNT) / 8U);
     static_assert(OCTREE_VOXEL_COUNT <= (0xffffffffU - OCTREE_MAX_LEAVES_COUNT) / 8U);
@@ -268,8 +267,6 @@ private:
         uint32_t node_count;
         uint32_t leaves_count;
         uint32_t data_count;
-        uint32_t deferred_task_count_ping;
-        uint32_t deferred_task_count_pong;
         uint32_t max_deferred_task_count;
         uint32_t max_dynamic_node_count;
         uint32_t max_dynamic_leaves_count;
@@ -277,8 +274,8 @@ private:
         uint32_t dynamic_leaves_count;
     };
 
-    static_assert(sizeof(OctreeInfo) == 68);
-    static_assert(offsetof(OctreeInfo, dynamic_node_count) == 60);
+    static_assert(sizeof(OctreeInfo) == 60);
+    static_assert(offsetof(OctreeInfo, dynamic_node_count) == 52);
 
     struct OctreeNode {
         enum class ChildrenState {
@@ -352,7 +349,6 @@ private:
     Ref<ROBufferVK> dynamic_leaves;
     Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;
     Ref<ROComputePipelineVK> dynamic_clear_pipeline;
-    Ref<ROBufferVK> voxel_claims;
     Ref<ROGraphicsPipelineVK> octree_build_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> octree_reset_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> octree_pre_deferred_debug_capture_compute_pipeline = MEM_NULL;

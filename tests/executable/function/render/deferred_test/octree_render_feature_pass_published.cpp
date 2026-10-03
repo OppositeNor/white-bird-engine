@@ -39,8 +39,6 @@ OctreeRenderFeaturePassPublished::OctreeRenderFeaturePassPublished(RendererVK* p
     : IOctreeRenderFeature(p_renderer, std::move(p_static_mesh_resources), p_debug_view_mode, "octree_2", "octree_2_dynamic", p_rebuild_static_every_frame) {
     update_states_pipeline = compile_compute_pipeline("octree_2_update_states_shader");
     dynamic_publication_pipeline = compile_compute_pipeline("octree_2_dynamic_update_states_shader");
-    pending_children =
-        ROBufferVK::Builder().set_properties(sizeof(uint32_t), OCTREE_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
 }
 
 std::string_view OctreeRenderFeaturePassPublished::get_name() const {
@@ -48,12 +46,10 @@ std::string_view OctreeRenderFeaturePassPublished::get_name() const {
 }
 
 uint32_t OctreeRenderFeaturePassPublished::get_reset_group_count() const {
-    // The reset also clears the voxel claims.
-    return static_cast<uint32_t>((OCTREE_CLAIM_WORD_COUNT + 63U) / 64U);
+    return 1;
 }
 
-void OctreeRenderFeaturePassPublished::register_implementation_render_graph_data(RendGraphDescVK& p_graph) const {
-    p_graph.add_resource(OCTREE_PENDING_CHILDREN, *pending_children);
+void OctreeRenderFeaturePassPublished::register_implementation_render_graph_data(RendGraphDescVK& /*p_graph*/) const {
 }
 
 void OctreeRenderFeaturePassPublished::add_static_publication_render_tasks(RendGraphDescVK& p_graph) const {
@@ -94,12 +90,6 @@ void OctreeRenderFeaturePassPublished::connect_implementation_render_tasks(RendG
             RT_RUN_BUILD_OCTREE_DEFERRED,
             RT_RUN_OCTREE_DEBUG_DRAW,
             RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
-    connect_resource_chain(p_graph,
-        OCTREE_PENDING_CHILDREN,
-        {RT_RESET_OCTREE, RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_UPDATE_OCTREE_STATES, RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_RUN_BUILD_OCTREE_DEFERRED});
-    connect_resource_chain(p_graph,
-        OCTREE_VOXEL_CLAIMS,
-        {RT_RESET_OCTREE, RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_PUBLISH_DYNAMIC_OCTREE, RT_RUN_BUILD_OCTREE_DEFERRED});
     connect_resource_chain(p_graph,
         OCTREE_DYNAMIC_NODES,
         {RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_PUBLISH_DYNAMIC_OCTREE, RT_RUN_BUILD_OCTREE_DEFERRED, RT_RUN_OCTREE_DEBUG_DRAW, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});

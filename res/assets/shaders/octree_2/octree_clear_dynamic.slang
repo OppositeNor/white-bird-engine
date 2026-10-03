@@ -40,10 +40,15 @@ struct DynamicDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
     /**
-     * @brief Descriptor-heap reference to octree_voxel_claims.
+     * @brief Descriptor-heap reference to octree_deferred_list_ping.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
-    uint2 claims;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "write")]
+    uint2 deferred_list_ping;
+    /**
+     * @brief Descriptor-heap reference to octree_deferred_list_pong.
+     */
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "write")]
+    uint2 deferred_list_pong;
 };
 [[vk::push_constant]]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
@@ -59,12 +64,7 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
     RWStructuredBuffer<OctreeNode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
     StructuredBuffer<OctreeDynamicLeafBlock> leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    RWStructuredBuffer<uint> claims = ResourceDescriptorHeap[descriptor_indices.claims.x];
     uint index = p_id.x;
-    uint extent = 1u << info[0].max_depth;
-    if (index < (extent * extent * extent + 31u) / 32u) {
-        claims[index] = 0;
-    }
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
         uint state = description >> OCTREE_CHILDREN_STATE_SHIFT;
@@ -77,7 +77,9 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     if (index == 0) {
         info[0].dynamic_node_count = 0;
         info[0].dynamic_leaves_count = 0;
-        info[0].deferred_task_count_ping = 0;
-        info[0].deferred_task_count_pong = 0;
+        RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[descriptor_indices.deferred_list_ping.x];
+        RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[descriptor_indices.deferred_list_pong.x];
+        deferred_list_ping[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
+        deferred_list_pong[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
     }
 }

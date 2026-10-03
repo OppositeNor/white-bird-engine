@@ -39,11 +39,6 @@ struct DynamicDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "octree_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
-    /**
-     * @brief Descriptor-heap reference to octree_voxel_claims.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims", "read")]
-    uint2 claims;
 };
 [[vk::push_constant]]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;

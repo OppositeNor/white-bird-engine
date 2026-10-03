@@ -59,39 +59,31 @@ ConstantBuffer<OctreeDescriptorIndices> descriptor_indices;
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-#ifdef WBE_USE_PING_WRITE
-    uint deferred_task_count = octree_info[0].deferred_task_count_pong;
-#else
-    uint deferred_task_count = octree_info[0].deferred_task_count_ping;
-#endif
-    if (p_dispatch_thread_id.x >= deferred_task_count) {
-        // Extra thread in the group. No work to do.
-        return;
-    }
+    // The list may exceed one dispatch's thread count, so each invocation strides over the whole dispatch.
+    uint task_stride = WorkgroupCount().x * 128;
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<OctreeLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
     RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
-    uint task = deferred_list_read[p_dispatch_thread_id.x];
+    uint deferred_task_count = deferred_list_read[OCTREE_DEFERRED_LIST_COUNT_INDEX];
+    for (uint task_index = p_dispatch_thread_id.x; task_index < deferred_task_count; task_index += task_stride) {
+        uint task = deferred_list_read[OCTREE_DEFERRED_LIST_ENTRY_OFFSET + task_index];
 
-    OctreeNodeTraceInfo trace_info = to_trace_info(task, octree_info[0].max_depth);
-    // Try to allocate the node.
+        OctreeNodeTraceInfo trace_info = to_trace_info(task, octree_info[0].max_depth);
+        // Try to allocate the node.
 #ifdef WBE_DYNAMIC_BUILD
-    RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
-    RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+        RWStructuredBuffer<OctreeNode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
+        RWStructuredBuffer<OctreeDynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+        if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #else
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+        if (!try_voxel_allocate(tree_nodes, tree_leaves, octree_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
 #endif
-        // If allocation failed, push this to the deferred list.
-        uint new_task_index;
-#ifdef WBE_USE_PING_WRITE
-        InterlockedAdd(octree_info[0].deferred_task_count_ping, 1, new_task_index);
-#else
-        InterlockedAdd(octree_info[0].deferred_task_count_pong, 1, new_task_index);
-#endif
-        WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
-            ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
-        deferred_list_write[new_task_index] = task;
+            // If allocation failed, push this to the deferred list.
+            uint new_task_index;
+            InterlockedAdd(deferred_list_write[OCTREE_DEFERRED_LIST_COUNT_INDEX], 1, new_task_index);
+            WBE_SHADER_DEBUG_ASSERT(new_task_index < octree_info[0].max_deferred_task_count,
+                ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+            deferred_list_write[OCTREE_DEFERRED_LIST_ENTRY_OFFSET + new_task_index] = task;
+        }
     }
 }

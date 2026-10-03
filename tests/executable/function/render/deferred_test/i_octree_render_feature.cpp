@@ -299,11 +299,11 @@ void IOctreeRenderFeature::create_resources() {
         ROBufferVK::Builder().set_properties(sizeof(OctreeLeaf), OCTREE_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     octree_deferred_list_ping =
         ROBufferVK::Builder()
-            .set_properties(sizeof(uint32_t), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .set_properties(sizeof(uint32_t), OCTREE_DEFERRED_LIST_ELEMENT_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
             .create_ref(base_render_data);
     octree_deferred_list_pong =
         ROBufferVK::Builder()
-            .set_properties(sizeof(uint32_t), OCTREE_MAX_DEFERRED_TASK_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+            .set_properties(sizeof(uint32_t), OCTREE_DEFERRED_LIST_ELEMENT_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
             .create_ref(base_render_data);
     octree_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, OCTREE_DEBUG_CUBE_INDICES.data(), sizeof(OCTREE_DEBUG_CUBE_INDICES));
@@ -327,8 +327,6 @@ void IOctreeRenderFeature::create_resources() {
         create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             &initial_debug_draw_command,
             sizeof(initial_debug_draw_command));
-    voxel_claims =
-        ROBufferVK::Builder().set_properties(sizeof(uint32_t), OCTREE_CLAIM_WORD_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
     initialize();
 }
 
@@ -342,8 +340,6 @@ void IOctreeRenderFeature::initialize() {
         .node_count = 8,
         .leaves_count = 0,
         .data_count = 8,
-        .deferred_task_count_ping = 0,
-        .deferred_task_count_pong = 0,
         .max_deferred_task_count = OCTREE_MAX_DEFERRED_TASK_COUNT,
         .max_dynamic_node_count = OCTREE_MAX_DYNAMIC_NODE_COUNT,
         .max_dynamic_leaves_count = OCTREE_MAX_DYNAMIC_LEAVES_COUNT,
@@ -478,7 +474,6 @@ void IOctreeRenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) 
         .add_resource(OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, *octree_pre_deferred_debug_info_buffer)
         .add_resource(OCTREE_PRE_DEFERRED_DEBUG_LIST_BUFFER, *octree_pre_deferred_debug_list_buffer)
         .add_resource(OCTREE_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, *octree_pre_deferred_debug_draw_indirect_buffer);
-    p_graph.add_resource(OCTREE_VOXEL_CLAIMS, *voxel_claims);
     register_implementation_render_graph_data(p_graph);
 }
 
@@ -517,8 +512,18 @@ void IOctreeRenderFeature::connect_render_tasks(RendGraphDescVK& p_graph) const 
             RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
     connect_resource_chain(p_graph,
         OCTREE_DEFERRED_LIST_PING,
-        {RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_BUILD_OCTREE_DEFERRED});
-    connect_resource_chain(p_graph, OCTREE_DEFERRED_LIST_PONG, {RT_STATIC_OCTREE_DEFERRED, RT_RUN_BUILD_OCTREE_DEFERRED});
+        {RT_RESET_OCTREE,
+            RT_RUN_BUILD_OCTREE,
+            RT_RUN_BUILD_OCTREE_DOUBLE_SIDED,
+            RT_STATIC_OCTREE_DEFERRED,
+            RT_CLEAR_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND,
+            RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG,
+            RT_RUN_BUILD_OCTREE_DEFERRED});
+    connect_resource_chain(p_graph,
+        OCTREE_DEFERRED_LIST_PONG,
+        {RT_RESET_OCTREE, RT_STATIC_OCTREE_DEFERRED, RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_OCTREE_DEFERRED});
     connect_resource_chain(
         p_graph, OCTREE_PRE_DEFERRED_DEBUG_INFO_BUFFER, {RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
     connect_resource_chain(
@@ -542,7 +547,7 @@ RendTaskDescVK IOctreeRenderFeature::make_static_once(RendTaskDescVK p_task, boo
 RendTaskDescVK IOctreeRenderFeature::get_dynamic_clear_task_desc() const {
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_CLEAR_DYNAMIC_OCTREE;
-    constexpr uint32_t GROUPS = static_cast<uint32_t>((std::max(OCTREE_MAX_NODE_COUNT, OCTREE_CLAIM_WORD_COUNT) + 127) / 128);
+    constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 127) / 128);
     task.task = make_unique<RTRunComputePipelineVK>(
         render_allocator, base_render_data, dynamic_clear_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     return task;

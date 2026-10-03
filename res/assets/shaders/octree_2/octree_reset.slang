@@ -30,15 +30,15 @@ struct OctreeResetDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
     /**
-     * @brief Descriptor-heap reference to octree_pending_children.
+     * @brief Descriptor-heap reference to octree_deferred_list_ping.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_pending_children")]
-    uint2 pending_children;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "write")]
+    uint2 deferred_list_ping;
     /**
-     * @brief Descriptor-heap reference to octree_voxel_claims.
+     * @brief Descriptor-heap reference to octree_deferred_list_pong.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_voxel_claims")]
-    uint2 voxel_claims;
+    [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "write")]
+    uint2 deferred_list_pong;
 };
 
 [[vk::push_constant]]
@@ -52,19 +52,10 @@ ConstantBuffer<OctreeResetDescriptorIndices> descriptor_indices;
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     RWStructuredBuffer<OctreeNode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<uint> pending_children = ResourceDescriptorHeap[descriptor_indices.pending_children.x];
-
-    RWStructuredBuffer<uint> voxel_claims = ResourceDescriptorHeap[descriptor_indices.voxel_claims.x];
     // Depth and capacity are immutable configuration; only the counters below are reset by thread zero.
-    uint extent = 1u << octree_info[0].max_depth;
-    uint claim_word_count = (extent * extent * extent + 31u) / 32u;
     uint index = p_dispatch_thread_id.x;
-    if (index < claim_word_count) {
-        voxel_claims[index] = 0;
-    }
     if (index < 8) {
         tree_nodes[index].children_data = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
-        pending_children[index] = uint(OctreeNode::ChildrenState::EMPTY) << OCTREE_CHILDREN_STATE_SHIFT;
         tree_nodes[index].data_index = index;
         tree_nodes[index].parent_index = -1;
     }
@@ -72,7 +63,9 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         octree_info[0].node_count = 8;
         octree_info[0].leaves_count = 0;
         octree_info[0].data_count = 8;
-        octree_info[0].deferred_task_count_ping = 0;
-        octree_info[0].deferred_task_count_pong = 0;
+        RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[descriptor_indices.deferred_list_ping.x];
+        RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[descriptor_indices.deferred_list_pong.x];
+        deferred_list_ping[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
+        deferred_list_pong[OCTREE_DEFERRED_LIST_COUNT_INDEX] = 0;
     }
 }
