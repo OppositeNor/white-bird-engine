@@ -1,0 +1,86 @@
+# Copyright 2025 OppositeNor
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+from typing import Any
+
+from build_script.build_dependency.build_dependency import WBEBuildDependency
+
+
+class WBEBuildDependencySlangPy(WBEBuildDependency):
+    """
+    Build slangpy from dependencies/slangpy for the shader tests.
+
+    The native extension is installed into a copy of the slangpy Python package, so the dependency checkout only
+    receives the compile_commands.json link its own build system writes there. The build does not use vcpkg: slangpy's
+    optional libraries (libjpeg, libpng, OpenEXR, asmjit) are taken from the system when found and are otherwise
+    disabled.
+    """
+
+    def __init__(self, p_build_root_dir: Path, p_dependencies_dir: Path, p_build_info: dict[str, Any]) -> None:
+        self._source_dir = p_dependencies_dir / "slangpy"
+        self._build_dir = p_build_root_dir / "slangpy"
+        self._build_info = p_build_info
+
+    def get_name(self) -> str:
+        return "slangpy"
+
+    def get_python_package_dir(self) -> Path:
+        """Return the directory to add to the Python path to import slangpy."""
+        return self._build_dir / "python"
+
+    def compile(self) -> None:
+        cmake_build_dir = self._build_dir / "cmake"
+        package_dir = self.get_python_package_dir() / "slangpy"
+        shutil.copytree(self._source_dir / "slangpy", package_dir, dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("__pycache__", "*.so", "*.pyd"))
+        configure_command = [
+            "cmake",
+            "-S", self._source_dir.as_posix(),
+            "-B", cmake_build_dir.as_posix(),
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DPython_ROOT_DIR:PATH={sys.prefix}",
+            f"-DPython_EXECUTABLE:FILEPATH={sys.executable}",
+            f"-DCMAKE_INSTALL_PREFIX={package_dir.as_posix()}",
+            "-DCMAKE_INSTALL_LIBDIR=.",
+            "-DCMAKE_INSTALL_BINDIR=.",
+            "-DCMAKE_INSTALL_INCLUDEDIR=include",
+            "-DCMAKE_INSTALL_DATAROOTDIR=.",
+            "-DSGL_BUILD_EXAMPLES=OFF",
+            "-DSGL_BUILD_TESTS=OFF",
+            # Third-party warnings, such as clang's macro redefinitions from the conda Python headers, must not fail
+            # the engine build.
+            "-DSGL_WARNINGS_AS_ERRORS=OFF",
+        ]
+        if self._build_info.get("generator") is not None:
+            configure_command.extend(["-G", self._build_info["generator"]])
+        if self._build_info.get("cpp-compiler") is not None:
+            configure_command.append(f"-DCMAKE_CXX_COMPILER={self._build_info['cpp-compiler']}")
+        if self._build_info.get("c-compiler") is not None:
+            configure_command.append(f"-DCMAKE_C_COMPILER={self._build_info['c-compiler']}")
+        if subprocess.run(configure_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to configure slangpy.")
+        build_command = ["cmake", "--build", cmake_build_dir.as_posix(), "--config", "Release"]
+        if os.cpu_count() is not None:
+            build_command.extend(["-j", str(os.cpu_count())])
+        if subprocess.run(build_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to build slangpy.")
+        install_command = ["cmake", "--install", cmake_build_dir.as_posix(), "--config", "Release"]
+        if subprocess.run(install_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to install slangpy.")

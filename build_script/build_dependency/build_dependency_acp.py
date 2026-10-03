@@ -20,8 +20,10 @@ import subprocess
 import sys
 from typing import Any
 
+from build_script.build_dependency.build_dependency import WBEBuildDependency
 
-class WBEACPDependenciesCompiler:
+
+class WBEBuildDependencyACP(WBEBuildDependency):
     """Configure and build native libraries required by the ACP."""
 
     def __init__(self,
@@ -29,10 +31,13 @@ class WBEACPDependenciesCompiler:
             p_build_root_dir: Path,
             p_dependencies_dir: Path,
             p_build_info: dict[str, Any]) -> None:
-        self._source_dir = p_root_dir / "build_script" / "resource" / "acp" / "dependencies"
+        self._source_dir = p_root_dir / "build_script" / "build_dependency" / "acp"
         self._build_dir = p_build_root_dir / "acp_dependencies"
         self._dependencies_dir = p_dependencies_dir
         self._build_info = p_build_info
+
+    def get_name(self) -> str:
+        return "ACP dependencies"
 
     def get_ktx_library_dir(self) -> Path:
         """Return the directory containing the ACP-specific libktx build."""

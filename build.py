@@ -122,8 +122,8 @@ if __name__ == "__main__":
     # Gather sources for reflection
     try:
         print(f"WBEBuilder: Building target: {build_setup.args.target}.")
-        print("WBEBuilder: Configuring texture compiler dependencies...")
-        build_setup.acp_dependencies_compiler.compile()
+        print("WBEBuilder: Building dependencies...")
+        build_setup.build_dependencies.compile()
         build_setup.setup_acp_compilers()
         print("WBEBuilder: Running asset conditioning pipeline...")
         build_setup.acp.process_resources()

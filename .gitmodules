@@ -49,3 +49,6 @@
 [submodule "dependencies/thread-pool"]
 	path = dependencies/thread-pool
 	url = https://github.com/bshoshany/thread-pool.git
+[submodule "dependencies/slangpy"]
+	path = dependencies/slangpy
+	url = https://github.com/shader-slang/slangpy.git

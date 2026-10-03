@@ -1,0 +1,13 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "radix_sort",
+            "source_type": "shader",
+            "src": "assets/shaders/radix_sort/radix_sort.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort.json"
+        }
+    ]
+}
+

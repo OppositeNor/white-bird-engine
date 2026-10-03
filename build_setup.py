@@ -19,7 +19,9 @@ import sys
 import shutil
 import build_config
 from build_script.resource.acp.acp import WBEACP
-from build_script.resource.acp.acp_dependencies_compiler import WBEACPDependenciesCompiler
+from build_script.build_dependency.build_dependency import WBEBuildDependencies
+from build_script.build_dependency.build_dependency_acp import WBEBuildDependencyACP
+from build_script.build_dependency.build_dependency_slangpy import WBEBuildDependencySlangPy
 
 # SETUP
 print("WBEBuilder: Setting up...")
@@ -76,11 +78,17 @@ if build_target["generate-tests"]:
     shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
-acp_dependencies_compiler = WBEACPDependenciesCompiler(
+acp_dependencies_compiler = WBEBuildDependencyACP(
     Path(root_dir), Path(build_dir), Path(dependencies_dir), build_target)
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
 test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
 acp_compilers_configured = False
+
+# Setup build dependencies
+build_dependencies = WBEBuildDependencies()
+build_dependencies.add(acp_dependencies_compiler)
+if build_target["generate-tests"]:
+    build_dependencies.add(WBEBuildDependencySlangPy(Path(build_dir), Path(dependencies_dir), build_target))
 
 
 def setup_acp_compilers() -> None:

@@ -6,7 +6,7 @@
             "source_type": "shader",
             "src": "assets/shaders/octree_3/octree_gather_leaves.slang",
             "dst": "assets/shaders/octree_3/octree_3_gather_leaves.spv",
-            "metadata": "assets/shaders/octree_3/octree_3_gather_leaves.json",
+            "metadata": "assets/shaders/octree_3/octree_3_gather_leaves.json"
         },
         {
             "id": "octree_3_gather_leaves_pipeline",

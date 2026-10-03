@@ -45,36 +45,37 @@ void workgroup_scope_per_thread_radix_sort_histogram<T : IInteger>(RWStructuredB
 
 /**
  * @brief Computes the radix sort digit histogram of a buffer within one workgroup.
- * @details Clears the histogram, then counts the digit of every element. When there are fewer elements than
- * invocations, each invocation counts at most one element and the remaining invocations are idle; otherwise each
- * invocation counts a contiguous section of the buffer. Every invocation of the workgroup must call this function with
- * the same buffer, element count, histogram, and bit region. The function synchronizes after counting, so the histogram
- * is visible to the whole workgroup on return.
+ * @details Clears the histogram, then counts the digit of every element in [p_data_start, p_data_start + p_data_count).
+ * When there are fewer elements than invocations, each invocation counts at most one element and the remaining
+ * invocations are idle; otherwise each invocation counts a contiguous section of that range. Every invocation of the
+ * workgroup must call this function with the same buffer, start offset, element count, histogram, and bit region. The
+ * function synchronizes after counting, so the histogram is visible to the whole workgroup on return.
  * @tparam T The integer element type.
  * @tparam WORKGROUP_SIZE The number of invocations in the workgroup.
  * @param p_data The buffer whose elements are counted.
- * @param p_data_count The number of elements to count, starting from the first element of p_data.
+ * @param p_data_start The index of the first element of p_data to count.
+ * @param p_data_count The number of elements to count, starting from p_data_start.
  * @param p_histogram The groupshared histogram that receives one counter per digit value.
  * @param p_invocation_id The local invocation index in [0, WORKGROUP_SIZE).
  * @param p_bit_region The bit offset of the WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit to count.
  */
 void workgroup_scope_radix_sort_histogram<T : IInteger, let WORKGROUP_SIZE : uint>(RWStructuredBuffer<T> p_data,
-        uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_SIZE], uint p_invocation_id,
+        uint p_data_start, uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_SIZE], uint p_group_thread_id,
         uint p_bit_region) {
-    for (uint i = p_invocation_id; i < WBE_RADIX_SORT_BUCKET_SIZE; i += WORKGROUP_SIZE) {
+    for (uint i = p_group_thread_id; i < WBE_RADIX_SORT_BUCKET_SIZE; i += WORKGROUP_SIZE) {
         p_histogram[i] = 0;
     }
     GroupMemoryBarrierWithGroupSync();
     // If we have less than workgroup size elements, we assign each thread to an element and discard the overflowed threads.
     if (WORKGROUP_SIZE > p_data_count) {
-        workgroup_scope_per_thread_radix_sort_histogram(p_data, p_data_count, p_histogram, p_invocation_id, p_bit_region);
+        workgroup_scope_per_thread_radix_sort_histogram(p_data, p_data_count, p_histogram, p_group_thread_id, p_bit_region);
     } else {
         // Each invocation is responsible for a contiguous section of the buffer.
         const uint operate_stride = (p_data_count + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
-        const uint section_begin = p_invocation_id * operate_stride;
+        const uint section_begin = p_group_thread_id * operate_stride;
         const uint section_end = min(section_begin + operate_stride, p_data_count);
         for (uint i = section_begin; i < section_end; ++i) {
-            uint bucket = p_data[i].shr(int(p_bit_region)).toUInt() & WBE_RADIX_SORT_BUCKET_MASK;
+            uint bucket = p_data[p_data_start + i].shr(int(p_bit_region)).toUInt() & WBE_RADIX_SORT_BUCKET_MASK;
             InterlockedAdd(p_histogram[bucket], 1);
         }
     }

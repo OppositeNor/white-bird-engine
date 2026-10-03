@@ -18,3 +18,6 @@ dependencies:
   - pybind11>=2.12
   - pytest>=8
   - setuptools>=68
+  # Requirements of slangpy, which build.py builds from dependencies/slangpy for the shader tests.
+  - typing_extensions
+  - libcst

@@ -21,7 +21,8 @@ running or changing anything under `tests/executable/`, or verifying rendering o
 | Build only | `python build.py -t debug` |
 | Iterate on specific tests | `./build/debug/bin/wbe_unit_test --gtest_filter='WBEFooTest.*'` |
 | List tests | `./build/debug/bin/wbe_unit_test --gtest_list_tests` |
-| Leak check (manual, slow) | `python run_tests.py -t debug` (valgrind over the unit binary) |
+| Shader utility tests only | `python run_shader_tests.py -t debug` (extra args go to pytest, e.g. `-k morton`) |
+| Leak check (manual, slow) | `valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=42 ./build/debug/bin/wbe_unit_test` |
 | Benchmarks | `./build/<target>/bin/wbe_benchmark_test` (prefer a release target) |
 | Capture a render frame | `WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/abs/path.png WBE_CAPTURE_FRAME=5 ./build/debug/bin/wbe_render_test_<name>` |
 | Automated deferred checks | `python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2` |
@@ -39,9 +40,11 @@ testing or validation; the user does that.
 1. Runs `python build.py -t <target>`.
 2. If gtest args follow `--`, runs the unit binary with them first.
 3. Always runs the full `wbe_unit_test` afterward.
+4. Runs the shader tests through `run_shader_tests.run_shader_tests()`.
 
 It prints only `WBEValidator:` lines and stops at the first failed step. Detailed output goes to
-`build/validation_logs/<target>_build.log`, `<target>_requested_tests.log`, and `<target>_full_unit_tests.log`.
+`build/validation_logs/<target>_build.log`, `<target>_requested_tests.log`, `<target>_full_unit_tests.log`, and
+`<target>_shader_tests.log`.
 
 Valid targets are those with `generate-tests: True` in `build_config.py`: `debug`, `release`, `debug-ninja`,
 `release-ninja`, `debug-gcc`, `release-gcc`, `debug-gcc-ninja`, `release-gcc-ninja`. `deploy` builds no tests, which
@@ -239,9 +242,18 @@ python build.py -t release
 ./build/release/bin/wbe_benchmark_test --benchmark_filter='Allocator.*'
 ```
 
+## Shader tests
+
+`tests/shader/` holds pytest scripts that call Slang shader functions directly through slangpy. `build.py` builds
+slangpy from `dependencies/slangpy` as a build dependency of every test-generating target (into
+`build/<target>/slangpy/python`); do not `pip install slangpy`. Build the target first, then run
+`python run_shader_tests.py -t <target>` (extra args go to pytest). The `device` fixture in `tests/shader/conftest.py` adds the shader root,
+resolved from `build_config.resource_dir`, as the include path; load modules from that root or `#include` them from an
+inline kernel source when a function needs groupshared memory or a dispatch. Only shader utility functions are tested
+for now.
+
 ## Leak checking
 
-`python run_tests.py -t debug` runs `wbe_unit_test` under valgrind (`--leak-check=full`, exit code 42 on errors). It
-takes the same `-t` flag as `build.py` (via `build_setup`); always pass a test-generating target, because the default
-`deploy` has no unit binary. Build that target first. It is slow and not part of normal validation; use it when
-investigating ownership/lifetime bugs in `Ref`/`Unique`/allocators, and only when asked or clearly warranted.
+Run `wbe_unit_test` under valgrind directly (`valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=42
+./build/<target>/bin/wbe_unit_test`), using a test-generating target that you built first. It is slow and not part of
+normal validation; use it when investigating ownership/lifetime bugs in `Ref`/`Unique`/allocators, and only when asked or clearly warranted.
