@@ -453,12 +453,104 @@ uint2 z_order_swizzle_8x8(uint2 p_group_id, uint2 p_group_thread_id) {
     return p_group_id * 8 + uint2(swizzled_x, swizzled_y);
 }
 
+/**
+ * @brief Spreads the low 10 bits of a value so that two zero bits separate each pair of consecutive bits.
+ * @param p_value The value to spread. Bits above bit 9 are discarded.
+ * @return The spread value, with input bit i at output bit 3 * i.
+ */
+uint morton_spread_bits_3d(uint p_value) {
+    uint result = p_value & 0x000003FF;
+    result = (result | (result << 16)) & 0x030000FF;
+    result = (result | (result << 8)) & 0x0300F00F;
+    result = (result | (result << 4)) & 0x030C30C3;
+    result = (result | (result << 2)) & 0x09249249;
+    return result;
+}
+
+/**
+ * @brief Swizzles a 3D coordinate into a 30-bit Morton (Z-order) code.
+ * @param p_coordinate The coordinate to encode. Each component must be less than 1024; higher bits are discarded.
+ * @return The Morton code, interleaved as ...z1 y1 x1 z0 y0 x0 with x in the least significant bit.
+ */
+uint morton_encode_3d(uint3 p_coordinate) {
+    return morton_spread_bits_3d(p_coordinate.x)
+        | (morton_spread_bits_3d(p_coordinate.y) << 1)
+        | (morton_spread_bits_3d(p_coordinate.z) << 2);
+}
+
 uint morton_delta(uint p_code1, uint p_code2) {
     return firstbithigh(p_code1 ^ p_code2);
 }
 
 float random(float2 p_seed) {
     return frac(sin(dot(p_seed, float2(12.9898, 78.233))) * 43758.5453123);
+}
+
+/**
+ * @brief Computes an in-place inclusive prefix sum over a groupshared array of any size.
+ * @details Uses the work-efficient Brent-Kung up-sweep/down-sweep sum, so the array size is independent of the
+ * workgroup size. Every invocation of the workgroup must call this function with the same array and invocation count.
+ * The function synchronizes before reading and after the final write, so the results are visible to the whole
+ * workgroup on return.
+ * @tparam T The element type.
+ * @tparam N The number of elements in the array.
+ * @param p_data The groupshared array to sum in place.
+ * @param p_invocation_id The local invocation index in [0, p_invocation_count).
+ * @param p_invocation_count The number of invocations in the workgroup.
+ */
+void workgroup_inclusive_prefix_sum<T : IArithmetic, let N : uint>(inout groupshared T p_data[N], uint p_invocation_id,
+        uint p_invocation_count) {
+    GroupMemoryBarrierWithGroupSync();
+    uint stride = 1;
+    // Up-sweep: reduce each power-of-two block into its last element.
+    for (; stride < N; stride <<= 1) {
+        uint block_size = stride << 1;
+        for (uint i = (p_invocation_id + 1) * block_size - 1; i < N; i += p_invocation_count * block_size) {
+            p_data[i] = p_data[i] + p_data[i - stride];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+    // Down-sweep: propagate block totals into the middle of the next block.
+    for (stride >>= 2; stride > 0; stride >>= 1) {
+        uint block_size = stride << 1;
+        for (uint i = (p_invocation_id + 1) * block_size - 1 + stride; i < N; i += p_invocation_count * block_size) {
+            p_data[i] = p_data[i] + p_data[i - stride];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+}
+
+/**
+ * @brief Computes an in-place exclusive prefix sum over a groupshared array of any size.
+ * @details Performs an inclusive sum, then shifts the results one element toward the end and writes zero to the first
+ * element. Every invocation of the workgroup must call this function with the same array and invocation count. The
+ * function synchronizes before reading and after the final write, so the results are visible to the whole workgroup on
+ * return.
+ * @tparam T The element type.
+ * @tparam N The number of elements in the array.
+ * @param p_data The groupshared array to sum in place.
+ * @param p_invocation_id The local invocation index in [0, p_invocation_count).
+ * @param p_invocation_count The number of invocations in the workgroup.
+ */
+void workgroup_exclusive_prefix_sum<T : IArithmetic, let N : uint>(__ref groupshared T p_data[N], uint p_invocation_id,
+        uint p_invocation_count) {
+    workgroup_inclusive_prefix_sum(p_data, p_invocation_id, p_invocation_count);
+    // Shift one workgroup-sized chunk at a time, from the last chunk to the first. A chunk only reads elements below its
+    // own range, so the reads of the next chunk never overlap the writes of the current one, and a single barrier between
+    // each chunk's reads and writes is enough.
+    uint chunk_count = (N + p_invocation_count - 1) / p_invocation_count;
+    for (uint chunk = chunk_count; chunk > 0; --chunk) {
+        uint i = (chunk - 1) * p_invocation_count + p_invocation_id;
+        T previous = T(0);
+        if (i > 0 && i < N) {
+            previous = p_data[i - 1];
+        }
+        GroupMemoryBarrierWithGroupSync();
+        if (i < N) {
+            p_data[i] = previous;
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
 }
 
 #endif

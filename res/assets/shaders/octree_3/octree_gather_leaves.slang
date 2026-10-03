@@ -226,6 +226,8 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  */
 [shader("fragment")]
 void fragment_main(GSOutput p_input) {
+    RWStructuredBuffer<uint> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
+    RWStructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
     // Helper invocations cannot publish storage writes and receive undefined atomic results.
     // Keep them out of allocation retry loops; this shader does not need derivatives.
     if (IsHelperLane()) {
@@ -245,7 +247,15 @@ void fragment_main(GSOutput p_input) {
     center[horizontal_axis] = float(cell.x) + 0.5;
     center[vertical_axis] = float(cell.y) + 0.5;
     center[depth_axis] = clamp(floor(p_input.plane_depth), float(p_input.depth_bounds.x), float(p_input.depth_bounds.y)) + 0.5;
-    allocate_covered_voxel(center / extent);
+    // Get the voxel index according to the center, and get the morton code.
+    uint voxel_morton_code = morton_encode_3d(uint3(center));
+    uint leaf_index;
+    InterlockedAdd(
+        octree_info_buffer[0].leaves_count,
+        1,
+        leaf_index
+    );
+    tree_leaves[leaf_index] = voxel_morton_code;
 }
 
 #endif
