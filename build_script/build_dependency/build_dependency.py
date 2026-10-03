@@ -14,6 +14,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import fcntl
+from pathlib import Path
 
 
 class WBEBuildDependency(ABC):
@@ -33,9 +35,18 @@ class WBEBuildDependency(ABC):
 
 
 class WBEBuildDependencies:
-    """Ordered set of build dependencies compiled as one build task."""
+    """
+    Ordered set of build dependencies compiled as one build task.
 
-    def __init__(self) -> None:
+    Every target shares the same dependency build directory, so builds of different targets running at once take turns
+    compiling the dependencies.
+    """
+
+    def __init__(self, p_build_dir: Path) -> None:
+        """
+        :param p_build_dir: The dependency build directory shared by every target.
+        """
+        self._build_dir = p_build_dir
         self._dependencies: list[WBEBuildDependency] = []
 
     def add(self, p_dependency: WBEBuildDependency) -> None:
@@ -48,6 +59,9 @@ class WBEBuildDependencies:
 
         :raises RuntimeError: If any dependency fails to build.
         """
-        for dependency in self._dependencies:
-            print(f"WBEBuilder: Building dependency: {dependency.get_name()}...")
-            dependency.compile()
+        self._build_dir.mkdir(parents=True, exist_ok=True)
+        with open(self._build_dir / ".build.lock", "w", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            for dependency in self._dependencies:
+                print(f"WBEBuilder: Building dependency: {dependency.get_name()}...")
+                dependency.compile()

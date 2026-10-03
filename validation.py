@@ -73,8 +73,7 @@ def main() -> int:
         _run_step("requested tests", [str(unit_test_path), *gtest_args], f"{parsed_args.target}_requested_tests.log")
 
     _run_step("full unit tests", [str(unit_test_path)], f"{parsed_args.target}_full_unit_tests.log")
-    _run_function_step("shader tests", lambda p_log_file: run_shader_tests(parsed_args.target, p_log_file),
-        f"{parsed_args.target}_shader_tests.log")
+    _run_function_step("shader tests", run_shader_tests, f"{parsed_args.target}_shader_tests.log")
     print("WBEValidator: Finished successfully!")
     return 0
 

@@ -119,6 +119,14 @@ source_dir = "src"
 test_dir = "tests"
 test_env_dir = "test_env"
 resource_dir = "res"
+# Build dependencies (build_script/build_dependency) are built once, with these settings, into build/dependencies for
+# every target. slang-rhi in slangpy always compiles with -Werror, and GCC reports warnings in it that clang does not.
+dependency_build_dir = "dependencies"
+dependency_build_info = {
+    "c-compiler" : "clang",
+    "cpp-compiler" : "clang++",
+    "cmake-build-type" : "Release",
+}
 
 gen_info = {
     "static_labels" : [

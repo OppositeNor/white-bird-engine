@@ -27,13 +27,18 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
     """
     Build slangpy from dependencies/slangpy for the shader tests.
 
-    The native extension is installed into a copy of the slangpy Python package, so the dependency checkout only
-    receives the compile_commands.json link its own build system writes there. The build does not use vcpkg: slangpy's
-    optional libraries (libjpeg, libpng, OpenEXR, asmjit) are taken from the system when found and are otherwise
-    disabled.
+    slangpy's build writes its extension module, generated stubs, and a build-directory marker into the source package
+    dependencies/slangpy/slangpy (all ignored by its .gitignore), so only one slangpy build directory may exist. The
+    extension is installed into a copy of the Python package. The build does not use vcpkg: slangpy's optional libraries
+    (libjpeg, libpng, OpenEXR, asmjit) are taken from the system when found and are otherwise disabled.
     """
 
     def __init__(self, p_build_root_dir: Path, p_dependencies_dir: Path, p_build_info: dict[str, Any]) -> None:
+        """
+        :param p_build_root_dir: The dependency build directory shared by every target.
+        :param p_dependencies_dir: The vendored dependency directory containing slangpy.
+        :param p_build_info: The shared dependency build settings.
+        """
         self._source_dir = p_dependencies_dir / "slangpy"
         self._build_dir = p_build_root_dir / "slangpy"
         self._build_info = p_build_info
@@ -54,7 +59,9 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
             "cmake",
             "-S", self._source_dir.as_posix(),
             "-B", cmake_build_dir.as_posix(),
-            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DCMAKE_BUILD_TYPE={self._build_info['cmake-build-type']}",
+            f"-DCMAKE_C_COMPILER={self._build_info['c-compiler']}",
+            f"-DCMAKE_CXX_COMPILER={self._build_info['cpp-compiler']}",
             f"-DPython_ROOT_DIR:PATH={sys.prefix}",
             f"-DPython_EXECUTABLE:FILEPATH={sys.executable}",
             f"-DCMAKE_INSTALL_PREFIX={package_dir.as_posix()}",
@@ -68,19 +75,14 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
             # the engine build.
             "-DSGL_WARNINGS_AS_ERRORS=OFF",
         ]
-        if self._build_info.get("generator") is not None:
-            configure_command.extend(["-G", self._build_info["generator"]])
-        if self._build_info.get("cpp-compiler") is not None:
-            configure_command.append(f"-DCMAKE_CXX_COMPILER={self._build_info['cpp-compiler']}")
-        if self._build_info.get("c-compiler") is not None:
-            configure_command.append(f"-DCMAKE_C_COMPILER={self._build_info['c-compiler']}")
         if subprocess.run(configure_command, check=False).returncode != 0:
             raise RuntimeError("Failed to configure slangpy.")
-        build_command = ["cmake", "--build", cmake_build_dir.as_posix(), "--config", "Release"]
+        build_type = self._build_info["cmake-build-type"]
+        build_command = ["cmake", "--build", cmake_build_dir.as_posix(), "--config", build_type]
         if os.cpu_count() is not None:
             build_command.extend(["-j", str(os.cpu_count())])
         if subprocess.run(build_command, check=False).returncode != 0:
             raise RuntimeError("Failed to build slangpy.")
-        install_command = ["cmake", "--install", cmake_build_dir.as_posix(), "--config", "Release"]
+        install_command = ["cmake", "--install", cmake_build_dir.as_posix(), "--config", build_type]
         if subprocess.run(install_command, check=False).returncode != 0:
             raise RuntimeError("Failed to install slangpy.")

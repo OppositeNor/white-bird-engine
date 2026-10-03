@@ -32,7 +32,7 @@ class WBEBuildDependencyACP(WBEBuildDependency):
             p_dependencies_dir: Path,
             p_build_info: dict[str, Any]) -> None:
         self._source_dir = p_root_dir / "build_script" / "build_dependency" / "acp"
-        self._build_dir = p_build_root_dir / "acp_dependencies"
+        self._build_dir = p_build_root_dir / "acp"
         self._dependencies_dir = p_dependencies_dir
         self._build_info = p_build_info
 

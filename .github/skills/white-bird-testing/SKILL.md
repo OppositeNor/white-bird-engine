@@ -21,7 +21,7 @@ running or changing anything under `tests/executable/`, or verifying rendering o
 | Build only | `python build.py -t debug` |
 | Iterate on specific tests | `./build/debug/bin/wbe_unit_test --gtest_filter='WBEFooTest.*'` |
 | List tests | `./build/debug/bin/wbe_unit_test --gtest_list_tests` |
-| Shader utility tests only | `python run_shader_tests.py -t debug` (extra args go to pytest, e.g. `-k morton`) |
+| Shader utility tests only | `python run_shader_tests.py` (extra args go to pytest, e.g. `-k morton`) |
 | Leak check (manual, slow) | `valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=42 ./build/debug/bin/wbe_unit_test` |
 | Benchmarks | `./build/<target>/bin/wbe_benchmark_test` (prefer a release target) |
 | Capture a render frame | `WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/abs/path.png WBE_CAPTURE_FRAME=5 ./build/debug/bin/wbe_render_test_<name>` |
@@ -245,9 +245,10 @@ python build.py -t release
 ## Shader tests
 
 `tests/shader/` holds pytest scripts that call Slang shader functions directly through slangpy. `build.py` builds
-slangpy from `dependencies/slangpy` as a build dependency of every test-generating target (into
-`build/<target>/slangpy/python`); do not `pip install slangpy`. Build the target first, then run
-`python run_shader_tests.py -t <target>` (extra args go to pytest). The `device` fixture in `tests/shader/conftest.py` adds the shader root,
+slangpy from `dependencies/slangpy` as a build dependency of every test-generating target. Build dependencies are
+built once for all targets, with `build_config.dependency_build_info`, into `build/dependencies` (slangpy's package is
+`build/dependencies/slangpy/python`); do not `pip install slangpy`. Build a test-generating target first, then run `python run_shader_tests.py` (extra args go to
+pytest). The `device` fixture in `tests/shader/conftest.py` adds the shader root,
 resolved from `build_config.resource_dir`, as the include path; load modules from that root or `#include` them from an
 inline kernel source when a function needs groupshared memory or a dispatch. Only shader utility functions are tested
 for now.

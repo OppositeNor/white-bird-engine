@@ -43,6 +43,7 @@ per_target_include_dir = os.path.join(include_dir, "per_target", args.target)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
 build_root_dir = os.path.join(root_dir, "build")
+dependency_build_dir = os.path.join(build_root_dir, build_config.dependency_build_dir)
 build_dir = os.path.join(build_root_dir, build_target["export-directory"])
 binary_dir = os.path.join(build_dir, "bin")
 dependencies_dir = os.path.join(root_dir, "dependencies")
@@ -79,16 +80,17 @@ if build_target["generate-tests"]:
 
 # Setup ACP
 acp_dependencies_compiler = WBEBuildDependencyACP(
-    Path(root_dir), Path(build_dir), Path(dependencies_dir), build_target)
+    Path(root_dir), Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info)
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
 test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
 acp_compilers_configured = False
 
 # Setup build dependencies
-build_dependencies = WBEBuildDependencies()
+build_dependencies = WBEBuildDependencies(Path(dependency_build_dir))
 build_dependencies.add(acp_dependencies_compiler)
 if build_target["generate-tests"]:
-    build_dependencies.add(WBEBuildDependencySlangPy(Path(build_dir), Path(dependencies_dir), build_target))
+    build_dependencies.add(WBEBuildDependencySlangPy(
+        Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info))
 
 
 def setup_acp_compilers() -> None:
