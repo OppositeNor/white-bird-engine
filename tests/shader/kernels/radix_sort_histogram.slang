@@ -32,7 +32,7 @@ void main(uint3 p_group_thread_id : SV_GroupThreadID) {
     }
     GroupMemoryBarrierWithGroupSync();
     workgroup_scope_radix_sort_histogram<ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE>(data, DATA_START, DATA_COUNT, histogram,
-        p_group_thread_id.x, BIT_REGION);
+        p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
     // Each invocation writes back counters accumulated by other invocations, which relies on the trailing barrier.
     for (uint i = p_group_thread_id.x; i < WBE_RADIX_SORT_BUCKET_SIZE; i += KERNEL_WORKGROUP_SIZE) {
         histogram_output[i] = histogram[i];

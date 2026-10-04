@@ -18,8 +18,8 @@
 #include "utils/utils.slang"
 
 #define WBE_RADIX_SORT_BUCKET_BIT_SIZE 8
-#define WBE_RADIX_SORT_BUCKET_SIZE (1 << WBE_RADIX_SORT_BUCKET_BIT_SIZE)
-#define WBE_RADIX_SORT_BUCKET_MASK (WBE_RADIX_SORT_BUCKET_SIZE - 1)
+#define WBE_RADIX_SORT_BUCKET_COUNT (1 << WBE_RADIX_SORT_BUCKET_BIT_SIZE)
+#define WBE_RADIX_SORT_BUCKET_MASK (WBE_RADIX_SORT_BUCKET_COUNT - 1)
 
 /**
  * @brief Accumulates the radix sort digit histogram of up to one element per invocation.
@@ -36,7 +36,7 @@
  * @param p_bit_region The bit offset of the WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit to count.
  */
 void workgroup_scope_per_thread_radix_sort_histogram<T : IInteger>(RWStructuredBuffer<T> p_data, uint p_data_start,
-        uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_SIZE], uint p_invocation_id,
+        uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_COUNT], uint p_invocation_id,
         uint p_bit_region) {
     if (p_invocation_id >= p_data_count) {
         return;
@@ -62,9 +62,9 @@ void workgroup_scope_per_thread_radix_sort_histogram<T : IInteger>(RWStructuredB
  * @param p_bit_region The bit offset of the WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit to count.
  */
 void workgroup_scope_radix_sort_histogram<T : IInteger, let WORKGROUP_SIZE : uint>(RWStructuredBuffer<T> p_data,
-        uint p_data_start, uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_SIZE],
+        uint p_data_start, uint p_data_count, __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_COUNT],
         uint p_group_thread_id, uint p_bit_region) {
-    for (uint i = p_group_thread_id; i < WBE_RADIX_SORT_BUCKET_SIZE; i += WORKGROUP_SIZE) {
+    for (uint i = p_group_thread_id; i < WBE_RADIX_SORT_BUCKET_COUNT; i += WORKGROUP_SIZE) {
         // Initialize the original value in the histogram to 0.
         p_histogram[i] = 0;
     }
