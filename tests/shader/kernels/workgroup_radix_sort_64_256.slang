@@ -14,8 +14,9 @@
 */
 /**
  * @file workgroup_radix_sort_64_256.slang
- * @brief Test kernel that sorts a 256-element buffer in place with workgroup_radix_sort_64_256 on one 64-wide workgroup.
- * @details Sorts data in place. Required define: BIT_START.
+ * @brief Test kernel that sorts a 256-element buffer in place on one 64-wide workgroup.
+ * @details Runs workgroup_radix_sort_step_64_256 on the digit at BIT_START when BIT_START is defined, and
+ * workgroup_radix_sort_64_256 otherwise.
  */
 #include "radix_sort/radix_sort_utils.slang"
 
@@ -31,7 +32,11 @@ void main(uint3 p_group_thread_id : SV_GroupThreadID) {
         shared_data[i] = data[i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_radix_sort_64_256(shared_data, BIT_START, p_group_thread_id.x, shared_scratch);
+#ifdef BIT_START
+    workgroup_radix_sort_step_64_256(shared_data, BIT_START, p_group_thread_id.x, shared_scratch);
+#else
+    workgroup_radix_sort_64_256(shared_data, p_group_thread_id.x, shared_scratch);
+#endif
     for (uint i = p_group_thread_id.x; i < 256; i += 64) {
         data[i] = shared_data[i];
     }

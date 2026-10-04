@@ -112,7 +112,7 @@ void workgroup_scope_radix_sort_histogram<T : IInteger, let WORKGROUP_SIZE : uin
  * @param p_scratch Scratch array of 256 elements followed by one element that the function sets to zero; its contents are
  * overwritten.
  */
-void workgroup_radix_sort_64_256(__ref groupshared uint p_data[256],
+void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
         uint p_bit_start, uint p_thread_id, __ref groupshared uint p_scratch[256 + 1]) {
     if (p_thread_id == 0) {
         p_scratch[256] = 0;
@@ -150,6 +150,23 @@ void workgroup_radix_sort_64_256(__ref groupshared uint p_data[256],
         p_data[positions[i]] = values[i];
     }
     GroupMemoryBarrierWithGroupSync();
+}
+
+/**
+ * @brief Sorts a 256-element groupshared array of uint keys in place in ascending order with a 64-invocation workgroup.
+ * @details Runs workgroup_radix_sort_step_64_256 over every WBE_RADIX_SORT_WG_BIT_SIZE-bit digit, from the least
+ * significant one up. Every invocation of the 64-invocation workgroup must call this function with the same arrays.
+ * Callers must issue a workgroup barrier after filling p_data; the sorted array is visible to the whole workgroup on
+ * return.
+ * @param p_data The groupshared array to sort in place.
+ * @param p_thread_id The local invocation index in [0, 64).
+ * @param p_scratch Scratch array of 256 elements followed by one element; its contents are overwritten.
+ */
+void workgroup_radix_sort_64_256(__ref groupshared uint p_data[256], uint p_thread_id,
+        __ref groupshared uint p_scratch[256 + 1]) {
+    [unroll] for (uint i = 0; i < 32 / WBE_RADIX_SORT_WG_BIT_SIZE; ++i) {
+        workgroup_radix_sort_step_64_256(p_data, i * WBE_RADIX_SORT_WG_BIT_SIZE, p_thread_id, p_scratch);
+    }
 }
 
 #endif

@@ -134,53 +134,96 @@ SORT_WORKGROUP_SIZE = 64
 
 
 def run_radix_sort_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray,
-        p_bit_start: int) -> np.ndarray:
-    kernel = p_load_kernel("workgroup_radix_sort_64_256.slang", {"BIT_START": p_bit_start})
+        p_bit_start: int | None) -> np.ndarray:
+    """Runs workgroup_radix_sort_step_64_256 on the digit at p_bit_start, or workgroup_radix_sort_64_256 if it is None."""
+    defines: dict[str, str | int] = {} if p_bit_start is None else {"BIT_START": p_bit_start}
+    kernel = p_load_kernel("workgroup_radix_sort_64_256.slang", defines)
     usage = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
     data_buffer = p_device.create_buffer(element_count=SORT_ELEMENT_COUNT, struct_size=4, usage=usage, data=p_values)
     kernel.dispatch(thread_count=[SORT_WORKGROUP_SIZE, 1, 1], vars={"data": data_buffer})
     return data_buffer.to_numpy().view(np.uint32)
 
 
-# workgroup_radix_sort_64_256 sorts by a 2-bit digit.
-SORT_DIGIT_MASK = 0x3
+# workgroup_radix_sort_step_64_256 sorts by a 2-bit digit.
+SORT_STEP_DIGIT_MASK = 0x3
 
 
-def radix_sort_reference(p_values: np.ndarray, p_bit_start: int) -> np.ndarray:
-    digits = (p_values >> np.uint32(p_bit_start)) & np.uint32(SORT_DIGIT_MASK)
+def radix_sort_step_reference(p_values: np.ndarray, p_bit_start: int) -> np.ndarray:
+    digits = (p_values >> np.uint32(p_bit_start)) & np.uint32(SORT_STEP_DIGIT_MASK)
     return p_values[np.argsort(digits, kind="stable")]
 
 
-def check_radix_sort_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray,
+def check_radix_sort_step_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray,
         p_bit_start: int) -> None:
     result = run_radix_sort_64_256(p_device, p_load_kernel, p_values, p_bit_start)
-    np.testing.assert_array_equal(result, radix_sort_reference(p_values, p_bit_start))
+    np.testing.assert_array_equal(result, radix_sort_step_reference(p_values, p_bit_start))
 
 
 @pytest.mark.parametrize("p_bit_start", [0, 3, 8, 17, 30])
-def test_workgroup_radix_sort_64_256(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
+def test_workgroup_radix_sort_step_64_256(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
         p_bit_start: int) -> None:
     # Random bits outside the digit make every element distinct, so the comparison also checks stability.
     values = rng.integers(0, 2 ** 32, SORT_ELEMENT_COUNT, dtype=np.uint32)
-    check_radix_sort_64_256(device, load_kernel, values, p_bit_start)
+    check_radix_sort_step_64_256(device, load_kernel, values, p_bit_start)
 
 
 @pytest.mark.parametrize("p_digit", [0, 1, 2, 3])
-def test_workgroup_radix_sort_64_256_single_digit(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_radix_sort_step_64_256_single_digit(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator, p_digit: int) -> None:
     # Every element shares the digit, so its packed counter reaches 256. The order must be kept unchanged.
     values = (rng.integers(0, 2 ** 24, SORT_ELEMENT_COUNT, dtype=np.uint32) << np.uint32(8)) | np.uint32(p_digit)
-    check_radix_sort_64_256(device, load_kernel, values, 0)
+    check_radix_sort_step_64_256(device, load_kernel, values, 0)
 
 
-def test_workgroup_radix_sort_64_256_few_digits(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_radix_sort_step_64_256_few_digits(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Long runs of equal digits stress the per-digit ranks.
     digits = rng.choice(np.array([0, 3], dtype=np.uint32), SORT_ELEMENT_COUNT)
     values = (np.arange(SORT_ELEMENT_COUNT, dtype=np.uint32) << np.uint32(16)) | (digits << np.uint32(4))
-    check_radix_sort_64_256(device, load_kernel, values, 4)
+    check_radix_sort_step_64_256(device, load_kernel, values, 4)
+
+
+def test_workgroup_radix_sort_step_64_256_descending(device: spy.Device, load_kernel: KernelLoader) -> None:
+    values = np.arange(SORT_ELEMENT_COUNT - 1, -1, -1, dtype=np.uint32)
+    check_radix_sort_step_64_256(device, load_kernel, values, 0)
+
+
+def check_radix_sort_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray) -> None:
+    result = run_radix_sort_64_256(p_device, p_load_kernel, p_values, None)
+    np.testing.assert_array_equal(result, np.sort(p_values))
+
+
+# Upper bounds of the random keys: keys that fit in few bits leave the higher steps with a single digit value, and full
+# keys use every step.
+@pytest.mark.parametrize("p_key_limit", [2 ** 2, 2 ** 8, 2 ** 13, 2 ** 32])
+def test_workgroup_radix_sort_64_256(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
+        p_key_limit: int) -> None:
+    values = rng.integers(0, p_key_limit, SORT_ELEMENT_COUNT, dtype=np.uint32)
+    check_radix_sort_64_256(device, load_kernel, values)
+
+
+@pytest.mark.parametrize("p_value", [0, 0xFFFFFFFF])
+def test_workgroup_radix_sort_64_256_identical(device: spy.Device, load_kernel: KernelLoader, p_value: int) -> None:
+    # Every step has a single digit value, so its packed counter reaches 256.
+    values = np.full(SORT_ELEMENT_COUNT, p_value, dtype=np.uint32)
+    check_radix_sort_64_256(device, load_kernel, values)
 
 
 def test_workgroup_radix_sort_64_256_descending(device: spy.Device, load_kernel: KernelLoader) -> None:
-    values = np.arange(SORT_ELEMENT_COUNT - 1, -1, -1, dtype=np.uint32)
-    check_radix_sort_64_256(device, load_kernel, values, 0)
+    # Each key differs from its neighbors in both the lowest and the highest digits.
+    values = (np.arange(SORT_ELEMENT_COUNT - 1, -1, -1, dtype=np.uint32) * np.uint32(0x01010101))
+    check_radix_sort_64_256(device, load_kernel, values)
+
+
+def test_workgroup_radix_sort_64_256_sorted(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator) -> None:
+    values = np.sort(rng.integers(0, 2 ** 32, SORT_ELEMENT_COUNT, dtype=np.uint32))
+    check_radix_sort_64_256(device, load_kernel, values)
+
+
+def test_workgroup_radix_sort_64_256_duplicates(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator) -> None:
+    # A few distinct full-width keys repeated many times.
+    keys = rng.integers(0, 2 ** 32, 5, dtype=np.uint32)
+    values = rng.choice(keys, SORT_ELEMENT_COUNT)
+    check_radix_sort_64_256(device, load_kernel, values)
