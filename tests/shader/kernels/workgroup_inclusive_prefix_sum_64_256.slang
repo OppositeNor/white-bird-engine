@@ -17,7 +17,7 @@
  * @brief Test kernel that runs workgroup_inclusive_prefix_sum_64_256 in place over a 256-element buffer on one 64-wide
  * workgroup.
  */
-#include "utils/utils.slang"
+#include "prefix_sum/prefix_sum_utils.slang"
 
 RWStructuredBuffer<uint> data;
 // The extra trailing element holds the zero that out-of-range reads are clamped to.

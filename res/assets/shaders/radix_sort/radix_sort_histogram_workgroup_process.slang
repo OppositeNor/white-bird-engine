@@ -12,16 +12,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "radix_sort/radix_sort_utils.slang"
-
-struct BufferInfo {
-    uint element_count;
-};
+#include "utils/utils.slang"
+#include "prefix_sum/prefix_sum_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "buffer")] uint2 buffer;
-    [WBE_DESCRIPTOR("storage_buffer", "buffer")] uint2 output_buffer;
-    [WBE_DESCRIPTOR("uniform_buffer", "buffer_info")] uint2 buffer_info;
+#ifdef WBE_RADIX_SORT_LARGE
+    [WBE_DESCRIPTOR("storage_buffer", "buffer", "read")] uint2 buffer;
+#else
+    [WBE_DESCRIPTOR("uniform_buffer", "buffer")] uint2 buffer;
+#endif
+    [WBE_DESCRIPTOR("storage_buffer", "buffer", "write")] uint2 output_buffer;
 };
 
 [vk::push_constant]
@@ -40,9 +40,14 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     // The starting position of a thread in a 256 chunk.
     uint thread_data_start = group_thread_id * 4;
 
+#ifdef WBE_RADIX_SORT_LARGE
     RWStructuredBuffer<uint> buffer = decriptor_indices.buffer.x;
+#else
+    ConstantBuffer<uint> buffer = decriptor_indices.buffer.x;
+#endif
     RWStructuredBuffer<uint> output_buffer = decriptor_indices.buffer.x;
-    ConstantBuffer<BufferInfo> buffer_info = decriptor_indices.buffer_info.x;
+    // First value of the buffer is used as element count.
+    uint element_count = buffer[0];
     if (p_group_id.x == 0 && group_thread_id == 0) {
         // The first entry of output_buffer stores the number of workgroups.
         output_buffer[0] = total_group_num;
@@ -61,10 +66,11 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     uint group_data_offset = p_group_id.x * 64;
     for (uint i = 0; i < max(total_group_task_num / total_group_num, 1)) {
         // Each group holds a shared memory to calculate workgroup_scope_radix_sort_histogram
+        // The first four bytes are used as metadata.
         workgroup_scope_radix_sort_histogram<uint, 64>(
             buffer,
-            group_data_stride * i + group_data_offset,
-            buffer_info.element_count,
+            group_data_stride * i + group_data_offset + 4,
+            element_count,
             histogram,
             group_thread_id,
             WBE_RADIX_HISTOGRAM_BIT_REGION);

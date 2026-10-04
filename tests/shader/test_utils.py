@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 import pytest
@@ -21,8 +21,6 @@ import slangpy as spy
 
 RANDOM_SEED = 20251003
 SAMPLE_COUNT = 1024
-
-KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
 @pytest.fixture(scope="module")
 def utils(device: spy.Device, shader_include_dir: Path) -> spy.Module:
@@ -183,36 +181,3 @@ def test_random_range(utils: spy.Module, rng: np.random.Generator) -> None:
     result = call(utils.random, seeds)
     assert np.all((result >= 0.0) & (result < 1.0))
     np.testing.assert_array_equal(call(utils.random, seeds), result)
-
-
-PREFIX_SUM_ELEMENT_COUNT = 256
-PREFIX_SUM_WORKGROUP_SIZE = 64
-
-
-def run_inclusive_prefix_sum_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray) -> np.ndarray:
-    kernel = p_load_kernel("workgroup_inclusive_prefix_sum_64_256.slang", {})
-    buffer = p_device.create_buffer(element_count=len(p_values), struct_size=4,
-        usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access, data=p_values)
-    kernel.dispatch(thread_count=[PREFIX_SUM_WORKGROUP_SIZE, 1, 1], vars={"data": buffer})
-    return buffer.to_numpy().view(np.uint32)
-
-
-def test_workgroup_inclusive_prefix_sum_64_256(device: spy.Device, load_kernel: KernelLoader,
-        rng: np.random.Generator) -> None:
-    values = rng.integers(0, 1000, PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
-    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
-    np.testing.assert_array_equal(result, np.cumsum(values, dtype=np.uint32))
-
-
-def test_workgroup_inclusive_prefix_sum_64_256_ones(device: spy.Device, load_kernel: KernelLoader) -> None:
-    values = np.ones(PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
-    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
-    np.testing.assert_array_equal(result, np.arange(1, PREFIX_SUM_ELEMENT_COUNT + 1, dtype=np.uint32))
-
-
-def test_workgroup_inclusive_prefix_sum_64_256_single_element(device: spy.Device, load_kernel: KernelLoader) -> None:
-    # A lone value at the front must reach every later element and nothing may be added twice.
-    values = np.zeros(PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
-    values[0] = 7
-    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
-    np.testing.assert_array_equal(result, np.full(PREFIX_SUM_ELEMENT_COUNT, 7, dtype=np.uint32))

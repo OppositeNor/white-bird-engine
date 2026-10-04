@@ -48,6 +48,66 @@
                     "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "24"
                 }
             ]
+        },
+        {
+            "id": "radix_sort_histogram_workgroup_process_0_8_large",
+            "source_type": "shader",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_0_8_large.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_0_8_large.json",
+            "macros": [
+                {
+                    "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "0"
+                },
+                {
+                    "name": "WBE_RADIX_SORT_LARGE"
+                }
+            ]
+        },
+        {
+            "id": "radix_sort_histogram_workgroup_process_8_16_large",
+            "source_type": "shader",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_8_16_large.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_8_16_large.json",
+            "macros": [
+                {
+                    "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "8"
+                },
+                {
+                    "name": "WBE_RADIX_SORT_LARGE"
+                }
+            ]
+        },
+        {
+            "id": "radix_sort_histogram_workgroup_process_16_24_large",
+            "source_type": "shader",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_16_24_large.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_16_24_large.json",
+            "macros": [
+                {
+                    "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "16"
+                },
+                {
+                    "name": "WBE_RADIX_SORT_LARGE"
+                }
+            ]
+        },
+        {
+            "id": "radix_sort_histogram_workgroup_process_24_32_large",
+            "source_type": "shader",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_24_32_large.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_24_32_large.json",
+            "macros": [
+                {
+                    "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "24"
+                },
+                {
+                    "name": "WBE_RADIX_SORT_LARGE"
+                }
+            ]
         }
     ]
 }
