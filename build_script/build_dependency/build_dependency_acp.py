@@ -53,6 +53,7 @@ class WBEBuildDependencyACP(WBEBuildDependency):
         ccache_dir = self._build_dir / "ccache"
         ccache_dir.mkdir(parents=True, exist_ok=True)
         environment["CCACHE_DIR"] = ccache_dir.as_posix()
+        self._discard_cmake_cache_on_generator_change(self._build_dir, self._build_info.get("generator"))
         configure_command = [
             "cmake",
             "-S",

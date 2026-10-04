@@ -126,6 +126,7 @@ dependency_build_info = {
     "c-compiler" : "clang",
     "cpp-compiler" : "clang++",
     "cmake-build-type" : "Release",
+    "generator" : "Ninja",
 }
 
 gen_info = {

@@ -488,39 +488,39 @@ float random(float2 p_seed) {
 
 /**
  * @brief Computes an in-place inclusive prefix sum over a 256-element groupshared array with a 64-invocation workgroup.
- * @details Uses a Hillis-Steele scan in which each invocation owns 4 contiguous elements and updates them as one
- * uint4 per step. Reads that would fall before the start of the array are redirected to p_data[256], which must hold
- * zero and is left unchanged. Every invocation of the 64-invocation workgroup must call this function with the same
- * array. The function does not synchronize before its first read, so callers must issue a workgroup barrier after
- * filling the array; it synchronizes after the final write, so the results are visible to the whole workgroup on
- * return.
+ * @details Uses a Hillis-Steele scan in which each invocation owns 4 contiguous elements, starting at p_start, and
+ * updates them as one uint4 per step. The 64 invocations must together own every element of p_data[0, 256) exactly
+ * once. Reads that would fall before the start of the array are redirected to p_data[256], which must hold zero and is
+ * left unchanged. Every invocation of the 64-invocation workgroup must call this function with the same array. The
+ * function does not synchronize before its first read, so callers must issue a workgroup barrier after filling the
+ * array; it synchronizes after the final write, so the results are visible to the whole workgroup on return.
  * @param p_data The groupshared array to sum in place: 256 elements followed by a zero element.
- * @param p_invocation_id The local invocation index in [0, 64).
+ * @param p_start The index of the first of the 4 contiguous elements this invocation owns; a multiple of 4 in
+ * [0, 256).
  */
-void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256 + 1], uint p_invocation_id) {
-    uint thread_data_start = p_invocation_id * 4;
+void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256 + 1], uint p_start) {
     [unroll] for (uint i = 0; i < 8; ++i) {
         // We split the 256 entries in chunks of 4, where each thread performs SIMD on the 4 entries they're responsible of.
         uint offset = 1 << i;
         uint4 left_region_data = uint4(
             // It will trigger an unsigned overflow if the index has overflowed. So overflowed index could be captured by min.
-            p_data[min(thread_data_start - offset + 0, 256)],
-            p_data[min(thread_data_start - offset + 1, 256)],
-            p_data[min(thread_data_start - offset + 2, 256)],
-            p_data[min(thread_data_start - offset + 3, 256)]
+            p_data[min(p_start - offset + 0, 256)],
+            p_data[min(p_start - offset + 1, 256)],
+            p_data[min(p_start - offset + 2, 256)],
+            p_data[min(p_start - offset + 3, 256)]
         );
         uint4 curr_region_data = uint4(
-            p_data[thread_data_start + 0],
-            p_data[thread_data_start + 1],
-            p_data[thread_data_start + 2],
-            p_data[thread_data_start + 3]
+            p_data[p_start + 0],
+            p_data[p_start + 1],
+            p_data[p_start + 2],
+            p_data[p_start + 3]
         );
         curr_region_data += left_region_data;
         GroupMemoryBarrierWithGroupSync();
-        p_data[thread_data_start] = curr_region_data[0];
-        p_data[thread_data_start + 1] = curr_region_data[1];
-        p_data[thread_data_start + 2] = curr_region_data[2];
-        p_data[thread_data_start + 3] = curr_region_data[3];
+        p_data[p_start] = curr_region_data[0];
+        p_data[p_start + 1] = curr_region_data[1];
+        p_data[p_start + 2] = curr_region_data[2];
+        p_data[p_start + 3] = curr_region_data[3];
         GroupMemoryBarrierWithGroupSync();
     }
 }

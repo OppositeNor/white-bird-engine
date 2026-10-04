@@ -16,6 +16,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import fcntl
 from pathlib import Path
+import shutil
 
 
 class WBEBuildDependency(ABC):
@@ -32,6 +33,30 @@ class WBEBuildDependency(ABC):
 
         :raises RuntimeError: If the dependency fails to build.
         """
+
+    @staticmethod
+    def _discard_cmake_cache_on_generator_change(p_cmake_build_dir: Path, p_generator: str | None) -> None:
+        """
+        Discard the CMake cache of a build directory that was configured with a different generator.
+
+        CMake refuses to reconfigure a build directory with another generator, so only CMakeCache.txt and CMakeFiles are
+        removed; the rest of the build directory is kept.
+
+        :param p_cmake_build_dir: The CMake build directory.
+        :param p_generator: The generator the build directory is about to be configured with, or None for CMake's
+            default, in which case the cache is kept.
+        """
+        cache_path = p_cmake_build_dir / "CMakeCache.txt"
+        if p_generator is None or not cache_path.is_file():
+            return
+        for line in cache_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("CMAKE_GENERATOR:INTERNAL="):
+                if line.removeprefix("CMAKE_GENERATOR:INTERNAL=") == p_generator:
+                    return
+                break
+        print(f"WBEBuilder: Discarding the CMake cache in {p_cmake_build_dir}: its generator differs from {p_generator}.")
+        cache_path.unlink()
+        shutil.rmtree(p_cmake_build_dir / "CMakeFiles", ignore_errors=True)
 
 
 class WBEBuildDependencies:

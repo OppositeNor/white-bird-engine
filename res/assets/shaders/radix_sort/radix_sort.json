@@ -2,11 +2,11 @@
     "include": [],
     "resources": [
         {
-            "id": "radix_sort_histogram_stat_0_8",
+            "id": "radix_sort_histogram_workgroup_process_0_8",
             "source_type": "shader",
-            "src": "assets/shaders/radix_sort/radix_sort_histogram_stat.slang",
-            "dst": "assets/shaders/radix_sort/radix_sort_histogram_stat_0_8.spv",
-            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_stat_0_8.json",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_0_8.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_0_8.json",
             "macros": [
                 {
                     "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "0"
@@ -14,11 +14,11 @@
             ]
         },
         {
-            "id": "radix_sort_histogram_stat_8_16",
+            "id": "radix_sort_histogram_workgroup_process_8_16",
             "source_type": "shader",
-            "src": "assets/shaders/radix_sort/radix_sort_histogram_stat.slang",
-            "dst": "assets/shaders/radix_sort/radix_sort_histogram_stat_8_16.spv",
-            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_stat_8_16.json",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_8_16.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_8_16.json",
             "macros": [
                 {
                     "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "8"
@@ -26,11 +26,11 @@
             ]
         },
         {
-            "id": "radix_sort_histogram_stat_16_24",
+            "id": "radix_sort_histogram_workgroup_process_16_24",
             "source_type": "shader",
-            "src": "assets/shaders/radix_sort/radix_sort_histogram_stat.slang",
-            "dst": "assets/shaders/radix_sort/radix_sort_histogram_stat_16_24.spv",
-            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_stat_16_24.json",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_16_24.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_16_24.json",
             "macros": [
                 {
                     "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "16"
@@ -38,11 +38,11 @@
             ]
         },
         {
-            "id": "radix_sort_histogram_stat_24_32",
+            "id": "radix_sort_histogram_workgroup_process_24_32",
             "source_type": "shader",
-            "src": "assets/shaders/radix_sort/radix_sort_histogram_stat.slang",
-            "dst": "assets/shaders/radix_sort/radix_sort_histogram_stat_24_32.spv",
-            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_stat_24_32.json",
+            "src": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process.slang",
+            "dst": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_24_32.spv",
+            "metadata": "assets/shaders/radix_sort/radix_sort_histogram_workgroup_process_24_32.json",
             "macros": [
                 {
                     "name": "WBE_RADIX_HISTOGRAM_BIT_REGION", "value": "24"
@@ -51,4 +51,3 @@
         }
     ]
 }
-

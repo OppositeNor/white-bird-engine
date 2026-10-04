@@ -33,7 +33,7 @@ void main(uint3 p_group_thread_id : SV_GroupThreadID) {
         shared_data[256] = 0;
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256(shared_data, p_group_thread_id.x);
+    workgroup_inclusive_prefix_sum_64_256(shared_data, p_group_thread_id.x * 4);
     for (uint i = p_group_thread_id.x; i < 256; i += 64) {
         data[i] = shared_data[i];
     }

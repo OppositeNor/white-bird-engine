@@ -75,6 +75,9 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
             # the engine build.
             "-DSGL_WARNINGS_AS_ERRORS=OFF",
         ]
+        if self._build_info.get("generator") is not None:
+            configure_command.extend(["-G", self._build_info["generator"]])
+        self._discard_cmake_cache_on_generator_change(cmake_build_dir, self._build_info.get("generator"))
         if subprocess.run(configure_command, check=False).returncode != 0:
             raise RuntimeError("Failed to configure slangpy.")
         build_type = self._build_info["cmake-build-type"]
