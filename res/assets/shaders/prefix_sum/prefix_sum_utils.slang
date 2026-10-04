@@ -46,10 +46,9 @@ void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256 + 1
         );
         curr_region_data += left_region_data;
         GroupMemoryBarrierWithGroupSync();
-        p_data[p_start] = curr_region_data[0];
-        p_data[p_start + 1] = curr_region_data[1];
-        p_data[p_start + 2] = curr_region_data[2];
-        p_data[p_start + 3] = curr_region_data[3];
+        [unroll] for (uint i = 0; i < 4; ++i) {
+            p_data[p_start + i] = curr_region_data[i];
+        }
         GroupMemoryBarrierWithGroupSync();
     }
 }
@@ -96,14 +95,14 @@ void workgroup_general_prefix_sum<let N : uint>(RWStructuredBuffer<uint> p_buffe
             );
             curr_region_data += left_region_data;
             // The buffer is device memory, so group-memory barriers would not order these accesses.
-            AllMemoryBarrierWithGroupSync();
+            DeviceMemoryBarrierWithGroupSync();
             // The last chunk may extend past the range, which must not be written.
             [unroll] for (uint k = 0; k < 4; ++k) {
                 if (subportion_start + k < p_element_count) {
                     p_buffer[p_start + subportion_start + k] = curr_region_data[k];
                 }
             }
-            AllMemoryBarrierWithGroupSync();
+            DeviceMemoryBarrierWithGroupSync();
         }
     }
 }

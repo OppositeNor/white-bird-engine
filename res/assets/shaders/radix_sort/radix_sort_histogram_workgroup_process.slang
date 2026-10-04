@@ -25,7 +25,7 @@ struct DescriptorIndices {
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> decriptor_indices;
+ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 [numthreads(64, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
@@ -41,12 +41,12 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     uint thread_data_start = group_thread_id * 4;
 
 #ifdef WBE_RADIX_SORT_LARGE
-    RWStructuredBuffer<uint> buffer = decriptor_indices.buffer.x;
+    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.buffer.x];
 #else
-    ConstantBuffer<uint> buffer = decriptor_indices.buffer.x;
+    ConstantBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.buffer.x];
 #endif
-    RWStructuredBuffer<uint> output_buffer = decriptor_indices.buffer.x;
-    // First value of the buffer is used as element count.
+    RWStructuredBuffer<uint> output_buffer = ResourceDescriptorHeap[descriptor_indices.buffer.x];
+    // First four values are used as the buffer's metadata. The first element is the element count.
     uint element_count = buffer[0];
     if (p_group_id.x == 0 && group_thread_id == 0) {
         // The first entry of output_buffer stores the number of workgroups.
@@ -78,15 +78,25 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     // Calculate the prefix sum of the invocation's subgroup.
     workgroup_inclusive_prefix_sum_64_256(histogram, thread_data_start);
 
+    uint endian_start_index = 4 + total_group_num * WBE_RADIX_SORT_BUCKET_SIZE;
     if (group_thread_id == 0) {
         // The first thread is responsible for writing its data to the output buffer's corresponding session.
         // Write it to the region after all the buckets.
-        output_buffer[1 + total_group_num * WBE_RADIX_SORT_BUCKET_SIZE + group_id] = histogram[WBE_RADIX_SORT_BUCKET_SIZE - 1]
+        output_buffer[endian_start_index + group_id] = histogram[WBE_RADIX_SORT_BUCKET_SIZE - 1]
     }
     // Write the workgroup-wise prefix sum into the curresponding region
     [unroll] for (uint i = 0; i < 4; ++i) {
         // The first entry of output_buffer is the number of workgroups, and histogram's
         // index should - 1 because we're storing exclusive prefix sum.
-        output_buffer[1 + thread_data_start + i] = histogram[min(thread_data_start + i - 1, WBE_RADIX_SORT_BUCKET_SIZE)];
+        output_buffer[4 + thread_data_start + i] = histogram[min(thread_data_start + i - 1u, WBE_RADIX_SORT_BUCKET_SIZE)];
+    }
+    if (group_id == 0 && group_thread_id == 0) {
+        // the first thread is responsible to make the next element of the endians be 0 so that we could use that for clampping.
+        output_buffer[4 + total_group_num * WBE_RADIX_SORT_BUCKET_SIZE + total_group_num = 0];
+        // We could calculate those, though, but since we have redundent spaces for metadata we could use it.
+        // The start of the endian.
+        output_buffer[1] = endian_start_index;
+        // The start of the lane buckets.
+        output_buffer[2] = 4;
     }
 }
