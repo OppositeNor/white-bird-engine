@@ -14,28 +14,31 @@
 */
 /**
  * @file radix_sort_histogram.slang
- * @brief Test kernel that runs workgroup_scope_radix_sort_histogram on one workgroup and writes the histogram back.
- * @details Required defines: ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE, DATA_START, DATA_COUNT,
- * WBE_RADIX_HISTOGRAM_BIT_REGION, and HISTOGRAM_GARBAGE, the value the groupshared histogram holds before the call so
- * that a missing clear is observable.
+ * @brief Test kernel that accumulates two ranges with workgroup_scope_radix_sort_histogram on one workgroup.
+ * @details Loads the initial histogram from histogram, adds the counts of [FIRST_DATA_START, FIRST_DATA_START +
+ * FIRST_DATA_COUNT) and then of [SECOND_DATA_START, SECOND_DATA_START + SECOND_DATA_COUNT), and writes the histogram
+ * back. Required defines: ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE, FIRST_DATA_START, FIRST_DATA_COUNT, SECOND_DATA_START,
+ * SECOND_DATA_COUNT, and WBE_RADIX_HISTOGRAM_BIT_REGION.
  */
 #include "radix_sort/radix_sort_utils.slang"
 
 RWStructuredBuffer<ELEMENT_TYPE> data;
-RWStructuredBuffer<uint> histogram_output;
-groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
+RWStructuredBuffer<uint> histogram;
+groupshared uint shared_histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 
 [shader("compute")]
 [numthreads(KERNEL_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
+    // No barrier follows the load: the call must synchronize before counting so that every initial value is visible.
     for (uint i = p_group_thread_id.x; i < WBE_RADIX_SORT_BUCKET_COUNT; i += KERNEL_WORKGROUP_SIZE) {
-        histogram[i] = HISTOGRAM_GARBAGE;
+        shared_histogram[i] = histogram[i];
     }
-    GroupMemoryBarrierWithGroupSync();
-    workgroup_scope_radix_sort_histogram<ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE>(data, DATA_START, DATA_COUNT, histogram,
-        p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
+    workgroup_scope_radix_sort_histogram<ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE>(data, FIRST_DATA_START, FIRST_DATA_COUNT,
+        shared_histogram, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
+    workgroup_scope_radix_sort_histogram<ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE>(data, SECOND_DATA_START, SECOND_DATA_COUNT,
+        shared_histogram, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
     // Each invocation writes back counters accumulated by other invocations, which relies on the trailing barrier.
     for (uint i = p_group_thread_id.x; i < WBE_RADIX_SORT_BUCKET_COUNT; i += KERNEL_WORKGROUP_SIZE) {
-        histogram_output[i] = histogram[i];
+        histogram[i] = shared_histogram[i];
     }
 }

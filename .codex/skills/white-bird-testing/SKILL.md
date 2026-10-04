@@ -248,8 +248,8 @@ python build.py -t release
 slangpy from `dependencies/slangpy` as a build dependency of every test-generating target. Build dependencies are
 built once for all targets, with `build_config.dependency_build_info`, into `build/dependencies` (slangpy's package is
 `build/dependencies/slangpy/python`); do not `pip install slangpy`. Build a test-generating target first, then run `python run_shader_tests.py` (extra args go to
-pytest). The `device` fixture in `tests/shader/conftest.py` adds the shader root,
-resolved from `build_config.resource_dir`, as the include path; load modules from that root. When a function needs
+pytest). The `device` fixture in `tests/shader/conftest.py` uses the same include paths as the ACP shader compiler: the
+shader root, resolved from `build_config.resource_dir`, and its `utils` directory; load modules from that root. When a function needs
 groupshared memory or a dispatch, write a test kernel as a `.slang` file under `tests/shader/kernels/` (not as a Python
 string) and compile it with the `load_kernel(kernel_file, defines)` fixture, which specializes the kernel through
 preprocessor defines. Only shader utility functions are tested for now.

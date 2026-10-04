@@ -21,6 +21,8 @@ import build_config
 
 
 SHADER_INCLUDE_DIR = Path(build_config.root_dir) / build_config.resource_dir / "assets" / "shaders"
+# The same include paths the ACP shader compiler passes to slangc.
+SHADER_INCLUDE_PATHS = [SHADER_INCLUDE_DIR, SHADER_INCLUDE_DIR / "utils"]
 KERNEL_DIR = Path(__file__).parent / "kernels"
 
 
@@ -32,12 +34,12 @@ def shader_include_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def device(shader_include_dir: Path) -> spy.Device:
-    """Vulkan device shared by all shader tests, with the engine shader root as its include path."""
-    return spy.create_device(type=spy.DeviceType.vulkan, include_paths=[shader_include_dir])
+    """Vulkan device shared by all shader tests, with the engine shader include paths."""
+    return spy.create_device(type=spy.DeviceType.vulkan, include_paths=SHADER_INCLUDE_PATHS)
 
 
 @pytest.fixture(scope="session")
-def load_kernel(device: spy.Device, shader_include_dir: Path) -> Callable[[str, dict[str, str | int]], spy.ComputeKernel]:
+def load_kernel(device: spy.Device) -> Callable[[str, dict[str, str | int]], spy.ComputeKernel]:
     """
     Loader for the test kernels under tests/shader/kernels.
 
@@ -45,7 +47,7 @@ def load_kernel(device: spy.Device, shader_include_dir: Path) -> Callable[[str, 
     ones, so kernels can be specialized per test.
     """
     def load(p_kernel_name: str, p_defines: dict[str, str | int]) -> spy.ComputeKernel:
-        session = device.create_slang_session(compiler_options={"include_paths": [shader_include_dir, KERNEL_DIR],
+        session = device.create_slang_session(compiler_options={"include_paths": [*SHADER_INCLUDE_PATHS, KERNEL_DIR],
             "defines": {name: str(value) for name, value in p_defines.items()}})
         module = session.load_module(p_kernel_name)
         return device.create_compute_kernel(session.link_program([module], [module.entry_point("main")]))
