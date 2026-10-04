@@ -41,7 +41,7 @@ struct MaskedShadowDescriptorIndices {
 ConstantBuffer<MaskedShadowDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a masked static-mesh vertex and resolve its material identifier.
+ * @brief Transform a masked mesh vertex and resolve its material identifier.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Clip-space vertex output with material metadata.

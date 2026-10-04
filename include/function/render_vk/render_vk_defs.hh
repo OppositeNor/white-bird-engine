@@ -20,14 +20,9 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/vma_vk.hh"
-#include "glm/ext/matrix_float4x4.hpp"
-#include "glm/ext/vector_float3.hpp"
-#include "glm/ext/vector_float4.hpp"
 
-#include <array>
 #include <cstdint>
 #include <functional>
-#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -208,87 +203,6 @@ struct BaseRenderDataVK {
  * @brief The bindpoint for vertex buffer.
  */
 constexpr uint32_t VERTEX_BUFFER_BINDPOINT = 0;
-
-struct CameraInfoVKUBO {
-    /**
-     * @brief The view matrix.
-     */
-    glm::mat4 view;
-    /**
-     * @brief The projection matrix.
-     */
-    glm::mat4 proj;
-    /**
-     * @brief The world-space camera position.
-     */
-    glm::vec4 world_position;
-};
-
-constexpr uint32_t MAX_SPOT_LIGHT_INFO_COUNT = 4;
-
-struct SpotLightInfoVKUBO {
-    /**
-     * @brief Light-space view matrix.
-     */
-    glm::mat4 view;
-    /**
-     * @brief Light-space projection matrix.
-     */
-    glm::mat4 proj;
-    /**
-     * @brief Inverse light-space view-projection matrix used to reconstruct world positions from shadow-map depth.
-     */
-    glm::mat4 inv_view_proj;
-    /**
-     * @brief World-space position of the spot light.
-     */
-    glm::vec3 position;
-    /**
-     * @brief Scalar intensity multiplier.
-     */
-    float intensity = 0.0F;
-    /**
-     * @brief World-space direction the spot is pointing.
-     */
-    glm::vec3 direction;
-    /**
-     * @brief Cosine of the inner cone half-angle.
-     */
-    float inner_cone_cos = 0.0F;
-    /**
-     * @brief Linear-space color of the spot light.
-     */
-    glm::vec3 color;
-    /**
-     * @brief Cosine of the outer cone half-angle.
-     */
-    float outer_cone_cos = 0.0F;
-    /**
-     * @brief Maximum effective light distance.
-     */
-    float range = 0.0F;
-    /**
-     * @brief Projected emitter width in world units.
-     */
-    float emitter_width = 0.0F;
-    /**
-     * @brief Padding to match the shader struct array stride.
-     */
-    std::array<uint32_t, 2> padding{};
-};
-
-static_assert(sizeof(SpotLightInfoVKUBO) == 256);
-
-struct SpotLightInfosVKUBO {
-    /**
-     * @brief Active spot light data consumed by the shader.
-     */
-    std::array<SpotLightInfoVKUBO, MAX_SPOT_LIGHT_INFO_COUNT> spot_light_info{};
-    /**
-     * @brief Number of active entries in spot_light_info.
-     */
-    uint32_t spot_light_count = 0;
-};
 
 } // namespace WhiteBirdEngine
 

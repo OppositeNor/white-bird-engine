@@ -53,7 +53,7 @@ struct DrawCubeUnshadedDescriptorIndices {
 ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform an unshaded static-mesh vertex into clip space.
+ * @brief Transform an unshaded mesh vertex into clip space.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Vertex output for the unshaded fragment stage.

@@ -57,6 +57,7 @@
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <glm/trigonometric.hpp>
@@ -482,8 +483,104 @@ inline WBE::ComponentCamera make_default_test_camera_component(float p_aspect_ra
     return camera_component;
 }
 
-inline WBE::CameraInfoVKUBO make_camera_info_ubo(const WBE::ComponentCamera& p_camera_component) {
-    return WBE::CameraInfoVKUBO{
+/**
+ * @struct CameraInfoGPU
+ * @brief CPU-side mirror of the shader `CameraInfo` struct.
+ */
+struct CameraInfoGPU {
+    /**
+     * @brief The view matrix.
+     */
+    glm::mat4 view;
+    /**
+     * @brief The projection matrix.
+     */
+    glm::mat4 proj;
+    /**
+     * @brief The world-space camera position.
+     */
+    glm::vec4 world_position;
+};
+
+/**
+ * @brief Maximum number of spot lights in a SpotLightInfosGPU table.
+ */
+constexpr uint32_t MAX_SPOT_LIGHT_INFO_COUNT = 4;
+
+/**
+ * @struct SpotLightInfoGPU
+ * @brief CPU-side mirror of the shader `SpotLightInfo` struct.
+ */
+struct SpotLightInfoGPU {
+    /**
+     * @brief Light-space view matrix.
+     */
+    glm::mat4 view;
+    /**
+     * @brief Light-space projection matrix.
+     */
+    glm::mat4 proj;
+    /**
+     * @brief Inverse light-space view-projection matrix used to reconstruct world positions from shadow-map depth.
+     */
+    glm::mat4 inv_view_proj;
+    /**
+     * @brief World-space position of the spot light.
+     */
+    glm::vec3 position;
+    /**
+     * @brief Scalar intensity multiplier.
+     */
+    float intensity = 0.0F;
+    /**
+     * @brief World-space direction the spot is pointing.
+     */
+    glm::vec3 direction;
+    /**
+     * @brief Cosine of the inner cone half-angle.
+     */
+    float inner_cone_cos = 0.0F;
+    /**
+     * @brief Linear-space color of the spot light.
+     */
+    glm::vec3 color;
+    /**
+     * @brief Cosine of the outer cone half-angle.
+     */
+    float outer_cone_cos = 0.0F;
+    /**
+     * @brief Maximum effective light distance.
+     */
+    float range = 0.0F;
+    /**
+     * @brief Projected emitter width in world units.
+     */
+    float emitter_width = 0.0F;
+    /**
+     * @brief Padding to match the shader struct array stride.
+     */
+    std::array<uint32_t, 2> padding{};
+};
+
+static_assert(sizeof(SpotLightInfoGPU) == 256);
+
+/**
+ * @struct SpotLightInfosGPU
+ * @brief Spot light table with its active-entry count.
+ */
+struct SpotLightInfosGPU {
+    /**
+     * @brief Active spot light data consumed by the shader.
+     */
+    std::array<SpotLightInfoGPU, MAX_SPOT_LIGHT_INFO_COUNT> spot_light_info{};
+    /**
+     * @brief Number of active entries in spot_light_info.
+     */
+    uint32_t spot_light_count = 0;
+};
+
+inline CameraInfoGPU make_camera_info_gpu(const WBE::ComponentCamera& p_camera_component) {
+    return CameraInfoGPU{
         .view = p_camera_component.view,
         .proj = p_camera_component.proj,
         .world_position = glm::inverse(p_camera_component.view)[3],
@@ -512,8 +609,8 @@ inline WBE::ComponentSpotLight make_default_test_spot_light_component(float p_in
     return spot_light_component;
 }
 
-inline WBE::SpotLightInfoVKUBO make_spot_light_info_ubo(const WBE::ComponentSpotLight& p_spot_light_component) {
-    return WBE::SpotLightInfoVKUBO{.view = p_spot_light_component.view,
+inline SpotLightInfoGPU make_spot_light_info_gpu(const WBE::ComponentSpotLight& p_spot_light_component) {
+    return SpotLightInfoGPU{.view = p_spot_light_component.view,
         .proj = p_spot_light_component.proj,
         .inv_view_proj = glm::inverse(p_spot_light_component.proj * p_spot_light_component.view),
         .position = p_spot_light_component.position,

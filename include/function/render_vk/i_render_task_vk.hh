@@ -72,7 +72,7 @@ enum class RendResUsageVK : uint32_t {
 
 /**
  * @class ResAccessVK
- * @brief Compact resource declaration emitted by a Vulkan render task or graph descriptor.
+ * @brief Compact resource access reported by a Vulkan render task through IRenderTaskVK::append_accesses().
  */
 struct ResAccessVK {
     /** Resource identifier used by the graph. */
@@ -98,8 +98,8 @@ struct IRenderTaskVK : public IRenderTask {
 
     /**
      * @brief The queue family this task should run on. The render graph uses
-     * this to select the command pool/queue and to decide whether resource
-     * edges need queue ownership transfer barriers.
+     * this to select the command pool and queue, and to decide whether a
+     * resource edge becomes a pipeline barrier or a timeline semaphore.
      *
      * @return The queue family index.
      */

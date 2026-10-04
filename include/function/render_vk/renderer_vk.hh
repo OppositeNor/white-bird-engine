@@ -149,12 +149,13 @@ public:
     Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
 
     /**
-     * @brief Execute a render graph through this renderer's swap-chain path.
+     * @brief Run one renderer frame and, when a graph is given, render it to the swap chain.
      *
-     * This is used by render tasks that own their own graph instead of going
-     * through the named pipeline registry.
+     * Advances to the next frame-in-flight slot and waits for that slot's fence, then runs queued render jobs, due delayed
+     * calls, the shader-debug readback, and pending GPU jobs. When p_graph is not null, it acquires a swap-chain image,
+     * executes the graph, presents, and waits for the frame's fence. Must be called on the rendering thread.
      *
-     * @param p_graph The graph to execute.
+     * @param p_graph The graph to execute, or null to only run the frame's renderer work.
      * @param p_delta The frame delta forwarded to graph tasks.
      */
     void execute_graph(Ref<RenderGraphVK> p_graph, double p_delta);
@@ -211,22 +212,7 @@ public:
 private:
     Ref<JobBufferRingMPSC> job_buffer;
 
-    template <typename T>
-    using Vector = ::WhiteBirdEngine::Vector<T, AllocType>;
-    template <typename T>
-    using Set = ::WhiteBirdEngine::Set<T, AllocType>;
-    template <typename T>
-    using HashSet = ::WhiteBirdEngine::HashSet<T, AllocType>;
-    template <typename T>
-    using Deque = ::WhiteBirdEngine::Deque<T, AllocType>;
-    template <typename TKey, typename TVal>
-    using Map = ::WhiteBirdEngine::Map<TKey, TVal, AllocType>;
-    using String = ::WhiteBirdEngine::String<AllocType>;
-
     inline static RendererVK* singleton = nullptr;
-
-    template <typename T>
-    using STLAlloc = STLAllocator<T, AllocType, false, true, false>;
 
     AllocType* allocator = nullptr;
     Ref<RenderDatabase> render_database;
@@ -246,7 +232,7 @@ private:
     uint32_t swap_chain_images_count = 0;
     uint32_t frames_in_flight = 0;
     // Pending readback request; accessed only by the rendering thread.
-    String capture_png_path;
+    String<AllocType> capture_png_path;
     bool frame_capture_supported = false;
 
     VkQueue graphics_queue = VK_NULL_HANDLE;
@@ -266,11 +252,11 @@ private:
     Ref<ROCMultislotsVK> swap_chain_image_view_container;
     Ref<ROBufferVK> shader_debug_buffer;
 
-    Vector<Ref<ROFenseVK>> in_flight_fences;
+    Vector<Ref<ROFenseVK>, AllocType> in_flight_fences;
     std::array<std::pair<std::function<void()>, int32_t>, MAX_DELAYED_CALLS> delayed_calls;
 
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
-    Vector<Ref<SemaphoreVK>> image_available_semaphores;
+    Vector<Ref<SemaphoreVK>, AllocType> image_available_semaphores;
 
     struct RegisteredRenderGraph {
         Ref<RendGraphDescVK> descriptor;
@@ -279,7 +265,7 @@ private:
     };
 
     // Registered compiled render graphs, keyed by resource key.
-    Map<std::string, RegisteredRenderGraph> render_graphs;
+    Map<std::string, RegisteredRenderGraph, AllocType> render_graphs;
     // The currently active cached render graph.
     Ref<RenderGraphVK> active_graph;
 
@@ -319,9 +305,9 @@ private:
         uint32_t get_present() const {
             return get_required_index(present, "present");
         }
-        Set<uint32_t> get_unique_indices() const {
+        Set<uint32_t, AllocType> get_unique_indices() const {
             WBE_DEBUG_ASSERT(is_complete());
-            Set<uint32_t> result(allocator);
+            Set<uint32_t, AllocType> result(allocator);
             result.insert(get_graphics());
             result.insert(get_compute());
             result.insert(get_present());
@@ -339,8 +325,8 @@ private:
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR capabilities;
-        Vector<VkSurfaceFormatKHR> formats;
-        Vector<VkPresentModeKHR> present_modes;
+        Vector<VkSurfaceFormatKHR, AllocType> formats;
+        Vector<VkPresentModeKHR, AllocType> present_modes;
         bool is_adequate() const {
             return !formats.empty() && !present_modes.empty();
         }
@@ -348,7 +334,7 @@ private:
 
     BaseRenderDataVK base_render_data;
     QueueFamilyIndices queue_family_indices;
-    Vector<Ref<RenderPluginVK>> registered_plugins;
+    Vector<Ref<RenderPluginVK>, AllocType> registered_plugins;
 
     // Render objects for the renderer.
     struct RenderObjects {
@@ -360,9 +346,9 @@ private:
         RenderObjects& operator=(const RenderObjects&) = delete;
         RenderObjects& operator=(RenderObjects&&) noexcept = delete;
         // Swap chain images
-        Vector<Ref<ROImageVK>> swap_chain_images;
+        Vector<Ref<ROImageVK>, AllocType> swap_chain_images;
         // Swap chain image views.
-        Vector<Ref<ROImageViewVK>> swap_chain_image_views;
+        Vector<Ref<ROImageViewVK>, AllocType> swap_chain_image_views;
     };
     Unique<RenderObjects> render_objects;
 
@@ -374,8 +360,8 @@ private:
         std::promise<Ref<ROFenseVK>> submission_promise;
     };
     std::array<RegisteredGPUJob, MAX_GPU_JOBS> gpu_jobs;
-    Vector<GPUJobVK> running_gpu_jobs;
-    Vector<Ref<ROFenseVK>> running_gpu_job_fenses;
+    Vector<GPUJobVK, AllocType> running_gpu_jobs;
+    Vector<Ref<ROFenseVK>, AllocType> running_gpu_job_fenses;
     Ref<SemaphoreVK> running_gpu_job_semaphore;
 
     void init(RendererCapabilities& p_capabilities);
@@ -401,7 +387,7 @@ private:
     void create_async_objects();
 
     bool check_layer_support();
-    void pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices);
+    void pick_physical_device(const Vector<VkPhysicalDevice, AllocType>& p_physical_devices);
     void create_physical_device();
     void create_logical_device();
     void create_swap_chain_images();
@@ -412,8 +398,8 @@ private:
 
     QueueFamilyIndices get_queue_family_indices(VkPhysicalDevice p_device);
     SwapChainSupportDetails get_swap_chain_support_details(VkPhysicalDevice p_device);
-    VkSurfaceFormatKHR choose_swap_surface_format(const Vector<VkSurfaceFormatKHR>& p_available_formats);
-    VkPresentModeKHR choose_swap_present_mode(const Vector<VkPresentModeKHR>& p_available_present_modes);
+    VkSurfaceFormatKHR choose_swap_surface_format(const Vector<VkSurfaceFormatKHR, AllocType>& p_available_formats);
+    VkPresentModeKHR choose_swap_present_mode(const Vector<VkPresentModeKHR, AllocType>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
     void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
@@ -423,14 +409,14 @@ private:
 
     void run_stored_jobs();
     std::optional<uint32_t> acquire_swapchain_next_image(VkSemaphore p_image_avialable_semaphore);
-    std::optional<uint32_t> tick_setup_pipeline();
+    uint32_t advance_frame_slot();
     void run_delayed_calls();
     void run_gpu_jobs();
     void check_shader_debug_buffer();
     void synchronize_gpu_and_flush_delayed_calls();
     void flush_delayed_calls();
     void wait_for_running_gpu_jobs();
-    void submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>>& p_completion_fenses,
+    void submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, AllocType>& p_completion_fenses,
         std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
         Ref<SemaphoreVK> p_completion_semaphore);
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);

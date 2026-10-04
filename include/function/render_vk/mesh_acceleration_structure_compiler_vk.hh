@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class MeshAccelerationStructureCompilerVK
- * @brief Creates the ray-tracing acceleration structures of a compiled static mesh. Copyable and movable.
+ * @brief Creates the ray-tracing acceleration structures of compiled mesh resources. Copyable and movable.
  *
  * Covers the opaque and opaque double-sided categories: one bottom-level structure per drawable submesh, instanced by the
  * top-level structure once per instance at p_mesh_transform × the instance-local transform. Placing the mesh elsewhere

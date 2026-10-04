@@ -31,11 +31,11 @@ namespace WhiteBirdEngine {
 
 /**
  * @class MeshAccelerationStructureVK
- * @brief Ray-tracing acceleration structures of a compiled static mesh, with every resource their build needs.
+ * @brief Ray-tracing acceleration structures of compiled mesh resources, with every resource their build needs.
  *
  * Holds one bottom-level acceleration structure per drawable opaque or opaque double-sided submesh, the top-level
  * acceleration structure instancing them with the mesh's instance transforms, the instance buffer, scratch storage, and the
- * source static mesh whose geometry buffers the build reads. Created by MeshAccelerationStructureCompilerVK; the
+ * source mesh resources whose geometry buffers the build reads. Created by MeshAccelerationStructureCompilerVK; the
  * structures hold no data until record_build() has executed on the GPU. bind() imports the top-level structure under
  * `<key>.top_level`. Neither copyable nor movable, shared through Ref, and confined to the rendering thread.
  */
@@ -43,7 +43,7 @@ class MeshAccelerationStructureVK final : public IBindableRenderResourceVK {
 public:
     /** Member name of the top-level acceleration structure. */
     static constexpr std::string_view TOP_LEVEL = "top_level";
-    /** Usage the static mesh's vertex and index buffers need to serve as build inputs. */
+    /** Usage the mesh's vertex and index buffers need to serve as build inputs. */
     static constexpr VkBufferUsageFlags GEOMETRY_BUFFER_USAGE =
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
@@ -76,7 +76,7 @@ public:
      */
     Ref<ROAccelerationStructureVK> acquire_bottom_level(size_t p_index) const;
 
-    /** @brief Acquire the static mesh whose geometry the structures were built from. */
+    /** @brief Acquire the mesh resources whose geometry the structures were built from. */
     Ref<MeshResourcesVK> acquire_static_mesh() const {
         return static_mesh;
     }

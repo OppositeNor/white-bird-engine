@@ -37,7 +37,7 @@ struct ForwardDescriptorIndices {
 ConstantBuffer<ForwardDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-mesh vertex and resolve its bindless material identifier.
+ * @brief Transform a mesh vertex and resolve its bindless material identifier.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Vertex output in world and clip space.

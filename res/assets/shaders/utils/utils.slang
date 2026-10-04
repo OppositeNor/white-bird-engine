@@ -238,7 +238,7 @@ struct MaterialParamsBuffer {
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
-/** Per-submesh metadata for one static-mesh draw entry. */
+/** Per-submesh metadata for one mesh draw entry. */
 [WBE_DATA_TYPE]
 struct SubmeshData {
     /** Material table entry used by this submesh. */
@@ -269,7 +269,7 @@ struct InstanceData {
 };
 
 #ifdef WBE_REFLECTION_METADATA
-/** Reflection-only view of the static-mesh storage-buffer contract. */
+/** Reflection-only view of the mesh storage-buffer contract. */
 [WBE_DATA_TYPE]
 struct MeshContractMetadata {
     StructuredBuffer<SubmeshData> submeshes;

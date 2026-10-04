@@ -86,7 +86,7 @@ public:
     MeshResourcesVK& operator=(const MeshResourcesVK&) = delete;
     MeshResourcesVK& operator=(MeshResourcesVK&&) noexcept = delete;
 
-    /** @brief Construct empty allocator-owned static-mesh resource storage. */
+    /** @brief Construct empty allocator-owned mesh resource storage. */
     explicit MeshResourcesVK(RenderAllocator* p_allocator);
 
     /** @brief Acquire the shared vertex buffer. */
@@ -136,7 +136,7 @@ public:
         return material_params;
     }
 
-    /** @brief Acquire the sampler used by static-mesh materials. */
+    /** @brief Acquire the sampler used by the mesh materials. */
     Ref<ROSamplerVK> acquire_material_sampler() const {
         return material_sampler;
     }

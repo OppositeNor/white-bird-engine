@@ -34,7 +34,7 @@ struct DeferredGBufferDescriptorIndices {
 ConstantBuffer<DeferredGBufferDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-mesh vertex for the deferred G-buffer pass.
+ * @brief Transform a mesh vertex for the deferred G-buffer pass.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Vertex output in world and clip space.

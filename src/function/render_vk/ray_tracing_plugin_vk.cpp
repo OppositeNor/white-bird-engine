@@ -75,7 +75,7 @@ bool RayTracingPluginVK::supports_base_features(
         return false;
     }
 
-    // Static mesh BLAS builds read three-component float positions from vertex buffers.
+    // Mesh BLAS builds read three-component float positions from vertex buffers.
     VkFormatProperties position_format_properties{};
     vkGetPhysicalDeviceFormatProperties(p_physical_device, VK_FORMAT_R32G32B32_SFLOAT, &position_format_properties);
     if ((position_format_properties.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR) == 0) {

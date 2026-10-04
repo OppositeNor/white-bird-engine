@@ -57,9 +57,8 @@ public:
         friend ROImageVK;
         // Format used for the depth attachment of a spot light shadow map.
         static constexpr VkFormat SHADOW_MAP_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
-        // Format used for the dummy color attachment that accompanies a
-        // spot light shadow map (the Vulkan render pass requires at least
-        // one color attachment, but its contents are ignored).
+        // Format used for the color attachment that accompanies a spot
+        // light shadow map.
         static constexpr VkFormat SHADOW_MAP_COLOR_FORMAT = VK_FORMAT_R8_UNORM;
         // Image type.
         Required<VkImageType> image_type;
@@ -113,8 +112,8 @@ public:
         // `shadow_map_resolution`, format `SHADOW_MAP_DEPTH_FORMAT`, usage
         // depth-stencil attachment + sampled.
         Builder& shadow_map_depth(const ComponentSpotLight& p_spot_light);
-        // Configure this image as the dummy color attachment that pairs
-        // with `shadow_map_depth`: 2D, square, sized from the light's
+        // Configure this image as the color attachment that pairs with
+        // `shadow_map_depth`: 2D, square, sized from the light's
         // `shadow_map_resolution`, format `SHADOW_MAP_COLOR_FORMAT`, usage
         // color attachment.
         Builder& shadow_map_color(const ComponentSpotLight& p_spot_light);

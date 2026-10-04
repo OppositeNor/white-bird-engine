@@ -39,7 +39,7 @@ struct ShadowDescriptorIndices {
 ConstantBuffer<ShadowDescriptorIndices> descriptor_indices;
 
 /**
- * @brief Transform a static-mesh vertex into spot-light clip space.
+ * @brief Transform a mesh vertex into spot-light clip space.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Clip-space vertex output.

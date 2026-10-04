@@ -184,9 +184,9 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
     if (camera_info_buffer == nullptr) {
         return;
     }
-    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
+    CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
     add_render_job([camera_info, camera_info_buffer]() {
-        camera_info_buffer->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+        camera_info_buffer->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     });
 }
 
@@ -296,9 +296,9 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
             {.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
-        .add_buffer(SHADOW_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_ubo(spot_light_component))))
-        .add_buffer(SPOT_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_ubo(spot_light_component))))
-        .add_buffer(CAMERA_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_camera_info_ubo(camera_component))))
+        .add_buffer(SHADOW_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_gpu(spot_light_component))))
+        .add_buffer(SPOT_LIGHT_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_spot_light_info_gpu(spot_light_component))))
+        .add_buffer(CAMERA_INFO_BUFFER, make_uniform_buffer(WBE::to_initial_data(make_camera_info_gpu(camera_component))))
         .add_buffer(SPOT_LIGHT_COUNT_BUFFER, make_uniform_buffer(WBE::to_initial_data(spot_light_count)));
 
     // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.

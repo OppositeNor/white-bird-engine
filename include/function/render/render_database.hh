@@ -45,7 +45,7 @@ public:
      * @brief Key for a backend-neutral compiled render resource registry entry.
      *
      * A resource key alone is not enough because one resource can compile into
-     * multiple backend objects, such as shaders, layouts, and pipelines.
+     * multiple backend objects, such as shaders, image views, and pipelines.
      */
     struct CompiledRenderResourceKey {
         /**

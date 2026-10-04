@@ -120,15 +120,15 @@ ForwardSceneViewConfig make_forward_sponza_view_config() {
     };
 }
 
-struct BillboardInfoVKUBO {
+struct BillboardInfoGPU {
     glm::vec4 position = glm::vec4(0.0F);
     glm::vec2 size = glm::vec2(0.0F);
     glm::vec2 size_padding = glm::vec2(0.0F);
     glm::vec4 rotation_axis = glm::vec4(0.0F);
 };
 
-BillboardInfoVKUBO make_light_billboard_info(const WBE::ComponentSpotLight& p_spot_light_component) {
-    return BillboardInfoVKUBO{
+BillboardInfoGPU make_light_billboard_info(const WBE::ComponentSpotLight& p_spot_light_component) {
+    return BillboardInfoGPU{
         .position = glm::vec4(p_spot_light_component.position, 1.0F),
         .size = LIGHT_BILLBOARD_SIZE,
         .rotation_axis = glm::vec4(0.0F, 1.0F, 0.0F, 0.0F),
@@ -328,9 +328,9 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
         return;
     }
 
-    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
+    SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
+    BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
     add_render_job([this, camera_info, spot_light_info, light_billboard_info]() {
         camera_info_ubos->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
         spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
@@ -509,7 +509,7 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     }
 
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU));
     }
 
     WBE::GraphicsPipelineCompilerVKContext compiler_context{
@@ -527,25 +527,25 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
 
 void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
     if (spot_light_info_ubos == WBE::MEM_NULL) {
-        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU));
     }
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
     log_uniform_buffer_descriptors(spot_light_info_ubos, "forward sponza shadow light buffer");
 }
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors() {
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::CameraInfoVKUBO));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU));
     }
     if (spot_light_count_ubos == WBE::MEM_NULL) {
         spot_light_count_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(uint32_t));
     }
     if (spot_light_info_ubos == WBE::MEM_NULL) {
-        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(WBE::SpotLightInfoVKUBO));
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU));
     }
-    WBE::CameraInfoVKUBO camera_info = make_camera_info_ubo(camera_component);
-    WBE::SpotLightInfoVKUBO spot_light_info = make_spot_light_info_ubo(spot_light_component);
+    CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
+    SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
     uint32_t spot_light_count = 1;
     camera_info_ubos->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));

@@ -94,7 +94,6 @@ public:
      * @brief Get a stable resource binding by id.
      *
      * @param p_resource_id The resource id to query.
-     * The binding may not have a current render object until runtime resources are populated.
      *
      * @return The resource binding stored under the id.
      */

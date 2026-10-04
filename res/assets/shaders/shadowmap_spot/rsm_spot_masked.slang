@@ -68,7 +68,7 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
 }
 
 /**
- * @brief Transform a static-mesh vertex for reflective shadow-map rendering.
+ * @brief Transform a mesh vertex for reflective shadow-map rendering.
  * @param p_input Incoming vertex attributes.
  * @param p_instance_id Index into mesh.instances.
  * @return Reflective shadow-map vertex output.

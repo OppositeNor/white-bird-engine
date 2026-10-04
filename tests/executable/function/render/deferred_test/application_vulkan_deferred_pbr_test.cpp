@@ -67,24 +67,24 @@ namespace WhiteBirdEngine {
 namespace {
 
 constexpr glm::vec2 LIGHT_BILLBOARD_SIZE = glm::vec2(0.35F, 0.35F);
-struct BillboardInfoVKUBO {
+struct BillboardInfoGPU {
     glm::vec4 position = glm::vec4(0.0F);
     glm::vec2 size = glm::vec2(0.0F);
     glm::vec2 size_padding = glm::vec2(0.0F);
     glm::vec4 rotation_axis = glm::vec4(0.0F);
 };
 
-BillboardInfoVKUBO make_light_billboard_info(const ComponentSpotLight& p_spot_light_component) {
-    return BillboardInfoVKUBO{
+BillboardInfoGPU make_light_billboard_info(const ComponentSpotLight& p_spot_light_component) {
+    return BillboardInfoGPU{
         .position = glm::vec4(p_spot_light_component.position, 1.0F),
         .size = LIGHT_BILLBOARD_SIZE,
         .rotation_axis = glm::vec4(0.0F, 1.0F, 0.0F, 0.0F),
     };
 }
 
-SpotLightInfosVKUBO make_spot_light_infos_ubo(const ComponentSpotLight& p_spot_light_component) {
-    SpotLightInfosVKUBO result;
-    result.spot_light_info[0] = make_spot_light_info_ubo(p_spot_light_component);
+SpotLightInfosGPU make_spot_light_infos_gpu(const ComponentSpotLight& p_spot_light_component) {
+    SpotLightInfosGPU result;
+    result.spot_light_info[0] = make_spot_light_info_gpu(p_spot_light_component);
     result.spot_light_count = 1;
     return result;
 }
@@ -256,10 +256,10 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
 
 void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
-    CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
+    CameraInfoGPU gbuffer_camera_info = make_camera_info_gpu(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
-    SpotLightInfosVKUBO spot_light_infos = make_spot_light_infos_ubo(spot_light_component);
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
+    BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
     add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_info]() {
         if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL ||
             spot_light_info_buffers == MEM_NULL || light_billboard_ubo == MEM_NULL) {
@@ -487,7 +487,7 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
         throw std::runtime_error("Failed to setup deferred light billboard overlay: texture resource was not found.");
     }
 
-    BillboardInfoVKUBO light_billboard_info = make_light_billboard_info(spot_light_component);
+    BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
     light_billboard_ubo = ROBufferVK::Builder()
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                               .initial_data(&light_billboard_info, sizeof(light_billboard_info))
@@ -584,7 +584,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(render_allocator,
         base_render_data,
-        sizeof(SpotLightInfoVKUBO) * MAX_SPOT_LIGHT_INFO_COUNT,
+        sizeof(SpotLightInfoGPU) * MAX_SPOT_LIGHT_INFO_COUNT,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     uint32_t spot_light_count = 1;
     spot_light_count_buffer =
@@ -620,8 +620,8 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
     gbuffer_camera_info_ubos =
-        create_per_frame_buffers(render_allocator, base_render_data, sizeof(CameraInfoVKUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-    CameraInfoVKUBO gbuffer_camera_info = make_camera_info_ubo(camera_component);
+        create_per_frame_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    CameraInfoGPU gbuffer_camera_info = make_camera_info_gpu(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
 
     gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
@@ -631,7 +631,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
-    SpotLightInfosVKUBO spot_light_infos = make_spot_light_infos_ubo(spot_light_component);
+    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
 
     spot_light_info_buffers->publish_buffer_update(spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
     log_uniform_buffer_descriptors(spot_light_info_buffers, "Spot light buffer");

@@ -68,7 +68,7 @@ public:
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
         camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
-        camera_info_ubo->update_buffer(&camera_info, sizeof(WBE::CameraInfoVKUBO));
+        camera_info_ubo->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     }
 
     void setup_graphics_pipeline() {
@@ -86,7 +86,7 @@ public:
         }
 
         aspect_ratio = base_render_data->swap_chain_aspect_ratio;
-        camera_info = WBE::CameraInfoVKUBO{
+        camera_info = CameraInfoGPU{
             // Look at the origin from (2,2,2)
             .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
             .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), aspect_ratio, 10.0F, 0.1F),
@@ -135,7 +135,7 @@ public:
 
 private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    WBE::CameraInfoVKUBO camera_info{};
+    CameraInfoGPU camera_info{};
     float aspect_ratio = 1.0F;
 };
 

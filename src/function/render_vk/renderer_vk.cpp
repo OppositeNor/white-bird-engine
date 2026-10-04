@@ -176,12 +176,7 @@ void RendererVK::tick(double p_delta) {
 }
 
 void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
-    // Setup pipeline.
-    auto tick_frame_counter = tick_setup_pipeline();
-    if (!tick_frame_counter.has_value()) {
-        // No pipeline selected, continue.
-        return;
-    }
+    uint32_t frame_slot = advance_frame_slot();
 
     // Frame-local resource updates must run after the slot is selected and its fence has completed.
     run_stored_jobs();
@@ -189,14 +184,13 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     run_delayed_calls();
     check_shader_debug_buffer();
     run_gpu_jobs();
-    uint32_t frame_counter = *tick_frame_counter;
 
     if (p_graph == MEM_NULL) {
         // No active render graph, nothing to do this frame.
         return;
     }
 
-    auto& image_available_semaphore = image_available_semaphores[frame_counter];
+    auto& image_available_semaphore = image_available_semaphores[frame_slot];
     auto next_image_index = acquire_swapchain_next_image(image_available_semaphore->get_semaphore());
     if (!next_image_index.has_value()) {
         // Swap chain resetted, needs re-acquire. Skip this frame's rendering.
@@ -204,7 +198,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     }
     uint32_t image_index = *next_image_index;
 
-    in_flight_fences[frame_counter]->reset();
+    in_flight_fences[frame_slot]->reset();
 
     // Update the current frame slot so the graph-bound swap-chain image-view container
     // resolves to the correct image view during task recording.
@@ -227,7 +221,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
         capture_png_path.clear();
     }
     present(image_index, p_graph);
-    in_flight_fences[frame_counter]->wait();
+    in_flight_fences[frame_slot]->wait();
 
     ++(base_render_data.current_frame);
 }
@@ -517,14 +511,14 @@ void RendererVK::create_swap_chain() { // NOLINT
         create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
     auto unique_indices = queue_family_indices.get_unique_indices();
-    Vector<uint32_t> swap_chain_queue_family_indices_array(allocator);
+    Vector<uint32_t, AllocType> swap_chain_queue_family_indices_array(allocator);
 
     // If we have to use the image between multiple queue families, we have to
     // specify it.
     if (unique_indices.size() > 1) {
         // Images can share ownership. If other queue families want to access we
         // don't have to explicitly transfer ownership.
-        swap_chain_queue_family_indices_array = Vector<uint32_t>(unique_indices.begin(), unique_indices.end(), allocator);
+        swap_chain_queue_family_indices_array = Vector<uint32_t, AllocType>(unique_indices.begin(), unique_indices.end(), allocator);
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = unique_indices.size();
         create_info.pQueueFamilyIndices = swap_chain_queue_family_indices_array.data();
@@ -567,7 +561,7 @@ void RendererVK::create_swap_chain() { // NOLINT
 void RendererVK::create_swap_chain_images() {
     // Create swap chain images.
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, nullptr);
-    Vector<VkImage> swap_chain_images(allocator);
+    Vector<VkImage, AllocType> swap_chain_images(allocator);
     swap_chain_images.resize(swap_chain_images_count);
     vkGetSwapchainImagesKHR(logical_device, swap_chain, &swap_chain_images_count, swap_chain_images.data());
     WBE_DEBUG_ASSERT(render_objects->swap_chain_images.empty());
@@ -771,7 +765,7 @@ void RendererVK::create_shader_debug_buffer() {
     if (frames_in_flight == 0) {
         throw std::runtime_error("Failed to create shader-debug buffer: frame count is invalid.");
     }
-    Vector<uint32_t> initial_data(SHADER_DEBUG_FRAME_WORD_COUNT * frames_in_flight, uint32_t{0}, allocator);
+    Vector<uint32_t, AllocType> initial_data(SHADER_DEBUG_FRAME_WORD_COUNT * frames_in_flight, uint32_t{0}, allocator);
     for (size_t frame_slot = 0; frame_slot < frames_in_flight; ++frame_slot) {
         initial_data[frame_slot * SHADER_DEBUG_FRAME_WORD_COUNT + 1] = SHADER_DEBUG_FRAME_ENTRY_CAPACITY;
     }
@@ -801,14 +795,14 @@ void RendererVK::create_physical_device() {
     if (physical_device_count == 0) {
         throw std::runtime_error("No valid physical device found.");
     }
-    Vector<VkPhysicalDevice> physical_devices(physical_device_count, allocator);
+    Vector<VkPhysicalDevice, AllocType> physical_devices(physical_device_count, allocator);
     vkEnumeratePhysicalDevices(vk_instance, &physical_device_count, physical_devices.data());
 
     // Pick one that's the most suitable.
     pick_physical_device(physical_devices);
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(physical_device, &device_properties);
-    String device_name(device_properties.deviceName, allocator);
+    String<AllocType> device_name(device_properties.deviceName, allocator);
     stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked video device: \"{}\".", device_name));
     queue_family_indices = get_queue_family_indices(physical_device);
 }
@@ -816,8 +810,8 @@ void RendererVK::create_physical_device() {
 void RendererVK::create_logical_device() { // NOLINT
     // Setup queues create info.
     float queue_priority = 1.0;
-    Set<uint32_t> indices = queue_family_indices.get_unique_indices();
-    Vector<VkDeviceQueueCreateInfo> queues_create_info(allocator);
+    Set<uint32_t, AllocType> indices = queue_family_indices.get_unique_indices();
+    Vector<VkDeviceQueueCreateInfo, AllocType> queues_create_info(allocator);
     queues_create_info.reserve(indices.size());
     for (uint32_t elem : indices) {
         VkDeviceQueueCreateInfo queue_create_info{};
@@ -960,7 +954,7 @@ void RendererVK::create_logical_device() { // NOLINT
 bool RendererVK::check_layer_support() {
     uint32_t layer_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
-    Vector<VkLayerProperties> layer_properties(layer_count, allocator);
+    Vector<VkLayerProperties, AllocType> layer_properties(layer_count, allocator);
     vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data());
     for (const auto* name : enabled_layers) {
         bool layer_found = false;
@@ -1095,7 +1089,7 @@ void RendererVK::log_device_unsuitability(VkPhysicalDevice p_device, std::string
     }
 }
 
-void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical_devices) {
+void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice, AllocType>& p_physical_devices) {
     physical_device = VK_NULL_HANDLE;
     const auto& game_config = EngineFunction::get_singleton()->game_config->get_config_options();
     if (game_config.render_device_index.has_value()) {
@@ -1117,7 +1111,7 @@ void RendererVK::pick_physical_device(const Vector<VkPhysicalDevice>& p_physical
             // Successfully pick the device.
             VkPhysicalDeviceProperties device_properties;
             vkGetPhysicalDeviceProperties(p_physical_devices[pick_device_index], &device_properties);
-            String device_name(device_properties.deviceName, allocator);
+            String<AllocType> device_name(device_properties.deviceName, allocator);
             physical_device = p_physical_devices[pick_device_index];
             stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Picked device: \"{}\".", device_name));
             return;
@@ -1153,11 +1147,11 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 
     uint32_t queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, nullptr);
-    Vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count, allocator);
+    Vector<VkQueueFamilyProperties, AllocType> queue_family_properties(queue_family_count, allocator);
     vkGetPhysicalDeviceQueueFamilyProperties(p_device, &queue_family_count, queue_family_properties.data());
 
     // Gather present support for every queue family up front.
-    Vector<VkBool32> present_support(queue_family_count, allocator);
+    Vector<VkBool32, AllocType> present_support(queue_family_count, allocator);
     for (uint32_t i = 0; i < queue_family_count; ++i) {
         present_support[i] = VK_FALSE;
         vkGetPhysicalDeviceSurfaceSupportKHR(p_device, i, surface, &present_support[i]);
@@ -1218,7 +1212,7 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
     SwapChainSupportDetails details{
-        .formats = Vector<VkSurfaceFormatKHR>(allocator), .present_modes = Vector<VkPresentModeKHR>(allocator)};
+        .formats = Vector<VkSurfaceFormatKHR, AllocType>(allocator), .present_modes = Vector<VkPresentModeKHR, AllocType>(allocator)};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -1231,7 +1225,7 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
     return details;
 }
 
-VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurfaceFormatKHR>& p_available_formats) {
+VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurfaceFormatKHR, AllocType>& p_available_formats) {
     for (const auto& available_format : p_available_formats) {
         if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return available_format;
@@ -1240,7 +1234,7 @@ VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurface
     return p_available_formats[0];
 }
 
-VkPresentModeKHR RendererVK::choose_swap_present_mode(const Vector<VkPresentModeKHR>& p_available_present_modes) {
+VkPresentModeKHR RendererVK::choose_swap_present_mode(const Vector<VkPresentModeKHR, AllocType>& p_available_present_modes) {
     for (const auto& available_present_mode : p_available_present_modes) {
         if (available_present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
             return VK_PRESENT_MODE_IMMEDIATE_KHR;
@@ -1301,14 +1295,13 @@ std::optional<uint32_t> RendererVK::acquire_swapchain_next_image(VkSemaphore p_i
     return image_index;
 }
 
-std::optional<uint32_t> RendererVK::tick_setup_pipeline() {
-    static uint32_t frame_counter = 0;
-    frame_counter = (frame_counter + 1) % frames_in_flight;
-    base_render_data.in_flight_fence = in_flight_fences[frame_counter]->get_fense();
-    base_render_data.current_frame_slot = frame_counter;
+uint32_t RendererVK::advance_frame_slot() {
+    const uint32_t frame_slot = (base_render_data.current_frame_slot + 1) % frames_in_flight;
+    base_render_data.in_flight_fence = in_flight_fences[frame_slot]->get_fense();
+    base_render_data.current_frame_slot = frame_slot;
 
-    in_flight_fences[frame_counter]->wait();
-    return frame_counter;
+    in_flight_fences[frame_slot]->wait();
+    return frame_slot;
 }
 
 void RendererVK::run_delayed_calls() {
@@ -1366,8 +1359,8 @@ void RendererVK::run_gpu_jobs() {
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to begin GPU-job command buffer: {}.", string_VkResult(result)));
     }
-    Vector<GPUJobVK> submitted_jobs(allocator);
-    Vector<Ref<ROFenseVK>> completion_fenses(allocator);
+    Vector<GPUJobVK, AllocType> submitted_jobs(allocator);
+    Vector<Ref<ROFenseVK>, AllocType> completion_fenses(allocator);
     std::vector<std::promise<Ref<ROFenseVK>>> submission_promises;
     for (auto& gpu_job : gpu_jobs) {
         if (!gpu_job.record) {
@@ -1448,7 +1441,7 @@ void RendererVK::wait_for_running_gpu_jobs() {
     running_gpu_job_semaphore = MEM_NULL;
 }
 
-void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>>& p_completion_fenses, // NOLINT
+void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, AllocType>& p_completion_fenses, // NOLINT
     std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
     Ref<SemaphoreVK> p_completion_semaphore) {
     VkMemoryBarrier2 barrier{};

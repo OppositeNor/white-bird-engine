@@ -49,7 +49,7 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
      * @class DispatchBase
      * @brief Attachment and pipeline state shared by regular and indirect dispatches.
      *
-     * Dispatches are copyable and movable. Their allocator must outlive every copy that retains their containers.
+     * Dispatches are copyable and movable. Their allocator must outlive every copy.
      */
     struct DispatchBase {
         /**
