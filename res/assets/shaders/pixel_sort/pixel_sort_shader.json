@@ -1,0 +1,27 @@
+{
+    "include": [],
+    "resources": [
+        {
+            "id": "workgroup_pixel_sort_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/workgroup_pixel_sort.slang",
+            "dst": "assets/shaders/pixel_sort/workgroup_pixel_sort.spv",
+            "metadata": "assets/shaders/pixel_sort/workgroup_pixel_sort.json"
+        },
+        {
+            "id": "present_pixel_sort_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/present_pixel_sort.slang",
+            "dst": "assets/shaders/pixel_sort/present_pixel_sort.spv",
+            "metadata": "assets/shaders/pixel_sort/present_pixel_sort.json"
+        },
+        {
+            "id": "present_pixel_sort_pipeline",
+            "type": "graphics_pipeline",
+            "vertex_stage_id": "present_pixel_sort_shader",
+            "fragment_stage_id": "present_pixel_sort_shader",
+            "depth_test": false,
+            "depth_write": false
+        }
+    ]
+}

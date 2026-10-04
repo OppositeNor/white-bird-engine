@@ -24,6 +24,15 @@
             "source_format": "srgb",
             "target_format": "srgb",
             "generate_mipmap": true
+        },
+        {
+            "id": "pixel_sort_source",
+            "source_type": "image_texture",
+            "src": "assets/models/Sponza/screenshot/large.jpg",
+            "dst": "assets/textures/pixel_sort_source.ktx2",
+            "source_format": "srgb",
+            "target_format": "srgb",
+            "generate_mipmap": false
         }
     ]
 }

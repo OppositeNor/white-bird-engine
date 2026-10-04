@@ -10,7 +10,8 @@
         "assets/shaders/deferred_composition/deferred_composition_shader.json",
         "assets/shaders/octree/octree.json",
         "assets/shaders/octree_2/octree_2.json",
-        "assets/shaders/bloom/bloom_shader.json"
+        "assets/shaders/bloom/bloom_shader.json",
+        "assets/shaders/pixel_sort/pixel_sort_shader.json"
     ],
     "resources": [
         {
