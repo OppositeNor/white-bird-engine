@@ -185,30 +185,34 @@ def test_random_range(utils: spy.Module, rng: np.random.Generator) -> None:
     np.testing.assert_array_equal(call(utils.random, seeds), result)
 
 
-def run_prefix_sum(p_device: spy.Device, p_load_kernel: KernelLoader, p_function: str, p_values: np.ndarray,
-        p_workgroup_size: int) -> np.ndarray:
-    kernel = p_load_kernel("workgroup_prefix_sum.slang", {"PREFIX_SUM": p_function, "ELEMENT_COUNT": len(p_values),
-        "KERNEL_WORKGROUP_SIZE": p_workgroup_size})
+PREFIX_SUM_ELEMENT_COUNT = 256
+PREFIX_SUM_WORKGROUP_SIZE = 64
+
+
+def run_inclusive_prefix_sum_64_256(p_device: spy.Device, p_load_kernel: KernelLoader, p_values: np.ndarray) -> np.ndarray:
+    kernel = p_load_kernel("workgroup_inclusive_prefix_sum_64_256.slang", {})
     buffer = p_device.create_buffer(element_count=len(p_values), struct_size=4,
         usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access, data=p_values)
-    kernel.dispatch(thread_count=[p_workgroup_size, 1, 1], vars={"data": buffer})
+    kernel.dispatch(thread_count=[PREFIX_SUM_WORKGROUP_SIZE, 1, 1], vars={"data": buffer})
     return buffer.to_numpy().view(np.uint32)
 
 
-PREFIX_SUM_SHAPES = [(1, 32), (31, 32), (32, 32), (100, 32), (256, 64), (1000, 64), (4096, 256)]
-
-
-@pytest.mark.parametrize(("p_element_count", "p_workgroup_size"), PREFIX_SUM_SHAPES)
-def test_workgroup_inclusive_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
-        p_element_count: int, p_workgroup_size: int) -> None:
-    values = rng.integers(0, 1000, p_element_count, dtype=np.uint32)
-    result = run_prefix_sum(device, load_kernel, "workgroup_inclusive_prefix_sum", values, p_workgroup_size)
+def test_workgroup_inclusive_prefix_sum_64_256(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator) -> None:
+    values = rng.integers(0, 1000, PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
+    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
     np.testing.assert_array_equal(result, np.cumsum(values, dtype=np.uint32))
 
 
-@pytest.mark.parametrize(("p_element_count", "p_workgroup_size"), PREFIX_SUM_SHAPES)
-def test_workgroup_exclusive_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
-        p_element_count: int, p_workgroup_size: int) -> None:
-    values = rng.integers(0, 1000, p_element_count, dtype=np.uint32)
-    result = run_prefix_sum(device, load_kernel, "workgroup_exclusive_prefix_sum", values, p_workgroup_size)
-    np.testing.assert_array_equal(result, np.concatenate([[0], np.cumsum(values, dtype=np.uint32)[:-1]]))
+def test_workgroup_inclusive_prefix_sum_64_256_ones(device: spy.Device, load_kernel: KernelLoader) -> None:
+    values = np.ones(PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
+    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
+    np.testing.assert_array_equal(result, np.arange(1, PREFIX_SUM_ELEMENT_COUNT + 1, dtype=np.uint32))
+
+
+def test_workgroup_inclusive_prefix_sum_64_256_single_element(device: spy.Device, load_kernel: KernelLoader) -> None:
+    # A lone value at the front must reach every later element and nothing may be added twice.
+    values = np.zeros(PREFIX_SUM_ELEMENT_COUNT, dtype=np.uint32)
+    values[0] = 7
+    result = run_inclusive_prefix_sum_64_256(device, load_kernel, values)
+    np.testing.assert_array_equal(result, np.full(PREFIX_SUM_ELEMENT_COUNT, 7, dtype=np.uint32))

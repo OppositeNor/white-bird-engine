@@ -32,22 +32,21 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     RWStructuredBuffer<uint> buffer = decriptor_indices.buffer.x;
     RWStructuredBuffer<uint4> output_buffer = decriptor_indices.buffer.x;
     ConstantBuffer<BufferInfo> buffer_info = decriptor_indices.buffer_info.x;
-    // The first entry of output_buffer stores the metadata of the histogram.
     if (p_group_id.x == 0 && p_group_thread_id.x == 0) {
+        // The first entry of output_buffer stores the metadata of the histogram.
         output_buffer[0] = uint4(arena_count, 0, 0, 0);
     }
     uint data_start = p_group_id.x * 64;
-    groupshared uint histogram[WBE_RADIX_SORT_BUCKET_SIZE];
+    // An extra is filled for zero clampping
+    groupshared uint histogram[WBE_RADIX_SORT_BUCKET_SIZE + 1];
+    if (p_group_thread_id.x == 0) {
+        histogram[WBE_RADIX_SORT_BUCKET_SIZE] = 0;
+    }
     // Each group holds a shared memory to calculate workgroup_scope_radix_sort_histogram
     workgroup_scope_radix_sort_histogram<uint, 64>(buffer, data_start, buffer_info.element_count, histogram, p_group_thread_id.x, BIT_REGION);
-    // Then write the output buffer correspondingly.
-    uint workgroup_output_region = WBE_RADIX_SORT_BUCKET_COUNT * p_group_id.x;
-    uint thread_workgroup_portion = p_group_thread_id.x * 4;
-    // We first pack it into a uint4 to perform SIMD write.
-    uint4 result = uint4(
-            histogram[thread_workgroup_portion],
-            histogram[thread_workgroup_portion + 1],
-            histogram[thread_workgroup_portion + 2],
-            histogram[thread_workgroup_portion + 3]);
-    output_buffer[(workgroup_output_region + thread_workgroup_portion) / 4 + 1] = result;
+
+    // Calculate the prefix sum of the invocation's subgroup.
+    workgroup_inclusive_prefix_sum_64_256(histogram, p_group_thread_id.x);
+
+    // TODO
 }

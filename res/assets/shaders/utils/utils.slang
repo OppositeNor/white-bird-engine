@@ -487,70 +487,42 @@ float random(float2 p_seed) {
 }
 
 /**
- * @brief Computes an in-place inclusive prefix sum over a groupshared array of any size.
- * @details Uses the work-efficient Brent-Kung up-sweep/down-sweep sum, so the array size is independent of the
- * workgroup size. Every invocation of the workgroup must call this function with the same array and invocation count.
- * The function synchronizes before reading and after the final write, so the results are visible to the whole
- * workgroup on return.
- * @tparam T The element type.
- * @tparam N The number of elements in the array.
- * @param p_data The groupshared array to sum in place.
- * @param p_invocation_id The local invocation index in [0, p_invocation_count).
- * @param p_invocation_count The number of invocations in the workgroup.
- */
-void workgroup_inclusive_prefix_sum<T : IArithmetic, let N : uint>(inout groupshared T p_data[N], uint p_invocation_id,
-        uint p_invocation_count) {
-    GroupMemoryBarrierWithGroupSync();
-    uint stride = 1;
-    // Up-sweep: reduce each power-of-two block into its last element.
-    for (; stride < N; stride <<= 1) {
-        uint block_size = stride << 1;
-        for (uint i = (p_invocation_id + 1) * block_size - 1; i < N; i += p_invocation_count * block_size) {
-            p_data[i] = p_data[i] + p_data[i - stride];
-        }
-        GroupMemoryBarrierWithGroupSync();
-    }
-    // Down-sweep: propagate block totals into the middle of the next block.
-    for (stride >>= 2; stride > 0; stride >>= 1) {
-        uint block_size = stride << 1;
-        for (uint i = (p_invocation_id + 1) * block_size - 1 + stride; i < N; i += p_invocation_count * block_size) {
-            p_data[i] = p_data[i] + p_data[i - stride];
-        }
-        GroupMemoryBarrierWithGroupSync();
-    }
-}
-
-/**
- * @brief Computes an in-place exclusive prefix sum over a groupshared array of any size.
- * @details Performs an inclusive sum, then shifts the results one element toward the end and writes zero to the first
- * element. Every invocation of the workgroup must call this function with the same array and invocation count. The
- * function synchronizes before reading and after the final write, so the results are visible to the whole workgroup on
+ * @brief Computes an in-place inclusive prefix sum over a 256-element groupshared array with a 64-invocation workgroup.
+ * @details Uses a Hillis-Steele scan in which each invocation owns 4 contiguous elements and updates them as one
+ * uint4 per step. Reads that would fall before the start of the array are redirected to p_data[256], which must hold
+ * zero and is left unchanged. Every invocation of the 64-invocation workgroup must call this function with the same
+ * array. The function does not synchronize before its first read, so callers must issue a workgroup barrier after
+ * filling the array; it synchronizes after the final write, so the results are visible to the whole workgroup on
  * return.
- * @tparam T The element type.
- * @tparam N The number of elements in the array.
- * @param p_data The groupshared array to sum in place.
- * @param p_invocation_id The local invocation index in [0, p_invocation_count).
- * @param p_invocation_count The number of invocations in the workgroup.
+ * @param p_data The groupshared array to sum in place: 256 elements followed by a zero element.
+ * @param p_invocation_id The local invocation index in [0, 64).
  */
-void workgroup_exclusive_prefix_sum<T : IArithmetic, let N : uint>(__ref groupshared T p_data[N], uint p_invocation_id,
-        uint p_invocation_count) {
-    workgroup_inclusive_prefix_sum(p_data, p_invocation_id, p_invocation_count);
-    // Shift one workgroup-sized chunk at a time, from the last chunk to the first. A chunk only reads elements below its
-    // own range, so the reads of the next chunk never overlap the writes of the current one, and a single barrier between
-    // each chunk's reads and writes is enough.
-    uint chunk_count = (N + p_invocation_count - 1) / p_invocation_count;
-    for (uint chunk = chunk_count; chunk > 0; --chunk) {
-        uint i = (chunk - 1) * p_invocation_count + p_invocation_id;
-        T previous = T(0);
-        if (i > 0 && i < N) {
-            previous = p_data[i - 1];
-        }
+void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256 + 1], uint p_invocation_id) {
+    uint thread_data_start = p_invocation_id * 4;
+    [unroll] for (uint i = 0; i < 8; ++i) {
+        // We split the 256 entries in chunks of 4, where each thread performs SIMD on the 4 entries they're responsible of.
+        uint offset = 1 << i;
+        uint4 left_region_data = uint4(
+            // It will trigger an unsigned overflow if the index has overflowed. So overflowed index could be captured by min.
+            p_data[min(thread_data_start - offset + 0, 256)],
+            p_data[min(thread_data_start - offset + 1, 256)],
+            p_data[min(thread_data_start - offset + 2, 256)],
+            p_data[min(thread_data_start - offset + 3, 256)]
+        );
+        uint4 curr_region_data = uint4(
+            p_data[thread_data_start + 0],
+            p_data[thread_data_start + 1],
+            p_data[thread_data_start + 2],
+            p_data[thread_data_start + 3]
+        );
+        curr_region_data += left_region_data;
         GroupMemoryBarrierWithGroupSync();
-        if (i < N) {
-            p_data[i] = previous;
-        }
+        p_data[thread_data_start] = curr_region_data[0];
+        p_data[thread_data_start + 1] = curr_region_data[1];
+        p_data[thread_data_start + 2] = curr_region_data[2];
+        p_data[thread_data_start + 3] = curr_region_data[3];
+        GroupMemoryBarrierWithGroupSync();
     }
-    GroupMemoryBarrierWithGroupSync();
 }
 
 #endif

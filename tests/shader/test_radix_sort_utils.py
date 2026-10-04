@@ -35,7 +35,7 @@ def run_histogram(p_device: spy.Device, p_load_kernel: KernelLoader, p_element_t
         p_data_start: int, p_data_count: int, p_workgroup_size: int, p_bit_region: int) -> np.ndarray:
     kernel = p_load_kernel("radix_sort_histogram.slang", {"ELEMENT_TYPE": p_element_type,
         "KERNEL_WORKGROUP_SIZE": p_workgroup_size, "DATA_START": p_data_start, "DATA_COUNT": p_data_count,
-        "BIT_REGION": p_bit_region, "HISTOGRAM_GARBAGE": HISTOGRAM_GARBAGE})
+        "WBE_RADIX_HISTOGRAM_BIT_REGION": p_bit_region, "HISTOGRAM_GARBAGE": HISTOGRAM_GARBAGE})
     usage = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
     data_buffer = p_device.create_buffer(element_count=len(p_data), struct_size=4, usage=usage, data=p_data)
     histogram_buffer = p_device.create_buffer(element_count=BUCKET_SIZE, struct_size=4, usage=usage,
