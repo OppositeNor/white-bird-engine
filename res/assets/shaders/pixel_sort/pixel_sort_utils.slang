@@ -24,10 +24,27 @@
 #ifndef WBE_FILE_PIXEL_SORT_UTILS_SLANG
 #define WBE_FILE_PIXEL_SORT_UTILS_SLANG
 
-/** Value used in the pixel sort index image for pixels outside the contrast mask. */
-#define WBE_PIXEL_SORT_UNMASKED 0xFFFFFFFFu
+/**
+ * Value of the pixel sort mask image for pixels outside the contrast mask. Masked pixels store their rank among the masked
+ * pixels of their column, so the image height must be less than this value.
+ */
+#define WBE_PIXEL_SORT_UNMASKED 0xFFFFu
+
 /** The first entries of the column offset buffer are metadata; the first one is the column count. */
 #define WBE_PIXEL_SORT_COLUMN_OFFSETS_START 4
+
+/**
+ * @brief Get the key buffer index of a masked pixel.
+ * @param p_column_offsets The column offset buffer from prefix_sum_pixel_sort_columns.
+ * @param p_column The column of the pixel.
+ * @param p_rank The rank of the pixel among the masked pixels of its column, from the mask image.
+ * @return The index of the pixel's entry in the key data.
+ */
+uint pixel_sort_key_index(RWStructuredBuffer<uint> p_column_offsets, uint p_column, uint p_rank) {
+    // The column starts where the previous column ends.
+    uint column_start = p_column == 0 ? 0 : p_column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + p_column - 1];
+    return column_start + p_rank;
+}
 
 /**
  * @struct PixelSortContrast

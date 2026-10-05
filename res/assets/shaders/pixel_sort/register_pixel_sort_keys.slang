@@ -16,9 +16,9 @@
  * @file register_pixel_sort_keys.slang
  * @brief Compute pass that registers the pixels inside the contrast mask into the radix sort key buffer.
  * @details One invocation per column; dispatch ceil(width / 64) workgroups. Each invocation walks its column from the top
- * and writes the key of every masked pixel to the next entry of the column's range of the key buffer, and that entry's
- * index to the pixel in the index image. Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED. The key buffer receives
- * the total number of masked pixels as its element count.
+ * and writes the key of every masked pixel to the next entry of the column's range of the key buffer, and the pixel's
+ * rank among the masked pixels of its column to the mask image. Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED.
+ * The key buffer receives the total number of masked pixels as its element count.
  */
 #include "utils.slang"
 #include "sort/radix_sort_utils.slang"
@@ -34,8 +34,8 @@ struct RegisterPixelSortKeysDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Radix sort key buffer receiving the element count and the keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
-    /** Image receiving the key buffer index of every pixel; must have the extent of source. */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sort_indices", "write")] uint2 indices;
+    /** R16_UINT mask image receiving the column rank of every masked pixel; must have the extent of source. */
+    [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "write")] uint2 mask;
 };
 
 [[vk::push_constant]]
@@ -48,7 +48,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<PixelSortContrast> contrast = ResourceDescriptorHeap[descriptor_indices.contrast.x];
     RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[descriptor_indices.column_offsets.x];
     RWStructuredBuffer<uint> keys = ResourceDescriptorHeap[descriptor_indices.keys.x];
-    RWTexture2D<uint> indices = ResourceDescriptorHeap[descriptor_indices.indices.x];
+    RWTexture2D<uint> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
     uint2 extent;
     source.GetDimensions(extent.x, extent.y);
     uint column = p_dispatch_thread_id.x;
@@ -58,17 +58,17 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (column == extent.x - 1) {
         keys[0] = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + column];
     }
-    // The column starts where the previous column ends.
-    uint index = column == 0 ? 0 : column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + column - 1];
+    uint rank = 0;
     for (uint row = 0; row < extent.y; ++row) {
         uint2 pixel = uint2(column, row);
         float3 color = source.Load(int3(pixel, 0)).rgb;
         if (pixel_sort_in_contrast(color, contrast)) {
-            keys[WBE_RADIX_SORT_DATA_START + index] = pixel_sort_make_key(color, pixel, extent);
-            indices[pixel] = index;
-            ++index;
+            keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, column, rank)] =
+                pixel_sort_make_key(color, pixel, extent);
+            mask[pixel] = rank;
+            ++rank;
         } else {
-            indices[pixel] = WBE_PIXEL_SORT_UNMASKED;
+            mask[pixel] = WBE_PIXEL_SORT_UNMASKED;
         }
     }
 }

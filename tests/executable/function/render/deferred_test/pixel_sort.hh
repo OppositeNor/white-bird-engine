@@ -48,8 +48,8 @@ public:
      * @param p_renderer The renderer; must outlive the effect.
      * @param p_extent Extent of the color images the effect is applied to.
      * @param p_color_format Format of the color images the effect is applied to.
-     * @throws std::runtime_error If a shader resource is missing, or the extent is empty or too large to pack the sort
-     * keys into 32 bits.
+     * @throws std::runtime_error If a shader resource is missing, the extent is empty or too large to pack the sort keys
+     * into 32 bits, or the height does not fit the 16-bit mask image.
      */
     PixelSort(RenderAllocator* p_allocator, RendererVK* p_renderer, VkExtent2D p_extent, VkFormat p_color_format);
     ~PixelSort() override = default;
@@ -72,9 +72,9 @@ public:
     static constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
 
     /** The smallest luminance of a sorted pixel. */
-    static constexpr float MIN_LUMINANCE = 0.25F;
+    static constexpr float MIN_LUMINANCE = 0.1F;
     /** The largest luminance of a sorted pixel. */
-    static constexpr float MAX_LUMINANCE = 0.8F;
+    static constexpr float MAX_LUMINANCE = 0.9F;
 
 private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.

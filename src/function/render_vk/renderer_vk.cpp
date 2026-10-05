@@ -1313,9 +1313,11 @@ void RendererVK::run_delayed_calls() {
         }
         --delayed_call.second;
         if (delayed_call.second < 0) {
-            // Run delayed calls that should be called in the current frame.
-            delayed_call.first();
+            // Run delayed calls that should be called in the current frame. The call is moved out first because running
+            // or destroying it may register new delayed calls, which can reuse this now-free slot.
+            auto call = std::move(delayed_call.first);
             delayed_call.first = nullptr;
+            call();
         }
     }
 }

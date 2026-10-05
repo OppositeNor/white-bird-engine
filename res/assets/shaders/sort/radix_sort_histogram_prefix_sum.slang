@@ -22,63 +22,42 @@ struct DescriptorIndices {
 [vk::push_constant]
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
-// Each sub-histogram is summed by SUB_HISTOGRAM_THREAD_COUNT invocations, each owning 4 contiguous entries.
-#define SUB_HISTOGRAM_THREAD_COUNT (WBE_RADIX_SORT_BUCKET_COUNT / 4)
-#define WORKGROUP_SIZE 256
-// The number of sub-histograms the workgroup processes at once.
-#define SUB_HISTOGRAMS_PER_CHUNK (WORKGROUP_SIZE / SUB_HISTOGRAM_THREAD_COUNT)
+// TODO: Slang does not support globallycoherent descriptors fetched from the descriptor heap
+// (https://github.com/shader-slang/slang/issues/13440), so under the Vulkan memory model, buffer accesses are private and
+// barriers do not make them visible to other invocations. The invocations therefore never exchange values through the
+// buffer.
+// One invocation per bucket.
+#define WORKGROUP_SIZE WBE_RADIX_SORT_BUCKET_COUNT
+// The number of sub-histogram entries each invocation loads before summing them, so that the loads overlap.
+#define ROWS_PER_BATCH 8
 
 // Computes an in-place inclusive prefix sum across the sub-histograms, separately for every bucket, so that entry b of
-// sub-histogram g becomes the sum of entry b of sub-histograms [0, g]. Must be dispatched with exactly one workgroup.
+// sub-histogram g becomes the sum of entry b of sub-histograms [0, g]. Invocation b owns bucket b and walks its entries
+// from the first sub-histogram to the last with a running sum, so no invocation reads an entry another one writes; the
+// invocations never communicate, which needs no shader-level memory synchronization. The invocations of a batch access
+// adjacent entries of one sub-histogram at a time. Must be dispatched with exactly one workgroup.
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
     RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
     uint sub_histogram_num = buffer[0];
     uint lane_start = buffer[2];
-    uint group_thread_id = p_group_thread_id.x;
-    // The maximum number of workgroup we have is 16384. The size of histogram is 256 entries.
-    // We have 256 threads spawned, each 64 threads are responsible for doing one histogram addition, so 4 sub-histograms
-    // are processed at once. We still have to split the sub-histograms into chunks, though, since 256 threads is not
-    // enough for 16384 histogram summations.
-    uint chunk_sub_histogram_offset = group_thread_id / SUB_HISTOGRAM_THREAD_COUNT;
-    uint entry_start = (group_thread_id % SUB_HISTOGRAM_THREAD_COUNT) * 4;
-    uint chunk_count = (sub_histogram_num + SUB_HISTOGRAMS_PER_CHUNK - 1) / SUB_HISTOGRAMS_PER_CHUNK;
-
-    for (uint i = 1; i < sub_histogram_num; i <<= 1) {
-        for (uint j = chunk_count; j > 0; --j) {
-            // We have to start from the right side, because we're reading values from the left side, which must still
-            // hold the values of the previous step.
-            uint sub_histogram = (j - 1) * SUB_HISTOGRAMS_PER_CHUNK + chunk_sub_histogram_offset;
-            // Sub-histograms past the end and sub-histograms with no left neighbor at this stride stay unchanged.
-            bool active = sub_histogram < sub_histogram_num && sub_histogram >= i;
-            uint curr_start = lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + entry_start;
-            uint left_start = curr_start - i * WBE_RADIX_SORT_BUCKET_COUNT;
-            uint4 curr_region_data = uint4(0);
-            if (active) {
-                uint4 left_region_data = uint4(
-                    buffer[left_start + 0],
-                    buffer[left_start + 1],
-                    buffer[left_start + 2],
-                    buffer[left_start + 3]
-                );
-                curr_region_data = uint4(
-                    buffer[curr_start + 0],
-                    buffer[curr_start + 1],
-                    buffer[curr_start + 2],
-                    buffer[curr_start + 3]
-                );
-                curr_region_data += left_region_data;
+    uint bucket = p_group_thread_id.x;
+    uint running_sum = 0;
+    for (uint batch_start = 0; batch_start < sub_histogram_num; batch_start += ROWS_PER_BATCH) {
+        uint values[ROWS_PER_BATCH];
+        [unroll] for (uint i = 0; i < ROWS_PER_BATCH; ++i) {
+            uint sub_histogram = batch_start + i;
+            values[i] = sub_histogram < sub_histogram_num
+                ? buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket]
+                : 0;
+        }
+        [unroll] for (uint i = 0; i < ROWS_PER_BATCH; ++i) {
+            uint sub_histogram = batch_start + i;
+            running_sum += values[i];
+            if (sub_histogram < sub_histogram_num) {
+                buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket] = running_sum;
             }
-            // The left sub-histogram may be in the same chunk, so every read must finish before any write.
-            // The buffer is device memory, so group-memory barriers would not order these accesses.
-            DeviceMemoryBarrierWithGroupSync();
-            if (active) {
-                [unroll] for (uint k = 0; k < 4; ++k) {
-                    buffer[curr_start + k] = curr_region_data[k];
-                }
-            }
-            DeviceMemoryBarrierWithGroupSync();
         }
     }
 }

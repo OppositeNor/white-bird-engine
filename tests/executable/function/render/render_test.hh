@@ -152,10 +152,24 @@ inline bool exec_test_requested(std::string_view p_variable) {
     throw std::runtime_error(std::format("{} must be 0 or 1, but is \"{}\".", variable, value));
 }
 
+/**
+ * @brief Request the frame captures configured by the environment.
+ *
+ * WBE_CAPTURE_PNG is the absolute output path and WBE_CAPTURE_FRAME the first captured frame (default 5). Without
+ * WBE_CAPTURE_INTERVAL, one frame is captured to WBE_CAPTURE_PNG. With a positive WBE_CAPTURE_INTERVAL, a frame is
+ * captured every that many frames from WBE_CAPTURE_FRAME on, each to WBE_CAPTURE_PNG with `_frame<number>` inserted
+ * before the extension.
+ *
+ * @param p_renderer The renderer to request captures from.
+ * @param p_frame The current frame number.
+ * @throws std::runtime_error If a variable is malformed.
+ */
 inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
     static std::string capture_png_path;
     static uint64_t capture_frame = 5;
     static bool capture_requested = false;
+    static uint64_t capture_interval = 0;
+    static uint64_t next_capture_frame = 0;
     const char* capture_path = std::getenv("WBE_CAPTURE_PNG");
     if (capture_path != nullptr && *capture_path != '\0') {
         if (*capture_path != '/') {
@@ -171,9 +185,33 @@ inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
             throw std::runtime_error("WBE_CAPTURE_FRAME must be a nonnegative frame number.");
         }
     }
-    if (!capture_png_path.empty() && !capture_requested && p_frame >= capture_frame) {
-        p_renderer.request_frame_capture(capture_png_path);
+    if (const char* interval = std::getenv("WBE_CAPTURE_INTERVAL"); interval != nullptr && *interval != '\0') {
+        std::string interval_text(interval);
+        const char* interval_end = interval_text.data() + interval_text.size();
+        auto result = std::from_chars(interval_text.c_str(), interval_end, capture_interval);
+        if (result.ec != std::errc{} || result.ptr != interval_end || capture_interval == 0) {
+            throw std::runtime_error("WBE_CAPTURE_INTERVAL must be a positive frame count.");
+        }
+    }
+    if (capture_png_path.empty()) {
+        return;
+    }
+    if (capture_interval == 0) {
+        if (!capture_requested && p_frame >= capture_frame) {
+            p_renderer.request_frame_capture(capture_png_path);
+            capture_requested = true;
+        }
+        return;
+    }
+    if (!capture_requested) {
+        next_capture_frame = capture_frame;
         capture_requested = true;
+    }
+    if (p_frame >= next_capture_frame) {
+        const Path path(capture_png_path);
+        const Path frame_path = path.parent_path() / std::format("{}_frame{}{}", path.stem().string(), p_frame, path.extension().string());
+        p_renderer.request_frame_capture(frame_path.string());
+        next_capture_frame = p_frame + capture_interval;
     }
 }
 

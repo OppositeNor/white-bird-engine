@@ -55,55 +55,62 @@ void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256 + 1
 
 /**
  * @brief Computes an in-place inclusive prefix sum over a buffer range of any length with one workgroup.
- * @details Sums p_buffer[p_start, p_start + p_element_count) with a Hillis-Steele scan. The range is split into chunks
- * of 4 * N elements; in each chunk, invocation p_thread_id owns the 4 contiguous elements starting at
- * 4 * p_thread_id and updates them as one uint4 per step. Chunks are processed from the last to the first within each
- * step, so every read of an element to the left sees the value from the previous step. Reads that would fall before
- * the start of the range are redirected to p_buffer[p_start + p_element_count], which must hold zero and is left
- * unchanged, as are all elements outside the range. Every invocation of the N-invocation workgroup must call this
- * function with the same buffer, start, and element count, and only one workgroup may operate on the range at a time.
- * The function synchronizes between reading and writing each chunk, so the results are visible to the whole workgroup
- * on return.
+ * @details Sums p_buffer[p_start, p_start + p_element_count) in chunks of 4 * N elements, from the first chunk to the
+ * last. In each chunk, invocation p_thread_id loads the 4 contiguous elements starting at 4 * p_thread_id and sums them
+ * locally, the invocation totals are scanned in p_scratch with a Hillis-Steele scan, and every invocation stores its
+ * elements plus the totals of the earlier invocations and the sum of every earlier chunk. Each element of p_buffer is
+ * only accessed by the invocation that owns it, so the invocations exchange values through p_scratch alone: buffer
+ * accesses need no shader-level memory synchronization. Elements outside the range are neither read nor written. Every
+ * invocation of the N-invocation workgroup must call this function with the same buffer, start, element count, and
+ * scratch array, and only one workgroup may operate on the range at a time. The function synchronizes before reusing
+ * p_scratch for the next chunk; each invocation's results are written by that invocation, so callers must order any read
+ * of elements written by other invocations, for example with a later dispatch.
+ * @todo Slang does not support globallycoherent descriptors fetched from the descriptor heap
+ * (https://github.com/shader-slang/slang/issues/13440), so under the Vulkan memory model, accesses to p_buffer are private
+ * and barriers do not make them visible to other invocations. The invocations therefore never exchange values through
+ * p_buffer.
  * @tparam N The number of invocations in the workgroup.
  * @param p_buffer The buffer whose range is summed in place.
  * @param p_start The index of the first element of the range.
  * @param p_element_count The number of elements in the range.
  * @param p_thread_id The local invocation index in [0, N).
+ * @param p_scratch Scratch array of one element per invocation; its contents are overwritten.
  */
 void workgroup_general_prefix_sum<let N : uint>(RWStructuredBuffer<uint> p_buffer, uint p_start, uint p_element_count,
-        uint p_thread_id) {
-    // Each chunk covers 4 elements per invocation.
-    uint chunk_count = (p_element_count + 4 * N - 1) / (4 * N);
-    for (uint i = 1; i < p_element_count; i <<= 1) {
-        for (uint j = chunk_count; j > 0; --j) {
-            // We have to start from the right side, because we're reading values from the left side.
-            uint subportion_start = (N * (j - 1) + p_thread_id) * 4;
-            // Subportion of the work area.
-            uint4 left_region_data = uint4(
-                // An index before the range underflows, and an index past the range is too large; min redirects both
-                // to the zero element after the range.
-                p_buffer[p_start + min(subportion_start - i + 0, p_element_count)],
-                p_buffer[p_start + min(subportion_start - i + 1, p_element_count)],
-                p_buffer[p_start + min(subportion_start - i + 2, p_element_count)],
-                p_buffer[p_start + min(subportion_start - i + 3, p_element_count)]
-            );
-            uint4 curr_region_data = uint4(
-                p_buffer[p_start + min(subportion_start + 0, p_element_count)],
-                p_buffer[p_start + min(subportion_start + 1, p_element_count)],
-                p_buffer[p_start + min(subportion_start + 2, p_element_count)],
-                p_buffer[p_start + min(subportion_start + 3, p_element_count)]
-            );
-            curr_region_data += left_region_data;
-            // The buffer is device memory, so group-memory barriers would not order these accesses.
-            DeviceMemoryBarrierWithGroupSync();
-            // The last chunk may extend past the range, which must not be written.
-            [unroll] for (uint k = 0; k < 4; ++k) {
-                if (subportion_start + k < p_element_count) {
-                    p_buffer[p_start + subportion_start + k] = curr_region_data[k];
-                }
+        uint p_thread_id, __ref groupshared uint p_scratch[N]) {
+    // The sum of every element in the earlier chunks.
+    uint carry = 0;
+    for (uint chunk_start = 0; chunk_start < p_element_count; chunk_start += 4 * N) {
+        uint element_start = chunk_start + p_thread_id * 4;
+        // Elements past the range count as zero, so they do not change the sums.
+        uint4 values = uint4(0);
+        [unroll] for (uint k = 0; k < 4; ++k) {
+            if (element_start + k < p_element_count) {
+                values[k] = p_buffer[p_start + element_start + k];
             }
-            DeviceMemoryBarrierWithGroupSync();
         }
+        values.y += values.x;
+        values.z += values.y;
+        values.w += values.z;
+        p_scratch[p_thread_id] = values.w;
+        GroupMemoryBarrierWithGroupSync();
+        // Inclusive scan of the invocation totals.
+        for (uint offset = 1; offset < N; offset <<= 1) {
+            uint left = p_thread_id >= offset ? p_scratch[p_thread_id - offset] : 0;
+            GroupMemoryBarrierWithGroupSync();
+            p_scratch[p_thread_id] += left;
+            GroupMemoryBarrierWithGroupSync();
+        }
+        uint thread_offset = carry + (p_thread_id == 0 ? 0 : p_scratch[p_thread_id - 1]);
+        // The last chunk may extend past the range, which must not be written.
+        [unroll] for (uint k = 0; k < 4; ++k) {
+            if (element_start + k < p_element_count) {
+                p_buffer[p_start + element_start + k] = values[k] + thread_offset;
+            }
+        }
+        carry += p_scratch[N - 1];
+        // Every invocation has read p_scratch before the next chunk overwrites it.
+        GroupMemoryBarrierWithGroupSync();
     }
 }
 #endif

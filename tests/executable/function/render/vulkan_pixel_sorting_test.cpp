@@ -64,8 +64,8 @@ inline constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION = "pixel_sort_
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SAMPLER = "pixel_sort_sampler";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_COLUMN_OFFSETS = "pixel_sort_column_offsets";
-inline constexpr std::string_view REND_RES_PIXEL_SORT_INDICES_IMAGE = "pixel_sort_indices_image";
-inline constexpr std::string_view REND_RES_PIXEL_SORT_INDICES = "pixel_sort_indices";
+inline constexpr std::string_view REND_RES_PIXEL_SORT_MASK_IMAGE = "pixel_sort_mask_image";
+inline constexpr std::string_view REND_RES_PIXEL_SORT_MASK = "pixel_sort_mask";
 // The register pass writes and the write pass reads this buffer; the radix sort passes alternate between it and the swap buffer.
 inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS = "pixel_sort_keys";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS_SWAP = "pixel_sort_keys_swap";
@@ -182,6 +182,11 @@ public:
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
         // A key packs the column, luminance, and row, so at least 2 luminance levels must fit in 32 bits.
+        // The mask image stores each masked pixel's rank within its column as R16_UINT, with 0xFFFF marking unmasked pixels.
+        if (source_extent.height >= UINT16_MAX) {
+            throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}-pixel-high image is too high for the 16-bit pixel sort mask.",
+                source_extent.height));
+        }
         if (element_count == 0 || UINT32_MAX / element_count < 2) {
             throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}x{} image is too large to pack its pixel sort keys into 32 bits.",
                 source_extent.width, source_extent.height));
@@ -219,11 +224,11 @@ public:
                     .format = PIXEL_SORT_DESTINATION_FORMAT,
                     .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
             .add_image_view(REND_RES_PIXEL_SORT_DESTINATION, REND_RES_PIXEL_SORT_DESTINATION_IMAGE)
-            .add_image(REND_RES_PIXEL_SORT_INDICES_IMAGE,
+            .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
                 {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
-                    .format = VK_FORMAT_R32_UINT,
+                    .format = VK_FORMAT_R16_UINT,
                     .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
-            .add_image_view(REND_RES_PIXEL_SORT_INDICES, REND_RES_PIXEL_SORT_INDICES_IMAGE)
+            .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
             .add_sampler(REND_RES_PIXEL_SORT_SAMPLER,
                 {.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                     .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -286,8 +291,8 @@ public:
 
         WBE::connect_resource_chain(pipeline_desc,
             REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
-            {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS});
-        WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_INDICES, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+            {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+        WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_MASK, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
         // Every task using a key buffer or the histogram, in execution order. Pass p reads the keys from one buffer and
         // scatters them into the other, so each buffer is written by every other scatter.
         WBE::connect_resource_chain(pipeline_desc,

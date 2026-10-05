@@ -45,8 +45,8 @@ constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
 constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION = "pixel_sort_destination";
 constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 constexpr std::string_view REND_RES_PIXEL_SORT_COLUMN_OFFSETS = "pixel_sort_column_offsets";
-constexpr std::string_view REND_RES_PIXEL_SORT_INDICES_IMAGE = "pixel_sort_indices_image";
-constexpr std::string_view REND_RES_PIXEL_SORT_INDICES = "pixel_sort_indices";
+constexpr std::string_view REND_RES_PIXEL_SORT_MASK_IMAGE = "pixel_sort_mask_image";
+constexpr std::string_view REND_RES_PIXEL_SORT_MASK = "pixel_sort_mask";
 // The register pass writes and the write pass reads this buffer; the radix sort passes alternate between it and the swap
 // buffer.
 constexpr std::string_view REND_RES_PIXEL_SORT_KEYS = "pixel_sort_keys";
@@ -85,6 +85,11 @@ PixelSort::PixelSort(RenderAllocator* p_allocator, RendererVK* p_renderer, VkExt
     }
     const uint64_t element_count = static_cast<uint64_t>(extent.width) * extent.height;
     // A key packs the column, luminance, and row, so at least 2 luminance levels must fit in 32 bits.
+    // The mask image stores each masked pixel's rank within its column as R16_UINT, with 0xFFFF marking unmasked pixels.
+    if (extent.height >= UINT16_MAX) {
+        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}-pixel-high image is too high for the 16-bit pixel sort mask.",
+            extent.height));
+    }
     if (element_count == 0 || UINT32_MAX / element_count < 2) {
         throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}x{} image is empty or too large to pack its sort keys into 32 bits.",
             extent.width, extent.height));
@@ -126,9 +131,9 @@ std::string_view PixelSort::add_render_tasks(
         .add_image(REND_RES_PIXEL_SORT_SOURCE_IMAGE,
             {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = color_format, .extent = image_extent})
         .add_image_view(REND_RES_PIXEL_SORT_SOURCE, REND_RES_PIXEL_SORT_SOURCE_IMAGE)
-        .add_image(REND_RES_PIXEL_SORT_INDICES_IMAGE,
-            {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = VK_FORMAT_R32_UINT, .extent = image_extent})
-        .add_image_view(REND_RES_PIXEL_SORT_INDICES, REND_RES_PIXEL_SORT_INDICES_IMAGE)
+        .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
+            {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = VK_FORMAT_R16_UINT, .extent = image_extent})
+        .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
         .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
             {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM,
                 .domain = DeviceDomain::HOST_DEVICE,
@@ -188,8 +193,8 @@ std::string_view PixelSort::add_render_tasks(
         {RT_COPY_PIXEL_SORT_SOURCE, RT_COUNT_PIXEL_SORT_MASK, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
     connect_resource_chain(p_graph,
         REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
-        {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS});
-    connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_INDICES, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+        {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+    connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_MASK, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
     // Every task using a key buffer or the histogram, in execution order. Pass p reads the keys from one buffer and scatters
     // them into the other, so each buffer is written by every other scatter.
     connect_resource_chain(p_graph,
