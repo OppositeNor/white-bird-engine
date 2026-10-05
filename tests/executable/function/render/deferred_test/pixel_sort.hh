@@ -31,11 +31,36 @@
 namespace WhiteBirdEngine {
 
 /**
+ * @enum PixelSortDirection
+ * @brief The lines of the image that the pixel sort sorts.
+ */
+enum class PixelSortDirection : uint8_t {
+    /** Sort every column, from the top. */
+    VERTICAL,
+    /** Sort every row, from the left. */
+    HORIZONTAL,
+};
+
+/**
+ * @enum PixelSortMetric
+ * @brief The value the pixel sort orders the pixels of every line by.
+ * @details The values must match the WBE_PIXEL_SORT_METRIC_ macros in pixel_sort_utils.slang.
+ */
+enum class PixelSortMetric : uint32_t {
+    /** Sort by luminance, darkest first. */
+    LUMINANCE = 0,
+    /** Sort by hue, from red through green and blue to magenta. */
+    HUE = 1,
+    /** Sort by saturation, grayest first. */
+    SATURATION = 2,
+};
+
+/**
  * @class PixelSort
- * @brief Post-processing effect that sorts, by luminance, the pixels of every column of the color image whose luminance
- * is inside a contrast range.
- * @details Copies the color image, counts the masked pixels of every column, turns the counts into the range of every
- * column in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
+ * @brief Post-processing effect that sorts, by a selectable metric, the pixels of every column or row of the color image
+ * whose luminance is inside a contrast range.
+ * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
+ * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
  * pass resources are graph-owned, so every graph the effect is added to allocates its own. Neither copyable nor movable.
  */
@@ -48,10 +73,18 @@ public:
      * @param p_renderer The renderer; must outlive the effect.
      * @param p_extent Extent of the color images the effect is applied to.
      * @param p_color_format Format of the color images the effect is applied to.
+     * @param p_direction Whether the effect sorts the columns or the rows of the image.
+     * @param p_metric The value the effect orders the pixels of every line by.
      * @throws std::runtime_error If a shader resource is missing, the extent is empty or too large to pack the sort keys
-     * into 32 bits, or the height does not fit the 16-bit mask image.
+     * into 32 bits, the length of a sorted line does not fit the 16-bit mask image, or p_metric is not a PixelSortMetric
+     * value.
      */
-    PixelSort(RenderAllocator* p_allocator, RendererVK* p_renderer, VkExtent2D p_extent, VkFormat p_color_format);
+    PixelSort(RenderAllocator* p_allocator,
+        RendererVK* p_renderer,
+        VkExtent2D p_extent,
+        VkFormat p_color_format,
+        PixelSortDirection p_direction,
+        PixelSortMetric p_metric);
     ~PixelSort() override = default;
     PixelSort(const PixelSort&) = delete;
     PixelSort(PixelSort&&) = delete;
@@ -90,6 +123,10 @@ private:
     RendererVK* renderer = nullptr;
     VkExtent2D extent{};
     VkFormat color_format = VK_FORMAT_UNDEFINED;
+    PixelSortDirection direction = PixelSortDirection::VERTICAL;
+    PixelSortMetric metric = PixelSortMetric::SATURATION;
+    // The number of sorted lines: the width for vertical sorting, the height for horizontal sorting.
+    uint32_t line_count = 0;
     uint32_t sub_histogram_num = 1;
     Ref<ROComputePipelineVK> copy_source_pipeline;
     Ref<ROComputePipelineVK> count_mask_pipeline;

@@ -346,7 +346,13 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     post_processing =
-        make_unique<PixelSort>(render_allocator, render_allocator, renderer_vk, base_render_data->swap_chain_extent, LIGHTING_OUTPUT_FORMAT);
+        make_unique<PixelSort>(render_allocator,
+            render_allocator,
+            renderer_vk,
+            base_render_data->swap_chain_extent,
+            LIGHTING_OUTPUT_FORMAT,
+            PixelSortDirection::VERTICAL,
+            PixelSortMetric::SATURATION);
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
     auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);

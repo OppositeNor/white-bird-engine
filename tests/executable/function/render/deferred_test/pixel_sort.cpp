@@ -55,7 +55,7 @@ constexpr std::string_view REND_RES_PIXEL_SORT_HISTOGRAM = "pixel_sort_histogram
 // Must match the numthreads of copy_pixel_sort_source.slang and write_sorted_pixels.slang.
 constexpr uint32_t PIXEL_SORT_TILE_SIZE = 8;
 // Must match the numthreads of count_pixel_sort_mask.slang and register_pixel_sort_keys.slang, which run one invocation per
-// column.
+// sorted line.
 constexpr uint32_t PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64;
 // Must match WBE_PIXEL_SORT_COLUMN_OFFSETS_START in pixel_sort_utils.slang.
 constexpr uint32_t PIXEL_SORT_COLUMN_OFFSETS_START = 4;
@@ -70,25 +70,46 @@ constexpr uint32_t RADIX_SORT_DATA_START = 4;
 struct PixelSortContrastGPU {
     float min_luminance = PixelSort::MIN_LUMINANCE;
     float max_luminance = PixelSort::MAX_LUMINANCE;
+    uint32_t sort_metric = static_cast<uint32_t>(PixelSortMetric::SATURATION);
 };
 
 std::string make_bit_region_name(uint32_t p_pass) {
     return std::format("{}_{}", p_pass * 8, (p_pass + 1) * 8);
 }
 
+// The id of the variant of a direction-dependent pixel sort shader, e.g. count_pixel_sort_mask_vertical_shader.
+std::string make_direction_shader_id(std::string_view p_shader_name, PixelSortDirection p_direction) {
+    const std::string_view direction_name = p_direction == PixelSortDirection::VERTICAL ? "vertical" : "horizontal";
+    return std::format("{}_{}_shader", p_shader_name, direction_name);
+}
+
 } // namespace
 
-PixelSort::PixelSort(RenderAllocator* p_allocator, RendererVK* p_renderer, VkExtent2D p_extent, VkFormat p_color_format)
-    : IPostProcessing(p_allocator), renderer(p_renderer), extent(p_extent), color_format(p_color_format) {
+PixelSort::PixelSort(RenderAllocator* p_allocator,
+    RendererVK* p_renderer,
+    VkExtent2D p_extent,
+    VkFormat p_color_format,
+    PixelSortDirection p_direction,
+    PixelSortMetric p_metric)
+    : IPostProcessing(p_allocator), renderer(p_renderer), extent(p_extent), color_format(p_color_format),
+      direction(p_direction), metric(p_metric) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: renderer is null.");
     }
+    if (metric != PixelSortMetric::LUMINANCE && metric != PixelSortMetric::HUE && metric != PixelSortMetric::SATURATION) {
+        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: {} is not a pixel sort metric.",
+            static_cast<uint32_t>(metric)));
+    }
+    const bool vertical = direction == PixelSortDirection::VERTICAL;
+    line_count = vertical ? extent.width : extent.height;
+    const uint32_t line_length = vertical ? extent.height : extent.width;
     const uint64_t element_count = static_cast<uint64_t>(extent.width) * extent.height;
-    // A key packs the column, luminance, and row, so at least 2 luminance levels must fit in 32 bits.
-    // The mask image stores each masked pixel's rank within its column as R16_UINT, with 0xFFFF marking unmasked pixels.
-    if (extent.height >= UINT16_MAX) {
-        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}-pixel-high image is too high for the 16-bit pixel sort mask.",
-            extent.height));
+    // A key packs the line, saturation, and position along the line, so at least 2 saturation levels must fit in 32
+    // bits.
+    // The mask image stores each masked pixel's rank within its line as R16_UINT, with 0xFFFF marking unmasked pixels.
+    if (line_length >= UINT16_MAX) {
+        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}-pixel sorted line is too long for the 16-bit pixel sort mask.",
+            line_length));
     }
     if (element_count == 0 || UINT32_MAX / element_count < 2) {
         throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}x{} image is empty or too large to pack its sort keys into 32 bits.",
@@ -99,10 +120,10 @@ PixelSort::PixelSort(RenderAllocator* p_allocator, RendererVK* p_renderer, VkExt
         1U,
         RADIX_SORT_MAX_WORKGROUP_COUNT);
     copy_source_pipeline = compile("copy_pixel_sort_source_shader");
-    count_mask_pipeline = compile("count_pixel_sort_mask_shader");
+    count_mask_pipeline = compile(make_direction_shader_id("count_pixel_sort_mask", direction));
     prefix_sum_columns_pipeline = compile("prefix_sum_pixel_sort_columns_shader");
-    register_keys_pipeline = compile("register_pixel_sort_keys_shader");
-    write_sorted_pixels_pipeline = compile("write_sorted_pixels_shader");
+    register_keys_pipeline = compile(make_direction_shader_id("register_pixel_sort_keys", direction));
+    write_sorted_pixels_pipeline = compile(make_direction_shader_id("write_sorted_pixels", direction));
     histogram_prefix_sum_pipeline = compile("radix_sort_histogram_prefix_sum");
     for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
         const std::string bit_region = make_bit_region_name(pass);
@@ -118,9 +139,9 @@ std::string_view PixelSort::add_render_tasks(
         .height = (extent.height + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
         .depth = 1};
     const VkExtent3D column_group_count{
-        .width = (extent.width + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE, .height = 1, .depth = 1};
-    // The column counts are followed by the zero element the prefix sum reads.
-    const size_t column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + extent.width + 1) * sizeof(uint32_t);
+        .width = (line_count + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE, .height = 1, .depth = 1};
+    // The line counts are followed by the zero element the prefix sum reads.
+    const size_t column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + line_count + 1) * sizeof(uint32_t);
     // Sized for the case where every pixel is inside the mask.
     const size_t key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
     const size_t histogram_buffer_size =
@@ -137,7 +158,7 @@ std::string_view PixelSort::add_render_tasks(
         .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
             {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM,
                 .domain = DeviceDomain::HOST_DEVICE,
-                .initial_data = to_initial_data(PixelSortContrastGPU{})})
+                .initial_data = to_initial_data(PixelSortContrastGPU{.sort_metric = static_cast<uint32_t>(metric)})})
         .add_buffer(REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
             {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = column_offsets_buffer_size})
         .add_buffer(REND_RES_PIXEL_SORT_KEYS, {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size})

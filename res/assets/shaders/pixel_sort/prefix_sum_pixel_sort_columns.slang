@@ -14,9 +14,9 @@
 */
 /**
  * @file prefix_sum_pixel_sort_columns.slang
- * @brief Compute pass that turns the per-column mask counts into the end offset of every column in the key buffer.
- * @details Dispatch exactly one workgroup. After the pass, the keys of column c occupy
- * [offset(c - 1), offset(c)) of the key data, with offset(-1) = 0.
+ * @brief Compute pass that turns the per-line mask counts into the end offset of every sorted line in the key buffer.
+ * @details Dispatch exactly one workgroup. After the pass, the keys of line l occupy [offset(l - 1), offset(l)) of the
+ * key data, with offset(-1) = 0. The pass does not depend on the sort direction, so both variants share it.
  */
 #include "utils.slang"
 #include "prefix_sum/prefix_sum_utils.slang"
@@ -24,7 +24,7 @@
 
 /** Descriptor indices of the resources used by the column prefix sum pass. */
 struct PrefixSumPixelSortColumnsDescriptorIndices {
-    /** Buffer holding the mask count of every column, summed in place. */
+    /** Buffer holding the mask count of every line, summed in place. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
 };
 

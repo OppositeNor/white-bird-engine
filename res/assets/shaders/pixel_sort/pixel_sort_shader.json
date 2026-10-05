@@ -9,11 +9,30 @@
             "metadata": "assets/shaders/pixel_sort/copy_pixel_sort_source.json"
         },
         {
-            "id": "count_pixel_sort_mask_shader",
+            "id": "count_pixel_sort_mask_vertical_shader",
             "source_type": "shader",
             "src": "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
-            "dst": "assets/shaders/pixel_sort/count_pixel_sort_mask.spv",
-            "metadata": "assets/shaders/pixel_sort/count_pixel_sort_mask.json"
+            "dst": "assets/shaders/pixel_sort/count_pixel_sort_mask_vertical.spv",
+            "metadata": "assets/shaders/pixel_sort/count_pixel_sort_mask_vertical.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "0"
+                }
+            ]
+        },
+        {
+            "id": "count_pixel_sort_mask_horizontal_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
+            "dst": "assets/shaders/pixel_sort/count_pixel_sort_mask_horizontal.spv",
+            "metadata": "assets/shaders/pixel_sort/count_pixel_sort_mask_horizontal.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "1"
+                }
+            ]
         },
         {
             "id": "prefix_sum_pixel_sort_columns_shader",
@@ -23,18 +42,56 @@
             "metadata": "assets/shaders/pixel_sort/prefix_sum_pixel_sort_columns.json"
         },
         {
-            "id": "register_pixel_sort_keys_shader",
+            "id": "register_pixel_sort_keys_vertical_shader",
             "source_type": "shader",
             "src": "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
-            "dst": "assets/shaders/pixel_sort/register_pixel_sort_keys.spv",
-            "metadata": "assets/shaders/pixel_sort/register_pixel_sort_keys.json"
+            "dst": "assets/shaders/pixel_sort/register_pixel_sort_keys_vertical.spv",
+            "metadata": "assets/shaders/pixel_sort/register_pixel_sort_keys_vertical.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "0"
+                }
+            ]
         },
         {
-            "id": "write_sorted_pixels_shader",
+            "id": "register_pixel_sort_keys_horizontal_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
+            "dst": "assets/shaders/pixel_sort/register_pixel_sort_keys_horizontal.spv",
+            "metadata": "assets/shaders/pixel_sort/register_pixel_sort_keys_horizontal.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "id": "write_sorted_pixels_vertical_shader",
             "source_type": "shader",
             "src": "assets/shaders/pixel_sort/write_sorted_pixels.slang",
-            "dst": "assets/shaders/pixel_sort/write_sorted_pixels.spv",
-            "metadata": "assets/shaders/pixel_sort/write_sorted_pixels.json"
+            "dst": "assets/shaders/pixel_sort/write_sorted_pixels_vertical.spv",
+            "metadata": "assets/shaders/pixel_sort/write_sorted_pixels_vertical.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "0"
+                }
+            ]
+        },
+        {
+            "id": "write_sorted_pixels_horizontal_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/write_sorted_pixels.slang",
+            "dst": "assets/shaders/pixel_sort/write_sorted_pixels_horizontal.spv",
+            "metadata": "assets/shaders/pixel_sort/write_sorted_pixels_horizontal.json",
+            "macros": [
+                {
+                    "name": "WBE_PIXEL_SORT_HORIZONTAL",
+                    "value": "1"
+                }
+            ]
         },
         {
             "id": "present_pixel_sort_shader",

@@ -80,6 +80,8 @@ inline constexpr uint32_t PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64;
 inline constexpr uint32_t PIXEL_SORT_COLUMN_OFFSETS_START = 4;
 inline constexpr float PIXEL_SORT_DEFAULT_MIN_LUMINANCE = 0.25F;
 inline constexpr float PIXEL_SORT_DEFAULT_MAX_LUMINANCE = 0.8F;
+// Must match WBE_PIXEL_SORT_METRIC_SATURATION in pixel_sort_utils.slang: 0 sorts by luminance, 1 by hue, 2 by saturation.
+inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 2;
 // Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
 // WBE_RADIX_SORT_DATA_START in radix_sort_utils.slang.
 inline constexpr uint32_t RADIX_SORT_BUCKET_COUNT = 256;
@@ -98,6 +100,8 @@ struct PixelSortContrastGPU {
     float min_luminance = PIXEL_SORT_DEFAULT_MIN_LUMINANCE;
     /** The largest luminance of a sorted pixel, in [0, 1]. */
     float max_luminance = PIXEL_SORT_DEFAULT_MAX_LUMINANCE;
+    /** The metric the sorted pixels are ordered by: 0 for luminance, 1 for hue, 2 for saturation. */
+    uint32_t sort_metric = PIXEL_SORT_DEFAULT_METRIC;
 };
 
 /**
@@ -107,7 +111,7 @@ struct PixelSortContrastGPU {
  *
  * One invocation per column counts its masked pixels, a prefix sum turns the counts into the range of every column in
  * the key buffer, and one invocation per column registers its masked pixels into that range and stores each pixel's
- * buffer index in an index image. Every key orders by column, then luminance, and stores the source row (see
+ * buffer index in an index image. Every key orders by column, then saturation, and stores the source row (see
  * pixel_sort_utils.slang), so one radix sort of all keys sorts every column in place within its range. Each of the 4 radix
  * sort passes runs the histogram, histogram prefix sum, and scatter shaders for one 8-bit digit, alternating between two
  * key buffers. Finally, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
@@ -141,7 +145,8 @@ public:
             throw std::runtime_error(std::format("Invalid pixel sort contrast range [{}, {}]: it must satisfy 0 <= min <= max <= 1.",
                 p_min_luminance, p_max_luminance));
         }
-        contrast = {.min_luminance = p_min_luminance, .max_luminance = p_max_luminance};
+        contrast.min_luminance = p_min_luminance;
+        contrast.max_luminance = p_max_luminance;
         WBE::ROBufferVK* contrast_buffer_ptr = contrast_buffer.get();
         if (contrast_buffer_ptr == nullptr) {
             return;
@@ -181,7 +186,7 @@ public:
 
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
-        // A key packs the column, luminance, and row, so at least 2 luminance levels must fit in 32 bits.
+        // A key packs the column, saturation, and row, so at least 2 saturation levels must fit in 32 bits.
         // The mask image stores each masked pixel's rank within its column as R16_UINT, with 0xFFFF marking unmasked pixels.
         if (source_extent.height >= UINT16_MAX) {
             throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}-pixel-high image is too high for the 16-bit pixel sort mask.",
@@ -235,14 +240,14 @@ public:
                     .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE});
 
         const VkExtent3D column_dispatch{.width = column_group_count, .height = 1, .depth = 1};
-        add_compute_task(pipeline_desc, RT_COUNT_PIXEL_SORT_MASK, "count_pixel_sort_mask_shader", column_dispatch, {});
+        add_compute_task(pipeline_desc, RT_COUNT_PIXEL_SORT_MASK, "count_pixel_sort_mask_vertical_shader", column_dispatch, {});
         // The prefix sum runs in a single workgroup.
         add_compute_task(pipeline_desc,
             RT_PREFIX_SUM_PIXEL_SORT_COLUMNS,
             "prefix_sum_pixel_sort_columns_shader",
             {.width = 1, .height = 1, .depth = 1},
             {});
-        add_compute_task(pipeline_desc, RT_REGISTER_PIXEL_SORT_KEYS, "register_pixel_sort_keys_shader", column_dispatch, {});
+        add_compute_task(pipeline_desc, RT_REGISTER_PIXEL_SORT_KEYS, "register_pixel_sort_keys_vertical_shader", column_dispatch, {});
 
         std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
         std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
@@ -275,7 +280,7 @@ public:
         }
 
         // After an even number of passes, the sorted keys are back in the key buffer.
-        add_compute_task(pipeline_desc, RT_WRITE_SORTED_PIXELS, "write_sorted_pixels_shader", tile_group_count, {});
+        add_compute_task(pipeline_desc, RT_WRITE_SORTED_PIXELS, "write_sorted_pixels_vertical_shader", tile_group_count, {});
 
         WBE::RendTaskDescVK present_task_desc(render_allocator);
         present_task_desc.task_id = RT_PRESENT_SORTED_PIXELS;

@@ -15,10 +15,11 @@
 /**
  * @file register_pixel_sort_keys.slang
  * @brief Compute pass that registers the pixels inside the contrast mask into the radix sort key buffer.
- * @details One invocation per column; dispatch ceil(width / 64) workgroups. Each invocation walks its column from the top
- * and writes the key of every masked pixel to the next entry of the column's range of the key buffer, and the pixel's
- * rank among the masked pixels of its column to the mask image. Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED.
- * The key buffer receives the total number of masked pixels as its element count.
+ * @details One invocation per sorted line; dispatch ceil(width / 64) workgroups, or ceil(height / 64) for the horizontal
+ * variant. Each invocation walks its line from the start and writes the key of every masked pixel to the next entry of
+ * the line's range of the key buffer, and the pixel's rank among the masked pixels of its line to the mask image.
+ * Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED. The key buffer receives the total number of masked pixels as its
+ * element count.
  */
 #include "utils.slang"
 #include "sort/radix_sort_utils.slang"
@@ -28,13 +29,13 @@
 struct RegisterPixelSortKeysDescriptorIndices {
     /** Image whose pixels are sorted. */
     [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
-    /** The contrast range of the sorted pixels. */
+    /** The contrast range of the sorted pixels and the metric they are sorted by. */
     [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
-    /** The end offset of every column in the key buffer, from prefix_sum_pixel_sort_columns. */
+    /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Radix sort key buffer receiving the element count and the keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
-    /** R16_UINT mask image receiving the column rank of every masked pixel; must have the extent of source. */
+    /** R16_UINT mask image receiving the line rank of every masked pixel; must have the extent of source. */
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "write")] uint2 mask;
 };
 
@@ -51,20 +52,21 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWTexture2D<uint> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
     uint2 extent;
     source.GetDimensions(extent.x, extent.y);
-    uint column = p_dispatch_thread_id.x;
-    if (column >= extent.x) {
+    uint2 line_extent = pixel_sort_line_coordinates(extent);
+    uint line = p_dispatch_thread_id.x;
+    if (line >= line_extent.x) {
         return;
     }
-    if (column == extent.x - 1) {
-        keys[0] = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + column];
+    if (line == line_extent.x - 1) {
+        keys[0] = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + line];
     }
     uint rank = 0;
-    for (uint row = 0; row < extent.y; ++row) {
-        uint2 pixel = uint2(column, row);
+    for (uint position = 0; position < line_extent.y; ++position) {
+        uint2 pixel = pixel_sort_line_pixel(uint2(line, position));
         float3 color = source.Load(int3(pixel, 0)).rgb;
         if (pixel_sort_in_contrast(color, contrast)) {
-            keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, column, rank)] =
-                pixel_sort_make_key(color, pixel, extent);
+            keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, line, rank)] =
+                pixel_sort_make_key(color, contrast.sort_metric, pixel, extent);
             mask[pixel] = rank;
             ++rank;
         } else {

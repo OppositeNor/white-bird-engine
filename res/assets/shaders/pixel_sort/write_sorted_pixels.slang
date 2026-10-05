@@ -16,9 +16,10 @@
  * @file write_sorted_pixels.slang
  * @brief Compute pass that writes the pixels of the source image in the order of the sorted radix sort keys.
  * @details Dispatch one 8x8 workgroup per 8x8 pixel tile. A pixel inside the contrast mask receives the source pixel of
- * the sorted key at its column rank, which register_pixel_sort_keys stored in the mask image. That key belongs to the
- * same column, so the masked pixels of every column end up sorted by luminance with the darkest at the top. Other pixels
- * keep their source color.
+ * the sorted key at its line rank, which register_pixel_sort_keys stored in the mask image. That key belongs to the
+ * same line, so the masked pixels of every line end up sorted by the metric selected in PixelSortContrast, from the
+ * smallest value, top to bottom in the vertical variant and left to right in the horizontal variant. Other pixels keep
+ * their source color.
  */
 #include "utils.slang"
 #include "sort/radix_sort_utils.slang"
@@ -30,9 +31,9 @@ struct WriteSortedPixelsDescriptorIndices {
     [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
     /** Radix sort key buffer holding the sorted keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "read")] uint2 keys;
-    /** R16_UINT mask image holding the column rank of every masked pixel, from register_pixel_sort_keys. */
+    /** R16_UINT mask image holding the line rank of every masked pixel, from register_pixel_sort_keys. */
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "read")] uint2 mask;
-    /** The end offset of every column in the key buffer, from prefix_sum_pixel_sort_columns. */
+    /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Image receiving the sorted pixels; must have the extent of source. */
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_destination", "write")] uint2 destination;
@@ -58,8 +59,9 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     uint rank = mask[pixel];
     uint2 source_pixel = pixel;
     if (rank != WBE_PIXEL_SORT_UNMASKED) {
-        uint key = keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, pixel.x, rank)];
-        source_pixel.y = pixel_sort_key_row(key, extent);
+        uint line = pixel_sort_line_coordinates(pixel).x;
+        uint key = keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, line, rank)];
+        source_pixel = pixel_sort_key_pixel(key, line, extent);
     }
     destination[pixel] = float4(source.Load(int3(source_pixel, 0)).rgb, 1.0);
 }
