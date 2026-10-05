@@ -2,11 +2,32 @@
     "include": [],
     "resources": [
         {
-            "id": "workgroup_pixel_sort_shader",
+            "id": "count_pixel_sort_mask_shader",
             "source_type": "shader",
-            "src": "assets/shaders/pixel_sort/workgroup_pixel_sort.slang",
-            "dst": "assets/shaders/pixel_sort/workgroup_pixel_sort.spv",
-            "metadata": "assets/shaders/pixel_sort/workgroup_pixel_sort.json"
+            "src": "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
+            "dst": "assets/shaders/pixel_sort/count_pixel_sort_mask.spv",
+            "metadata": "assets/shaders/pixel_sort/count_pixel_sort_mask.json"
+        },
+        {
+            "id": "prefix_sum_pixel_sort_columns_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/prefix_sum_pixel_sort_columns.slang",
+            "dst": "assets/shaders/pixel_sort/prefix_sum_pixel_sort_columns.spv",
+            "metadata": "assets/shaders/pixel_sort/prefix_sum_pixel_sort_columns.json"
+        },
+        {
+            "id": "register_pixel_sort_keys_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
+            "dst": "assets/shaders/pixel_sort/register_pixel_sort_keys.spv",
+            "metadata": "assets/shaders/pixel_sort/register_pixel_sort_keys.json"
+        },
+        {
+            "id": "write_sorted_pixels_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/write_sorted_pixels.slang",
+            "dst": "assets/shaders/pixel_sort/write_sorted_pixels.spv",
+            "metadata": "assets/shaders/pixel_sort/write_sorted_pixels.json"
         },
         {
             "id": "present_pixel_sort_shader",

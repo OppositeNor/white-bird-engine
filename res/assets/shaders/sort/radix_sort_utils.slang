@@ -29,6 +29,32 @@
 #define WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE (32 / WBE_RADIX_SORT_WG_BUCKET_COUNT)
 #define WBE_RADIX_SORT_WG_COUNTER_MASK ((1u << WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE) - 1)
 
+// The number of elements each radix sort workgroup aims to own, matching the scatter batch size.
+#define WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP 256
+// The first entries of the radix sort key buffers are metadata; the first one is the element count.
+#define WBE_RADIX_SORT_DATA_START 4
+
+/**
+ * @brief Get the number of sub-histograms, and so of histogram and scatter workgroups, of a radix sort pass.
+ * @details Host code dispatching the passes must use the same formula.
+ * @param p_element_count The number of keys sorted.
+ * @return min(WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, max(ceil(p_element_count / WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP), 1)).
+ */
+uint radix_sort_sub_histogram_num(uint p_element_count) {
+    uint group_num = (p_element_count + WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP;
+    return clamp(group_num, 1u, uint(WBE_RADIX_SORT_MAX_WORKGROUP_COUNT));
+}
+
+/**
+ * @brief Get the WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit of a key.
+ * @param p_key The key.
+ * @param p_bit_region The bit offset of the digit.
+ * @return The digit, in [0, WBE_RADIX_SORT_BUCKET_COUNT).
+ */
+uint radix_sort_digit(uint p_key, uint p_bit_region) {
+    return (p_key >> p_bit_region) & WBE_RADIX_SORT_BUCKET_MASK;
+}
+
 /**
  * @brief Accumulates the radix sort digit histogram of up to one element per invocation.
  * @details Invocation p_invocation_id counts the digit of element p_data_start + p_invocation_id; invocations with an

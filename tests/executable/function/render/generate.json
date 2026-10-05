@@ -26,8 +26,8 @@
                     "sources" : ["vulkan_draw_sponza_test.cpp"]
                 },
                 {
-                    "name" : "vulkan_workgroup_pixel_sorting_test",
-                    "sources" : ["vulkan_workgroup_pixel_sorting_test.cpp"]
+                    "name" : "vulkan_pixel_sorting_test",
+                    "sources" : ["vulkan_pixel_sorting_test.cpp"]
                 }
 
             ]

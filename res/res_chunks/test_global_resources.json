@@ -12,6 +12,7 @@
         "assets/shaders/octree/octree.json",
         "assets/shaders/octree_2/octree_2.json",
         "assets/shaders/bloom/bloom_shader.json",
+        "assets/shaders/sort/sort.json",
         "assets/shaders/pixel_sort/pixel_sort_shader.json"
     ],
     "resources": [

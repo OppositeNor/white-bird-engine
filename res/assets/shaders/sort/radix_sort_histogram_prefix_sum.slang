@@ -16,7 +16,7 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "buffer", "write")] uint2 buffer;
+    [WBE_DESCRIPTOR("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
 };
 
 [vk::push_constant]
@@ -30,9 +30,10 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 // Computes an in-place inclusive prefix sum across the sub-histograms, separately for every bucket, so that entry b of
 // sub-histogram g becomes the sum of entry b of sub-histograms [0, g]. Must be dispatched with exactly one workgroup.
+[shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.buffer.x];
+    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
     uint sub_histogram_num = buffer[0];
     uint lane_start = buffer[2];
     uint group_thread_id = p_group_thread_id.x;
