@@ -16,5 +16,6 @@ imgui.ini
 *.log
 
 # TODO: Figure out a way to import this.
+res/assets/other/
 res/assets/models/IntelSponza
 res/assets/models/IntelSponzaCurtains

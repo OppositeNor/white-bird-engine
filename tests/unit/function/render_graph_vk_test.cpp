@@ -23,6 +23,7 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -30,6 +31,7 @@
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -427,6 +429,62 @@ TEST(WBERenderGraphVKTest, ResourceEdgeChainOrdersConflictingAccesses) {
     RenderGraphVK graph(&render_data);
 
     EXPECT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, DumpGraphMetadataIsEmptyBeforeBuild) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+
+    RendGraphMetadataVK metadata = graph.dump_graph_metadata();
+    EXPECT_TRUE(metadata.tasks.empty());
+    EXPECT_TRUE(metadata.edges.empty());
+}
+
+TEST(WBERenderGraphVKTest, DumpGraphMetadataListsTasksInExecutionOrderAndEdgeAccesses) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    // Declared out of execution order to check that the metadata follows the topological order.
+    descriptor.add_task(make_probe_desc(&allocator, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
+    descriptor.add_task(make_probe_desc(&allocator, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+    descriptor.add_task(make_probe_desc(&allocator, "rewriter", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+    descriptor.get_task("writer").connect("reader", TEST_LOGICAL_RESOURCE);
+    descriptor.get_task("reader").connect("rewriter", TEST_LOGICAL_RESOURCE);
+    RenderGraphVK graph(&render_data);
+    // The edges are resolved before command-buffer allocation, which fails without a device.
+    ASSERT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+
+    RendGraphMetadataVK metadata = graph.dump_graph_metadata();
+    ASSERT_EQ(metadata.tasks.size(), 3);
+    EXPECT_EQ(metadata.tasks[0].task_id, "writer");
+    EXPECT_EQ(metadata.tasks[1].task_id, "reader");
+    EXPECT_EQ(metadata.tasks[2].task_id, "rewriter");
+    for (uint64_t i = 0; i < metadata.tasks.size(); ++i) {
+        EXPECT_EQ(metadata.tasks[i].topological_order, i);
+        EXPECT_EQ(metadata.tasks[i].queue_family, QueueFamilyVK::GRAPHICS);
+    }
+
+    ASSERT_EQ(metadata.edges.size(), 2);
+    auto find_edge = [&metadata](std::string_view p_from, std::string_view p_to) {
+        auto edge = std::ranges::find_if(metadata.edges, [p_from, p_to](const RendGraphEdgeMetadataVK& p_edge) {
+            return p_edge.from_task_id == p_from && p_edge.to_task_id == p_to;
+        });
+        return edge == metadata.edges.end() ? nullptr : &*edge;
+    };
+    const RendGraphEdgeMetadataVK* write_read = find_edge("writer", "reader");
+    ASSERT_NE(write_read, nullptr);
+    EXPECT_EQ(write_read->resource_id, TEST_LOGICAL_RESOURCE);
+    EXPECT_TRUE(write_read->from_task_writes);
+    EXPECT_FALSE(write_read->to_task_writes);
+    EXPECT_FALSE(write_read->cross_queue);
+    const RendGraphEdgeMetadataVK* read_write = find_edge("reader", "rewriter");
+    ASSERT_NE(read_write, nullptr);
+    EXPECT_EQ(read_write->resource_id, TEST_LOGICAL_RESOURCE);
+    EXPECT_FALSE(read_write->from_task_writes);
+    EXPECT_TRUE(read_write->to_task_writes);
+    EXPECT_FALSE(read_write->cross_queue);
 }
 
 TEST(WBERenderGraphVKTest, EdgesOnAnotherResourceDoNotOrderAConflict) {

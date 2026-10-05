@@ -315,12 +315,19 @@ void RayTracingPluginVK::create_descriptor_arenas(BaseRenderDataVK* p_render_dat
 void RayTracingPluginVK::on_frame_begin(const BaseRenderDataVK* /*p_render_data*/) {
 }
 
-void RayTracingPluginVK::on_before_task_recorded(
-    VkCommandBuffer /*p_command_buffer*/, const RendTaskID& /*p_task_id*/, QueueFamilyVK /*p_queue_family*/) {
+void RayTracingPluginVK::on_render_graph_registered(std::string_view /*p_graph_key*/, const RenderGraphVK& /*p_graph*/) {
 }
 
-void RayTracingPluginVK::on_after_task_recorded(
-    VkCommandBuffer /*p_command_buffer*/, const RendTaskID& /*p_task_id*/, QueueFamilyVK /*p_queue_family*/) {
+void RayTracingPluginVK::on_before_task_recorded(VkCommandBuffer /*p_command_buffer*/,
+    const RenderGraphVK& /*p_graph*/,
+    const RendTaskID& /*p_task_id*/,
+    QueueFamilyVK /*p_queue_family*/) {
+}
+
+void RayTracingPluginVK::on_after_task_recorded(VkCommandBuffer /*p_command_buffer*/,
+    const RenderGraphVK& /*p_graph*/,
+    const RendTaskID& /*p_task_id*/,
+    QueueFamilyVK /*p_queue_family*/) {
 }
 
 void RayTracingPluginVK::on_renderer_terminating() {

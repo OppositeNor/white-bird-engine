@@ -87,8 +87,15 @@ public:
         const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
     virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) override;
-    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
-    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
+    virtual void on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) override;
+    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) override;
+    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) override;
     virtual void on_renderer_terminating() override;
 
     /**

@@ -25,6 +25,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
@@ -291,6 +292,15 @@ public:
      * @return Structured descriptor debug data.
      */
     DebugData list_descriptors() const;
+
+    /**
+     * @brief Take a snapshot of the compiled graph's tasks and resource dependency edges.
+     *
+     * Before build_from_descriptor(), the snapshot is empty. Must be called on the rendering thread.
+     *
+     * @return The tasks in execution order and the edges with the stages and accesses the graph derived for them.
+     */
+    RendGraphMetadataVK dump_graph_metadata() const;
 
     /**
      * @brief Acquire the container bound to a graph resource.

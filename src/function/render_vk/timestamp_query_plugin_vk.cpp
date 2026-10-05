@@ -20,6 +20,8 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/path.hh"
@@ -38,6 +40,8 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <utility>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -84,7 +88,8 @@ double TimestampQueryPluginVK::DurationStatistics::get_standard_deviation() cons
 
 TimestampQueryPluginVK::TimestampQueryPluginVK(const BaseRenderDataVK* p_render_data)
     : render_data(p_render_data), report_path(FileSystem::get_executable_dir() / DEFAULT_REPORT_FILE_NAME),
-      frame_queries(p_render_data->allocator), query_results(p_render_data->allocator), task_statistics(p_render_data->allocator) {
+      frame_queries(p_render_data->allocator), query_results(p_render_data->allocator), task_statistics(p_render_data->allocator),
+      graph_keys(p_render_data->allocator), graph_metadata(p_render_data->allocator) {
     singleton = this;
 }
 
@@ -171,6 +176,20 @@ void TimestampQueryPluginVK::configure_descriptor_heaps(
 void TimestampQueryPluginVK::create_descriptor_arenas(BaseRenderDataVK* /*p_render_data*/) {
 }
 
+void TimestampQueryPluginVK::on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) {
+    WBE_DEBUG_ASSERT(enabled);
+    graph_keys[&p_graph] = std::string(p_graph_key);
+    RendGraphMetadataVK metadata = p_graph.dump_graph_metadata();
+    auto existing = std::ranges::find_if(graph_metadata, [p_graph_key](const RegisteredGraphMetadata& p_registered) {
+        return p_registered.graph_key == p_graph_key;
+    });
+    if (existing != graph_metadata.end()) {
+        existing->metadata = std::move(metadata);
+        return;
+    }
+    graph_metadata.push_back({.graph_key = std::string(p_graph_key), .metadata = std::move(metadata)});
+}
+
 void TimestampQueryPluginVK::on_frame_begin(const BaseRenderDataVK* p_render_data) {
     WBE_DEBUG_ASSERT(enabled);
     WBE_DEBUG_ASSERT(p_render_data == render_data);
@@ -180,7 +199,7 @@ void TimestampQueryPluginVK::on_frame_begin(const BaseRenderDataVK* p_render_dat
 }
 
 void TimestampQueryPluginVK::on_before_task_recorded(
-    VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) {
+    VkCommandBuffer p_command_buffer, const RenderGraphVK& p_graph, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) {
     WBE_DEBUG_ASSERT(enabled);
     FrameQueries& frame = get_recording_frame_queries();
     WBE_DEBUG_ASSERT(!frame.task_open);
@@ -189,19 +208,23 @@ void TimestampQueryPluginVK::on_before_task_recorded(
             std::format("Failed to record GPU timestamps: a frame records more than {} render-graph tasks.", MAX_TASKS_PER_FRAME));
     }
     const auto first_query = static_cast<uint32_t>(frame.tasks.size() * 2);
-    frame.tasks.push_back({.task_id = p_task_id, .queue_family = p_queue_family});
+    frame.tasks.push_back(
+        {.graph_key = std::string(get_graph_key(p_graph)), .task_id = p_task_id, .queue_family = p_queue_family});
     frame.task_open = true;
     // The reset and both writes are query commands on the same queue, so they execute in submission order.
     vkCmdResetQueryPool(p_command_buffer, frame.query_pool, first_query, 2);
     vkCmdWriteTimestamp2(p_command_buffer, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, frame.query_pool, first_query);
 }
 
-void TimestampQueryPluginVK::on_after_task_recorded(
-    VkCommandBuffer p_command_buffer, [[maybe_unused]] const RendTaskID& p_task_id, [[maybe_unused]] QueueFamilyVK p_queue_family) {
+void TimestampQueryPluginVK::on_after_task_recorded(VkCommandBuffer p_command_buffer,
+    [[maybe_unused]] const RenderGraphVK& p_graph,
+    [[maybe_unused]] const RendTaskID& p_task_id,
+    [[maybe_unused]] QueueFamilyVK p_queue_family) {
     WBE_DEBUG_ASSERT(enabled);
     FrameQueries& frame = get_recording_frame_queries();
     WBE_DEBUG_ASSERT(frame.task_open);
-    WBE_DEBUG_ASSERT(frame.tasks.back().task_id == p_task_id && frame.tasks.back().queue_family == p_queue_family);
+    WBE_DEBUG_ASSERT(frame.tasks.back().task_id == p_task_id && frame.tasks.back().queue_family == p_queue_family &&
+                     frame.tasks.back().graph_key == get_graph_key(p_graph));
     const auto end_query = static_cast<uint32_t>(frame.tasks.size() * 2 - 1);
     // The end timestamp is written once every previously recorded command of the task has completed.
     vkCmdWriteTimestamp2(p_command_buffer, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, frame.query_pool, end_query);
@@ -274,7 +297,7 @@ void TimestampQueryPluginVK::collect_frame_queries(FrameQueries& p_frame_queries
         const uint64_t start = query_results[i * 2] & timestamp_mask;
         const uint64_t end = query_results[(i * 2) + 1] & timestamp_mask;
         const auto duration = static_cast<double>((end - start) & timestamp_mask) * timestamp_period;
-        task_statistics[TaskKey(task.queue_family, task.task_id)].add_sample(duration);
+        task_statistics[TaskKey(task.graph_key, task.queue_family, task.task_id)].add_sample(duration);
 
         const auto queue_index = static_cast<size_t>(std::to_underlying(task.queue_family));
         WBE_DEBUG_ASSERT(queue_index < QUEUE_FAMILY_COUNT);
@@ -295,6 +318,15 @@ void TimestampQueryPluginVK::collect_frame_queries(FrameQueries& p_frame_queries
     }
     ++sampled_frame_count;
     p_frame_queries.tasks.clear();
+}
+
+std::string_view TimestampQueryPluginVK::get_graph_key(const RenderGraphVK& p_graph) const {
+    auto entry = graph_keys.find(&p_graph);
+    // Graphs may be built and executed without registering them with the renderer; their tasks are reported under "".
+    if (entry == graph_keys.end()) {
+        return {};
+    }
+    return entry->second;
 }
 
 void TimestampQueryPluginVK::write_report() const {
@@ -338,9 +370,44 @@ void TimestampQueryPluginVK::write_report() const {
     report["tasks"] = nlohmann::json::array();
     for (const auto* entry : sorted_tasks) {
         nlohmann::json task = statistics_json(entry->second);
-        task["task_id"] = entry->first.second;
-        task["queue"] = queue_family_name(entry->first.first);
+        task["render_graph"] = std::get<0>(entry->first);
+        task["task_id"] = std::get<2>(entry->first);
+        task["queue"] = queue_family_name(std::get<1>(entry->first));
         report["tasks"].push_back(std::move(task));
+    }
+
+    // Every registered graph with its tasks in execution order, each with its statistics (null when never sampled).
+    report["render_graphs"] = nlohmann::json::array();
+    for (const RegisteredGraphMetadata& registered : graph_metadata) {
+        nlohmann::json graph;
+        graph["key"] = registered.graph_key;
+        graph["tasks"] = nlohmann::json::array();
+        for (const RendGraphTaskMetadataVK& task_metadata : registered.metadata.tasks) {
+            nlohmann::json task;
+            task["task_id"] = task_metadata.task_id;
+            task["queue"] = queue_family_name(task_metadata.queue_family);
+            task["topological_order"] = task_metadata.topological_order;
+            auto statistics =
+                task_statistics.find(TaskKey(registered.graph_key, task_metadata.queue_family, task_metadata.task_id));
+            task["timing"] = statistics == task_statistics.end() ? nlohmann::json(nullptr) : statistics_json(statistics->second);
+            graph["tasks"].push_back(std::move(task));
+        }
+        graph["edges"] = nlohmann::json::array();
+        for (const RendGraphEdgeMetadataVK& edge_metadata : registered.metadata.edges) {
+            nlohmann::json edge;
+            edge["from"] = edge_metadata.from_task_id;
+            edge["to"] = edge_metadata.to_task_id;
+            edge["resource"] = edge_metadata.resource_id;
+            edge["from_task_writes"] = edge_metadata.from_task_writes;
+            edge["to_task_writes"] = edge_metadata.to_task_writes;
+            edge["cross_queue"] = edge_metadata.cross_queue;
+            edge["src_stage"] = string_VkPipelineStageFlags2(edge_metadata.src_stage);
+            edge["src_access"] = string_VkAccessFlags2(edge_metadata.src_access);
+            edge["dst_stage"] = string_VkPipelineStageFlags2(edge_metadata.dst_stage);
+            edge["dst_access"] = string_VkAccessFlags2(edge_metadata.dst_access);
+            graph["edges"].push_back(std::move(edge));
+        }
+        report["render_graphs"].push_back(std::move(graph));
     }
 
     if (report_path.has_parent_path()) {

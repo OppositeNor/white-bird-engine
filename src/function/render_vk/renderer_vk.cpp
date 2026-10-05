@@ -1594,6 +1594,9 @@ Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
     graph->build_from_descriptor(*desc_ref);
+    for (auto& plugin : registered_plugins) {
+        plugin->on_render_graph_registered(p_resource_key, *graph);
+    }
     Ref<RenderGraphVK> graph_ref = graph;
 
     render_graphs.emplace(std::string(p_resource_key),

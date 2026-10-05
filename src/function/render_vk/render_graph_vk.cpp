@@ -24,6 +24,7 @@
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -595,6 +596,37 @@ DebugData RenderGraphVK::list_descriptors() const {
     return make_descriptor_data(RendResViewVK(&all_resources).descriptor_debug_data());
 }
 
+RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
+    auto node_writes = [](const RGNode& p_node, std::string_view p_resource_id) {
+        return std::ranges::any_of(p_node.writes, [p_resource_id](const ResAccessVK& p_access) {
+            return p_access.res_id == p_resource_id;
+        });
+    };
+    RendGraphMetadataVK metadata(render_data->allocator);
+    metadata.tasks.reserve(nodes.size());
+    // topological_sort() leaves the nodes in execution order.
+    for (const auto& node : nodes) {
+        metadata.tasks.push_back(
+            {.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order});
+    }
+    metadata.edges.reserve(resource_edges.size());
+    for (const auto& edge : resource_edges) {
+        metadata.edges.push_back({
+            .from_task_id = edge->from->task_id,
+            .to_task_id = edge->to->task_id,
+            .resource_id = edge->res_id,
+            .src_stage = edge->src_stage,
+            .src_access = edge->src_access,
+            .dst_stage = edge->dst_stage,
+            .dst_access = edge->dst_access,
+            .from_task_writes = node_writes(*edge->from, edge->res_id),
+            .to_task_writes = node_writes(*edge->to, edge->res_id),
+            .cross_queue = edge->from->in_queue != edge->to->in_queue,
+        });
+    }
+    return metadata;
+}
+
 void RenderGraphVK::build_from_descriptor(RendGraphDescVK& p_desc) {
     free_command_buffers();
     nodes.clear();
@@ -1096,7 +1128,7 @@ void RenderGraphVK::record_node(
     }
     if (render_data->render_plugins != nullptr) {
         for (auto& plugin : *render_data->render_plugins) {
-            plugin->on_before_task_recorded(p_command_buffer, p_node->task_id, p_node->in_queue);
+            plugin->on_before_task_recorded(p_command_buffer, *this, p_node->task_id, p_node->in_queue);
         }
     }
     if (render_data->descriptor_heap_allocator == nullptr) {
@@ -1117,7 +1149,7 @@ void RenderGraphVK::record_node(
 
     if (render_data->render_plugins != nullptr) {
         for (auto& plugin : *render_data->render_plugins) {
-            plugin->on_after_task_recorded(p_command_buffer, p_node->task_id, p_node->in_queue);
+            plugin->on_after_task_recorded(p_command_buffer, *this, p_node->task_id, p_node->in_queue);
         }
     }
 

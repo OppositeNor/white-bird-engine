@@ -34,12 +34,14 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 class RendererVK;
+class RenderGraphVK;
 
 /**
  * @class RenderPluginVK
@@ -158,15 +160,30 @@ public:
     virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) = 0;
 
     /**
+     * @brief Observe a render graph that the renderer has built and registered under a resource key.
+     *
+     * Called on the rendering thread after the graph is built and before it is first executed. The graph stays alive until it
+     * is unregistered; a later graph may be registered under the same key.
+     *
+     * @param p_graph_key The resource key the graph is registered under.
+     * @param p_graph The built graph.
+     */
+    virtual void on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) = 0;
+
+    /**
      * @brief Record plugin commands at the start of a render-graph task's command buffer.
      *
      * Called on the rendering thread immediately after the task's primary command buffer begins, outside any rendering scope.
      *
      * @param p_command_buffer The task's command buffer in the recording state.
+     * @param p_graph The graph the task belongs to.
      * @param p_task_id The render-graph task identifier.
      * @param p_queue_family The queue family the command buffer is submitted to.
      */
-    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
+    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) = 0;
 
     /**
      * @brief Record plugin commands at the end of a render-graph task's command buffer.
@@ -175,10 +192,14 @@ public:
      * Every call is paired with the preceding on_before_task_recorded() call for the same task.
      *
      * @param p_command_buffer The task's command buffer in the recording state.
+     * @param p_graph The graph the task belongs to.
      * @param p_task_id The render-graph task identifier.
      * @param p_queue_family The queue family the command buffer is submitted to.
      */
-    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
+    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) = 0;
 
     /**
      * @brief Finish plugin work while the renderer terminates.

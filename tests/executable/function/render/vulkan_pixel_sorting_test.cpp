@@ -119,7 +119,11 @@ struct PixelSortContrastGPU {
 class ApplicationVulkanPixelSortingTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanPixelSortingTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+        : WBE::ApplicationGame(
+              WBE::RendererCapabilities{
+                  .timestamp_query = WBE::exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
+              },
+              WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
     }
 
     virtual void logic_update(double p_delta) override {

@@ -21,6 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "platform/file_system/path.hh"
@@ -30,7 +31,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -42,7 +45,10 @@ namespace WhiteBirdEngine {
  *
  * When enabled through RendererCapabilities::timestamp_query, the plugin brackets every render-graph task's command buffer
  * with timestamps, reads them back once the frame slot's work has completed, and accumulates per-task and per-queue
- * statistics. When the renderer terminates it writes the statistics as a JSON report to get_report_path().
+ * statistics. Task statistics are kept per registered render graph, so graphs that share task identifiers are timed
+ * separately. The plugin also takes a RendGraphMetadataVK snapshot of every graph registered with the renderer. When the
+ * renderer terminates it writes the statistics, and every registered graph's tasks and edges together with each task's
+ * statistics, as a JSON report to get_report_path().
  *
  * The plugin is owned by the renderer, is neither copyable nor movable, and is confined to the rendering thread.
  */
@@ -123,6 +129,14 @@ public:
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
 
     /**
+     * @brief Snapshot the graph's metadata for the report and attribute its tasks' timestamps to p_graph_key.
+     *
+     * A graph registered again under the same key replaces the previous snapshot; samples of both graphs are accumulated
+     * under the key.
+     */
+    virtual void on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) override;
+
+    /**
      * @brief Collect the completed timestamps of the frame slot that is starting, then prepare it for new queries.
      *
      * Blocks until every query previously recorded for the slot is available.
@@ -136,12 +150,18 @@ public:
      *
      * @throws std::runtime_error If the frame slot has not begun or the frame exceeds MAX_TASKS_PER_FRAME tasks.
      */
-    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
+    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) override;
 
     /**
      * @brief Write the task's end timestamp after all of its commands.
      */
-    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
+    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer,
+        const RenderGraphVK& p_graph,
+        const RendTaskID& p_task_id,
+        QueueFamilyVK p_queue_family) override;
 
     /**
      * @brief Collect all outstanding timestamps, write the JSON report, and destroy the query pools.
@@ -167,8 +187,15 @@ private:
     };
 
     struct RecordedTaskQuery {
+        // The key of the graph the task belongs to; empty for graphs not registered with the renderer.
+        std::string graph_key;
         RendTaskID task_id;
         QueueFamilyVK queue_family = QueueFamilyVK::GRAPHICS;
+    };
+
+    struct RegisteredGraphMetadata {
+        std::string graph_key;
+        RendGraphMetadataVK metadata;
     };
 
     // Queries of one frame-in-flight slot. Task i owns queries 2i (start) and 2i + 1 (end).
@@ -178,7 +205,7 @@ private:
         bool task_open = false;
     };
 
-    using TaskKey = std::pair<QueueFamilyVK, RendTaskID>;
+    using TaskKey = std::tuple<std::string, QueueFamilyVK, RendTaskID>;
 
     const BaseRenderDataVK* render_data = nullptr;
     VkDevice logical_device = VK_NULL_HANDLE;
@@ -192,12 +219,17 @@ private:
     Vector<FrameQueries, RenderAllocator> frame_queries;
     Vector<uint64_t, RenderAllocator> query_results;
     Map<TaskKey, DurationStatistics, RenderAllocator> task_statistics;
+    // The registration key of every graph registered with the renderer.
+    Map<const RenderGraphVK*, std::string, RenderAllocator> graph_keys;
+    // The metadata of every registered graph key, in registration order.
+    Vector<RegisteredGraphMetadata, RenderAllocator> graph_metadata;
     std::array<DurationStatistics, QUEUE_FAMILY_COUNT> queue_frame_statistics{};
     uint64_t sampled_frame_count = 0;
 
     void prepare_frame_queries(uint32_t p_frame_count);
     FrameQueries& get_recording_frame_queries();
     void collect_frame_queries(FrameQueries& p_frame_queries);
+    std::string_view get_graph_key(const RenderGraphVK& p_graph) const;
     void write_report() const;
     void destroy_query_pools();
 
