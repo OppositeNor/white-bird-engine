@@ -43,6 +43,7 @@
 #include "i_octree_render_feature.hh"
 #include "octree_render_feature_atomic.hh"
 #include "octree_render_feature_pass_published.hh"
+#include "pixel_sort.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -154,6 +155,12 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         frame_capture_requested.store(true, std::memory_order_relaxed);
     }
     frame_capture_key_was_down = frame_capture_key_down;
+
+    bool post_processing_key_down = input_manager->get_input_status(KEYCODE_1).is_down();
+    if (post_processing_key_down && !post_processing_key_was_down) {
+        post_processing_requested.store(!post_processing_requested.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    }
+    post_processing_key_was_down = post_processing_key_down;
 
     bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
     if (bloom_acquire_key_down && !bloom_acquire_key_was_down && !bloom_acquire_in_flight) {
@@ -290,6 +297,12 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
         summed_area_table_active = requested;
         stdout_log(WBE_CHANNEL_DEBUG)->message(requested ? "Deferred shadow filtering: summed-area table." : "Deferred shadow filtering: mipmaps.");
     }
+    bool post_processing_enabled = post_processing_requested.load(std::memory_order_relaxed);
+    if (post_processing_enabled != post_processing->is_enabled()) {
+        post_processing->set_enabled(post_processing_enabled);
+        stdout_log(WBE_CHANNEL_DEBUG)
+            ->message(std::format("Post-processing {}: {}.", post_processing->get_name(), post_processing_enabled ? "enabled" : "disabled"));
+    }
     if (bloom_acquire_requested.exchange(false, std::memory_order_acq_rel)) {
         auto& task = bloom_acquire_tasks[summed_area_table_active ? 1 : 0];
         if (task == MEM_NULL) {
@@ -332,6 +345,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
                                              : "Octree static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
+    post_processing =
+        make_unique<PixelSort>(render_allocator, render_allocator, renderer_vk, base_render_data->swap_chain_extent, LIGHTING_OUTPUT_FORMAT);
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
     auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);

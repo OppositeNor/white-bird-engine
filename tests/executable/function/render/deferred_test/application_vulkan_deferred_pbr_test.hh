@@ -44,6 +44,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "i_octree_render_feature.hh"
+#include "i_post_processing.hh"
 #include "input_manager_mocked.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
@@ -184,7 +185,8 @@ private:
         std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     void add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const;
-    void connect_deferred_render_tasks(RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const;
+    void connect_deferred_render_tasks(
+        RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
     RendTaskDescVK create_shadow_moments_summed_area_table_task_desc() const;
     RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;
@@ -201,6 +203,8 @@ private:
     Unique<DynamicMeshRenderFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
     Unique<IOctreeRenderFeature> octree;
+    // Applied in place to the result image after lighting composition; toggled with the 1 key.
+    Unique<IPostProcessing> post_processing;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
@@ -267,6 +271,9 @@ private:
     bool render_graph_switch_key_was_down = false;
     bool voxel_debug_view_key_was_down = false;
     bool frame_capture_key_was_down = false;
+    bool post_processing_key_was_down = false;
+    // Input-thread mailbox; render_update applies it to the post-processing between frames.
+    std::atomic_bool post_processing_requested = false;
     std::atomic_bool frame_capture_requested = false;
     std::atomic<bool> summed_area_table_requested = false;
     std::atomic<VoxelDebugViewMode> voxel_debug_view_mode = VoxelDebugViewMode::DISABLED;

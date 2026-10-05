@@ -2,6 +2,13 @@
     "include": [],
     "resources": [
         {
+            "id": "copy_pixel_sort_source_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/copy_pixel_sort_source.slang",
+            "dst": "assets/shaders/pixel_sort/copy_pixel_sort_source.spv",
+            "metadata": "assets/shaders/pixel_sort/copy_pixel_sort_source.json"
+        },
+        {
             "id": "count_pixel_sort_mask_shader",
             "source_type": "shader",
             "src": "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",

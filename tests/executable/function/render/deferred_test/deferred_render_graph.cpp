@@ -35,10 +35,10 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
 #include "i_octree_render_feature.hh"
+#include "i_post_processing.hh"
 #include "resource/resource_utils.hh"
 #include <algorithm>
 #include <array>
@@ -177,22 +177,24 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(octree->get_deferred_construction_render_task_desc());
     pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc())
         .add_task(create_indirect_lighting_task_desc())
-        .add_task(create_combine_lighting_task_desc())
-        .add_task(create_bloom_extract_task_desc())
+        .add_task(create_combine_lighting_task_desc());
+    const std::string_view post_processing_last_task_id =
+        post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
+    pipeline_desc.add_task(create_bloom_extract_task_desc())
         .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
         .add_task(octree->get_debug_draw_render_task_desc())
         .add_task(octree->get_pre_deferred_debug_draw_render_task_desc())
         .add_task(create_light_billboard_task_desc());
-    connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table);
+    connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
     octree->connect_render_tasks(pipeline_desc);
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
 }
 
 void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
-    RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table) const { // NOLINT
+    RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const { // NOLINT
     constexpr std::string_view DIRECT_LIGHTING = RT_RUN_DIRECT_LIGHTING;
     constexpr std::string_view INDIRECT_LIGHTING = RT_RUN_INDIRECT_LIGHTING;
 
@@ -244,8 +246,9 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     // Lighting composition and post-processing.
     connect_resource_chain(p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_DIRECT_LIGHTING, RT_COMBINE_LIGHTING});
     connect_resource_chain(p_pipeline_desc, INDIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_INDIRECT_LIGHTING, RT_COMBINE_LIGHTING});
-    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {RT_COMBINE_LIGHTING, RT_EXTRACT_BLOOM});
-    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {RT_COMBINE_LIGHTING, RT_RUN_PRESENT_RESULT_IMAGE});
+    // The post-processing modifies the result image in place after composition, so bloom and present read its output.
+    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {p_post_processing_last_task_id, RT_EXTRACT_BLOOM});
+    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {p_post_processing_last_task_id, RT_RUN_PRESENT_RESULT_IMAGE});
     // The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
     connect_resource_chain(
         p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_EXTRACT_BLOOM, RT_BLUR_BLOOM, RT_ACQUIRE_BLOOM, RT_RUN_PRESENT_RESULT_IMAGE});

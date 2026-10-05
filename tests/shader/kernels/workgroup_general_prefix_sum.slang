@@ -15,15 +15,15 @@
 /**
  * @file workgroup_general_prefix_sum.slang
  * @brief Test kernel that runs workgroup_general_prefix_sum over a range of data on one workgroup.
- * @details Required defines: KERNEL_WORKGROUP_SIZE, DATA_START, and DATA_COUNT. data[DATA_START + DATA_COUNT] must hold
- * zero.
+ * @details Required defines: KERNEL_WORKGROUP_SIZE, DATA_START, and DATA_COUNT.
  */
 #include "prefix_sum/prefix_sum_utils.slang"
 
 RWStructuredBuffer<uint> data;
+groupshared uint scratch[KERNEL_WORKGROUP_SIZE];
 
 [shader("compute")]
 [numthreads(KERNEL_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    workgroup_general_prefix_sum<KERNEL_WORKGROUP_SIZE>(data, DATA_START, DATA_COUNT, p_group_thread_id.x);
+    workgroup_general_prefix_sum<KERNEL_WORKGROUP_SIZE>(data, DATA_START, DATA_COUNT, p_group_thread_id.x, scratch);
 }
