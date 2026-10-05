@@ -19,7 +19,6 @@
 #include "core/allocator/heap_allocator_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include "test_utilities.hh"
 #include <bit>

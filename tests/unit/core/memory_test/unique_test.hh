@@ -20,7 +20,6 @@
 #include "core/memory/unique.hh"
 #include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include <gtest/gtest.h>
 #include <memory>

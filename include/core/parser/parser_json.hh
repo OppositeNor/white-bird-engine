@@ -215,8 +215,16 @@ public:
             }
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
-            p_value = T(data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>(), data.at("w").get<float>());
+        } else if constexpr (std::same_as<T, glm::vec4>) {
+            p_value = glm::vec4(data.at("x").get<float>(),
+                data.at("y").get<float>(),
+                data.at("z").get<float>(),
+                data.at("w").get<float>());
+        } else if constexpr (std::same_as<T, glm::quat>) {
+            p_value = T(data.at("w").get<float>(),
+                data.at("x").get<float>(),
+                data.at("y").get<float>(),
+                data.at("z").get<float>());
         } else if constexpr (std::same_as<T, glm::mat4>) {
             if (!data.is_array() || data.size() != 16) {
                 throw std::runtime_error("Failed to get glm::mat4: expected an array containing exactly 16 values.");
@@ -262,11 +270,16 @@ public:
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(
                 data.at(p_key).at("x").get<float>(), data.at(p_key).at("y").get<float>(), data.at(p_key).at("z").get<float>());
-        } else if constexpr (std::same_as<T, glm::vec4> || std::same_as<T, glm::quat>) {
-            p_value = T(data.at(p_key).at("x").get<float>(),
+        } else if constexpr (std::same_as<T, glm::vec4>) {
+            p_value = glm::vec4(data.at(p_key).at("x").get<float>(),
                 data.at(p_key).at("y").get<float>(),
                 data.at(p_key).at("z").get<float>(),
                 data.at(p_key).at("w").get<float>());
+        } else if constexpr (std::same_as<T, glm::quat>) {
+            p_value = T(data.at(p_key).at("w").get<float>(),
+                data.at(p_key).at("x").get<float>(),
+                data.at(p_key).at("y").get<float>(),
+                data.at(p_key).at("z").get<float>());
         } else if constexpr (std::same_as<T, glm::mat4>) {
             const auto& matrix_data = data.at(p_key);
             if (!matrix_data.is_array() || matrix_data.size() != 16) {

@@ -222,7 +222,7 @@ public:
         } else if constexpr (std::same_as<T, glm::vec4>) {
             p_value = glm::vec4(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
         } else if constexpr (std::same_as<T, glm::quat>) {
-            p_value = glm::quat(node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>(), node["w"].as<float>());
+            p_value = glm::quat(node["w"].as<float>(), node["x"].as<float>(), node["y"].as<float>(), node["z"].as<float>());
         } else if constexpr (std::same_as<T, glm::mat4>) {
             if (!node.IsSequence() || node.size() != 16) {
                 throw std::runtime_error("Failed to get glm::mat4: expected a sequence containing exactly 16 values.");

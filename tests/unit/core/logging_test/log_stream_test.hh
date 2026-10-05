@@ -18,7 +18,6 @@
 #include "core/logging/log_stream.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 
 #include <gtest/gtest.h>

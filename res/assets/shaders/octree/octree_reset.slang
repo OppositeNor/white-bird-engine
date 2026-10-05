@@ -18,10 +18,8 @@
 struct OctreeResetDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "octree_info")]
     uint2 octree_info;
-    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer", "read")]
+    [WBE_DESCRIPTOR("storage_buffer", "octree_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
-    uint2 material_sampler;
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_ping", "write")]
     uint2 deferred_list_ping;
     [WBE_DESCRIPTOR("storage_buffer", "octree_deferred_list_pong", "write")]

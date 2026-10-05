@@ -18,7 +18,6 @@
 #include "core/async/worker.hh"
 #include "global/global.hh"
 #include "job_test_utils.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include <atomic>
 #include <future>

@@ -24,7 +24,6 @@
 #include "function/render_software/renderer_software.hh"
 #include "global/global.hh"
 #include "job_test_utils.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
 #include <atomic>

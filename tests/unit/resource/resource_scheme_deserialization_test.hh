@@ -18,7 +18,6 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "test_global.hh"
 #include <exception>

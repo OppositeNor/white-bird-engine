@@ -18,7 +18,6 @@
 #include "core/allocator/heap_allocator_fixed_size_pool.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include <cstddef>
 #include <cstdint>

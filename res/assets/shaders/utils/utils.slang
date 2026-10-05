@@ -180,16 +180,6 @@ float4 software_mul_float4x4_vector(
         float4((p_matrix)[0][2], (p_matrix)[1][2], (p_matrix)[2][2], (p_matrix)[3][2]),                                  \
         float4((p_matrix)[0][3], (p_matrix)[1][3], (p_matrix)[2][3], (p_matrix)[3][3])
 
-/**
- * @brief Time information.
- */
-struct Time {
-    /**
-     * @brief The duration from the start of the application until now.
-     */
-    float duration_sec;
-};
-
 /** Maximum number of bindless material entries addressable by one draw pass. */
 static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
@@ -198,14 +188,6 @@ static const uint WBE_MAX_MATERIAL_COUNT = 32;
 struct WBE_TEXTUREAttribute {
     /** Texture role; an empty value selects the annotated variable name. */
     string texture_role = "";
-};
-
-/** Descriptor-heap indices shared by material shaders. */
-struct MaterialDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
-    uint2 material_params;
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
-    uint2 material_sampler;
 };
 
 #ifdef WBE_REFLECTION_METADATA

@@ -1269,20 +1269,6 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     return result;
 }
 
-void RendererVK::setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent) {
-    // Setup viewport and scissor information.
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = static_cast<float>(p_swap_chain_extent.width);
-    viewport.height = static_cast<float>(p_swap_chain_extent.height);
-    viewport.minDepth = 0.0F;
-    viewport.maxDepth = 1.0F;
-
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent = p_swap_chain_extent;
-}
-
 void RendererVK::run_stored_jobs() {
     // Run some jobs stored in the job buffer.
     for (size_t i = 0; i < RUN_MAX_JOBS_PER_FRAME; ++i) {

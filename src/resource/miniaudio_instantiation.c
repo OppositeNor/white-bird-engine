@@ -11,6 +11,8 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+*/
+
 /* Builds miniaudio with stb_vorbis so its decoders support Ogg Vorbis. miniaudio enables its Vorbis decoder only when the
    stb_vorbis declarations precede the implementation; the stb_vorbis implementation follows it. */
 #define STB_VORBIS_HEADER_ONLY

@@ -31,7 +31,6 @@
 #include "glm/ext/vector_uint3.hpp"
 #include "glm/ext/vector_uint4.hpp"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "resource/ktx_texture.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"

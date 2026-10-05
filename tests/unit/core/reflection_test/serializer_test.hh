@@ -22,7 +22,6 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 #include "test_global.hh"
 #include <cstddef>

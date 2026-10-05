@@ -22,7 +22,6 @@
 #include "generated/serializable_factory.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 #include "test_global.hh"
 

@@ -21,7 +21,6 @@
 #include "function/scene/world.hh"
 #include "glm/matrix.hpp"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>

@@ -30,7 +30,6 @@
 #include "function/scene/scene_node.hh"
 #include "function/scene/world.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"

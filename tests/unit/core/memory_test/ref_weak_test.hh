@@ -19,7 +19,6 @@
 #include "core/memory/reference_weak.hh"
 #include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include <cstdint>
 #include <cstdlib>

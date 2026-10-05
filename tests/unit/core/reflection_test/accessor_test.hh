@@ -17,7 +17,6 @@
 
 #include "generated/serializables_access.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 #include "test_global.hh"
 

@@ -18,7 +18,6 @@
 #include "core/allocator/heap_allocator_atomic_mutex_aligned_pool_impl_list.hh"
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
 #include <atomic>

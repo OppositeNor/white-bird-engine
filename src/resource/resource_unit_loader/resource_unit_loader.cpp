@@ -237,15 +237,13 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
     if (p_scheme.is_hdr) {
         auto image_data =
             load_image_data_hdr(file_path, p_scheme.channel_count, p_scheme.flip_h, p_scheme.flip_v, width, height, file_channels);
-        if (!image_data.has_value()) {
-            throw std::runtime_error(std::format("Failed to load HDR image data from file: {}", file_path.string()));
-        }
         resource_unit.width = width;
         resource_unit.height = height;
         resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
         resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
         resource_unit.config.set(RUImage::IS_HDR);
-        auto data = p_res_chunk.push_data(width * height * resource_unit.channel_count * sizeof(float), (*image_data).data());
+        WBE_DEBUG_ASSERT(width * height * resource_unit.channel_count == image_data.size());
+        auto data = p_res_chunk.push_data(image_data.size() * sizeof(float), image_data.data());
         resource_unit.image_data = data;
     } else {
         auto image_data =

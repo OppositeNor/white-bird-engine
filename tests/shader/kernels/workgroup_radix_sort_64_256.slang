@@ -18,7 +18,7 @@
  * @details Runs workgroup_radix_sort_step_64_256 on the digit at BIT_START when BIT_START is defined, and
  * workgroup_radix_sort_64_256 otherwise.
  */
-#include "radix_sort/radix_sort_utils.slang"
+#include "sort/radix_sort_utils.slang"
 
 RWStructuredBuffer<uint> data;
 groupshared uint shared_data[256];

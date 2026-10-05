@@ -18,7 +18,6 @@
 #include "boost/thread/lock_types.hpp"
 #include "core/debug_utils/debug_mutex.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 
 #include <atomic>

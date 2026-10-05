@@ -144,8 +144,9 @@ void write_image_data_png(const Path& p_path, std::span<const uint8_t> p_data, u
  * @param p_file_channels Output: The channel count of the image in its original
  * file.
  * @return The image data.
+ * @throws std::runtime_error If the image cannot be loaded.
  */
-std::optional<std::vector<float>> load_image_data_hdr(
+std::vector<float> load_image_data_hdr(
     const Path& p_path, uint32_t p_desired_channels, bool p_flip_h, bool p_flip_v, uint32_t& p_width, uint32_t& p_height, uint32_t& p_file_channels);
 /**
  * @brief Flip an hdr image horizontally.

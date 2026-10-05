@@ -20,7 +20,7 @@
  * back. Required defines: ELEMENT_TYPE, KERNEL_WORKGROUP_SIZE, FIRST_DATA_START, FIRST_DATA_COUNT, SECOND_DATA_START,
  * SECOND_DATA_COUNT, and WBE_RADIX_HISTOGRAM_BIT_REGION.
  */
-#include "radix_sort/radix_sort_utils.slang"
+#include "sort/radix_sort_utils.slang"
 
 RWStructuredBuffer<ELEMENT_TYPE> data;
 RWStructuredBuffer<uint> histogram;

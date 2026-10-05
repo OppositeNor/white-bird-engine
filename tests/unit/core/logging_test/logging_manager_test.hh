@@ -20,7 +20,6 @@
 #include "core/reflection/reflection_defs.hh"
 #include "generated/label_manager.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>

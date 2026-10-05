@@ -24,7 +24,6 @@
 #include "core/profiling/profiler.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "test_global.hh"
 
 namespace WBE = WhiteBirdEngine;

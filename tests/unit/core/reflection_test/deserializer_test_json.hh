@@ -19,7 +19,6 @@
 #include "core/reflection/serializable.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "global/global.hh"
-#include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
 #include "test_global.hh"
 #include "utils/utils.hh"

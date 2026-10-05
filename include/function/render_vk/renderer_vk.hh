@@ -327,9 +327,6 @@ private:
         VkSurfaceCapabilitiesKHR capabilities;
         Vector<VkSurfaceFormatKHR, AllocType> formats;
         Vector<VkPresentModeKHR, AllocType> present_modes;
-        bool is_adequate() const {
-            return !formats.empty() && !present_modes.empty();
-        }
     };
 
     BaseRenderDataVK base_render_data;
@@ -401,7 +398,6 @@ private:
     VkSurfaceFormatKHR choose_swap_surface_format(const Vector<VkSurfaceFormatKHR, AllocType>& p_available_formats);
     VkPresentModeKHR choose_swap_present_mode(const Vector<VkPresentModeKHR, AllocType>& p_available_present_modes);
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capabilities);
-    void setup_viewport_and_scissor_info(VkExtent2D p_swap_chain_extent);
 
     VkAllocationCallbacks* get_allocation_callbacks() {
         return nullptr;
