@@ -27,7 +27,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[discriptor_indices.buffer];
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
-    uint bucket_num = buffer[0];
+    uint sub_histogram_num = buffer[0];
     uint endian_start = buffer[1];
     uint lane_start = buffer[2];
     // Each thread is responsible for summing 4 values. Because we did an inclusive prefix sum

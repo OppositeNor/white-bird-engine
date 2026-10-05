@@ -25,8 +25,8 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [numthreads(64, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
     RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.buffer];
-    uint bucket_num = buffer[0];
+    uint group_num = buffer[0];
     uint endian_start = buffer[1];
-    workgroup_general_prefix_sum<64>(buffer, endian_start, bucket_num, p_group_thread_id.x);
+    workgroup_general_prefix_sum<64>(buffer, endian_start, group_num, p_group_thread_id.x);
 }
 
