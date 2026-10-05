@@ -1242,11 +1242,18 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
 }
 
 VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurfaceFormatKHR, AllocType>& p_available_formats) {
-    for (const auto& available_format : p_available_formats) {
-        if (available_format.format == VK_FORMAT_R8G8B8A8_SRGB && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return available_format;
+    // Render targets hold linear color, so the swap chain must apply the sRGB encoding on write. Surfaces commonly offer only
+    // one of the two channel orders (e.g. X11 surfaces only offer BGRA).
+    for (VkFormat preferred_format : {VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB}) {
+        for (const auto& available_format : p_available_formats) {
+            if (available_format.format == preferred_format && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return available_format;
+            }
         }
     }
+    stdout_log(WBE_CHANNEL_RENDER)
+        ->warning(std::format("The surface offers no sRGB swap chain format; presenting with {}, so colors are not sRGB encoded.",
+            string_VkFormat(p_available_formats[0].format)));
     return p_available_formats[0];
 }
 
