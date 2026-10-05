@@ -78,20 +78,24 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchema : public Serializable {
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaAudio final : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaAudio)
-    // Sample rate of the audio. Could be read from file.
+    // Sample rate the audio is converted to when decoded. -1 keeps the file's
+    // sample rate.
     WBE_META(WBE_REFLECT)
     int32_t sample_rate = -1;
-    // The number of channels of the audio (typically 1 or 2). Could be read
-    // from file.
+    // The number of channels the audio is converted to when decoded (typically
+    // 1 or 2). 0 keeps the file's channel count.
     WBE_META(WBE_REFLECT)
-    uint32_t channels = 1;
-    // The bit depth per sample. Could be read from file.
+    uint32_t channels = 0;
+    // The expected bit depth per sample of the file. -1 skips the check;
+    // otherwise loading fails when the file differs.
     WBE_META(WBE_REFLECT)
     int32_t bit_depth = -1;
-    // The duration of the audio. Could be read from file.
+    // The expected duration of the file in seconds. -1 skips the check;
+    // otherwise loading fails when the file differs by more than a millisecond.
     WBE_META(WBE_REFLECT)
     float duration = -1.0F;
-    // The number of frames of the audio. Could be read from file.
+    // The expected number of frames of the file at its own sample rate. -1
+    // skips the check; otherwise loading fails when the file differs.
     WBE_META(WBE_REFLECT)
     int32_t frame_count = -1;
     // Is the audio loaded in stream.
@@ -184,8 +188,13 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaVideo : public RUSchema {
 
 /**
  * @class RUAudio
- * @brief Audio data resource. Contains description of an audio,
- * and a MemID referencing the resource of the audio data.
+ * @brief Audio data resource. Describes the decoded output format of an audio
+ * file and references its chunk-owned data.
+ *
+ * Non-streamed audio stores the whole file decoded to interleaved 32-bit float
+ * PCM. Streamed audio stores the encoded file bytes, which are decoded
+ * incrementally during playback into the described output format, so playback
+ * never reads files.
  *
  * When this unit references chunk-owned payload data, push that payload before
  * emplacing the resource unit so addresses stay stable inside the stack
@@ -198,26 +207,28 @@ struct RUAudio : public ResourceUnit {
      */
     // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum AudioConfig {
-        // Should the audio be streamed. If true, then audio data will be a
-        // stb_vorbis object.
+        // Should the audio be streamed. If true, then audio data holds the
+        // encoded file bytes instead of decoded PCM.
         IS_STREAM,
         // To track the total number of bits.
-        TOTAL_CONFIG_BIT
+        TOTAL_CONFIG_BIT,
     };
-    // Sample rate of the audio.
+    // Sample rate of the decoded audio.
     uint32_t sample_rate;
-    // The number of channels of the audio (typically 1 or 2).
+    // The number of interleaved channels of the decoded audio (typically 1 or 2).
     uint32_t channels;
-    // The bit depth per sample.
+    // The bit depth per decoded sample. Decoded samples are always 32-bit float.
     uint32_t bit_depth;
-    // The duration of the audio.
+    // The duration of the audio in seconds.
     float duration;
-    // The number of frames of the audio.
+    // The number of decoded frames of the audio.
     uint32_t frame_count;
     // Configurations of the audio.
     std::bitset<TOTAL_CONFIG_BIT> config;
-    // The data of the audio.
+    // The data of the audio: decoded PCM, or the encoded file when IS_STREAM is set.
     RefRes<char> audio_data;
+    // The size of audio_data in bytes.
+    size_t data_size;
 };
 
 /**
@@ -266,7 +277,7 @@ struct RUImage : public ResourceUnit {
         // Is the image an HDR image (32 bit instead of 8 bit)
         IS_HDR,
         // To track the total number of bits.
-        TOTAL_CONFIG_BIT
+        TOTAL_CONFIG_BIT,
     };
     // The width of the image (in pixels).
     uint32_t width;

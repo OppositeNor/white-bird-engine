@@ -19,6 +19,7 @@
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
+#include "test_global.hh"
 
 #include <cstdint>
 #include <glm/glm.hpp>
@@ -33,7 +34,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEDeserializerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {

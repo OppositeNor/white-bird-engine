@@ -19,6 +19,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <atomic>
@@ -40,7 +41,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -356,7 +357,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentAlloc
 
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i] {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 42);
             std::uniform_int_distribution<int> dist(16, 128);
@@ -425,7 +426,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentDeall
 
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i] {
             sync_point.arrive_and_wait();
             for (WBE::MemID mem : thread_mems[i]) {
                 pool.deallocate(mem);
@@ -461,7 +462,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentMixed
 
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i] {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 200);
             std::uniform_int_distribution<int> size_dist(16, 256);
@@ -477,7 +478,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentMixed
                     if (mem != WBE::MEM_NULL) {
                         active_mems[i].push_back(mem);
                         // Write pattern to verify memory integrity
-                        memset(pool.get(mem), static_cast<int>(i + j) & 0xFF, size);
+                        memset(pool.get(mem), (i + j) & 0xFF, size);
                     }
                 } else {
                     // Deallocate
@@ -528,7 +529,7 @@ TEST_F(WBEHeapAllocAtomicSharedMutexAlignedPoolImplicitListTest, ConcurrentStres
 
     threads.reserve(NUM_THREADS);
     for (int i = 0; i < NUM_THREADS; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i] {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 300);
             std::uniform_int_distribution<int> size_dist(8, 64);

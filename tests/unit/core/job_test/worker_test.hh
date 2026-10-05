@@ -19,6 +19,7 @@
 #include "global/global.hh"
 #include "job_test_utils.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include <atomic>
 #include <future>
 #include <gtest/gtest.h>
@@ -30,7 +31,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEWorkerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -46,14 +47,14 @@ TEST_F(WBEWorkerTest, HandleCompletesWithoutDrainingPool) {
     std::latch release_blocking(1);
     std::atomic<bool> target_executed{false};
 
-    std::future<void> blocking_handle = worker.add_job([&]() {
+    std::future<void> blocking_handle = worker.add_job([&] {
         blocking_started.count_down();
         release_blocking.wait();
     });
 
     blocking_started.wait();
 
-    std::future<void> target_handle = worker.add_job([&]() {
+    std::future<void> target_handle = worker.add_job([&] {
         target_executed.store(true, std::memory_order_release);
     });
 
@@ -70,7 +71,7 @@ TEST_F(WBEWorkerTest, HandleCompletesWithoutDrainingPool) {
 TEST_F(WBEWorkerTest, SubmitTaskReturnsValue) {
     WBE::Worker worker;
 
-    std::future<int> result = worker.submit_task([]() {
+    std::future<int> result = worker.submit_task([] {
         return 42;
     });
 

@@ -18,6 +18,7 @@
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_utils.hh"
+#include "test_global.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
@@ -32,7 +33,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEResourceUtilsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {

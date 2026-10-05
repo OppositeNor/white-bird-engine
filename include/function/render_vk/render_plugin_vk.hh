@@ -18,10 +18,12 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -145,6 +147,46 @@ public:
      * @brief Register plugin-owned arenas after the renderer has created the physical heaps.
      */
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) = 0;
+
+    /**
+     * @brief Start a renderer frame after the current frame slot has been selected and its in-flight fence has signaled.
+     *
+     * Called on the rendering thread once per renderer frame, before any render-graph task of that frame is recorded.
+     *
+     * @param p_render_data Renderer data whose current frame slot identifies the starting frame.
+     */
+    virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) = 0;
+
+    /**
+     * @brief Record plugin commands at the start of a render-graph task's command buffer.
+     *
+     * Called on the rendering thread immediately after the task's primary command buffer begins, outside any rendering scope.
+     *
+     * @param p_command_buffer The task's command buffer in the recording state.
+     * @param p_task_id The render-graph task identifier.
+     * @param p_queue_family The queue family the command buffer is submitted to.
+     */
+    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
+
+    /**
+     * @brief Record plugin commands at the end of a render-graph task's command buffer.
+     *
+     * Called on the rendering thread immediately before the task's primary command buffer ends, outside any rendering scope.
+     * Every call is paired with the preceding on_before_task_recorded() call for the same task.
+     *
+     * @param p_command_buffer The task's command buffer in the recording state.
+     * @param p_task_id The render-graph task identifier.
+     * @param p_queue_family The queue family the command buffer is submitted to.
+     */
+    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
+
+    /**
+     * @brief Finish plugin work while the renderer terminates.
+     *
+     * Called on the rendering thread after the device has become idle and before the plugin is released and the logical
+     * device is destroyed.
+     */
+    virtual void on_renderer_terminating() = 0;
 
 protected:
     friend class RendererVK;

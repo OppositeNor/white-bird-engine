@@ -47,6 +47,13 @@ struct RendererCapabilities {
      * @brief Whether ray query is requested and was enabled.
      */
     bool ray_query = false;
+    /**
+     * @brief Whether GPU timestamp queries are requested and were enabled.
+     *
+     * When enabled, the renderer samples the GPU execution time of every render-graph task and writes a JSON report when
+     * it terminates.
+     */
+    bool timestamp_query = false;
 };
 
 /**

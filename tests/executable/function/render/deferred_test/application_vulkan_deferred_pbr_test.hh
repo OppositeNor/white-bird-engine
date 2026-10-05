@@ -29,6 +29,9 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -40,11 +43,8 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_acceleration_structure_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "input_manager_mocked.hh"
 #include "i_octree_render_feature.hh"
+#include "input_manager_mocked.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
 #include <atomic>
@@ -73,7 +73,12 @@ namespace WhiteBirdEngine {
 class ApplicationVulkanDeferredPBRTest : public ApplicationGame {
 public:
     ApplicationVulkanDeferredPBRTest()
-        : ApplicationGame(RendererCapabilities{.shader_debug = true, .ray_query = exec_test_ray_tracing_requested()},
+        : ApplicationGame(
+              RendererCapabilities{
+                  .shader_debug = true,
+                  .ray_query = exec_test_requested("WBE_EXEC_TEST_RAY_TRACING"),
+                  .timestamp_query = exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
+              },
               make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {
     }
 

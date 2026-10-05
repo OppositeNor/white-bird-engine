@@ -22,6 +22,7 @@
 #include "glm/matrix.hpp"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
@@ -94,7 +95,7 @@ void driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
 class WBEWorldSystemTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
         world = WBE::make_ref<WBE::World>(global->engine_core->pool_allocator, global->engine_core->pool_allocator);
     }
 

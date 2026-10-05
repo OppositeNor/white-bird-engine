@@ -20,6 +20,7 @@
 #include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include <cstdint>
 #include <cstdlib>
 #include <gtest/gtest.h>
@@ -33,7 +34,7 @@ namespace WBE = WhiteBirdEngine;
 class WBERefStrongTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -87,7 +88,7 @@ TEST_F(WBERefStrongTest, ConstructDestruct) {
     class TestClass {
     public:
         int* modify_val;
-        TestClass(int* p_modify_val) : modify_val(p_modify_val) {
+        explicit TestClass(int* p_modify_val) : modify_val(p_modify_val) {
             ++(*modify_val);
         }
         ~TestClass() {
@@ -159,7 +160,7 @@ TEST_F(WBERefStrongTest, NullReference) {
 
 class TestClass {
 public:
-    TestClass(int* p_val) : val(p_val) {
+    explicit TestClass(int* p_val) : val(p_val) {
         ++(*p_val);
     }
     ~TestClass() {

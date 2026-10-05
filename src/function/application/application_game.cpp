@@ -19,6 +19,7 @@
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/audio_ma/audio_renderer_ma.hh"
 #include "function/game_config/game_config.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
@@ -63,10 +64,10 @@ ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities, R
 }
 
 void ApplicationGame::run() {
-    std::jthread render_thread([this]() {
+    std::jthread render_thread([this] {
         run_render();
     });
-    std::jthread logic_thread([this]() {
+    std::jthread logic_thread([this] {
         run_logic();
     });
 }
@@ -99,7 +100,7 @@ void ApplicationGame::init() {
             global_allocator(), get_worker_thread_count(engine_config.worker_thread_count, renderer->get_worker_nums()));
     }
     worker = make_ref<Worker>(global_allocator(), 1);
-    // audio_renderer = make_ref<AudioRendererMA>(global_allocator());
+    audio_renderer = make_ref<AudioRendererMA>(global_allocator());
     ResourceManager::get_singleton()->load_global_resource("res_chunks/global_resources.json");
 }
 
@@ -145,8 +146,8 @@ WindowProperties ApplicationGame::get_window_properties_from_game_config_options
         .title = p_game_config_options.game_name,
         .width = p_game_config_options.window_width,
         .height = p_game_config_options.window_height,
-        .is_resizable = false,  // TODO
-        .is_full_screen = false // TODO
+        .is_resizable = false,   // TODO
+        .is_full_screen = false, // TODO
     };
     return properties;
 }

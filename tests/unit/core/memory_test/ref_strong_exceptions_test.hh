@@ -21,6 +21,7 @@
 #include "global/global.hh"
 #include "mock_heap_allocator_aligned.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
@@ -30,7 +31,7 @@ namespace WBE = WhiteBirdEngine;
 class WBERefStrongExceptionsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {

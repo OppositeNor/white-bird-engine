@@ -22,8 +22,11 @@ namespace WhiteBirdEngine {
 
 /**
  * @class AudioRendererMA
- * @brief MA audio renderer.
+ * @brief Audio renderer backed by miniaudio.
  *
+ * Owns a miniaudio context, a playback device in the device's native format, and an engine whose node graph is mixed by the
+ * device's real-time callback thread. Construction starts playback and throws std::runtime_error on any initialization
+ * failure. Neither copyable nor movable, because the device callback holds the address of the engine.
  */
 class AudioRendererMA final : public AudioRenderer {
 public:
@@ -38,6 +41,9 @@ private:
     ma_context context{};
     ma_device device{};
     ma_engine engine{};
+    bool context_initialized = false;
+    bool device_initialized = false;
+    bool engine_initialized = false;
 
     void init();
     void terminate();

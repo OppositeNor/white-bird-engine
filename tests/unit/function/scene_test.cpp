@@ -32,6 +32,7 @@
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -109,7 +110,7 @@ void scene_driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
 
 class RecordingRenderer final : public WBE::IRenderer {
 public:
-    RecordingRenderer(WBE::RenderAllocator* p_allocator)
+    explicit RecordingRenderer(WBE::RenderAllocator* p_allocator)
         : render_database(WBE::make_ref<WBE::RenderDatabase>(p_allocator, p_allocator)) {
     }
 
@@ -153,7 +154,7 @@ private:
 class WBEWorldTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {

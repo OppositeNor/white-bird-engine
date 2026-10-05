@@ -158,7 +158,11 @@ if (WBE_MAKE_TEST)
 endif()
 # Setup miniaudio
 add_library(WBE_MINIAUDIO_BUILD_LIB
-    dependencies/miniaudio/miniaudio.c
+    src/resource/miniaudio_instantiation.c
+)
+target_include_directories(WBE_MINIAUDIO_BUILD_LIB PRIVATE
+    ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
+    ${PROJECT_SOURCE_DIR}/dependencies/stb
 )
 
 

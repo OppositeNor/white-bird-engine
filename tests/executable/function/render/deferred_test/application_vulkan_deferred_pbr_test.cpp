@@ -318,14 +318,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
             throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
         }
     }
-    bool rebuild_static_every_frame = false;
-    if (const char* selection = std::getenv("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT")) {
-        if (std::string_view(selection) == "1") {
-            rebuild_static_every_frame = true;
-        } else if (std::string_view(selection) != "0") {
-            throw std::runtime_error("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT must be 0 or 1.");
-        }
-    }
+    const bool rebuild_static_every_frame = exec_test_requested("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT");
     if (use_atomic_octree) {
         octree = make_unique<OctreeRenderFeatureAtomic>(
             render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);

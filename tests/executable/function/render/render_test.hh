@@ -30,7 +30,9 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -39,8 +41,6 @@
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -129,6 +129,29 @@ inline void write_descriptor_debug_output(std::string_view p_name, const DebugDa
     write_descriptor_debug_output(p_name, stream.str());
 }
 
+/**
+ * @brief Read an executable-test switch environment variable.
+ *
+ * Known switches: WBE_WAIT_PROCESS_INJECT waits for Enter before initialization, WBE_EXEC_TEST_RAY_TRACING builds and
+ * imports ray-tracing acceleration structures, WBE_EXEC_TEST_TIMESTAMP_QUERY samples GPU task times and writes a report on
+ * exit, and WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT rebuilds the deferred test's static octree every frame.
+ *
+ * @param p_variable The environment variable name.
+ * @return True when the variable is "1"; false when it is unset, empty, or "0".
+ * @throws std::runtime_error If the variable has any other value.
+ */
+inline bool exec_test_requested(std::string_view p_variable) {
+    const std::string variable(p_variable);
+    const char* value = std::getenv(variable.c_str());
+    if (value == nullptr || std::string_view(value).empty() || std::string_view(value) == "0") {
+        return false;
+    }
+    if (std::string_view(value) == "1") {
+        return true;
+    }
+    throw std::runtime_error(std::format("{} must be 0 or 1, but is \"{}\".", variable, value));
+}
+
 inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
     static std::string capture_png_path;
     static uint64_t capture_frame = 5;
@@ -156,20 +179,12 @@ inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
 
 inline void on_exec_test_start() {
 
-    const char* wait_process_inject = std::getenv("WBE_WAIT_PROCESS_INJECT");
-    if (wait_process_inject != nullptr && std::string_view(wait_process_inject) == "1") {
+    if (exec_test_requested("WBE_WAIT_PROCESS_INJECT")) {
         std::println("WBE_WAIT_PROCESS_INJECT is set. Running on PID: {}, Press Enter to continue...", OS::get_pid());
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 }
 
-/**
- * @brief Whether WBE_EXEC_TEST_RAY_TRACING=1 asks the executable to build and import ray-tracing acceleration structures.
- */
-inline bool exec_test_ray_tracing_requested() {
-    const char* value = std::getenv("WBE_EXEC_TEST_RAY_TRACING");
-    return value != nullptr && std::string_view(value) == "1";
-}
 
 inline std::string_view mesh_vertex_entry(RefRes<RUGraphicsPipeline> p_pipeline) {
     if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL) {
@@ -211,13 +226,8 @@ inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
     const ShaderMetadata masked_metadata = ShaderMetadataLoader().load(masked_pipeline->vertex_stage);
     const std::optional<MaterialTextureContract> material_contract =
         p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
-    return MeshCompilerVK(p_renderer).compile(p_mesh,
-        opaque_metadata,
-        mesh_vertex_entry(p_opaque_pipeline),
-        masked_metadata,
-        mesh_vertex_entry(masked_pipeline),
-        material_contract,
-        p_config);
+    return MeshCompilerVK(p_renderer)
+        .compile(p_mesh, opaque_metadata, mesh_vertex_entry(p_opaque_pipeline), masked_metadata, mesh_vertex_entry(masked_pipeline), material_contract, p_config);
 }
 
 /**
@@ -305,14 +315,16 @@ inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_mesh_key, std
  * @return p_task.
  */
 inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipelineVK& p_pipeline, const MeshResourceKeys& p_keys) {
-    const std::array<std::pair<std::string_view, std::string_view>, 6> mappings{{
-        {REND_RES_MESH_SUBMESHES, p_keys.submeshes},
-        {REND_RES_MESH_NODES, p_keys.nodes},
-        {REND_RES_MESH_INSTANCES, p_keys.instances},
-        {REND_RES_MESH_TRANSFORM, p_keys.transform},
-        {REND_RES_MESH_MATERIAL_PARAMS, p_keys.material_params},
-        {REND_RES_MESH_MATERIAL_SAMPLER, p_keys.material_sampler},
-    }};
+    const std::array<std::pair<std::string_view, std::string_view>, 6> mappings{
+        {
+            {REND_RES_MESH_SUBMESHES, p_keys.submeshes},
+            {REND_RES_MESH_NODES, p_keys.nodes},
+            {REND_RES_MESH_INSTANCES, p_keys.instances},
+            {REND_RES_MESH_TRANSFORM, p_keys.transform},
+            {REND_RES_MESH_MATERIAL_PARAMS, p_keys.material_params},
+            {REND_RES_MESH_MATERIAL_SAMPLER, p_keys.material_sampler},
+        },
+    };
     const auto& fields = p_pipeline.get_descriptor_layout().fields;
     for (const auto& [shader_id, graph_id] : mappings) {
         if (!std::ranges::any_of(fields, [shader_id](const auto& p_field) {
@@ -321,7 +333,8 @@ inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipe
             continue;
         }
         if (graph_id.empty()) {
-            throw std::runtime_error("Pipeline declares mesh resource \"" + std::string(shader_id) + "\" but no graph resource is provided for it.");
+            throw std::runtime_error(std::format(
+                "Pipeline declares mesh resource \"{}\" but no graph resource is provided for it.", shader_id));
         }
         p_task.alias(shader_id, graph_id);
     }
@@ -331,7 +344,8 @@ inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipe
 /**
  * @brief Convert one compiled mesh draw batch into a pipeline batch drawn with p_pipeline.
  */
-inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(const MeshDrawBatchVK& p_source, Ref<ROGraphicsPipelineVK> p_pipeline) {
+inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(
+    const MeshDrawBatchVK& p_source, Ref<ROGraphicsPipelineVK> p_pipeline) {
     RTRunGraphicsPipelineIndirectVK::PipelineBatch batch;
     batch.graphics_pipeline = std::move(p_pipeline);
     batch.first_draw = p_source.first_draw;
@@ -344,7 +358,7 @@ inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(const Me
 inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_mesh_pipeline_batches(
     RenderAllocator* p_allocator, Ref<MeshResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
     Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
-    size_t batch_count = [&p_resources, p_double_sided, p_masked]() {
+    size_t batch_count = [&p_resources, p_double_sided, p_masked] {
         if (p_double_sided) {
             return p_resources->get_opaque_double_sided_draw_batch_count();
         }
@@ -352,7 +366,7 @@ inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> m
     }();
     result.reserve(batch_count);
     for (size_t i = 0; i < batch_count; ++i) {
-        const MeshDrawBatchVK& source = [i, p_double_sided, p_masked, &p_resources]() {
+        const MeshDrawBatchVK& source = [i, p_double_sided, p_masked, &p_resources] {
             if (p_double_sided) {
                 return p_resources->get_opaque_double_sided_draw_batch(i);
             }
@@ -426,7 +440,7 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
     std::string_view p_mesh_key = STATIC_MESH_KEY,
     std::string_view p_transform_id = {}) {
     auto batches = make_mesh_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
-    std::string_view indirect_buffer_member = [p_double_sided, p_masked]() {
+    std::string_view indirect_buffer_member = [p_double_sided, p_masked] {
         if (p_double_sided) {
             return MeshResourcesVK::OPAQUE_DOUBLE_SIDED_DRAW_BATCHES;
         }
@@ -610,7 +624,8 @@ inline WBE::ComponentSpotLight make_default_test_spot_light_component(float p_in
 }
 
 inline SpotLightInfoGPU make_spot_light_info_gpu(const WBE::ComponentSpotLight& p_spot_light_component) {
-    return SpotLightInfoGPU{.view = p_spot_light_component.view,
+    return SpotLightInfoGPU{
+        .view = p_spot_light_component.view,
         .proj = p_spot_light_component.proj,
         .inv_view_proj = glm::inverse(p_spot_light_component.proj * p_spot_light_component.view),
         .position = p_spot_light_component.position,
@@ -620,7 +635,8 @@ inline SpotLightInfoGPU make_spot_light_info_gpu(const WBE::ComponentSpotLight& 
         .color = p_spot_light_component.color,
         .outer_cone_cos = p_spot_light_component.outer_cone_cos,
         .range = p_spot_light_component.range,
-        .emitter_width = p_spot_light_component.emitter_width};
+        .emitter_width = p_spot_light_component.emitter_width,
+    };
 }
 
 inline void log_uniform_buffer_descriptors(WBE::Ref<WBE::ROCMultislotsVK> p_buffers, std::string_view p_label) {

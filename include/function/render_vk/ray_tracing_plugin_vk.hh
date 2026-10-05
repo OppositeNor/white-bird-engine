@@ -15,23 +15,17 @@
 #ifndef WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 #define WBE_FILE_RAY_TRACING_PLUGIN_VK_HH
 
-#include "core/allocator/i_allocator.hh"
-#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_acceleration_structure_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/roc_single_vk.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include "utils/interface/i_singleton.hh"
 
 #include <cstddef>
 #include <span>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -92,6 +86,10 @@ public:
     virtual void configure_descriptor_heaps(
         const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
     virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
+    virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) override;
+    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
+    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) override;
+    virtual void on_renderer_terminating() override;
 
     /**
      * @brief Return the ray-tracing device state, for creating acceleration structures.

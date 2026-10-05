@@ -19,12 +19,13 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_plugin_vk.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -186,26 +187,36 @@ ResourceScopeVK resource_scope(RendResUsageVK p_usage, bool p_write, QueueFamily
         return {.access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, .stage = shader_stage_scope(p_queue_family)};
     case RendResUsageVK::COLOR_ATTACHMENT:
         ensure_graphics_queue_usage(p_queue_family, p_usage);
-        return {.access = p_write ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-            .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
+        return {
+            .access = p_write ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+            .stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        };
     case RendResUsageVK::DEPTH_ATTACHMENT:
         ensure_graphics_queue_usage(p_queue_family, p_usage);
-        return {.access = p_write ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-            .stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT};
+        return {
+            .access = p_write ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+            .stage = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        };
     case RendResUsageVK::STORAGE_IMAGE:
-        return {.access = p_write ? VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT : VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
-            .stage = shader_stage_scope(p_queue_family)};
+        return {
+            .access = p_write ? VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT : VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+            .stage = shader_stage_scope(p_queue_family),
+        };
     case RendResUsageVK::UNIFORM_BUFFER:
         if (p_write) {
             break;
         }
         return {.access = VK_ACCESS_2_UNIFORM_READ_BIT, .stage = shader_stage_scope(p_queue_family)};
     case RendResUsageVK::STORAGE_BUFFER:
-        return {.access = p_write ? VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT : VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
-            .stage = shader_stage_scope(p_queue_family)};
+        return {
+            .access = p_write ? VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT : VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+            .stage = shader_stage_scope(p_queue_family),
+        };
     case RendResUsageVK::ACCELERATION_STRUCTURE:
-        return {.access = p_write ? VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR : VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
-            .stage = p_write ? VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR : shader_stage_scope(p_queue_family)};
+        return {
+            .access = p_write ? VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR : VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .stage = p_write ? VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR : shader_stage_scope(p_queue_family),
+        };
     case RendResUsageVK::TRANSFER_SRC:
         if (p_write) {
             break;
@@ -463,7 +474,7 @@ void RenderGraphVK::add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std:
     ensure_accessed(dst_scope, *p_to);
     auto edge = make_ref<RGResEdge>(render_data->allocator);
     edge->from = p_from;
-    edge->to = p_to;
+    edge->to = std::move(p_to);
     edge->res_id = std::move(p_resource_id);
     // Only the previous task's writes need to be made available; a previous read only needs an execution dependency.
     edge->src_stage = src_scope.stage;
@@ -1083,6 +1094,11 @@ void RenderGraphVK::record_node(
     if (vkBeginCommandBuffer(p_command_buffer, &begin_info) != VK_SUCCESS) {
         throw std::runtime_error("RenderGraphVK: failed to begin command buffer.");
     }
+    if (render_data->render_plugins != nullptr) {
+        for (auto& plugin : *render_data->render_plugins) {
+            plugin->on_before_task_recorded(p_command_buffer, p_node->task_id, p_node->in_queue);
+        }
+    }
     if (render_data->descriptor_heap_allocator == nullptr) {
         throw std::runtime_error("RenderGraphVK: descriptor heap allocator is unavailable.");
     }
@@ -1097,6 +1113,12 @@ void RenderGraphVK::record_node(
     if (p_record_present_transition) {
         // Present waits on this node's terminal semaphore, so the present layout transition must be recorded before it is signaled.
         record_present_transition(p_command_buffer);
+    }
+
+    if (render_data->render_plugins != nullptr) {
+        for (auto& plugin : *render_data->render_plugins) {
+            plugin->on_after_task_recorded(p_command_buffer, p_node->task_id, p_node->in_queue);
+        }
     }
 
     if (vkEndCommandBuffer(p_command_buffer) != VK_SUCCESS) {

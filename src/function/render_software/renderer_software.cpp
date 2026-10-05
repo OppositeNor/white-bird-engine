@@ -33,6 +33,7 @@ RendererSoftware::RendererSoftware(Ref<RenderAllocator> p_allocator, RendererCap
     p_capabilities.conservative_rasterization = false;
     p_capabilities.ray_tracing = false;
     p_capabilities.ray_query = false;
+    p_capabilities.timestamp_query = false;
 }
 
 void RendererSoftware::tick(double p_delta) {

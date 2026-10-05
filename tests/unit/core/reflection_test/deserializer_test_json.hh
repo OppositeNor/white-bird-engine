@@ -21,6 +21,7 @@
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "reflection_test_data.hh"
+#include "test_global.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
@@ -38,7 +39,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEDeserializerJSONTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -487,7 +488,7 @@ TEST_F(WBEDeserializerJSONTest, VectorContainer_LargeVector) {
     for (int i = 0; i < 1000; ++i) {
         large_vector_json += std::to_string(i);
         if (i < 999) {
-            large_vector_json += ",";
+            large_vector_json += ',';
         }
     }
     large_vector_json += "]}";
@@ -1209,16 +1210,20 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
         std::function<void(WBE::Serializable*)> validator;
     };
 
-    std::vector<TestCase> test_cases = {{.type_name = "TestSerializable",
-                                            .json_data = R"({"si32_test": 123, "str_test": "runtime_test"})",
-                                            .validator =
-                                                [](WBE::Serializable* p_obj) {
-                                                    auto* ptr = dynamic_cast<WBE::TestSerializable*>(p_obj);
-                                                    ASSERT_NE(ptr, nullptr);
-                                                    EXPECT_EQ(ptr->si32_test, 123);
-                                                    EXPECT_EQ(ptr->str_test, "runtime_test");
-                                                }},
-        {.type_name = "TestInheritedChild",
+    std::vector<TestCase> test_cases = {
+        {
+            .type_name = "TestSerializable",
+            .json_data = R"({"si32_test": 123, "str_test": "runtime_test"})",
+            .validator =
+                [](WBE::Serializable* p_obj) {
+                    auto* ptr = dynamic_cast<WBE::TestSerializable*>(p_obj);
+                    ASSERT_NE(ptr, nullptr);
+                    EXPECT_EQ(ptr->si32_test, 123);
+                    EXPECT_EQ(ptr->str_test, "runtime_test");
+                },
+        },
+        {
+            .type_name = "TestInheritedChild",
             .json_data = R"({"base_id": 456, "child_id": 789})",
             .validator =
                 [](WBE::Serializable* p_obj) {
@@ -1226,13 +1231,20 @@ TEST_F(WBEDeserializerJSONTest, DynamicDispatch_RuntimeTypeResolution) {
                     ASSERT_NE(ptr, nullptr);
                     EXPECT_EQ(ptr->base_id, 456);
                     EXPECT_EQ(ptr->child_id, 789);
-                }},
-        {.type_name = "TestVectorContainer", .json_data = R"({"ints": [10, 20, 30]})", .validator = [](WBE::Serializable* p_obj) {
-             auto* ptr = dynamic_cast<WBE::TestVectorContainer*>(p_obj);
-             ASSERT_NE(ptr, nullptr);
-             EXPECT_EQ(ptr->ints.size(), 3);
-             EXPECT_EQ(ptr->ints[1], 20);
-         }}};
+                },
+        },
+        {
+            .type_name = "TestVectorContainer",
+            .json_data = R"({"ints": [10, 20, 30]})",
+            .validator =
+                [](WBE::Serializable* p_obj) {
+                    auto* ptr = dynamic_cast<WBE::TestVectorContainer*>(p_obj);
+                    ASSERT_NE(ptr, nullptr);
+                    EXPECT_EQ(ptr->ints.size(), 3);
+                    EXPECT_EQ(ptr->ints[1], 20);
+                },
+        },
+    };
 
     WBE::ParserJSON parser;
 

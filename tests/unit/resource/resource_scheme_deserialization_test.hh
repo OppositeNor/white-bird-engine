@@ -20,6 +20,7 @@
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "test_global.hh"
 #include <exception>
 #include <gtest/gtest.h>
 #include <memory>
@@ -30,7 +31,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEResourceSchemaDeserializationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -122,7 +123,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaAudioDefaults) {
     ASSERT_EQ(scheme.id, "test_audio_02");
     ASSERT_EQ(scheme.type, "audio");
     ASSERT_EQ(scheme.sample_rate, -1);       // Default value
-    ASSERT_EQ(scheme.channels, 1U);          // Default value
+    ASSERT_EQ(scheme.channels, 0U);          // Default value
     ASSERT_EQ(scheme.bit_depth, -1);         // Default value
     ASSERT_FLOAT_EQ(scheme.duration, -1.0F); // Default value
     ASSERT_EQ(scheme.frame_count, -1);       // Default value

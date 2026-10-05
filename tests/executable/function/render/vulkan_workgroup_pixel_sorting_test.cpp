@@ -61,7 +61,7 @@ inline constexpr uint32_t PIXEL_SORT_CHUNK_SIZE = 64;
 
 /**
  * @class ApplicationVulkanWorkgroupPixelSortingTest
- * @brief Sorts the pixels of every column of each 64x64 chunk of an image by luminance, one workgroup per chunk, and
+ * @brief Sorts the pixels of every row of each 64x64 chunk of an image by luminance, one workgroup per chunk, and
  * presents the result.
  */
 class ApplicationVulkanWorkgroupPixelSortingTest : public WBE::ApplicationGame {

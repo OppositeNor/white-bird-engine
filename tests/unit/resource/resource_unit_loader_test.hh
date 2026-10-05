@@ -38,16 +38,20 @@
 #include "resource/resource_unit_loader/resource_unit_loader.hh"
 #include "resource/resource_utils.hh"
 #include "resource_test_utils.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <functional>
 #include <gtest/gtest.h>
 #include <memory>
+#include <numbers>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -119,7 +123,7 @@ struct OrderedDestroyTestResourceUnit : public WBE::ResourceUnit {
 class ResourcePopulatorTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
         text_scheme.path = "test_text_files/test_file_utf8.txt";
     }
 
@@ -156,7 +160,22 @@ protected:
                 auto* data = static_cast<char*>(p_stack_allocator.get(data_mem_id));
                 std::memset(data, 0, TEST_BINARY_SIZE);
                 const std::array<float, 15> vertices{
-                    0.0F, 0.5F, 0.0F, 0.5F, 1.0F, -0.5F, -0.5F, 0.0F, 0.0F, 0.0F, 0.5F, -0.5F, 0.0F, 1.0F, 0.0F};
+                    0.0F,
+                    0.5F,
+                    0.0F,
+                    0.5F,
+                    1.0F,
+                    -0.5F,
+                    -0.5F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.5F,
+                    -0.5F,
+                    0.0F,
+                    1.0F,
+                    0.0F,
+                };
                 const std::array<uint32_t, 3> indices{0, 1, 2};
                 std::memcpy(data, vertices.data(), sizeof(vertices));
                 std::memcpy(data + sizeof(vertices), indices.data(), sizeof(indices));
@@ -169,6 +188,48 @@ protected:
                 p_assign_ref(WBE::RefRes<char>(binary_mem_id, &p_stack_allocator));
             })
             .build(p_stream);
+    }
+
+    // Load p_scheme with the audio loader, capturing the pushed audio data into p_data and returning a copy of the unit.
+    WBE::RUAudio load_audio(const WBE::RUSchemaAudio& p_scheme, std::vector<char>& p_data) {
+        WBE::ResourceUnitLoaderAudio loader;
+        std::stringstream stream;
+        WBE::StackAllocator stack_allocator(1024);
+        WBE::RefRes<WBE::RUAudio> captured_audio = WBE::MEM_NULL;
+        auto res_chunk = MockResourceChunk::Builder()
+                             .set_push_data_callback([&p_data](size_t p_size, const void* p_res) -> WBE::RefRes<char> {
+                                 p_data.resize(p_size);
+                                 std::memcpy(p_data.data(), p_res, p_size);
+                                 return WBE::MEM_NULL;
+                             })
+                             .set_reserve_res_unit_storage_callback(
+                                 [&captured_audio, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                     EXPECT_EQ(p_size, sizeof(WBE::RUAudio));
+                                     WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                     captured_audio = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUAudio>();
+                                     return captured_audio.force_cast<char>();
+                                 })
+                             .build(stream);
+        loader.populate_scheme(*res_chunk, p_scheme);
+        if (captured_audio == nullptr) {
+            throw std::runtime_error("Audio loader did not store a resource unit.");
+        }
+        return *captured_audio;
+    }
+
+    static WBE::RUSchemaAudio make_audio_scheme(std::string_view p_path, bool p_is_stream) {
+        WBE::RUSchemaAudio scheme;
+        scheme.id = "loaded_audio";
+        scheme.type = "audio";
+        scheme.path = p_path;
+        scheme.is_stream = p_is_stream;
+        return scheme;
+    }
+
+    static float read_audio_sample(const std::vector<char>& p_data, size_t p_index) {
+        float sample = 0.0F;
+        std::memcpy(&sample, p_data.data() + (p_index * sizeof(float)), sizeof(float));
+        return sample;
     }
 
     WBE::RUSchemaSubmesh3D make_triangle_submesh_scheme() {
@@ -359,7 +420,8 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 16> loaders = {&audio_loader,
+    const std::array<const WBE::IResourceUnitLoader*, 16> loaders = {
+        &audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
@@ -374,8 +436,10 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &component_loader,
         &prefab_loader,
         &world_loader,
-        &scene_loader};
-    const std::array<std::string_view, 16> expected_resource_types = {"audio",
+        &scene_loader,
+    };
+    const std::array<std::string_view, 16> expected_resource_types = {
+        "audio",
         "binary",
         "font",
         "image",
@@ -390,7 +454,8 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         "component",
         "prefab",
         "world",
-        "scene"};
+        "scene",
+    };
 
     for (size_t i = 0; i < loaders.size(); ++i) {
         auto first_resource_types = loaders[i]->get_supported_resource_types();
@@ -530,11 +595,13 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     EXPECT_EQ(vertex_data.attributes.get()[1].offset, sizeof(float) * 3);
     EXPECT_EQ(vertex_data.attributes.get()[1].size, sizeof(float) * 2);
 
-    const std::array<std::array<float, 5>, 3> expected_vertices{{
-        {{0.0F, 0.5F, 0.0F, 0.5F, 1.0F}},
-        {{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F}},
-        {{0.5F, -0.5F, 0.0F, 1.0F, 0.0F}},
-    }};
+    const std::array<std::array<float, 5>, 3> expected_vertices{
+        {
+            {{0.0F, 0.5F, 0.0F, 0.5F, 1.0F}},
+            {{-0.5F, -0.5F, 0.0F, 0.0F, 0.0F}},
+            {{0.5F, -0.5F, 0.0F, 1.0F, 0.0F}},
+        },
+    };
     for (size_t vertex_index = 0; vertex_index < expected_vertices.size(); ++vertex_index) {
         std::array<float, 5> actual_vertex{};
         std::memcpy(actual_vertex.data(),
@@ -581,20 +648,22 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
         size_t element_size;
         size_t section_start;
     };
-    const std::array<FormatCase, 12> format_cases{{
-        {.type = "float", .format = WBE::RUVertexAttributeFormat::FLOAT, .element_size = 4, .section_start = 0},
-        {.type = "vec2", .format = WBE::RUVertexAttributeFormat::FLOAT2, .element_size = 8, .section_start = 36},
-        {.type = "vec3", .format = WBE::RUVertexAttributeFormat::FLOAT3, .element_size = 12, .section_start = 0},
-        {.type = "vec4", .format = WBE::RUVertexAttributeFormat::FLOAT4, .element_size = 16, .section_start = 0},
-        {.type = "int", .format = WBE::RUVertexAttributeFormat::INT, .element_size = 4, .section_start = 0},
-        {.type = "ivec2", .format = WBE::RUVertexAttributeFormat::INT2, .element_size = 8, .section_start = 36},
-        {.type = "ivec3", .format = WBE::RUVertexAttributeFormat::INT3, .element_size = 12, .section_start = 0},
-        {.type = "ivec4", .format = WBE::RUVertexAttributeFormat::INT4, .element_size = 16, .section_start = 0},
-        {.type = "uint", .format = WBE::RUVertexAttributeFormat::UINT, .element_size = 4, .section_start = 0},
-        {.type = "uvec2", .format = WBE::RUVertexAttributeFormat::UINT2, .element_size = 8, .section_start = 36},
-        {.type = "uvec3", .format = WBE::RUVertexAttributeFormat::UINT3, .element_size = 12, .section_start = 0},
-        {.type = "uvec4", .format = WBE::RUVertexAttributeFormat::UINT4, .element_size = 16, .section_start = 0},
-    }};
+    const std::array<FormatCase, 12> format_cases{
+        {
+            {.type = "float", .format = WBE::RUVertexAttributeFormat::FLOAT, .element_size = 4, .section_start = 0},
+            {.type = "vec2", .format = WBE::RUVertexAttributeFormat::FLOAT2, .element_size = 8, .section_start = 36},
+            {.type = "vec3", .format = WBE::RUVertexAttributeFormat::FLOAT3, .element_size = 12, .section_start = 0},
+            {.type = "vec4", .format = WBE::RUVertexAttributeFormat::FLOAT4, .element_size = 16, .section_start = 0},
+            {.type = "int", .format = WBE::RUVertexAttributeFormat::INT, .element_size = 4, .section_start = 0},
+            {.type = "ivec2", .format = WBE::RUVertexAttributeFormat::INT2, .element_size = 8, .section_start = 36},
+            {.type = "ivec3", .format = WBE::RUVertexAttributeFormat::INT3, .element_size = 12, .section_start = 0},
+            {.type = "ivec4", .format = WBE::RUVertexAttributeFormat::INT4, .element_size = 16, .section_start = 0},
+            {.type = "uint", .format = WBE::RUVertexAttributeFormat::UINT, .element_size = 4, .section_start = 0},
+            {.type = "uvec2", .format = WBE::RUVertexAttributeFormat::UINT2, .element_size = 8, .section_start = 36},
+            {.type = "uvec3", .format = WBE::RUVertexAttributeFormat::UINT3, .element_size = 12, .section_start = 0},
+            {.type = "uvec4", .format = WBE::RUVertexAttributeFormat::UINT4, .element_size = 16, .section_start = 0},
+        },
+    };
     WBE::ResourceUnitLoaderMesh loader;
 
     for (const FormatCase& format_case : format_cases) {
@@ -672,66 +741,104 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme)), std::runtime_error);
     };
     WBE::RUSchemaIndexView valid_indices{
-        .binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 3}};
+        .binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 3},
+    };
 
     expect_invalid(
-        {.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 60},
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 60},
             .stride = 20,
-            .attributes = {{.role = "position", .type = "vec3", .offset = 0}, {.role = "position", .type = "vec2", .offset = 12}}},
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}, {.role = "position", .type = "vec2", .offset = 12}},
+        },
         valid_indices);
     static_assert(WBE::dynam_hash("role_002876ae4c05a223") == WBE::dynam_hash("role_2ffa43e2b7d24f56"));
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 72},
-                       .stride = 24,
-                       .attributes = {{.role = "role_002876ae4c05a223", .type = "vec3", .offset = 0},
-                           {.role = "role_2ffa43e2b7d24f56", .type = "vec3", .offset = 12}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 72},
+            .stride = 24,
+            .attributes =
+                {
+                    {.role = "role_002876ae4c05a223", .type = "vec3", .offset = 0},
+                    {.role = "role_2ffa43e2b7d24f56", .type = "vec3", .offset = 12},
+                },
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 52},
-                       .stride = 20,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}, {.role = "uv", .type = "vec2", .offset = 12}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 52},
+            .stride = 20,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}, {.role = "uv", .type = "vec2", .offset = 12}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "double", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "double", .offset = 0}},
+        },
         valid_indices);
     expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36}, .stride = 12, .attributes = {}}, valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 0,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 0,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 2, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 2, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 1}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 1}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "", .type = "vec3", .offset = 0}},
+        },
         valid_indices);
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
+        },
         {.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = 10}});
-    expect_invalid({.binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
-                       .stride = 12,
-                       .attributes = {{.role = "position", .type = "vec3", .offset = 0}}},
+    expect_invalid(
+        {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = 36},
+            .stride = 12,
+            .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
+        },
         {.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 2}});
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {
     using CategorySchema = WBE::RUSchemaSubmeshInstance3D WBE::RUSchemaMesh3D::*;
     using Category = WBE::RUSubmeshInstance3D WBE::RUMesh3D::*;
-    const std::array<std::pair<CategorySchema, Category>, 3> categories{{
-        {&WBE::RUSchemaMesh3D::opaque_instances, &WBE::RUMesh3D::opaque_instances},
-        {&WBE::RUSchemaMesh3D::masked_instances, &WBE::RUMesh3D::masked_instances},
-        {&WBE::RUSchemaMesh3D::double_sided_opaque_instances, &WBE::RUMesh3D::double_sided_opaque_instances},
-    }};
+    const std::array<std::pair<CategorySchema, Category>, 3> categories{
+        {
+            {&WBE::RUSchemaMesh3D::opaque_instances, &WBE::RUMesh3D::opaque_instances},
+            {&WBE::RUSchemaMesh3D::masked_instances, &WBE::RUMesh3D::masked_instances},
+            {&WBE::RUSchemaMesh3D::double_sided_opaque_instances, &WBE::RUMesh3D::double_sided_opaque_instances},
+        },
+    };
     for (const auto& [schema_category, category] : categories) {
         WBE::StackAllocator stack_allocator(8192);
         std::stringstream stream;
@@ -1138,8 +1245,112 @@ TEST_F(ResourcePopulatorTest, TextureResourceGeneral) {
     destructor(destructor_resource);
 }
 
-TEST_F(ResourcePopulatorTest, AudioResourceGeneral) {
-    // TODO: loader is not implemented yet.
+TEST_F(ResourcePopulatorTest, AudioResourceDecodesWavToFloatPcm) {
+    constexpr uint32_t WAV_FRAME_COUNT = 11025;
+    constexpr double WAV_SAMPLE_RATE = 44100.0;
+    std::vector<char> data;
+    WBE::RUAudio audio = load_audio(make_audio_scheme("assets/audio/test_sine_stereo.wav", false), data);
+
+    EXPECT_EQ(audio.sample_rate, 44100U);
+    EXPECT_EQ(audio.channels, 2U);
+    EXPECT_EQ(audio.bit_depth, 32U);
+    EXPECT_EQ(audio.frame_count, WAV_FRAME_COUNT);
+    EXPECT_FLOAT_EQ(audio.duration, 0.25F);
+    EXPECT_FALSE(audio.config.test(WBE::RUAudio::IS_STREAM));
+    EXPECT_EQ(audio.data_size, size_t{WAV_FRAME_COUNT} * 2 * sizeof(float));
+    ASSERT_EQ(data.size(), audio.data_size);
+    // The left channel holds a 0.5-amplitude 440 Hz sine and the right channel is silent.
+    for (size_t frame : {size_t{0}, size_t{25}, size_t{100}, size_t{WAV_FRAME_COUNT - 1}}) {
+        const double expected = 0.5 * std::sin(2.0 * std::numbers::pi * 440.0 * static_cast<double>(frame) / WAV_SAMPLE_RATE);
+        EXPECT_NEAR(read_audio_sample(data, frame * 2), expected, 1e-3) << "frame " << frame;
+        EXPECT_EQ(read_audio_sample(data, (frame * 2) + 1), 0.0F) << "frame " << frame;
+    }
+}
+
+TEST_F(ResourcePopulatorTest, AudioResourceConvertsChannelsAndSampleRate) {
+    WBE::RUSchemaAudio scheme = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    scheme.channels = 1;
+    scheme.sample_rate = 22050;
+    std::vector<char> data;
+    WBE::RUAudio audio = load_audio(scheme, data);
+
+    EXPECT_EQ(audio.sample_rate, 22050U);
+    EXPECT_EQ(audio.channels, 1U);
+    EXPECT_NEAR(static_cast<double>(audio.frame_count), 11025.0 / 2.0, 1.0);
+    EXPECT_NEAR(audio.duration, 0.25F, 1e-3F);
+    ASSERT_EQ(data.size(), size_t{audio.frame_count} * sizeof(float));
+    // Downmixing averages the 0.5-amplitude left channel with the silent right channel.
+    float peak = 0.0F;
+    for (size_t i = 0; i < audio.frame_count; ++i) {
+        peak = std::max(peak, std::abs(read_audio_sample(data, i)));
+    }
+    EXPECT_NEAR(peak, 0.25F, 0.02F);
+}
+
+TEST_F(ResourcePopulatorTest, AudioResourceKeepsStreamEncoded) {
+    std::vector<char> data;
+    WBE::RUAudio audio = load_audio(make_audio_scheme("assets/audio/test_sine_mono.ogg", true), data);
+    const auto encoded = WBE::load_binary_file<char>(WBE::get_resource_path("assets/audio/test_sine_mono.ogg").string().c_str());
+
+    EXPECT_TRUE(audio.config.test(WBE::RUAudio::IS_STREAM));
+    EXPECT_EQ(audio.sample_rate, 48000U);
+    EXPECT_EQ(audio.channels, 1U);
+    EXPECT_EQ(audio.bit_depth, 32U);
+    // Vorbis decoders cannot report a length, so the loader counts the decoded frames.
+    EXPECT_EQ(audio.frame_count, 12000U);
+    EXPECT_FLOAT_EQ(audio.duration, 0.25F);
+    EXPECT_EQ(audio.data_size, encoded.size());
+    EXPECT_EQ(data, encoded);
+}
+
+TEST_F(ResourcePopulatorTest, AudioResourceDecodesVorbis) {
+    std::vector<char> data;
+    WBE::RUAudio audio = load_audio(make_audio_scheme("assets/audio/test_sine_mono.ogg", false), data);
+
+    EXPECT_FALSE(audio.config.test(WBE::RUAudio::IS_STREAM));
+    EXPECT_EQ(audio.channels, 1U);
+    EXPECT_EQ(audio.frame_count, 12000U);
+    ASSERT_EQ(data.size(), size_t{12000} * sizeof(float));
+    float peak = 0.0F;
+    for (size_t i = 0; i < audio.frame_count; ++i) {
+        peak = std::max(peak, std::abs(read_audio_sample(data, i)));
+    }
+    EXPECT_GT(peak, 0.05F);
+}
+
+TEST_F(ResourcePopulatorTest, AudioResourceChecksManifestExpectations) {
+    std::vector<char> data;
+    WBE::RUSchemaAudio matching = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    matching.bit_depth = 16;
+    matching.frame_count = 11025;
+    matching.duration = 0.25F;
+    EXPECT_NO_THROW(load_audio(matching, data));
+
+    WBE::RUSchemaAudio wrong_bit_depth = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    wrong_bit_depth.bit_depth = 24;
+    EXPECT_THROW(load_audio(wrong_bit_depth, data), std::runtime_error);
+
+    WBE::RUSchemaAudio wrong_frame_count = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    wrong_frame_count.frame_count = 11024;
+    EXPECT_THROW(load_audio(wrong_frame_count, data), std::runtime_error);
+
+    WBE::RUSchemaAudio wrong_duration = make_audio_scheme("assets/audio/test_sine_mono.ogg", true);
+    wrong_duration.duration = 0.3F;
+    EXPECT_THROW(load_audio(wrong_duration, data), std::runtime_error);
+}
+
+TEST_F(ResourcePopulatorTest, AudioResourceRejectsInvalidInput) {
+    std::vector<char> data;
+    WBE::RUSchemaAudio zero_sample_rate = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    zero_sample_rate.sample_rate = 0;
+    EXPECT_THROW(load_audio(zero_sample_rate, data), std::runtime_error);
+
+    WBE::RUSchemaAudio too_many_channels = make_audio_scheme("assets/audio/test_sine_stereo.wav", false);
+    too_many_channels.channels = 1000;
+    EXPECT_THROW(load_audio(too_many_channels, data), std::runtime_error);
+
+    EXPECT_THROW(load_audio(make_audio_scheme("assets/audio/missing.wav", false), data), std::runtime_error);
+    EXPECT_THROW(load_audio(make_audio_scheme("assets/images/test_ppm3.ppm", false), data), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, FontResourceGeneral) {

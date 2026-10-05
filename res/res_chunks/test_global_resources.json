@@ -3,6 +3,7 @@
     "include": [
         "assets/meshes/triangle.json",
         "assets/images/test_images.json",
+        "assets/audio/test_audio.json",
         "assets/shaders/billboard/billboard_shader.json",
         "assets/shaders/draw_triangle/draw_triangle_shader.json",
         "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.json",

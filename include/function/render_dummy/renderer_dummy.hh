@@ -40,6 +40,7 @@ public:
         p_capabilities.conservative_rasterization = false;
         p_capabilities.ray_tracing = false;
         p_capabilities.ray_query = false;
+        p_capabilities.timestamp_query = false;
     }
 
     virtual ~RendererDummy() override = default;

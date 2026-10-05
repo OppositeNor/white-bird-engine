@@ -74,10 +74,11 @@ the failing test names with the relevant assertion output if anything failed.
 
 ## Working directory and test_env
 
-Run test binaries from the **repository root**. Fixtures construct `Global` with the relative path `test_env`:
+Run test binaries from the **repository root**. Fixtures construct `Global` over the relative path `test_env` through
+`tests/unit/test_global.hh`:
 
 ```cpp
-global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+global = WBE::make_test_global();
 ```
 
 `test_env/` is build output, not source:
@@ -170,6 +171,18 @@ Use a `::testing::Test` fixture with `SetUp`/`TearDown` when the code needs `Glo
 logging, metadata). Keep `Global` construction per test so state doesn't leak between tests. The existing fixtures
 hold it in a `std::unique_ptr` — that is an accepted test-only exception to the memory-model rules. Engine objects
 under test still go through engine allocators and handles (`make_ref`, `make_unique`, `Vector<T, Alloc>`).
+
+Construct it with `WBE::make_test_global()`, never `Global` directly. Engine pools are committed and zeroed up front, and
+`test_env`'s `engine_config.yaml` is sized for the rendering executables (a 6 GiB resource pool), so a plain `Global`
+makes every test slow and memory-heavy. The helper overrides the engine configuration per test through command-line
+options, defaulting to 16 MiB resource and global pools. A test that needs more passes its own configuration:
+
+```cpp
+global = WBE::make_test_global({.resource_mem_pool_size = WBE_MI_B(256)});
+```
+
+Run unit tests in a single process. Do not launch several test processes in parallel: each one commits its pools, and a
+parallel runner has exhausted memory and crashed the machine.
 
 Many tests don't need `Global` at all: allocator, container, parser, and most renderer-helper tests construct only
 what they use (e.g. `RenderAllocator allocator(WBE_KI_B(64));`). Prefer that — it's faster and isolates failures.

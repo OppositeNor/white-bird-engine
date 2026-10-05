@@ -177,6 +177,9 @@ void RendererVK::tick(double p_delta) {
 
 void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     uint32_t frame_slot = advance_frame_slot();
+    for (auto& plugin : registered_plugins) {
+        plugin->on_frame_begin(&base_render_data);
+    }
 
     // Frame-local resource updates must run after the slot is selected and its fence has completed.
     run_stored_jobs();
@@ -223,7 +226,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     present(image_index, p_graph);
     in_flight_fences[frame_slot]->wait();
 
-    ++(base_render_data.current_frame);
+    ++base_render_data.current_frame;
 }
 
 Ref<ROCMultislotsVK> RendererVK::acquire_swap_chain_image_view_container() const {
@@ -261,6 +264,10 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
 
 void RendererVK::terminate() {
     vkDeviceWaitIdle(logical_device);
+    for (auto& plugin : registered_plugins) {
+        plugin->on_renderer_terminating();
+    }
+    base_render_data.render_plugins = nullptr;
     registered_plugins.clear();
     if (swap_chain_image_view_container != MEM_NULL) {
         swap_chain_image_view_container->clear();
@@ -361,6 +368,7 @@ void RendererVK::setup_base_render_data() {
         register_delay_call(std::move(p_function), p_delayed_frames);
     };
     base_render_data.frames_in_flight = frames_in_flight;
+    base_render_data.render_plugins = &registered_plugins;
 }
 
 void RendererVK::create_instance() { // NOLINT
@@ -726,35 +734,43 @@ void RendererVK::create_descriptor_heap_allocator() {
     base_render_data.buffer_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
-            {.byte_offset = buffer_offset,
+            {
+                .byte_offset = buffer_offset,
                 .descriptor_stride = properties.bufferDescriptorSize,
                 .descriptor_count = BUFFER_DESCRIPTOR_CAPACITY,
-                .descriptor_alignment = properties.bufferDescriptorAlignment}),
+                .descriptor_alignment = properties.bufferDescriptorAlignment,
+            }),
     };
     base_render_data.sampled_image_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
-            {.byte_offset = sampled_image_offset,
+            {
+                .byte_offset = sampled_image_offset,
                 .descriptor_stride = properties.imageDescriptorSize,
                 .descriptor_count = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY,
-                .descriptor_alignment = properties.imageDescriptorAlignment}),
+                .descriptor_alignment = properties.imageDescriptorAlignment,
+            }),
     };
     base_render_data.sampled_image_descriptor_capacity = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY;
     base_render_data.storage_image_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
-            {.byte_offset = storage_image_offset,
+            {
+                .byte_offset = storage_image_offset,
                 .descriptor_stride = properties.imageDescriptorSize,
                 .descriptor_count = STORAGE_IMAGE_DESCRIPTOR_CAPACITY,
-                .descriptor_alignment = properties.imageDescriptorAlignment}),
+                .descriptor_alignment = properties.imageDescriptorAlignment,
+            }),
     };
     base_render_data.sampler_descriptor_arena = {
         .heap_id = sampler_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(sampler_heap_id,
-            {.byte_offset = sampler_offset,
+            {
+                .byte_offset = sampler_offset,
                 .descriptor_stride = properties.samplerDescriptorSize,
                 .descriptor_count = SAMPLER_DESCRIPTOR_CAPACITY,
-                .descriptor_alignment = properties.samplerDescriptorAlignment}),
+                .descriptor_alignment = properties.samplerDescriptorAlignment,
+            }),
     };
     for (auto& plugin : registered_plugins) {
         plugin->create_descriptor_arenas(&base_render_data);
@@ -784,7 +800,7 @@ void RendererVK::create_async_objects() {
     in_flight_fences.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         // Start signaled, since there is no previous frame to wait for at the first frame.
-        in_flight_fences.push_back(make_ref<ROFenseVK>(allocator, &base_render_data, true));
+        in_flight_fences.emplace_back(make_ref<ROFenseVK>(allocator, &base_render_data, true));
     }
 }
 
@@ -1176,20 +1192,18 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
     //   Present prefers the graphics queue family to avoid concurrent swapchain sharing.
     for (uint32_t i = 0; i < queue_family_count; ++i) {
         const VkQueueFlags flags = queue_family_properties[i].queueFlags;
-        if (!indices.graphics.has_value() && (flags & VK_QUEUE_GRAPHICS_BIT)) {
-            if (!indices.compute.has_value() || i != *indices.compute) {
-                indices.graphics = i;
-            }
+        if ((!indices.graphics.has_value() && (flags & VK_QUEUE_GRAPHICS_BIT)) &&
+            (!indices.compute.has_value() || i != *indices.compute)) {
+            indices.graphics = i;
         }
-        if (!indices.compute.has_value() && (flags & VK_QUEUE_COMPUTE_BIT)) {
-            if (!indices.graphics.has_value() || i != *indices.graphics) {
-                indices.compute = i;
-            }
+
+        if ((!indices.compute.has_value() && (flags & VK_QUEUE_COMPUTE_BIT)) &&
+            (!indices.graphics.has_value() || i != *indices.graphics)) {
+            indices.compute = i;
         }
-        if (!indices.present.has_value() && present_support[i]) {
-            if (indices.graphics.has_value() && i == *indices.graphics) {
-                indices.present = i;
-            }
+
+        if ((!indices.present.has_value() && present_support[i]) && (indices.graphics.has_value() && i == *indices.graphics)) {
+            indices.present = i;
         }
     }
 
@@ -1212,7 +1226,9 @@ RendererVK::QueueFamilyIndices RendererVK::get_queue_family_indices(VkPhysicalDe
 
 RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(VkPhysicalDevice p_device) {
     SwapChainSupportDetails details{
-        .formats = Vector<VkSurfaceFormatKHR, AllocType>(allocator), .present_modes = Vector<VkPresentModeKHR, AllocType>(allocator)};
+        .formats = Vector<VkSurfaceFormatKHR, AllocType>(allocator),
+        .present_modes = Vector<VkPresentModeKHR, AllocType>(allocator),
+    };
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p_device, surface, &details.capabilities);
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(p_device, surface, &format_count, nullptr);
@@ -1309,7 +1325,7 @@ void RendererVK::run_delayed_calls() {
         if (delayed_call.second < 0) {
             continue;
         }
-        --(delayed_call.second);
+        --delayed_call.second;
         if (delayed_call.second < 0) {
             // Run delayed calls that should be called in the current frame.
             delayed_call.first();
@@ -1328,7 +1344,7 @@ std::future<Ref<ROFenseVK>> RendererVK::register_gpu_job(GPUJobVK p_job) {
         }
         Ref<ROFenseVK> completion_fense = make_ref<ROFenseVK>(global_allocator(), &base_render_data);
         gpu_job.record = std::move(p_job);
-        gpu_job.completion_fense = completion_fense;
+        gpu_job.completion_fense = std::move(completion_fense);
         return gpu_job.submission_promise.get_future();
     }
     throw std::runtime_error("Failed to register GPU job: GPU-job capacity is exhausted.");
@@ -1627,7 +1643,7 @@ void RendererVK::unregister_render_graph(std::string_view p_resource_key) {
     }
     render_graphs.erase(graph_entry);
     register_delay_call(
-        [released_graph, released_descriptor]() mutable {
+        [released_graph, released_descriptor] mutable {
             released_graph = MEM_NULL;
             released_descriptor = MEM_NULL;
         },

@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_RENDER_VK_DEFS_HH
 #define WBE_FILE_RENDER_VK_DEFS_HH
 
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
@@ -28,6 +30,7 @@
 namespace WhiteBirdEngine {
 
 class DescriptorHeapAllocatorVK;
+class RenderPluginVK;
 
 /** @brief Identifies a physical Vulkan descriptor heap owned by the renderer. */
 using DescriptorHeapIDVK = uint32_t;
@@ -102,7 +105,7 @@ struct BaseRayTracingDataVK {
  *
  */
 struct BaseRenderDataVK {
-    BaseRenderDataVK(RenderAllocator* p_allocator) : allocator(p_allocator), queue_family_indices(p_allocator) {
+    explicit BaseRenderDataVK(RenderAllocator* p_allocator) : allocator(p_allocator), queue_family_indices(p_allocator) {
     }
     // The render allocator.
     RenderAllocator* allocator = nullptr;
@@ -144,7 +147,8 @@ struct BaseRenderDataVK {
     KTXVulkanDeviceInfoVK* ktx_vulkan_device_info = nullptr;
     /** Descriptor-heap properties reported by the physical device. */
     VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptor_heap_properties{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT};
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT,
+    };
     /** Renderer-owned resource descriptor heap. */
     DescriptorHeapIDVK resource_descriptor_heap_id = UINT32_MAX;
     /** Renderer-owned sampler descriptor heap. */
@@ -194,6 +198,9 @@ struct BaseRenderDataVK {
 
     /** The queue family indices. */
     Set<uint32_t, RenderAllocator> queue_family_indices;
+
+    /** Non-owning list of the renderer's enabled plugins, or null when no renderer owns this data. */
+    Vector<Ref<RenderPluginVK>, RenderAllocator>* render_plugins = nullptr;
 
     /** Function to register a delayed call. */
     std::function<void(std::function<void()>&& p_function, uint32_t p_delayed_frames)> register_delayed_call;

@@ -17,9 +17,11 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/function_utils.hh"
+#include "function/render/i_render_task.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
@@ -308,6 +310,20 @@ void RayTracingPluginVK::create_descriptor_arenas(BaseRenderDataVK* p_render_dat
             .descriptor_alignment = p_render_data->descriptor_heap_properties.bufferDescriptorAlignment,
         });
     base_ray_tracing_data->acceleration_structure_descriptor_arena = {.heap_id = heap_id, .arena_id = arena_id};
+}
+
+void RayTracingPluginVK::on_frame_begin(const BaseRenderDataVK* /*p_render_data*/) {
+}
+
+void RayTracingPluginVK::on_before_task_recorded(
+    VkCommandBuffer /*p_command_buffer*/, const RendTaskID& /*p_task_id*/, QueueFamilyVK /*p_queue_family*/) {
+}
+
+void RayTracingPluginVK::on_after_task_recorded(
+    VkCommandBuffer /*p_command_buffer*/, const RendTaskID& /*p_task_id*/, QueueFamilyVK /*p_queue_family*/) {
+}
+
+void RayTracingPluginVK::on_renderer_terminating() {
 }
 
 } // namespace WhiteBirdEngine

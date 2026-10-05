@@ -19,6 +19,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <barrier>
@@ -37,7 +38,7 @@ namespace WBE = WhiteBirdEngine;
 class WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -132,7 +133,7 @@ TEST_F(WBEHeapAllocAtomicMutexAlignedPoolImplicitListTest, ConcurrentAllocations
 
     threads.reserve(THREAD_COUNT);
     for (int i = 0; i < THREAD_COUNT; ++i) {
-        threads.emplace_back([&, i]() {
+        threads.emplace_back([&, i] {
             sync_point.arrive_and_wait();
             std::mt19937 rng(i + 37);
             std::uniform_int_distribution<int> size_dist(16, 128);

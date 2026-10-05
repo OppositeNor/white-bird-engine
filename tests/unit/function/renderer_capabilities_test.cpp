@@ -23,13 +23,14 @@ namespace WhiteBirdEngine {
 
 TEST(WBERendererCapabilitiesTest, DummyRendererDisablesUnsupportedCapabilities) {
     RenderAllocator allocator(WBE_KI_B(64));
-    RendererCapabilities capabilities{.conservative_rasterization = true, .ray_tracing = true, .ray_query = true};
+    RendererCapabilities capabilities{.conservative_rasterization = true, .ray_tracing = true, .ray_query = true, .timestamp_query = true};
 
     RendererDummy renderer(&allocator, capabilities);
 
     EXPECT_FALSE(capabilities.conservative_rasterization);
     EXPECT_FALSE(capabilities.ray_tracing);
     EXPECT_FALSE(capabilities.ray_query);
+    EXPECT_FALSE(capabilities.timestamp_query);
 }
 
 } // namespace WhiteBirdEngine

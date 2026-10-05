@@ -17,6 +17,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
+#include "function/render_vk/timestamp_query_plugin_vk.hh"
 
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -30,6 +31,9 @@ void register_builtin_render_plugins_vk(Vector<Ref<RenderPluginVK>, RenderAlloca
     p_registered_plugins.clear();
     if (p_capabilities.ray_tracing || p_capabilities.ray_query) {
         p_registered_plugins.emplace_back(make_ref<RayTracingPluginVK>(p_allocator, p_render_data));
+    }
+    if (p_capabilities.timestamp_query) {
+        p_registered_plugins.emplace_back(make_ref<TimestampQueryPluginVK>(p_allocator, p_render_data));
     }
 }
 

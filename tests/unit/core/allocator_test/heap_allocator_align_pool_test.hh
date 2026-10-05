@@ -20,6 +20,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 #include "test_utilities.hh"
 #include "utils/defs.hh"
 #include <bit>
@@ -38,7 +39,7 @@ constexpr size_t AAPT_HEADER_SIZE = WBE::HeapAllocatorAlignedPool::HEADER_SIZE;
 class WBEAllocAlignedPoolTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+        global = WBE::make_test_global();
     }
 
     void TearDown() override {
@@ -194,7 +195,7 @@ TEST_F(WBEAllocAlignedPoolTest, ConstructDestructCall) {
     uint32_t test_val = 0;
     class TestClass {
     public:
-        TestClass(uint32_t* p_test_val) {
+        explicit TestClass(uint32_t* p_test_val) {
             test_val_ptr = p_test_val;
             *test_val_ptr = 1;
         }

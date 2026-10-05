@@ -19,6 +19,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
+#include "test_global.hh"
 
 #include <gtest/gtest.h>
 #include <memory>
@@ -27,7 +28,7 @@
 namespace WBE = WhiteBirdEngine;
 
 TEST(WBELogStreamTest, General) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+    std::unique_ptr<WBE::Global> global = WBE::make_test_global();
     std::stringstream ss;
     WBE::LogStream log_stream(ss);
     log_stream.message("Test message");
@@ -48,7 +49,7 @@ WBE_LABEL(WBE_TEST_CHANNEL, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabel) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+    std::unique_ptr<WBE::Global> global = WBE::make_test_global();
     std::stringstream ss;
     WBE::LogStream log_stream(WBE::WBE_TEST_CHANNEL, ss);
     log_stream.message("Test message");
@@ -71,7 +72,7 @@ WBE_LABEL(WBE_TEST_LABEL_NAME_MACRO, WBE_CHANNEL)
 }
 
 TEST(WBELogStreamTest, UserDefinedLabelMacroExpand) {
-    std::unique_ptr<WBE::Global> global = std::make_unique<WBE::Global>(0, nullptr, WBE::Path("test_env"));
+    std::unique_ptr<WBE::Global> global = WBE::make_test_global();
     std::stringstream ss;
     WBE::LogStream log_stream(WBE::WBE_TEST_LABEL_MACRO, ss);
     log_stream.message("Test message");
