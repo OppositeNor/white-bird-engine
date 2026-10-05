@@ -56,9 +56,22 @@ enum class PixelSortMetric : uint32_t {
 };
 
 /**
+ * @enum PixelSortScope
+ * @brief The pixels each sort of the pixel sort covers.
+ * @details The values must match the WBE_PIXEL_SORT_SCOPE_ macros in pixel_sort_utils.slang.
+ */
+enum class PixelSortScope : uint32_t {
+    /** Sort all masked pixels of every line together, compacting them across unmasked gaps. */
+    LINE = 0,
+    /** Sort every span, a maximal run of consecutive masked pixels of a line, independently. */
+    SPAN = 1,
+};
+
+/**
  * @class PixelSort
  * @brief Post-processing effect that sorts, by a selectable metric, the pixels of every column or row of the color image
- * whose luminance is inside a contrast range.
+ * whose luminance is inside a contrast range, either across the whole line or within every span of consecutive masked
+ * pixels.
  * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
@@ -75,16 +88,18 @@ public:
      * @param p_color_format Format of the color images the effect is applied to.
      * @param p_direction Whether the effect sorts the columns or the rows of the image.
      * @param p_metric The value the effect orders the pixels of every line by.
+     * @param p_scope Whether each sort covers a whole line or one span of consecutive masked pixels.
      * @throws std::runtime_error If a shader resource is missing, the extent is empty or too large to pack the sort keys
-     * into 32 bits, the length of a sorted line does not fit the 16-bit mask image, or p_metric is not a PixelSortMetric
-     * value.
+     * into 32 bits, the length of a sorted line does not fit the 16-bit mask image, p_metric is not a PixelSortMetric
+     * value, or p_scope is not a PixelSortScope value.
      */
     PixelSort(RenderAllocator* p_allocator,
         RendererVK* p_renderer,
         VkExtent2D p_extent,
         VkFormat p_color_format,
         PixelSortDirection p_direction,
-        PixelSortMetric p_metric);
+        PixelSortMetric p_metric,
+        PixelSortScope p_scope);
     ~PixelSort() override = default;
     PixelSort(const PixelSort&) = delete;
     PixelSort(PixelSort&&) = delete;
@@ -125,6 +140,7 @@ private:
     VkFormat color_format = VK_FORMAT_UNDEFINED;
     PixelSortDirection direction = PixelSortDirection::VERTICAL;
     PixelSortMetric metric = PixelSortMetric::SATURATION;
+    PixelSortScope scope = PixelSortScope::LINE;
     // The number of sorted lines: the width for vertical sorting, the height for horizontal sorting.
     uint32_t line_count = 0;
     uint32_t sub_histogram_num = 1;

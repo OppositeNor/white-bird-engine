@@ -71,6 +71,7 @@ struct PixelSortContrastGPU {
     float min_luminance = PixelSort::MIN_LUMINANCE;
     float max_luminance = PixelSort::MAX_LUMINANCE;
     uint32_t sort_metric = static_cast<uint32_t>(PixelSortMetric::SATURATION);
+    uint32_t sort_scope = static_cast<uint32_t>(PixelSortScope::LINE);
 };
 
 std::string make_bit_region_name(uint32_t p_pass) {
@@ -90,9 +91,10 @@ PixelSort::PixelSort(RenderAllocator* p_allocator,
     VkExtent2D p_extent,
     VkFormat p_color_format,
     PixelSortDirection p_direction,
-    PixelSortMetric p_metric)
+    PixelSortMetric p_metric,
+    PixelSortScope p_scope)
     : IPostProcessing(p_allocator), renderer(p_renderer), extent(p_extent), color_format(p_color_format),
-      direction(p_direction), metric(p_metric) {
+      direction(p_direction), metric(p_metric), scope(p_scope) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: renderer is null.");
     }
@@ -100,13 +102,18 @@ PixelSort::PixelSort(RenderAllocator* p_allocator,
         throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: {} is not a pixel sort metric.",
             static_cast<uint32_t>(metric)));
     }
+    if (scope != PixelSortScope::LINE && scope != PixelSortScope::SPAN) {
+        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: {} is not a pixel sort scope.",
+            static_cast<uint32_t>(scope)));
+    }
     const bool vertical = direction == PixelSortDirection::VERTICAL;
     line_count = vertical ? extent.width : extent.height;
     const uint32_t line_length = vertical ? extent.height : extent.width;
     const uint64_t element_count = static_cast<uint64_t>(extent.width) * extent.height;
     // A key packs the line, saturation, and position along the line, so at least 2 saturation levels must fit in 32
     // bits.
-    // The mask image stores each masked pixel's rank within its line as R16_UINT, with 0xFFFF marking unmasked pixels.
+    // The mask image stores each masked pixel's rank within its line, and with the span scope its span offset and span
+    // length, as 16-bit channels, with 0xFFFF marking unmasked pixels.
     if (line_length >= UINT16_MAX) {
         throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: a {}-pixel sorted line is too long for the 16-bit pixel sort mask.",
             line_length));
@@ -147,18 +154,21 @@ std::string_view PixelSort::add_render_tasks(
     const size_t histogram_buffer_size =
         (RADIX_SORT_DATA_START + static_cast<size_t>(sub_histogram_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
     const VkExtent3D image_extent{.width = extent.width, .height = extent.height, .depth = 1};
+    // The span scope stores the rank, span offset, and span length of every masked pixel; the line scope only the rank.
+    const VkFormat mask_format = scope == PixelSortScope::SPAN ? VK_FORMAT_R16G16B16A16_UINT : VK_FORMAT_R16_UINT;
 
     p_graph
         .add_image(REND_RES_PIXEL_SORT_SOURCE_IMAGE,
             {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = color_format, .extent = image_extent})
         .add_image_view(REND_RES_PIXEL_SORT_SOURCE, REND_RES_PIXEL_SORT_SOURCE_IMAGE)
         .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
-            {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = VK_FORMAT_R16_UINT, .extent = image_extent})
+            {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .format = mask_format, .extent = image_extent})
         .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
         .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
             {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM,
                 .domain = DeviceDomain::HOST_DEVICE,
-                .initial_data = to_initial_data(PixelSortContrastGPU{.sort_metric = static_cast<uint32_t>(metric)})})
+                .initial_data = to_initial_data(PixelSortContrastGPU{
+                    .sort_metric = static_cast<uint32_t>(metric), .sort_scope = static_cast<uint32_t>(scope)})})
         .add_buffer(REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
             {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = column_offsets_buffer_size})
         .add_buffer(REND_RES_PIXEL_SORT_KEYS, {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size})

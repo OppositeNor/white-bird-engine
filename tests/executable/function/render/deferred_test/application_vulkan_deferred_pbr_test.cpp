@@ -352,7 +352,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
             base_render_data->swap_chain_extent,
             LIGHTING_OUTPUT_FORMAT,
             PixelSortDirection::VERTICAL,
-            PixelSortMetric::SATURATION);
+            PixelSortMetric::SATURATION,
+            PixelSortScope::SPAN);
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
     auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);

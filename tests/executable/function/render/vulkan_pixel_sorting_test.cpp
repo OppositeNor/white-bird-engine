@@ -102,6 +102,8 @@ struct PixelSortContrastGPU {
     float max_luminance = PIXEL_SORT_DEFAULT_MAX_LUMINANCE;
     /** The metric the sorted pixels are ordered by: 0 for luminance, 1 for hue, 2 for saturation. */
     uint32_t sort_metric = PIXEL_SORT_DEFAULT_METRIC;
+    /** The pixels each sort covers: 0 for the whole column, as the R16_UINT mask image requires, 1 for each span. */
+    uint32_t sort_scope = 0;
 };
 
 /**

@@ -23,6 +23,12 @@
  * keeps the source position of every key. The contrast mask always selects pixels by luminance. The keys of line l are
  * registered at the range of the key buffer that starts after the keys of every earlier line, so the sort keeps every
  * line in its range, and the k-th masked pixel of line l receives the k-th key of that range.
+ *
+ * With PixelSortContrast.sort_scope set to WBE_PIXEL_SORT_SCOPE_SPAN, every span, a maximal run of consecutive masked
+ * pixels of a line, is sorted independently instead. The pixel at offset o of a span of length n whose first key is
+ * registered at index s of the key data gets the key s * L + v * n + o. The keys of the span fill [s * L, (s + n) * L),
+ * which ends where the range of the next span starts, so the sort keeps every span in its range with the same 32-bit
+ * budget as the line scope.
  */
 #ifndef WBE_FILE_PIXEL_SORT_UTILS_SLANG
 #define WBE_FILE_PIXEL_SORT_UTILS_SLANG
@@ -33,8 +39,9 @@
 #endif
 
 /**
- * Value of the pixel sort mask image for pixels outside the contrast mask. Masked pixels store their rank among the masked
- * pixels of their line, so the line length must be less than this value.
+ * Value of the x channel of the pixel sort mask image for pixels outside the contrast mask. Masked pixels store their rank
+ * among the masked pixels of their line in x, so the line length must be less than this value. With the span scope, they
+ * also store their offset in their span in y and the length of their span in z.
  */
 #define WBE_PIXEL_SORT_UNMASKED 0xFFFFu
 
@@ -90,9 +97,15 @@ uint pixel_sort_key_index(RWStructuredBuffer<uint> p_column_offsets, uint p_line
 /** PixelSortContrast.sort_metric value that sorts the pixels by saturation. */
 #define WBE_PIXEL_SORT_METRIC_SATURATION 2u
 
+/** PixelSortContrast.sort_scope value that sorts all masked pixels of every line together. */
+#define WBE_PIXEL_SORT_SCOPE_LINE 0u
+/** PixelSortContrast.sort_scope value that sorts every span of consecutive masked pixels independently. */
+#define WBE_PIXEL_SORT_SCOPE_SPAN 1u
+
 /**
  * @struct PixelSortContrast
- * @brief The luminance range of the pixels that are sorted and the metric they are sorted by, set by the host.
+ * @brief The luminance range of the pixels that are sorted, the metric they are sorted by, and the scope of each sort, set
+ * by the host.
  */
 struct PixelSortContrast {
     /** The smallest luminance of a sorted pixel, in [0, 1]. */
@@ -101,6 +114,11 @@ struct PixelSortContrast {
     float max_luminance;
     /** The metric the sorted pixels are ordered by; the host must set one of the WBE_PIXEL_SORT_METRIC_ values. */
     uint sort_metric;
+    /**
+     * The pixels each sort covers; the host must set one of the WBE_PIXEL_SORT_SCOPE_ values. The span scope requires a
+     * mask image with at least 3 channels.
+     */
+    uint sort_scope;
 };
 
 /**
@@ -188,6 +206,18 @@ uint pixel_sort_key_levels(uint2 p_extent) {
 }
 
 /**
+ * @brief Quantize the sort metric of a color to the levels a key can hold.
+ * @param p_color The color.
+ * @param p_sort_metric One of the WBE_PIXEL_SORT_METRIC_ values.
+ * @param p_metric_levels The number of levels, from pixel_sort_key_levels.
+ * @return The quantized metric, in [0, p_metric_levels).
+ */
+uint pixel_sort_quantized_metric(float3 p_color, uint p_sort_metric, uint p_metric_levels) {
+    float metric = pixel_sort_metric(p_color, p_sort_metric);
+    return min(uint(metric * float(p_metric_levels)), p_metric_levels - 1);
+}
+
+/**
  * @brief Build the sort key of a pixel.
  * @param p_color The color of the pixel.
  * @param p_sort_metric The metric the key orders by; one of the WBE_PIXEL_SORT_METRIC_ values.
@@ -197,8 +227,7 @@ uint pixel_sort_key_levels(uint2 p_extent) {
  */
 uint pixel_sort_make_key(float3 p_color, uint p_sort_metric, uint2 p_pixel, uint2 p_extent) {
     uint metric_levels = pixel_sort_key_levels(p_extent);
-    float metric = pixel_sort_metric(p_color, p_sort_metric);
-    uint quantized_metric = min(uint(metric * float(metric_levels)), metric_levels - 1);
+    uint quantized_metric = pixel_sort_quantized_metric(p_color, p_sort_metric, metric_levels);
     uint2 line_coordinates = pixel_sort_line_coordinates(p_pixel);
     uint line_length = pixel_sort_line_coordinates(p_extent).y;
     return (line_coordinates.x * metric_levels + quantized_metric) * line_length + line_coordinates.y;
@@ -214,6 +243,35 @@ uint pixel_sort_make_key(float3 p_color, uint p_sort_metric, uint2 p_pixel, uint
 uint2 pixel_sort_key_pixel(uint p_key, uint p_line, uint2 p_extent) {
     uint line_length = pixel_sort_line_coordinates(p_extent).y;
     return pixel_sort_line_pixel(uint2(p_line, p_key % line_length));
+}
+
+/**
+ * @brief Build the span scope sort key of a pixel.
+ * @param p_color The color of the pixel.
+ * @param p_sort_metric The metric the key orders by; one of the WBE_PIXEL_SORT_METRIC_ values.
+ * @param p_span_start The key data index of the first key of the pixel's span.
+ * @param p_span_length The number of pixels in the span.
+ * @param p_offset The offset of the pixel in the span.
+ * @param p_extent The image extent.
+ * @return The packed key, in [p_span_start * L, (p_span_start + p_span_length) * L).
+ */
+uint pixel_sort_make_span_key(
+    float3 p_color, uint p_sort_metric, uint p_span_start, uint p_span_length, uint p_offset, uint2 p_extent) {
+    uint metric_levels = pixel_sort_key_levels(p_extent);
+    uint quantized_metric = pixel_sort_quantized_metric(p_color, p_sort_metric, metric_levels);
+    return p_span_start * metric_levels + quantized_metric * p_span_length + p_offset;
+}
+
+/**
+ * @brief Get the offset in its span of the source pixel of a span scope sort key.
+ * @param p_key The key.
+ * @param p_span_start The key data index of the first key of the span.
+ * @param p_span_length The number of pixels in the span.
+ * @param p_extent The image extent.
+ * @return The offset of the pixel the key was built from.
+ */
+uint pixel_sort_span_key_offset(uint p_key, uint p_span_start, uint p_span_length, uint2 p_extent) {
+    return (p_key - p_span_start * pixel_sort_key_levels(p_extent)) % p_span_length;
 }
 
 #endif

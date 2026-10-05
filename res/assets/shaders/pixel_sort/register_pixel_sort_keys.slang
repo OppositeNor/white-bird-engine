@@ -19,7 +19,9 @@
  * variant. Each invocation walks its line from the start and writes the key of every masked pixel to the next entry of
  * the line's range of the key buffer, and the pixel's rank among the masked pixels of its line to the mask image.
  * Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED. The key buffer receives the total number of masked pixels as its
- * element count.
+ * element count. With the span scope, a span starts at a masked pixel that is the first of its line or follows an
+ * unmasked pixel; the invocation measures the span before registering its pixels with span keys, and also writes each
+ * pixel's offset in its span and the span length to the mask image.
  */
 #include "utils.slang"
 #include "sort/radix_sort_utils.slang"
@@ -35,7 +37,10 @@ struct RegisterPixelSortKeysDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Radix sort key buffer receiving the element count and the keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
-    /** R16_UINT mask image receiving the line rank of every masked pixel; must have the extent of source. */
+    /**
+     * Mask image receiving the line rank of every masked pixel, and with the span scope its span offset and span length;
+     * must have the extent of source, and be R16G16B16A16_UINT with the span scope or R16_UINT with the line scope.
+     */
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "write")] uint2 mask;
 };
 
@@ -49,7 +54,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<PixelSortContrast> contrast = ResourceDescriptorHeap[descriptor_indices.contrast.x];
     RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[descriptor_indices.column_offsets.x];
     RWStructuredBuffer<uint> keys = ResourceDescriptorHeap[descriptor_indices.keys.x];
-    RWTexture2D<uint> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
+    RWTexture2D<uint4> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
     uint2 extent;
     source.GetDimensions(extent.x, extent.y);
     uint2 line_extent = pixel_sort_line_coordinates(extent);
@@ -61,16 +66,47 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         keys[0] = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + line];
     }
     uint rank = 0;
+    if (contrast.sort_scope == WBE_PIXEL_SORT_SCOPE_SPAN) {
+        uint position = 0;
+        while (position < line_extent.y) {
+            uint2 pixel = pixel_sort_line_pixel(uint2(line, position));
+            if (!pixel_sort_in_contrast(source.Load(int3(pixel, 0)).rgb, contrast)) {
+                mask[pixel] = uint4(WBE_PIXEL_SORT_UNMASKED, 0, 0, 0);
+                ++position;
+                continue;
+            }
+            // The pixel starts a span, which ends before the next unmasked pixel or at the end of the line.
+            uint span_length = 1;
+            while (position + span_length < line_extent.y) {
+                uint2 next_pixel = pixel_sort_line_pixel(uint2(line, position + span_length));
+                if (!pixel_sort_in_contrast(source.Load(int3(next_pixel, 0)).rgb, contrast)) {
+                    break;
+                }
+                ++span_length;
+            }
+            uint span_start = pixel_sort_key_index(column_offsets, line, rank);
+            for (uint offset = 0; offset < span_length; ++offset) {
+                uint2 span_pixel = pixel_sort_line_pixel(uint2(line, position + offset));
+                float3 color = source.Load(int3(span_pixel, 0)).rgb;
+                keys[WBE_RADIX_SORT_DATA_START + span_start + offset] =
+                    pixel_sort_make_span_key(color, contrast.sort_metric, span_start, span_length, offset, extent);
+                mask[span_pixel] = uint4(rank + offset, offset, span_length, 0);
+            }
+            rank += span_length;
+            position += span_length;
+        }
+        return;
+    }
     for (uint position = 0; position < line_extent.y; ++position) {
         uint2 pixel = pixel_sort_line_pixel(uint2(line, position));
         float3 color = source.Load(int3(pixel, 0)).rgb;
         if (pixel_sort_in_contrast(color, contrast)) {
             keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, line, rank)] =
                 pixel_sort_make_key(color, contrast.sort_metric, pixel, extent);
-            mask[pixel] = rank;
+            mask[pixel] = uint4(rank, 0, 0, 0);
             ++rank;
         } else {
-            mask[pixel] = WBE_PIXEL_SORT_UNMASKED;
+            mask[pixel] = uint4(WBE_PIXEL_SORT_UNMASKED, 0, 0, 0);
         }
     }
 }

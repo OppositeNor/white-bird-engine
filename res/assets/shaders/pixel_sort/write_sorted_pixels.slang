@@ -18,8 +18,9 @@
  * @details Dispatch one 8x8 workgroup per 8x8 pixel tile. A pixel inside the contrast mask receives the source pixel of
  * the sorted key at its line rank, which register_pixel_sort_keys stored in the mask image. That key belongs to the
  * same line, so the masked pixels of every line end up sorted by the metric selected in PixelSortContrast, from the
- * smallest value, top to bottom in the vertical variant and left to right in the horizontal variant. Other pixels keep
- * their source color.
+ * smallest value, top to bottom in the vertical variant and left to right in the horizontal variant. With the span scope,
+ * the key belongs to the same span, whose pixels are consecutive, so the source pixel is the pixel of the span at the
+ * offset the key encodes, and every span ends up sorted on its own. Other pixels keep their source color.
  */
 #include "utils.slang"
 #include "sort/radix_sort_utils.slang"
@@ -31,8 +32,10 @@ struct WriteSortedPixelsDescriptorIndices {
     [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
     /** Radix sort key buffer holding the sorted keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "read")] uint2 keys;
-    /** R16_UINT mask image holding the line rank of every masked pixel, from register_pixel_sort_keys. */
+    /** Mask image holding the line rank, span offset, and span length of every masked pixel, from register_pixel_sort_keys. */
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "read")] uint2 mask;
+    /** The scope of the sort. */
+    [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
     /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Image receiving the sorted pixels; must have the extent of source. */
@@ -47,7 +50,8 @@ ConstantBuffer<WriteSortedPixelsDescriptorIndices> descriptor_indices;
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     Texture2D<float4> source = ResourceDescriptorHeap[descriptor_indices.source.x];
     RWStructuredBuffer<uint> keys = ResourceDescriptorHeap[descriptor_indices.keys.x];
-    RWTexture2D<uint> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
+    RWTexture2D<uint4> mask = ResourceDescriptorHeap[descriptor_indices.mask.x];
+    ConstantBuffer<PixelSortContrast> contrast = ResourceDescriptorHeap[descriptor_indices.contrast.x];
     RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[descriptor_indices.column_offsets.x];
     RWTexture2D<float4> destination = ResourceDescriptorHeap[descriptor_indices.destination.x];
     uint2 extent;
@@ -56,12 +60,21 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (any(pixel >= extent)) {
         return;
     }
-    uint rank = mask[pixel];
+    uint4 mask_value = mask[pixel];
+    uint rank = mask_value.x;
     uint2 source_pixel = pixel;
     if (rank != WBE_PIXEL_SORT_UNMASKED) {
-        uint line = pixel_sort_line_coordinates(pixel).x;
-        uint key = keys[WBE_RADIX_SORT_DATA_START + pixel_sort_key_index(column_offsets, line, rank)];
-        source_pixel = pixel_sort_key_pixel(key, line, extent);
+        uint2 line_coordinates = pixel_sort_line_coordinates(pixel);
+        uint key_index = pixel_sort_key_index(column_offsets, line_coordinates.x, rank);
+        uint key = keys[WBE_RADIX_SORT_DATA_START + key_index];
+        if (contrast.sort_scope == WBE_PIXEL_SORT_SCOPE_SPAN) {
+            uint offset = mask_value.y;
+            uint span_length = mask_value.z;
+            uint source_offset = pixel_sort_span_key_offset(key, key_index - offset, span_length, extent);
+            source_pixel = pixel_sort_line_pixel(uint2(line_coordinates.x, line_coordinates.y - offset + source_offset));
+        } else {
+            source_pixel = pixel_sort_key_pixel(key, line_coordinates.x, extent);
+        }
     }
     destination[pixel] = float4(source.Load(int3(source_pixel, 0)).rgb, 1.0);
 }
