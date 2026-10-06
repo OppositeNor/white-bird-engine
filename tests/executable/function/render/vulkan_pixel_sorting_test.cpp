@@ -78,8 +78,8 @@ inline constexpr uint32_t PIXEL_SORT_TILE_SIZE = 8;
 inline constexpr uint32_t PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64;
 // Must match WBE_PIXEL_SORT_COLUMN_OFFSETS_START in pixel_sort_utils.slang.
 inline constexpr uint32_t PIXEL_SORT_COLUMN_OFFSETS_START = 4;
-inline constexpr float PIXEL_SORT_DEFAULT_MIN_LUMINANCE = 0.25F;
-inline constexpr float PIXEL_SORT_DEFAULT_MAX_LUMINANCE = 0.8F;
+inline constexpr float PIXEL_SORT_DEFAULT_MIN_METRIC = 0.25F;
+inline constexpr float PIXEL_SORT_DEFAULT_MAX_METRIC = 0.8F;
 // Must match WBE_PIXEL_SORT_METRIC_SATURATION in pixel_sort_utils.slang: 0 sorts by luminance, 1 by hue, 2 by saturation.
 inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 2;
 // Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
@@ -96,11 +96,11 @@ inline constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
  * @brief GPU layout of PixelSortContrast in pixel_sort_utils.slang.
  */
 struct PixelSortContrastGPU {
-    /** The smallest luminance of a sorted pixel, in [0, 1]. */
-    float min_luminance = PIXEL_SORT_DEFAULT_MIN_LUMINANCE;
-    /** The largest luminance of a sorted pixel, in [0, 1]. */
-    float max_luminance = PIXEL_SORT_DEFAULT_MAX_LUMINANCE;
-    /** The metric the sorted pixels are ordered by: 0 for luminance, 1 for hue, 2 for saturation. */
+    /** The smallest sort metric of a sorted pixel, in [0, 1]. */
+    float min_metric = PIXEL_SORT_DEFAULT_MIN_METRIC;
+    /** The largest sort metric of a sorted pixel, in [0, 1]. */
+    float max_metric = PIXEL_SORT_DEFAULT_MAX_METRIC;
+    /** The metric the sorted pixels are ordered and masked by: 0 for luminance, 1 for hue, 2 for saturation. */
     uint32_t sort_metric = PIXEL_SORT_DEFAULT_METRIC;
     /** The pixels each sort covers: 0 for the whole column, as the R16_UINT mask image requires, 1 for each span. */
     uint32_t sort_scope = 0;
@@ -108,7 +108,7 @@ struct PixelSortContrastGPU {
 
 /**
  * @class ApplicationVulkanPixelSortingTest
- * @brief Sorts the pixels of every column of an image that are inside a luminance contrast mask with the GPU radix sort,
+ * @brief Sorts the pixels of every column of an image that are inside a saturation contrast mask with the GPU radix sort,
  * and presents the result.
  *
  * One invocation per column counts its masked pixels, a prefix sum turns the counts into the range of every column in
@@ -137,22 +137,22 @@ public:
     }
 
     /**
-     * @brief Set the luminance range of the sorted pixels.
+     * @brief Set the sort metric range of the sorted pixels.
      *
      * Before setup_render_graph(), the range becomes the initial contrast buffer content; afterwards the buffer is updated
      * through a render job. Must be called from the logic thread.
      *
-     * @param p_min_luminance The smallest luminance of a sorted pixel.
-     * @param p_max_luminance The largest luminance of a sorted pixel.
-     * @throws std::runtime_error If the range is not within [0, 1] or p_min_luminance exceeds p_max_luminance.
+     * @param p_min_metric The smallest sort metric of a sorted pixel.
+     * @param p_max_metric The largest sort metric of a sorted pixel.
+     * @throws std::runtime_error If the range is not within [0, 1] or p_min_metric exceeds p_max_metric.
      */
-    void set_contrast(float p_min_luminance, float p_max_luminance) {
-        if (!(0.0F <= p_min_luminance && p_min_luminance <= p_max_luminance && p_max_luminance <= 1.0F)) {
+    void set_contrast(float p_min_metric, float p_max_metric) {
+        if (!(0.0F <= p_min_metric && p_min_metric <= p_max_metric && p_max_metric <= 1.0F)) {
             throw std::runtime_error(std::format("Invalid pixel sort contrast range [{}, {}]: it must satisfy 0 <= min <= max <= 1.",
-                p_min_luminance, p_max_luminance));
+                p_min_metric, p_max_metric));
         }
-        contrast.min_luminance = p_min_luminance;
-        contrast.max_luminance = p_max_luminance;
+        contrast.min_metric = p_min_metric;
+        contrast.max_metric = p_max_metric;
         WBE::ROBufferVK* contrast_buffer_ptr = contrast_buffer.get();
         if (contrast_buffer_ptr == nullptr) {
             return;

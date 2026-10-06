@@ -20,7 +20,8 @@
  * l, in an image of N lines of M pixels, gets one 32-bit key, (l * L + v) * M + p, where v is the quantized sort metric
  * of the pixel, which the host selects with PixelSortContrast.sort_metric, and L = floor((2^32 - 1) / (N * M)) is the
  * number of metric levels. Sorting the keys in ascending order groups them by line, orders each line by the metric, and
- * keeps the source position of every key. The contrast mask always selects pixels by luminance. The keys of line l are
+ * keeps the source position of every key. The contrast mask selects the pixels whose sort metric is inside a range, so it
+ * follows the metric the pixels are sorted by. The keys of line l are
  * registered at the range of the key buffer that starts after the keys of every earlier line, so the sort keeps every
  * line in its range, and the k-th masked pixel of line l receives the k-th key of that range.
  *
@@ -104,15 +105,17 @@ uint pixel_sort_key_index(RWStructuredBuffer<uint> p_column_offsets, uint p_line
 
 /**
  * @struct PixelSortContrast
- * @brief The luminance range of the pixels that are sorted, the metric they are sorted by, and the scope of each sort, set
- * by the host.
+ * @brief The range of the sort metric of the pixels that are sorted, the metric they are sorted by, and the scope of each
+ * sort, set by the host.
  */
 struct PixelSortContrast {
-    /** The smallest luminance of a sorted pixel, in [0, 1]. */
-    float min_luminance;
-    /** The largest luminance of a sorted pixel, in [0, 1]. */
-    float max_luminance;
-    /** The metric the sorted pixels are ordered by; the host must set one of the WBE_PIXEL_SORT_METRIC_ values. */
+    /** The smallest sort metric of a sorted pixel, in [0, 1]. */
+    float min_metric;
+    /** The largest sort metric of a sorted pixel, in [0, 1]. */
+    float max_metric;
+    /**
+     * The metric the sorted pixels are ordered and masked by; the host must set one of the WBE_PIXEL_SORT_METRIC_ values.
+     */
     uint sort_metric;
     /**
      * The pixels each sort covers; the host must set one of the WBE_PIXEL_SORT_SCOPE_ values. The span scope requires a
@@ -128,17 +131,6 @@ struct PixelSortContrast {
  */
 float pixel_sort_luminance(float3 p_color) {
     return saturate(dot(p_color, float3(0.2126, 0.7152, 0.0722)));
-}
-
-/**
- * @brief Check whether a pixel is inside the contrast mask.
- * @param p_color The linear color of the pixel.
- * @param p_contrast The contrast range.
- * @return Whether the luminance of p_color is within [min_luminance, max_luminance].
- */
-bool pixel_sort_in_contrast(float3 p_color, PixelSortContrast p_contrast) {
-    float luminance = pixel_sort_luminance(p_color);
-    return luminance >= p_contrast.min_luminance && luminance <= p_contrast.max_luminance;
 }
 
 /**
@@ -194,6 +186,17 @@ float pixel_sort_metric(float3 p_color, uint p_sort_metric) {
     default:
         return pixel_sort_saturation(p_color);
     }
+}
+
+/**
+ * @brief Check whether a pixel is inside the contrast mask.
+ * @param p_color The linear color of the pixel.
+ * @param p_contrast The contrast range and the sort metric.
+ * @return Whether the sort metric of p_color is within [min_metric, max_metric].
+ */
+bool pixel_sort_in_contrast(float3 p_color, PixelSortContrast p_contrast) {
+    float metric = pixel_sort_metric(p_color, p_contrast.sort_metric);
+    return metric >= p_contrast.min_metric && metric <= p_contrast.max_metric;
 }
 
 /**

@@ -38,6 +38,6 @@ float4 fragment_main(VSOutput p_input) : SV_Target0 {
     SamplerState result_sampler = SamplerDescriptorHeap[descriptor_indices.result_sampler.x];
     float3 color = result_image.SampleLevel(result_sampler, p_input.uv, 0.0).rgb;
     color += bloom_image.SampleLevel(result_sampler, p_input.uv, 0.0).rgb;
-    color = color / (color + float3(1.0));
+    color = color / sqrt(color * color + 1.5);
     return float4(color, 1.0);
 }

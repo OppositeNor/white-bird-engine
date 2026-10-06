@@ -70,7 +70,7 @@ enum class PixelSortScope : uint32_t {
 /**
  * @class PixelSort
  * @brief Post-processing effect that sorts, by a selectable metric, the pixels of every column or row of the color image
- * whose luminance is inside a contrast range, either across the whole line or within every span of consecutive masked
+ * whose sort metric is inside a contrast range, either across the whole line or within every span of consecutive masked
  * pixels.
  * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
@@ -87,7 +87,7 @@ public:
      * @param p_extent Extent of the color images the effect is applied to.
      * @param p_color_format Format of the color images the effect is applied to.
      * @param p_direction Whether the effect sorts the columns or the rows of the image.
-     * @param p_metric The value the effect orders the pixels of every line by.
+     * @param p_metric The value the effect orders the pixels of every line by, and masks them by.
      * @param p_scope Whether each sort covers a whole line or one span of consecutive masked pixels.
      * @throws std::runtime_error If a shader resource is missing, the extent is empty or too large to pack the sort keys
      * into 32 bits, the length of a sorted line does not fit the 16-bit mask image, p_metric is not a PixelSortMetric
@@ -119,10 +119,10 @@ public:
     static constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
     static constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
 
-    /** The smallest luminance of a sorted pixel. */
-    static constexpr float MIN_LUMINANCE = 0.1F;
-    /** The largest luminance of a sorted pixel. */
-    static constexpr float MAX_LUMINANCE = 0.9F;
+    /** The smallest sort metric of a sorted pixel. */
+    static constexpr float MIN_METRIC = 0.3F;
+    /** The largest sort metric of a sorted pixel. */
+    static constexpr float MAX_METRIC = 1.1F;
 
 private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.

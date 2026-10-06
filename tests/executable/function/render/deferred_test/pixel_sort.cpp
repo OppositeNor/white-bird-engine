@@ -68,8 +68,8 @@ constexpr uint32_t RADIX_SORT_DATA_START = 4;
 
 // GPU layout of PixelSortContrast in pixel_sort_utils.slang.
 struct PixelSortContrastGPU {
-    float min_luminance = PixelSort::MIN_LUMINANCE;
-    float max_luminance = PixelSort::MAX_LUMINANCE;
+    float min_metric = PixelSort::MIN_METRIC;
+    float max_metric = PixelSort::MAX_METRIC;
     uint32_t sort_metric = static_cast<uint32_t>(PixelSortMetric::SATURATION);
     uint32_t sort_scope = static_cast<uint32_t>(PixelSortScope::LINE);
 };
