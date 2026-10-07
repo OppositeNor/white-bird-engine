@@ -134,6 +134,8 @@ struct BaseRenderDataVK {
     VkQueue graphics_queue = VK_NULL_HANDLE;
     /** Compute queue family. */
     VkQueue compute_queue = VK_NULL_HANDLE;
+    /** The queue family index of graphics_queue. */
+    uint32_t graphics_queue_family_index = UINT32_MAX;
     /** The viewport for the final presentation. */
     VkViewport viewport{};
     /** The scissor for the final presentation. */

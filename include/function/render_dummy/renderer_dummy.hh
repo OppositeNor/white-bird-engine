@@ -41,6 +41,7 @@ public:
         p_capabilities.ray_tracing = false;
         p_capabilities.ray_query = false;
         p_capabilities.timestamp_query = false;
+        p_capabilities.descriptor_set = false;
     }
 
     virtual ~RendererDummy() override = default;

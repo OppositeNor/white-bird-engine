@@ -41,6 +41,7 @@
 #include "utils/defs.hh"
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -130,14 +131,29 @@ public:
      * @brief Submit work from another thread for execution on the rendering thread.
      *
      * Render objects are render-thread-confined. Cross-thread callers must use this job buffer instead of operating on them
-     * directly.
+     * directly. drain_job_buffer_tasks(), which termination also calls, stops accepting jobs and runs the queued ones;
+     * threads that may submit work while the jobs are drained use try_add_job().
      *
      * @param p_job Work to execute on the rendering thread.
      * @return Future completed after the job runs.
+     * @throws std::runtime_error If the renderer is terminating and refuses the job.
      */
-    virtual std::future<void> add_job(std::function<void()> p_job) override {
-        return job_buffer->add_job(std::move(p_job));
-    }
+    virtual std::future<void> add_job(std::function<void()> p_job) override;
+
+    /**
+     * @brief Submit work for execution on the rendering thread unless the renderer is terminating.
+     *
+     * Every accepted job runs, at the latest during termination. Safe to call from any thread.
+     */
+    virtual std::optional<std::future<void>> try_add_job(std::function<void()> p_job) override;
+
+    /**
+     * @brief Wait for the device to become idle, stop accepting jobs, and run every queued job.
+     *
+     * Producers already submitting finish their submissions, and their jobs run too. Termination calls this again in case
+     * the owner did not.
+     */
+    virtual void drain_job_buffer_tasks() override;
 
     /**
      * @brief Register a Vulkan render graph descriptor under a resource key.
@@ -211,6 +227,10 @@ public:
 
 private:
     Ref<JobBufferRingMPSC> job_buffer;
+    // Cleared by drain_job_buffer_tasks(); try_add_job() refuses jobs afterwards.
+    std::atomic<bool> accepting_jobs = true;
+    // Producers between checking accepting_jobs and finishing their push; draining continues until none remain.
+    std::atomic<uint32_t> submitting_job_count = 0;
 
     inline static RendererVK* singleton = nullptr;
 

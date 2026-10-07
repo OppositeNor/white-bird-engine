@@ -64,12 +64,16 @@ ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities, R
 }
 
 void ApplicationGame::run() {
-    std::jthread render_thread([this] {
-        run_render();
-    });
-    std::jthread logic_thread([this] {
-        run_logic();
-    });
+    {
+        std::jthread render_thread([this] {
+            run_render();
+        });
+        std::jthread logic_thread([this] {
+            run_logic();
+        });
+    }
+    // Run the render jobs queued after the last frame while the application objects they capture are alive.
+    renderer->drain_job_buffer_tasks();
 }
 
 void ApplicationGame::init() {

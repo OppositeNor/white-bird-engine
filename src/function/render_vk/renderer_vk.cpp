@@ -49,6 +49,7 @@
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -62,6 +63,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -263,7 +265,10 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
 }
 
 void RendererVK::terminate() {
-    vkDeviceWaitIdle(logical_device);
+    // Owners normally drain while the objects jobs capture are alive; this covers the jobs queued since, such as returns of
+    // readback staging buffers, while the plugins, graphs, and render objects they may use still exist. Their captured
+    // render objects are released before the allocators they live on are destroyed.
+    drain_job_buffer_tasks();
     for (auto& plugin : registered_plugins) {
         plugin->on_renderer_terminating();
     }
@@ -340,6 +345,7 @@ void RendererVK::setup_base_render_data() {
     base_render_data.allocation_callbacks = get_allocation_callbacks();
     base_render_data.graphics_queue = graphics_queue;
     base_render_data.compute_queue = compute_queue;
+    base_render_data.graphics_queue_family_index = queue_family_indices.get_graphics();
     base_render_data.viewport = viewport;
     base_render_data.scissor = scissor;
     base_render_data.graphics_command_pool = graphics_command_pool;
@@ -1274,6 +1280,40 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     window->get_size_in_pixels(extent_width, extent_height);
     VkExtent2D result{.width = extent_width, .height = extent_height};
     return result;
+}
+
+std::future<void> RendererVK::add_job(std::function<void()> p_job) {
+    std::optional<std::future<void>> result = try_add_job(std::move(p_job));
+    if (!result.has_value()) {
+        throw std::runtime_error("RendererVK: refused a render job because the renderer is terminating.");
+    }
+    return std::move(*result);
+}
+
+std::optional<std::future<void>> RendererVK::try_add_job(std::function<void()> p_job) {
+    // Register as a producer before checking the flag: either termination observes the registration and waits for the
+    // push, or this producer observes the cleared flag.
+    submitting_job_count.fetch_add(1, std::memory_order_seq_cst);
+    if (!accepting_jobs.load(std::memory_order_seq_cst)) {
+        submitting_job_count.fetch_sub(1, std::memory_order_seq_cst);
+        return std::nullopt;
+    }
+    std::future<void> result = job_buffer->add_job(std::move(p_job));
+    submitting_job_count.fetch_sub(1, std::memory_order_seq_cst);
+    return result;
+}
+
+void RendererVK::drain_job_buffer_tasks() {
+    vkDeviceWaitIdle(logical_device);
+    // Stop accepting jobs so that producers cannot keep draining from finishing. Draining continues while a producer
+    // accepted before the flag changed is still pushing, which also unblocks producers waiting on a full buffer; the final
+    // drain collects their last jobs.
+    accepting_jobs.store(false, std::memory_order_seq_cst);
+    while (submitting_job_count.load(std::memory_order_seq_cst) != 0) {
+        run_stored_jobs();
+        std::this_thread::yield();
+    }
+    run_stored_jobs();
 }
 
 void RendererVK::run_stored_jobs() {

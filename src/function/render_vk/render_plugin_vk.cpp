@@ -16,6 +16,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/descriptor_set_plugin_vk.hh"
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
 #include "function/render_vk/timestamp_query_plugin_vk.hh"
 
@@ -34,6 +35,9 @@ void register_builtin_render_plugins_vk(Vector<Ref<RenderPluginVK>, RenderAlloca
     }
     if (p_capabilities.timestamp_query) {
         p_registered_plugins.emplace_back(make_ref<TimestampQueryPluginVK>(p_allocator, p_render_data));
+    }
+    if (p_capabilities.descriptor_set) {
+        p_registered_plugins.emplace_back(make_ref<DescriptorSetPluginVK>(p_allocator, p_render_data));
     }
 }
 

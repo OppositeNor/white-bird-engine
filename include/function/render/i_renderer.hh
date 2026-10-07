@@ -21,6 +21,9 @@
 #include "function/render/render_database.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
+#include <functional>
+#include <future>
+#include <optional>
 #include <string_view>
 namespace WhiteBirdEngine {
 
@@ -54,6 +57,13 @@ struct RendererCapabilities {
      * it terminates.
      */
     bool timestamp_query = false;
+    /**
+     * @brief Whether classic Vulkan descriptor sets are requested and were enabled.
+     *
+     * When enabled, the renderer provides a descriptor pool for code that cannot use the renderer's descriptor heaps, such as
+     * third-party libraries.
+     */
+    bool descriptor_set = false;
 };
 
 /**
@@ -87,6 +97,27 @@ public:
      * @param p_path Destination PNG file path; its parent directory must already exist.
      */
     virtual void request_frame_capture(std::string_view p_path);
+
+    /**
+     * @brief Submit a job like add_job(), unless the renderer has stopped accepting jobs.
+     *
+     * Use this from threads that may still submit work while the renderer terminates. The default implementation never
+     * refuses and forwards to add_job().
+     *
+     * @param p_job The job to run on the rendering thread.
+     * @return The future completed after the job runs, or std::nullopt when the renderer refused the job; a refused job
+     * never runs.
+     */
+    virtual std::optional<std::future<void>> try_add_job(std::function<void()> p_job);
+
+    /**
+     * @brief Stop accepting jobs and run every job still queued.
+     *
+     * Afterwards add_job() throws and try_add_job() refuses. Call it after the rendering thread has stopped, while the
+     * objects that queued jobs capture are still alive, such as at the end of an application's run loop. The default
+     * implementation does nothing, for renderers that do not queue jobs.
+     */
+    virtual void drain_job_buffer_tasks();
 
     /**
      * @brief Get number of workers working on rendering.

@@ -54,6 +54,12 @@ public:
     ApplicationGame& operator=(const ApplicationGame&) = delete;
     ApplicationGame& operator=(ApplicationGame&&) noexcept = delete;
 
+    /**
+     * @brief Run the render and logic threads until the window closes, then drain the renderer's queued jobs.
+     *
+     * The jobs run after both threads have stopped and before the application is destroyed. Afterwards the renderer refuses
+     * new jobs, so add_render_job() throws.
+     */
     virtual void run() override;
 
     virtual double get_render_delta() const override {

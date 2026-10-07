@@ -33,11 +33,14 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
+#include "imgui.h"
+#include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "rt_imgui_vk.hh"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -58,6 +61,7 @@ inline constexpr std::string_view RT_PREFIX_SUM_PIXEL_SORT_COLUMNS = "prefix_sum
 inline constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
 inline constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
 inline constexpr std::string_view RT_PRESENT_SORTED_PIXELS = "present_sorted_pixels";
+inline constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION_IMAGE = "pixel_sort_destination_image";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION = "pixel_sort_destination";
@@ -124,6 +128,7 @@ public:
         : WBE::ApplicationGame(
               WBE::RendererCapabilities{
                   .timestamp_query = WBE::exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
+                  .descriptor_set = true,
               },
               WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
     }
@@ -131,9 +136,12 @@ public:
     virtual void logic_update(double p_delta) override {
     }
 
-    virtual void render_update(double /*p_delta*/) override {
+    virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        imgui_overlay->begin_frame(p_delta);
+        draw_parameter_window();
+        imgui_overlay->end_frame();
     }
 
     /**
@@ -168,6 +176,7 @@ public:
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
+        imgui_overlay = WBE::make_unique<WBE::ImGuiOverlayVK>(WBE::global_allocator(), renderer);
 
         auto texture_resource = resource_manager->get_resource<WBE::RUTexture>(REND_RES_PIXEL_SORT_SOURCE);
         if (texture_resource == nullptr) {
@@ -300,6 +309,12 @@ public:
                                      .create_unique(base_render_data);
         pipeline_desc.add_task(std::move(present_task_desc));
 
+        WBE::RendTaskDescVK imgui_task_desc(render_allocator);
+        imgui_task_desc.task_id = RT_DRAW_IMGUI;
+        imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+        imgui_task_desc.task = WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+        pipeline_desc.add_task(std::move(imgui_task_desc));
+
         WBE::connect_resource_chain(pipeline_desc,
             REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
             {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
@@ -332,16 +347,45 @@ public:
         }
         WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
         WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PRESENT_SORTED_PIXELS});
+        WBE::connect_resource_chain(pipeline_desc, WBE::REND_RES_SWAP_CHAIN, {RT_PRESENT_SORTED_PIXELS, RT_DRAW_IMGUI});
         WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("pixel_sorting_graph", std::move(pipeline_desc));
         contrast_buffer = graph->acquire_resource(REND_RES_PIXEL_SORT_CONTRAST)->get().dynamic_cast_ref<WBE::ROBufferVK>();
+        ui_contrast = contrast;
         WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
         renderer->activate_render_graph("pixel_sorting_graph");
     }
 
 private:
     PixelSortContrastGPU contrast;
-    // Graph-owned contrast buffer, updated from the logic thread through render jobs.
+    // The contrast edited in the parameter window; owned by the rendering thread.
+    PixelSortContrastGPU ui_contrast;
+    // Graph-owned contrast buffer, updated from the logic thread through render jobs and by the parameter window.
     WBE::Ref<WBE::ROBufferVK> contrast_buffer;
+    // Destroyed before the renderer, after the rendering thread has stopped.
+    WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
+
+    /**
+     * @brief Draw the parameter window and upload the contrast when it changes. Must be called on the rendering thread.
+     */
+    void draw_parameter_window() {
+        static constexpr std::array<const char*, 3> SORT_METRIC_NAMES{"Luminance", "Hue", "Saturation"};
+        bool changed = false;
+        ImGui::Begin("Pixel Sorting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        changed |= ImGui::SliderFloat("Min metric", &ui_contrast.min_metric, 0.0F, 1.0F);
+        changed |= ImGui::SliderFloat("Max metric", &ui_contrast.max_metric, 0.0F, 1.0F);
+        int sort_metric = static_cast<int>(ui_contrast.sort_metric);
+        if (ImGui::Combo("Sort metric", &sort_metric, SORT_METRIC_NAMES.data(), static_cast<int>(SORT_METRIC_NAMES.size()))) {
+            ui_contrast.sort_metric = static_cast<uint32_t>(sort_metric);
+            changed = true;
+        }
+        ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
+        if (!changed) {
+            return;
+        }
+        ui_contrast.max_metric = std::max(ui_contrast.min_metric, ui_contrast.max_metric);
+        contrast_buffer->update_buffer(&ui_contrast, sizeof(PixelSortContrastGPU));
+    }
 
     /**
      * @brief Add a task that dispatches a compute shader resource.

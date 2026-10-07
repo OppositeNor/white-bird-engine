@@ -34,6 +34,7 @@ RendererSoftware::RendererSoftware(Ref<RenderAllocator> p_allocator, RendererCap
     p_capabilities.ray_tracing = false;
     p_capabilities.ray_query = false;
     p_capabilities.timestamp_query = false;
+    p_capabilities.descriptor_set = false;
 }
 
 void RendererSoftware::tick(double p_delta) {

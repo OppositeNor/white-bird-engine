@@ -21,6 +21,15 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
 
+#ifdef _DEBUG
+#include <cstdio>
+// List every allocation still alive when VMA destroys a memory block, before its leak assertion fires.
+#define VMA_LEAK_LOG_FORMAT(format, ...) /* NOLINT */                                                                     \
+    do {                                                                                                                    \
+        std::fprintf(stderr, "[VMA leak] " format "\n" __VA_OPT__(, ) __VA_ARGS__);                                       \
+    } while (false)
+#endif
+
 #define VMA_IMPLEMENTATION // NOLINT
 #include "function/render_vk/vma_vk.hh"
 

@@ -13,14 +13,25 @@
    limitations under the License.
 */
 #include "function/render/i_renderer.hh"
+#include <functional>
+#include <future>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace WhiteBirdEngine {
 
 void IRenderer::request_frame_capture(std::string_view p_path) {
     static_cast<void>(p_path);
     throw std::runtime_error("This renderer does not support frame capture.");
+}
+
+void IRenderer::drain_job_buffer_tasks() {
+}
+
+std::optional<std::future<void>> IRenderer::try_add_job(std::function<void()> p_job) {
+    return add_job(std::move(p_job));
 }
 
 } // namespace WhiteBirdEngine
