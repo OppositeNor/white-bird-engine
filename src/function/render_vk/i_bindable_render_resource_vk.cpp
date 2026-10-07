@@ -37,7 +37,10 @@ void IBindableRenderResourceVK::bind_render_object(
     if (p_resource == MEM_NULL) {
         throw std::runtime_error(std::format("Failed to bind render resource '{}': render object is null.", p_resource_id));
     }
-    bind_container(p_graph, p_resource_id, make_ref<ROCSingleVK>(p_graph.allocator, std::move(p_resource)));
+    // The container keeps resolving the imported object; recreating it rebinds the same object.
+    bind_container(p_graph, p_resource_id, make_ref<ROCSingleVK>(p_graph.allocator, [resource = std::move(p_resource)](uint32_t /*p_slot*/) {
+        return resource;
+    }));
 }
 
 void IBindableRenderResourceVK::bind_container(

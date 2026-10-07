@@ -72,7 +72,7 @@ void DynamicMeshRenderFeature::set_transform(size_t p_entity_index, const glm::m
 RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
     size_t p_entity_index,
     Ref<ROGraphicsPipelineVK> p_pipeline,
-    VkExtent2D p_extent,
+    RenderTestExtentFactory p_extent,
     std::span<const std::string_view> p_colors,
     std::optional<std::string_view> p_depth) const {
     if (p_entity_index >= entities.size()) {
@@ -85,7 +85,7 @@ RendTaskDescVK DynamicMeshRenderFeature::make_task(std::string_view p_task_id,
         std::move(p_pipeline),
         false,
         {},
-        p_extent,
+        std::move(p_extent),
         p_colors,
         p_depth,
         VK_ATTACHMENT_LOAD_OP_LOAD,

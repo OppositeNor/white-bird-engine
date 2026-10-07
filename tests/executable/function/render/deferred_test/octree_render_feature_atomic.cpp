@@ -94,17 +94,19 @@ RendTaskDescVK OctreeRenderFeatureAtomic::make_deferred_construction_render_task
     RendTaskDescVK task_desc(render_allocator);
     constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
     constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
-    Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(render_allocator,
-        base_render_data,
-        p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline,
-        p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline,
-        false,
-        // A single raster pass can leave contenders at any depth; allow one retry per tree level.
-        static_cast<uint32_t>(OCTREE_MAX_DEPTH),
-        PROPAGATION_GROUP_COUNT);
-    task->set_iteration_prefixes(
-        octree_deferred_count_reset_pong_compute_pipeline, octree_deferred_count_reset_ping_compute_pipeline, RESET_GROUP_COUNT);
-    task_desc.task = std::move(task);
+    task_desc.factory = [this, p_dynamic, RESET_GROUP_COUNT, PROPAGATION_GROUP_COUNT](const RendGraphContextVK& /*p_context*/) {
+        Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(render_allocator,
+            base_render_data,
+            p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline,
+            p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline,
+            false,
+            // A single raster pass can leave contenders at any depth; allow one retry per tree level.
+            static_cast<uint32_t>(OCTREE_MAX_DEPTH),
+            PROPAGATION_GROUP_COUNT);
+        task->set_iteration_prefixes(
+            octree_deferred_count_reset_pong_compute_pipeline, octree_deferred_count_reset_ping_compute_pipeline, RESET_GROUP_COUNT);
+        return task;
+    };
     return task_desc;
 }
 

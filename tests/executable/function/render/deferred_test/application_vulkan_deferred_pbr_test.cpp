@@ -345,15 +345,14 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
                                              : "Octree static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
-    post_processing =
-        make_unique<PixelSort>(render_allocator,
-            render_allocator,
-            renderer_vk,
-            base_render_data->swap_chain_extent,
-            LIGHTING_OUTPUT_FORMAT,
-            PixelSortDirection::VERTICAL,
-            PixelSortMetric::SATURATION,
-            PixelSortScope::SPAN);
+    post_processing = make_unique<PixelSort>(render_allocator,
+        render_allocator,
+        renderer_vk,
+        &RendGraphContextVK::swap_chain_extent,
+        LIGHTING_OUTPUT_FORMAT,
+        PixelSortDirection::VERTICAL,
+        PixelSortMetric::SATURATION,
+        PixelSortScope::SPAN);
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
     auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);
@@ -382,7 +381,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
         p_double_sided ? gbuffer_double_sided_graphics_pipeline : gbuffer_opaque_graphics_pipeline,
         false,
         clear_values,
-        base_render_data->swap_chain_extent,
+        &RendGraphContextVK::swap_chain_extent,
         color_attachments,
         GBUFFER_DEPTH_IMAGE_VIEW,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -546,7 +545,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
         p_double_sided ? shadow_double_sided_graphics_pipeline : shadow_opaque_graphics_pipeline,
         false,
         clear_values,
-        shadow_extent,
+        make_fixed_extent_factory(shadow_extent),
         color_attachments,
         SHADOWMAP_DEPTH_IMAGE_VIEW,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,

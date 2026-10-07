@@ -20,13 +20,14 @@
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <cstddef>
@@ -41,6 +42,7 @@
 namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
+struct RendTaskDescVK;
 struct RendBufferDeclVK;
 struct RendImageDeclVK;
 struct RendImageViewDeclVK;
@@ -215,7 +217,9 @@ struct RGNode {
  * construction fails.
  *
  * The graph is built once from a RendGraphDescVK; thereafter, execute()
- * may be called every frame.
+ * may be called every frame. The graph-owned resources follow the
+ * RendGraphContextVK: execute() calls update_context() whenever the context of
+ * the render data differs from the one the resources were built for.
  */
 class RenderGraphVK {
 public:
@@ -243,10 +247,36 @@ public:
      * @throws std::runtime_error If the descriptor is invalid, cyclic, or
      * leaves a resource conflict unordered.
      *
-     * @param p_desc The render graph descriptor. Its tasks are moved into the
-     * graph, so the descriptor cannot build another graph afterward.
+     * @param p_desc The render graph descriptor. The graph keeps copies of its
+     * resource and task factories to rebuild them when the context changes.
      */
     void build_from_descriptor(RendGraphDescVK& p_desc);
+
+    /**
+     * @brief Rebuild the graph against a context.
+     *
+     * Every graph-owned resource whose configuration differs from its previous evaluation is reallocated, in declaration
+     * order, and every view of a reallocated image is recreated. New objects replace the old ones in place in their
+     * containers, so RenderGraphVK::acquire_resource() callers observe them. Reallocated resources lose their content.
+     * Then every task is recreated from its factory, and the dependency edges, synchronization, and command buffers are
+     * rebuilt for the new tasks. Does nothing when p_context equals the current context. Must be called on the rendering
+     * thread while none of the graph's submitted work is pending; execute() calls it before recording when the context
+     * changes.
+     *
+     * @param p_context The context to evaluate the factories against.
+     * @throws std::runtime_error If a re-evaluated resource configuration is invalid or changes whether a resource is per
+     * frame, or if the recreated tasks do not form a valid graph.
+     */
+    void update_context(const RendGraphContextVK& p_context);
+
+    /**
+     * @brief Get the context the graph-owned resources were last built for.
+     *
+     * @return The current context.
+     */
+    const RendGraphContextVK& get_context() const {
+        return context;
+    }
 
     /**
      * @brief Execute every node in topological order, submitting each to the
@@ -321,6 +351,14 @@ private:
     Vector<Ref<RGResEdge>, RenderAllocator> resource_edges;
     // All resources known to the graph, keyed by res_id.
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
+    // The context the graph-owned resources were last built for.
+    RendGraphContextVK context;
+    // One per graph-owned resource, in declaration order: re-evaluates its factory against the current context and
+    // recreates its container when its configuration, or the image it views, changed.
+    Vector<std::function<void()>, RenderAllocator> resource_refreshers;
+    // Recreates every task from the copied task descriptors of the graph descriptor, and rebuilds the edges,
+    // synchronization, and command buffers for them.
+    std::function<void()> task_builder;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
@@ -347,11 +385,12 @@ private:
     void allocate_image_view(const RendImageViewDeclVK& p_view_decl);
     void allocate_sampler(const RendSamplerDeclVK& p_sampler_decl);
     void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
-    Ref<RenderObjectContainerVK> create_container(bool p_per_frame, const std::function<Ref<IRenderObjectVK>(uint32_t)>& p_factory) const;
-    void instantiate_tasks(RendGraphDescVK& p_desc);
+    Ref<RenderObjectContainerVK> create_container(bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;
+    void build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
+    void instantiate_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
-    void add_resource_edges(const RendGraphDescVK& p_desc);
+    void add_resource_edges(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void validate_resource_conflicts() const;
     void validate_queue_completion() const;
     bool has_resource_path(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string_view p_resource_id) const;

@@ -67,25 +67,26 @@ Ref<ROBufferVK> require_buffer_resource(Ref<IRenderObjectVK> p_resource, uint32_
 
 } // namespace
 
-ROCMultislotsVK::ROCMultislotsVK(RenderAllocator* p_allocator, uint32_t p_slot_count, bool p_flush)
-    : allocator(p_allocator), flush(p_flush), resources(create_slot_resources(p_allocator, p_slot_count)),
+ROCMultislotsVK::ROCMultislotsVK(RenderAllocator* p_allocator, uint32_t p_slot_count, Factory p_factory, bool p_flush)
+    : allocator(p_allocator), factory(std::move(p_factory)), flush(p_flush),
+      resources(create_slot_resources(p_allocator, p_slot_count)),
       applied_generations(create_applied_generations(p_allocator, p_slot_count)), pending_buffer_data(p_allocator) {
+    if (factory == nullptr) {
+        throw std::runtime_error("ROCMultislotsVK: resource factory is null.");
+    }
+    recreate();
 }
 
-ROCMultislotsVK::ROCMultislotsVK(RenderAllocator* p_allocator, uint32_t p_slot_count, Factory p_factory, bool p_flush)
-    : allocator(p_allocator), flush(p_flush), resources(create_slot_resources(p_allocator, p_slot_count)),
-      applied_generations(create_applied_generations(p_allocator, p_slot_count)), pending_buffer_data(p_allocator) {
-    if (!p_factory) {
-        throw std::runtime_error("ROCMultislotsVK: resource factory is empty.");
-    }
-
+void ROCMultislotsVK::recreate() {
     for (uint32_t slot = 0; slot < resources.size(); ++slot) {
-        Ref<IRenderObjectVK> resource_ref = p_factory(slot);
+        Ref<IRenderObjectVK> resource_ref = factory(slot);
         if (resource_ref == MEM_NULL) {
             throw std::runtime_error(std::format("ROCMultislotsVK: resource factory returned null for slot {}.", slot));
         }
         retain_resource_type(resource_ref);
         resources[slot] = std::move(resource_ref);
+        // A new slot receives the newest published update again when it is next resolved.
+        applied_generations[slot] = 0;
     }
 }
 

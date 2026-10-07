@@ -25,11 +25,20 @@
 
 namespace WhiteBirdEngine {
 
-ROCSingleVK::ROCSingleVK(Ref<IRenderObjectVK> p_resource) : resource(std::move(p_resource)) {
-    if (resource == MEM_NULL) {
-        throw std::runtime_error("ROCSingleVK: resource is null.");
+ROCSingleVK::ROCSingleVK(Factory p_factory) : factory(std::move(p_factory)) {
+    if (factory == nullptr) {
+        throw std::runtime_error("ROCSingleVK: resource factory is null.");
     }
-    retain_resource_type(resource);
+    recreate();
+}
+
+void ROCSingleVK::recreate() {
+    Ref<IRenderObjectVK> new_resource = factory(0);
+    if (new_resource == MEM_NULL) {
+        throw std::runtime_error("ROCSingleVK: resource factory returned null.");
+    }
+    retain_resource_type(new_resource);
+    resource = std::move(new_resource);
 }
 
 void ROCSingleVK::set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) {

@@ -103,6 +103,9 @@ public:
 
         const char* vertex_data = triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start;
         const char* index_data = triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start;
+        // Copied once, because the buffer factories may run again after the mesh resource is gone.
+        std::vector<uint8_t> vertex_bytes(vertex_data, vertex_data + triangle_submesh->vertices.binary.size);
+        std::vector<uint8_t> index_bytes(index_data, index_data + triangle_submesh->indices.binary.size);
 
         const WBE::IndexedDrawRegionVK indexed_draw_region{
             .first_index = 0,
@@ -112,27 +115,30 @@ public:
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_VERTEX,
-                    .domain = WBE::DeviceDomain::HOST_DEVICE,
-                    .initial_data = std::vector<uint8_t>(vertex_data, vertex_data + triangle_submesh->vertices.binary.size)})
+                [vertex_bytes = std::move(vertex_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_VERTEX,
+                        .domain = WBE::DeviceDomain::HOST_DEVICE,
+                        .initial_data = vertex_bytes};
+                })
             .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_INDEX,
-                    .domain = WBE::DeviceDomain::HOST_DEVICE,
-                    .initial_data = std::vector<uint8_t>(index_data, index_data + triangle_submesh->indices.binary.size)});
+                [index_bytes = std::move(index_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_INDEX,
+                        .domain = WBE::DeviceDomain::HOST_DEVICE,
+                        .initial_data = index_bytes};
+                });
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
         const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-        task_desc.task = WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                             .set_pipeline(graphics_pipeline)
-                             .set_render_extent(base_render_data->swap_chain_extent)
-                             .set_clear_values(clear_values)
-                             .set_indexed_draw(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
-                                 REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
-                                 vertex_input,
-                                 0,
-                                 indexed_draw_region)
-                             .create_unique(base_render_data);
+        task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
+            return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                .set_pipeline(graphics_pipeline)
+                .set_render_extent(p_context.swap_chain_extent)
+                .set_clear_values(clear_values)
+                .set_indexed_draw(
+                    REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
+                .create_unique(base_render_data);
+        };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));

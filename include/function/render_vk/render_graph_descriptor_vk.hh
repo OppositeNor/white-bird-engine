@@ -21,14 +21,16 @@
 #include "function/function_utils.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -79,6 +81,13 @@ struct RendBufferDescVK {
     bool per_frame = false;
     /** Bytes uploaded into every allocated buffer during graph compilation. */
     std::vector<uint8_t> initial_data;
+
+    /**
+     * @brief Compare two configurations.
+     * @param p_other The configuration to compare with.
+     * @return True if every field of both configurations is equal.
+     */
+    bool operator==(const RendBufferDescVK& p_other) const;
 };
 
 /**
@@ -102,6 +111,13 @@ struct RendImageDescVK {
     uint32_t layers = 1;
     /** Whether one image is allocated per frame in flight instead of one for the whole graph. */
     bool per_frame = false;
+
+    /**
+     * @brief Compare two configurations.
+     * @param p_other The configuration to compare with.
+     * @return True if every field of both configurations is equal.
+     */
+    bool operator==(const RendImageDescVK& p_other) const;
 };
 
 /**
@@ -125,6 +141,13 @@ struct RendImageViewDescVK {
     uint32_t base_array_layer = 0;
     /** Number of viewed array layers; VK_REMAINING_ARRAY_LAYERS views every layer from base_array_layer. */
     uint32_t layer_count = 1;
+
+    /**
+     * @brief Compare two configurations.
+     * @param p_other The configuration to compare with.
+     * @return True if every field of both configurations is equal.
+     */
+    bool operator==(const RendImageViewDescVK& p_other) const;
 };
 
 /**
@@ -158,7 +181,34 @@ struct RendSamplerDescVK {
     VkBorderColor border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     /** Whether texture coordinates are unnormalized. */
     bool unnormalized_coordinates = false;
+
+    /**
+     * @brief Compare two configurations.
+     * @param p_other The configuration to compare with.
+     * @return True if every field of both configurations is equal.
+     */
+    bool operator==(const RendSamplerDescVK& p_other) const;
 };
+
+/**
+ * @brief Factory of the configuration of a graph-owned buffer, evaluated against the render graph context.
+ */
+using RendBufferFactoryVK = std::function<RendBufferDescVK(const RendGraphContextVK&)>;
+
+/**
+ * @brief Factory of the configuration of a graph-owned image, evaluated against the render graph context.
+ */
+using RendImageFactoryVK = std::function<RendImageDescVK(const RendGraphContextVK&)>;
+
+/**
+ * @brief Factory of the configuration of a graph-owned image view, evaluated against the render graph context.
+ */
+using RendImageViewFactoryVK = std::function<RendImageViewDescVK(const RendGraphContextVK&)>;
+
+/**
+ * @brief Factory of the configuration of a graph-owned sampler, evaluated against the render graph context.
+ */
+using RendSamplerFactoryVK = std::function<RendSamplerDescVK(const RendGraphContextVK&)>;
 
 /**
  * @class RendBufferDeclVK
@@ -167,8 +217,8 @@ struct RendSamplerDescVK {
 struct RendBufferDeclVK {
     /** Graph resource identifier. */
     std::string res_id;
-    /** Buffer configuration. */
-    RendBufferDescVK desc;
+    /** Factory of the buffer configuration. */
+    RendBufferFactoryVK factory;
 };
 
 /**
@@ -178,8 +228,8 @@ struct RendBufferDeclVK {
 struct RendImageDeclVK {
     /** Graph resource identifier. */
     std::string res_id;
-    /** Image configuration. */
-    RendImageDescVK desc;
+    /** Factory of the image configuration. */
+    RendImageFactoryVK factory;
 };
 
 /**
@@ -191,8 +241,8 @@ struct RendImageViewDeclVK {
     std::string res_id;
     /** Graph resource identifier of the viewed image. */
     std::string image_id;
-    /** View configuration. */
-    RendImageViewDescVK desc;
+    /** Factory of the view configuration. */
+    RendImageViewFactoryVK factory;
 };
 
 /**
@@ -202,8 +252,8 @@ struct RendImageViewDeclVK {
 struct RendSamplerDeclVK {
     /** Graph resource identifier. */
     std::string res_id;
-    /** Sampler configuration. */
-    RendSamplerDescVK desc;
+    /** Factory of the sampler configuration. */
+    RendSamplerFactoryVK factory;
 };
 
 /**
@@ -218,27 +268,37 @@ struct RendResEdgeDescVK {
 };
 
 /**
- * @class RendTaskDescVK
- * @brief A high-level Vulkan render task descriptor that owns its concrete IRenderTaskVK until the graph is built.
+ * @brief Factory of a render task, evaluated against the render graph context.
  *
- * Movable but not copyable, because it solely owns the task. Building a graph from the descriptor transfers the task into
- * the graph.
+ * The graph calls it when it is built and again whenever the context changes, and owns every task it returns; the
+ * previous tasks are destroyed before their replacements are created. State that must survive a rebuild belongs outside
+ * the task, and code that keeps a handle to the task must take it again from within the factory. The factory must return
+ * a non-null task, and is called on the rendering thread.
+ */
+using RendTaskFactoryVK = std::function<Unique<IRenderTaskVK>(const RendGraphContextVK&)>;
+
+/**
+ * @class RendTaskDescVK
+ * @brief A high-level Vulkan render task descriptor: the task factory, its resource dependencies, and its resource map.
+ *
+ * Copyable and movable; copies share the factory's captured state.
  */
 struct RendTaskDescVK {
     /** @brief Construct an empty task descriptor backed by the supplied allocator. */
     explicit RendTaskDescVK(RenderAllocator* p_allocator);
     /**
-     * @brief Construct a descriptor that owns a prebuilt task.
+     * @brief Construct a descriptor from a task factory.
      *
      * @param p_allocator Allocator used by the dependency list and resource map.
      * @param p_task_id Task id used for graph dependencies.
-     * @param p_task Task transferred to the graph when the descriptor is built.
+     * @param p_factory Factory of the task.
+     * @throws std::runtime_error If p_factory is null.
      */
-    RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
+    RendTaskDescVK(RenderAllocator* p_allocator, std::string_view p_task_id, RendTaskFactoryVK p_factory);
     ~RendTaskDescVK() = default;
-    RendTaskDescVK(const RendTaskDescVK&) = delete;
+    RendTaskDescVK(const RendTaskDescVK&) = default;
     RendTaskDescVK(RendTaskDescVK&&) noexcept = default;
-    RendTaskDescVK& operator=(const RendTaskDescVK&) = delete;
+    RendTaskDescVK& operator=(const RendTaskDescVK&) = default;
     RendTaskDescVK& operator=(RendTaskDescVK&&) noexcept = default;
 
     /**
@@ -275,8 +335,8 @@ struct RendTaskDescVK {
     Vector<RendResEdgeDescVK, RenderAllocator> next;
     // Task-local to graph resource identifier map.
     RenderTaskResourceMap resource_map;
-    // The concrete task, moved into the graph when the graph is built.
-    Unique<IRenderTaskVK> task;
+    // Factory of the concrete task, called by the graph when it is built and whenever the graph context changes.
+    RendTaskFactoryVK factory;
 };
 
 /**
@@ -284,10 +344,14 @@ struct RendTaskDescVK {
  * @brief A high-level Vulkan render pipeline descriptor.
  *
  * Every resource is declared once in this graph-wide descriptor. Buffers, images, image views, and samplers declared with
- * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled;
- * resources owned elsewhere are imported with add_resource(), which binds any IBindableRenderResourceVK. Tasks refer to
- * every resource by id through their reflected shader, attachment, and fixed-function accesses, resolved through each
- * task's resource map.
+ * add_buffer(), add_image(), add_image_view(), and add_sampler() are allocated and owned by the graph when it is compiled.
+ * They are declared through factories of their configurations, and tasks through task factories; whenever the
+ * RendGraphContextVK changes, such as when the swap chain is resized, the graph re-evaluates every resource factory and
+ * reallocates the resources whose configuration changed, together with the views of reallocated images, then recreates
+ * every task and rebuilds its dependency edges and synchronization. Reallocated resources lose their content and are
+ * replaced in place in their containers, so tasks and RenderGraphVK::acquire_resource() callers observe the new objects; resources
+ * owned elsewhere are imported with add_resource(), which binds any IBindableRenderResourceVK. Tasks refer to every resource
+ * by id through their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
  */
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)
@@ -303,12 +367,13 @@ struct RendGraphDescVK {
     RendGraphDescVK& add_task(RendTaskDescVK p_task_desc);
 
     /**
-     * @brief Append a prebuilt task to the graph.
+     * @brief Append a task to the graph from its factory.
      * @param p_task_id The task id used for graph dependencies.
-     * @param p_task The concrete task transferred into the graph.
+     * @param p_factory Factory of the task.
      * @return This graph descriptor.
+     * @throws std::runtime_error If p_factory is null.
      */
-    RendGraphDescVK& add_task(std::string_view p_task_id, Unique<IRenderTaskVK> p_task);
+    RendGraphDescVK& add_task(std::string_view p_task_id, RendTaskFactoryVK p_factory);
 
     /**
      * @brief Get a task descriptor that was already added, typically to connect it to later tasks.
@@ -341,44 +406,59 @@ struct RendGraphDescVK {
      */
     RendGraphDescVK& add_resource(std::string_view p_resource_id, const IBindableRenderResourceVK& p_resource);
 
-
-
     /**
      * @brief Declare a buffer allocated by the graph during compilation.
+     *
+     * The factory is evaluated when the graph is compiled and again whenever the graph context changes; it must keep
+     * per_frame unchanged. The buffer is reallocated, and its initial data uploaded again, when the configuration changes.
+     *
      * @param p_resource_id Graph resource identifier.
-     * @param p_desc Buffer configuration.
+     * @param p_factory Factory of the buffer configuration.
      * @return This graph descriptor.
+     * @throws std::runtime_error If p_resource_id is empty or p_factory is null.
      */
-    RendGraphDescVK& add_buffer(std::string_view p_resource_id, RendBufferDescVK p_desc);
+    RendGraphDescVK& add_buffer(std::string_view p_resource_id, RendBufferFactoryVK p_factory);
 
     /**
      * @brief Declare an image allocated by the graph during compilation.
+     *
+     * The factory is evaluated when the graph is compiled and again whenever the graph context changes; it must keep
+     * per_frame unchanged. The image is reallocated when the configuration changes.
+     *
      * @param p_resource_id Graph resource identifier.
-     * @param p_desc Image configuration.
+     * @param p_factory Factory of the image configuration.
      * @return This graph descriptor.
+     * @throws std::runtime_error If p_resource_id is empty or p_factory is null.
      */
-    RendGraphDescVK& add_image(std::string_view p_resource_id, RendImageDescVK p_desc);
+    RendGraphDescVK& add_image(std::string_view p_resource_id, RendImageFactoryVK p_factory);
 
     /**
      * @brief Declare an image view created by the graph during compilation.
      *
-     * A view of a per-frame image is itself per-frame.
+     * A view of a per-frame image is itself per-frame. The factory is evaluated when the graph is compiled and again
+     * whenever the graph context changes. The view is recreated when its configuration changes or the viewed image is
+     * reallocated.
      *
      * @param p_resource_id Graph resource identifier of the view.
      * @param p_image_id Graph resource identifier of the viewed image, allocated by the graph or imported as an ROImageVK.
-     * @param p_desc View configuration.
+     * @param p_factory Factory of the view configuration; null selects the default RendImageViewDescVK.
      * @return This graph descriptor.
+     * @throws std::runtime_error If p_resource_id or p_image_id is empty.
      */
-    RendGraphDescVK& add_image_view(std::string_view p_resource_id, std::string_view p_image_id, RendImageViewDescVK p_desc = {});
+    RendGraphDescVK& add_image_view(std::string_view p_resource_id, std::string_view p_image_id, RendImageViewFactoryVK p_factory = nullptr);
 
     /**
      * @brief Declare a sampler created by the graph during compilation.
+     *
+     * The factory is evaluated when the graph is compiled and again whenever the graph context changes. The sampler is
+     * recreated when its configuration changes.
+     *
      * @param p_resource_id Graph resource identifier.
-     * @param p_desc Sampler configuration.
+     * @param p_factory Factory of the sampler configuration; null selects the default RendSamplerDescVK.
      * @return This graph descriptor.
+     * @throws std::runtime_error If p_resource_id is empty.
      */
-    RendGraphDescVK& add_sampler(std::string_view p_resource_id, const RendSamplerDescVK& p_desc = {});
-
+    RendGraphDescVK& add_sampler(std::string_view p_resource_id, RendSamplerFactoryVK p_factory = nullptr);
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-

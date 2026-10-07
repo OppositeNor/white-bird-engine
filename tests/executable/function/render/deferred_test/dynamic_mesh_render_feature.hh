@@ -15,17 +15,19 @@
 #ifndef WBE_FILE_DYNAMIC_MESH_RENDER_FEATURE_HH
 #define WBE_FILE_DYNAMIC_MESH_RENDER_FEATURE_HH
 
-#include "core/memory/reference_strong.hh"
-#include "function/render/render_resource_unit.hh"
 #include "../entity_draw_data.hh"
+#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -83,7 +85,7 @@ public:
     RendTaskDescVK make_task(std::string_view p_task_id,
         size_t p_entity_index,
         Ref<ROGraphicsPipelineVK> p_pipeline,
-        VkExtent2D p_extent,
+        std::function<VkExtent2D(const RendGraphContextVK&)> p_extent,
         std::span<const std::string_view> p_colors = {},
         std::optional<std::string_view> p_depth = std::nullopt) const;
 

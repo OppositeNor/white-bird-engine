@@ -269,38 +269,61 @@ public:
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add_resource(REND_RES_PIXEL_SORT_SOURCE, *source_view)
             .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                    .domain = WBE::DeviceDomain::HOST_DEVICE,
-                    .initial_data = WBE::to_initial_data(contrast)})
+                // The initial contrast is captured once, so the buffer keeps its identity, and the updates written to it,
+                // when the factory runs again.
+                [initial_data = WBE::to_initial_data(contrast)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                        .domain = WBE::DeviceDomain::HOST_DEVICE,
+                        .initial_data = initial_data};
+                })
             .add_buffer(REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = column_offsets_buffer_size})
-            .add_buffer(REND_RES_PIXEL_SORT_KEYS, {.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size})
-            .add_buffer(REND_RES_PIXEL_SORT_KEYS_SWAP, {.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size})
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = column_offsets_buffer_size};
+                })
+            .add_buffer(REND_RES_PIXEL_SORT_KEYS,
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size};
+                })
+            .add_buffer(REND_RES_PIXEL_SORT_KEYS_SWAP,
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size};
+                })
             .add_buffer(REND_RES_PIXEL_SORT_HISTOGRAM,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = histogram_buffer_size})
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = histogram_buffer_size};
+                })
             .add_image(REND_RES_PIXEL_SORT_DESTINATION_IMAGE,
-                {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
-                    .format = PIXEL_SORT_DESTINATION_FORMAT,
-                    .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                        .format = PIXEL_SORT_DESTINATION_FORMAT,
+                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                })
             .add_image_view(REND_RES_PIXEL_SORT_DESTINATION, REND_RES_PIXEL_SORT_DESTINATION_IMAGE)
             .add_buffer(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS,
-                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                    .domain = WBE::DeviceDomain::HOST_DEVICE,
-                    .initial_data = WBE::to_initial_data(post_processing_params)})
+                [initial_data = WBE::to_initial_data(post_processing_params)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                        .domain = WBE::DeviceDomain::HOST_DEVICE,
+                        .initial_data = initial_data};
+                })
             .add_image(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE,
-                {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
-                    .format = PIXEL_SORT_DESTINATION_FORMAT,
-                    .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                        .format = PIXEL_SORT_DESTINATION_FORMAT,
+                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                })
             .add_image_view(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT, REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE)
             .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
-                {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
-                    .format = VK_FORMAT_R16_UINT,
-                    .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
+                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                        .format = VK_FORMAT_R16_UINT,
+                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                })
             .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
-            .add_sampler(REND_RES_PIXEL_SORT_SAMPLER,
-                {.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .add_sampler(REND_RES_PIXEL_SORT_SAMPLER, [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::RendSamplerDescVK{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                     .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                    .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE});
+                    .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
+            });
 
         const VkExtent3D column_dispatch{.width = column_group_count, .height = 1, .depth = 1};
         add_compute_task(pipeline_desc, RT_COUNT_PIXEL_SORT_MASK, "count_pixel_sort_mask_vertical_shader", column_dispatch, {});
@@ -354,18 +377,22 @@ public:
         present_task_desc.task_id = RT_PRESENT_SORTED_PIXELS;
         present_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
         const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-        present_task_desc.task = WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                                     .set_pipeline(present_pipeline)
-                                     .set_render_extent(base_render_data->swap_chain_extent)
-                                     .set_clear_values(clear_values)
-                                     .set_draw_vertex_count(3)
-                                     .create_unique(base_render_data);
+        present_task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
+            return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                .set_pipeline(present_pipeline)
+                .set_render_extent(p_context.swap_chain_extent)
+                .set_clear_values(clear_values)
+                .set_draw_vertex_count(3)
+                .create_unique(base_render_data);
+        };
         pipeline_desc.add_task(std::move(present_task_desc));
 
         WBE::RendTaskDescVK imgui_task_desc(render_allocator);
         imgui_task_desc.task_id = RT_DRAW_IMGUI;
         imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        imgui_task_desc.task = WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+        imgui_task_desc.factory = [=, this](const WBE::RendGraphContextVK& /*p_context*/) {
+            return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+        };
         pipeline_desc.add_task(std::move(imgui_task_desc));
 
         WBE::connect_resource_chain(pipeline_desc,
@@ -491,7 +518,9 @@ private:
         for (const auto& [task_resource_id, graph_resource_id] : p_aliases) {
             task_desc.alias(task_resource_id, graph_resource_id);
         }
-        task_desc.task = WBE::make_unique<WBE::RTRunComputePipelineVK>(render_allocator, base_render_data, pipeline, p_dispatch_group_count);
+        task_desc.factory = [=](const WBE::RendGraphContextVK& /*p_context*/) {
+            return WBE::make_unique<WBE::RTRunComputePipelineVK>(render_allocator, base_render_data, pipeline, p_dispatch_group_count);
+        };
         p_graph.add_task(std::move(task_desc));
     }
 };

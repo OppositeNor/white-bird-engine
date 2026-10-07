@@ -17,12 +17,14 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "i_post_processing.hh"
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <string_view>
 #include <utility>
@@ -84,18 +86,20 @@ public:
      * @brief Compile the effect's compute pipelines.
      * @param p_allocator Allocator of the effect's pipelines and tasks; must outlive the effect.
      * @param p_renderer The renderer; must outlive the effect.
-     * @param p_extent Extent of the color images the effect is applied to.
+     * @param p_extent Factory of the extent of the color images the effect is applied to. Every graph the effect is added to
+     * evaluates it against its render graph context, and resizes the effect's resources and dispatches with it.
      * @param p_color_format Format of the color images the effect is applied to.
      * @param p_direction Whether the effect sorts the columns or the rows of the image.
      * @param p_metric The value the effect orders the pixels of every line by, and masks them by.
      * @param p_scope Whether each sort covers a whole line or one span of consecutive masked pixels.
-     * @throws std::runtime_error If a shader resource is missing, the extent is empty or too large to pack the sort keys
-     * into 32 bits, the length of a sorted line does not fit the 16-bit mask image, p_metric is not a PixelSortMetric
-     * value, or p_scope is not a PixelSortScope value.
+     * @throws std::runtime_error If a shader resource is missing, p_extent is null, the extent of the current renderer
+     * state is empty or too large to pack the sort keys into 32 bits, the length of a sorted line does not fit the 16-bit
+     * mask image, p_metric is not a PixelSortMetric value, or p_scope is not a PixelSortScope value. Graphs throw the same
+     * extent errors when a later context yields an invalid extent.
      */
     PixelSort(RenderAllocator* p_allocator,
         RendererVK* p_renderer,
-        VkExtent2D p_extent,
+        std::function<VkExtent2D(const RendGraphContextVK&)> p_extent,
         VkFormat p_color_format,
         PixelSortDirection p_direction,
         PixelSortMetric p_metric,
@@ -128,22 +132,24 @@ private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.
     static constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
 
+    // The sizes of the resources and dispatches of the effect for one extent of the color image.
+    struct Layout;
+
+    static Layout make_layout(VkExtent2D p_extent, PixelSortDirection p_direction);
     Ref<ROComputePipelineVK> compile(std::string_view p_shader_id) const;
+    // Add a task dispatching p_pipeline with the workgroup counts of the layout of the graph's context.
     void add_compute_task(RendGraphDescVK& p_graph,
         std::string_view p_task_id,
         const Ref<ROComputePipelineVK>& p_pipeline,
-        VkExtent3D p_dispatch_group_count,
+        VkExtent3D Layout::* p_group_count,
         std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
 
     RendererVK* renderer = nullptr;
-    VkExtent2D extent{};
+    std::function<VkExtent2D(const RendGraphContextVK&)> extent;
     VkFormat color_format = VK_FORMAT_UNDEFINED;
     PixelSortDirection direction = PixelSortDirection::VERTICAL;
     PixelSortMetric metric = PixelSortMetric::SATURATION;
     PixelSortScope scope = PixelSortScope::LINE;
-    // The number of sorted lines: the width for vertical sorting, the height for horizontal sorting.
-    uint32_t line_count = 0;
-    uint32_t sub_histogram_num = 1;
     Ref<ROComputePipelineVK> copy_source_pipeline;
     Ref<ROComputePipelineVK> count_mask_pipeline;
     Ref<ROComputePipelineVK> prefix_sum_columns_pipeline;

@@ -124,7 +124,9 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_rend
             .add_entry(write_pong ? ping_pipeline : pong_pipeline, PROPAGATION_GROUP_COUNT)
             .add_entry(publication_pipeline, publication_group_count);
     }
-    task_desc.task = make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
+    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
+    };
     return task_desc;
 }
 
@@ -132,7 +134,9 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_state_update_render_task_de
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_UPDATE_OCTREE_STATES;
     constexpr VkExtent3D GROUP_COUNT{.width = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 63) / 64), .height = 1, .depth = 1};
-    task_desc.task = make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT);
+    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT);
+    };
     return task_desc;
 }
 
@@ -140,8 +144,10 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_dynamic_publication_task_de
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_PUBLISH_DYNAMIC_OCTREE;
     constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
-    task.task = make_unique<RTRunComputePipelineVK>(
-        render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
+    task.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTRunComputePipelineVK>(
+            render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
+    };
     return task;
 }
 

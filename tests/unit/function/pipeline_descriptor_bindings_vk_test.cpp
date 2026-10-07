@@ -96,12 +96,40 @@ ShaderDescriptorHeapLayoutVK make_mapping_layout() {
     return layout;
 }
 
-void add_mapping_resource(
-    RenderAllocator* p_allocator, Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources, std::string_view p_id, RendResTID p_type) {
+class TestMappingResourceVK final : public IRenderObjectVK {
+public:
+    explicit TestMappingResourceVK(const BaseRenderDataVK* p_render_data) : IRenderObjectVK(p_render_data) {
+    }
+    virtual ~TestMappingResourceVK() override = default;
+    TestMappingResourceVK(const TestMappingResourceVK&) = delete;
+    TestMappingResourceVK(TestMappingResourceVK&&) noexcept = delete;
+    TestMappingResourceVK& operator=(const TestMappingResourceVK&) = delete;
+    TestMappingResourceVK& operator=(TestMappingResourceVK&&) noexcept = delete;
+
+    virtual TypeID get_type_uuid() const override {
+        return TypeUUID<ROBufferVK>::UUID;
+    }
+};
+
+// Add a resource whose two slots are empty, so that pushing its descriptor fails.
+void add_mapping_resource(RenderAllocator* p_allocator,
+    const BaseRenderDataVK* p_render_data,
+    Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources,
+    std::string_view p_id,
+    RendResTID p_type) {
     auto resource = make_ref<RendResVK>(p_allocator);
     resource->res_id = p_id;
     resource->res_type_id = p_type;
-    resource->container = make_ref<ROCMultislotsVK>(p_allocator, p_allocator, 2, false);
+    auto container = make_ref<ROCMultislotsVK>(
+        p_allocator,
+        p_allocator,
+        2,
+        [p_allocator, p_render_data](uint32_t /*p_slot*/) {
+            return make_ref<TestMappingResourceVK>(p_allocator, p_render_data).dynamic_cast_ref<IRenderObjectVK>();
+        },
+        false);
+    container->clear();
+    resource->container = container;
     p_resources.emplace(std::string(p_id), resource);
 }
 
@@ -135,7 +163,7 @@ TEST(WBEPipelineDescriptorBindingsVKTest, BindsReflectedResourcesThroughTheTaskR
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
     RendResViewVK view(&resources, &map);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
-    add_mapping_resource(&allocator, resources, "mapped", TypeUUID<ROImageViewVK>::UUID);
+    add_mapping_resource(&allocator, &render_data, resources, "mapped", TypeUUID<ROImageViewVK>::UUID);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
     resources.at("mapped")->res_type_id = TypeUUID<ROBufferVK>::UUID;
     EXPECT_NO_THROW(bindings.bind_resources(view));

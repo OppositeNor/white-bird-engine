@@ -392,41 +392,51 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
                            bool p_masked,
                            std::string_view p_color_attachment,
                            std::string_view p_depth_attachment,
-                           VkExtent2D p_extent,
+                           WBE::RenderTestExtentFactory p_extent,
                            bool p_load) {
         const std::array<VkClearValue, 2> clear_values{shadow_color_clear, shadow_depth_clear};
         const std::array<std::string_view, 1> color_attachments{p_color_attachment};
         const VkAttachmentLoadOp load_op = p_load ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
-        return WBE::make_mesh_task_desc(
-            render_allocator, base_render_data, p_task_id, static_mesh_resources, p_pipeline, p_masked, clear_values, p_extent, color_attachments, p_depth_attachment, load_op, load_op);
+        return WBE::make_mesh_task_desc(render_allocator,
+            base_render_data,
+            p_task_id,
+            static_mesh_resources,
+            p_pipeline,
+            p_masked,
+            clear_values,
+            std::move(p_extent),
+            color_attachments,
+            p_depth_attachment,
+            load_op,
+            load_op);
     };
     WBE::RendTaskDescVK shadow_opaque_task = create_task(RT_RUN_SHADOWMAP_OPAQUE,
         shadow_opaque_graphics_pipeline,
         false,
         REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
         REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-        shadow_extent,
+        WBE::make_fixed_extent_factory(shadow_extent),
         false);
     WBE::RendTaskDescVK shadow_masked_task = create_task(RT_RUN_SHADOWMAP_MASKED,
         shadow_masked_graphics_pipeline,
         true,
         REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW,
         REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW,
-        shadow_extent,
+        WBE::make_fixed_extent_factory(shadow_extent),
         true);
     WBE::RendTaskDescVK main_opaque_task = create_task(RT_RUN_MAIN_OPAQUE,
         main_opaque_graphics_pipeline,
         false,
         WBE::REND_RES_SWAP_CHAIN,
         REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
-        base_render_data->swap_chain_extent,
+        &WBE::RendGraphContextVK::swap_chain_extent,
         false);
     WBE::RendTaskDescVK main_masked_task = create_task(RT_RUN_MAIN_MASKED,
         main_masked_graphics_pipeline,
         true,
         WBE::REND_RES_SWAP_CHAIN,
         REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW,
-        base_render_data->swap_chain_extent,
+        &WBE::RendGraphContextVK::swap_chain_extent,
         true);
     write_shadow_dynamic_descriptors();
     write_main_dynamic_descriptors();
@@ -564,8 +574,6 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
     constexpr std::string_view MAIN_DEPTH_IMAGE = "draw_sponza_depth_image";
     const VkExtent3D shadow_image_extent{.width = shadow_extent.width, .height = shadow_extent.height, .depth = 1};
-    const VkExtent3D main_image_extent{
-        .width = base_render_data->swap_chain_extent.width, .height = base_render_data->swap_chain_extent.height, .depth = 1};
     const WBE::RendSamplerDescVK clamped_linear_sampler{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
@@ -574,11 +582,23 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     pipeline_desc.add_resource(WBE::STATIC_MESH_KEY, *static_mesh_resources);
     pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
         .add_image(SHADOWMAP_DEPTH_IMAGE,
-            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = SHADOWMAP_DEPTH_FORMAT, .extent = shadow_image_extent})
+            [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
+                    .format = SHADOWMAP_DEPTH_FORMAT,
+                    .extent = shadow_image_extent};
+            })
         .add_image(SHADOWMAP_COLOR_IMAGE,
-            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, .format = SHADOWMAP_COLOR_FORMAT, .extent = shadow_image_extent})
+            [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET,
+                    .format = SHADOWMAP_COLOR_FORMAT,
+                    .extent = shadow_image_extent};
+            })
         .add_image(MAIN_DEPTH_IMAGE,
-            {.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, .format = MAIN_DEPTH_FORMAT, .extent = main_image_extent})
+            [](const WBE::RendGraphContextVK& p_context) {
+                return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
+                    .format = MAIN_DEPTH_FORMAT,
+                    .extent = {.width = p_context.swap_chain_extent.width, .height = p_context.swap_chain_extent.height, .depth = 1}};
+            })
         .add_image_view(REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW, MAIN_DEPTH_IMAGE)
         .add_image_view(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
         .add_image_view(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
@@ -586,14 +606,21 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
         .add_resource(CAMERA_INFO_BUFFER, *camera_info_ubos)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_ubos)
         .add_resource(SPOT_LIGHT_COUNT_BUFFER, *spot_light_count_ubos)
-        .add_sampler(SHADOW_SAMPLER, clamped_linear_sampler)
+        .add_sampler(SHADOW_SAMPLER,
+            [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                return clamped_linear_sampler;
+            })
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, *camera_info_ubos)
         .add_buffer(LIGHT_BILLBOARD_INFO_BUFFER,
-            {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                .domain = WBE::DeviceDomain::HOST_DEVICE,
-                .initial_data = WBE::to_initial_data(make_light_billboard_info(spot_light_component))})
+            [initial_data = WBE::to_initial_data(make_light_billboard_info(spot_light_component))](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                    .domain = WBE::DeviceDomain::HOST_DEVICE,
+                    .initial_data = initial_data};
+            })
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view)
-        .add_sampler(LIGHT_BILLBOARD_SAMPLER, clamped_linear_sampler);
+        .add_sampler(LIGHT_BILLBOARD_SAMPLER, [=](const WBE::RendGraphContextVK& /*p_context*/) {
+            return clamped_linear_sampler;
+        });
 
     p_shadow_opaque_task.connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW).connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
     pipeline_desc.tasks.emplace_back(std::move(p_shadow_opaque_task));
@@ -610,12 +637,14 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
     WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
     light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
     light_billboard_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-    light_billboard_task_desc.task = WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                                         .set_pipeline(light_billboard_pipeline)
-                                         .set_render_extent(base_render_data->swap_chain_extent)
-                                         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-                                         .set_draw_vertex_count(6)
-                                         .create_unique(base_render_data);
+    light_billboard_task_desc.factory = [=, this](const WBE::RendGraphContextVK& p_context) {
+        return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+            .set_pipeline(light_billboard_pipeline)
+            .set_render_extent(p_context.swap_chain_extent)
+            .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
+            .set_draw_vertex_count(6)
+            .create_unique(base_render_data);
+    };
     pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
 
     WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_sponza_pipeline", std::move(pipeline_desc));

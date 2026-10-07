@@ -178,6 +178,11 @@ void RendererVK::tick(double p_delta) {
 }
 
 void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
+    if (window->consume_size_changed()) {
+        // Some window systems never report the swap chain as out of date after a resize. Recreating resets the render
+        // data, including its in-flight fence, so it must happen before the frame slot selects the fence of this frame.
+        recreate_swap_chain();
+    }
     uint32_t frame_slot = advance_frame_slot();
     for (auto& plugin : registered_plugins) {
         plugin->on_frame_begin(&base_render_data);
@@ -189,11 +194,6 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     run_delayed_calls();
     check_shader_debug_buffer();
     run_gpu_jobs();
-
-    if (window->consume_size_changed()) {
-        // Some window systems never report the swap chain as out of date after a resize.
-        recreate_swap_chain();
-    }
 
     if (p_graph == MEM_NULL) {
         // No active render graph, nothing to do this frame.
@@ -650,16 +650,19 @@ void RendererVK::refresh_swap_chain_image_view_container() {
     }
 
     if (swap_chain_image_view_container == MEM_NULL || swap_chain_image_view_container->get_slot_count() != frames_in_flight) {
-        swap_chain_image_view_container = make_ref<ROCMultislotsVK>(allocator, allocator, frames_in_flight, false);
+        // Every slot starts with a view of the current swap chain; execute_graph() rebinds the slot of each frame to the
+        // view of the acquired image.
+        swap_chain_image_view_container = make_ref<ROCMultislotsVK>(
+            allocator,
+            allocator,
+            frames_in_flight,
+            [this](uint32_t p_slot) {
+                const auto& image_views = render_objects->swap_chain_image_views;
+                return image_views[p_slot % image_views.size()];
+            },
+            false);
     } else {
-        swap_chain_image_view_container->clear();
-    }
-
-    const uint32_t image_view_count = static_cast<uint32_t>(render_objects->swap_chain_image_views.size());
-    const uint32_t slot_count = swap_chain_image_view_container->get_slot_count();
-    for (uint32_t slot = 0; slot < slot_count; ++slot) {
-        uint32_t image_index = slot % image_view_count;
-        swap_chain_image_view_container->set(slot, render_objects->swap_chain_image_views[image_index]);
+        swap_chain_image_view_container->recreate();
     }
 }
 

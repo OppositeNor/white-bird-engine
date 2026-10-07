@@ -341,8 +341,17 @@ void WindowSDL::get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) {
 
 void WindowSDL::resize(uint32_t p_width, uint32_t p_height) {
     constexpr auto MAX_SIZE = static_cast<uint32_t>(std::numeric_limits<int>::max());
-    if (p_width == 0 || p_height == 0 || p_width > MAX_SIZE || p_height > MAX_SIZE) {
-        throw std::runtime_error(std::format("Failed to resize SDL window: {}x{} is not a valid window size.", p_width, p_height));
+    if (p_width == 0) {
+        throw std::runtime_error("Failed to resize SDL window: width is 0.");
+    }
+    if (p_height == 0) {
+        throw std::runtime_error("Failed to resize SDL window: height is 0.");
+    }
+    if (p_width > MAX_SIZE) {
+        throw std::runtime_error(std::format("Failed to resize SDL window: width {} exceeds the SDL limit {}.", p_width, MAX_SIZE));
+    }
+    if (p_height > MAX_SIZE) {
+        throw std::runtime_error(std::format("Failed to resize SDL window: height {} exceeds the SDL limit {}.", p_height, MAX_SIZE));
     }
     SDL_SetWindowSize(window, static_cast<int>(p_width), static_cast<int>(p_height));
     // The window system may apply the size later, which SDL_WINDOWEVENT_SIZE_CHANGED reports again.

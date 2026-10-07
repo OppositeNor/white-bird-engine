@@ -264,6 +264,8 @@ Rules:
   - No short single-line forms: functions, lambdas, blocks, `if`, loops, `case`, `enum` all break to next line.
   - `AlwaysBreakTemplateDeclarations: Yes`.
   - `BreakStringLiterals: false` — long error-message string literals stay on one line.
+- Declare every overriding member function, destructors included, with both `virtual` and `override`
+  (`virtual void record(...) override;`, `virtual ~Foo() override = default;`). Never write `override` without `virtual`.
 - Use `WBE_NO_FALSE_SHARING` to pad hot atomics that risk contention.
 - Use the engine's `Path` alias from `platform/file_system/path.hh` for filesystem paths in engine APIs. It is `std::filesystem::path`; use standard path operations directly.
 - For unbounded counting semaphores, use `std::counting_semaphore<>` (max = `PTRDIFF_MAX`); do not pick a small `LeastMaxValue` unless you can prove the bound.

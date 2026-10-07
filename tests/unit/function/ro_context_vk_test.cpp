@@ -121,6 +121,25 @@ TypeID TestDescriptorResourceVK::get_type_uuid() const {
     return TypeUUID<TestDescriptorResourceVK>::UUID;
 }
 
+namespace {
+
+// Factory of one TestContextResourceVK per slot, identified by p_first_id plus the slot index.
+RenderObjectContainerVK::Factory make_context_factory(
+    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, uint32_t p_first_id = 0) {
+    return [p_allocator, p_render_data, p_first_id](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(p_allocator, p_render_data, p_first_id + p_slot).template dynamic_cast_ref<IRenderObjectVK>();
+    };
+}
+
+// Factory of TestDescriptorResourceVK objects without descriptor rows.
+RenderObjectContainerVK::Factory make_empty_descriptor_factory(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
+    return [p_allocator, p_render_data](uint32_t /*p_slot*/) {
+        return make_ref<TestDescriptorResourceVK>(p_allocator, p_render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
+    };
+}
+
+} // namespace
+
 TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
@@ -152,15 +171,15 @@ TEST(WBEROCMultislotsVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
         return Ref<IRenderObjectVK>(MEM_NULL);
     }}),
         std::runtime_error);
-    EXPECT_THROW(ROCMultislotsVK(nullptr, 2), std::runtime_error);
-    EXPECT_THROW(ROCMultislotsVK(&allocator, 0), std::runtime_error);
+    EXPECT_THROW(ROCMultislotsVK(nullptr, 2, make_context_factory(&allocator, &render_data)), std::runtime_error);
+    EXPECT_THROW(ROCMultislotsVK(&allocator, 0, make_context_factory(&allocator, &render_data)), std::runtime_error);
 }
 
 TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
 
-    ROCMultislotsVK context(&allocator, 3);
+    ROCMultislotsVK context(&allocator, 3, make_context_factory(&allocator, &render_data, 100));
     auto slot_zero_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 0).template dynamic_cast_ref<IRenderObjectVK>();
     auto slot_two_resource =
@@ -168,6 +187,7 @@ TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
 
     context.set(0, slot_zero_resource);
     context.set(2, slot_two_resource);
+    context.clear(1);
 
     auto default_resource = context.get().dynamic_cast_ref<TestContextResourceVK>();
     ASSERT_NE(default_resource, MEM_NULL);
@@ -184,7 +204,7 @@ TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
 
-    ROCMultislotsVK context(&allocator, 2, false);
+    ROCMultislotsVK context(&allocator, 2, make_context_factory(&allocator, &render_data, 100), false);
     auto slot_zero_resource =
         make_ref<TestContextResourceVK>(&allocator, &render_data, 10).template dynamic_cast_ref<IRenderObjectVK>();
     auto slot_one_resource =
@@ -208,7 +228,7 @@ TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
 TEST(WBEROCMultislotsVKTest, RejectsEmptyPublishedBufferUpdate) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ROCMultislotsVK context(&allocator, 2);
+    ROCMultislotsVK context(&allocator, 2, make_context_factory(&allocator, &render_data));
 
     EXPECT_THROW(context.publish_buffer_update(nullptr, 0, 1), std::runtime_error);
     uint8_t value = 0;
@@ -220,7 +240,9 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     BaseRenderDataVK render_data(&allocator);
 
     auto resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 7).template dynamic_cast_ref<IRenderObjectVK>();
-    ROCSingleVK container(resource);
+    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+        return resource;
+    });
 
     EXPECT_EQ(container.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
 
@@ -238,7 +260,9 @@ TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescriptors) 
             make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 17, false)})
                         .template dynamic_cast_ref<IRenderObjectVK>();
 
-    ROCSingleVK container(resource);
+    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+        return resource;
+    });
     DebugDataArray rows = parse_json_array(container.to_string());
 
     ASSERT_EQ(rows.size(), 2U);
@@ -256,7 +280,8 @@ TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
 
-    ROCMultislotsVK container(&allocator, 3);
+    ROCMultislotsVK container(&allocator, 3, make_empty_descriptor_factory(&allocator, &render_data));
+    container.clear(1);
     container.set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 4, true)})
@@ -280,7 +305,7 @@ TEST(WBEROCMultislotsVKTest, ToStringDoesNotTriggerFlushSynchronization) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
 
-    ROCMultislotsVK container(&allocator, 1);
+    ROCMultislotsVK container(&allocator, 1, make_empty_descriptor_factory(&allocator, &render_data));
     container.set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 9, true)})
@@ -302,10 +327,56 @@ TEST(WBEROCSingleVKTest, EmptyDescriptorResourcesProduceEmptyJsonArray) {
     auto resource =
         make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
 
-    ROCSingleVK container(resource);
+    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+        return resource;
+    });
     DebugDataArray rows = parse_json_array(container.to_string());
 
     EXPECT_TRUE(rows.empty());
+}
+
+TEST(WBEROCSingleVKTest, RecreateReplacesTheResourceWithANewOneFromTheFactory) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    uint32_t created_count = 0;
+    ROCSingleVK container([&allocator, &render_data, &created_count](uint32_t p_slot) {
+        EXPECT_EQ(p_slot, 0U);
+        return make_ref<TestContextResourceVK>(&allocator, &render_data, created_count++).template dynamic_cast_ref<IRenderObjectVK>();
+    });
+    EXPECT_EQ(container.get().dynamic_cast_ref<TestContextResourceVK>()->context_id, 0U);
+
+    container.recreate();
+
+    EXPECT_EQ(created_count, 2U);
+    EXPECT_EQ(container.get().dynamic_cast_ref<TestContextResourceVK>()->context_id, 1U);
+}
+
+TEST(WBEROCSingleVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
+    EXPECT_THROW(ROCSingleVK(RenderObjectContainerVK::Factory{}), std::runtime_error);
+    EXPECT_THROW(ROCSingleVK([](uint32_t /*p_slot*/) {
+        return Ref<IRenderObjectVK>(MEM_NULL);
+    }),
+        std::runtime_error);
+}
+
+TEST(WBEROCMultislotsVKTest, RecreateReplacesEverySlotIncludingClearedAndReplacedOnes) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    uint32_t generation = 0;
+    ROCMultislotsVK container(&allocator, 3, [&allocator, &render_data, &generation](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(&allocator, &render_data, generation * 10 + p_slot).template dynamic_cast_ref<IRenderObjectVK>();
+    });
+    container.clear(1);
+    container.set(2, make_ref<TestContextResourceVK>(&allocator, &render_data, 99).template dynamic_cast_ref<IRenderObjectVK>());
+
+    generation = 1;
+    container.recreate();
+
+    for (uint32_t slot = 0; slot < 3; ++slot) {
+        auto resource = container.get(slot).dynamic_cast_ref<TestContextResourceVK>();
+        ASSERT_NE(resource, MEM_NULL);
+        EXPECT_EQ(resource->context_id, 10U + slot);
+    }
 }
 
 } // namespace WhiteBirdEngine

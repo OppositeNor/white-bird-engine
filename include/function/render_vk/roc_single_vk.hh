@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class ROCSingleVK
- * @brief Container that always resolves the same render object.
+ * @brief Container that resolves the same render object for every slot.
  */
 class ROCSingleVK final : public RenderObjectContainerVK {
 public:
@@ -37,7 +37,12 @@ public:
     ROCSingleVK& operator=(const ROCSingleVK&) = delete;
     ROCSingleVK& operator=(ROCSingleVK&&) noexcept = delete;
 
-    explicit ROCSingleVK(Ref<IRenderObjectVK> p_resource);
+    /**
+     * @brief Create the render object with a factory.
+     * @param p_factory Factory called with slot 0 now and on every recreate().
+     * @throws std::runtime_error If p_factory is null or returns null.
+     */
+    explicit ROCSingleVK(Factory p_factory);
 
     void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) override;
 
@@ -52,8 +57,10 @@ public:
     Ref<IRenderObject> get(uint32_t p_frame_slot) override;
     Ref<IRenderObject> get(uint32_t p_frame_slot) const override;
     DebugDataRows descriptor_debug_data() const override;
+    virtual void recreate() override;
 
 private:
+    Factory factory;
     Ref<IRenderObjectVK> resource;
 };
 

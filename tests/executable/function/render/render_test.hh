@@ -33,6 +33,7 @@
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -53,6 +54,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -462,6 +464,23 @@ inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererV
     return GraphicsPipelineCompilerVK(context).compile(p_key, p_pipeline).graphics_pipeline;
 }
 
+/**
+ * @brief Extent of a render test pass, evaluated against the render graph context whenever its task is created.
+ */
+using RenderTestExtentFactory = std::function<VkExtent2D(const RendGraphContextVK&)>;
+
+/**
+ * @brief Make a render test extent factory that ignores the render graph context.
+ *
+ * @param p_extent The extent the factory returns.
+ * @return The factory.
+ */
+inline RenderTestExtentFactory make_fixed_extent_factory(VkExtent2D p_extent) {
+    return [p_extent](const RendGraphContextVK& /*p_context*/) {
+        return p_extent;
+    };
+}
+
 inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLINT
     const BaseRenderDataVK* p_render_data,
     std::string_view p_task_id,
@@ -469,7 +488,7 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
     Ref<ROGraphicsPipelineVK> p_pipeline,
     bool p_masked,
     std::span<const VkClearValue> p_clear_values,
-    VkExtent2D p_render_extent,
+    RenderTestExtentFactory p_render_extent,
     std::span<const std::string_view> p_color_attachment_ids,
     std::optional<std::string_view> p_depth_attachment_id = std::nullopt,
     VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -485,8 +504,7 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
         return p_masked ? MeshResourcesVK::MASKED_DRAW_BATCHES : MeshResourcesVK::OPAQUE_DRAW_BATCHES;
     }();
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
-    task_builder.set_render_extent(p_render_extent)
-        .set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::VERTICES))
+    task_builder.set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::VERTICES))
         .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INDICES))
         .set_indirect_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, indirect_buffer_member))
         .set_clear_values(p_clear_values)
@@ -495,7 +513,13 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
     for (auto& batch : batches) {
         task_builder.add_pipeline_batch(std::move(batch));
     }
-    RendTaskDescVK result(p_allocator, p_task_id, task_builder.create_unique(p_render_data));
+    RendTaskDescVK result(p_allocator,
+        p_task_id,
+        [task_builder, p_render_data, render_extent = std::move(p_render_extent)](const RendGraphContextVK& p_context) {
+            RTRunGraphicsPipelineIndirectVK::Builder builder = task_builder;
+            builder.set_render_extent(render_extent(p_context));
+            return builder.create_unique(p_render_data);
+        });
     alias_render_targets(result, p_color_attachment_ids, p_depth_attachment_id);
     alias_mesh_resources(result, *p_pipeline, make_mesh_resource_keys(p_mesh_key, p_transform_id));
     return result;

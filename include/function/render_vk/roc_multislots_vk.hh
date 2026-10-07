@@ -36,8 +36,6 @@ namespace WhiteBirdEngine {
  */
 class ROCMultislotsVK final : public RenderObjectContainerVK {
 public:
-    using Factory = std::function<Ref<IRenderObjectVK>(uint32_t)>;
-
     ROCMultislotsVK() = delete;
     ~ROCMultislotsVK() override = default;
     ROCMultislotsVK(const ROCMultislotsVK&) = delete;
@@ -46,19 +44,12 @@ public:
     ROCMultislotsVK& operator=(ROCMultislotsVK&&) noexcept = delete;
 
     /**
-     * @brief Create an empty container with an explicit number of slots.
-     * @param p_allocator Non-owning allocator used by the container's storage; it must outlive the container.
-     * @param p_slot_count Number of slots to create.
-     * @param p_flush Whether published buffer updates are applied lazily when each slot is resolved.
-     */
-    ROCMultislotsVK(RenderAllocator* p_allocator, uint32_t p_slot_count, bool p_flush = true);
-
-    /**
      * @brief Create and populate an explicit number of slots.
      * @param p_allocator Non-owning allocator used by the container's storage; it must outlive the container.
      * @param p_slot_count Number of slots to create.
-     * @param p_factory Factory invoked once for each slot index.
+     * @param p_factory Factory invoked once for each slot index now and on every recreate().
      * @param p_flush Whether published buffer updates are applied lazily when each slot is resolved.
+     * @throws std::runtime_error If p_allocator or p_factory is null, p_slot_count is zero, or p_factory returns null.
      */
     ROCMultislotsVK(RenderAllocator* p_allocator, uint32_t p_slot_count, Factory p_factory, bool p_flush = true);
 
@@ -97,6 +88,15 @@ public:
     uint32_t get_slot_count() const;
 
     /**
+     * @brief Replace the render object of every slot with a new one from the factory.
+     *
+     * With flush enabled, the newest published buffer update is applied again to every new slot when it is next resolved.
+     *
+     * @throws std::runtime_error If the factory returns null for a slot.
+     */
+    virtual void recreate() override;
+
+    /**
      * @brief Publish the latest buffer contents for lazy per-slot application.
      *
      * The call and subsequent resource resolution must be externally synchronized. Each slot applies the newest published
@@ -113,6 +113,7 @@ private:
     void synchronize(uint32_t p_slot) const;
 
     RenderAllocator* allocator = nullptr;
+    Factory factory;
     bool flush = true;
     Vector<Ref<IRenderObjectVK>, RenderAllocator> resources;
     mutable Vector<uint64_t, RenderAllocator> applied_generations;

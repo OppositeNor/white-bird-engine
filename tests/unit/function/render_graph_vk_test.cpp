@@ -90,8 +90,11 @@ private:
 };
 
 Ref<ROCSingleVK> make_test_container(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
-    return make_ref<ROCSingleVK>(p_allocator,
-        make_ref<TestDescriptorResourceVK>(p_allocator, p_render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObjectVK>());
+    Ref<IRenderObjectVK> resource =
+        make_ref<TestDescriptorResourceVK>(p_allocator, p_render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObjectVK>();
+    return make_ref<ROCSingleVK>(p_allocator, [resource](uint32_t /*p_slot*/) {
+        return resource;
+    });
 }
 
 class RTGraphResourceProbeVK final : public IRenderTaskVK {
@@ -163,14 +166,14 @@ class RTGraphEdgeProbeVK final : public IRenderTaskVK {
 public:
     RTGraphEdgeProbeVK(RenderAllocator* p_allocator,
         QueueFamilyVK p_queue_family,
-        std::initializer_list<std::string_view> p_reads,
-        std::initializer_list<std::string_view> p_writes)
+        const std::vector<std::string>& p_reads,
+        const std::vector<std::string>& p_writes)
         : queue(p_queue_family), reads(p_allocator), writes(p_allocator) {
-        for (std::string_view read : p_reads) {
-            reads.push_back({.res_id = std::string(read), .usage = RendResUsageVK::STORAGE_BUFFER});
+        for (const std::string& read : p_reads) {
+            reads.push_back({.res_id = read, .usage = RendResUsageVK::STORAGE_BUFFER});
         }
-        for (std::string_view write : p_writes) {
-            writes.push_back({.res_id = std::string(write), .usage = RendResUsageVK::STORAGE_BUFFER});
+        for (const std::string& write : p_writes) {
+            writes.push_back({.res_id = write, .usage = RendResUsageVK::STORAGE_BUFFER});
         }
     }
     ~RTGraphEdgeProbeVK() override = default;
@@ -205,8 +208,14 @@ RendTaskDescVK make_probe_desc(RenderAllocator* p_allocator,
     QueueFamilyVK p_queue_family,
     std::initializer_list<std::string_view> p_reads,
     std::initializer_list<std::string_view> p_writes) {
-    return RendTaskDescVK(
-        p_allocator, p_task_id, make_unique<RTGraphEdgeProbeVK>(p_allocator, p_allocator, p_queue_family, p_reads, p_writes));
+    return RendTaskDescVK(p_allocator,
+        p_task_id,
+        [p_allocator,
+            p_queue_family,
+            reads = std::vector<std::string>(p_reads.begin(), p_reads.end()),
+            writes = std::vector<std::string>(p_writes.begin(), p_writes.end())](const RendGraphContextVK& /*p_context*/) {
+            return make_unique<RTGraphEdgeProbeVK>(p_allocator, p_allocator, p_queue_family, reads, writes);
+        });
 }
 
 std::string build_error(RenderGraphVK& p_graph, RendGraphDescVK& p_descriptor) {
@@ -226,11 +235,20 @@ TEST(WBERenderGraphVKTest, RendResViewDescriptorDebugDataAddsResourceIdsAndSorts
     render_data.frames_in_flight = 2;
     Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
 
-    auto single_container = make_ref<ROCSingleVK>(&allocator,
-        make_ref<TestDescriptorResourceVK>(
-            &allocator, &render_data, DebugDataArray{make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 7)})
-            .template dynamic_cast_ref<IRenderObjectVK>());
-    auto per_frame_container = make_ref<ROCMultislotsVK>(&allocator, &allocator, render_data.frames_in_flight, false);
+    Ref<IRenderObjectVK> single_resource = make_ref<TestDescriptorResourceVK>(
+        &allocator, &render_data, DebugDataArray{make_descriptor_row("ROImageViewVK", "sampled_image", "resource", 7)})
+                                               .template dynamic_cast_ref<IRenderObjectVK>();
+    auto single_container = make_ref<ROCSingleVK>(&allocator, [single_resource](uint32_t /*p_slot*/) {
+        return single_resource;
+    });
+    auto per_frame_container = make_ref<ROCMultislotsVK>(
+        &allocator,
+        &allocator,
+        render_data.frames_in_flight,
+        [&allocator, &render_data](uint32_t /*p_slot*/) {
+            return make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
+        },
+        false);
     per_frame_container->set(0,
         make_ref<TestDescriptorResourceVK>(
             &allocator, &render_data, DebugDataArray{make_descriptor_row("ROSamplerVK", "sampler", "sampler", 7)})
@@ -319,7 +337,9 @@ TEST(WBERenderGraphVKTest, MissingReflectedResourceFailsDuringTaskBinding) {
     RenderAllocator allocator(WBE_KI_B(128));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
-    descriptor.add_task("missing", make_unique<RTGraphResourceProbeVK>(&allocator, true, false));
+    descriptor.add_task("missing", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTGraphResourceProbeVK>(&allocator, true, false);
+    });
     RenderGraphVK graph(&render_data);
 
     EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
@@ -330,8 +350,12 @@ TEST(WBERenderGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
     descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
-    descriptor.add_task("first", make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
-    descriptor.add_task("second", make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
+    descriptor.add_task("first", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTGraphResourceProbeVK>(&allocator, false, true);
+    });
+    descriptor.add_task("second", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTGraphResourceProbeVK>(&allocator, false, true);
+    });
     RenderGraphVK graph(&render_data);
 
     try {
@@ -348,8 +372,12 @@ TEST(WBERenderGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) 
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK descriptor(&allocator);
     descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
-    descriptor.add_task("first", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true)));
-    descriptor.add_task("second", make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true)));
+    descriptor.add_task("first", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
+    });
+    descriptor.add_task("second", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTTriggeredVK>(&allocator, make_unique<RTGraphResourceProbeVK>(&allocator, false, true));
+    });
     RenderGraphVK graph(&render_data);
 
     try {
@@ -369,8 +397,12 @@ TEST(WBERenderGraphVKTest, ResourceListAccessExpandsToIndexedResourcesForConflic
         make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).dynamic_cast_ref<IRenderObject>());
     RendGraphDescVK descriptor(&allocator);
     descriptor.add_resource("textures", *resource_list);
-    descriptor.add_task("writer", make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", true));
-    descriptor.add_task("reader", make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", false));
+    descriptor.add_task("writer", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", true);
+    });
+    descriptor.add_task("reader", [&allocator](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTGraphListAccessProbeVK>(&allocator, "textures", false);
+    });
     RenderGraphVK graph(&render_data);
 
     try {
@@ -400,6 +432,39 @@ TEST(WBERenderGraphVKTest, AliasedTaskAccessesResolveToGraphResourcesForValidati
 
     EXPECT_NE(build_error(graph, descriptor).find("resource 'dynamic_nodes' without a chain of edges on that resource"),
         std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, TaskFactoriesReceiveTheContextOfTheRenderData) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    render_data.swap_chain_extent = {.width = 640, .height = 360};
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    VkExtent2D received_extent{};
+    descriptor.add_task("task", [&allocator, &received_extent](const RendGraphContextVK& p_context) {
+        received_extent = p_context.swap_chain_extent;
+        return make_unique<RTGraphEdgeProbeVK>(
+            &allocator, &allocator, QueueFamilyVK::GRAPHICS, std::vector<std::string>{}, std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
+    });
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+    EXPECT_EQ(received_extent.width, 640U);
+    EXPECT_EQ(received_extent.height, 360U);
+    const RendGraphContextVK expected_context{.swap_chain_extent = {.width = 640, .height = 360}};
+    EXPECT_TRUE(graph.get_context() == expected_context);
+}
+
+TEST(WBERenderGraphVKTest, RejectsTaskFactoriesThatReturnNull) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task("task", [](const RendGraphContextVK& /*p_context*/) {
+        return Unique<IRenderTaskVK>();
+    });
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_NE(build_error(graph, descriptor).find("task factory returned null for: task"), std::string::npos);
 }
 
 TEST(WBERenderGraphVKTest, RejectsAliasesThatTheTaskNeverUses) {
@@ -573,12 +638,15 @@ TEST(WBERenderGraphVKTest, GraphOwnedResourcesRejectDuplicateIdsBeforeAllocation
 
     RendGraphDescVK imported_duplicate(&allocator);
     imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
-    imported_duplicate.add_buffer(TEST_LOGICAL_RESOURCE, {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = 16});
+    imported_duplicate.add_buffer(TEST_LOGICAL_RESOURCE, [=](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = 16};
+    });
     EXPECT_NE(build_error(graph, imported_duplicate).find("duplicate resource id: logical"), std::string::npos);
 
     RendGraphDescVK owned_duplicate(&allocator);
-    owned_duplicate.add_image(
-        TEST_SHARED_RESOURCE, {.format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 4, .height = 4, .depth = 1}});
+    owned_duplicate.add_image(TEST_SHARED_RESOURCE, [=](const RendGraphContextVK& /*p_context*/) {
+        return RendImageDescVK{.format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 4, .height = 4, .depth = 1}};
+    });
     owned_duplicate.add_sampler(TEST_SHARED_RESOURCE);
     EXPECT_NE(build_error(graph, owned_duplicate).find("duplicate resource id: shared"), std::string::npos);
 }
@@ -589,24 +657,35 @@ TEST(WBERenderGraphVKTest, RejectsInvalidGraphOwnedResourceDeclarations) {
     RenderGraphVK graph(&render_data);
 
     RendGraphDescVK image_usage_buffer(&allocator);
-    image_usage_buffer.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .size = 16});
+    image_usage_buffer.add_buffer("buffer", [=](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE, .size = 16};
+    });
     EXPECT_NE(build_error(graph, image_usage_buffer).find("buffer 'buffer' has a non-buffer primary usage"), std::string::npos);
 
     RendGraphDescVK empty_buffer(&allocator);
-    empty_buffer.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM});
+    empty_buffer.add_buffer("buffer", [=](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM};
+    });
     EXPECT_NE(build_error(graph, empty_buffer).find("buffer 'buffer' has no size"), std::string::npos);
 
     RendGraphDescVK oversized_data(&allocator);
-    oversized_data.add_buffer("buffer", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .size = 2, .initial_data = {1, 2, 3}});
+    oversized_data.add_buffer("buffer", [=](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .size = 2, .initial_data = {1, 2, 3}};
+    });
     EXPECT_NE(build_error(graph, oversized_data).find("initial data of buffer 'buffer' exceeds its size"), std::string::npos);
 
     RendGraphDescVK buffer_usage_image(&allocator);
-    buffer_usage_image.add_image("image",
-        {.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .format = VK_FORMAT_R8G8B8A8_UNORM, .extent = {.width = 4, .height = 4, .depth = 1}});
+    buffer_usage_image.add_image("image", [=](const RendGraphContextVK& /*p_context*/) {
+        return RendImageDescVK{.usage = RendResPrimaryUsageVK::BUFFER_STORAGE,
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
+            .extent = {.width = 4, .height = 4, .depth = 1}};
+    });
     EXPECT_NE(build_error(graph, buffer_usage_image).find("image 'image' has a non-image primary usage"), std::string::npos);
 
     RendGraphDescVK undefined_image(&allocator);
-    undefined_image.add_image("image", {.extent = {.width = 4, .height = 4, .depth = 1}});
+    undefined_image.add_image("image", [=](const RendGraphContextVK& /*p_context*/) {
+        return RendImageDescVK{.extent = {.width = 4, .height = 4, .depth = 1}};
+    });
     EXPECT_NE(build_error(graph, undefined_image).find("image 'image' has an undefined format"), std::string::npos);
 }
 
