@@ -78,10 +78,10 @@ inline constexpr uint32_t PIXEL_SORT_TILE_SIZE = 8;
 inline constexpr uint32_t PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64;
 // Must match WBE_PIXEL_SORT_COLUMN_OFFSETS_START in pixel_sort_utils.slang.
 inline constexpr uint32_t PIXEL_SORT_COLUMN_OFFSETS_START = 4;
-inline constexpr float PIXEL_SORT_DEFAULT_MIN_METRIC = 0.25F;
+inline constexpr float PIXEL_SORT_DEFAULT_MIN_METRIC = 0.20F;
 inline constexpr float PIXEL_SORT_DEFAULT_MAX_METRIC = 0.8F;
 // Must match WBE_PIXEL_SORT_METRIC_SATURATION in pixel_sort_utils.slang: 0 sorts by luminance, 1 by hue, 2 by saturation.
-inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 2;
+inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 0;
 // Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
 // WBE_RADIX_SORT_DATA_START in radix_sort_utils.slang.
 inline constexpr uint32_t RADIX_SORT_BUCKET_COUNT = 256;

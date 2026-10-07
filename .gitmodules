@@ -52,3 +52,6 @@
 [submodule "dependencies/slangpy"]
 	path = dependencies/slangpy
 	url = https://github.com/shader-slang/slangpy.git
+[submodule "dependencies/imgui"]
+	path = dependencies/imgui
+	url = https://github.com/ocornut/imgui.git
