@@ -37,11 +37,11 @@ constexpr size_t AAPT_HEADER_SIZE = WBE::HeapAllocatorAlignedPool::HEADER_SIZE;
 
 class WBEAllocAlignedPoolTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 

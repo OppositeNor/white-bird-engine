@@ -113,31 +113,31 @@ public:
         : render_database(WBE::make_ref<WBE::RenderDatabase>(p_allocator, p_allocator)) {
     }
 
-    uint32_t get_worker_nums() override {
+    virtual uint32_t get_worker_nums() override {
         return 1;
     }
 
-    void tick(double p_delta) override {
+    virtual void tick(double p_delta) override {
         (void)p_delta;
     }
 
-    WBE::Ref<WBE::RenderDatabase> get_render_database() override {
+    virtual WBE::Ref<WBE::RenderDatabase> get_render_database() override {
         return render_database;
     }
 
-    void register_render_graph(std::string_view p_resource_key) override {
+    virtual void register_render_graph(std::string_view p_resource_key) override {
         registered_graphs.emplace_back(p_resource_key);
     }
 
-    void unregister_render_graph(std::string_view p_resource_key) override {
+    virtual void unregister_render_graph(std::string_view p_resource_key) override {
         unregistered_graphs.emplace_back(p_resource_key);
     }
 
-    void activate_render_graph(std::string_view p_resource_key) override {
+    virtual void activate_render_graph(std::string_view p_resource_key) override {
         activated_graphs.emplace_back(p_resource_key);
     }
 
-    std::future<void> add_job(std::function<void()> p_job) override {
+    virtual std::future<void> add_job(std::function<void()> p_job) override {
         (void)p_job;
         return WBE::create_completed_job_future();
     }
@@ -152,11 +152,11 @@ private:
 
 class WBEWorldTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 

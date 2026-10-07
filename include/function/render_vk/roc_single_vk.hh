@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
 class ROCSingleVK final : public RenderObjectContainerVK {
 public:
     ROCSingleVK() = delete;
-    ~ROCSingleVK() override = default;
+    virtual ~ROCSingleVK() override = default;
     ROCSingleVK(const ROCSingleVK&) = delete;
     ROCSingleVK(ROCSingleVK&&) noexcept = delete;
     ROCSingleVK& operator=(const ROCSingleVK&) = delete;
@@ -44,19 +44,19 @@ public:
      */
     explicit ROCSingleVK(Factory p_factory);
 
-    void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) override;
+    virtual void set(uint32_t p_frame_slot, Ref<IRenderObjectVK> p_resource) override;
 
-    void clear(uint32_t p_frame_slot) override;
+    virtual void clear(uint32_t p_frame_slot) override;
 
-    void clear() override;
+    virtual void clear() override;
 
     void set(Ref<IRenderObjectVK> p_resource);
 
-    Ref<IRenderObject> get() override;
-    Ref<IRenderObject> get() const override;
-    Ref<IRenderObject> get(uint32_t p_frame_slot) override;
-    Ref<IRenderObject> get(uint32_t p_frame_slot) const override;
-    DebugDataRows descriptor_debug_data() const override;
+    virtual Ref<IRenderObject> get() override;
+    virtual Ref<IRenderObject> get() const override;
+    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) override;
+    virtual Ref<IRenderObject> get(uint32_t p_frame_slot) const override;
+    virtual DebugDataRows descriptor_debug_data() const override;
     virtual void recreate() override;
 
 private:

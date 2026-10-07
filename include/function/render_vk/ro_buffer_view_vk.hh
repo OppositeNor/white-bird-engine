@@ -119,7 +119,7 @@ public:
     ROBufferViewVK& operator=(const ROBufferViewVK&) = delete;
     ROBufferViewVK& operator=(ROBufferViewVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @class ExposedFields

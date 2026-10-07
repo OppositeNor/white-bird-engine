@@ -71,7 +71,7 @@ public:
     TestContextResourceVK& operator=(const TestContextResourceVK&) = delete;
     TestContextResourceVK& operator=(TestContextResourceVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     uint32_t context_id;
 };
@@ -91,9 +91,9 @@ public:
     TestDescriptorResourceVK& operator=(const TestDescriptorResourceVK&) = delete;
     TestDescriptorResourceVK& operator=(TestDescriptorResourceVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
-    DebugDataRows descriptor_debug_data() const override {
+    virtual DebugDataRows descriptor_debug_data() const override {
         return rows;
     }
 

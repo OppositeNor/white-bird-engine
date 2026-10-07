@@ -119,7 +119,7 @@ public:
     ROAccelerationStructureVK& operator=(const ROAccelerationStructureVK&) = delete;
     ROAccelerationStructureVK& operator=(ROAccelerationStructureVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @brief Get the owned Vulkan acceleration-structure handle.
@@ -142,14 +142,14 @@ public:
      */
     uint32_t get_descriptor_index() const;
 
-    DebugDataRows descriptor_debug_data() const override;
+    virtual DebugDataRows descriptor_debug_data() const override;
 
 
     /**
      * @brief Import this object under p_resource_id.
      * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     Ref<ROBufferVK> storage_buffer;

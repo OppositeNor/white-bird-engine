@@ -77,11 +77,11 @@ public:
     TestDescriptorResourceVK& operator=(const TestDescriptorResourceVK&) = delete;
     TestDescriptorResourceVK& operator=(TestDescriptorResourceVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override {
+    virtual TypeID get_type_uuid() const override {
         return static_hash("RenderGraphTestDescriptorResourceVK");
     }
 
-    DebugDataRows descriptor_debug_data() const override {
+    virtual DebugDataRows descriptor_debug_data() const override {
         return rows;
     }
 
@@ -102,29 +102,29 @@ public:
     RTGraphResourceProbeVK(bool p_require_missing_resource, bool p_write_resource)
         : require_missing_resource(p_require_missing_resource), write_resource(p_write_resource) {
     }
-    ~RTGraphResourceProbeVK() override = default;
+    virtual ~RTGraphResourceProbeVK() override = default;
     RTGraphResourceProbeVK(const RTGraphResourceProbeVK&) = delete;
     RTGraphResourceProbeVK(RTGraphResourceProbeVK&&) noexcept = delete;
     RTGraphResourceProbeVK& operator=(const RTGraphResourceProbeVK&) = delete;
     RTGraphResourceProbeVK& operator=(RTGraphResourceProbeVK&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    void bind_resources(const RendResViewVK& p_resources) override {
+    virtual void bind_resources(const RendResViewVK& p_resources) override {
         if (require_missing_resource) {
             static_cast<void>(p_resources.get(TEST_MISSING_RESOURCE));
         }
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         if (write_resource) {
             p_writes.push_back({.res_id = std::string(TEST_LOGICAL_RESOURCE), .usage = RendResUsageVK::STORAGE_BUFFER});
         }
     }
 
-    void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
     }
 
 private:
@@ -136,17 +136,17 @@ class RTGraphListAccessProbeVK final : public IRenderTaskVK {
 public:
     RTGraphListAccessProbeVK(std::string_view p_resource_id, bool p_write) : resource_id(p_resource_id), write(p_write) {
     }
-    ~RTGraphListAccessProbeVK() override = default;
+    virtual ~RTGraphListAccessProbeVK() override = default;
     RTGraphListAccessProbeVK(const RTGraphListAccessProbeVK&) = delete;
     RTGraphListAccessProbeVK(RTGraphListAccessProbeVK&&) noexcept = delete;
     RTGraphListAccessProbeVK& operator=(const RTGraphListAccessProbeVK&) = delete;
     RTGraphListAccessProbeVK& operator=(RTGraphListAccessProbeVK&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         if (write) {
             p_writes.push_back({.res_id = resource_id, .usage = RendResUsageVK::STORAGE_IMAGE});
         } else {
@@ -154,7 +154,7 @@ public:
         }
     }
 
-    void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
     }
 
 private:
@@ -176,22 +176,22 @@ public:
             writes.push_back({.res_id = write, .usage = RendResUsageVK::STORAGE_BUFFER});
         }
     }
-    ~RTGraphEdgeProbeVK() override = default;
+    virtual ~RTGraphEdgeProbeVK() override = default;
     RTGraphEdgeProbeVK(const RTGraphEdgeProbeVK&) = delete;
     RTGraphEdgeProbeVK(RTGraphEdgeProbeVK&&) noexcept = delete;
     RTGraphEdgeProbeVK& operator=(const RTGraphEdgeProbeVK&) = delete;
     RTGraphEdgeProbeVK& operator=(RTGraphEdgeProbeVK&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return queue;
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         p_reads.insert(p_reads.end(), reads.begin(), reads.end());
         p_writes.insert(p_writes.end(), writes.begin(), writes.end());
     }
 
-    void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
     }
 
 private:

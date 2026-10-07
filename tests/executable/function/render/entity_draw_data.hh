@@ -39,7 +39,7 @@ public:
     static constexpr std::string_view TRANSFORM = "transform";
 
     EntityDrawData() = delete;
-    ~EntityDrawData() override = default;
+    virtual ~EntityDrawData() override = default;
     EntityDrawData(const EntityDrawData&) = delete;
     EntityDrawData(EntityDrawData&&) noexcept = delete;
     EntityDrawData& operator=(const EntityDrawData&) = delete;
@@ -70,7 +70,7 @@ public:
     /**
      * @brief Import the transform under `<p_resource_id>.transform`; the mesh is imported separately.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     Ref<MeshResourcesVK> mesh;

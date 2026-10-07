@@ -155,7 +155,7 @@ public:
     ROStagingBufferVK& operator=(const ROStagingBufferVK&) = delete;
     ROStagingBufferVK& operator=(ROStagingBufferVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @brief Get the exposed fields.

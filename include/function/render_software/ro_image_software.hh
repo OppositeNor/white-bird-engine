@@ -40,7 +40,7 @@ public:
     ROImageSoftware& operator=(const ROImageSoftware&) = delete;
     ROImageSoftware& operator=(ROImageSoftware&&) = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     enum class Format {
         R8G8B8A8_UNORM,

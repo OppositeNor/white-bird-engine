@@ -44,21 +44,21 @@ public:
         Ref<MeshResourcesVK> p_static_mesh_resources,
         const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
         bool p_rebuild_static_every_frame = false);
-    ~OctreeRenderFeatureAtomic() override = default;
+    virtual ~OctreeRenderFeatureAtomic() override = default;
     OctreeRenderFeatureAtomic(const OctreeRenderFeatureAtomic&) = delete;
     OctreeRenderFeatureAtomic(OctreeRenderFeatureAtomic&&) = delete;
     OctreeRenderFeatureAtomic& operator=(const OctreeRenderFeatureAtomic&) = delete;
     OctreeRenderFeatureAtomic& operator=(OctreeRenderFeatureAtomic&&) = delete;
 
-    std::string_view get_name() const override;
+    virtual std::string_view get_name() const override;
 
 private:
-    uint32_t get_reset_group_count() const override;
-    void register_implementation_render_graph_data(RendGraphDescVK& p_graph) const override;
-    void add_static_publication_render_tasks(RendGraphDescVK& p_graph) const override;
-    void add_dynamic_publication_render_tasks(RendGraphDescVK& p_graph) const override;
-    void connect_implementation_render_tasks(RendGraphDescVK& p_graph) const override;
-    RendTaskDescVK make_deferred_construction_render_task_desc(bool p_dynamic) const override;
+    virtual uint32_t get_reset_group_count() const override;
+    virtual void register_implementation_render_graph_data(RendGraphDescVK& p_graph) const override;
+    virtual void add_static_publication_render_tasks(RendGraphDescVK& p_graph) const override;
+    virtual void add_dynamic_publication_render_tasks(RendGraphDescVK& p_graph) const override;
+    virtual void connect_implementation_render_tasks(RendGraphDescVK& p_graph) const override;
+    virtual RendTaskDescVK make_deferred_construction_render_task_desc(bool p_dynamic) const override;
 };
 
 } // namespace WhiteBirdEngine

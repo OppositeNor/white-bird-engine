@@ -36,7 +36,7 @@ namespace WhiteBirdEngine {
 class RTTriggeredVK final : public IRenderTaskVK {
 public:
     RTTriggeredVK() = delete;
-    ~RTTriggeredVK() override = default;
+    virtual ~RTTriggeredVK() override = default;
     RTTriggeredVK(const RTTriggeredVK&) = delete;
     RTTriggeredVK(RTTriggeredVK&&) noexcept = delete;
     RTTriggeredVK& operator=(const RTTriggeredVK&) = delete;
@@ -54,10 +54,10 @@ public:
      */
     std::atomic_bool activate{false};
 
-    QueueFamilyVK queue_family() const override;
+    virtual QueueFamilyVK queue_family() const override;
     virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
-    void bind_resources(const RendResViewVK& p_resources) override;
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override;
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     Unique<IRenderTaskVK> task;

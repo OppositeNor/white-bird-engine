@@ -76,7 +76,7 @@ public:
      * @brief Import this list under p_resource_id.
      * @throws std::runtime_error If the list was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     Vector<Ref<IRenderObject>, RenderAllocator> resources;

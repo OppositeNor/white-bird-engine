@@ -61,7 +61,7 @@ public:
         {% endif %}
         {% endfor %}
     }
-    ~SerializableFactory() override {
+    virtual ~SerializableFactory() override {
         singleton = nullptr;
     }
     SerializableFactory(const SerializableFactory&) = delete;

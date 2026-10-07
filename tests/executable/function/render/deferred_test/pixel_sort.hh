@@ -104,17 +104,17 @@ public:
         PixelSortDirection p_direction,
         PixelSortMetric p_metric,
         PixelSortScope p_scope);
-    ~PixelSort() override = default;
+    virtual ~PixelSort() override = default;
     PixelSort(const PixelSort&) = delete;
     PixelSort(PixelSort&&) = delete;
     PixelSort& operator=(const PixelSort&) = delete;
     PixelSort& operator=(PixelSort&&) = delete;
 
-    std::string_view get_name() const override {
+    virtual std::string_view get_name() const override {
         return "pixel sort";
     }
 
-    std::string_view add_render_tasks(
+    virtual std::string_view add_render_tasks(
         RendGraphDescVK& p_graph, std::string_view p_color_image_view, std::string_view p_previous_task_id) const override;
 
     static constexpr std::string_view RT_COPY_PIXEL_SORT_SOURCE = "copy_pixel_sort_source";

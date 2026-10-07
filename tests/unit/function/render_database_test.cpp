@@ -26,13 +26,13 @@ namespace WhiteBirdEngine {
 class RenderDatabaseTestRenderObject final : public IRenderObject {
 public:
     RenderDatabaseTestRenderObject() = default;
-    ~RenderDatabaseTestRenderObject() override = default;
+    virtual ~RenderDatabaseTestRenderObject() override = default;
     RenderDatabaseTestRenderObject(const RenderDatabaseTestRenderObject&) = delete;
     RenderDatabaseTestRenderObject(RenderDatabaseTestRenderObject&&) noexcept = delete;
     RenderDatabaseTestRenderObject& operator=(const RenderDatabaseTestRenderObject&) = delete;
     RenderDatabaseTestRenderObject& operator=(RenderDatabaseTestRenderObject&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 };
 
 TypeID RenderDatabaseTestRenderObject::get_type_uuid() const {

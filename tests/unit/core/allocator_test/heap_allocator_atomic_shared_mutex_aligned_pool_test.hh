@@ -33,11 +33,11 @@ constexpr size_t AAAPT_HEADER_SIZE = WBE::HeapAllocatorAtomicSharedMutexAlignedP
 
 class WBEAllocAtomicSharedMutexAlignedPoolTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 

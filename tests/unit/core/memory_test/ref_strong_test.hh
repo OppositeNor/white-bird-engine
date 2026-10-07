@@ -32,11 +32,11 @@ namespace WBE = WhiteBirdEngine;
 
 class WBERefStrongTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 
@@ -247,7 +247,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     class DerivedClass : public BaseClass {
     public:
         int derived_value = 123;
-        int get_type() const override {
+        virtual int get_type() const override {
             return 2;
         }
     };
@@ -255,7 +255,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
     class AnotherClass : public BaseClass {
     public:
         int another_value = 456;
-        int get_type() const override {
+        virtual int get_type() const override {
             return 3;
         }
     };

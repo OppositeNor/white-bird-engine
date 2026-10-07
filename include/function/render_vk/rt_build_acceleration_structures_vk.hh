@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
 class RTBuildAccelerationStructuresVK final : public IRenderTaskVK {
 public:
     RTBuildAccelerationStructuresVK() = delete;
-    ~RTBuildAccelerationStructuresVK() override = default;
+    virtual ~RTBuildAccelerationStructuresVK() override = default;
     RTBuildAccelerationStructuresVK(const RTBuildAccelerationStructuresVK&) = delete;
     RTBuildAccelerationStructuresVK(RTBuildAccelerationStructuresVK&&) noexcept = delete;
     RTBuildAccelerationStructuresVK& operator=(const RTBuildAccelerationStructuresVK&) = delete;
@@ -42,13 +42,13 @@ public:
     RTBuildAccelerationStructuresVK(
         const BaseRenderDataVK* p_render_data, std::string_view p_acceleration_structure_resource_id, GPUJobVK p_record_job);
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
     virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

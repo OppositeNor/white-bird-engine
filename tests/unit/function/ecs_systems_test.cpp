@@ -93,12 +93,12 @@ void driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
 
 class WBEWorldSystemTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
         world = WBE::make_ref<WBE::World>(global->engine_core->pool_allocator, global->engine_core->pool_allocator);
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         world = WBE::MEM_NULL;
         global.reset();
     }

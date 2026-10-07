@@ -191,7 +191,7 @@ public:
     ROImageVK& operator=(const ROImageVK&) = delete;
     ROImageVK& operator=(ROImageVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @brief Constructor. Allocates a device-local device memory for the image and binds it.
@@ -512,7 +512,7 @@ public:
      * @brief Import this object under p_resource_id.
      * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     enum class Ownership {

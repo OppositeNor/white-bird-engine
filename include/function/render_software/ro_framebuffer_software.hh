@@ -36,7 +36,7 @@ public:
     ROFramebufferSoftware& operator=(const ROFramebufferSoftware&) = delete;
     ROFramebufferSoftware& operator=(ROFramebufferSoftware&&) = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     ROFramebufferSoftware(Ref<ROImageSoftware> p_image);
 

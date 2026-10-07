@@ -48,7 +48,7 @@ public:
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     MeshAccelerationStructureVK() = delete;
-    ~MeshAccelerationStructureVK() override = default;
+    virtual ~MeshAccelerationStructureVK() override = default;
     MeshAccelerationStructureVK(const MeshAccelerationStructureVK&) = delete;
     MeshAccelerationStructureVK(MeshAccelerationStructureVK&&) noexcept = delete;
     MeshAccelerationStructureVK& operator=(const MeshAccelerationStructureVK&) = delete;
@@ -93,7 +93,7 @@ public:
      * @brief Import the top-level acceleration structure under `<p_resource_id>.top_level`.
      * @throws std::runtime_error If p_resource_id is empty or the structure is missing.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     friend class MeshAccelerationStructureCompilerVK;

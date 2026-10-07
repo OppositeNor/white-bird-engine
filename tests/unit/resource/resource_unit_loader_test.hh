@@ -121,12 +121,12 @@ struct OrderedDestroyTestResourceUnit : public WBE::ResourceUnit {
 
 class ResourcePopulatorTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
         text_scheme.path = "test_text_files/test_file_utf8.txt";
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 

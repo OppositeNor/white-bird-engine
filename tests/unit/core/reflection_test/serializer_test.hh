@@ -38,11 +38,11 @@ namespace WBE = WhiteBirdEngine;
 
 class WBESerializerTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    virtual void SetUp() override {
         global = WBE::make_test_global();
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
         global.reset();
     }
 

@@ -84,27 +84,27 @@ public:
             throw std::runtime_error("Failed to create the voxel debug indirect-lighting task: queue families do not match.");
         }
     }
-    ~VoxelDebugIndirectLightingTask() override = default;
+    virtual ~VoxelDebugIndirectLightingTask() override = default;
     VoxelDebugIndirectLightingTask(const VoxelDebugIndirectLightingTask&) = delete;
     VoxelDebugIndirectLightingTask(VoxelDebugIndirectLightingTask&&) noexcept = delete;
     VoxelDebugIndirectLightingTask& operator=(const VoxelDebugIndirectLightingTask&) = delete;
     VoxelDebugIndirectLightingTask& operator=(VoxelDebugIndirectLightingTask&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return task->queue_family();
     }
 
-    void bind_resources(const RendResViewVK& p_resources) override {
+    virtual void bind_resources(const RendResViewVK& p_resources) override {
         task->bind_resources(p_resources);
         debug_view_task->bind_resources(p_resources);
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         task->append_accesses(p_reads, p_writes);
         debug_view_task->append_accesses(p_reads, p_writes);
     }
 
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override {
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
         IRenderTaskVK* selected_task =
             debug_view_mode->load(std::memory_order_relaxed) == VoxelDebugViewMode::DISABLED ? task.get() : debug_view_task.get();
         selected_task->record(p_command_buffer, p_delta);

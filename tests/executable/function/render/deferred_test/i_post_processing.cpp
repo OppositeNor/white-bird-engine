@@ -34,25 +34,25 @@ public:
             throw std::runtime_error("Failed to create a toggleable post-processing task: task or effect is null.");
         }
     }
-    ~RTToggleableVK() override = default;
+    virtual ~RTToggleableVK() override = default;
     RTToggleableVK(const RTToggleableVK&) = delete;
     RTToggleableVK(RTToggleableVK&&) noexcept = delete;
     RTToggleableVK& operator=(const RTToggleableVK&) = delete;
     RTToggleableVK& operator=(RTToggleableVK&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return task->queue_family();
     }
 
-    void bind_resources(const RendResViewVK& p_resources) override {
+    virtual void bind_resources(const RendResViewVK& p_resources) override {
         task->bind_resources(p_resources);
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         task->append_accesses(p_reads, p_writes);
     }
 
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override {
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
         if (effect->is_enabled()) {
             task->record(p_command_buffer, p_delta);
         }

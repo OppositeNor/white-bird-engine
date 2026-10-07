@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
 class ROCMultislotsVK final : public RenderObjectContainerVK {
 public:
     ROCMultislotsVK() = delete;
-    ~ROCMultislotsVK() override = default;
+    virtual ~ROCMultislotsVK() override = default;
     ROCMultislotsVK(const ROCMultislotsVK&) = delete;
     ROCMultislotsVK(ROCMultislotsVK&&) noexcept = delete;
     ROCMultislotsVK& operator=(const ROCMultislotsVK&) = delete;
@@ -57,29 +57,29 @@ public:
      * @brief Resolve the first slot.
      * @return The resource stored at slot zero.
      */
-    Ref<IRenderObject> get() override;
+    virtual Ref<IRenderObject> get() override;
 
     /**
      * @brief Resolve the first slot.
      * @return The resource stored at slot zero.
      */
-    Ref<IRenderObject> get() const override;
-    Ref<IRenderObject> get(uint32_t p_slot) override;
-    Ref<IRenderObject> get(uint32_t p_slot) const override;
-    DebugDataRows descriptor_debug_data() const override;
-    void set(uint32_t p_slot, Ref<IRenderObjectVK> p_resource) override;
+    virtual Ref<IRenderObject> get() const override;
+    virtual Ref<IRenderObject> get(uint32_t p_slot) override;
+    virtual Ref<IRenderObject> get(uint32_t p_slot) const override;
+    virtual DebugDataRows descriptor_debug_data() const override;
+    virtual void set(uint32_t p_slot, Ref<IRenderObjectVK> p_resource) override;
 
     /**
      * @brief Release the resource retained for one slot.
      *
      * @param p_slot Slot index to clear.
      */
-    void clear(uint32_t p_slot) override;
+    virtual void clear(uint32_t p_slot) override;
 
     /**
      * @brief Release the resources retained for all slots.
      */
-    void clear() override;
+    virtual void clear() override;
 
     /**
      * @brief Get the number of configured slots.

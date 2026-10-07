@@ -291,7 +291,7 @@ public:
     ROImageViewVK& operator=(const ROImageViewVK&) = delete;
     ROImageViewVK& operator=(ROImageViewVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @brief Constructor.
@@ -310,7 +310,7 @@ public:
         return image_view;
     }
 
-    DebugDataRows descriptor_debug_data() const override;
+    virtual DebugDataRows descriptor_debug_data() const override;
 
     /**
      * @brief Get or lazily create the sampled-image descriptor index.
@@ -349,7 +349,7 @@ public:
      * @brief Import this object under p_resource_id.
      * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     VkImageView image_view = VK_NULL_HANDLE;

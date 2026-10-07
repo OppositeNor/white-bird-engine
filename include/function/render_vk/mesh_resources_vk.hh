@@ -183,7 +183,7 @@ public:
      * @brief Import every present member under `<p_resource_id>.<member>`.
      * @throws std::runtime_error If p_resource_id is empty or a required member is missing.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     friend class MeshCompilerVK;

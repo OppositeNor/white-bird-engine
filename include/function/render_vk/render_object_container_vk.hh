@@ -120,7 +120,7 @@ public:
      * @brief Import this container under p_resource_id.
      * @throws std::runtime_error If the container was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 protected:
     RenderObjectContainerVK() = default;

@@ -473,7 +473,7 @@ public:
     ROBufferVK& operator=(const ROBufferVK&) = delete;
     ROBufferVK& operator=(ROBufferVK&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override;
+    virtual TypeID get_type_uuid() const override;
 
     /**
      * @brief Get the buffer instance.
@@ -509,7 +509,7 @@ public:
         return memory_offset;
     }
 
-    DebugDataRows descriptor_debug_data() const override;
+    virtual DebugDataRows descriptor_debug_data() const override;
 
     /**
      * @brief Get or lazily create the whole-buffer uniform descriptor index.
@@ -630,7 +630,7 @@ public:
      * @brief Import this object under p_resource_id.
      * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
      */
-    void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+    virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
     void* mapped_memory = nullptr;

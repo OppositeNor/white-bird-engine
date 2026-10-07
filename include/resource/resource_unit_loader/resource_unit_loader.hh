@@ -83,17 +83,17 @@ public:
         : supported_resource_types{std::string(p_resource_type)}, expected_scheme_type(p_resource_type) {
     }
 
-    std::span<const std::string> get_supported_resource_types() const override {
+    virtual std::span<const std::string> get_supported_resource_types() const override {
         return supported_resource_types;
     }
 
-    void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override {
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override {
         SchemaType scheme;
         scheme.deserialize(p_scheme_data);
         (void)populate_typed_scheme_ptr(p_res_chunk, scheme);
     }
 
-    std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const final {
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override final {
         const auto* p_typed_scheme = dynamic_cast<const SchemaType*>(&p_scheme);
         if (p_typed_scheme == nullptr) {
             throw std::runtime_error(std::format(
@@ -116,7 +116,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaAudio& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaAudio& p_scheme) const override;
 };
 
 class ResourceUnitLoaderBinary final : public ResourceUnitLoaderTyped<RUSchemaBinary> {
@@ -125,7 +125,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaBinary& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaBinary& p_scheme) const override;
 };
 
 class ResourceUnitLoaderFont final : public ResourceUnitLoaderTyped<RUSchemaFont> {
@@ -134,7 +134,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaFont& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaFont& p_scheme) const override;
 };
 
 class ResourceUnitLoaderImage final : public ResourceUnitLoaderTyped<RUSchemaImage> {
@@ -143,7 +143,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaImage& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaImage& p_scheme) const override;
 };
 
 /**
@@ -156,7 +156,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaTexture& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaTexture& p_scheme) const override;
 };
 
 class ResourceUnitLoaderText final : public ResourceUnitLoaderTyped<RUSchemaText> {
@@ -165,7 +165,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaText& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaText& p_scheme) const override;
 };
 
 class ResourceUnitLoaderVideo final : public ResourceUnitLoaderTyped<RUSchemaVideo> {
@@ -174,7 +174,7 @@ public:
     }
 
 protected:
-    std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaVideo& p_scheme) const override;
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaVideo& p_scheme) const override;
 };
 
 } // namespace WhiteBirdEngine

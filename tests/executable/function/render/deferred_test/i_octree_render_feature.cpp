@@ -61,21 +61,21 @@ public:
         : task(std::move(p_task)), completed(std::move(p_completed)), finish(p_finish) {
         WBE_DEBUG_ASSERT(task != MEM_NULL && completed != MEM_NULL);
     }
-    ~RTOctreeStaticStageVK() override = default;
+    virtual ~RTOctreeStaticStageVK() override = default;
     RTOctreeStaticStageVK(const RTOctreeStaticStageVK&) = delete;
     RTOctreeStaticStageVK(RTOctreeStaticStageVK&&) = delete;
     RTOctreeStaticStageVK& operator=(const RTOctreeStaticStageVK&) = delete;
     RTOctreeStaticStageVK& operator=(RTOctreeStaticStageVK&&) = delete;
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return task->queue_family();
     }
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         task->append_accesses(p_reads, p_writes);
     }
-    void bind_resources(const RendResViewVK& p_resources) override {
+    virtual void bind_resources(const RendResViewVK& p_resources) override {
         task->bind_resources(p_resources);
     }
-    void record(VkCommandBuffer p_buffer, double p_delta) override {
+    virtual void record(VkCommandBuffer p_buffer, double p_delta) override {
         if (*completed) {
             return;
         }
@@ -98,19 +98,19 @@ private:
 class RTOctreeFrameBeginVK final : public IRenderTaskVK {
 public:
     RTOctreeFrameBeginVK() = default;
-    ~RTOctreeFrameBeginVK() override = default;
+    virtual ~RTOctreeFrameBeginVK() override = default;
     RTOctreeFrameBeginVK(const RTOctreeFrameBeginVK&) = delete;
     RTOctreeFrameBeginVK(RTOctreeFrameBeginVK&&) = delete;
     RTOctreeFrameBeginVK& operator=(const RTOctreeFrameBeginVK&) = delete;
     RTOctreeFrameBeginVK& operator=(RTOctreeFrameBeginVK&&) = delete;
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         // The full memory barrier below covers every command, which the octree reset edge synchronizes after.
         p_writes.push_back({.res_id = std::string(IOctreeRenderFeature::OCTREE_INFO), .usage = RendResUsageVK::ALL_COMMANDS});
     }
-    void record(VkCommandBuffer p_buffer, double) override {
+    virtual void record(VkCommandBuffer p_buffer, double) override {
         VkMemoryBarrier2 barrier{.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
             .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
@@ -178,25 +178,25 @@ public:
             throw std::runtime_error("Failed to create the voxel debug-view task: mode range is invalid.");
         }
     }
-    ~RTVoxelDebugView() override = default;
+    virtual ~RTVoxelDebugView() override = default;
     RTVoxelDebugView(const RTVoxelDebugView&) = delete;
     RTVoxelDebugView(RTVoxelDebugView&&) noexcept = delete;
     RTVoxelDebugView& operator=(const RTVoxelDebugView&) = delete;
     RTVoxelDebugView& operator=(RTVoxelDebugView&&) noexcept = delete;
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return task->queue_family();
     }
 
-    void bind_resources(const RendResViewVK& p_resources) override {
+    virtual void bind_resources(const RendResViewVK& p_resources) override {
         task->bind_resources(p_resources);
     }
 
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         task->append_accesses(p_reads, p_writes);
     }
 
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override {
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
         VoxelDebugViewMode current_mode = mode->load(std::memory_order_relaxed);
         if (current_mode >= first_mode && current_mode <= last_mode) {
             task->record(p_command_buffer, p_delta);

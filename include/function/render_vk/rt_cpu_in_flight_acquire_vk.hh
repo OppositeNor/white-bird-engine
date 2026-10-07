@@ -41,7 +41,7 @@ namespace WhiteBirdEngine {
 class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
     RTCPUInFlightAcquireVK() = delete;
-    ~RTCPUInFlightAcquireVK() override = default;
+    virtual ~RTCPUInFlightAcquireVK() override = default;
     RTCPUInFlightAcquireVK(const RTCPUInFlightAcquireVK&) = delete;
     RTCPUInFlightAcquireVK(RTCPUInFlightAcquireVK&&) noexcept = delete;
     RTCPUInFlightAcquireVK& operator=(const RTCPUInFlightAcquireVK&) = delete;
@@ -63,15 +63,15 @@ public:
         std::span<uint8_t> p_destination,
         std::binary_semaphore* p_completion_semaphore);
 
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
     }
 
     virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
 
-    void bind_resources(const RendResViewVK& p_resources) override;
+    virtual void bind_resources(const RendResViewVK& p_resources) override;
 
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override;
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
     const BaseRenderDataVK* render_data = nullptr;

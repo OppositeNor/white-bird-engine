@@ -42,24 +42,24 @@ public:
     RTTriggerProbeVK() = delete;
     explicit RTTriggerProbeVK(TriggerProbeState& p_state) : state(p_state) {
     }
-    ~RTTriggerProbeVK() override {
+    virtual ~RTTriggerProbeVK() override {
         ++state.destructions;
     }
     RTTriggerProbeVK(const RTTriggerProbeVK&) = delete;
     RTTriggerProbeVK(RTTriggerProbeVK&&) = delete;
     RTTriggerProbeVK& operator=(const RTTriggerProbeVK&) = delete;
     RTTriggerProbeVK& operator=(RTTriggerProbeVK&&) = delete;
-    QueueFamilyVK queue_family() const override {
+    virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::COMPUTE;
     }
-    void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         p_reads.emplace_back("input", RendResUsageVK::STORAGE_BUFFER);
         p_writes.emplace_back("output", RendResUsageVK::STORAGE_IMAGE);
     }
-    void bind_resources(const RendResViewVK&) override {
+    virtual void bind_resources(const RendResViewVK&) override {
         ++state.bindings;
     }
-    void record(VkCommandBuffer p_command_buffer, double p_delta) override {
+    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
         ++state.recordings;
         state.command_buffer = p_command_buffer;
         state.delta = p_delta;

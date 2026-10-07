@@ -30,13 +30,13 @@ namespace {
 class RenderResourceListVKTestObject final : public IRenderObject {
 public:
     RenderResourceListVKTestObject() = default;
-    ~RenderResourceListVKTestObject() override = default;
+    virtual ~RenderResourceListVKTestObject() override = default;
     RenderResourceListVKTestObject(const RenderResourceListVKTestObject&) = delete;
     RenderResourceListVKTestObject(RenderResourceListVKTestObject&&) noexcept = delete;
     RenderResourceListVKTestObject& operator=(const RenderResourceListVKTestObject&) = delete;
     RenderResourceListVKTestObject& operator=(RenderResourceListVKTestObject&&) noexcept = delete;
 
-    TypeID get_type_uuid() const override {
+    virtual TypeID get_type_uuid() const override {
         return static_hash("RenderResourceListVKTestObject");
     }
 };
