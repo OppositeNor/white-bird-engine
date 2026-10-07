@@ -26,6 +26,7 @@
 #include <atomic>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -74,6 +75,9 @@ void WindowSDL::tick_logic() { // NOLINT
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
             window_should_close.store(true, std::memory_order_release);
+        }
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+            window_size_changed.store(true, std::memory_order_release);
         }
         if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
             // Map the SDL keycode to our KeyCode
@@ -333,6 +337,20 @@ void WindowSDL::get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) {
     SDL_GetWindowSizeInPixels(window, reinterpret_cast<int*>(&p_width), reinterpret_cast<int*>(&p_height));
     window_properties.width = p_width;
     window_properties.height = p_height;
+}
+
+void WindowSDL::resize(uint32_t p_width, uint32_t p_height) {
+    constexpr auto MAX_SIZE = static_cast<uint32_t>(std::numeric_limits<int>::max());
+    if (p_width == 0 || p_height == 0 || p_width > MAX_SIZE || p_height > MAX_SIZE) {
+        throw std::runtime_error(std::format("Failed to resize SDL window: {}x{} is not a valid window size.", p_width, p_height));
+    }
+    SDL_SetWindowSize(window, static_cast<int>(p_width), static_cast<int>(p_height));
+    // The window system may apply the size later, which SDL_WINDOWEVENT_SIZE_CHANGED reports again.
+    window_size_changed.store(true, std::memory_order_release);
+}
+
+bool WindowSDL::consume_size_changed() {
+    return window_size_changed.exchange(false, std::memory_order_acq_rel);
 }
 
 void WindowSDL::init_vulkan(VkInstance p_instance) {

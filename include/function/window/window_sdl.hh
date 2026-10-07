@@ -45,6 +45,8 @@ public:
     virtual void tick_render() override;
     virtual void tick_logic() override;
     virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) override;
+    virtual void resize(uint32_t p_width, uint32_t p_height) override;
+    virtual bool consume_size_changed() override;
     virtual bool should_close() const override;
 
     virtual void init_vulkan(VkInstance p_instance) override;
@@ -58,6 +60,7 @@ private:
 
     SDL_Window* window = nullptr;
     std::atomic<bool> window_should_close = false;
+    std::atomic<bool> window_size_changed = false;
 
     VkSurfaceKHR vulkan_surface = VK_NULL_HANDLE;
 };

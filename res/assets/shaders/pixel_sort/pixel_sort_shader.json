@@ -94,6 +94,13 @@
             ]
         },
         {
+            "id": "pixel_sorting_post_processing_shader",
+            "source_type": "shader",
+            "src": "assets/shaders/pixel_sort/pixel_sorting_post_processing.slang",
+            "dst": "assets/shaders/pixel_sort/pixel_sorting_post_processing.spv",
+            "metadata": "assets/shaders/pixel_sort/pixel_sorting_post_processing.json"
+        },
+        {
             "id": "present_pixel_sort_shader",
             "source_type": "shader",
             "src": "assets/shaders/pixel_sort/present_pixel_sort.slang",

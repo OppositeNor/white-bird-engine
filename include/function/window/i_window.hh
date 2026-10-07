@@ -104,6 +104,28 @@ public:
     virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) = 0;
 
     /**
+     * @brief Resize the window.
+     *
+     * The window system may apply the new size asynchronously. Once the size changes, consume_size_changed() reports
+     * it, so that the renderer resizes its swap chain to the new size. Must be called from the logic thread.
+     *
+     * @param p_width The new width of the window, in screen coordinates.
+     * @param p_height The new height of the window, in screen coordinates.
+     * @throws std::runtime_error If p_width or p_height is 0 or does not fit the window system's size range.
+     */
+    virtual void resize(uint32_t p_width, uint32_t p_height) = 0;
+
+    /**
+     * @brief Report whether the size of the window changed since the last call, and clear the report.
+     *
+     * Both resize() and size changes made through the window system, such as the user resizing the window, are reported.
+     * Thread-safe.
+     *
+     * @return True if the size of the window changed since the last call. False otherwise.
+     */
+    virtual bool consume_size_changed() = 0;
+
+    /**
      * @brief Initialize Vulkan window.
      *
      * @param p_instance The Vulkan instance.

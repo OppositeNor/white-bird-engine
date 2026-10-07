@@ -190,6 +190,11 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     check_shader_debug_buffer();
     run_gpu_jobs();
 
+    if (window->consume_size_changed()) {
+        // Some window systems never report the swap chain as out of date after a resize.
+        recreate_swap_chain();
+    }
+
     if (p_graph == MEM_NULL) {
         // No active render graph, nothing to do this frame.
         return;
@@ -1278,7 +1283,10 @@ VkExtent2D RendererVK::choose_swap_extent(const VkSurfaceCapabilitiesKHR& p_capa
     }
     uint32_t extent_width = 0, extent_height = 0;
     window->get_size_in_pixels(extent_width, extent_height);
-    VkExtent2D result{.width = extent_width, .height = extent_height};
+    VkExtent2D result{
+        .width = std::clamp(extent_width, p_capabilities.minImageExtent.width, p_capabilities.maxImageExtent.width),
+        .height = std::clamp(extent_height, p_capabilities.minImageExtent.height, p_capabilities.maxImageExtent.height),
+    };
     return result;
 }
 

@@ -80,6 +80,15 @@ public:
     }
 
     /**
+     * @brief Get the window of the application.
+     *
+     * @return The window of the application.
+     */
+    Ref<IWindow> get_window() const {
+        return window;
+    }
+
+    /**
      * @brief Get the renderer instance.
      *
      * @return The renderer instance.

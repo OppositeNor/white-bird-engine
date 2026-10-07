@@ -60,11 +60,15 @@ inline constexpr std::string_view RT_COUNT_PIXEL_SORT_MASK = "count_pixel_sort_m
 inline constexpr std::string_view RT_PREFIX_SUM_PIXEL_SORT_COLUMNS = "prefix_sum_pixel_sort_columns";
 inline constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
 inline constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
+inline constexpr std::string_view RT_PIXEL_SORTING_POST_PROCESSING = "pixel_sorting_post_processing";
 inline constexpr std::string_view RT_PRESENT_SORTED_PIXELS = "present_sorted_pixels";
 inline constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION_IMAGE = "pixel_sort_destination_image";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_DESTINATION = "pixel_sort_destination";
+inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE = "pixel_sorting_post_processing_output_image";
+inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT = "pixel_sorting_post_processing_output";
+inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS = "pixel_sorting_post_processing_params";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SAMPLER = "pixel_sort_sampler";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_COLUMN_OFFSETS = "pixel_sort_column_offsets";
@@ -75,7 +79,7 @@ inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS = "pixel_sort_keys";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS_SWAP = "pixel_sort_keys_swap";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_HISTOGRAM = "pixel_sort_histogram";
 inline constexpr VkFormat PIXEL_SORT_DESTINATION_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
-// Must match the numthreads of write_sorted_pixels.slang.
+// Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
 inline constexpr uint32_t PIXEL_SORT_TILE_SIZE = 8;
 // Must match the numthreads of count_pixel_sort_mask.slang and register_pixel_sort_keys.slang, which run one invocation per
 // column.
@@ -86,6 +90,7 @@ inline constexpr float PIXEL_SORT_DEFAULT_MIN_METRIC = 0.20F;
 inline constexpr float PIXEL_SORT_DEFAULT_MAX_METRIC = 0.8F;
 // Must match WBE_PIXEL_SORT_METRIC_SATURATION in pixel_sort_utils.slang: 0 sorts by luminance, 1 by hue, 2 by saturation.
 inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 0;
+inline constexpr float PIXEL_SORTING_POST_PROCESSING_DEFAULT_GAMMA = 1.0F;
 // Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
 // WBE_RADIX_SORT_DATA_START in radix_sort_utils.slang.
 inline constexpr uint32_t RADIX_SORT_BUCKET_COUNT = 256;
@@ -111,6 +116,15 @@ struct PixelSortContrastGPU {
 };
 
 /**
+ * @class PixelSortingPostProcessingParamsGPU
+ * @brief GPU layout of PixelSortingPostProcessingParams in pixel_sorting_post_processing.slang.
+ */
+struct PixelSortingPostProcessingParamsGPU {
+    /** The exponent every color channel is raised to; 1 leaves the color unchanged. */
+    float gamma = PIXEL_SORTING_POST_PROCESSING_DEFAULT_GAMMA;
+};
+
+/**
  * @class ApplicationVulkanPixelSortingTest
  * @brief Sorts the pixels of every column of an image that are inside a saturation contrast mask with the GPU radix sort,
  * and presents the result.
@@ -120,7 +134,8 @@ struct PixelSortContrastGPU {
  * buffer index in an index image. Every key orders by column, then saturation, and stores the source row (see
  * pixel_sort_utils.slang), so one radix sort of all keys sorts every column in place within its range. Each of the 4 radix
  * sort passes runs the histogram, histogram prefix sum, and scatter shaders for one 8-bit digit, alternating between two
- * key buffers. Finally, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
+ * key buffers. Then, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
+ * Finally, a post-processing pass applies general effects to the sorted image before it is presented.
  */
 class ApplicationVulkanPixelSortingTest : public WBE::ApplicationGame {
 public:
@@ -168,6 +183,30 @@ public:
         const PixelSortContrastGPU contrast_value = contrast;
         add_render_job([contrast_value, contrast_buffer_ptr]() {
             contrast_buffer_ptr->update_buffer(&contrast_value, sizeof(PixelSortContrastGPU));
+        });
+    }
+
+    /**
+     * @brief Set the gamma the post-processing pass raises every color channel to.
+     *
+     * Before setup_render_graph(), the gamma becomes the initial parameter buffer content; afterwards the buffer is updated
+     * through a render job. Must be called from the logic thread.
+     *
+     * @param p_gamma The exponent every color channel is raised to.
+     * @throws std::runtime_error If p_gamma is not positive.
+     */
+    void set_gamma(float p_gamma) {
+        if (!(p_gamma > 0.0F)) {
+            throw std::runtime_error(std::format("Invalid pixel sorting post-processing gamma {}: it must be positive.", p_gamma));
+        }
+        post_processing_params.gamma = p_gamma;
+        WBE::ROBufferVK* params_buffer_ptr = post_processing_params_buffer.get();
+        if (params_buffer_ptr == nullptr) {
+            return;
+        }
+        const PixelSortingPostProcessingParamsGPU params_value = post_processing_params;
+        add_render_job([params_value, params_buffer_ptr]() {
+            params_buffer_ptr->update_buffer(&params_value, sizeof(PixelSortingPostProcessingParamsGPU));
         });
     }
 
@@ -244,6 +283,15 @@ public:
                     .format = PIXEL_SORT_DESTINATION_FORMAT,
                     .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
             .add_image_view(REND_RES_PIXEL_SORT_DESTINATION, REND_RES_PIXEL_SORT_DESTINATION_IMAGE)
+            .add_buffer(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS,
+                {.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                    .domain = WBE::DeviceDomain::HOST_DEVICE,
+                    .initial_data = WBE::to_initial_data(post_processing_params)})
+            .add_image(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE,
+                {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                    .format = PIXEL_SORT_DESTINATION_FORMAT,
+                    .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}})
+            .add_image_view(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT, REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE)
             .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
                 {.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
                     .format = VK_FORMAT_R16_UINT,
@@ -296,6 +344,11 @@ public:
 
         // After an even number of passes, the sorted keys are back in the key buffer.
         add_compute_task(pipeline_desc, RT_WRITE_SORTED_PIXELS, "write_sorted_pixels_vertical_shader", tile_group_count, {});
+        add_compute_task(pipeline_desc,
+            RT_PIXEL_SORTING_POST_PROCESSING,
+            "pixel_sorting_post_processing_shader",
+            tile_group_count,
+            {});
 
         WBE::RendTaskDescVK present_task_desc(render_allocator);
         present_task_desc.task_id = RT_PRESENT_SORTED_PIXELS;
@@ -346,11 +399,19 @@ public:
             histogram_chain[pass * 3 + 2] = scatter_task_ids[pass];
         }
         WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
-        WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PRESENT_SORTED_PIXELS});
+        WBE::connect_resource_chain(
+            pipeline_desc, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PIXEL_SORTING_POST_PROCESSING});
+        WBE::connect_resource_chain(pipeline_desc,
+            REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT,
+            {RT_PIXEL_SORTING_POST_PROCESSING, RT_PRESENT_SORTED_PIXELS});
         WBE::connect_resource_chain(pipeline_desc, WBE::REND_RES_SWAP_CHAIN, {RT_PRESENT_SORTED_PIXELS, RT_DRAW_IMGUI});
         WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("pixel_sorting_graph", std::move(pipeline_desc));
         contrast_buffer = graph->acquire_resource(REND_RES_PIXEL_SORT_CONTRAST)->get().dynamic_cast_ref<WBE::ROBufferVK>();
         ui_contrast = contrast;
+        post_processing_params_buffer = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS)
+                                            ->get()
+                                            .dynamic_cast_ref<WBE::ROBufferVK>();
+        ui_post_processing_params = post_processing_params;
         WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
         renderer->activate_render_graph("pixel_sorting_graph");
     }
@@ -361,11 +422,17 @@ private:
     PixelSortContrastGPU ui_contrast;
     // Graph-owned contrast buffer, updated from the logic thread through render jobs and by the parameter window.
     WBE::Ref<WBE::ROBufferVK> contrast_buffer;
+    PixelSortingPostProcessingParamsGPU post_processing_params;
+    // The post-processing parameters edited in the parameter window; owned by the rendering thread.
+    PixelSortingPostProcessingParamsGPU ui_post_processing_params;
+    // Graph-owned post-processing parameter buffer, updated from the logic thread through render jobs and by the parameter
+    // window.
+    WBE::Ref<WBE::ROBufferVK> post_processing_params_buffer;
     // Destroyed before the renderer, after the rendering thread has stopped.
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
 
     /**
-     * @brief Draw the parameter window and upload the contrast when it changes. Must be called on the rendering thread.
+     * @brief Draw the parameter window and upload the contrast and post-processing parameters when they change. Must be called on the rendering thread.
      */
     void draw_parameter_window() {
         static constexpr std::array<const char*, 3> SORT_METRIC_NAMES{"Luminance", "Hue", "Saturation"};
@@ -377,6 +444,10 @@ private:
         if (ImGui::Combo("Sort metric", &sort_metric, SORT_METRIC_NAMES.data(), static_cast<int>(SORT_METRIC_NAMES.size()))) {
             ui_contrast.sort_metric = static_cast<uint32_t>(sort_metric);
             changed = true;
+        }
+        if (ImGui::SliderFloat("Gamma", &ui_post_processing_params.gamma, 0.1F, 4.0F)) {
+            ui_post_processing_params.gamma = std::max(ui_post_processing_params.gamma, 0.1F);
+            post_processing_params_buffer->update_buffer(&ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
         }
         ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
