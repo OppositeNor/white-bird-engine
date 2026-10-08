@@ -19,6 +19,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "i_post_processing.hh"
@@ -70,6 +71,23 @@ enum class PixelSortScope : uint32_t {
 };
 
 /**
+ * @class PixelSortSettings
+ * @brief Configuration of the pixel sort post-processing.
+ */
+struct PixelSortSettings {
+    /** Whether the columns or the rows of the image are sorted. */
+    PixelSortDirection direction = PixelSortDirection::VERTICAL;
+    /** The value the pixels of every line are ordered and masked by. */
+    PixelSortMetric metric = PixelSortMetric::SATURATION;
+    /** Whether each sort covers a whole line or one span of consecutive masked pixels. */
+    PixelSortScope scope = PixelSortScope::LINE;
+    /** The smallest sort metric of a sorted pixel. */
+    float min_metric = 0.3F;
+    /** The largest sort metric of a sorted pixel. */
+    float max_metric = 1.1F;
+};
+
+/**
  * @class PixelSort
  * @brief Post-processing effect that sorts, by a selectable metric, the pixels of every column or row of the color image
  * whose sort metric is inside a contrast range, either across the whole line or within every span of consecutive masked
@@ -89,21 +107,15 @@ public:
      * @param p_extent Factory of the extent of the color images the effect is applied to. Every graph the effect is added to
      * evaluates it against its render graph context, and resizes the effect's resources and dispatches with it.
      * @param p_color_format Format of the color images the effect is applied to.
-     * @param p_direction Whether the effect sorts the columns or the rows of the image.
-     * @param p_metric The value the effect orders the pixels of every line by, and masks them by.
-     * @param p_scope Whether each sort covers a whole line or one span of consecutive masked pixels.
-     * @throws std::runtime_error If a shader resource is missing, p_extent is null, the extent of the current renderer
-     * state is empty or too large to pack the sort keys into 32 bits, the length of a sorted line does not fit the 16-bit
-     * mask image, p_metric is not a PixelSortMetric value, or p_scope is not a PixelSortScope value. Graphs throw the same
-     * extent errors when a later context yields an invalid extent.
+     * @param p_settings The initial configuration of the effect.
+     * @throws std::runtime_error If a shader resource is missing, p_extent is null, or p_settings is invalid (see
+     * set_settings()). Graphs throw the same extent errors when a later context yields an invalid extent.
      */
     PixelSort(RenderAllocator* p_allocator,
         RendererVK* p_renderer,
         std::function<VkExtent2D(const RendGraphContextVK&)> p_extent,
         VkFormat p_color_format,
-        PixelSortDirection p_direction,
-        PixelSortMetric p_metric,
-        PixelSortScope p_scope);
+        const PixelSortSettings& p_settings);
     virtual ~PixelSort() override = default;
     PixelSort(const PixelSort&) = delete;
     PixelSort(PixelSort&&) = delete;
@@ -123,10 +135,35 @@ public:
     static constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
     static constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
 
-    /** The smallest sort metric of a sorted pixel. */
-    static constexpr float MIN_METRIC = 0.3F;
-    /** The largest sort metric of a sorted pixel. */
-    static constexpr float MAX_METRIC = 1.1F;
+    /**
+     * @brief Get the configuration of the effect.
+     * @return The current configuration.
+     */
+    const PixelSortSettings& get_settings() const {
+        return settings;
+    }
+
+    /**
+     * @brief Change the configuration of the effect.
+     *
+     * A changed direction or scope changes the effect's pipelines, resources, and dispatches: every graph the effect was
+     * added to must then be rebuilt with RenderGraphVK::rebuild() before it executes again. Otherwise the new metric and
+     * range take effect in a graph once upload_settings() writes them to it.
+     *
+     * @param p_settings The new configuration.
+     * @return True if every graph the effect was added to must be rebuilt.
+     * @throws std::runtime_error If p_settings.metric is not a PixelSortMetric value, p_settings.scope is not a
+     * PixelSortScope value, the metric range is negative or reversed, or a line of the extent of the current renderer state
+     * in p_settings.direction is too long for the 16-bit pixel sort mask.
+     */
+    bool set_settings(const PixelSortSettings& p_settings);
+
+    /**
+     * @brief Write the metric, range, and scope of the configuration to the contrast buffer of a graph.
+     * @param p_graph A graph the effect was added to, built with the current direction and scope.
+     * @throws std::runtime_error If p_graph has no pixel sort contrast buffer.
+     */
+    void upload_settings(RenderGraphVK& p_graph) const;
 
 private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.
@@ -135,9 +172,30 @@ private:
     // The sizes of the resources and dispatches of the effect for one extent of the color image.
     struct Layout;
 
+    // The ids of the histogram, histogram prefix sum, and scatter tasks of every radix sort pass.
+    struct RadixSortTaskIds;
+
+    // One pipeline per PixelSortDirection value, indexed by the direction.
+    using DirectionPipelines = std::array<Ref<ROComputePipelineVK>, 2>;
+
     static Layout make_layout(VkExtent2D p_extent, PixelSortDirection p_direction);
+    static void validate_settings(const PixelSortSettings& p_settings);
     Ref<ROComputePipelineVK> compile(std::string_view p_shader_id) const;
-    // Add a task dispatching p_pipeline with the workgroup counts of the layout of the graph's context.
+    DirectionPipelines compile_direction_variants(std::string_view p_shader_name) const;
+    // Add a task dispatching the pipeline of the current direction with the workgroup counts of the layout of the graph's
+    // context.
+    void add_compute_task(RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
+        const DirectionPipelines& p_pipelines,
+        VkExtent3D Layout::* p_group_count,
+        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
+    void add_graph_resources(RendGraphDescVK& p_graph) const;
+    RadixSortTaskIds add_radix_sort_tasks(RendGraphDescVK& p_graph) const;
+    static void connect_render_tasks(RendGraphDescVK& p_graph,
+        std::string_view p_color_image_view,
+        std::string_view p_previous_task_id,
+        const RadixSortTaskIds& p_task_ids);
+    // Add a task dispatching a pipeline that does not depend on the direction.
     void add_compute_task(RendGraphDescVK& p_graph,
         std::string_view p_task_id,
         const Ref<ROComputePipelineVK>& p_pipeline,
@@ -147,14 +205,13 @@ private:
     RendererVK* renderer = nullptr;
     std::function<VkExtent2D(const RendGraphContextVK&)> extent;
     VkFormat color_format = VK_FORMAT_UNDEFINED;
-    PixelSortDirection direction = PixelSortDirection::VERTICAL;
-    PixelSortMetric metric = PixelSortMetric::SATURATION;
-    PixelSortScope scope = PixelSortScope::LINE;
+    // Read by the factories of every graph the effect was added to.
+    PixelSortSettings settings;
     Ref<ROComputePipelineVK> copy_source_pipeline;
-    Ref<ROComputePipelineVK> count_mask_pipeline;
+    DirectionPipelines count_mask_pipelines;
     Ref<ROComputePipelineVK> prefix_sum_columns_pipeline;
-    Ref<ROComputePipelineVK> register_keys_pipeline;
-    Ref<ROComputePipelineVK> write_sorted_pixels_pipeline;
+    DirectionPipelines register_keys_pipelines;
+    DirectionPipelines write_sorted_pixels_pipelines;
     Ref<ROComputePipelineVK> histogram_prefix_sum_pipeline;
     std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> histogram_pipelines;
     std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> scatter_pipelines;

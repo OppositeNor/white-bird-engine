@@ -42,6 +42,7 @@
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "platform/file_system/path.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
@@ -155,6 +156,23 @@ inline bool exec_test_requested(std::string_view p_variable) {
 }
 
 /**
+ * @brief Parse an executable-test frame number or frame count from an environment variable value.
+ * @param p_text The variable value.
+ * @param p_error_message The message thrown when the value is not a nonnegative decimal integer.
+ * @return The parsed value.
+ * @throws std::runtime_error If p_text is not entirely a nonnegative decimal integer.
+ */
+inline uint64_t parse_exec_test_frame_count(std::string_view p_text, std::string_view p_error_message) {
+    const char* text_end = p_text.data() + p_text.size();
+    uint64_t value = 0;
+    auto result = std::from_chars(p_text.data(), text_end, value);
+    if (result.ec != std::errc{} || result.ptr != text_end) {
+        throw std::runtime_error(std::string(p_error_message));
+    }
+    return value;
+}
+
+/**
  * @brief Request the frame captures configured by the environment.
  *
  * WBE_CAPTURE_PNG is the absolute output path and WBE_CAPTURE_FRAME the first captured frame (default 5). Without
@@ -164,9 +182,10 @@ inline bool exec_test_requested(std::string_view p_variable) {
  *
  * @param p_renderer The renderer to request captures from.
  * @param p_frame The current frame number.
+ * @return True if a capture of the frame rendered next was requested by this call.
  * @throws std::runtime_error If a variable is malformed.
  */
-inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
+inline bool on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
     static std::string capture_png_path;
     static uint64_t capture_frame = 5;
     static bool capture_requested = false;
@@ -180,30 +199,24 @@ inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
         capture_png_path = capture_path;
     }
     if (const char* frame = std::getenv("WBE_CAPTURE_FRAME"); frame != nullptr) {
-        std::string frame_text(frame);
-        const char* frame_end = frame_text.data() + frame_text.size();
-        auto result = std::from_chars(frame_text.c_str(), frame_end, capture_frame);
-        if (result.ec != std::errc{} || result.ptr != frame_end) {
-            throw std::runtime_error("WBE_CAPTURE_FRAME must be a nonnegative frame number.");
-        }
+        capture_frame = parse_exec_test_frame_count(frame, "WBE_CAPTURE_FRAME must be a nonnegative frame number.");
     }
     if (const char* interval = std::getenv("WBE_CAPTURE_INTERVAL"); interval != nullptr && *interval != '\0') {
-        std::string interval_text(interval);
-        const char* interval_end = interval_text.data() + interval_text.size();
-        auto result = std::from_chars(interval_text.c_str(), interval_end, capture_interval);
-        if (result.ec != std::errc{} || result.ptr != interval_end || capture_interval == 0) {
+        capture_interval = parse_exec_test_frame_count(interval, "WBE_CAPTURE_INTERVAL must be a positive frame count.");
+        if (capture_interval == 0) {
             throw std::runtime_error("WBE_CAPTURE_INTERVAL must be a positive frame count.");
         }
     }
     if (capture_png_path.empty()) {
-        return;
+        return false;
     }
     if (capture_interval == 0) {
         if (!capture_requested && p_frame >= capture_frame) {
             p_renderer.request_frame_capture(capture_png_path);
             capture_requested = true;
+            return true;
         }
-        return;
+        return false;
     }
     if (!capture_requested) {
         next_capture_frame = capture_frame;
@@ -211,10 +224,13 @@ inline void on_exec_test_render(IRenderer& p_renderer, uint64_t p_frame) {
     }
     if (p_frame >= next_capture_frame) {
         const Path path(capture_png_path);
-        const Path frame_path = path.parent_path() / std::format("{}_frame{}{}", path.stem().string(), p_frame, path.extension().string());
+        const Path frame_path =
+            path.parent_path() / std::format("{}_frame{}{}", path.stem().string(), p_frame, path.extension().string());
         p_renderer.request_frame_capture(frame_path.string());
         next_capture_frame = p_frame + capture_interval;
+        return true;
     }
+    return false;
 }
 
 inline void on_exec_test_start() {
@@ -224,7 +240,6 @@ inline void on_exec_test_start() {
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 }
-
 
 inline std::string_view mesh_vertex_entry(RefRes<RUGraphicsPipeline> p_pipeline) {
     if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL) {
@@ -373,8 +388,8 @@ inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipe
             continue;
         }
         if (graph_id.empty()) {
-            throw std::runtime_error(std::format(
-                "Pipeline declares mesh resource \"{}\" but no graph resource is provided for it.", shader_id));
+            throw std::runtime_error(
+                std::format("Pipeline declares mesh resource \"{}\" but no graph resource is provided for it.", shader_id));
         }
         p_task.alias(shader_id, graph_id);
     }

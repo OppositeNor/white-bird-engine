@@ -13,9 +13,6 @@
    limitations under the License.
 */
 #include "../render_test.hh"
-#include "function/render_vk/rt_build_acceleration_structures_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
-#include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
@@ -23,23 +20,29 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_build_acceleration_structures_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
 #include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
 #include "i_octree_render_feature.hh"
 #include "i_post_processing.hh"
 #include "resource/resource_utils.hh"
+#include "rt_imgui_vk.hh"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -139,6 +142,14 @@ std::vector<uint8_t> convert_bloom_to_rgba8(std::span<const uint8_t> p_bloom_dat
     return rgba8;
 }
 
+RendImageDescVK make_graph_image_desc(RendResPrimaryUsageVK p_usage, VkFormat p_format, VkExtent2D p_extent) {
+    return RendImageDescVK{
+        .usage = p_usage,
+        .format = p_format,
+        .extent = {.width = p_extent.width, .height = p_extent.height, .depth = 1},
+    };
+}
+
 } // namespace
 
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
@@ -182,9 +193,7 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
     octree->add_construction_render_tasks(pipeline_desc, *dynamic_mesh);
     pipeline_desc.add_task(octree->get_deferred_construction_render_task_desc());
-    pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc())
-        .add_task(create_indirect_lighting_task_desc())
-        .add_task(create_combine_lighting_task_desc());
+    pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc()).add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
     const std::string_view post_processing_last_task_id =
         post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
     pipeline_desc.add_task(create_bloom_extract_task_desc())
@@ -193,11 +202,13 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_present_result_image_task_desc())
         .add_task(octree->get_debug_draw_render_task_desc())
         .add_task(octree->get_pre_deferred_debug_draw_render_task_desc())
-        .add_task(create_light_billboard_task_desc());
+        .add_task(create_light_billboard_task_desc())
+        .add_task(create_imgui_task_desc());
     connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
     octree->connect_render_tasks(pipeline_desc);
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
+    deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
 }
 
 void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
@@ -207,8 +218,9 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
 
     // Shadow and reflective-shadow-map passes.
     for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW}) {
-        connect_resource_chain(
-            p_pipeline_desc, shadow_color, {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW, RT_RUN_DYNAMIC_SHADOW_SECOND});
+        connect_resource_chain(p_pipeline_desc,
+            shadow_color,
+            {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW, RT_RUN_DYNAMIC_SHADOW_SECOND});
     }
     connect_resource_chain(p_pipeline_desc,
         SHADOWMAP_DEPTH_IMAGE_VIEW,
@@ -261,10 +273,13 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
         p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_EXTRACT_BLOOM, RT_BLUR_BLOOM, RT_ACQUIRE_BLOOM, RT_RUN_PRESENT_RESULT_IMAGE});
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
-        {RT_RUN_PRESENT_RESULT_IMAGE,
+        {
+            RT_RUN_PRESENT_RESULT_IMAGE,
             IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW,
             IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
-            RT_RUN_LIGHT_BILLBOARD});
+            RT_RUN_LIGHT_BILLBOARD,
+            RT_DRAW_IMGUI,
+        });
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
@@ -286,59 +301,48 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
 }
 
 void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const {
+    add_shadow_graph_resources(p_pipeline_desc);
+    add_gbuffer_graph_resources(p_pipeline_desc);
+    add_lighting_graph_resources(p_pipeline_desc);
+}
+
+void ApplicationVulkanDeferredPBRTest::add_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
     constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
     constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
     constexpr std::string_view RSM_NORMAL_IMAGE = "rsm_normal_image";
     constexpr std::string_view SHADOW_MOMENTS_IMAGE = "shadow_moments_image";
     constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE = "shadow_moments_sat_horizontal_image";
     constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE = "shadow_moments_sat_image";
-    constexpr std::string_view GBUFFER_ALBEDO_IMAGE = "gbuffer_albedo_image";
-    constexpr std::string_view GBUFFER_NORMAL_IMAGE = "gbuffer_normal_image";
-    constexpr std::string_view GBUFFER_RMA_IMAGE = "gbuffer_rma_image";
-    constexpr std::string_view GBUFFER_DEPTH_IMAGE = "gbuffer_depth_image";
-    constexpr std::string_view DIRECT_LIGHTING_IMAGE = "direct_lighting_image";
-    constexpr std::string_view INDIRECT_LIGHTING_IMAGE = "indirect_lighting_image";
-    constexpr std::string_view RESULT_IMAGE = "result_color_image";
-    constexpr std::string_view BLOOM_PING_IMAGE = "bloom_ping_image";
-    constexpr std::string_view BLOOM_PONG_IMAGE = "bloom_pong_image";
-    auto image = [](RendResPrimaryUsageVK p_usage, VkFormat p_format, VkExtent2D p_extent) {
-        return RendImageDescVK{
-            .usage = p_usage, .format = p_format, .extent = {.width = p_extent.width, .height = p_extent.height, .depth = 1}};
-    };
-    RendImageDescVK shadow_moments = image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, SHADOW_MOMENTS_FORMAT, shadow_extent);
+    RendImageDescVK shadow_moments =
+        make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, SHADOW_MOMENTS_FORMAT, shadow_extent);
     shadow_moments.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     shadow_moments.mip_levels = shadow_mipmap_level_count;
-    RendImageDescVK bloom_ping = image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, bloom_extent);
-    bloom_ping.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    const RendSamplerDescVK clamped_linear_sampler{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
 
     // Shadow and reflective-shadow-map targets.
     p_pipeline_desc
         .add_image(SHADOWMAP_DEPTH_IMAGE,
-            [image, extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, extent);
+            [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, extent);
             })
         .add_image(SHADOWMAP_COLOR_IMAGE,
-            [image, extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_FLUX_FORMAT, extent);
+            [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_FLUX_FORMAT, extent);
             })
         .add_image(RSM_NORMAL_IMAGE,
-            [image, extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_NORMAL_FORMAT, extent);
+            [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_NORMAL_FORMAT, extent);
             })
         .add_image(SHADOW_MOMENTS_IMAGE,
             [shadow_moments](const RendGraphContextVK& /*p_context*/) {
                 return shadow_moments;
             })
         .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE,
-            [image, extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
+            [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
             })
         .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE,
-            [image, extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
+            [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
             })
         .add_image_view(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
         .add_image_view(SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
@@ -352,64 +356,98 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
         .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE)
         .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE)
         .add_sampler(SHADOW_SAMPLER, [mip_level_count = shadow_mipmap_level_count](const RendGraphContextVK& /*p_context*/) {
-            return RendSamplerDescVK{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            return RendSamplerDescVK{
+                .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .min_lod = 0.0F,
-                .max_lod = static_cast<float>(mip_level_count - 1)};
+                .max_lod = static_cast<float>(mip_level_count - 1),
+            };
         });
+}
+
+void ApplicationVulkanDeferredPBRTest::add_gbuffer_graph_resources(RendGraphDescVK& p_pipeline_desc) {
+    constexpr std::string_view GBUFFER_ALBEDO_IMAGE = "gbuffer_albedo_image";
+    constexpr std::string_view GBUFFER_NORMAL_IMAGE = "gbuffer_normal_image";
+    constexpr std::string_view GBUFFER_RMA_IMAGE = "gbuffer_rma_image";
+    constexpr std::string_view GBUFFER_DEPTH_IMAGE = "gbuffer_depth_image";
 
     // G-buffer targets.
     p_pipeline_desc
         .add_image(GBUFFER_ALBEDO_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_ALBEDO_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_ALBEDO_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(GBUFFER_NORMAL_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_NORMAL_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_NORMAL_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(GBUFFER_RMA_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_RMA_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, GBUFFER_RMA_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(GBUFFER_DEPTH_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, GBUFFER_DEPTH_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, GBUFFER_DEPTH_FORMAT, p_context.swap_chain_extent);
             })
         .add_image_view(GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_ALBEDO_IMAGE)
         .add_image_view(GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE)
         .add_image_view(GBUFFER_RMA_IMAGE_VIEW, GBUFFER_RMA_IMAGE)
         .add_image_view(GBUFFER_DEPTH_IMAGE_VIEW, GBUFFER_DEPTH_IMAGE)
         .add_sampler(GBUFFER_SAMPLER, [=](const RendGraphContextVK& /*p_context*/) {
-            return RendSamplerDescVK{.min_filter = VK_FILTER_NEAREST,
+            return RendSamplerDescVK{
+                .min_filter = VK_FILTER_NEAREST,
                 .mag_filter = VK_FILTER_NEAREST,
                 .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
+                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            };
         });
+}
+
+void ApplicationVulkanDeferredPBRTest::add_lighting_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
+    constexpr std::string_view DIRECT_LIGHTING_IMAGE = "direct_lighting_image";
+    constexpr std::string_view INDIRECT_LIGHTING_IMAGE = "indirect_lighting_image";
+    constexpr std::string_view RESULT_IMAGE = "result_color_image";
+    constexpr std::string_view BLOOM_PING_IMAGE = "bloom_ping_image";
+    constexpr std::string_view BLOOM_PONG_IMAGE = "bloom_pong_image";
+    RendImageDescVK bloom_ping =
+        make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, bloom_extent);
+    bloom_ping.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    const RendSamplerDescVK clamped_linear_sampler{
+        .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    };
 
     // Lighting and post-processing outputs.
     p_pipeline_desc
         .add_image(DIRECT_LIGHTING_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(INDIRECT_LIGHTING_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(RESULT_IMAGE,
-            [image](const RendGraphContextVK& p_context) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
+            [](const RendGraphContextVK& p_context) {
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, p_context.swap_chain_extent);
             })
         .add_image(BLOOM_PING_IMAGE,
             [bloom_ping](const RendGraphContextVK& /*p_context*/) {
                 return bloom_ping;
             })
         .add_image(BLOOM_PONG_IMAGE,
-            [image, extent = bloom_extent](const RendGraphContextVK& /*p_context*/) {
-                return image(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, extent);
+            [extent = bloom_extent](const RendGraphContextVK& /*p_context*/) {
+                return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, extent);
             })
         .add_image_view(DIRECT_LIGHTING_IMAGE_VIEW, DIRECT_LIGHTING_IMAGE)
         .add_image_view(INDIRECT_LIGHTING_IMAGE_VIEW, INDIRECT_LIGHTING_IMAGE)
@@ -441,7 +479,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
     RTRunComputePipelinesSequentialVK::Dispatch dispatch(render_allocator);
     dispatch.add_entry(shadow_moments_summed_area_table_horizontal_compute_pipeline, horizontal_dispatch_group_count)
         .add_entry(shadow_moments_summed_area_table_vertical_compute_pipeline, vertical_dispatch_group_count);
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this, dispatch](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
     };
     return task_desc;
@@ -450,7 +488,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTGenerateMipmapsVK>(
             render_allocator, base_render_data, SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, shadow_extent, shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
     };
@@ -502,7 +540,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc(
         .height = (bloom_extent.height + 7U) / 8U,
         .depth = 1,
     };
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this, dispatch_group_count](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, bloom_extract_compute_pipeline, dispatch_group_count);
     };
     return task_desc;
@@ -519,7 +557,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
     };
     // Starting from ping, even iterations blur ping into pong and odd iterations blur pong back into ping, so an even
     // iteration count leaves the result in ping.
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this, dispatch_group_count](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTPingPongVK>(render_allocator,
             base_render_data,
             kawase_blur_pong_write_compute_pipeline,
@@ -550,7 +588,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
     task_desc.task_id = RT_RUN_PRESENT_RESULT_IMAGE;
     task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN);
     const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-    task_desc.factory = [=, this](const RendGraphContextVK& p_context) {
+    task_desc.factory = [this, clear_values](const RendGraphContextVK& p_context) {
         return RTRunGraphicsPipelineVK::Builder(render_allocator)
             .set_pipeline(present_post_processing_graphics_pipeline)
             .set_render_extent(p_context.swap_chain_extent)
@@ -579,7 +617,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
     task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
     const std::array<std::string_view, 1> color_targets{REND_RES_SWAP_CHAIN};
     alias_render_targets(task_desc, color_targets, GBUFFER_DEPTH_IMAGE_VIEW);
-    task_desc.factory = [=, this](const RendGraphContextVK& p_context) {
+    task_desc.factory = [this](const RendGraphContextVK& p_context) {
         return RTRunGraphicsPipelineVK::Builder(render_allocator)
             .set_pipeline(light_billboard_pipeline)
             .set_render_extent(p_context.swap_chain_extent)
@@ -587,6 +625,16 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_des
             .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
             .set_draw_vertex_count(6)
             .create_unique(base_render_data);
+    };
+    return task_desc;
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_imgui_task_desc() {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_DRAW_IMGUI;
+    task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN);
+    task_desc.factory = [this](const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
     };
     return task_desc;
 }

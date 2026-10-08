@@ -17,12 +17,14 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
 #include "i_octree_render_feature.hh"
 #include <atomic>
 #include <cstdint>
@@ -63,7 +65,8 @@ void OctreeRenderFeaturePassPublished::add_dynamic_publication_render_tasks(Rend
 void OctreeRenderFeaturePassPublished::connect_implementation_render_tasks(RendGraphDescVK& p_graph) const {
     connect_resource_chain(p_graph,
         OCTREE_INFO,
-        {RT_RESET_OCTREE,
+        {
+            RT_RESET_OCTREE,
             RT_RUN_BUILD_OCTREE,
             RT_RUN_BUILD_OCTREE_DOUBLE_SIDED,
             RT_UPDATE_OCTREE_STATES,
@@ -75,10 +78,12 @@ void OctreeRenderFeaturePassPublished::connect_implementation_render_tasks(RendG
             RT_CAPTURE_OCTREE_PRE_DEFERRED_DEBUG,
             RT_RUN_BUILD_OCTREE_DEFERRED,
             RT_SETUP_OCTREE_DEBUG_DRAW,
-            RT_RUN_OCTREE_DEBUG_DRAW});
+            RT_RUN_OCTREE_DEBUG_DRAW,
+        });
     connect_resource_chain(p_graph,
         OCTREE_NODE_BUFFER,
-        {RT_RESET_OCTREE,
+        {
+            RT_RESET_OCTREE,
             RT_RUN_BUILD_OCTREE,
             RT_RUN_BUILD_OCTREE_DOUBLE_SIDED,
             RT_UPDATE_OCTREE_STATES,
@@ -89,23 +94,38 @@ void OctreeRenderFeaturePassPublished::connect_implementation_render_tasks(RendG
             RT_PUBLISH_DYNAMIC_OCTREE,
             RT_RUN_BUILD_OCTREE_DEFERRED,
             RT_RUN_OCTREE_DEBUG_DRAW,
-            RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
+            RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
+        });
     connect_resource_chain(p_graph,
         OCTREE_DYNAMIC_NODES,
-        {RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_PUBLISH_DYNAMIC_OCTREE, RT_RUN_BUILD_OCTREE_DEFERRED, RT_RUN_OCTREE_DEBUG_DRAW, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
+        {
+            RT_CLEAR_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND,
+            RT_PUBLISH_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_OCTREE_DEFERRED,
+            RT_RUN_OCTREE_DEBUG_DRAW,
+            RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
+        });
     connect_resource_chain(p_graph,
         OCTREE_DYNAMIC_LEAVES,
-        {RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, RT_PUBLISH_DYNAMIC_OCTREE, RT_RUN_BUILD_OCTREE_DEFERRED, RT_RUN_OCTREE_DEBUG_DRAW, RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW});
+        {
+            RT_CLEAR_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND,
+            RT_PUBLISH_DYNAMIC_OCTREE,
+            RT_RUN_BUILD_OCTREE_DEFERRED,
+            RT_RUN_OCTREE_DEBUG_DRAW,
+            RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
+        });
 }
 
 RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_render_task_desc(bool p_dynamic) const {
     RendTaskDescVK task_desc(render_allocator);
     const Ref<ROComputePipelineVK>& reset_ping_pipeline = octree_deferred_count_reset_pong_compute_pipeline;
     const Ref<ROComputePipelineVK>& reset_pong_pipeline = octree_deferred_count_reset_ping_compute_pipeline;
-    const Ref<ROComputePipelineVK>& ping_pipeline =
-        p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline;
-    const Ref<ROComputePipelineVK>& pong_pipeline =
-        p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline;
+    const Ref<ROComputePipelineVK>& ping_pipeline = p_dynamic ? dynamic_ping_pipeline : octree_deferred_propagation_pong_write_compute_pipeline;
+    const Ref<ROComputePipelineVK>& pong_pipeline = p_dynamic ? dynamic_pong_pipeline : octree_deferred_propagation_ping_write_compute_pipeline;
     const Ref<ROComputePipelineVK>& publication_pipeline = p_dynamic ? dynamic_publication_pipeline : update_states_pipeline;
     constexpr uint32_t THREADS_PER_GROUP = 64;
     constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
@@ -115,7 +135,8 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_rend
         .width = static_cast<uint32_t>(p_dynamic ? (OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128
                                                  : (OCTREE_MAX_NODE_COUNT + THREADS_PER_GROUP - 1) / THREADS_PER_GROUP),
         .height = 1,
-        .depth = 1};
+        .depth = 1,
+    };
     // Rasterization allocates depth one's children. Each round publishes one further level;
     // an extra retry consumes leaf occupancy and drains the remaining deferred entries.
     for (uint32_t iteration = 0; iteration < OCTREE_MAX_DEPTH; ++iteration) {
@@ -124,7 +145,7 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_rend
             .add_entry(write_pong ? ping_pipeline : pong_pipeline, PROPAGATION_GROUP_COUNT)
             .add_entry(publication_pipeline, publication_group_count);
     }
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this, dispatch](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
     };
     return task_desc;
@@ -134,7 +155,7 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_state_update_render_task_de
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_UPDATE_OCTREE_STATES;
     constexpr VkExtent3D GROUP_COUNT{.width = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 63) / 64), .height = 1, .depth = 1};
-    task_desc.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.factory = [this, GROUP_COUNT](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT);
     };
     return task_desc;
@@ -144,7 +165,7 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_dynamic_publication_task_de
     RendTaskDescVK task(render_allocator);
     task.task_id = RT_PUBLISH_DYNAMIC_OCTREE;
     constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
-    task.factory = [=, this](const RendGraphContextVK& /*p_context*/) {
+    task.factory = [this](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(
             render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
     };

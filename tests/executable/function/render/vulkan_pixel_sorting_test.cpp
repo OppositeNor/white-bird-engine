@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
@@ -19,31 +20,35 @@
 #include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
+#include "function/function_utils.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "global/global.hh"
 #include "glm/gtc/packing.hpp"
+#include "global/global.hh"
 #include "imgui.h"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "resource/resource_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include "rt_imgui_vk.hh"
 #include <algorithm>
 #include <array>
@@ -168,6 +173,17 @@ inline constexpr uint32_t RADIX_SORT_DATA_START = 4;
 inline constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
 
 /**
+ * @enum PixelSortOrientation
+ * @brief The lines of the image the pixel sort sorts.
+ */
+enum class PixelSortOrientation : uint8_t {
+    /** Sort every column, from the top. */
+    VERTICAL,
+    /** Sort every row, from the left. */
+    HORIZONTAL,
+};
+
+/**
  * @class PixelSortContrastGPU
  * @brief GPU layout of PixelSortContrast in pixel_sort_utils.slang.
  */
@@ -178,7 +194,7 @@ struct PixelSortContrastGPU {
     float max_metric = PIXEL_SORT_DEFAULT_MAX_METRIC;
     /** The metric the sorted pixels are ordered and masked by: 0 for luminance, 1 for hue, 2 for saturation. */
     uint32_t sort_metric = PIXEL_SORT_DEFAULT_METRIC;
-    /** The pixels each sort covers: 0 for the whole column, as the R16_UINT mask image requires, 1 for each span. */
+    /** The pixels each sort covers: 0 for the whole line, as the R16_UINT mask image requires, 1 for each span. */
     uint32_t sort_scope = 0;
 };
 
@@ -193,13 +209,14 @@ struct PixelSortingPostProcessingParamsGPU {
 
 /**
  * @class ApplicationVulkanPixelSortingTest
- * @brief Sorts the pixels of every column of an image that are inside a saturation contrast mask with the GPU radix sort,
- * and presents the result.
+ * @brief Sorts the pixels of every column or row of an image that are inside a contrast mask with the GPU radix sort, and
+ * presents the result.
  *
- * One invocation per column counts its masked pixels, a prefix sum turns the counts into the range of every column in
- * the key buffer, and one invocation per column registers its masked pixels into that range and stores each pixel's
- * buffer index in an index image. Every key orders by column, then saturation, and stores the source row (see
- * pixel_sort_utils.slang), so one radix sort of all keys sorts every column in place within its range. Each of the 4 radix
+ * The orientation selects whether the columns or the rows are sorted; changing it rebuilds the render graph. One
+ * invocation per line counts its masked pixels, a prefix sum turns the counts into the range of every line in the key
+ * buffer, and one invocation per line registers its masked pixels into that range and stores each pixel's buffer index
+ * in an index image. Every key orders by line, then metric, and stores the position along the line (see
+ * pixel_sort_utils.slang), so one radix sort of all keys sorts every line in place within its range. Each of the 4 radix
  * sort passes runs the histogram, histogram prefix sum, and scatter shaders for one 8-bit digit, alternating between two
  * key buffers. Then, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
  * Finally, a post-processing pass applies general effects to the sorted image before it is presented.
@@ -222,6 +239,9 @@ public:
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
         poll_screenshot();
+        if (ui_orientation != built_orientation) {
+            rebuild_render_graph();
+        }
         imgui_overlay->begin_frame(p_delta);
         draw_parameter_window();
         imgui_overlay->end_frame();
@@ -230,8 +250,8 @@ public:
     /**
      * @brief Set the sort metric range of the sorted pixels.
      *
-     * Before setup_render_graph(), the range becomes the initial contrast buffer content; afterwards the buffer is updated
-     * through a render job. Must be called from the logic thread.
+     * Before setup_render_graph(), the range becomes the initial contrast buffer content; afterwards the contrast is
+     * updated through a render job. Must be called from the logic thread.
      *
      * @param p_min_metric The smallest sort metric of a sorted pixel.
      * @param p_max_metric The largest sort metric of a sorted pixel.
@@ -239,25 +259,26 @@ public:
      */
     void set_contrast(float p_min_metric, float p_max_metric) {
         if (!(0.0F <= p_min_metric && p_min_metric <= p_max_metric && p_max_metric <= 1.0F)) {
-            throw std::runtime_error(std::format("Invalid pixel sort contrast range [{}, {}]: it must satisfy 0 <= min <= max <= 1.",
-                p_min_metric, p_max_metric));
+            throw std::runtime_error(std::format(
+                "Invalid pixel sort contrast range [{}, {}]: it must satisfy 0 <= min <= max <= 1.", p_min_metric, p_max_metric));
         }
         contrast.min_metric = p_min_metric;
         contrast.max_metric = p_max_metric;
-        WBE::ROBufferVK* contrast_buffer_ptr = contrast_buffer.get();
-        if (contrast_buffer_ptr == nullptr) {
+        if (!render_graph_built) {
             return;
         }
-        const PixelSortContrastGPU contrast_value = contrast;
-        add_render_job([contrast_value, contrast_buffer_ptr]() {
-            contrast_buffer_ptr->update_buffer(&contrast_value, sizeof(PixelSortContrastGPU));
+        // The job resolves the current buffer, because a graph rebuild replaces it.
+        add_render_job([this, p_min_metric, p_max_metric] {
+            ui_contrast.min_metric = p_min_metric;
+            ui_contrast.max_metric = p_max_metric;
+            contrast_buffer->update_buffer(&ui_contrast, sizeof(PixelSortContrastGPU));
         });
     }
 
     /**
      * @brief Set the gamma the post-processing pass raises every color channel to.
      *
-     * Before setup_render_graph(), the gamma becomes the initial parameter buffer content; afterwards the buffer is updated
+     * Before setup_render_graph(), the gamma becomes the initial parameter buffer content; afterwards the gamma is updated
      * through a render job. Must be called from the logic thread.
      *
      * @param p_gamma The exponent every color channel is raised to.
@@ -268,16 +289,41 @@ public:
             throw std::runtime_error(std::format("Invalid pixel sorting post-processing gamma {}: it must be positive.", p_gamma));
         }
         post_processing_params.gamma = p_gamma;
-        WBE::ROBufferVK* params_buffer_ptr = post_processing_params_buffer.get();
-        if (params_buffer_ptr == nullptr) {
+        if (!render_graph_built) {
             return;
         }
-        const PixelSortingPostProcessingParamsGPU params_value = post_processing_params;
-        add_render_job([params_value, params_buffer_ptr]() {
-            params_buffer_ptr->update_buffer(&params_value, sizeof(PixelSortingPostProcessingParamsGPU));
+        // The job resolves the current buffer, because a graph rebuild replaces it.
+        add_render_job([this, p_gamma] {
+            ui_post_processing_params.gamma = p_gamma;
+            post_processing_params_buffer->update_buffer(&ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
         });
     }
 
+    /**
+     * @brief Set whether the columns or the rows of the image are sorted.
+     *
+     * Before setup_render_graph(), the orientation selects the initial render graph; afterwards the graph is rebuilt for it
+     * through a render job. Must be called from the logic thread.
+     *
+     * @param p_orientation The lines of the image to sort.
+     */
+    void set_orientation(PixelSortOrientation p_orientation) {
+        orientation = p_orientation;
+        if (!render_graph_built) {
+            return;
+        }
+        add_render_job([this, p_orientation] {
+            ui_orientation = p_orientation;
+        });
+    }
+
+    /**
+     * @brief Load the source image, size the window to it, and build the render graph for the configured orientation.
+     *
+     * Must be called once, before run().
+     *
+     * @throws std::runtime_error If a resource is missing, the image is too large to sort, or the graph cannot be built.
+     */
     void setup_render_graph() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
@@ -302,232 +348,356 @@ public:
             .color_attachment_formats = {base_render_data->swap_chain_format},
         };
         WBE::GraphicsPipelineCompilerVK graphics_compiler(graphics_compiler_context);
-        WBE::Ref<WBE::ROImageViewVK> source_view = graphics_compiler.compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
-        WBE::Ref<WBE::ROGraphicsPipelineVK> present_pipeline =
-            graphics_compiler.compile("present_pixel_sort_pipeline", present_pipeline_resource).graphics_pipeline;
+        source_view = graphics_compiler.compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
+        present_pipeline = graphics_compiler.compile("present_pixel_sort_pipeline", present_pipeline_resource).graphics_pipeline;
 
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
-        // A key packs the column, saturation, and row, so at least 2 saturation levels must fit in 32 bits.
-        // The mask image stores each masked pixel's rank within its column as R16_UINT, with 0xFFFF marking unmasked pixels.
-        if (source_extent.height >= UINT16_MAX) {
-            throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}-pixel-high image is too high for the 16-bit pixel sort mask.",
-                source_extent.height));
-        }
+        // A key packs the line, metric, and position along the line, so at least 2 metric levels must fit in 32 bits.
         if (element_count == 0 || UINT32_MAX / element_count < 2) {
             throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}x{} image is too large to pack its pixel sort keys into 32 bits.",
-                source_extent.width, source_extent.height));
+                source_extent.width,
+                source_extent.height));
         }
         // Show the image at its own size. This runs before the logic and rendering threads start, and the renderer
         // resizes the swap chain, and with it the graph, on the first frame.
         get_window()->resize(source_extent.width, source_extent.height);
-        const uint32_t sub_histogram_num = std::clamp(
+        ui_contrast = contrast;
+        ui_post_processing_params = post_processing_params;
+        ui_orientation = orientation;
+        build_render_graph(orientation);
+        render_graph_built = true;
+    }
+
+private:
+    static constexpr std::string_view PIXEL_SORTING_GRAPH_ID = "pixel_sorting_graph";
+
+    /**
+     * @brief Replace the render graph with one for the orientation selected on the rendering thread.
+     *
+     * Must be called on the rendering thread, outside of the renderer tick; the renderer releases the previous graph once
+     * its frames have finished.
+     */
+    void rebuild_render_graph() {
+        WBE::RendererVK::get_singleton()->unregister_render_graph(PIXEL_SORTING_GRAPH_ID);
+        build_render_graph(ui_orientation);
+    }
+
+    /**
+     * @brief Build, register, and activate the render graph that sorts the lines of p_orientation.
+     *
+     * The contrast and post-processing buffers start with the parameters of the rendering thread.
+     *
+     * @param p_orientation The lines of the image to sort.
+     * @throws std::runtime_error If a sorted line is too long for the 16-bit pixel sort mask, or a shader is missing.
+     */
+    void build_render_graph(PixelSortOrientation p_orientation) {
+        auto* render_allocator = get_renderer_allocator().get();
+        auto* renderer = WBE::RendererVK::get_singleton();
+        const PixelSortGraphLayout layout = make_graph_layout(p_orientation);
+        WBE::RendGraphDescVK pipeline_desc(render_allocator);
+        add_graph_resources(pipeline_desc, layout);
+        const RadixSortTaskIds radix_sort_task_ids = add_sort_tasks(pipeline_desc, layout);
+        add_present_tasks(pipeline_desc);
+        connect_graph_tasks(pipeline_desc, radix_sort_task_ids);
+        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph(PIXEL_SORTING_GRAPH_ID, std::move(pipeline_desc));
+        contrast_buffer = graph->acquire_resource(REND_RES_PIXEL_SORT_CONTRAST)->get().dynamic_cast_ref<WBE::ROBufferVK>();
+        post_processing_params_buffer =
+            graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS)->get().dynamic_cast_ref<WBE::ROBufferVK>();
+        result_image = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE);
+        WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
+        renderer->activate_render_graph(PIXEL_SORTING_GRAPH_ID);
+        built_orientation = p_orientation;
+    }
+
+    // The sizes of the resources and dispatches of a graph for the source image and one orientation.
+    struct PixelSortGraphLayout {
+        VkExtent3D source_extent{};
+        std::string_view orientation_name;
+        uint32_t sub_histogram_num = 1;
+        uint32_t column_group_count = 0;
+        VkExtent3D tile_group_count{};
+        size_t column_offsets_buffer_size = 0;
+        size_t key_buffer_size = 0;
+        size_t histogram_buffer_size = 0;
+    };
+
+    // The ids of the histogram, histogram prefix sum, and scatter tasks of every radix sort pass.
+    struct RadixSortTaskIds {
+        std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
+        std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
+        std::array<std::string, RADIX_SORT_PASS_COUNT> scatter_task_ids;
+    };
+
+    PixelSortGraphLayout make_graph_layout(PixelSortOrientation p_orientation) const {
+        PixelSortGraphLayout layout;
+        layout.source_extent = source_view->fields().image->fields().extent;
+        const VkExtent3D source_extent = layout.source_extent;
+        const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
+        const bool vertical = p_orientation == PixelSortOrientation::VERTICAL;
+        layout.orientation_name = vertical ? "vertical" : "horizontal";
+        // The number of sorted lines, and the number of pixels in each.
+        const uint32_t line_count = vertical ? source_extent.width : source_extent.height;
+        const uint32_t line_length = vertical ? source_extent.height : source_extent.width;
+        // The mask image stores each masked pixel's rank within its line as R16_UINT, with 0xFFFF marking unmasked pixels.
+        if (line_length >= UINT16_MAX) {
+            throw std::runtime_error(std::format(
+                "Failed to build the pixel sorting graph: a {}-pixel line is too long for the 16-bit pixel sort mask.", line_length));
+        }
+        layout.sub_histogram_num = std::clamp(
             static_cast<uint32_t>((element_count + RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / RADIX_SORT_ELEMENTS_PER_WORKGROUP),
             1U,
             RADIX_SORT_MAX_WORKGROUP_COUNT);
-        const VkExtent3D tile_group_count{.width = (source_extent.width + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
+        layout.tile_group_count = {
+            .width = (source_extent.width + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
             .height = (source_extent.height + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
-            .depth = 1};
-        const uint32_t column_group_count = (source_extent.width + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE;
-        // The column counts are followed by the zero element the prefix sum reads.
-        const size_t column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + source_extent.width + 1) * sizeof(uint32_t);
+            .depth = 1,
+        };
+        layout.column_group_count = (line_count + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE;
+        // The line counts are followed by the zero element the prefix sum reads.
+        layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + line_count + 1) * sizeof(uint32_t);
         // Sized for the case where every pixel is inside the mask.
-        const size_t key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
-        const size_t histogram_buffer_size =
-            (RADIX_SORT_DATA_START + static_cast<size_t>(sub_histogram_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
+        layout.key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
+        layout.histogram_buffer_size =
+            (RADIX_SORT_DATA_START + static_cast<size_t>(layout.sub_histogram_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
+        return layout;
+    }
 
-        WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
+    // The contrast and post-processing buffers start with the parameters of the rendering thread.
+    void add_graph_resources(WBE::RendGraphDescVK& p_graph, const PixelSortGraphLayout& p_layout) const {
+        p_graph.add_resource(WBE::REND_RES_SWAP_CHAIN, *WBE::RendererVK::get_singleton()->acquire_swap_chain_image_view_container())
             .add_resource(REND_RES_PIXEL_SORT_SOURCE, *source_view)
             .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
                 // The initial contrast is captured once, so the buffer keeps its identity, and the updates written to it,
                 // when the factory runs again.
-                [initial_data = WBE::to_initial_data(contrast)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                [initial_data = WBE::to_initial_data(ui_contrast)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
                         .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = initial_data};
+                        .initial_data = initial_data,
+                    };
                 })
             .add_buffer(REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = column_offsets_buffer_size};
+                [size = p_layout.column_offsets_buffer_size](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = size};
                 })
             .add_buffer(REND_RES_PIXEL_SORT_KEYS,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size};
+                [size = p_layout.key_buffer_size](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = size};
                 })
             .add_buffer(REND_RES_PIXEL_SORT_KEYS_SWAP,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = key_buffer_size};
+                [size = p_layout.key_buffer_size](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = size};
                 })
             .add_buffer(REND_RES_PIXEL_SORT_HISTOGRAM,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = histogram_buffer_size};
+                [size = p_layout.histogram_buffer_size](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = size};
                 })
             .add_image(REND_RES_PIXEL_SORT_DESTINATION_IMAGE,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                [extent = p_layout.source_extent](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendImageDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
                         .format = PIXEL_SORT_DESTINATION_FORMAT,
-                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                        .extent = {.width = extent.width, .height = extent.height, .depth = 1},
+                    };
                 })
             .add_image_view(REND_RES_PIXEL_SORT_DESTINATION, REND_RES_PIXEL_SORT_DESTINATION_IMAGE)
             .add_buffer(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS,
-                [initial_data = WBE::to_initial_data(post_processing_params)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                [initial_data = WBE::to_initial_data(ui_post_processing_params)](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
                         .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = initial_data};
+                        .initial_data = initial_data,
+                    };
                 })
             .add_image(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                [extent = p_layout.source_extent](const WBE::RendGraphContextVK& /*p_context*/) {
                     // The screenshot reads the result back through a transfer.
-                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                    return WBE::RendImageDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
                         .additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                         .format = PIXEL_SORT_DESTINATION_FORMAT,
-                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                        .extent = {.width = extent.width, .height = extent.height, .depth = 1},
+                    };
                 })
             .add_image_view(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT, REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE)
             .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
-                [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                [extent = p_layout.source_extent](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendImageDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
                         .format = VK_FORMAT_R16_UINT,
-                        .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
+                        .extent = {.width = extent.width, .height = extent.height, .depth = 1},
+                    };
                 })
             .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
             .add_sampler(REND_RES_PIXEL_SORT_SAMPLER, [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                return WBE::RendSamplerDescVK{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                return WBE::RendSamplerDescVK{
+                    .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                     .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                    .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
+                    .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                };
             });
+    }
 
-        const VkExtent3D column_dispatch{.width = column_group_count, .height = 1, .depth = 1};
-        add_compute_task(pipeline_desc, RT_COUNT_PIXEL_SORT_MASK, "count_pixel_sort_mask_vertical_shader", column_dispatch, {});
+    RadixSortTaskIds add_sort_tasks(WBE::RendGraphDescVK& p_graph, const PixelSortGraphLayout& p_layout) {
+        const VkExtent3D column_dispatch{.width = p_layout.column_group_count, .height = 1, .depth = 1};
+        add_compute_task(p_graph,
+            RT_COUNT_PIXEL_SORT_MASK,
+            std::format("count_pixel_sort_mask_{}_shader", p_layout.orientation_name),
+            column_dispatch,
+            {});
         // The prefix sum runs in a single workgroup.
-        add_compute_task(pipeline_desc,
+        add_compute_task(p_graph,
             RT_PREFIX_SUM_PIXEL_SORT_COLUMNS,
             "prefix_sum_pixel_sort_columns_shader",
             {.width = 1, .height = 1, .depth = 1},
             {});
-        add_compute_task(pipeline_desc, RT_REGISTER_PIXEL_SORT_KEYS, "register_pixel_sort_keys_vertical_shader", column_dispatch, {});
+        add_compute_task(p_graph,
+            RT_REGISTER_PIXEL_SORT_KEYS,
+            std::format("register_pixel_sort_keys_{}_shader", p_layout.orientation_name),
+            column_dispatch,
+            {});
 
-        std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
-        std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
-        std::array<std::string, RADIX_SORT_PASS_COUNT> scatter_task_ids;
+        RadixSortTaskIds task_ids = add_radix_sort_tasks(p_graph, p_layout);
+
+        // After an even number of passes, the sorted keys are back in the key buffer.
+        add_compute_task(p_graph,
+            RT_WRITE_SORTED_PIXELS,
+            std::format("write_sorted_pixels_{}_shader", p_layout.orientation_name),
+            p_layout.tile_group_count,
+            {});
+        add_compute_task(p_graph,
+            RT_PIXEL_SORTING_POST_PROCESSING,
+            "pixel_sorting_post_processing_shader",
+            p_layout.tile_group_count,
+            {});
+        return task_ids;
+    }
+
+    RadixSortTaskIds add_radix_sort_tasks(WBE::RendGraphDescVK& p_graph, const PixelSortGraphLayout& p_layout) {
+        RadixSortTaskIds task_ids;
         for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
             const std::string_view input_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS : REND_RES_PIXEL_SORT_KEYS_SWAP;
             const std::string_view output_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS_SWAP : REND_RES_PIXEL_SORT_KEYS;
             const std::string bit_region = std::format("{}_{}", pass * 8, (pass + 1) * 8);
-            histogram_task_ids[pass] = std::format("radix_sort_histogram_{}", bit_region);
-            prefix_sum_task_ids[pass] = std::format("radix_sort_histogram_prefix_sum_{}", bit_region);
-            scatter_task_ids[pass] = std::format("radix_sort_scatter_{}", bit_region);
-            add_compute_task(pipeline_desc,
-                histogram_task_ids[pass],
+            task_ids.histogram_task_ids[pass] = std::format("radix_sort_histogram_{}", bit_region);
+            task_ids.prefix_sum_task_ids[pass] = std::format("radix_sort_histogram_prefix_sum_{}", bit_region);
+            task_ids.scatter_task_ids[pass] = std::format("radix_sort_scatter_{}", bit_region);
+            add_compute_task(p_graph,
+                task_ids.histogram_task_ids[pass],
                 std::format("radix_sort_histogram_workgroup_process_{}", bit_region),
-                {.width = sub_histogram_num, .height = 1, .depth = 1},
+                {.width = p_layout.sub_histogram_num, .height = 1, .depth = 1},
                 {{"input_buffer", input_keys}, {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
             // The prefix sum runs in a single workgroup.
-            add_compute_task(pipeline_desc,
-                prefix_sum_task_ids[pass],
+            add_compute_task(p_graph,
+                task_ids.prefix_sum_task_ids[pass],
                 "radix_sort_histogram_prefix_sum",
                 {.width = 1, .height = 1, .depth = 1},
                 {{"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
-            add_compute_task(pipeline_desc,
-                scatter_task_ids[pass],
+            add_compute_task(p_graph,
+                task_ids.scatter_task_ids[pass],
                 std::format("radix_sort_scatter_{}", bit_region),
-                {.width = sub_histogram_num, .height = 1, .depth = 1},
-                {{"input_buffer", input_keys},
+                {.width = p_layout.sub_histogram_num, .height = 1, .depth = 1},
+                {
+                    {"input_buffer", input_keys},
                     {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM},
-                    {"output_buffer", output_keys}});
+                    {"output_buffer", output_keys},
+                });
         }
+        return task_ids;
+    }
 
-        // After an even number of passes, the sorted keys are back in the key buffer.
-        add_compute_task(pipeline_desc, RT_WRITE_SORTED_PIXELS, "write_sorted_pixels_vertical_shader", tile_group_count, {});
-        add_compute_task(pipeline_desc,
-            RT_PIXEL_SORTING_POST_PROCESSING,
-            "pixel_sorting_post_processing_shader",
-            tile_group_count,
-            {});
-
+    void add_present_tasks(WBE::RendGraphDescVK& p_graph) {
+        auto* render_allocator = get_renderer_allocator().get();
+        const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
         WBE::RendTaskDescVK present_task_desc(render_allocator);
         present_task_desc.task_id = RT_PRESENT_SORTED_PIXELS;
         present_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
         const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-        present_task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
+        present_task_desc.factory = [render_allocator, base_render_data, pipeline = present_pipeline, clear_values](
+                                        const WBE::RendGraphContextVK& p_context) {
             return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                .set_pipeline(present_pipeline)
+                .set_pipeline(pipeline)
                 .set_render_extent(p_context.swap_chain_extent)
                 .set_clear_values(clear_values)
                 .set_draw_vertex_count(3)
                 .create_unique(base_render_data);
         };
-        pipeline_desc.add_task(std::move(present_task_desc));
+        p_graph.add_task(std::move(present_task_desc));
 
         WBE::RendTaskDescVK imgui_task_desc(render_allocator);
         imgui_task_desc.task_id = RT_DRAW_IMGUI;
         imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        imgui_task_desc.factory = [=, this](const WBE::RendGraphContextVK& /*p_context*/) {
+        imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
             return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
         };
-        pipeline_desc.add_task(std::move(imgui_task_desc));
-
-        WBE::connect_resource_chain(pipeline_desc,
-            REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
-            {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
-        WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_MASK, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
-        // Every task using a key buffer or the histogram, in execution order. Pass p reads the keys from one buffer and
-        // scatters them into the other, so each buffer is written by every other scatter.
-        WBE::connect_resource_chain(pipeline_desc,
-            REND_RES_PIXEL_SORT_KEYS,
-            {RT_REGISTER_PIXEL_SORT_KEYS,
-                histogram_task_ids[0],
-                scatter_task_ids[0],
-                scatter_task_ids[1],
-                histogram_task_ids[2],
-                scatter_task_ids[2],
-                scatter_task_ids[3],
-                RT_WRITE_SORTED_PIXELS});
-        WBE::connect_resource_chain(pipeline_desc,
-            REND_RES_PIXEL_SORT_KEYS_SWAP,
-            {scatter_task_ids[0],
-                histogram_task_ids[1],
-                scatter_task_ids[1],
-                scatter_task_ids[2],
-                histogram_task_ids[3],
-                scatter_task_ids[3]});
-        std::array<std::string_view, RADIX_SORT_PASS_COUNT * 3> histogram_chain;
-        for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
-            histogram_chain[pass * 3 + 0] = histogram_task_ids[pass];
-            histogram_chain[pass * 3 + 1] = prefix_sum_task_ids[pass];
-            histogram_chain[pass * 3 + 2] = scatter_task_ids[pass];
-        }
-        WBE::connect_resource_chain(pipeline_desc, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
-        WBE::connect_resource_chain(
-            pipeline_desc, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PIXEL_SORTING_POST_PROCESSING});
-        WBE::connect_resource_chain(pipeline_desc,
-            REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT,
-            {RT_PIXEL_SORTING_POST_PROCESSING, RT_PRESENT_SORTED_PIXELS});
-        WBE::connect_resource_chain(pipeline_desc, WBE::REND_RES_SWAP_CHAIN, {RT_PRESENT_SORTED_PIXELS, RT_DRAW_IMGUI});
-        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("pixel_sorting_graph", std::move(pipeline_desc));
-        contrast_buffer = graph->acquire_resource(REND_RES_PIXEL_SORT_CONTRAST)->get().dynamic_cast_ref<WBE::ROBufferVK>();
-        ui_contrast = contrast;
-        post_processing_params_buffer = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS)
-                                            ->get()
-                                            .dynamic_cast_ref<WBE::ROBufferVK>();
-        ui_post_processing_params = post_processing_params;
-        result_image = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE);
-        WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
-        renderer->activate_render_graph("pixel_sorting_graph");
+        p_graph.add_task(std::move(imgui_task_desc));
     }
 
-private:
+    static void connect_graph_tasks(WBE::RendGraphDescVK& p_graph, const RadixSortTaskIds& p_task_ids) {
+        WBE::connect_resource_chain(p_graph,
+            REND_RES_PIXEL_SORT_COLUMN_OFFSETS,
+            {RT_COUNT_PIXEL_SORT_MASK, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+        WBE::connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_MASK, {RT_REGISTER_PIXEL_SORT_KEYS, RT_WRITE_SORTED_PIXELS});
+        // Every task using a key buffer or the histogram, in execution order. Pass p reads the keys from one buffer and
+        // scatters them into the other, so each buffer is written by every other scatter.
+        WBE::connect_resource_chain(p_graph,
+            REND_RES_PIXEL_SORT_KEYS,
+            {
+                RT_REGISTER_PIXEL_SORT_KEYS,
+                p_task_ids.histogram_task_ids[0],
+                p_task_ids.scatter_task_ids[0],
+                p_task_ids.scatter_task_ids[1],
+                p_task_ids.histogram_task_ids[2],
+                p_task_ids.scatter_task_ids[2],
+                p_task_ids.scatter_task_ids[3],
+                RT_WRITE_SORTED_PIXELS,
+            });
+        WBE::connect_resource_chain(p_graph,
+            REND_RES_PIXEL_SORT_KEYS_SWAP,
+            {
+                p_task_ids.scatter_task_ids[0],
+                p_task_ids.histogram_task_ids[1],
+                p_task_ids.scatter_task_ids[1],
+                p_task_ids.scatter_task_ids[2],
+                p_task_ids.histogram_task_ids[3],
+                p_task_ids.scatter_task_ids[3],
+            });
+        std::array<std::string_view, RADIX_SORT_PASS_COUNT * 3> histogram_chain;
+        for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
+            histogram_chain[pass * 3 + 0] = p_task_ids.histogram_task_ids[pass];
+            histogram_chain[pass * 3 + 1] = p_task_ids.prefix_sum_task_ids[pass];
+            histogram_chain[pass * 3 + 2] = p_task_ids.scatter_task_ids[pass];
+        }
+        WBE::connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
+        WBE::connect_resource_chain(
+            p_graph, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PIXEL_SORTING_POST_PROCESSING});
+        WBE::connect_resource_chain(
+            p_graph, REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT, {RT_PIXEL_SORTING_POST_PROCESSING, RT_PRESENT_SORTED_PIXELS});
+        WBE::connect_resource_chain(p_graph, WBE::REND_RES_SWAP_CHAIN, {RT_PRESENT_SORTED_PIXELS, RT_DRAW_IMGUI});
+    }
+
+    // The parameters configured on the logic thread before setup_render_graph().
     PixelSortContrastGPU contrast;
+    PixelSortOrientation orientation = PixelSortOrientation::VERTICAL;
+    // Whether setup_render_graph() has run; afterwards the configuration is forwarded to the rendering thread.
+    bool render_graph_built = false;
+    // The source image and the present pipeline, shared by every graph built for an orientation.
+    WBE::Ref<WBE::ROImageViewVK> source_view;
+    WBE::Ref<WBE::ROGraphicsPipelineVK> present_pipeline;
+    // The orientation selected in the parameter window, and the one the current graph sorts; owned by the rendering
+    // thread.
+    PixelSortOrientation ui_orientation = PixelSortOrientation::VERTICAL;
+    PixelSortOrientation built_orientation = PixelSortOrientation::VERTICAL;
     // The contrast edited in the parameter window; owned by the rendering thread.
     PixelSortContrastGPU ui_contrast;
-    // Graph-owned contrast buffer, updated from the logic thread through render jobs and by the parameter window.
+    // Contrast buffer of the current graph, updated by the parameter window and by render jobs of the logic thread.
     WBE::Ref<WBE::ROBufferVK> contrast_buffer;
     PixelSortingPostProcessingParamsGPU post_processing_params;
     // The post-processing parameters edited in the parameter window; owned by the rendering thread.
     PixelSortingPostProcessingParamsGPU ui_post_processing_params;
-    // Graph-owned post-processing parameter buffer, updated from the logic thread through render jobs and by the parameter
-    // window.
+    // Post-processing parameter buffer of the current graph, updated by the parameter window and by render jobs of the
+    // logic thread.
     WBE::Ref<WBE::ROBufferVK> post_processing_params_buffer;
     // Destroyed before the renderer, after the rendering thread has stopped.
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
@@ -574,7 +744,7 @@ private:
             const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_base_render_data()->swap_chain_format);
             // Converting and encoding a full-size image takes long enough to stall a frame, so a worker does it.
             screenshot_write = WBE::Worker::get_singleton()->submit_task(
-                [result_data = std::move(result_data), extent = screenshot_extent, encode_srgb, path = make_screenshot_path()]() {
+                [result_data = std::move(result_data), extent = screenshot_extent, encode_srgb, path = make_screenshot_path()] {
                     const std::vector<uint8_t> rgba8 = convert_result_to_rgba8(result_data, encode_srgb);
                     std::filesystem::create_directories(path.parent_path());
                     WBE::write_image_data_png(path, rgba8, extent.width, extent.height, 4);
@@ -596,6 +766,14 @@ private:
         changed |= ImGui::SliderFloat("Min metric", &ui_contrast.min_metric, 0.0F, 1.0F);
         changed |= ImGui::SliderFloat("Max metric", &ui_contrast.max_metric, 0.0F, 1.0F);
         int sort_metric = static_cast<int>(ui_contrast.sort_metric);
+        // Switching rebuilds the graph, which would release the result image of a screenshot in progress.
+        static constexpr std::array<const char*, 2> ORIENTATION_NAMES{"Vertical", "Horizontal"};
+        int selected_orientation = static_cast<int>(ui_orientation);
+        ImGui::BeginDisabled(is_screenshot_in_progress());
+        if (ImGui::Combo("Orientation", &selected_orientation, ORIENTATION_NAMES.data(), static_cast<int>(ORIENTATION_NAMES.size()))) {
+            ui_orientation = static_cast<PixelSortOrientation>(selected_orientation);
+        }
+        ImGui::EndDisabled();
         if (ImGui::Combo("Sort metric", &sort_metric, SORT_METRIC_NAMES.data(), static_cast<int>(SORT_METRIC_NAMES.size()))) {
             ui_contrast.sort_metric = static_cast<uint32_t>(sort_metric);
             changed = true;

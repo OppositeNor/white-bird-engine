@@ -27,13 +27,16 @@
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
+#include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/ray_tracing_plugin_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/ray_tracing_plugin_vk.hh"
-#include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -41,6 +44,7 @@
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
 #include "i_octree_render_feature.hh"
+#include "imgui.h"
 #include "octree_render_feature_atomic.hh"
 #include "octree_render_feature_pass_published.hh"
 #include "pixel_sort.hh"
@@ -61,6 +65,8 @@
 #include <format>
 #include <limits>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -113,7 +119,7 @@ void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
                                 glm::scale(glm::mat4(1.0F), glm::vec3(0.3F, 0.45F, 0.3F));
     // The second cube is a second entity of the same compiled mesh, offset from the first.
     const glm::mat4 second_transform = glm::translate(glm::mat4(1.0F), glm::vec3(-1.2F, 0.0F, -0.5F)) * transform;
-    add_render_job([this, transform, second_transform]() {
+    add_render_job([this, transform, second_transform] {
         dynamic_mesh->set_transform(0, transform);
         dynamic_mesh->set_transform(1, second_transform);
     });
@@ -163,7 +169,8 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
     post_processing_key_was_down = post_processing_key_down;
 
     bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
-    if (bloom_acquire_key_down && !bloom_acquire_key_was_down && !bloom_acquire_in_flight) {
+    const bool bloom_acquire_button_down = bloom_acquire_button_pressed.exchange(false, std::memory_order_relaxed);
+    if (((bloom_acquire_key_down && !bloom_acquire_key_was_down) || bloom_acquire_button_down) && !bloom_acquire_in_flight) {
         bloom_acquire_requested.store(true, std::memory_order_release);
         bloom_acquire_in_flight = true;
     }
@@ -267,7 +274,7 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
     SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
     BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
-    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_info]() {
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_info] {
         if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL ||
             spot_light_info_buffers == MEM_NULL || light_billboard_ubo == MEM_NULL) {
             throw std::runtime_error("Failed to update deferred descriptors: per-frame buffers are not initialized.");
@@ -280,8 +287,11 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     });
 }
 
-void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
+void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
+    // A captured frame shows the scene without the configuration window.
+    bool capturing_frame = false;
     if (frame_capture_requested.exchange(false, std::memory_order_relaxed)) {
+        capturing_frame = true;
         const Path output_directory = std::filesystem::absolute(Path("test_env") / "captures");
         std::filesystem::create_directories(output_directory);
         const auto timestamp =
@@ -289,8 +299,13 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
         const Path output_path = output_directory / std::format("deferred_{}_frame_{}.png", timestamp, base_render_data->current_frame);
         renderer_vk->request_frame_capture(output_path.string());
     } else {
-        WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+        capturing_frame = WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
     }
+    imgui_overlay->begin_frame(p_delta);
+    if (!capturing_frame) {
+        draw_configuration_window();
+    }
+    imgui_overlay->end_frame();
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
     if (requested != summed_area_table_active) {
         renderer_vk->activate_render_graph(requested ? DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH : DEFERRED_MIPMAP_RENDER_GRAPH);
@@ -300,8 +315,7 @@ void ApplicationVulkanDeferredPBRTest::render_update(double /* p_delta */) {
     bool post_processing_enabled = post_processing_requested.load(std::memory_order_relaxed);
     if (post_processing_enabled != post_processing->is_enabled()) {
         post_processing->set_enabled(post_processing_enabled);
-        stdout_log(WBE_CHANNEL_DEBUG)
-            ->message(std::format("Post-processing {}: {}.", post_processing->get_name(), post_processing_enabled ? "enabled" : "disabled"));
+        stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Post-processing {}: {}.", post_processing->get_name(), post_processing_enabled ? "enabled" : "disabled"));
     }
     if (bloom_acquire_requested.exchange(false, std::memory_order_acq_rel)) {
         auto& task = bloom_acquire_tasks[summed_area_table_active ? 1 : 0];
@@ -350,9 +364,11 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         renderer_vk,
         &RendGraphContextVK::swap_chain_extent,
         LIGHTING_OUTPUT_FORMAT,
-        PixelSortDirection::VERTICAL,
-        PixelSortMetric::SATURATION,
-        PixelSortScope::SPAN);
+        PixelSortSettings{
+            .direction = PixelSortDirection::VERTICAL,
+            .metric = PixelSortMetric::SATURATION,
+            .scope = PixelSortScope::SPAN,
+        });
     auto mipmap_shadow_opaque_task = create_shadow_task(false);
     auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);
@@ -390,10 +406,104 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
     return descriptor;
 }
 
+void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
+    static constexpr std::array<const char*, 2> SHADOW_FILTERING_NAMES{"Mipmaps", "Summed-area table"};
+    static constexpr std::array<const char*, 3> VOXEL_DEBUG_VIEW_NAMES{"Disabled", "Post octree build", "Pre deferred propagation"};
+    ImGui::Begin("Deferred Rendering", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    // Every control writes the request its shortcut key writes, so the window and the keys stay in sync.
+    int shadow_filtering = summed_area_table_requested.load(std::memory_order_relaxed) ? 1 : 0;
+    if (ImGui::Combo(
+            "Shadow filtering (R)", &shadow_filtering, SHADOW_FILTERING_NAMES.data(), static_cast<int>(SHADOW_FILTERING_NAMES.size()))) {
+        summed_area_table_requested.store(shadow_filtering == 1, std::memory_order_relaxed);
+    }
+    // The combo lists the modes in the order the V key cycles through them.
+    int voxel_debug_view = 0;
+    switch (voxel_debug_view_mode.load(std::memory_order_relaxed)) {
+    case VoxelDebugViewMode::DISABLED:
+        voxel_debug_view = 0;
+        break;
+    case VoxelDebugViewMode::POST_OCTREE_BUILD:
+        voxel_debug_view = 1;
+        break;
+    case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
+        voxel_debug_view = 2;
+        break;
+    }
+    if (ImGui::Combo(
+            "Voxel debug view (V)", &voxel_debug_view, VOXEL_DEBUG_VIEW_NAMES.data(), static_cast<int>(VOXEL_DEBUG_VIEW_NAMES.size()))) {
+        constexpr std::array<VoxelDebugViewMode, 3> MODES{
+            VoxelDebugViewMode::DISABLED,
+            VoxelDebugViewMode::POST_OCTREE_BUILD,
+            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+        };
+        voxel_debug_view_mode.store(MODES[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);
+    }
+    bool post_processing_enabled = post_processing_requested.load(std::memory_order_relaxed);
+    const std::string post_processing_label = std::format("Post-processing: {} (1)", post_processing->get_name());
+    if (ImGui::Checkbox(post_processing_label.c_str(), &post_processing_enabled)) {
+        post_processing_requested.store(post_processing_enabled, std::memory_order_relaxed);
+    }
+    if (post_processing_enabled) {
+        draw_pixel_sort_options();
+    }
+    if (ImGui::Button("Capture frame (F1)")) {
+        frame_capture_requested.store(true, std::memory_order_relaxed);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save bloom image (B)")) {
+        bloom_acquire_button_pressed.store(true, std::memory_order_relaxed);
+    }
+    ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::End();
+}
+
+void ApplicationVulkanDeferredPBRTest::draw_pixel_sort_options() {
+    static constexpr std::array<const char*, 2> DIRECTION_NAMES{"Vertical", "Horizontal"};
+    static constexpr std::array<const char*, 3> METRIC_NAMES{"Luminance", "Hue", "Saturation"};
+    static constexpr std::array<const char*, 2> SCOPE_NAMES{"Line", "Span"};
+    PixelSortSettings settings = post_processing->get_settings();
+    bool changed = false;
+    ImGui::Indent();
+    int direction = static_cast<int>(settings.direction);
+    if (ImGui::Combo("Direction", &direction, DIRECTION_NAMES.data(), static_cast<int>(DIRECTION_NAMES.size()))) {
+        settings.direction = static_cast<PixelSortDirection>(direction);
+        changed = true;
+    }
+    int metric = static_cast<int>(settings.metric);
+    if (ImGui::Combo("Sort metric", &metric, METRIC_NAMES.data(), static_cast<int>(METRIC_NAMES.size()))) {
+        settings.metric = static_cast<PixelSortMetric>(metric);
+        changed = true;
+    }
+    int scope = static_cast<int>(settings.scope);
+    if (ImGui::Combo("Scope", &scope, SCOPE_NAMES.data(), static_cast<int>(SCOPE_NAMES.size()))) {
+        settings.scope = static_cast<PixelSortScope>(scope);
+        changed = true;
+    }
+    changed |= ImGui::SliderFloat("Min metric", &settings.min_metric, 0.0F, 1.0F);
+    changed |= ImGui::SliderFloat("Max metric", &settings.max_metric, 0.0F, 1.0F);
+    ImGui::Unindent();
+    if (!changed) {
+        return;
+    }
+    settings.max_metric = std::max(settings.min_metric, settings.max_metric);
+    // A new direction or scope changes the effect's pipelines and resources, which a rebuild of each graph applies; the
+    // other settings only change the contrast buffer of each graph. The previous frames have finished, because the
+    // renderer waits for each frame before it starts the next.
+    const bool requires_rebuild = post_processing->set_settings(settings);
+    for (Ref<RenderGraphVK>& graph : deferred_render_graphs) {
+        if (requires_rebuild) {
+            graph->rebuild();
+        } else {
+            post_processing->upload_settings(*graph);
+        }
+    }
+}
+
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
     renderer_vk = RendererVK::get_singleton();
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = get_renderer_allocator().get();
+    imgui_overlay = make_unique<ImGuiOverlayVK>(global_allocator(), renderer_vk);
     camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
 }
 
@@ -406,8 +516,7 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
     shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided");
-    gbuffer_double_sided_pipeline_resource =
-        resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided");
+    gbuffer_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided");
     shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot");
     gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer");
     // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
@@ -442,9 +551,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     static_mesh_resources = create_mesh_resources(
         renderer_vk, sponza_mesh, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, static_mesh_config);
     if (build_acceleration_structure) {
-        mesh_acceleration_structure =
-            MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data())
-                .compile(static_mesh_resources, glm::mat4(1.0F));
+        mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data())
+                                          .compile(static_mesh_resources, glm::mat4(1.0F));
     }
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,

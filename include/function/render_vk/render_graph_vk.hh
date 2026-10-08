@@ -176,9 +176,9 @@ struct RGSemaphoreWaitVK {
  * @brief A node of the render graph.
  */
 struct RGNode {
-    RGNode(RenderAllocator* p_allocator)
-        : out_edges(p_allocator), resource_map(p_allocator), reads(p_allocator), writes(p_allocator),
-          barriers(p_allocator), semaphore_waits(p_allocator) {
+    explicit RGNode(RenderAllocator* p_allocator)
+        : out_edges(p_allocator), resource_map(p_allocator), reads(p_allocator), writes(p_allocator), barriers(p_allocator),
+          semaphore_waits(p_allocator) {
     }
     // The render task that should be performed during this node. Unique ownership.
     Unique<IRenderTaskVK> render_task;
@@ -235,7 +235,7 @@ public:
      *
      * @param p_render_data The base render data.
      */
-    RenderGraphVK(const BaseRenderDataVK* p_render_data);
+    explicit RenderGraphVK(const BaseRenderDataVK* p_render_data);
 
     /**
      * @brief Build the graph from a high-level descriptor: take ownership of
@@ -268,6 +268,19 @@ public:
      * frame, or if the recreated tasks do not form a valid graph.
      */
     void update_context(const RendGraphContextVK& p_context);
+
+    /**
+     * @brief Rebuild the graph against its current context.
+     *
+     * Does what update_context() does when the context changes, without a context change: every graph-owned resource
+     * whose factory now yields a different configuration is reallocated, and every task is recreated. Use it after state
+     * that resource or task factories read has changed. Must be called on the rendering thread while none of the graph's
+     * submitted work is pending.
+     *
+     * @throws std::runtime_error If a re-evaluated resource configuration is invalid or changes whether a resource is per
+     * frame, or if the recreated tasks do not form a valid graph.
+     */
+    void rebuild();
 
     /**
      * @brief Get the context the graph-owned resources were last built for.

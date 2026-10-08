@@ -679,8 +679,7 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
     metadata.tasks.reserve(nodes.size());
     // topological_sort() leaves the nodes in execution order.
     for (const auto& node : nodes) {
-        metadata.tasks.push_back(
-            {.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order});
+        metadata.tasks.push_back({.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order});
     }
     metadata.edges.reserve(resource_edges.size());
     for (const auto& edge : resource_edges) {
@@ -710,7 +709,7 @@ void RenderGraphVK::build_from_descriptor(RendGraphDescVK& p_desc) {
     context = RendGraphContextVK::from_render_data(*render_data);
     all_resources = index_resources(p_desc);
     allocate_resources(p_desc);
-    task_builder = [this, tasks = p_desc.tasks]() {
+    task_builder = [this, tasks = p_desc.tasks] {
         build_tasks(tasks);
     };
     task_builder();
@@ -828,7 +827,7 @@ void RenderGraphVK::allocate_buffer(const RendBufferDeclVK& p_buffer_decl) {
             return make_buffer(render_data, decl.res_id, decl.factory(context));
         });
     register_resource(p_buffer_decl.res_id, container);
-    resource_refreshers.emplace_back([this, decl = p_buffer_decl, previous_desc = desc, container]() mutable {
+    resource_refreshers.emplace_back([this, decl = p_buffer_decl, previous_desc = desc, container] mutable {
         RendBufferDescVK new_desc = decl.factory(context);
         if (new_desc == previous_desc) {
             return;
@@ -848,7 +847,7 @@ void RenderGraphVK::allocate_image(const RendImageDeclVK& p_image_decl) {
             return make_image(render_data, decl.res_id, decl.factory(context));
         });
     register_resource(p_image_decl.res_id, container);
-    resource_refreshers.emplace_back([this, decl = p_image_decl, previous_desc = desc, container]() mutable {
+    resource_refreshers.emplace_back([this, decl = p_image_decl, previous_desc = desc, container] mutable {
         const RendImageDescVK new_desc = decl.factory(context);
         if (new_desc == previous_desc) {
             return;
@@ -878,7 +877,7 @@ void RenderGraphVK::allocate_image_view(const RendImageViewDeclVK& p_view_decl) 
         });
     register_resource(p_view_decl.res_id, container);
     resource_refreshers.emplace_back(
-        [this, decl = p_view_decl, previous_desc = p_view_decl.factory(context), container, image_container]() mutable {
+        [this, decl = p_view_decl, previous_desc = p_view_decl.factory(context), container, image_container] mutable {
             const RendImageViewDescVK new_desc = decl.factory(context);
             // The viewed image may have been recreated by its own refresher, or replaced outside the graph if imported.
             bool image_changed = false;
@@ -902,7 +901,7 @@ void RenderGraphVK::allocate_sampler(const RendSamplerDeclVK& p_sampler_decl) {
             return make_sampler_builder(decl.factory(context)).create_ref(render_data);
         });
     register_resource(p_sampler_decl.res_id, container);
-    resource_refreshers.emplace_back([this, decl = p_sampler_decl, previous_desc = p_sampler_decl.factory(context), container]() mutable {
+    resource_refreshers.emplace_back([this, decl = p_sampler_decl, previous_desc = p_sampler_decl.factory(context), container] mutable {
         const RendSamplerDescVK new_desc = decl.factory(context);
         if (new_desc == previous_desc) {
             return;
@@ -917,10 +916,16 @@ void RenderGraphVK::update_context(const RendGraphContextVK& p_context) {
         return;
     }
     context = p_context;
+    rebuild();
+}
+
+void RenderGraphVK::rebuild() {
     for (auto& refresh : resource_refreshers) {
         refresh();
     }
-    WBE_DEBUG_ASSERT(task_builder != nullptr);
+    if (task_builder == nullptr) {
+        throw std::runtime_error("RenderGraphVK: cannot rebuild a graph that was not built from a descriptor.");
+    }
     task_builder();
 }
 

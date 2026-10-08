@@ -45,7 +45,9 @@
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "i_octree_render_feature.hh"
 #include "i_post_processing.hh"
+#include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
+#include "pixel_sort.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
 #include <atomic>
@@ -79,6 +81,8 @@ public:
                   .shader_debug = true,
                   .ray_query = exec_test_requested("WBE_EXEC_TEST_RAY_TRACING"),
                   .timestamp_query = exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
+                  // The Dear ImGui backend of the configuration window allocates classic descriptor sets.
+                  .descriptor_set = true,
               },
               make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {
     }
@@ -157,6 +161,7 @@ private:
     static constexpr std::string_view RT_ACQUIRE_BLOOM = "acquire_bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
+    static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
@@ -165,6 +170,10 @@ private:
 
     void control(double p_delta);
     void update_descriptors();
+    // Draw the configuration window, whose controls mirror the toggle shortcut keys. Runs on the rendering thread.
+    void draw_configuration_window();
+    // Draw the pixel sort options and apply their changes to both deferred graphs. Runs on the rendering thread.
+    void draw_pixel_sort_options();
 
     void setup_render_context();
     void load_resources();
@@ -185,6 +194,9 @@ private:
         std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task);
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     void add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const;
+    void add_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
+    static void add_gbuffer_graph_resources(RendGraphDescVK& p_pipeline_desc);
+    void add_lighting_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     void connect_deferred_render_tasks(
         RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const;
     RendTaskDescVK create_shadow_mipmap_task_desc() const;
@@ -197,6 +209,7 @@ private:
     RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_light_billboard_task_desc() const;
+    RendTaskDescVK create_imgui_task_desc();
     CompositionCameraInfo make_composition_camera_info() const;
     void write_completed_bloom_acquire();
 
@@ -204,7 +217,9 @@ private:
     double dynamic_mesh_time = 0.0;
     Unique<IOctreeRenderFeature> octree;
     // Applied in place to the result image after lighting composition; toggled with the 1 key.
-    Unique<IPostProcessing> post_processing;
+    Unique<PixelSort> post_processing;
+    // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table.
+    std::array<Ref<RenderGraphVK>, 2> deferred_render_graphs;
     RendererVK* renderer_vk = nullptr;
     const BaseRenderDataVK* base_render_data = nullptr;
     RenderAllocator* render_allocator = nullptr;
@@ -265,6 +280,8 @@ private:
     std::array<RefRaw<RTTriggeredVK>, 2> bloom_acquire_tasks;
     // Input-thread mailbox; render_update forwards requests to the active graph's wrapper.
     std::atomic_bool bloom_acquire_requested = false;
+    // Rendering-thread mailbox of the configuration window's bloom button; control() handles it like a B key press.
+    std::atomic_bool bloom_acquire_button_pressed = false;
     std::binary_semaphore bloom_acquire_completed{0};
     bool bloom_acquire_key_was_down = false;
     bool bloom_acquire_in_flight = false;
@@ -278,6 +295,9 @@ private:
     std::atomic<bool> summed_area_table_requested = false;
     std::atomic<VoxelDebugViewMode> voxel_debug_view_mode = VoxelDebugViewMode::DISABLED;
     bool summed_area_table_active = false;
+    // Draws the configuration window into the swap chain after every other pass. Destroyed before the renderer, after
+    // the rendering thread has stopped.
+    Unique<ImGuiOverlayVK> imgui_overlay;
     ComponentCamera camera_component{};
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
     float camera_yaw = default_test_camera_yaw();

@@ -14,14 +14,21 @@
 */
 #include "pixel_sort.hh"
 #include "../render_test.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/function_utils.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
+#include "i_post_processing.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <algorithm>
 #include <array>
@@ -68,11 +75,24 @@ constexpr uint32_t RADIX_SORT_DATA_START = 4;
 
 // GPU layout of PixelSortContrast in pixel_sort_utils.slang.
 struct PixelSortContrastGPU {
-    float min_metric = PixelSort::MIN_METRIC;
-    float max_metric = PixelSort::MAX_METRIC;
+    float min_metric = 0.0F;
+    float max_metric = 0.0F;
     uint32_t sort_metric = static_cast<uint32_t>(PixelSortMetric::SATURATION);
     uint32_t sort_scope = static_cast<uint32_t>(PixelSortScope::LINE);
 };
+
+PixelSortContrastGPU make_contrast(const PixelSortSettings& p_settings) {
+    return PixelSortContrastGPU{
+        .min_metric = p_settings.min_metric,
+        .max_metric = p_settings.max_metric,
+        .sort_metric = static_cast<uint32_t>(p_settings.metric),
+        .sort_scope = static_cast<uint32_t>(p_settings.scope),
+    };
+}
+
+size_t direction_index(PixelSortDirection p_direction) {
+    return p_direction == PixelSortDirection::VERTICAL ? 0 : 1;
+}
 
 std::string make_bit_region_name(uint32_t p_pass) {
     return std::format("{}_{}", p_pass * 8, (p_pass + 1) * 8);
@@ -98,6 +118,12 @@ struct PixelSort::Layout {
     VkExtent3D column_group_count{};
     VkExtent3D sub_histogram_group_count{};
     VkExtent3D single_group_count{.width = 1, .height = 1, .depth = 1};
+};
+
+struct PixelSort::RadixSortTaskIds {
+    std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
+    std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
+    std::array<std::string, RADIX_SORT_PASS_COUNT> scatter_task_ids;
 };
 
 PixelSort::Layout PixelSort::make_layout(VkExtent2D p_extent, PixelSortDirection p_direction) {
@@ -134,45 +160,35 @@ PixelSort::Layout PixelSort::make_layout(VkExtent2D p_extent, PixelSortDirection
     layout.key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
     layout.histogram_buffer_size =
         (RADIX_SORT_DATA_START + static_cast<size_t>(layout.sub_histogram_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
-    layout.tile_group_count = VkExtent3D{.width = (p_extent.width + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
+    layout.tile_group_count = VkExtent3D{
+        .width = (p_extent.width + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
         .height = (p_extent.height + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
-        .depth = 1};
+        .depth = 1,
+    };
     layout.column_group_count = VkExtent3D{
-        .width = (layout.line_count + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE, .height = 1, .depth = 1};
+        .width = (layout.line_count + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE,
+        .height = 1,
+        .depth = 1,
+    };
     layout.sub_histogram_group_count = VkExtent3D{.width = layout.sub_histogram_num, .height = 1, .depth = 1};
     return layout;
 }
 
-PixelSort::PixelSort(RenderAllocator* p_allocator,
-    RendererVK* p_renderer,
-    RenderTestExtentFactory p_extent,
-    VkFormat p_color_format,
-    PixelSortDirection p_direction,
-    PixelSortMetric p_metric,
-    PixelSortScope p_scope)
-    : IPostProcessing(p_allocator), renderer(p_renderer), extent(std::move(p_extent)), color_format(p_color_format),
-      direction(p_direction), metric(p_metric), scope(p_scope) {
+PixelSort::PixelSort(
+    RenderAllocator* p_allocator, RendererVK* p_renderer, RenderTestExtentFactory p_extent, VkFormat p_color_format, const PixelSortSettings& p_settings)
+    : IPostProcessing(p_allocator), renderer(p_renderer), extent(std::move(p_extent)), color_format(p_color_format) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: renderer is null.");
     }
     if (extent == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: extent factory is null.");
     }
-    if (metric != PixelSortMetric::LUMINANCE && metric != PixelSortMetric::HUE && metric != PixelSortMetric::SATURATION) {
-        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: {} is not a pixel sort metric.",
-            static_cast<uint32_t>(metric)));
-    }
-    if (scope != PixelSortScope::LINE && scope != PixelSortScope::SPAN) {
-        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: {} is not a pixel sort scope.",
-            static_cast<uint32_t>(scope)));
-    }
-    // Reject an extent that is invalid for the current renderer state before any graph is built.
-    static_cast<void>(make_layout(extent(RendGraphContextVK::from_render_data(*renderer->get_base_render_data())), direction));
+    static_cast<void>(set_settings(p_settings));
     copy_source_pipeline = compile("copy_pixel_sort_source_shader");
-    count_mask_pipeline = compile(make_direction_shader_id("count_pixel_sort_mask", direction));
+    count_mask_pipelines = compile_direction_variants("count_pixel_sort_mask");
     prefix_sum_columns_pipeline = compile("prefix_sum_pixel_sort_columns_shader");
-    register_keys_pipeline = compile(make_direction_shader_id("register_pixel_sort_keys", direction));
-    write_sorted_pixels_pipeline = compile(make_direction_shader_id("write_sorted_pixels", direction));
+    register_keys_pipelines = compile_direction_variants("register_pixel_sort_keys");
+    write_sorted_pixels_pipelines = compile_direction_variants("write_sorted_pixels");
     histogram_prefix_sum_pipeline = compile("radix_sort_histogram_prefix_sum");
     for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
         const std::string bit_region = make_bit_region_name(pass);
@@ -181,12 +197,74 @@ PixelSort::PixelSort(RenderAllocator* p_allocator,
     }
 }
 
+void PixelSort::validate_settings(const PixelSortSettings& p_settings) {
+    if (p_settings.metric != PixelSortMetric::LUMINANCE && p_settings.metric != PixelSortMetric::HUE &&
+        p_settings.metric != PixelSortMetric::SATURATION) {
+        throw std::runtime_error(
+            std::format("Invalid pixel sort settings: {} is not a pixel sort metric.", static_cast<uint32_t>(p_settings.metric)));
+    }
+    if (p_settings.scope != PixelSortScope::LINE && p_settings.scope != PixelSortScope::SPAN) {
+        throw std::runtime_error(
+            std::format("Invalid pixel sort settings: {} is not a pixel sort scope.", static_cast<uint32_t>(p_settings.scope)));
+    }
+    if (p_settings.direction != PixelSortDirection::VERTICAL && p_settings.direction != PixelSortDirection::HORIZONTAL) {
+        throw std::runtime_error(std::format(
+            "Invalid pixel sort settings: {} is not a pixel sort direction.", static_cast<uint32_t>(p_settings.direction)));
+    }
+    if (p_settings.min_metric < 0.0F) {
+        throw std::runtime_error(std::format("Invalid pixel sort settings: the minimum metric {} is negative.", p_settings.min_metric));
+    }
+    if (p_settings.min_metric > p_settings.max_metric) {
+        throw std::runtime_error(std::format("Invalid pixel sort settings: the minimum metric {} exceeds the maximum metric {}.",
+            p_settings.min_metric,
+            p_settings.max_metric));
+    }
+}
+
+bool PixelSort::set_settings(const PixelSortSettings& p_settings) {
+    validate_settings(p_settings);
+    // Reject a direction whose lines are too long for the extent of the current renderer state before any graph uses it.
+    static_cast<void>(make_layout(extent(RendGraphContextVK::from_render_data(*renderer->get_base_render_data())), p_settings.direction));
+    const bool requires_rebuild = p_settings.direction != settings.direction || p_settings.scope != settings.scope;
+    settings = p_settings;
+    return requires_rebuild;
+}
+
+void PixelSort::upload_settings(RenderGraphVK& p_graph) const {
+    Ref<ROBufferVK> contrast_buffer = p_graph.acquire_resource(REND_RES_PIXEL_SORT_CONTRAST)->get().dynamic_cast_ref<ROBufferVK>();
+    if (contrast_buffer == MEM_NULL) {
+        throw std::runtime_error("Failed to upload the pixel sort settings: the graph's contrast resource is not a buffer.");
+    }
+    const PixelSortContrastGPU contrast = make_contrast(settings);
+    contrast_buffer->update_buffer(&contrast, sizeof(contrast));
+}
+
 std::string_view PixelSort::add_render_tasks(
     RendGraphDescVK& p_graph, std::string_view p_color_image_view, std::string_view p_previous_task_id) const {
-    // Every factory evaluates the layout of the extent in the graph's context, and captures copies rather than this,
-    // because graphs may outlive the effect.
-    auto layout_of = [extent_factory = extent, sort_direction = direction](const RendGraphContextVK& p_context) {
-        return make_layout(extent_factory(p_context), sort_direction);
+    add_graph_resources(p_graph);
+    add_compute_task(
+        p_graph, RT_COPY_PIXEL_SORT_SOURCE, copy_source_pipeline, &Layout::tile_group_count, {{REND_RES_PIXEL_SORT_INPUT, p_color_image_view}});
+    add_compute_task(p_graph, RT_COUNT_PIXEL_SORT_MASK, count_mask_pipelines, &Layout::column_group_count, {});
+    // The prefix sums run in a single workgroup.
+    add_compute_task(p_graph, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, prefix_sum_columns_pipeline, &Layout::single_group_count, {});
+    add_compute_task(p_graph, RT_REGISTER_PIXEL_SORT_KEYS, register_keys_pipelines, &Layout::column_group_count, {});
+
+    const RadixSortTaskIds radix_sort_task_ids = add_radix_sort_tasks(p_graph);
+    // After an even number of passes, the sorted keys are back in the key buffer.
+    add_compute_task(p_graph,
+        RT_WRITE_SORTED_PIXELS,
+        write_sorted_pixels_pipelines,
+        &Layout::tile_group_count,
+        {{REND_RES_PIXEL_SORT_DESTINATION, p_color_image_view}});
+    connect_render_tasks(p_graph, p_color_image_view, p_previous_task_id, radix_sort_task_ids);
+    return RT_WRITE_SORTED_PIXELS;
+}
+
+void PixelSort::add_graph_resources(RendGraphDescVK& p_graph) const {
+    // Every factory reads the current settings, so rebuilding a graph applies a changed direction or scope. The effect
+    // outlives every graph it was added to.
+    auto layout_of = [this](const RendGraphContextVK& p_context) {
+        return make_layout(extent(p_context), settings.direction);
     };
     auto storage_buffer = [layout_of](size_t Layout::* p_size) {
         return [layout_of, p_size](const RendGraphContextVK& p_context) {
@@ -196,69 +274,75 @@ std::string_view PixelSort::add_render_tasks(
     auto image = [layout_of](VkFormat p_format) {
         return [layout_of, p_format](const RendGraphContextVK& p_context) {
             const VkExtent2D image_extent = layout_of(p_context).extent;
-            return RendImageDescVK{.usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+            return RendImageDescVK{
+                .usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE,
                 .format = p_format,
-                .extent = {.width = image_extent.width, .height = image_extent.height, .depth = 1}};
+                .extent = {.width = image_extent.width, .height = image_extent.height, .depth = 1},
+            };
         };
     };
-    // The span scope stores the rank, span offset, and span length of every masked pixel; the line scope only the rank.
-    const VkFormat mask_format = scope == PixelSortScope::SPAN ? VK_FORMAT_R16G16B16A16_UINT : VK_FORMAT_R16_UINT;
-
     p_graph.add_image(REND_RES_PIXEL_SORT_SOURCE_IMAGE, image(color_format))
         .add_image_view(REND_RES_PIXEL_SORT_SOURCE, REND_RES_PIXEL_SORT_SOURCE_IMAGE)
-        .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE, image(mask_format))
+        .add_image(REND_RES_PIXEL_SORT_MASK_IMAGE,
+            [this, layout_of](const RendGraphContextVK& p_context) {
+                // The span scope stores the rank, span offset, and span length of every masked pixel; the line scope only
+                // the rank.
+                const VkFormat mask_format = settings.scope == PixelSortScope::SPAN ? VK_FORMAT_R16G16B16A16_UINT : VK_FORMAT_R16_UINT;
+                const VkExtent2D image_extent = layout_of(p_context).extent;
+                return RendImageDescVK{
+                    .usage = RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                    .format = mask_format,
+                    .extent = {.width = image_extent.width, .height = image_extent.height, .depth = 1},
+                };
+            })
         .add_image_view(REND_RES_PIXEL_SORT_MASK, REND_RES_PIXEL_SORT_MASK_IMAGE)
+        // The initial content follows the settings, so a rebuild after a scope change reallocates the buffer with it.
         .add_buffer(REND_RES_PIXEL_SORT_CONTRAST,
-            [initial_data = to_initial_data(PixelSortContrastGPU{.sort_metric = static_cast<uint32_t>(metric),
-                 .sort_scope = static_cast<uint32_t>(scope)})](const RendGraphContextVK& /*p_context*/) {
+            [this](const RendGraphContextVK& /*p_context*/) {
                 return RendBufferDescVK{
-                    .usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .initial_data = initial_data};
+                    .usage = RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                    .domain = DeviceDomain::HOST_DEVICE,
+                    .initial_data = to_initial_data(make_contrast(settings)),
+                };
             })
         .add_buffer(REND_RES_PIXEL_SORT_COLUMN_OFFSETS, storage_buffer(&Layout::column_offsets_buffer_size))
         .add_buffer(REND_RES_PIXEL_SORT_KEYS, storage_buffer(&Layout::key_buffer_size))
         .add_buffer(REND_RES_PIXEL_SORT_KEYS_SWAP, storage_buffer(&Layout::key_buffer_size))
         .add_buffer(REND_RES_PIXEL_SORT_HISTOGRAM, storage_buffer(&Layout::histogram_buffer_size));
+}
 
-    add_compute_task(
-        p_graph, RT_COPY_PIXEL_SORT_SOURCE, copy_source_pipeline, &Layout::tile_group_count, {{REND_RES_PIXEL_SORT_INPUT, p_color_image_view}});
-    add_compute_task(p_graph, RT_COUNT_PIXEL_SORT_MASK, count_mask_pipeline, &Layout::column_group_count, {});
-    // The prefix sums run in a single workgroup.
-    add_compute_task(p_graph, RT_PREFIX_SUM_PIXEL_SORT_COLUMNS, prefix_sum_columns_pipeline, &Layout::single_group_count, {});
-    add_compute_task(p_graph, RT_REGISTER_PIXEL_SORT_KEYS, register_keys_pipeline, &Layout::column_group_count, {});
-
-    std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
-    std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
-    std::array<std::string, RADIX_SORT_PASS_COUNT> scatter_task_ids;
+PixelSort::RadixSortTaskIds PixelSort::add_radix_sort_tasks(RendGraphDescVK& p_graph) const {
+    RadixSortTaskIds task_ids;
     for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
         const std::string_view input_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS : REND_RES_PIXEL_SORT_KEYS_SWAP;
         const std::string_view output_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS_SWAP : REND_RES_PIXEL_SORT_KEYS;
         const std::string bit_region = make_bit_region_name(pass);
-        histogram_task_ids[pass] = std::format("pixel_sort_radix_sort_histogram_{}", bit_region);
-        prefix_sum_task_ids[pass] = std::format("pixel_sort_radix_sort_histogram_prefix_sum_{}", bit_region);
-        scatter_task_ids[pass] = std::format("pixel_sort_radix_sort_scatter_{}", bit_region);
+        task_ids.histogram_task_ids[pass] = std::format("pixel_sort_radix_sort_histogram_{}", bit_region);
+        task_ids.prefix_sum_task_ids[pass] = std::format("pixel_sort_radix_sort_histogram_prefix_sum_{}", bit_region);
+        task_ids.scatter_task_ids[pass] = std::format("pixel_sort_radix_sort_scatter_{}", bit_region);
         add_compute_task(p_graph,
-            histogram_task_ids[pass],
+            task_ids.histogram_task_ids[pass],
             histogram_pipelines[pass],
             &Layout::sub_histogram_group_count,
             {{"input_buffer", input_keys}, {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
         add_compute_task(p_graph,
-            prefix_sum_task_ids[pass],
+            task_ids.prefix_sum_task_ids[pass],
             histogram_prefix_sum_pipeline,
             &Layout::single_group_count,
             {{"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
         add_compute_task(p_graph,
-            scatter_task_ids[pass],
+            task_ids.scatter_task_ids[pass],
             scatter_pipelines[pass],
             &Layout::sub_histogram_group_count,
             {{"input_buffer", input_keys}, {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}, {"output_buffer", output_keys}});
     }
-    // After an even number of passes, the sorted keys are back in the key buffer.
-    add_compute_task(p_graph,
-        RT_WRITE_SORTED_PIXELS,
-        write_sorted_pixels_pipeline,
-        &Layout::tile_group_count,
-        {{REND_RES_PIXEL_SORT_DESTINATION, p_color_image_view}});
+    return task_ids;
+}
 
+void PixelSort::connect_render_tasks(RendGraphDescVK& p_graph,
+    std::string_view p_color_image_view,
+    std::string_view p_previous_task_id,
+    const RadixSortTaskIds& p_task_ids) {
     connect_resource_chain(p_graph, p_color_image_view, {p_previous_task_id, RT_COPY_PIXEL_SORT_SOURCE, RT_WRITE_SORTED_PIXELS});
     connect_resource_chain(p_graph,
         REND_RES_PIXEL_SORT_SOURCE,
@@ -271,31 +355,40 @@ std::string_view PixelSort::add_render_tasks(
     // them into the other, so each buffer is written by every other scatter.
     connect_resource_chain(p_graph,
         REND_RES_PIXEL_SORT_KEYS,
-        {RT_REGISTER_PIXEL_SORT_KEYS,
-            histogram_task_ids[0],
-            scatter_task_ids[0],
-            scatter_task_ids[1],
-            histogram_task_ids[2],
-            scatter_task_ids[2],
-            scatter_task_ids[3],
-            RT_WRITE_SORTED_PIXELS});
+        {
+            RT_REGISTER_PIXEL_SORT_KEYS,
+            p_task_ids.histogram_task_ids[0],
+            p_task_ids.scatter_task_ids[0],
+            p_task_ids.scatter_task_ids[1],
+            p_task_ids.histogram_task_ids[2],
+            p_task_ids.scatter_task_ids[2],
+            p_task_ids.scatter_task_ids[3],
+            RT_WRITE_SORTED_PIXELS,
+        });
     connect_resource_chain(p_graph,
         REND_RES_PIXEL_SORT_KEYS_SWAP,
-        {scatter_task_ids[0], histogram_task_ids[1], scatter_task_ids[1], scatter_task_ids[2], histogram_task_ids[3], scatter_task_ids[3]});
+        {
+            p_task_ids.scatter_task_ids[0],
+            p_task_ids.histogram_task_ids[1],
+            p_task_ids.scatter_task_ids[1],
+            p_task_ids.scatter_task_ids[2],
+            p_task_ids.histogram_task_ids[3],
+            p_task_ids.scatter_task_ids[3],
+        });
     std::array<std::string_view, RADIX_SORT_PASS_COUNT * 3> histogram_chain;
     for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
-        histogram_chain[pass * 3 + 0] = histogram_task_ids[pass];
-        histogram_chain[pass * 3 + 1] = prefix_sum_task_ids[pass];
-        histogram_chain[pass * 3 + 2] = scatter_task_ids[pass];
+        histogram_chain[pass * 3 + 0] = p_task_ids.histogram_task_ids[pass];
+        histogram_chain[pass * 3 + 1] = p_task_ids.prefix_sum_task_ids[pass];
+        histogram_chain[pass * 3 + 2] = p_task_ids.scatter_task_ids[pass];
     }
     connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
-    return RT_WRITE_SORTED_PIXELS;
 }
 
 Ref<ROComputePipelineVK> PixelSort::compile(std::string_view p_shader_id) const {
     auto shader_resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_shader_id);
     if (shader_resource == nullptr) {
-        throw std::runtime_error(std::format("Failed to create the pixel sort post-processing: shader resource {} was not found.", p_shader_id));
+        throw std::runtime_error(
+            std::format("Failed to create the pixel sort post-processing: shader resource {} was not found.", p_shader_id));
     }
     ComputePipelineCompilerVKContext compute_compiler_context{
         .allocator = get_allocator(),
@@ -305,9 +398,18 @@ Ref<ROComputePipelineVK> PixelSort::compile(std::string_view p_shader_id) const 
     return ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;
 }
 
+PixelSort::DirectionPipelines PixelSort::compile_direction_variants(std::string_view p_shader_name) const {
+    DirectionPipelines pipelines;
+    pipelines[direction_index(PixelSortDirection::VERTICAL)] =
+        compile(make_direction_shader_id(p_shader_name, PixelSortDirection::VERTICAL));
+    pipelines[direction_index(PixelSortDirection::HORIZONTAL)] =
+        compile(make_direction_shader_id(p_shader_name, PixelSortDirection::HORIZONTAL));
+    return pipelines;
+}
+
 void PixelSort::add_compute_task(RendGraphDescVK& p_graph,
     std::string_view p_task_id,
-    const Ref<ROComputePipelineVK>& p_pipeline,
+    const DirectionPipelines& p_pipelines,
     VkExtent3D Layout::* p_group_count,
     std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const {
     RendTaskDescVK task_desc(get_allocator());
@@ -315,12 +417,20 @@ void PixelSort::add_compute_task(RendGraphDescVK& p_graph,
     for (const auto& [task_resource_id, graph_resource_id] : p_aliases) {
         task_desc.alias(task_resource_id, graph_resource_id);
     }
-    task_desc.factory = [this, pipeline = p_pipeline, p_group_count](const RendGraphContextVK& p_context) {
-        const Layout layout = make_layout(extent(p_context), direction);
+    task_desc.factory = [this, pipelines = p_pipelines, p_group_count](const RendGraphContextVK& p_context) {
+        const Layout layout = make_layout(extent(p_context), settings.direction);
         return make_toggleable_task(make_unique<RTRunComputePipelineVK>(
-            get_allocator(), renderer->get_base_render_data(), pipeline, layout.*p_group_count));
+            get_allocator(), renderer->get_base_render_data(), pipelines[direction_index(settings.direction)], layout.*p_group_count));
     };
     p_graph.add_task(std::move(task_desc));
+}
+
+void PixelSort::add_compute_task(RendGraphDescVK& p_graph,
+    std::string_view p_task_id,
+    const Ref<ROComputePipelineVK>& p_pipeline,
+    VkExtent3D Layout::* p_group_count,
+    std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const {
+    add_compute_task(p_graph, p_task_id, DirectionPipelines{p_pipeline, p_pipeline}, p_group_count, p_aliases);
 }
 
 } // namespace WhiteBirdEngine
