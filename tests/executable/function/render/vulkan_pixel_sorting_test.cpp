@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -22,6 +23,7 @@
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -33,25 +35,35 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "global/global.hh"
+#include "glm/gtc/packing.hpp"
 #include "imgui.h"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
+#include "resource/resource_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "rt_imgui_vk.hh"
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <filesystem>
 #include <format>
+#include <future>
 #include <initializer_list>
 #include <memory>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -91,6 +103,61 @@ inline constexpr float PIXEL_SORT_DEFAULT_MAX_METRIC = 0.8F;
 // Must match WBE_PIXEL_SORT_METRIC_SATURATION in pixel_sort_utils.slang: 0 sorts by luminance, 1 by hue, 2 by saturation.
 inline constexpr uint32_t PIXEL_SORT_DEFAULT_METRIC = 0;
 inline constexpr float PIXEL_SORTING_POST_PROCESSING_DEFAULT_GAMMA = 1.0F;
+// Bytes of one R16G16B16A16_SFLOAT pixel of the result image.
+inline constexpr size_t PIXEL_SORT_RESULT_BYTES_PER_PIXEL = 8;
+// Directory, relative to the working directory, that receives the screenshots.
+inline constexpr std::string_view PIXEL_SORT_SCREENSHOT_DIRECTORY = "build/screenshots";
+
+namespace {
+
+bool is_srgb_format(VkFormat p_format) {
+    return p_format == VK_FORMAT_R8G8B8A8_SRGB || p_format == VK_FORMAT_B8G8R8A8_SRGB;
+}
+
+// The sRGB transfer function, applied by the hardware when a linear color is written to an sRGB swap chain.
+float encode_srgb(float p_linear) {
+    if (p_linear <= 0.0031308F) {
+        return p_linear * 12.92F;
+    }
+    return 1.055F * std::pow(p_linear, 1.0F / 2.4F) - 0.055F;
+}
+
+// Convert the R16G16B16A16_SFLOAT result image to opaque RGBA8, encoded as the swap chain displays it.
+std::vector<uint8_t> convert_result_to_rgba8(std::span<const uint8_t> p_result_data, bool p_encode_srgb) {
+    if (p_result_data.size_bytes() % PIXEL_SORT_RESULT_BYTES_PER_PIXEL != 0) {
+        throw std::runtime_error("Failed to convert the pixel sorting screenshot: byte count is not pixel aligned.");
+    }
+    const size_t pixel_count = p_result_data.size_bytes() / PIXEL_SORT_RESULT_BYTES_PER_PIXEL;
+    std::vector<uint8_t> rgba8(pixel_count * 4);
+    for (size_t pixel = 0; pixel < pixel_count; ++pixel) {
+        for (size_t channel = 0; channel < 3; ++channel) {
+            uint16_t packed_channel = 0;
+            std::memcpy(&packed_channel,
+                p_result_data.data() + pixel * PIXEL_SORT_RESULT_BYTES_PER_PIXEL + channel * sizeof(packed_channel),
+                sizeof(packed_channel));
+            float value = glm::unpackHalf1x16(packed_channel);
+            if (!std::isfinite(value)) {
+                value = value > 0.0F ? 1.0F : 0.0F;
+            }
+            value = std::clamp(value, 0.0F, 1.0F);
+            if (p_encode_srgb) {
+                value = encode_srgb(value);
+            }
+            rgba8[pixel * 4 + channel] = static_cast<uint8_t>(std::lround(value * 255.0F));
+        }
+        rgba8[pixel * 4 + 3] = UINT8_MAX;
+    }
+    return rgba8;
+}
+
+// A screenshot path named after the current local time, e.g. build/screenshots/pixel_sorting_20261007_183012.png.
+WBE::Path make_screenshot_path() {
+    const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
+    const std::chrono::zoned_time local_time{std::chrono::current_zone(), now};
+    return WBE::Path(PIXEL_SORT_SCREENSHOT_DIRECTORY) / std::format("pixel_sorting_{:%Y%m%d_%H%M%S}.png", local_time);
+}
+
+} // namespace
 // Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
 // WBE_RADIX_SORT_DATA_START in radix_sort_utils.slang.
 inline constexpr uint32_t RADIX_SORT_BUCKET_COUNT = 256;
@@ -154,6 +221,7 @@ public:
     virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        poll_screenshot();
         imgui_overlay->begin_frame(p_delta);
         draw_parameter_window();
         imgui_overlay->end_frame();
@@ -250,6 +318,9 @@ public:
             throw std::runtime_error(std::format("Failed to setup pixel sorting test: a {}x{} image is too large to pack its pixel sort keys into 32 bits.",
                 source_extent.width, source_extent.height));
         }
+        // Show the image at its own size. This runs before the logic and rendering threads start, and the renderer
+        // resizes the swap chain, and with it the graph, on the first frame.
+        get_window()->resize(source_extent.width, source_extent.height);
         const uint32_t sub_histogram_num = std::clamp(
             static_cast<uint32_t>((element_count + RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / RADIX_SORT_ELEMENTS_PER_WORKGROUP),
             1U,
@@ -307,7 +378,9 @@ public:
                 })
             .add_image(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE,
                 [=](const WBE::RendGraphContextVK& /*p_context*/) {
+                    // The screenshot reads the result back through a transfer.
                     return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_READ_WRITE,
+                        .additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                         .format = PIXEL_SORT_DESTINATION_FORMAT,
                         .extent = {.width = source_extent.width, .height = source_extent.height, .depth = 1}};
                 })
@@ -439,6 +512,7 @@ public:
                                             ->get()
                                             .dynamic_cast_ref<WBE::ROBufferVK>();
         ui_post_processing_params = post_processing_params;
+        result_image = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE);
         WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
         renderer->activate_render_graph("pixel_sorting_graph");
     }
@@ -457,6 +531,60 @@ private:
     WBE::Ref<WBE::ROBufferVK> post_processing_params_buffer;
     // Destroyed before the renderer, after the rendering thread has stopped.
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
+    // Graph-owned container of the post-processed result image, the content of the screenshots.
+    WBE::Ref<WBE::RenderObjectContainerVK> result_image;
+    // The screenshot in progress, owned by the rendering thread: first the readback of the result image, then the worker
+    // task that converts and writes it.
+    std::optional<std::future<std::vector<uint8_t>>> screenshot_readback;
+    std::future<void> screenshot_write;
+    VkExtent2D screenshot_extent{};
+
+    bool is_screenshot_in_progress() const {
+        return screenshot_readback.has_value() || screenshot_write.valid();
+    }
+
+    /**
+     * @brief Start reading back the result image for a screenshot. Must be called on the rendering thread.
+     *
+     * The result image is the post-processed image before the present and UI passes, so the UI is not in the screenshot.
+     * The readback copies the result of the previous frame at the start of the next one.
+     */
+    void request_screenshot() {
+        WBE::Ref<WBE::ROImageVK> image = result_image->get().dynamic_cast_ref<WBE::ROImageVK>();
+        if (image == WBE::MEM_NULL) {
+            throw std::runtime_error("Failed to take a pixel sorting screenshot: the result image is not an image.");
+        }
+        const VkExtent3D extent = image->fields().extent;
+        screenshot_extent = {.width = extent.width, .height = extent.height};
+        screenshot_readback = image->acquire_image_content();
+    }
+
+    /**
+     * @brief Advance the screenshot in progress: hand a completed readback to a worker, and collect a completed write.
+     *
+     * Must be called on the rendering thread.
+     *
+     * @throws std::runtime_error If the readback, conversion, or PNG write failed.
+     */
+    void poll_screenshot() {
+        constexpr std::chrono::seconds NO_WAIT{0};
+        if (screenshot_readback.has_value() && screenshot_readback->wait_for(NO_WAIT) == std::future_status::ready) {
+            std::vector<uint8_t> result_data = screenshot_readback->get();
+            screenshot_readback.reset();
+            const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_base_render_data()->swap_chain_format);
+            // Converting and encoding a full-size image takes long enough to stall a frame, so a worker does it.
+            screenshot_write = WBE::Worker::get_singleton()->submit_task(
+                [result_data = std::move(result_data), extent = screenshot_extent, encode_srgb, path = make_screenshot_path()]() {
+                    const std::vector<uint8_t> rgba8 = convert_result_to_rgba8(result_data, encode_srgb);
+                    std::filesystem::create_directories(path.parent_path());
+                    WBE::write_image_data_png(path, rgba8, extent.width, extent.height, 4);
+                    WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Saved pixel sorting screenshot to {}.", path.string()));
+                });
+        }
+        if (screenshot_write.valid() && screenshot_write.wait_for(NO_WAIT) == std::future_status::ready) {
+            screenshot_write.get();
+        }
+    }
 
     /**
      * @brief Draw the parameter window and upload the contrast and post-processing parameters when they change. Must be called on the rendering thread.
@@ -475,6 +603,16 @@ private:
         if (ImGui::SliderFloat("Gamma", &ui_post_processing_params.gamma, 0.1F, 4.0F)) {
             ui_post_processing_params.gamma = std::max(ui_post_processing_params.gamma, 0.1F);
             post_processing_params_buffer->update_buffer(&ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
+        }
+        const bool screenshot_in_progress = is_screenshot_in_progress();
+        ImGui::BeginDisabled(screenshot_in_progress);
+        if (ImGui::Button("Screenshot")) {
+            request_screenshot();
+        }
+        ImGui::EndDisabled();
+        if (screenshot_in_progress) {
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Saving...");
         }
         ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();

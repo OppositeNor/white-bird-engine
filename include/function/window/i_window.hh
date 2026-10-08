@@ -107,7 +107,8 @@ public:
      * @brief Resize the window.
      *
      * The window system may apply the new size asynchronously. Once the size changes, consume_size_changed() reports
-     * it, so that the renderer resizes its swap chain to the new size. Must be called from the logic thread.
+     * it, so that the renderer resizes its swap chain to the new size. Must be called from the logic thread, or before
+     * the application starts its threads.
      *
      * @param p_width The new width of the window, in screen coordinates.
      * @param p_height The new height of the window, in screen coordinates.
