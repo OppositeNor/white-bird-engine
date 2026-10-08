@@ -53,7 +53,7 @@ struct RTPingPongVK final : public IRenderTaskVK {
      * @param p_initial_state Selection used by the first iteration; false selects ping and true selects pong.
      * @param p_iterations Number of alternating pipeline dispatches recorded by the task.
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
-     * @param p_queue_family Queue family used to submit the compute dispatch.
+     * @param p_queue_family Queue used to submit the compute dispatch: GRAPHICS, COMPUTE_1, or COMPUTE_2.
      */
     RTPingPongVK(const BaseRenderDataVK* p_render_data,
         Ref<ROComputePipelineVK> p_ping_pipeline,
@@ -61,7 +61,7 @@ struct RTPingPongVK final : public IRenderTaskVK {
         bool p_initial_state,
         uint32_t p_iterations,
         VkExtent3D p_dispatch_group_count,
-        QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
+        QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     /**
      * @brief Configure one preparatory compute dispatch before each ping or pong dispatch.
@@ -89,7 +89,7 @@ struct RTPingPongVK final : public IRenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
+    QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> ping_pipeline;
     Ref<ROComputePipelineVK> pong_pipeline;
     Unique<PipelineDescriptorBindingsVK> ping_descriptor_bindings;

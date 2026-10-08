@@ -140,8 +140,10 @@ VkQueue queue_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_queue_f
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return p_render_data->graphics_queue;
-    case QueueFamilyVK::COMPUTE:
-        return p_render_data->compute_queue;
+    case QueueFamilyVK::COMPUTE_1:
+        return p_render_data->compute_queue_1;
+    case QueueFamilyVK::COMPUTE_2:
+        return p_render_data->compute_queue_2;
     }
     return VK_NULL_HANDLE;
 }
@@ -150,7 +152,8 @@ VkCommandPool pool_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_qu
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return p_render_data->graphics_command_pool;
-    case QueueFamilyVK::COMPUTE:
+    case QueueFamilyVK::COMPUTE_1:
+    case QueueFamilyVK::COMPUTE_2:
         return p_render_data->compute_command_pool;
     }
     return VK_NULL_HANDLE;
@@ -169,14 +172,15 @@ VkPipelineStageFlags2 shader_stage_scope(QueueFamilyVK p_queue_family) {
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    case QueueFamilyVK::COMPUTE:
+    case QueueFamilyVK::COMPUTE_1:
+    case QueueFamilyVK::COMPUTE_2:
         return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     }
     throw std::runtime_error("RenderGraphVK: unknown queue family.");
 }
 
 void ensure_graphics_queue_usage(QueueFamilyVK p_queue_family, RendResUsageVK p_usage) {
-    if (p_queue_family == QueueFamilyVK::COMPUTE) {
+    if (p_queue_family != QueueFamilyVK::GRAPHICS) {
         throw std::runtime_error(
             std::format("RenderGraphVK: resource usage {} is not valid on the compute queue.", std::to_underlying(p_usage)));
     }

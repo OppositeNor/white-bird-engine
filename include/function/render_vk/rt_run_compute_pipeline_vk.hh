@@ -46,12 +46,12 @@ struct RTRunComputePipelineVK final : public IRenderTaskVK {
      * @param p_render_data Base render data.
      * @param p_pipeline Compute pipeline retained by the task.
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
-     * @param p_queue_family Queue family used to submit the compute dispatch.
+     * @param p_queue_family Queue used to submit the compute dispatch: GRAPHICS, COMPUTE_1, or COMPUTE_2.
      */
     RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
         Ref<ROComputePipelineVK> p_pipeline,
         VkExtent3D p_dispatch_group_count,
-        QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
+        QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -65,7 +65,7 @@ struct RTRunComputePipelineVK final : public IRenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
+    QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> pipeline;
     Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     VkExtent3D dispatch_group_count{.width = 1, .height = 1, .depth = 1};

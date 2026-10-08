@@ -102,7 +102,8 @@ RendTaskDescVK OctreeRenderFeatureAtomic::make_deferred_construction_render_task
             false,
             // A single raster pass can leave contenders at any depth; allow one retry per tree level.
             static_cast<uint32_t>(OCTREE_MAX_DEPTH),
-            PROPAGATION_GROUP_COUNT);
+            PROPAGATION_GROUP_COUNT,
+            QueueFamilyVK::COMPUTE_1);
         task->set_iteration_prefixes(
             octree_deferred_count_reset_pong_compute_pipeline, octree_deferred_count_reset_ping_compute_pipeline, RESET_GROUP_COUNT);
         return task;

@@ -50,7 +50,7 @@ public:
     RTTriggerProbeVK& operator=(const RTTriggerProbeVK&) = delete;
     RTTriggerProbeVK& operator=(RTTriggerProbeVK&&) = delete;
     virtual QueueFamilyVK queue_family() const override {
-        return QueueFamilyVK::COMPUTE;
+        return QueueFamilyVK::COMPUTE_1;
     }
     virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         p_reads.emplace_back("input", RendResUsageVK::STORAGE_BUFFER);
@@ -117,7 +117,7 @@ TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
         Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
         task.bind_resources(RendResViewVK(&resources));
         EXPECT_EQ(state.bindings, 1);
-        EXPECT_EQ(task.queue_family(), QueueFamilyVK::COMPUTE);
+        EXPECT_EQ(task.queue_family(), QueueFamilyVK::COMPUTE_1);
         Vector<ResAccessVK, RenderAllocator> reads(&allocator);
         Vector<ResAccessVK, RenderAllocator> writes(&allocator);
         task.append_accesses(reads, writes);

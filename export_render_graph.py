@@ -16,7 +16,8 @@
 The report is the JSON file TimestampQueryPluginVK writes when the renderer terminates (by default
 gpu_timestamp_report.json next to the executable). Every selected render graph is drawn the same way in both formats:
 
-- Nodes are tasks, colored by queue (blue for graphics, yellow for compute), labeled with their mean GPU time.
+- Nodes are tasks, colored by queue (blue for graphics, yellow for compute_1, green for compute_2), labeled with their
+  mean GPU time.
 - Parallel resource edges between the same two tasks are merged into one arrow. The label lists each resource, marked
   W when the next task writes it and R when it only reads it.
 - Solid arrows stay on one queue (pipeline barriers); red dashed arrows cross queues (timeline semaphores).
@@ -35,10 +36,12 @@ from pathlib import Path
 from typing import Any
 
 
-GRAPHICS_FILL: str = "#dbeafe"
-GRAPHICS_STROKE: str = "#1d4ed8"
-COMPUTE_FILL: str = "#fde68a"
-COMPUTE_STROKE: str = "#b45309"
+# Fill and stroke colors of each queue name TimestampQueryPluginVK reports, in report order.
+QUEUE_COLORS: dict[str, tuple[str, str]] = {
+    "graphics": ("#dbeafe", "#1d4ed8"),
+    "compute_1": ("#fde68a", "#b45309"),
+    "compute_2": ("#bbf7d0", "#15803d"),
+}
 TEXT_COLOR: str = "#0f172a"
 CROSS_QUEUE_COLOR: str = "#b91c1c"
 
@@ -87,6 +90,9 @@ def build_graph(p_graph: dict[str, Any], p_include_timing: bool) -> Graph:
     tasks: list[dict[str, Any]] = p_graph["tasks"]
     edges: list[dict[str, Any]] = p_graph["edges"]
     queue_by_task: dict[str, str] = {task["task_id"]: task["queue"] for task in tasks}
+    for task_id, queue in queue_by_task.items():
+        if queue not in QUEUE_COLORS:
+            raise ValueError(f"Task '{task_id}' of graph '{p_graph['key']}' runs on unknown queue '{queue}'.")
 
     nodes: list[GraphNode] = [
         GraphNode(
@@ -112,10 +118,11 @@ def build_graph(p_graph: dict[str, Any], p_include_timing: bool) -> Graph:
         for (from_task, to_task), pair_edges in merged.items()
     ]
 
-    graphics_count: int = sum(1 for node in nodes if node.queue == "graphics")
+    queue_counts: list[str] = [
+        f"{count} {queue}" for queue in QUEUE_COLORS if (count := sum(1 for node in nodes if node.queue == queue)) > 0]
     cross_queue_count: int = sum(1 for arrow in arrows if arrow.cross_queue)
     summary: str = (
-        f"{len(nodes)} tasks ({graphics_count} graphics, {len(nodes) - graphics_count} compute), {len(edges)} resource "
+        f"{len(nodes)} tasks ({', '.join(queue_counts)}), {len(edges)} resource "
         f"edges merged into {len(arrows)} arrows, {cross_queue_count} of which cross queues."
     )
     return Graph(key=p_graph["key"], summary=summary, nodes=nodes, arrows=arrows)
@@ -129,8 +136,8 @@ def to_mermaid(p_graph: Graph, p_direction: str) -> str:
         lines.append(f'    {node.node_id}["{label}"]:::{node.queue}')
     for arrow in p_graph.arrows:
         lines.append(f'    {arrow.from_node_id} -->|"{"<br/>".join(arrow.resources)}"| {arrow.to_node_id}')
-    lines.append(f"    classDef graphics fill:{GRAPHICS_FILL},stroke:{GRAPHICS_STROKE},color:{TEXT_COLOR}")
-    lines.append(f"    classDef compute fill:{COMPUTE_FILL},stroke:{COMPUTE_STROKE},color:{TEXT_COLOR}")
+    for queue, (fill, stroke) in QUEUE_COLORS.items():
+        lines.append(f"    classDef {queue} fill:{fill},stroke:{stroke},color:{TEXT_COLOR}")
     cross_queue_links: list[str] = [str(index) for index, arrow in enumerate(p_graph.arrows) if arrow.cross_queue]
     if cross_queue_links:
         lines.append(
@@ -155,7 +162,7 @@ def to_dot(p_graph: Graph, p_direction: str) -> str:
     ]
     for node in p_graph.nodes:
         label: str = node.task_id if node.timing_label is None else f"{node.task_id}\n{node.timing_label}"
-        fill, stroke = (GRAPHICS_FILL, GRAPHICS_STROKE) if node.queue == "graphics" else (COMPUTE_FILL, COMPUTE_STROKE)
+        fill, stroke = QUEUE_COLORS[node.queue]
         lines.append(f'    {node.node_id} [label={dot_string(label)}, fillcolor="{fill}", color="{stroke}"];')
     for arrow in p_graph.arrows:
         style: str = (

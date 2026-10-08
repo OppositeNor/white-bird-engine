@@ -419,8 +419,11 @@ void PixelSort::add_compute_task(RendGraphDescVK& p_graph,
     }
     task_desc.factory = [this, pipelines = p_pipelines, p_group_count](const RendGraphContextVK& p_context) {
         const Layout layout = make_layout(extent(p_context), settings.direction);
-        return make_toggleable_task(make_unique<RTRunComputePipelineVK>(
-            get_allocator(), renderer->get_base_render_data(), pipelines[direction_index(settings.direction)], layout.*p_group_count));
+        return make_toggleable_task(make_unique<RTRunComputePipelineVK>(get_allocator(),
+            renderer->get_base_render_data(),
+            pipelines[direction_index(settings.direction)],
+            layout.*p_group_count,
+            QueueFamilyVK::COMPUTE_1));
     };
     p_graph.add_task(std::move(task_desc));
 }

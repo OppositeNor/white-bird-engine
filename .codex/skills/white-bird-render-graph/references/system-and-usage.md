@@ -101,9 +101,9 @@ queue ownership transfers are not encoded.
 
 ## Queue behavior
 
-`QueueFamilyVK::GRAPHICS` selects the graphics queue and command pool. `QueueFamilyVK::COMPUTE` selects the compute queue and command pool. A compute-capable graphics family may serve both when no dedicated compute family exists.
+`QueueFamilyVK::GRAPHICS` selects the graphics queue and command pool. `QueueFamilyVK::COMPUTE_1` and `QueueFamilyVK::COMPUTE_2` select two queues of the compute family, sharing its command pool. The renderer gives each logical queue its own `VkQueue` while its family has unused queues; otherwise logical queues share a `VkQueue`, and edges between tasks on the same `VkQueue` become pipeline barriers. A compute-capable graphics family may serve every logical queue when no dedicated compute family exists.
 
-`RTRunComputePipelineVK` defaults to compute. Keep that default for compute-only dispatches unless they must share graphics-queue ordering unavailable through graph dependencies.
+The compute tasks (`RTRunComputePipelineVK`, `RTRunComputePipelinesSequentialVK`, and `RTPingPongVK`) default to graphics. Pass a compute queue for dispatches that should overlap graphics work or each other; independent tasks on `COMPUTE_1` and `COMPUTE_2` can run concurrently.
 
 `ROImageVK` and `ROBufferVK` default to all unique renderer-selected queue families. With multiple families they use `VK_SHARING_MODE_CONCURRENT`, so no ownership transfer is needed between graph queues. If a builder supplies a restricted family set and creates an exclusive resource, the caller must account for ownership; the current graph does not generate the required release/acquire transfers.
 

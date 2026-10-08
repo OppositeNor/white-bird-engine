@@ -72,6 +72,9 @@
 namespace WhiteBirdEngine {
 
 namespace {
+// Each GPU-job batch uses a fresh timeline semaphore that is signaled once, to this value.
+constexpr uint64_t GPU_JOB_COMPLETION_VALUE = 1;
+
 struct ExtensionSupportQueryResult {
     bool success = true;
     std::vector<std::string> unsupported_extensions;
@@ -349,7 +352,8 @@ void RendererVK::setup_base_render_data() {
         static_cast<float>(swap_chain_extent.width) / static_cast<float>(swap_chain_extent.height);
     base_render_data.allocation_callbacks = get_allocation_callbacks();
     base_render_data.graphics_queue = graphics_queue;
-    base_render_data.compute_queue = compute_queue;
+    base_render_data.compute_queue_1 = compute_queue_1;
+    base_render_data.compute_queue_2 = compute_queue_2;
     base_render_data.graphics_queue_family_index = queue_family_indices.get_graphics();
     base_render_data.viewport = viewport;
     base_render_data.scissor = scissor;
@@ -838,24 +842,49 @@ void RendererVK::create_physical_device() {
 }
 
 void RendererVK::create_logical_device() { // NOLINT
+    // Assign each logical queue its own queue within its family while the family has unused queues; once a family runs out,
+    // later logical queues share the family's last queue.
+    uint32_t queue_family_count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
+    Vector<VkQueueFamilyProperties, AllocType> queue_family_properties(queue_family_count, allocator);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_family_properties.data());
+    Vector<uint32_t, AllocType> requested_queue_counts(queue_family_count, 0, allocator);
+    auto take_queue = [&](uint32_t p_family_index) {
+        WBE_DEBUG_ASSERT(p_family_index < queue_family_count);
+        uint32_t& requested_count = requested_queue_counts[p_family_index];
+        const uint32_t available_count = queue_family_properties[p_family_index].queueCount;
+        const uint32_t queue_index = std::min(requested_count, available_count - 1);
+        requested_count = std::min(requested_count + 1, available_count);
+        return queue_index;
+    };
+    graphics_queue_index = take_queue(queue_family_indices.get_graphics());
+    compute_queue_1_index = take_queue(queue_family_indices.get_compute());
+    compute_queue_2_index = take_queue(queue_family_indices.get_compute());
+    // Present reuses the first queue of its family, which is the graphics queue when the families match.
+    if (requested_queue_counts[queue_family_indices.get_present()] == 0) {
+        take_queue(queue_family_indices.get_present());
+    }
+
     // Setup queues create info.
-    float queue_priority = 1.0;
-    Set<uint32_t, AllocType> indices = queue_family_indices.get_unique_indices();
+    const uint32_t max_requested_queue_count = *std::ranges::max_element(requested_queue_counts);
+    Vector<float, AllocType> queue_priorities(max_requested_queue_count, 1.0F, allocator);
     Vector<VkDeviceQueueCreateInfo, AllocType> queues_create_info(allocator);
-    queues_create_info.reserve(indices.size());
-    for (uint32_t elem : indices) {
+    for (uint32_t family_index = 0; family_index < queue_family_count; ++family_index) {
+        if (requested_queue_counts[family_index] == 0) {
+            continue;
+        }
         VkDeviceQueueCreateInfo queue_create_info{};
         queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queue_create_info.queueFamilyIndex = elem;
-        queue_create_info.queueCount = 1;
-        queue_create_info.pQueuePriorities = &queue_priority;
+        queue_create_info.queueFamilyIndex = family_index;
+        queue_create_info.queueCount = requested_queue_counts[family_index];
+        queue_create_info.pQueuePriorities = queue_priorities.data();
         queues_create_info.push_back(queue_create_info);
     }
 
     // Setup logical device create info.
     VkDeviceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info.queueCreateInfoCount = indices.size();
+    create_info.queueCreateInfoCount = static_cast<uint32_t>(queues_create_info.size());
     create_info.pQueueCreateInfos = queues_create_info.data();
 
     // Setup layers.
@@ -976,8 +1005,17 @@ void RendererVK::create_logical_device() { // NOLINT
     }
 
     // Get the device queues.
-    vkGetDeviceQueue(logical_device, queue_family_indices.get_graphics(), 0, &graphics_queue);
-    vkGetDeviceQueue(logical_device, queue_family_indices.get_compute(), 0, &compute_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_graphics(), graphics_queue_index, &graphics_queue);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_compute(), compute_queue_1_index, &compute_queue_1);
+    vkGetDeviceQueue(logical_device, queue_family_indices.get_compute(), compute_queue_2_index, &compute_queue_2);
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(std::format("Vulkan queues: graphics {}:{}, compute 1 {}:{}, compute 2 {}:{}.",
+            queue_family_indices.get_graphics(),
+            graphics_queue_index,
+            queue_family_indices.get_compute(),
+            compute_queue_1_index,
+            queue_family_indices.get_compute(),
+            compute_queue_2_index));
     vkGetDeviceQueue(logical_device, queue_family_indices.get_present(), 0, &present_queue);
 }
 
@@ -1435,7 +1473,8 @@ void RendererVK::run_gpu_jobs() {
         gpu_job.submission_promise = std::promise<Ref<ROFenseVK>>();
         submitted_jobs.back()(gpu_job_command_buffer);
     }
-    Ref<SemaphoreVK> completion_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, true);
+    // A timeline semaphore, because every compute queue waits on it and a binary semaphore allows only one waiter.
+    Ref<SemaphoreVK> completion_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, false);
     submit_gpu_job_command_buffer(completion_fenses, submission_promises, completion_semaphore);
     running_gpu_jobs = std::move(submitted_jobs);
     running_gpu_job_fenses = std::move(completion_fenses);
@@ -1529,7 +1568,8 @@ void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, Allo
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &command_buffer_info;
-    VkSemaphoreSubmitInfo signal_info = p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    VkSemaphoreSubmitInfo signal_info =
+        p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, GPU_JOB_COMPLETION_VALUE);
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &signal_info;
     WBE_DEBUG_ASSERT(!p_completion_fenses.empty());
@@ -1548,14 +1588,20 @@ void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, Allo
         }
         p_submission_promises[i].set_value(p_completion_fenses[i]);
     }
-    VkSemaphoreSubmitInfo wait_info = p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+    VkSemaphoreSubmitInfo wait_info =
+        p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, GPU_JOB_COMPLETION_VALUE);
     VkSubmitInfo2 compute_wait_submit{};
     compute_wait_submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     compute_wait_submit.waitSemaphoreInfoCount = 1;
     compute_wait_submit.pWaitSemaphoreInfos = &wait_info;
-    result = vkQueueSubmit2(compute_queue, 1, &compute_wait_submit, VK_NULL_HANDLE);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error(std::format("Failed to synchronize GPU jobs with the compute queue: {}.", string_VkResult(result)));
+    // Both logical compute queues may share one VkQueue, which needs to wait only once.
+    const size_t compute_queue_count = compute_queue_1 == compute_queue_2 ? 1 : 2;
+    const std::array<VkQueue, 2> compute_queues{compute_queue_1, compute_queue_2};
+    for (size_t i = 0; i < compute_queue_count; ++i) {
+        result = vkQueueSubmit2(compute_queues[i], 1, &compute_wait_submit, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error(std::format("Failed to synchronize GPU jobs with the compute queue: {}.", string_VkResult(result)));
+        }
     }
 }
 

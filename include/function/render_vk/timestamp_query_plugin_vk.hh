@@ -171,7 +171,7 @@ public:
     virtual void on_renderer_terminating() override;
 
 private:
-    static constexpr size_t QUEUE_FAMILY_COUNT = 2;
+    static constexpr size_t QUEUE_FAMILY_COUNT = 3;
 
     // Running duration statistics in nanoseconds, accumulated with Welford's algorithm.
     struct DurationStatistics {

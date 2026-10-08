@@ -26,13 +26,17 @@ namespace WhiteBirdEngine {
 
 /**
  * @class QueueFamilyVK
- * @brief Logical queue families a Vulkan render task can request. The
+ * @brief Logical queues a Vulkan render task can request. The
  * RenderGraphVK maps these to the concrete VkQueue / VkCommandPool from
  * BaseRenderDataVK.
+ *
+ * COMPUTE_1 and COMPUTE_2 are two queues of the compute queue family. They are distinct VkQueues when the family exposes
+ * enough queues; otherwise they share one VkQueue and the graph orders their tasks with pipeline barriers.
  */
 enum class QueueFamilyVK : uint32_t {
     GRAPHICS = 0,
-    COMPUTE = 1,
+    COMPUTE_1 = 1,
+    COMPUTE_2 = 2,
 };
 
 class RendResViewVK;

@@ -40,7 +40,6 @@
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
 #include "i_octree_render_feature.hh"
-#include "i_post_processing.hh"
 #include "resource/resource_utils.hh"
 #include "rt_imgui_vk.hh"
 #include <algorithm>
@@ -480,7 +479,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
     dispatch.add_entry(shadow_moments_summed_area_table_horizontal_compute_pipeline, horizontal_dispatch_group_count)
         .add_entry(shadow_moments_summed_area_table_vertical_compute_pipeline, vertical_dispatch_group_count);
     task_desc.factory = [this, dispatch](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
+        return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch, QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -501,7 +500,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
     Ref<ROComputePipelineVK> pipeline =
         p_use_summed_area_table ? direct_lighting_summed_area_table_compute_pipeline : direct_lighting_compute_pipeline;
     task_desc.factory = [this, pipeline](const RendGraphContextVK& p_context) {
-        return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, pipeline, make_screen_tile_group_count(p_context));
+        return make_unique<RTRunComputePipelineVK>(
+            render_allocator, base_render_data, pipeline, make_screen_tile_group_count(p_context), QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -512,9 +512,12 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_d
     task_desc.factory = [this](const RendGraphContextVK& p_context) {
         const VkExtent3D dispatch_group_count = make_screen_tile_group_count(p_context);
         Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, indirect_lighting_compute_pipeline, dispatch_group_count);
-        Unique<IRenderTaskVK> debug_view_task = make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, indirect_lighting_debug_view_compute_pipeline, dispatch_group_count);
+            render_allocator, base_render_data, indirect_lighting_compute_pipeline, dispatch_group_count, QueueFamilyVK::COMPUTE_2);
+        Unique<IRenderTaskVK> debug_view_task = make_unique<RTRunComputePipelineVK>(render_allocator,
+            base_render_data,
+            indirect_lighting_debug_view_compute_pipeline,
+            dispatch_group_count,
+            QueueFamilyVK::COMPUTE_2);
         return make_unique<VoxelDebugIndirectLightingTask>(
             render_allocator, std::move(task), std::move(debug_view_task), &voxel_debug_view_mode);
     };
@@ -526,7 +529,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_combine_lighting_task_de
     task_desc.task_id = RT_COMBINE_LIGHTING;
     task_desc.factory = [this](const RendGraphContextVK& p_context) {
         return make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, combine_lighting_compute_pipeline, make_screen_tile_group_count(p_context));
+            render_allocator, base_render_data, combine_lighting_compute_pipeline, make_screen_tile_group_count(p_context), QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -541,7 +544,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_extract_task_desc(
         .depth = 1,
     };
     task_desc.factory = [this, dispatch_group_count](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, bloom_extract_compute_pipeline, dispatch_group_count);
+        return make_unique<RTRunComputePipelineVK>(
+            render_allocator, base_render_data, bloom_extract_compute_pipeline, dispatch_group_count, QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -564,7 +568,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
             kawase_blur_ping_write_compute_pipeline,
             false,
             BLOOM_BLUR_PASS_COUNT,
-            dispatch_group_count);
+            dispatch_group_count,
+            QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }

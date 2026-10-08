@@ -56,8 +56,10 @@ const char* queue_family_name(QueueFamilyVK p_queue_family) {
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return "graphics";
-    case QueueFamilyVK::COMPUTE:
-        return "compute";
+    case QueueFamilyVK::COMPUTE_1:
+        return "compute_1";
+    case QueueFamilyVK::COMPUTE_2:
+        return "compute_2";
     }
     throw std::runtime_error("Failed to name queue family: unknown queue family.");
 }

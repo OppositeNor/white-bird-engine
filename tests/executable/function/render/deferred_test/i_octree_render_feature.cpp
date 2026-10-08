@@ -372,7 +372,8 @@ RendTaskDescVK IOctreeRenderFeature::get_reset_render_task_desc() const {
         return make_unique<RTRunComputePipelineVK>(render_allocator,
             base_render_data,
             octree_reset_compute_pipeline,
-            VkExtent3D{.width = get_reset_group_count(), .height = 1, .depth = 1});
+            VkExtent3D{.width = get_reset_group_count(), .height = 1, .depth = 1},
+            QueueFamilyVK::COMPUTE_1);
     };
     alias_mesh_resources(task_desc, *octree_reset_compute_pipeline, make_mesh_resource_keys(STATIC_MESH_KEY));
     return task_desc;
@@ -416,7 +417,8 @@ RendTaskDescVK IOctreeRenderFeature::get_debug_capture_render_task_desc(std::str
         Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(render_allocator,
             base_render_data,
             octree_pre_deferred_debug_capture_compute_pipeline,
-            VkExtent3D{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1});
+            VkExtent3D{.width = OCTREE_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1},
+            QueueFamilyVK::COMPUTE_1);
         return make_unique<RTVoxelDebugView>(render_allocator, std::move(task), debug_view_mode, p_mode, p_mode);
     };
     return task_desc;
@@ -427,7 +429,7 @@ RendTaskDescVK IOctreeRenderFeature::get_debug_draw_setup_render_task_desc() con
     task_desc.task_id = RT_SETUP_OCTREE_DEBUG_DRAW;
     task_desc.factory = [this](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, octree_debug_draw_setup_compute_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1});
+            render_allocator, base_render_data, octree_debug_draw_setup_compute_pipeline, VkExtent3D{.width = 1, .height = 1, .depth = 1}, QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -578,7 +580,7 @@ RendTaskDescVK IOctreeRenderFeature::get_dynamic_clear_task_desc() const {
     constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 127) / 128);
     task.factory = [this](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, dynamic_clear_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
+            render_allocator, base_render_data, dynamic_clear_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1}, QueueFamilyVK::COMPUTE_1);
     };
     return task;
 }

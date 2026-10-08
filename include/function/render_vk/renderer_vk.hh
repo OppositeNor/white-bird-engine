@@ -256,8 +256,13 @@ private:
     bool frame_capture_supported = false;
 
     VkQueue graphics_queue = VK_NULL_HANDLE;
-    VkQueue compute_queue = VK_NULL_HANDLE;
+    VkQueue compute_queue_1 = VK_NULL_HANDLE;
+    VkQueue compute_queue_2 = VK_NULL_HANDLE;
     VkQueue present_queue = VK_NULL_HANDLE;
+    // Queue indices within their queue families, assigned when the logical device is created.
+    uint32_t graphics_queue_index = 0;
+    uint32_t compute_queue_1_index = 0;
+    uint32_t compute_queue_2_index = 0;
 
     VkFormat swap_chain_image_format = VK_FORMAT_UNDEFINED;
     VkExtent2D swap_chain_extent{};

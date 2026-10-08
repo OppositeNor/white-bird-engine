@@ -132,8 +132,10 @@ struct BaseRenderDataVK {
     VkAllocationCallbacks* allocation_callbacks = nullptr;
     /** Graphics queue family. */
     VkQueue graphics_queue = VK_NULL_HANDLE;
-    /** Compute queue family. */
-    VkQueue compute_queue = VK_NULL_HANDLE;
+    /** First compute queue, used by QueueFamilyVK::COMPUTE_1. It may equal graphics_queue when no other queue is available. */
+    VkQueue compute_queue_1 = VK_NULL_HANDLE;
+    /** Second compute queue, used by QueueFamilyVK::COMPUTE_2. It may equal another queue when no other queue is available. */
+    VkQueue compute_queue_2 = VK_NULL_HANDLE;
     /** The queue family index of graphics_queue. */
     uint32_t graphics_queue_family_index = UINT32_MAX;
     /** The viewport for the final presentation. */
@@ -143,7 +145,7 @@ struct BaseRenderDataVK {
 
     /** Graphics command pool. */
     VkCommandPool graphics_command_pool = VK_NULL_HANDLE;
-    /** Compute command pool. */
+    /** Compute command pool shared by both compute queues. */
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
     /** Non-owning libktx Vulkan upload context owned by RendererVK. */
     KTXVulkanDeviceInfoVK* ktx_vulkan_device_info = nullptr;

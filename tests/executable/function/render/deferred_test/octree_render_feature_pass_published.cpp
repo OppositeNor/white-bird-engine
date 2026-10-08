@@ -146,7 +146,7 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::make_deferred_construction_rend
             .add_entry(publication_pipeline, publication_group_count);
     }
     task_desc.factory = [this, dispatch](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch);
+        return make_unique<RTRunComputePipelinesSequentialVK>(render_allocator, base_render_data, dispatch, QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -156,7 +156,8 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_state_update_render_task_de
     task_desc.task_id = RT_UPDATE_OCTREE_STATES;
     constexpr VkExtent3D GROUP_COUNT{.width = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + 63) / 64), .height = 1, .depth = 1};
     task_desc.factory = [this, GROUP_COUNT](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTRunComputePipelineVK>(render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT);
+        return make_unique<RTRunComputePipelineVK>(
+            render_allocator, base_render_data, update_states_pipeline, GROUP_COUNT, QueueFamilyVK::COMPUTE_1);
     };
     return task_desc;
 }
@@ -167,7 +168,7 @@ RendTaskDescVK OctreeRenderFeaturePassPublished::get_dynamic_publication_task_de
     constexpr uint32_t GROUPS = static_cast<uint32_t>((OCTREE_MAX_NODE_COUNT + OCTREE_MAX_DYNAMIC_NODE_COUNT + 127) / 128);
     task.factory = [this](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1});
+            render_allocator, base_render_data, dynamic_publication_pipeline, VkExtent3D{.width = GROUPS, .height = 1, .depth = 1}, QueueFamilyVK::COMPUTE_1);
     };
     return task;
 }

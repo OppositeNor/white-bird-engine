@@ -92,10 +92,10 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
      *
      * @param p_render_data Base render data.
      * @param p_dispatch Ordered compute entries retained by the task.
-     * @param p_queue_family Queue family used to submit the compute dispatches.
+     * @param p_queue_family Queue used to submit the compute dispatches: GRAPHICS, COMPUTE_1, or COMPUTE_2.
      */
     RTRunComputePipelinesSequentialVK(
-        const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE);
+        const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -109,7 +109,7 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
 
 private:
     const BaseRenderDataVK* render_data = nullptr;
-    QueueFamilyVK queue_family_id = QueueFamilyVK::COMPUTE;
+    QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Vector<Entry, RenderAllocator> entries;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
 };

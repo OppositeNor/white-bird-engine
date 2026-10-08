@@ -23,7 +23,7 @@ Every task implements `queue_family()`, `append_accesses()`, and `record()`, and
 
 Graph construction rejects cycles, self edges, unknown task ids, undeclared resources, empty stages, and graphics-only stages on compute tasks. Every read-write, write-read, or write-write conflict between declared accesses must be ordered by a chain of edges carrying that same resource; edges on other resources do not count. Read-read pairs do not conflict. Consecutive edges on one resource must share a stage at the middle task, and an edge into a task that writes the resource must be a `WRITE` edge.
 
-Prefer existing task types such as `RTRunComputePipelineVK`, `RTRunGraphicsPipelineVK`, and `RTRunGraphicsPipelineIndirectVK` before adding a new `IRenderTaskVK`. Render-graph command buffers bind the renderer-owned descriptor heaps before task recording, and pipeline-run tasks bind their reflected fields to graph resources at graph build and push their descriptor indices automatically. `RTRunComputePipelineVK` defaults to `QueueFamilyVK::COMPUTE`; do not override it to graphics without a concrete queue constraint.
+Prefer existing task types such as `RTRunComputePipelineVK`, `RTRunGraphicsPipelineVK`, and `RTRunGraphicsPipelineIndirectVK` before adding a new `IRenderTaskVK`. Render-graph command buffers bind the renderer-owned descriptor heaps before task recording, and pipeline-run tasks bind their reflected fields to graph resources at graph build and push their descriptor indices automatically. `RTRunComputePipelineVK`, `RTRunComputePipelinesSequentialVK`, and `RTPingPongVK` default to `QueueFamilyVK::GRAPHICS`; pass `QueueFamilyVK::COMPUTE_1` or `QueueFamilyVK::COMPUTE_2` to run them asynchronously.
 
 ## Use queues and resources safely
 
