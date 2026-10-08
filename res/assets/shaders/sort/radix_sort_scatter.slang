@@ -38,10 +38,11 @@ groupshared uint batch_digit_starts[WBE_RADIX_SORT_BUCKET_COUNT];
 // Scatters the elements of one sub-histogram into their sorted positions for the digit at WBE_RADIX_HISTOGRAM_BIT_REGION.
 // Workgroup g owns the contiguous input range that sub-histogram g counted:
 // [g * elements_per_group, (g + 1) * elements_per_group), with elements_per_group = ceil(element_count / sub_histogram_num).
-// The histogram buffer must hold the column-wise inclusive prefix sum from radix_sort_histogram_prefix_sum. Each element
+// The histogram buffer must hold the column-wise inclusive prefix sum from radix_sort_histogram_add_overflow. Each element
 // is written to: (number of elements with a smaller digit) + (number of elements with the same digit in earlier
 // sub-histograms) + (rank among the elements with the same digit in this sub-histogram). The workgroup sorts its range
-// stably by the digit in batches of 256, so the scatter is stable. Must be dispatched with sub_histogram_num workgroups.
+// stably by the digit in batches of 256, so the scatter is stable. The output buffer receives the metadata of the input
+// buffer. Must be dispatched with the local sort dispatch.
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
@@ -51,14 +52,15 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
     uint thread_data_start = group_thread_id * 4;
-    uint element_count = input_buffer[0];
-    uint sub_histogram_num = histogram_buffer[0];
-    uint lane_start = histogram_buffer[2];
+    uint element_count = input_buffer[WBE_RADIX_SORT_ELEMENT_COUNT_INDEX];
+    uint sub_histogram_num = histogram_buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX];
+    uint lane_start = histogram_buffer[WBE_RADIX_SORT_LANE_START_INDEX];
     if (group_id >= sub_histogram_num) {
         return;
     }
     if (group_id == 0 && group_thread_id == 0) {
-        output_buffer[0] = element_count;
+        output_buffer[WBE_RADIX_SORT_ELEMENT_COUNT_INDEX] = element_count;
+        output_buffer[WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX] = input_buffer[WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX];
     }
 
     // The last sub-histogram holds the total count of each digit after the column-wise inclusive prefix sum. An exclusive
@@ -85,7 +87,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         digit_offsets[digit] = digit_start + earlier_sub_histogram_count;
     }
 
-    uint elements_per_group = (element_count + sub_histogram_num - 1) / sub_histogram_num;
+    uint elements_per_group = radix_sort_elements_per_local_sort(element_count, sub_histogram_num);
     uint group_begin = min(group_id * elements_per_group, element_count);
     uint group_end = min(group_begin + elements_per_group, element_count);
     for (uint batch_begin = group_begin; batch_begin < group_end; batch_begin += BATCH_SIZE) {

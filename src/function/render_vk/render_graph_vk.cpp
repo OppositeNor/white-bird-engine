@@ -239,7 +239,8 @@ ResourceScopeVK resource_scope(RendResUsageVK p_usage, bool p_write, QueueFamily
         if (p_write) {
             break;
         }
-        ensure_graphics_queue_usage(p_queue_family, p_usage);
+        // Indirect draws and indirect dispatches both read their commands in the draw-indirect stage, which compute queues
+        // also support.
         return {.access = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT, .stage = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT};
     case RendResUsageVK::VERTEX_BUFFER:
         if (p_write) {

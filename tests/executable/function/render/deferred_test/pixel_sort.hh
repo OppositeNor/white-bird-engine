@@ -172,7 +172,8 @@ private:
     // The sizes of the resources and dispatches of the effect for one extent of the color image.
     struct Layout;
 
-    // The ids of the histogram, histogram prefix sum, and scatter tasks of every radix sort pass.
+    // The ids of the histogram, histogram prefix sum, overflow prefix sum, overflow addition, and scatter tasks of every radix
+    // sort pass.
     struct RadixSortTaskIds;
 
     // One pipeline per PixelSortDirection value, indexed by the direction.
@@ -201,6 +202,13 @@ private:
         const Ref<ROComputePipelineVK>& p_pipeline,
         VkExtent3D Layout::* p_group_count,
         std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
+    // Add a task dispatching a pipeline that does not depend on the direction with the radix sort dispatch at p_dispatch_offset
+    // bytes of the radix sort dispatch buffer.
+    void add_indirect_compute_task(RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
+        const Ref<ROComputePipelineVK>& p_pipeline,
+        VkDeviceSize p_dispatch_offset,
+        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
 
     RendererVK* renderer = nullptr;
     std::function<VkExtent2D(const RendGraphContextVK&)> extent;
@@ -212,7 +220,10 @@ private:
     Ref<ROComputePipelineVK> prefix_sum_columns_pipeline;
     DirectionPipelines register_keys_pipelines;
     DirectionPipelines write_sorted_pixels_pipelines;
+    Ref<ROComputePipelineVK> radix_sort_prepare_dispatch_pipeline;
     Ref<ROComputePipelineVK> histogram_prefix_sum_pipeline;
+    Ref<ROComputePipelineVK> histogram_overflow_prefix_sum_pipeline;
+    Ref<ROComputePipelineVK> histogram_add_overflow_pipeline;
     std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> histogram_pipelines;
     std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> scatter_pipelines;
 };

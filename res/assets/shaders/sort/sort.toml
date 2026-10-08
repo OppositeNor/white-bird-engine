@@ -48,6 +48,27 @@ dst = "assets/shaders/sort/radix_sort_histogram_prefix_sum.spv"
 metadata = "assets/shaders/sort/radix_sort_histogram_prefix_sum.json"
 
 [[resources]]
+id = "radix_sort_histogram_overflow_prefix_sum"
+source_type = "shader"
+src = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.slang"
+dst = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.spv"
+metadata = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.json"
+
+[[resources]]
+id = "radix_sort_histogram_add_overflow"
+source_type = "shader"
+src = "assets/shaders/sort/radix_sort_histogram_add_overflow.slang"
+dst = "assets/shaders/sort/radix_sort_histogram_add_overflow.spv"
+metadata = "assets/shaders/sort/radix_sort_histogram_add_overflow.json"
+
+[[resources]]
+id = "radix_sort_prepare_dispatch"
+source_type = "shader"
+src = "assets/shaders/sort/radix_sort_prepare_dispatch.slang"
+dst = "assets/shaders/sort/radix_sort_prepare_dispatch.spv"
+metadata = "assets/shaders/sort/radix_sort_prepare_dispatch.json"
+
+[[resources]]
 id = "radix_sort_scatter_0_8"
 source_type = "shader"
 src = "assets/shaders/sort/radix_sort_scatter.slang"

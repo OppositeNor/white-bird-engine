@@ -22,42 +22,43 @@ struct DescriptorIndices {
 [vk::push_constant]
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
-// TODO: Slang does not support globallycoherent descriptors fetched from the descriptor heap
-// (https://github.com/shader-slang/slang/issues/13440), so under the Vulkan memory model, buffer accesses are private and
-// barriers do not make them visible to other invocations. The invocations therefore never exchange values through the
-// buffer.
 // One invocation per bucket.
 #define WORKGROUP_SIZE WBE_RADIX_SORT_BUCKET_COUNT
-// The number of sub-histogram entries each invocation loads before summing them, so that the loads overlap.
-#define ROWS_PER_BATCH 8
 
-// Computes an in-place inclusive prefix sum across the sub-histograms, separately for every bucket, so that entry b of
-// sub-histogram g becomes the sum of entry b of sub-histograms [0, g]. Invocation b owns bucket b and walks its entries
-// from the first sub-histogram to the last with a running sum, so no invocation reads an entry another one writes; the
-// invocations never communicate, which needs no shader-level memory synchronization. The invocations of a batch access
-// adjacent entries of one sub-histogram at a time. Must be dispatched with exactly one workgroup.
+groupshared uint histograms[WBE_RADIX_SORT_SCAN_ENTRY_NUM];
+
+// First step of the global prefix sum of the sub-histograms. Workgroup w scans the WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM
+// sub-histograms starting at w * WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM in groupshared memory, so that entry b of each becomes the
+// sum of entry b over the earlier sub-histograms of the same scan group and itself. Sub-histograms past the last one count
+// as zero. The last scanned entry of every bucket is the total of the scan group, written to overflow histogram w at
+// overflow_start + w * WBE_RADIX_SORT_BUCKET_COUNT. radix_sort_histogram_overflow_prefix_sum and
+// radix_sort_histogram_add_overflow then add the totals of the earlier scan groups. Must be dispatched with the histogram
+// prefix scan dispatch: ceil(sub_histogram_num / WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM) workgroups.
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
-void main(uint3 p_group_thread_id : SV_GroupThreadID) {
+void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
-    uint sub_histogram_num = buffer[0];
-    uint lane_start = buffer[2];
+    uint sub_histogram_num = buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX];
+    uint overflow_start = buffer[WBE_RADIX_SORT_OVERFLOW_START_INDEX];
+    uint lane_start = buffer[WBE_RADIX_SORT_LANE_START_INDEX];
+    uint group_id = p_group_id.x;
     uint bucket = p_group_thread_id.x;
-    uint running_sum = 0;
-    for (uint batch_start = 0; batch_start < sub_histogram_num; batch_start += ROWS_PER_BATCH) {
-        uint values[ROWS_PER_BATCH];
-        [unroll] for (uint i = 0; i < ROWS_PER_BATCH; ++i) {
-            uint sub_histogram = batch_start + i;
-            values[i] = sub_histogram < sub_histogram_num
-                ? buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket]
-                : 0;
-        }
-        [unroll] for (uint i = 0; i < ROWS_PER_BATCH; ++i) {
-            uint sub_histogram = batch_start + i;
-            running_sum += values[i];
-            if (sub_histogram < sub_histogram_num) {
-                buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket] = running_sum;
-            }
+    uint first_sub_histogram = group_id * WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM;
+    [unroll] for (uint i = 0; i < WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM; ++i) {
+        uint sub_histogram = first_sub_histogram + i;
+        histograms[bucket + i * WBE_RADIX_SORT_BUCKET_COUNT] = sub_histogram < sub_histogram_num
+            ? buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket]
+            : 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    workgroup_inclusive_histogram_scan(histograms, bucket);
+    [unroll] for (uint i = 0; i < WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM; ++i) {
+        uint sub_histogram = first_sub_histogram + i;
+        if (sub_histogram < sub_histogram_num) {
+            buffer[lane_start + sub_histogram * WBE_RADIX_SORT_BUCKET_COUNT + bucket] =
+                histograms[bucket + i * WBE_RADIX_SORT_BUCKET_COUNT];
         }
     }
+    buffer[overflow_start + group_id * WBE_RADIX_SORT_BUCKET_COUNT + bucket] =
+        histograms[bucket + (WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM - 1) * WBE_RADIX_SORT_BUCKET_COUNT];
 }

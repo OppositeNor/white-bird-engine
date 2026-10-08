@@ -37,6 +37,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/rt_run_compute_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "glm/gtc/packing.hpp"
@@ -76,6 +77,7 @@ namespace WBE = WhiteBirdEngine;
 inline constexpr std::string_view RT_COUNT_PIXEL_SORT_MASK = "count_pixel_sort_mask";
 inline constexpr std::string_view RT_PREFIX_SUM_PIXEL_SORT_COLUMNS = "prefix_sum_pixel_sort_columns";
 inline constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
+inline constexpr std::string_view RT_RADIX_SORT_PREPARE_DISPATCH = "radix_sort_prepare_dispatch";
 inline constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
 inline constexpr std::string_view RT_PIXEL_SORTING_POST_PROCESSING = "pixel_sorting_post_processing";
 inline constexpr std::string_view RT_PRESENT_SORTED_PIXELS = "present_sorted_pixels";
@@ -95,6 +97,8 @@ inline constexpr std::string_view REND_RES_PIXEL_SORT_MASK = "pixel_sort_mask";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS = "pixel_sort_keys";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_KEYS_SWAP = "pixel_sort_keys_swap";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_HISTOGRAM = "pixel_sort_histogram";
+// The indirect dispatches of the radix sort passes, written from the local sort count of the registered keys.
+inline constexpr std::string_view REND_RES_RADIX_SORT_DISPATCH = "radix_sort_dispatch";
 inline constexpr VkFormat PIXEL_SORT_DESTINATION_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 // Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
 inline constexpr uint32_t PIXEL_SORT_TILE_SIZE = 8;
@@ -163,12 +167,18 @@ WBE::Path make_screenshot_path() {
 }
 
 } // namespace
-// Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, and
-// WBE_RADIX_SORT_DATA_START in radix_sort_utils.slang.
+// Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT,
+// WBE_RADIX_SORT_DATA_START,
+// WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM, WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START, and
+// WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START in radix_sort_utils.slang.
 inline constexpr uint32_t RADIX_SORT_BUCKET_COUNT = 256;
 inline constexpr uint32_t RADIX_SORT_ELEMENTS_PER_WORKGROUP = 256;
 inline constexpr uint32_t RADIX_SORT_MAX_WORKGROUP_COUNT = 16384;
 inline constexpr uint32_t RADIX_SORT_DATA_START = 4;
+inline constexpr uint32_t RADIX_SORT_SCAN_HISTOGRAM_NUM = 16;
+inline constexpr VkDeviceSize RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET = 0;
+inline constexpr VkDeviceSize RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_OFFSET = 3 * sizeof(uint32_t);
+inline constexpr size_t RADIX_SORT_DISPATCH_BUFFER_SIZE = 2 * sizeof(VkDispatchIndirectCommand);
 // Each pass sorts by one 8-bit digit of the 32-bit keys.
 inline constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
 
@@ -216,9 +226,10 @@ struct PixelSortingPostProcessingParamsGPU {
  * invocation per line counts its masked pixels, a prefix sum turns the counts into the range of every line in the key
  * buffer, and one invocation per line registers its masked pixels into that range and stores each pixel's buffer index
  * in an index image. Every key orders by line, then metric, and stores the position along the line (see
- * pixel_sort_utils.slang), so one radix sort of all keys sorts every line in place within its range. Each of the 4 radix
- * sort passes runs the histogram, histogram prefix sum, and scatter shaders for one 8-bit digit, alternating between two
- * key buffers. Then, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
+ * pixel_sort_utils.slang), so one radix sort of all keys sorts every line in place within its range. A single invocation
+ * writes the indirect dispatches of the radix sort from the number of registered keys. Each of the 4 radix sort passes
+ * runs the histogram, histogram prefix scan, overflow prefix sum, overflow addition, and scatter shaders for one 8-bit
+ * digit, alternating between two key buffers. Then, every masked pixel reads the sorted key at its stored index, and the other pixels keep their color.
  * Finally, a post-processing pass applies general effects to the sorted image before it is presented.
  */
 class ApplicationVulkanPixelSortingTest : public WBE::ApplicationGame {
@@ -414,7 +425,6 @@ private:
     struct PixelSortGraphLayout {
         VkExtent3D source_extent{};
         std::string_view orientation_name;
-        uint32_t sub_histogram_num = 1;
         uint32_t column_group_count = 0;
         VkExtent3D tile_group_count{};
         size_t column_offsets_buffer_size = 0;
@@ -422,10 +432,13 @@ private:
         size_t histogram_buffer_size = 0;
     };
 
-    // The ids of the histogram, histogram prefix sum, and scatter tasks of every radix sort pass.
+    // The ids of the histogram, histogram prefix sum, overflow prefix sum, overflow addition, and scatter tasks of every
+    // radix sort pass.
     struct RadixSortTaskIds {
         std::array<std::string, RADIX_SORT_PASS_COUNT> histogram_task_ids;
         std::array<std::string, RADIX_SORT_PASS_COUNT> prefix_sum_task_ids;
+        std::array<std::string, RADIX_SORT_PASS_COUNT> overflow_prefix_sum_task_ids;
+        std::array<std::string, RADIX_SORT_PASS_COUNT> add_overflow_task_ids;
         std::array<std::string, RADIX_SORT_PASS_COUNT> scatter_task_ids;
     };
 
@@ -444,10 +457,11 @@ private:
             throw std::runtime_error(std::format(
                 "Failed to build the pixel sorting graph: a {}-pixel line is too long for the 16-bit pixel sort mask.", line_length));
         }
-        layout.sub_histogram_num = std::clamp(
-            static_cast<uint32_t>((element_count + RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / RADIX_SORT_ELEMENTS_PER_WORKGROUP),
-            1U,
-            RADIX_SORT_MAX_WORKGROUP_COUNT);
+        // The radix sort has one local sort per RADIX_SORT_ELEMENTS_PER_WORKGROUP keys, up to RADIX_SORT_MAX_WORKGROUP_COUNT, and
+        // sizes its buffers for the case where every pixel is inside the mask.
+        const uint64_t max_local_sort_num = std::clamp<uint64_t>(
+            (element_count + RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / RADIX_SORT_ELEMENTS_PER_WORKGROUP, 1, RADIX_SORT_MAX_WORKGROUP_COUNT);
+        const uint64_t max_overflow_num = (max_local_sort_num + RADIX_SORT_SCAN_HISTOGRAM_NUM - 1) / RADIX_SORT_SCAN_HISTOGRAM_NUM;
         layout.tile_group_count = {
             .width = (source_extent.width + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
             .height = (source_extent.height + PIXEL_SORT_TILE_SIZE - 1) / PIXEL_SORT_TILE_SIZE,
@@ -458,8 +472,9 @@ private:
         layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + line_count + 1) * sizeof(uint32_t);
         // Sized for the case where every pixel is inside the mask.
         layout.key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
+        // The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.
         layout.histogram_buffer_size =
-            (RADIX_SORT_DATA_START + static_cast<size_t>(layout.sub_histogram_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
+            (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * sizeof(uint32_t);
         return layout;
     }
 
@@ -492,6 +507,11 @@ private:
             .add_buffer(REND_RES_PIXEL_SORT_HISTOGRAM,
                 [size = p_layout.histogram_buffer_size](const WBE::RendGraphContextVK& /*p_context*/) {
                     return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE, .size = size};
+                })
+            .add_buffer(REND_RES_RADIX_SORT_DISPATCH,
+                [](const WBE::RendGraphContextVK& /*p_context*/) {
+                    return WBE::RendBufferDescVK{
+                        .usage = WBE::RendResPrimaryUsageVK::BUFFER_INDIRECT, .size = RADIX_SORT_DISPATCH_BUFFER_SIZE};
                 })
             .add_image(REND_RES_PIXEL_SORT_DESTINATION_IMAGE,
                 [extent = p_layout.source_extent](const WBE::RendGraphContextVK& /*p_context*/) {
@@ -558,7 +578,7 @@ private:
             column_dispatch,
             {});
 
-        RadixSortTaskIds task_ids = add_radix_sort_tasks(p_graph, p_layout);
+        RadixSortTaskIds task_ids = add_radix_sort_tasks(p_graph);
 
         // After an even number of passes, the sorted keys are back in the key buffer.
         add_compute_task(p_graph,
@@ -574,30 +594,48 @@ private:
         return task_ids;
     }
 
-    RadixSortTaskIds add_radix_sort_tasks(WBE::RendGraphDescVK& p_graph, const PixelSortGraphLayout& p_layout) {
+    RadixSortTaskIds add_radix_sort_tasks(WBE::RendGraphDescVK& p_graph) {
         RadixSortTaskIds task_ids;
+        // The element count is fixed once the keys are registered, so every pass uses the same dispatches.
+        add_compute_task(p_graph,
+            RT_RADIX_SORT_PREPARE_DISPATCH,
+            "radix_sort_prepare_dispatch",
+            {.width = 1, .height = 1, .depth = 1},
+            {{"input_buffer", REND_RES_PIXEL_SORT_KEYS}, {"dispatch_buffer", REND_RES_RADIX_SORT_DISPATCH}});
         for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
             const std::string_view input_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS : REND_RES_PIXEL_SORT_KEYS_SWAP;
             const std::string_view output_keys = pass % 2 == 0 ? REND_RES_PIXEL_SORT_KEYS_SWAP : REND_RES_PIXEL_SORT_KEYS;
             const std::string bit_region = std::format("{}_{}", pass * 8, (pass + 1) * 8);
             task_ids.histogram_task_ids[pass] = std::format("radix_sort_histogram_{}", bit_region);
             task_ids.prefix_sum_task_ids[pass] = std::format("radix_sort_histogram_prefix_sum_{}", bit_region);
+            task_ids.overflow_prefix_sum_task_ids[pass] = std::format("radix_sort_histogram_overflow_prefix_sum_{}", bit_region);
+            task_ids.add_overflow_task_ids[pass] = std::format("radix_sort_histogram_add_overflow_{}", bit_region);
             task_ids.scatter_task_ids[pass] = std::format("radix_sort_scatter_{}", bit_region);
-            add_compute_task(p_graph,
+            add_indirect_compute_task(p_graph,
                 task_ids.histogram_task_ids[pass],
                 std::format("radix_sort_histogram_workgroup_process_{}", bit_region),
-                {.width = p_layout.sub_histogram_num, .height = 1, .depth = 1},
+                RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
                 {{"input_buffer", input_keys}, {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
-            // The prefix sum runs in a single workgroup.
-            add_compute_task(p_graph,
+            add_indirect_compute_task(p_graph,
                 task_ids.prefix_sum_task_ids[pass],
                 "radix_sort_histogram_prefix_sum",
+                RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_OFFSET,
+                {{"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
+            // The overflow histograms are scanned in a single workgroup.
+            add_compute_task(p_graph,
+                task_ids.overflow_prefix_sum_task_ids[pass],
+                "radix_sort_histogram_overflow_prefix_sum",
                 {.width = 1, .height = 1, .depth = 1},
                 {{"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
-            add_compute_task(p_graph,
+            add_indirect_compute_task(p_graph,
+                task_ids.add_overflow_task_ids[pass],
+                "radix_sort_histogram_add_overflow",
+                RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
+                {{"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM}});
+            add_indirect_compute_task(p_graph,
                 task_ids.scatter_task_ids[pass],
                 std::format("radix_sort_scatter_{}", bit_region),
-                {.width = p_layout.sub_histogram_num, .height = 1, .depth = 1},
+                RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
                 {
                     {"input_buffer", input_keys},
                     {"histogram_buffer", REND_RES_PIXEL_SORT_HISTOGRAM},
@@ -645,6 +683,7 @@ private:
             REND_RES_PIXEL_SORT_KEYS,
             {
                 RT_REGISTER_PIXEL_SORT_KEYS,
+                RT_RADIX_SORT_PREPARE_DISPATCH,
                 p_task_ids.histogram_task_ids[0],
                 p_task_ids.scatter_task_ids[0],
                 p_task_ids.scatter_task_ids[1],
@@ -663,13 +702,23 @@ private:
                 p_task_ids.histogram_task_ids[3],
                 p_task_ids.scatter_task_ids[3],
             });
-        std::array<std::string_view, RADIX_SORT_PASS_COUNT * 3> histogram_chain;
+        std::array<std::string_view, RADIX_SORT_PASS_COUNT * 5> histogram_chain;
+        // The prepare task followed by every task dispatched indirectly, in execution order.
+        std::array<std::string_view, 1 + RADIX_SORT_PASS_COUNT * 4> dispatch_chain;
+        dispatch_chain[0] = RT_RADIX_SORT_PREPARE_DISPATCH;
         for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
-            histogram_chain[pass * 3 + 0] = p_task_ids.histogram_task_ids[pass];
-            histogram_chain[pass * 3 + 1] = p_task_ids.prefix_sum_task_ids[pass];
-            histogram_chain[pass * 3 + 2] = p_task_ids.scatter_task_ids[pass];
+            histogram_chain[pass * 5 + 0] = p_task_ids.histogram_task_ids[pass];
+            histogram_chain[pass * 5 + 1] = p_task_ids.prefix_sum_task_ids[pass];
+            histogram_chain[pass * 5 + 2] = p_task_ids.overflow_prefix_sum_task_ids[pass];
+            histogram_chain[pass * 5 + 3] = p_task_ids.add_overflow_task_ids[pass];
+            histogram_chain[pass * 5 + 4] = p_task_ids.scatter_task_ids[pass];
+            dispatch_chain[1 + pass * 4 + 0] = p_task_ids.histogram_task_ids[pass];
+            dispatch_chain[1 + pass * 4 + 1] = p_task_ids.prefix_sum_task_ids[pass];
+            dispatch_chain[1 + pass * 4 + 2] = p_task_ids.add_overflow_task_ids[pass];
+            dispatch_chain[1 + pass * 4 + 3] = p_task_ids.scatter_task_ids[pass];
         }
         WBE::connect_resource_chain(p_graph, REND_RES_PIXEL_SORT_HISTOGRAM, histogram_chain);
+        WBE::connect_resource_chain(p_graph, REND_RES_RADIX_SORT_DISPATCH, dispatch_chain);
         WBE::connect_resource_chain(
             p_graph, REND_RES_PIXEL_SORT_DESTINATION, {RT_WRITE_SORTED_PIXELS, RT_PIXEL_SORTING_POST_PROCESSING});
         WBE::connect_resource_chain(
@@ -816,19 +865,8 @@ private:
         VkExtent3D p_dispatch_group_count,
         std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) {
         auto* render_allocator = get_renderer_allocator().get();
-        auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
-        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>(p_shader_id);
-        if (shader_resource == nullptr) {
-            throw std::runtime_error(std::format("Failed to setup pixel sorting test: shader resource {} was not found.", p_shader_id));
-        }
-        WBE::ComputePipelineCompilerVKContext compute_compiler_context{
-            .allocator = render_allocator,
-            .render_data = base_render_data,
-            .render_database = renderer->get_render_database(),
-        };
-        WBE::Ref<WBE::ROComputePipelineVK> pipeline =
-            WBE::ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;
+        const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
+        WBE::Ref<WBE::ROComputePipelineVK> pipeline = compile_compute_pipeline(p_shader_id);
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = p_task_id;
         for (const auto& [task_resource_id, graph_resource_id] : p_aliases) {
@@ -838,6 +876,56 @@ private:
             return WBE::make_unique<WBE::RTRunComputePipelineVK>(render_allocator, base_render_data, pipeline, p_dispatch_group_count);
         };
         p_graph.add_task(std::move(task_desc));
+    }
+
+    /**
+     * @brief Add a task that dispatches a compute shader resource with the radix sort dispatch at an offset of the radix sort
+     * dispatch buffer.
+     * @param p_graph The graph descriptor receiving the task.
+     * @param p_task_id The task id.
+     * @param p_shader_id The resource id of the compute shader.
+     * @param p_dispatch_offset The byte offset of the VkDispatchIndirectCommand in the radix sort dispatch buffer.
+     * @param p_aliases Pairs of a shader resource id and the graph resource it refers to.
+     * @throws std::runtime_error If the shader resource is not found.
+     */
+    void add_indirect_compute_task(WBE::RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
+        std::string_view p_shader_id,
+        VkDeviceSize p_dispatch_offset,
+        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) {
+        auto* render_allocator = get_renderer_allocator().get();
+        const auto* base_render_data = WBE::RendererVK::get_singleton()->get_base_render_data();
+        WBE::Ref<WBE::ROComputePipelineVK> pipeline = compile_compute_pipeline(p_shader_id);
+        WBE::RendTaskDescVK task_desc(render_allocator);
+        task_desc.task_id = p_task_id;
+        for (const auto& [task_resource_id, graph_resource_id] : p_aliases) {
+            task_desc.alias(task_resource_id, graph_resource_id);
+        }
+        task_desc.factory = [=](const WBE::RendGraphContextVK& /*p_context*/) {
+            return WBE::make_unique<WBE::RTRunComputePipelineIndirectVK>(
+                render_allocator, base_render_data, pipeline, REND_RES_RADIX_SORT_DISPATCH, p_dispatch_offset);
+        };
+        p_graph.add_task(std::move(task_desc));
+    }
+
+    /**
+     * @brief Compile a compute shader resource.
+     * @param p_shader_id The resource id of the compute shader.
+     * @return The compiled compute pipeline.
+     * @throws std::runtime_error If the shader resource is not found.
+     */
+    WBE::Ref<WBE::ROComputePipelineVK> compile_compute_pipeline(std::string_view p_shader_id) {
+        auto* renderer = WBE::RendererVK::get_singleton();
+        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>(p_shader_id);
+        if (shader_resource == nullptr) {
+            throw std::runtime_error(std::format("Failed to setup pixel sorting test: shader resource {} was not found.", p_shader_id));
+        }
+        WBE::ComputePipelineCompilerVKContext compute_compiler_context{
+            .allocator = get_renderer_allocator().get(),
+            .render_data = renderer->get_base_render_data(),
+            .render_database = renderer->get_render_database(),
+        };
+        return WBE::ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;
     }
 };
 

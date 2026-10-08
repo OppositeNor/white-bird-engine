@@ -19,7 +19,7 @@
  * variant. Each invocation walks its line from the start and writes the key of every masked pixel to the next entry of
  * the line's range of the key buffer, and the pixel's rank among the masked pixels of its line to the mask image.
  * Pixels outside the mask get WBE_PIXEL_SORT_UNMASKED. The key buffer receives the total number of masked pixels as its
- * element count. With the span scope, a span starts at a masked pixel that is the first of its line or follows an
+ * element count, and the number of radix sort local sorts of that count. With the span scope, a span starts at a masked pixel that is the first of its line or follows an
  * unmasked pixel; the invocation measures the span before registering its pixels with span keys, and also writes each
  * pixel's offset in its span and the span length to the mask image.
  */
@@ -35,7 +35,7 @@ struct RegisterPixelSortKeysDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
     /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
-    /** Radix sort key buffer receiving the element count and the keys. */
+    /** Radix sort key buffer receiving the element count, the local sort count, and the keys. */
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
     /**
      * Mask image receiving the line rank of every masked pixel, and with the span scope its span offset and span length;
@@ -63,7 +63,9 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         return;
     }
     if (line == line_extent.x - 1) {
-        keys[0] = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + line];
+        uint element_count = column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + line];
+        keys[WBE_RADIX_SORT_ELEMENT_COUNT_INDEX] = element_count;
+        keys[WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX] = radix_sort_local_sort_num(element_count);
     }
     uint rank = 0;
     if (contrast.sort_scope == WBE_PIXEL_SORT_SCOPE_SPAN) {

@@ -21,7 +21,6 @@
 #define WBE_RADIX_SORT_BUCKET_BIT_SIZE 8
 #define WBE_RADIX_SORT_BUCKET_COUNT (1 << WBE_RADIX_SORT_BUCKET_BIT_SIZE)
 #define WBE_RADIX_SORT_BUCKET_MASK (WBE_RADIX_SORT_BUCKET_COUNT - 1)
-#define WBE_RADIX_SORT_MAX_WORKGROUP_COUNT 16384
 // Workgroup radix sorting packs one counter per digit value into a uint, so its digit is narrower than the bucket digit.
 #define WBE_RADIX_SORT_WG_BIT_SIZE 2
 #define WBE_RADIX_SORT_WG_BUCKET_COUNT (1 << WBE_RADIX_SORT_WG_BIT_SIZE)
@@ -29,20 +28,79 @@
 #define WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE (32 / WBE_RADIX_SORT_WG_BUCKET_COUNT)
 #define WBE_RADIX_SORT_WG_COUNTER_MASK ((1u << WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE) - 1)
 
-// The number of elements each radix sort workgroup aims to own, matching the scatter batch size.
+// The number of elements each local sort, i.e. each histogram and scatter workgroup, aims to own, matching the scatter batch
+// size. Past WBE_RADIX_SORT_MAX_WORKGROUP_COUNT local sorts, each local sort owns more elements instead.
 #define WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP 256
-// The first entries of the radix sort key buffers are metadata; the first one is the element count.
+#define WBE_RADIX_SORT_MAX_WORKGROUP_COUNT 16384
+// The first entries of the radix sort key buffers are metadata: the element count, then the number of local sorts.
 #define WBE_RADIX_SORT_DATA_START 4
+#define WBE_RADIX_SORT_ELEMENT_COUNT_INDEX 0
+#define WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX 1
+
+// The histogram buffer holds the sub-histogram count at index 0, the start of the overflow histograms at index 1, and the
+// start of the sub-histograms at index 2.
+#define WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX 0
+#define WBE_RADIX_SORT_OVERFLOW_START_INDEX 1
+#define WBE_RADIX_SORT_LANE_START_INDEX 2
+// The number of consecutive sub-histograms each histogram prefix scan workgroup scans in groupshared memory.
+#define WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM 16
+#define WBE_RADIX_SORT_SCAN_ENTRY_NUM (WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM * WBE_RADIX_SORT_BUCKET_COUNT)
+
+// The dispatch buffer holds two VkDispatchIndirectCommand: the local sort dispatch, used by the histogram, overflow
+// addition, and scatter passes, then the histogram prefix scan dispatch.
+#define WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START 0
+#define WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START 3
 
 /**
- * @brief Get the number of sub-histograms, and so of histogram and scatter workgroups, of a radix sort pass.
- * @details Host code dispatching the passes must use the same formula.
+ * @brief Get the number of local sorts, and so of sub-histograms, of a radix sort pass.
+ * @details Host code sizing the radix sort buffers must use the same formula.
  * @param p_element_count The number of keys sorted.
  * @return min(WBE_RADIX_SORT_MAX_WORKGROUP_COUNT, max(ceil(p_element_count / WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP), 1)).
  */
-uint radix_sort_sub_histogram_num(uint p_element_count) {
+uint radix_sort_local_sort_num(uint p_element_count) {
     uint group_num = (p_element_count + WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP - 1) / WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP;
     return clamp(group_num, 1u, uint(WBE_RADIX_SORT_MAX_WORKGROUP_COUNT));
+}
+
+/**
+ * @brief Get the number of elements each local sort of a radix sort pass owns.
+ * @details Local sort g owns [g * elements_per_local_sort, (g + 1) * elements_per_local_sort), clamped to the element count.
+ * @param p_element_count The number of keys sorted.
+ * @param p_local_sort_num The number of local sorts, from radix_sort_local_sort_num(p_element_count).
+ * @return ceil(p_element_count / p_local_sort_num).
+ */
+uint radix_sort_elements_per_local_sort(uint p_element_count, uint p_local_sort_num) {
+    return (p_element_count + p_local_sort_num - 1) / p_local_sort_num;
+}
+
+/**
+ * @brief Computes, separately for every bucket, the inclusive prefix sum across WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM consecutive
+ * histograms held in groupshared memory, with a WBE_RADIX_SORT_BUCKET_COUNT-invocation workgroup.
+ * @details Entry h * WBE_RADIX_SORT_BUCKET_COUNT + b holds bucket b of histogram h, and becomes the sum of bucket b over
+ * histograms [0, h]. The scan takes log2(WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM) steps with strides starting at
+ * WBE_RADIX_SORT_BUCKET_COUNT; in each step every entry adds the entry one stride before it, or 0 if there is none. The
+ * exclusive prefix sum of histogram h is the inclusive one of histogram h - 1, or 0 for the first histogram. Invocation
+ * p_thread_id updates the entries p_thread_id + k * WBE_RADIX_SORT_BUCKET_COUNT. Every invocation of the workgroup must call
+ * this function with the same array. The function does not synchronize before its first read, so callers must issue a
+ * workgroup barrier after filling p_data; it synchronizes after the final write, so the scanned array is visible to the
+ * whole workgroup on return.
+ * @param p_data The groupshared histograms to scan in place.
+ * @param p_thread_id The local invocation index in [0, WBE_RADIX_SORT_BUCKET_COUNT).
+ */
+void workgroup_inclusive_histogram_scan(__ref groupshared uint p_data[WBE_RADIX_SORT_SCAN_ENTRY_NUM], uint p_thread_id) {
+    [unroll] for (uint stride = WBE_RADIX_SORT_BUCKET_COUNT; stride < WBE_RADIX_SORT_SCAN_ENTRY_NUM; stride <<= 1) {
+        uint sums[WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM];
+        [unroll] for (uint i = 0; i < WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM; ++i) {
+            uint index = p_thread_id + i * WBE_RADIX_SORT_BUCKET_COUNT;
+            sums[i] = index >= stride ? p_data[index] + p_data[index - stride] : p_data[index];
+        }
+        // Every invocation has read the entries of this step before any of them is overwritten.
+        GroupMemoryBarrierWithGroupSync();
+        [unroll] for (uint i = 0; i < WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM; ++i) {
+            p_data[p_thread_id + i * WBE_RADIX_SORT_BUCKET_COUNT] = sums[i];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
 }
 
 /**
