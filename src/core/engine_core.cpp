@@ -54,7 +54,7 @@ EngineCore::EngineCore(uint32_t p_argc, char* p_argv[], const Path& p_root_dir) 
 }
 
 void EngineCore::initialize(uint32_t p_argc, char* p_argv[]) {
-    engine_config = new EngineConfig((file_system->get_config_directory() / "engine_config.yaml"), p_argc, p_argv);
+    engine_config = new EngineConfig((file_system->get_config_directory() / "engine_config.toml"), p_argc, p_argv);
     pool_allocator = new HeapAllocatorGlobal(engine_config->get_config_options().global_mem_pool_size,
         engine_config->get_config_options().global_mem_pool_arena_count);
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);

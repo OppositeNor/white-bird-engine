@@ -1,0 +1,60 @@
+include = []
+
+[[resources]]
+id = "deferred_gbuffer_shader"
+source_type = "shader"
+src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang"
+dst = "assets/shaders/deferred_gbuffer/deferred_gbuffer.spv"
+metadata = "assets/shaders/deferred_gbuffer/deferred_gbuffer.json"
+
+[[resources]]
+id = "deferred_gbuffer_mesh_transform_shader"
+source_type = "shader"
+src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang"
+dst = "assets/shaders/deferred_gbuffer/deferred_gbuffer_mesh_transform.spv"
+metadata = "assets/shaders/deferred_gbuffer/deferred_gbuffer_mesh_transform.json"
+macros = [
+    { name = "WBE_MESH_TRANSFORM" },
+]
+
+[[resources]]
+id = "deferred_gbuffer_dynamic"
+type = "graphics_pipeline"
+vertex_stage_id = "deferred_gbuffer_mesh_transform_shader"
+fragment_stage_id = "deferred_gbuffer_mesh_transform_shader"
+fragment_stage_entry = "fragment_main"
+depth_test = true
+depth_write = true
+color_blend = false
+
+[[resources]]
+id = "deferred_gbuffer"
+type = "graphics_pipeline"
+vertex_stage_id = "deferred_gbuffer_shader"
+fragment_stage_id = "deferred_gbuffer_shader"
+fragment_stage_entry = "fragment_main"
+depth_test = true
+depth_write = true
+color_blend = false
+
+[[resources]]
+id = "deferred_gbuffer_masked"
+type = "graphics_pipeline"
+vertex_stage_id = "deferred_gbuffer_shader"
+fragment_stage_id = "deferred_gbuffer_shader"
+fragment_stage_entry = "fragment_masked_main"
+depth_test = true
+depth_write = true
+cull_backfaces = false
+color_blend = false
+
+[[resources]]
+id = "deferred_gbuffer_opaque_double_sided"
+type = "graphics_pipeline"
+vertex_stage_id = "deferred_gbuffer_shader"
+fragment_stage_id = "deferred_gbuffer_shader"
+depth_test = true
+depth_write = true
+color_blend = false
+cull_backfaces = false
+fragment_stage_entry = "fragment_double_sided_main"

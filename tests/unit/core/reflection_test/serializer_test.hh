@@ -16,7 +16,7 @@
 #define WBE_FILE_SERIALIZER_TEST_HH
 
 #include "core/parser/parser_json.hh"
-#include "core/parser/parser_yaml.hh"
+#include "core/parser/parser_toml.hh"
 #include "core/reflection/serializable.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "glm/ext/vector_float3.hpp"
@@ -1186,136 +1186,136 @@ inline void dynamic_dispatch_test_reference_semantics() {
 TEST_F(WBESerializerTest, DefaultConstruct) {
     WBE::JSONData json_data;
     serializer_test_default_construct(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_default_construct(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_default_construct(toml_data);
 }
 
 TEST_F(WBESerializerTest, General) {
     WBE::JSONData json_data;
     serializer_test_general(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_general(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_general(toml_data);
 }
 
 TEST_F(WBESerializerTest, AliasFieldsSerializeCanonically) {
     WBE::JSONData json_data;
     serializer_test_aliases_use_canonical_names(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_aliases_use_canonical_names(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_aliases_use_canonical_names(toml_data);
 }
 
 TEST_F(WBESerializerTest, NestingSerialize) {
     WBE::JSONData json_data;
     serializer_test_nesting(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_nesting(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_nesting(toml_data);
 }
 
 TEST_F(WBESerializerTest, DeepNestingSerialize) {
     WBE::JSONData json_data;
     serializer_test_deep_nesting(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_deep_nesting(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_deep_nesting(toml_data);
 }
 
 TEST_F(WBESerializerTest, VectorPrimitivesSerialize) {
     WBE::JSONData json_data_int, json_data_strs;
     serializer_test_vector_primitives(json_data_int, json_data_strs);
-    WBE::YAMLData yaml_data_int, yaml_data_strs;
-    serializer_test_vector_primitives(yaml_data_int, yaml_data_strs);
+    WBE::TOMLData toml_data_int, toml_data_strs;
+    serializer_test_vector_primitives(toml_data_int, toml_data_strs);
 }
 
 TEST_F(WBESerializerTest, VectorOfSerializableSerialize) {
     WBE::JSONData json_data;
     serializer_test_vector_serializables(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_vector_serializables(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_vector_serializables(toml_data);
 }
 
 TEST_F(WBESerializerTest, StructWithVectorFieldSerialize) {
     WBE::JSONData json_data;
     serializer_test_struct_with_vector_serializables(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_struct_with_vector_serializables(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_struct_with_vector_serializables(toml_data);
 }
 
 TEST_F(WBESerializerTest, Depth2Serialize) {
     WBE::JSONData json_data;
     serializer_test_depth_2(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_depth_2(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_depth_2(toml_data);
 }
 
 TEST_F(WBESerializerTest, Depth3Serialize) {
     WBE::JSONData json_data;
     serializer_test_depth_3(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_depth_3(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_depth_3(toml_data);
 }
 
 TEST_F(WBESerializerTest, VectorOfDeepNestingSerialize) {
     WBE::JSONData json_data;
     serializer_vector_with_deep_nesting(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_vector_with_deep_nesting(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_vector_with_deep_nesting(toml_data);
 }
 
 // Inheritance serialization tests
 TEST_F(WBESerializerTest, InheritanceBaseSerialize) {
     WBE::JSONData json_data;
     serializer_test_inheritance_base(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_inheritance_base(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_inheritance_base(toml_data);
 }
 
 TEST_F(WBESerializerTest, InheritanceChildSerialize) {
     WBE::JSONData json_data;
     serializer_test_inheritance_child(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_inheritance_child(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_inheritance_child(toml_data);
 }
 
 TEST_F(WBESerializerTest, InheritanceMultilevelSerialize) {
     WBE::JSONData json_data;
     serializer_test_inheritance_multilevel(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_inheritance_multilevel(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_inheritance_multilevel(toml_data);
 }
 
 TEST_F(WBESerializerTest, InheritanceWithNestedSerialize) {
     WBE::JSONData json_data;
     serializer_test_inheritance_with_nested(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_inheritance_with_nested(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_inheritance_with_nested(toml_data);
 }
 
 TEST_F(WBESerializerTest, InheritanceVectorSerialize) {
     WBE::JSONData json_data;
     serializer_test_inheritance_vector(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_inheritance_vector(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_inheritance_vector(toml_data);
 }
 
 // Multiple inheritance serialization tests
 TEST_F(WBESerializerTest, MultipleInheritanceSerialize) {
     WBE::JSONData json_data;
     serializer_test_multiple_inheritance(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_multiple_inheritance(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_multiple_inheritance(toml_data);
 }
 
 TEST_F(WBESerializerTest, DiamondInheritanceSerialize) {
     WBE::JSONData json_data;
     serializer_test_diamond_inheritance(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_diamond_inheritance(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_diamond_inheritance(toml_data);
 }
 
 TEST_F(WBESerializerTest, MultipleInheritanceVectorSerialize) {
     WBE::JSONData json_data;
     serializer_test_multiple_inheritance_vector(json_data);
-    WBE::YAMLData yaml_data;
-    serializer_test_multiple_inheritance_vector(yaml_data);
+    WBE::TOMLData toml_data;
+    serializer_test_multiple_inheritance_vector(toml_data);
 }
 
 // Dynamic serialization tests (JSON only)
@@ -1577,9 +1577,10 @@ TEST_F(WBESerializerTest, RequiredFieldsBaseSerialization) {
     const auto& json_data = json_parser.get_data();
     test_required_fields_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_required_fields_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_required_fields_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, RequiredFieldsChildSerialization) {
@@ -1587,9 +1588,10 @@ TEST_F(WBESerializerTest, RequiredFieldsChildSerialization) {
     const auto& json_data = json_parser.get_data();
     test_required_fields_child_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_required_fields_child_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_required_fields_child_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, MultipleRequiredInheritanceSerialization) {
@@ -1597,9 +1599,10 @@ TEST_F(WBESerializerTest, MultipleRequiredInheritanceSerialization) {
     const auto& json_data = json_parser.get_data();
     test_multiple_required_inheritance_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_multiple_required_inheritance_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_multiple_required_inheritance_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, StaticSerializableSerialization) {
@@ -1607,9 +1610,10 @@ TEST_F(WBESerializerTest, StaticSerializableSerialization) {
     const auto& json_data = json_parser.get_data();
     test_static_serializable_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_static_serializable_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_static_serializable_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, StaticWithRequiredSerialization) {
@@ -1617,9 +1621,10 @@ TEST_F(WBESerializerTest, StaticWithRequiredSerialization) {
     const auto& json_data = json_parser.get_data();
     test_static_with_required_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_static_with_required_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_static_with_required_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, StaticComplexSerialization) {
@@ -1627,9 +1632,10 @@ TEST_F(WBESerializerTest, StaticComplexSerialization) {
     const auto& json_data = json_parser.get_data();
     test_static_complex_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_static_complex_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_static_complex_serialization(toml_data);
 }
 
 TEST_F(WBESerializerTest, MixedContainerSerialization) {
@@ -1637,9 +1643,10 @@ TEST_F(WBESerializerTest, MixedContainerSerialization) {
     const auto& json_data = json_parser.get_data();
     test_mixed_container_serialization(json_data);
 
-    WBE::ParserYAML yaml_parser;
-    const auto& yaml_data = yaml_parser.get_data();
-    test_mixed_container_serialization(yaml_data);
+
+    WBE::ParserTOML toml_parser;
+    const auto& toml_data = toml_parser.get_data();
+    test_mixed_container_serialization(toml_data);
 }
 
 #endif

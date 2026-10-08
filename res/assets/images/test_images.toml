@@ -1,0 +1,33 @@
+[[resources]]
+id = "test_ppm3"
+source_type = "image"
+source_file = "assets/images/test_ppm3.ppm"
+color_space = "rgb"
+channel_count = 3
+
+[[resources]]
+id = "camera_billboard"
+source_type = "image_texture"
+src = "assets/images/camera_billboard.png"
+dst = "assets/textures/camera_billboard.ktx2"
+source_format = "srgb"
+target_format = "srgb"
+generate_mipmap = true
+
+[[resources]]
+id = "spot_light_billboard"
+source_type = "image_texture"
+src = "assets/images/spot_light_billboard.png"
+dst = "assets/textures/spot_light_billboard.ktx2"
+source_format = "srgb"
+target_format = "srgb"
+generate_mipmap = true
+
+[[resources]]
+id = "pixel_sort_source"
+source_type = "image_texture"
+src = "assets/models/Sponza/screenshot/large.jpg"
+dst = "assets/textures/pixel_sort_source.ktx2"
+source_format = "srgb"
+target_format = "srgb"
+generate_mipmap = false

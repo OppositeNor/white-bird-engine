@@ -1,0 +1,17 @@
+include = []
+
+[[resources]]
+id = "draw_cube_unshaded_shader"
+source_type = "shader"
+src = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.slang"
+dst = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.spv"
+metadata = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.json"
+
+[[resources]]
+id = "draw_cube_unshaded_pipeline"
+type = "graphics_pipeline"
+vertex_stage_id = "draw_cube_unshaded_shader"
+fragment_stage_id = "draw_cube_unshaded_shader"
+depth_test = false
+depth_write = false
+color_blend = false

@@ -1,0 +1,19 @@
+scope = "test_only"
+include = [
+    "assets/meshes/triangle.toml",
+    "assets/images/test_images.toml",
+    "assets/audio/test_audio.toml",
+    "assets/shaders/billboard/billboard_shader.toml",
+    "assets/shaders/draw_triangle/draw_triangle_shader.toml",
+    "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.toml",
+    "assets/shaders/deferred_gbuffer/deferred_gbuffer_shader.toml",
+    "assets/shaders/deferred_composition/deferred_composition_shader.toml",
+    "assets/shaders/octree/octree.toml",
+    "assets/shaders/octree_2/octree_2.toml",
+    "assets/shaders/bloom/bloom_shader.toml",
+    "assets/shaders/sort/sort.toml",
+    "assets/shaders/pixel_sort/pixel_sort_shader.toml",
+]
+resources = [
+    { id = "test_text", source_type = "text", source_file = "test_text_files/test_file_utf8.txt" },
+]

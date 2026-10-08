@@ -83,10 +83,6 @@ set_target_properties(ktx PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/dependencies/KTX-Software/lib/include>;$<BUILD_INTERFACE:${KTX_PUBLIC_INCLUDE_DIR}>;$<INSTALL_INTERFACE:include>"
 )
 
-set(YAML_BUILD_SHARED_LIBS OFF)
-set(YAML_CPP_BUILD_TESTS OFF)
-set(YAML_CPP_BUILD_TOOLS OFF)
-add_subdirectory(dependencies/yaml-cpp)
 set(BUILD_TESTING OFF)
 set(BOOST_SUPERPROJECT_VERSION 1.89.0)
 # Build Boost.Thread, Boost.ProgramOptions, Boost.Container, and their CMake target dependencies.
@@ -210,6 +206,9 @@ endif()
 # Use default aligned gentypes in glm
 add_definitions(-DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
 
+# Report toml++ parse failures through toml::parse_result instead of exceptions.
+add_definitions(-DTOML_EXCEPTIONS=0)
+
 # Set include directories
 set(include_dirs 
     ${Vulkan_INCLUDE_DIR}
@@ -218,7 +217,7 @@ set(include_dirs
     ${PROJECT_SOURCE_DIR}/dependencies/entt/single_include
     ${PROJECT_SOURCE_DIR}/dependencies/glm
     ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
-    ${PROJECT_SOURCE_DIR}/dependencies/yaml-cpp/include
+    ${PROJECT_SOURCE_DIR}/dependencies/toml++/include
     ${PROJECT_SOURCE_DIR}/dependencies/stb
     ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
     ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
@@ -246,7 +245,6 @@ set(libs ${libs}
     Vulkan::Vulkan
     GPUOpen::VulkanMemoryAllocator
     SDL2::SDL2
-    yaml-cpp::yaml-cpp
     boost_thread
     boost_program_options
     WBE_MINIAUDIO_BUILD_LIB

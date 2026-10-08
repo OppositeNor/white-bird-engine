@@ -49,7 +49,7 @@ After rebuilding, include the specific generated header needed by the caller:
 #include "generated/serializables_sd.gen.hh"
 ```
 
-Static serialization works with JSON or YAML parser data:
+Static serialization works with JSON or TOML parser data:
 
 ```cpp
 Settings settings;

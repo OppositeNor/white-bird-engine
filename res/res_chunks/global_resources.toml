@@ -1,0 +1,10 @@
+include = [
+    "assets/meshes/cube.toml",
+    "assets/shaders/main_pipeline/main_pipeline_shader.toml",
+    "assets/shaders/forward_cook_torrance_pbr/forward_cook_torrance_pbr_shader.toml",
+    "assets/shaders/shadowmap_spot/shadowmap_spot_shader.toml",
+    "assets/shaders/kawase_blur/kawase_blur_shader.toml",
+    "assets/materials/default_material.toml",
+    "res_chunks/test_global_resources.toml",
+]
+resources = []

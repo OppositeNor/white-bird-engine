@@ -118,7 +118,7 @@ The generic parser plus generated recursion currently has coverage for:
 - single, multiple, multilevel, and virtual-diamond inheritance;
 - required fields and aliases.
 
-Support depends on both `SerializableSD<T>` and the selected parser data implementation. JSON and YAML have parallel but separate `set/get` branches. Do not claim a type is generally supported merely because one parser accepts it.
+Support depends on both `SerializableSD<T>` and the selected parser data implementation. JSON and TOML have parallel but separate `set/get` branches. Do not claim a type is generally supported merely because one parser accepts it.
 
 A nested type is not serializable merely because one of its fields uses `WBE_REFLECT`. The nested type must itself belong to a generated serializable category or provide a visible hand-written `SerializableSD<NestedType>` specialization; the same requirement applies to `std::vector<NestedType>` elements.
 
@@ -133,16 +133,16 @@ Vectors and optionals construct temporary elements with `T{}` during deserializa
 5. Add required/alias annotations only when the data contract needs them.
 6. Verify every reflected field and base type can be named from generated-header include context and can be serialized by each required parser format.
 7. Build with `python build.py -t debug`; do not invoke CMake directly and do not edit generated files.
-8. Add JSON/YAML tests for data-contract behavior, accessor tests for name/type access, and factory tests only when dynamic construction is required.
+8. Add JSON/TOML tests for data-contract behavior, accessor tests for name/type access, and factory tests only when dynamic construction is required.
 
-Use `tests/unit/core/reflection_test/reflection_test_data.hh` as the canonical declaration examples. Relevant consumers are tested in `accessor_test.hh`, `factory_test.hh`, `serializer_test.hh`, `deserializer_test_json.hh`, and `deserializer_test_yaml.hh`.
+Use `tests/unit/core/reflection_test/reflection_test_data.hh` as the canonical declaration examples. Relevant consumers are tested in `accessor_test.hh`, `factory_test.hh`, `serializer_test.hh`, `deserializer_test_json.hh`, and `deserializer_test_toml.hh`.
 
 ## Extending supported field or container types
 
 Choose one of two extension levels:
 
 - Add a hand-written `SerializableSD<NewType>` specialization when the type can be translated through the existing parser-data API. Place it in a non-generated header that is visible before generated specializations use it.
-- Extend `ParserJSON` and/or `ParserYAML` `set/get` branches when the parser-data representation itself must understand the type.
+- Extend `ParserJSON` and/or `ParserTOML` `set/get` branches when the parser-data representation itself must understand the type.
 
 For a reusable container, follow the generated `std::vector<T>` pattern only if recursive element conversion and default construction match the desired contract. Avoid teaching templates about a one-off application type.
 

@@ -1,0 +1,9 @@
+scope = "test_only"
+include = []
+
+[[resources]]
+id = "descriptor_heap_reflection_shader"
+source_type = "shader"
+src = "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.slang"
+dst = "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.spv"
+metadata = "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.json"

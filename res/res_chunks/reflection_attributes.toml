@@ -1,0 +1,9 @@
+scope = "test_only"
+include = []
+
+[[resources]]
+id = "reflection_attributes_shader"
+source_type = "shader"
+src = "assets/shaders/reflection_attributes/reflection_attributes.slang"
+dst = "assets/shaders/reflection_attributes/reflection_attributes.spv"
+metadata = "assets/shaders/reflection_attributes/reflection_attributes.json"

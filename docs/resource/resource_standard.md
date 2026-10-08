@@ -1,18 +1,38 @@
 # Asset Standard
 
-Assets are described by manifest files in the `res` folder and processed by ACP during build time.
+Assets are described by TOML manifest files (`.toml`) in the `res` folder and processed by ACP during build time.
+ACP emits each source manifest `<path>.toml` as the JSON runtime index file `<path>.json`; runtime code refers to the
+`.json` path.
 
 ## Manifest Discovery
 
-ACP only starts from root manifests under `res/res_chunks/`. It does not scan every JSON file under
-`res`, because resource formats such as glTF are also JSON and must not be treated as manifests.
+ACP only starts from root manifests matching `res/res_chunks/**/*.toml`. It does not scan every TOML file under
+`res`, because other files may also be TOML and must not be treated as manifests.
 
 Root manifests may reference additional manifests with the `include` array. Include paths are resolved
-relative to the resource root. ACP loads only those referenced manifest files from the resource tree,
-then recursively follows their includes.
+relative to the resource root and must name `.toml` source manifests. ACP loads only those referenced manifest files from
+the resource tree, then recursively follows their includes. Emitted runtime manifests list the corresponding `.json` paths.
 
-JSON files outside `res/res_chunks/` are processed only when they are reachable through `include` from
+TOML files outside `res/res_chunks/` are processed only when they are reachable through `include` from
 a root chunk manifest. Included files must be valid ACP manifests with a `resources` array.
+
+## Manifest Layout
+
+Manifests are TOML 1.0 documents parsed with Python's `tomllib`. Top-level `include` is an array of manifest paths, and
+each resource is one `[[resources]]` table. Nested resources use `[[resources.<field>]]` arrays of tables or inline tables:
+
+```toml
+include = ["assets/materials/default_material.toml"]
+
+[[resources]]
+id = "example_shader"
+source_type = "shader"
+src = "assets/shaders/example.slang"
+dst = "assets/shaders/example.spv"
+metadata = "assets/shaders/example.json"
+```
+
+A manifest with no resources still declares `resources = []`. TOML has no null; omit optional fields instead.
 
 ## Resource Scope
 
@@ -47,34 +67,32 @@ Source manifests live under `res/`. ACP writes deployment resources under
 
 Shader macros are compile-only and are not emitted into the runtime resource manifest:
 
-```json
-{
-    "id": "example_shader_variant",
-    "source_type": "shader",
-    "src": "assets/shaders/example.slang",
-    "dst": "assets/shaders/example_variant.spv",
-    "metadata": "assets/shaders/example_variant.json",
-    "macros": [
-        {"name": "WBE_MACRO_1"},
-        {"name": "WBE_MACRO_2", "value": "1"}
-    ]
-}
+```toml
+[[resources]]
+id = "example_shader_variant"
+source_type = "shader"
+src = "assets/shaders/example.slang"
+dst = "assets/shaders/example_variant.spv"
+metadata = "assets/shaders/example_variant.json"
+macros = [
+    { name = "WBE_MACRO_1" },
+    { name = "WBE_MACRO_2", value = "1" },
+]
 ```
 
 ## Material Resources
 
 Material resources fill shader-defined texture slots:
 
-```json
-{
-    "id": "example_material",
-    "type": "material",
-    "textures": [
-        {"texture_role": "albedo", "texture_id": "example_albedo"},
-        {"texture_role": "normal", "texture_id": "example_normal"},
-        {"texture_role": "rma", "texture_id": "example_rma"}
-    ]
-}
+```toml
+[[resources]]
+id = "example_material"
+type = "material"
+textures = [
+    { texture_role = "albedo", texture_id = "example_albedo" },
+    { texture_role = "normal", texture_id = "example_normal" },
+    { texture_role = "rma", texture_id = "example_rma" },
+]
 ```
 
 Materials do not declare a `material_type` or graphics pipelines; the graphics pipeline the application draws them with and its

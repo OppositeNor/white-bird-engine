@@ -449,7 +449,7 @@ void expect_deferred_masked_pipeline_resource(const Path& p_directory) {
 } // namespace
 
 TEST(WBEShaderMetadataVKTest, DeferredMaskedPipelineResourceUsesMaskedFragmentEntry) {
-    expect_deferred_masked_pipeline_resource(Path("res/assets/shaders/deferred_gbuffer"));
+    expect_deferred_masked_pipeline_resource(Path("test_env/res/assets/shaders/deferred_gbuffer"));
 }
 
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {

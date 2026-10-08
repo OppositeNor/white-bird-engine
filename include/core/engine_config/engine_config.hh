@@ -16,7 +16,7 @@
 #define WBE_FILE_ENGINE_CONFIG_HH
 
 #include "core/engine_config/engine_config_options.hh"
-#include "core/parser/parser_yaml.hh"
+#include "core/parser/parser_toml.hh"
 #include "generated/cla_configuration.gen.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
@@ -105,7 +105,7 @@ private:
     }
 
     void parse_config_file(const Path& p_path) {
-        auto parser = ParserYAML();
+        auto parser = ParserTOML();
         parser.parse(p_path);
         SerializableSD<EngineConfigOptions>::deserialize(parser.get_data(), config_options);
     }

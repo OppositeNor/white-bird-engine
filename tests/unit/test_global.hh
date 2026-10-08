@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  * @struct TestGlobalConfig
  * @brief Engine configuration a unit test constructs its Global with.
  *
- * Values override test_env's engine_config.yaml through the engine's command-line configuration, so each test only reserves
+ * Values override test_env's engine_config.toml through the engine's command-line configuration, so each test only reserves
  * the memory it needs. The shared configuration file stays sized for the rendering executables, which load the full test
  * resources. Engine pools are committed up front, so oversized pools make every test slower and heavier.
  */

@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_GAME_CONFIG_HH
 #define WBE_FILE_GAME_CONFIG_HH
 
-#include "core/parser/parser_yaml.hh"
+#include "core/parser/parser_toml.hh"
 #include "game_config_options.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
@@ -45,7 +45,7 @@ public:
      */
     GameConfig(const Path& p_config_file_path) {
         singleton = this;
-        auto parser = ParserYAML();
+        auto parser = ParserTOML();
         parser.parse(p_config_file_path);
         SerializableSD<GameConfigOptions>::deserialize(parser.get_data(), config_options);
     }
