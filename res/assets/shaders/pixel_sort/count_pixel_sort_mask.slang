@@ -17,7 +17,7 @@
  * @brief Compute pass that counts the pixels inside the contrast mask in every sorted line of the source image.
  * @details One invocation per line; dispatch ceil(width / 64) workgroups, or ceil(height / 64) for the horizontal
  * variant. The column offset buffer receives the line count at index 0, the mask count of line l at
- * WBE_PIXEL_SORT_COLUMN_OFFSETS_START + l, and the zero element the prefix sum reads after the counts.
+ * WBE_PIXEL_SORT_COLUMN_OFFSETS_START + l.
  */
 #include "utils.slang"
 #include "pixel_sort/pixel_sort_utils.slang"
@@ -47,7 +47,6 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     uint line = p_dispatch_thread_id.x;
     if (line == 0) {
         column_offsets[0] = line_extent.x;
-        column_offsets[WBE_PIXEL_SORT_COLUMN_OFFSETS_START + line_extent.x] = 0;
     }
     if (line >= line_extent.x) {
         return;

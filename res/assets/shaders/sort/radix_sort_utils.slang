@@ -182,8 +182,8 @@ void workgroup_scope_radix_sort_histogram<T : IInteger, let WORKGROUP_SIZE : uin
  * 64-invocation workgroup.
  * @details Invocation p_thread_id owns the 4 contiguous elements starting at 4 * p_thread_id. Each element is marked in
  * p_scratch with one WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE-bit counter per digit value packed into a uint, and an inclusive
- * prefix sum turns the marks into per-element digit counts. Each element reads the counts of the entry before it as its
- * rank among the elements with the same digit, and is placed after every element with a smaller digit. Elements with
+ * prefix sum turns the marks into per-element digit counts. Each element reads the counts of the entry before it, or zero
+ * for the first element, as its rank among the elements with the same digit, and is placed after every element with a smaller digit. Elements with
  * equal digits keep their relative order. A packed counter can overflow only when all 256 elements have the same digit,
  * in which case every element keeps its position. Every invocation of the 64-invocation workgroup must call this function
  * with the same arrays and bit offset. The function does not synchronize before its first read, so callers must issue a
@@ -193,14 +193,10 @@ void workgroup_scope_radix_sort_histogram<T : IInteger, let WORKGROUP_SIZE : uin
  * @param p_bit_start The bit offset of the WBE_RADIX_SORT_WG_BIT_SIZE-bit digit to sort by; in
  * [0, 32 - WBE_RADIX_SORT_WG_BIT_SIZE].
  * @param p_thread_id The local invocation index in [0, 64).
- * @param p_scratch Scratch array of 256 elements followed by one element that the function sets to zero; its contents are
- * overwritten.
+ * @param p_scratch Scratch array of 256 elements; its contents are overwritten.
  */
 void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
-        uint p_bit_start, uint p_thread_id, __ref groupshared uint p_scratch[256 + 1]) {
-    if (p_thread_id == 0) {
-        p_scratch[256] = 0;
-    }
+        uint p_bit_start, uint p_thread_id, __ref groupshared uint p_scratch[256]) {
     uint4 values;
     uint4 slots;
     // For each location in p_data, we mark the corresponding value as 1
@@ -219,12 +215,13 @@ void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
     [unroll] for (uint j = 1; j < WBE_RADIX_SORT_WG_BUCKET_COUNT; ++j) {
         slot_starts += histogram << (j * WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE);
     }
-    // Move each entry one slot to the right, so that it holds the histogram before its element. The first entry reads
-    // the zero at p_scratch[256] through the unsigned underflow.
+    // Each element reads the entry one slot to its left, which holds the histogram before it. The index of the first
+    // element underflows past the end, so it reads zero.
     uint4 positions;
     [unroll] for (uint i = 0; i < 4; ++i) {
-        uint rank = (p_scratch[min(p_thread_id * 4 + i - 1u, 256)] >> (slots[i] * WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE))
-            & WBE_RADIX_SORT_WG_COUNTER_MASK;
+        uint previous_index = p_thread_id * 4 + i - 1u;
+        uint previous_counts = previous_index < 256 ? p_scratch[previous_index] : 0;
+        uint rank = (previous_counts >> (slots[i] * WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE)) & WBE_RADIX_SORT_WG_COUNTER_MASK;
         uint slot_start = (slot_starts >> (slots[i] * WBE_RADIX_SORT_WG_COUNTER_BIT_SIZE)) & WBE_RADIX_SORT_WG_COUNTER_MASK;
         positions[i] = slot_start + rank;
     }
@@ -244,10 +241,10 @@ void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
  * return.
  * @param p_data The groupshared array to sort in place.
  * @param p_thread_id The local invocation index in [0, 64).
- * @param p_scratch Scratch array of 256 elements followed by one element; its contents are overwritten.
+ * @param p_scratch Scratch array of 256 elements; its contents are overwritten.
  */
 void workgroup_radix_sort_64_256(__ref groupshared uint p_data[256], uint p_thread_id,
-        __ref groupshared uint p_scratch[256 + 1]) {
+        __ref groupshared uint p_scratch[256]) {
     [unroll] for (uint i = 0; i < 32 / WBE_RADIX_SORT_WG_BIT_SIZE; ++i) {
         workgroup_radix_sort_step_64_256(p_data, i * WBE_RADIX_SORT_WG_BIT_SIZE, p_thread_id, p_scratch);
     }

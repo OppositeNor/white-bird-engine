@@ -20,17 +20,13 @@
 #include "prefix_sum/prefix_sum_utils.slang"
 
 RWStructuredBuffer<uint> data;
-// The extra trailing element holds the zero that out-of-range reads are clamped to.
-groupshared uint shared_data[256 + 1];
+groupshared uint shared_data[256];
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
     for (uint i = p_group_thread_id.x; i < 256; i += 64) {
         shared_data[i] = data[i];
-    }
-    if (p_group_thread_id.x == 0) {
-        shared_data[256] = 0;
     }
     GroupMemoryBarrierWithGroupSync();
     workgroup_inclusive_prefix_sum_64_256(shared_data, p_group_thread_id.x * 4);

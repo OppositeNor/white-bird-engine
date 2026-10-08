@@ -166,8 +166,7 @@ PixelSort::Layout PixelSort::make_layout(VkExtent2D p_extent, PixelSortDirection
     Layout layout;
     layout.extent = p_extent;
     layout.line_count = vertical ? p_extent.width : p_extent.height;
-    // The line counts are followed by the zero element the prefix sum reads.
-    layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + layout.line_count + 1) * sizeof(uint32_t);
+    layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + layout.line_count) * sizeof(uint32_t);
     // Sized for the case where every pixel is inside the mask.
     layout.key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
     // The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.

@@ -22,8 +22,7 @@
 
 RWStructuredBuffer<uint> data;
 groupshared uint shared_data[256];
-// The extra trailing element is the zero element the prefix sum clamps out-of-range reads to.
-groupshared uint shared_scratch[256 + 1];
+groupshared uint shared_scratch[256];
 
 [shader("compute")]
 [numthreads(64, 1, 1)]

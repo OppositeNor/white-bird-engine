@@ -29,7 +29,7 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 #define BATCH_SIZE 256
 
 groupshared uint sort_keys[BATCH_SIZE];
-groupshared uint sort_scratch[BATCH_SIZE + 1];
+groupshared uint sort_scratch[BATCH_SIZE];
 // The output index the next element of each digit is written to.
 groupshared uint digit_offsets[WBE_RADIX_SORT_BUCKET_COUNT];
 // The index of the first element of each digit in the sorted batch.
@@ -69,15 +69,13 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     [unroll] for (uint i = 0; i < 4; ++i) {
         sort_scratch[thread_data_start + i] = histogram_buffer[last_sub_histogram_start + thread_data_start + i];
     }
-    if (group_thread_id == 0) {
-        sort_scratch[BATCH_SIZE] = 0;
-    }
     GroupMemoryBarrierWithGroupSync();
     workgroup_inclusive_prefix_sum_64_256(sort_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint digit = thread_data_start + i;
-        // The first digit reads the zero at sort_scratch[256] through the unsigned underflow.
-        uint digit_start = sort_scratch[min(digit - 1u, BATCH_SIZE)];
+        // The index of the first digit underflows past the end, so it reads zero.
+        uint previous_digit = digit - 1u;
+        uint digit_start = previous_digit < BATCH_SIZE ? sort_scratch[previous_digit] : 0;
         // The inclusive prefix sum of the previous sub-histogram counts this digit in all earlier sub-histograms.
         uint earlier_sub_histogram_count = 0;
         if (group_id > 0) {

@@ -76,11 +76,10 @@ def run_general_prefix_sum(p_device: spy.Device, p_load_kernel: KernelLoader, p_
 
 def general_prefix_sum_input(p_rng: np.random.Generator, p_data_start: int, p_data_count: int,
         p_values: np.ndarray | None = None) -> np.ndarray:
-    """Random guards around the range, with the zero element the function requires right after the range."""
-    data = p_rng.integers(0, 1 << 20, p_data_start + p_data_count + 1 + GUARD_COUNT, dtype=np.uint32)
+    """Random guards around the range."""
+    data = p_rng.integers(0, 1 << 20, p_data_start + p_data_count + GUARD_COUNT, dtype=np.uint32)
     if p_values is not None:
         data[p_data_start:p_data_start + p_data_count] = p_values
-    data[p_data_start + p_data_count] = 0
     return data
 
 
@@ -113,7 +112,7 @@ GENERAL_PREFIX_SUM_SHAPES = [
 @pytest.mark.parametrize(("p_data_start", "p_data_count", "p_workgroup_size"), GENERAL_PREFIX_SUM_SHAPES)
 def test_workgroup_general_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
         p_data_start: int, p_data_count: int, p_workgroup_size: int) -> None:
-    # Elements outside the range, including the zero element after it, must be left unchanged.
+    # Elements outside the range must be left unchanged.
     data = general_prefix_sum_input(rng, p_data_start, p_data_count, rng.integers(0, 1000, p_data_count,
         dtype=np.uint32))
     result = run_general_prefix_sum(device, load_kernel, data, p_data_start, p_data_count, p_workgroup_size)

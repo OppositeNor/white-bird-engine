@@ -468,8 +468,7 @@ private:
             .depth = 1,
         };
         layout.column_group_count = (line_count + PIXEL_SORT_COLUMN_WORKGROUP_SIZE - 1) / PIXEL_SORT_COLUMN_WORKGROUP_SIZE;
-        // The line counts are followed by the zero element the prefix sum reads.
-        layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + line_count + 1) * sizeof(uint32_t);
+        layout.column_offsets_buffer_size = (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * sizeof(uint32_t);
         // Sized for the case where every pixel is inside the mask.
         layout.key_buffer_size = (RADIX_SORT_DATA_START + element_count) * sizeof(uint32_t);
         // The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.
