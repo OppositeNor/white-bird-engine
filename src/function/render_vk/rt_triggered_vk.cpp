@@ -19,16 +19,27 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include <atomic>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-RTTriggeredVK::RTTriggeredVK(Unique<IRenderTaskVK> p_task, bool p_activate) : activate(p_activate), task(std::move(p_task)) {
+RTTriggeredVK::RTTriggeredVK(Unique<IRenderTaskVK> p_task, bool p_activate)
+    : task(std::move(p_task)), remaining_frames(p_activate ? 1U : 0U) {
     if (task == MEM_NULL) {
         throw std::runtime_error("RTTriggeredVK: wrapped task must not be null.");
     }
+}
+
+void RTTriggeredVK::trigger() {
+    uint32_t expected = 0;
+    remaining_frames.compare_exchange_strong(expected, 1U, std::memory_order_acq_rel);
+}
+
+void RTTriggeredVK::enabled_for(uint32_t p_frames) {
+    remaining_frames.store(p_frames, std::memory_order_release);
 }
 
 QueueFamilyVK RTTriggeredVK::queue_family() const {
@@ -44,7 +55,10 @@ void RTTriggeredVK::bind_resources(const RendResViewVK& p_resources) {
 }
 
 void RTTriggeredVK::record(VkCommandBuffer p_command_buffer, double p_delta) {
-    if (activate.exchange(false, std::memory_order_acq_rel)) {
+    uint32_t frames = remaining_frames.load(std::memory_order_acquire);
+    while (frames > 0 && !remaining_frames.compare_exchange_weak(frames, frames - 1, std::memory_order_acq_rel)) {
+    }
+    if (frames > 0) {
         task->record(p_command_buffer, p_delta);
     }
 }

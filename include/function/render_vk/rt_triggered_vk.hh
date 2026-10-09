@@ -20,17 +20,19 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include <atomic>
+#include <cstdint>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 /**
  * @class RTTriggeredVK
- * @brief Owns a task and records it once per activation. Neither copyable nor movable.
+ * @brief Owns a task and records it while it has remaining enabled frames. Neither copyable nor movable.
  * @details Binding, initialization, queue selection and resource declarations always reach the child.
  * Inactive frames record no child commands; the graph still submits its synchronization and any
- * required layout transitions. Activation is consumed before recording, so a new activation during
- * recording remains pending. Repeated stores of true coalesce into one request, not a queue.
+ * required layout transitions. Each recording of an enabled frame consumes one remaining frame before
+ * recording the child, so a request made during recording applies to later recordings. Repeated triggers
+ * coalesce into one frame, not a queue.
  * Access this render object on the rendering thread; submit requests from other threads through render jobs.
  */
 class RTTriggeredVK final : public IRenderTaskVK {
@@ -50,9 +52,29 @@ public:
     explicit RTTriggeredVK(Unique<IRenderTaskVK> p_task, bool p_activate = false);
 
     /**
-     * @brief Set true to execute the child on its next graph recording; consumed atomically before execution.
+     * @brief Execute the child on its next graph recording.
+     *
+     * Sets the remaining frames to at least one, so a pending enabled_for() period is never shortened.
      */
-    std::atomic_bool activate{false};
+    void trigger();
+
+    /**
+     * @brief Execute the child on each of its next p_frames graph recordings.
+     *
+     * Replaces the remaining frames, so it can extend or shorten a pending period. Zero disables the child.
+     *
+     * @param p_frames The number of recordings to execute the child on.
+     */
+    void enabled_for(uint32_t p_frames);
+
+    /**
+     * @brief Get the number of upcoming recordings that execute the child.
+     *
+     * @return The remaining enabled frames.
+     */
+    uint32_t get_remaining_frames() const {
+        return remaining_frames.load(std::memory_order_acquire);
+    }
 
     virtual QueueFamilyVK queue_family() const override;
     virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override;
@@ -61,6 +83,7 @@ public:
 
 private:
     Unique<IRenderTaskVK> task;
+    std::atomic<uint32_t> remaining_frames;
 };
 
 } // namespace WhiteBirdEngine

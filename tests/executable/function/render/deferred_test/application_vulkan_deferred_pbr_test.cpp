@@ -322,7 +322,7 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
         if (task == MEM_NULL) {
             throw std::runtime_error("Deferred bloom acquisition task is unavailable.");
         }
-        task->activate.store(true, std::memory_order_release);
+        task->trigger();
     }
 }
 

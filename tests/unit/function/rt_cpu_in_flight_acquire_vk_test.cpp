@@ -69,9 +69,9 @@ TEST(WBERTCPUInFlightAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActiv
     std::binary_semaphore completion_semaphore(0);
     RTTriggeredVK task(make_unique<RTCPUInFlightAcquireVK>(&allocator, &render_data, "source_image", destination, &completion_semaphore));
     EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
-    task.activate.store(true);
+    task.trigger();
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
-    EXPECT_FALSE(task.activate.load());
+    EXPECT_EQ(task.get_remaining_frames(), 0U);
     EXPECT_FALSE(completion_semaphore.try_acquire());
 }
 

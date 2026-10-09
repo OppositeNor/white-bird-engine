@@ -80,16 +80,16 @@ TEST(WBERTTriggeredVKTest, ConsumesOneActivationAndCanBeRearmed) {
     RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
     task.record(VK_NULL_HANDLE, 1.0);
     EXPECT_EQ(state.recordings, 0);
-    task.activate.store(true);
-    task.activate.store(true); // Requests coalesce.
+    task.trigger();
+    task.trigger(); // Requests coalesce.
     task.record(VK_NULL_HANDLE, 2.0);
     EXPECT_EQ(state.recordings, 1);
     EXPECT_DOUBLE_EQ(state.delta, 2.0);
     EXPECT_EQ(state.command_buffer, VK_NULL_HANDLE);
-    EXPECT_FALSE(task.activate.load());
+    EXPECT_EQ(task.get_remaining_frames(), 0U);
     task.record(VK_NULL_HANDLE, 3.0);
     EXPECT_EQ(state.recordings, 1);
-    task.activate.store(true);
+    task.trigger();
     task.record(VK_NULL_HANDLE, 4.0);
     EXPECT_EQ(state.recordings, 2);
 }
@@ -99,14 +99,48 @@ TEST(WBERTTriggeredVKTest, ActivationDuringRecordingRemainsPending) {
     TriggerProbeState state;
     RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
     state.on_record = [&task]() {
-        task.activate.store(true);
+        task.trigger();
     };
     task.record(VK_NULL_HANDLE, 0.0);
-    EXPECT_TRUE(task.activate.load());
+    EXPECT_EQ(task.get_remaining_frames(), 1U);
     state.on_record = {};
     task.record(VK_NULL_HANDLE, 0.0);
     EXPECT_EQ(state.recordings, 2);
-    EXPECT_FALSE(task.activate.load());
+    EXPECT_EQ(task.get_remaining_frames(), 0U);
+}
+
+TEST(WBERTTriggeredVKTest, EnabledForRecordsRequestedFrames) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    TriggerProbeState state;
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
+    task.enabled_for(3);
+    EXPECT_EQ(task.get_remaining_frames(), 3U);
+    for (int i = 0; i < 5; ++i) {
+        task.record(VK_NULL_HANDLE, 0.0);
+    }
+    EXPECT_EQ(state.recordings, 3);
+    EXPECT_EQ(task.get_remaining_frames(), 0U);
+}
+
+TEST(WBERTTriggeredVKTest, TriggerDoesNotShortenEnabledPeriod) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    TriggerProbeState state;
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
+    task.enabled_for(3);
+    task.trigger();
+    EXPECT_EQ(task.get_remaining_frames(), 3U);
+    task.record(VK_NULL_HANDLE, 0.0);
+    task.trigger();
+    EXPECT_EQ(task.get_remaining_frames(), 2U);
+}
+
+TEST(WBERTTriggeredVKTest, EnabledForZeroCancelsPendingFrames) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    TriggerProbeState state;
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
+    task.enabled_for(0);
+    task.record(VK_NULL_HANDLE, 0.0);
+    EXPECT_EQ(state.recordings, 0);
 }
 
 TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
