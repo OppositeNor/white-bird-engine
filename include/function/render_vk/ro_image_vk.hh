@@ -32,6 +32,7 @@
 #include "glm/ext/vector_uint3.hpp"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <cstddef>
 #include <cstdint>
 #include <future>
 #include <set>
@@ -282,6 +283,14 @@ public:
      * @throws std::runtime_error If the destination is too small, the image cannot be copied, or no engine worker is available.
      */
     std::future<void> acquire_image_content(std::span<uint8_t> p_destination) const;
+
+    /**
+     * @brief Get the number of bytes acquire_image_content() produces for this image.
+     *
+     * @return The tightly packed byte size of every mip level and array layer.
+     * @throws std::runtime_error If the image cannot be acquired.
+     */
+    size_t get_content_size() const;
 
     struct ExposedFields {
         /**

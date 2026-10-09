@@ -52,6 +52,7 @@
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "resource/resource_utils.hh"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -63,7 +64,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <format>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -109,7 +109,6 @@ Ref<ROCMultislotsVK> create_per_frame_buffers(
 } // namespace
 
 void ApplicationVulkanDeferredPBRTest::logic_update(double p_delta) {
-    write_completed_bloom_acquire();
     control(p_delta);
     update_descriptors();
     dynamic_mesh_time += p_delta;
@@ -170,9 +169,10 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
 
     bool bloom_acquire_key_down = input_manager->get_input_status(KEYCODE_B).is_down();
     const bool bloom_acquire_button_down = bloom_acquire_button_pressed.exchange(false, std::memory_order_relaxed);
-    if (((bloom_acquire_key_down && !bloom_acquire_key_was_down) || bloom_acquire_button_down) && !bloom_acquire_in_flight) {
+    if (((bloom_acquire_key_down && !bloom_acquire_key_was_down) || bloom_acquire_button_down) &&
+        !bloom_acquire_in_flight.load(std::memory_order_acquire)) {
+        bloom_acquire_in_flight.store(true, std::memory_order_relaxed);
         bloom_acquire_requested.store(true, std::memory_order_release);
-        bloom_acquire_in_flight = true;
     }
     bloom_acquire_key_was_down = bloom_acquire_key_down;
 
@@ -288,6 +288,7 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
+    poll_frame_sequence();
     // A captured frame shows the scene without the configuration window.
     bool capturing_frame = false;
     if (frame_capture_requested.exchange(false, std::memory_order_relaxed)) {
@@ -307,7 +308,8 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
     }
     imgui_overlay->end_frame();
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
-    if (requested != summed_area_table_active) {
+    // The frame sequence runs on the wrappers of the active graph, so switching waits until its frames are recorded.
+    if (requested != summed_area_table_active && !frame_sequence_recording) {
         renderer_vk->activate_render_graph(requested ? DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH : DEFERRED_MIPMAP_RENDER_GRAPH);
         summed_area_table_active = requested;
         stdout_log(WBE_CHANNEL_DEBUG)->message(requested ? "Deferred shadow filtering: summed-area table." : "Deferred shadow filtering: mipmaps.");
@@ -324,6 +326,96 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
         }
         task->trigger();
     }
+    if (frame_sequence_requested) {
+        frame_sequence_requested = false;
+        if (!is_frame_sequence_in_progress()) {
+            start_frame_sequence();
+        }
+    }
+}
+
+void ApplicationVulkanDeferredPBRTest::start_frame_sequence() {
+    const VkFormat format = base_render_data->swap_chain_format;
+    if (format != VK_FORMAT_B8G8R8A8_SRGB && format != VK_FORMAT_B8G8R8A8_UNORM && format != VK_FORMAT_R8G8B8A8_SRGB &&
+        format != VK_FORMAT_R8G8B8A8_UNORM) {
+        throw std::runtime_error("Frame sequence capture supports only RGBA8 and BGRA8 swap-chain formats.");
+    }
+    const size_t graph_index = summed_area_table_active ? 1U : 0U;
+    RefRaw<RTTriggeredVK> present_task = frame_sequence_present_tasks[graph_index];
+    RefRaw<RTTriggeredVK> acquire_task = frame_sequence_acquire_tasks[graph_index];
+    if (present_task == MEM_NULL) {
+        throw std::runtime_error("Deferred frame sequence present task is unavailable.");
+    }
+    if (acquire_task == MEM_NULL) {
+        throw std::runtime_error("Deferred frame sequence acquisition task is unavailable.");
+    }
+
+    const auto timestamp =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    frame_sequence_directory = std::filesystem::absolute(Path("test_env") / "captures" / std::format("deferred_sequence_{}", timestamp));
+    std::filesystem::create_directories(frame_sequence_directory);
+
+    // The next tick records the first frame, so the renderer's current frame numbers it zero.
+    frame_sequence_first_frame = base_render_data->current_frame;
+    frame_sequence_frame_count = static_cast<uint32_t>(std::max(frame_sequence_frame_count_input, 1));
+    frame_sequence_written_count.store(0, std::memory_order_relaxed);
+    frame_sequence_recording = true;
+    // Every captured frame advances the scene by exactly one sequence frame, however long the capture takes.
+    frame_sequence_previous_delta_settings = get_delta_settings();
+    set_delta_settings(DeltaSettings{.is_fixed = true, .fixed_delta = 1.0 / FRAME_SEQUENCE_FRAMES_PER_SECOND});
+    present_task->enabled_for(frame_sequence_frame_count);
+    acquire_task->enabled_for(frame_sequence_frame_count);
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(std::format("Capturing {} frames at {} FPS to {}.", frame_sequence_frame_count, FRAME_SEQUENCE_FRAMES_PER_SECOND, frame_sequence_directory.generic_string()));
+}
+
+void ApplicationVulkanDeferredPBRTest::poll_frame_sequence() {
+    if (!frame_sequence_recording) {
+        return;
+    }
+    const uint32_t remaining_frames = frame_sequence_acquire_tasks[summed_area_table_active ? 1U : 0U]->get_remaining_frames();
+    const uint32_t recorded_count = frame_sequence_frame_count - remaining_frames;
+    // Each acquired frame holds a full image until it is written, so wait while too many are pending. The fixed delta
+    // keeps the sequence timing unaffected by the wait.
+    uint32_t written_count = frame_sequence_written_count.load(std::memory_order_acquire);
+    while (recorded_count - written_count >= FRAME_SEQUENCE_MAX_PENDING_FRAMES) {
+        frame_sequence_written_count.wait(written_count, std::memory_order_acquire);
+        written_count = frame_sequence_written_count.load(std::memory_order_acquire);
+    }
+    if (remaining_frames == 0) {
+        frame_sequence_recording = false;
+        set_delta_settings(frame_sequence_previous_delta_settings);
+    }
+}
+
+void ApplicationVulkanDeferredPBRTest::write_frame_sequence_frame(RTCPUInFlightAcquireVK::AcquiredImage p_image) {
+    // Count the frame even if writing throws, so the rendering thread never waits for it; the acquisition task rethrows.
+    struct WrittenCountGuard {
+        std::atomic<uint32_t>& written_count;
+        ~WrittenCountGuard() {
+            written_count.fetch_add(1, std::memory_order_release);
+            written_count.notify_all();
+        }
+    } written_count_guard{frame_sequence_written_count};
+
+    const bool blue_first = p_image.format == VK_FORMAT_B8G8R8A8_SRGB || p_image.format == VK_FORMAT_B8G8R8A8_UNORM;
+    constexpr size_t BYTES_PER_PIXEL = 4;
+    for (size_t offset = 0; offset < p_image.content.size(); offset += BYTES_PER_PIXEL) {
+        if (blue_first) {
+            std::swap(p_image.content[offset], p_image.content[offset + 2]);
+        }
+        // The presented alpha channel is not meaningful.
+        p_image.content[offset + 3] = UINT8_MAX;
+    }
+    const Path path = frame_sequence_directory / std::format("frame_{:05}.png", p_image.frame - frame_sequence_first_frame);
+    write_image_data_png(path, p_image.content, p_image.extent.width, p_image.extent.height, BYTES_PER_PIXEL);
+    if (p_image.frame - frame_sequence_first_frame + 1 == frame_sequence_frame_count) {
+        stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Wrote the last sequence frame to {}.", path.generic_string()));
+    }
+}
+
+bool ApplicationVulkanDeferredPBRTest::is_frame_sequence_in_progress() const {
+    return frame_sequence_recording || frame_sequence_written_count.load(std::memory_order_acquire) < frame_sequence_frame_count;
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
@@ -452,6 +544,21 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     ImGui::SameLine();
     if (ImGui::Button("Save bloom image (B)")) {
         bloom_acquire_button_pressed.store(true, std::memory_order_relaxed);
+    }
+    const bool frame_sequence_in_progress = is_frame_sequence_in_progress();
+    ImGui::BeginDisabled(frame_sequence_in_progress);
+    ImGui::SetNextItemWidth(120.0F);
+    if (ImGui::InputInt("Frames", &frame_sequence_frame_count_input)) {
+        frame_sequence_frame_count_input = std::max(frame_sequence_frame_count_input, 1);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Capture Frame Sequence")) {
+        frame_sequence_requested = true;
+    }
+    ImGui::EndDisabled();
+    if (frame_sequence_in_progress) {
+        ImGui::SameLine();
+        ImGui::Text("%u / %u frames written", frame_sequence_written_count.load(std::memory_order_acquire), frame_sequence_frame_count);
     }
     // The measured frame rate reflects the fixed delta rather than the real frame cost.
     if (!get_delta_settings().is_fixed) {
@@ -634,10 +741,6 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
     bloom_extent = base_render_data->swap_chain_extent;
-    if (bloom_extent.width > std::numeric_limits<size_t>::max() / bloom_extent.height / BLOOM_BYTES_PER_PIXEL) {
-        throw std::runtime_error("Failed to allocate the deferred bloom acquisition buffer: image byte size is too large.");
-    }
-    bloom_acquire_buffer.resize(static_cast<size_t>(bloom_extent.width) * bloom_extent.height * BLOOM_BYTES_PER_PIXEL);
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {

@@ -16,15 +16,15 @@
 #define WBE_FILE_RT_CPU_IN_FLIGHT_ACQUIRE_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>
+#include <functional>
 #include <future>
-#include <semaphore>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -35,11 +35,46 @@ namespace WhiteBirdEngine {
  * @class RTCPUInFlightAcquireVK
  * @brief Starts an asynchronous CPU acquisition of a graph image on every recording.
  *
- * Acquires into caller-owned storage and releases the CPU completion semaphore after population.
- * Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
+ * Every recording starts an independent acquisition into memory it allocates itself, and hands the result to a callback
+ * that takes ownership of it. Acquisitions never share memory, so consecutive recordings may be in flight together; wrap
+ * in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
+ * Instances are neither copyable nor movable.
  */
 class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
+    /**
+     * @struct AcquiredImage
+     * @brief One completed acquisition. Movable; copying duplicates the content.
+     */
+    struct AcquiredImage {
+        /**
+         * @brief The renderer's current frame when the acquisition was recorded. Consecutive recorded frames have
+         * consecutive values.
+         */
+        uint64_t frame = 0;
+        /**
+         * @brief The format of the source image.
+         */
+        VkFormat format = VK_FORMAT_UNDEFINED;
+        /**
+         * @brief The extent of the source image's first mip level.
+         */
+        VkExtent3D extent{};
+        /**
+         * @brief The tightly packed image bytes, laid out as ROImageVK::acquire_image_content() describes. Allocated from
+         * the global allocator.
+         */
+        Vector<uint8_t, HeapAllocatorGlobal> content;
+    };
+
+    /**
+     * @brief Callback receiving the ownership of one completed acquisition.
+     *
+     * Runs on an engine worker thread. Callbacks of different acquisitions may run concurrently and out of recording
+     * order; order them by AcquiredImage::frame. An exception thrown by the callback is rethrown by a later recording.
+     */
+    using Callback = std::function<void(AcquiredImage p_image)>;
+
     RTCPUInFlightAcquireVK() = delete;
     virtual ~RTCPUInFlightAcquireVK() override = default;
     RTCPUInFlightAcquireVK(const RTCPUInFlightAcquireVK&) = delete;
@@ -50,18 +85,14 @@ public:
     /**
      * @brief Construct an in-flight CPU image-acquisition task.
      *
-     * The completion semaphore and destination storage are non-owning and must outlive the task and every
-     * acquisition it starts. The semaphore must be acquired before recording another acquisition.
+     * Each acquisition holds its own copy of the callback, so the task may be destroyed while acquisitions are in flight;
+     * everything the callback references must outlive every acquisition the task starts.
      *
      * @param p_render_data Base Vulkan render data.
      * @param p_image_view_id Render-graph resource id of the source image view.
-     * @param p_destination CPU storage that receives the complete image.
-     * @param p_completion_semaphore CPU semaphore released after the destination has been populated.
+     * @param p_on_acquired Callback receiving each completed acquisition; empty throws.
      */
-    RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data,
-        std::string_view p_image_view_id,
-        std::span<uint8_t> p_destination,
-        std::binary_semaphore* p_completion_semaphore);
+    RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id, Callback p_on_acquired);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -76,10 +107,9 @@ public:
 private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string image_view_id;
-    std::span<uint8_t> destination;
-    std::binary_semaphore* completion_semaphore = nullptr;
+    Callback on_acquired;
     Ref<RenderObjectContainerVK> image_view_container;
-    std::future<void> pending_completion;
+    Vector<std::future<void>, RenderAllocator> pending_acquisitions;
 };
 
 } // namespace WhiteBirdEngine

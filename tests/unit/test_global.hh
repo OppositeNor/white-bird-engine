@@ -41,9 +41,17 @@ struct TestGlobalConfig {
      */
     size_t resource_mem_pool_size = WBE_MI_B(16);
     /**
-     * @brief Size of each global allocator arena in bytes.
+     * @brief Capacity of the global allocator for allocations below 1 KiB, in bytes.
      */
-    size_t global_mem_pool_size = WBE_MI_B(16);
+    size_t global_mem_small_pool_size = WBE_MI_B(1);
+    /**
+     * @brief Capacity of the global allocator for allocations from 1 KiB to 1 MiB, in bytes.
+     */
+    size_t global_mem_medium_pool_size = WBE_MI_B(15);
+    /**
+     * @brief Capacity of the global allocator for allocations above 1 MiB, in bytes.
+     */
+    size_t global_mem_large_pool_size = WBE_MI_B(16);
 };
 
 /**
@@ -56,7 +64,9 @@ inline std::unique_ptr<Global> make_test_global(const TestGlobalConfig& p_config
     std::vector<std::string> arguments{
         "wbe_unit_test",
         std::format("--resource_mem_pool_size={}", p_config.resource_mem_pool_size),
-        std::format("--global_mem_pool_size={}", p_config.global_mem_pool_size),
+        std::format("--global_mem_small_pool_size={}", p_config.global_mem_small_pool_size),
+        std::format("--global_mem_medium_pool_size={}", p_config.global_mem_medium_pool_size),
+        std::format("--global_mem_large_pool_size={}", p_config.global_mem_large_pool_size),
     };
     std::vector<char*> argument_pointers;
     argument_pointers.reserve(arguments.size());

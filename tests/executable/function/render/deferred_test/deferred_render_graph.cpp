@@ -199,6 +199,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_bloom_blur_task_desc())
         .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
+        .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
+        .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table))
         .add_task(octree->get_debug_draw_render_task_desc())
         .add_task(octree->get_pre_deferred_debug_draw_render_task_desc())
         .add_task(create_light_billboard_task_desc())
@@ -270,6 +272,10 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     // The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
     connect_resource_chain(
         p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_EXTRACT_BLOOM, RT_BLUR_BLOOM, RT_ACQUIRE_BLOOM, RT_RUN_PRESENT_RESULT_IMAGE});
+    // The frame sequence presents the same result and bloom into its own image, which it then acquires.
+    connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {p_post_processing_last_task_id, RT_RUN_PRESENT_FRAME_SEQUENCE});
+    connect_resource_chain(p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_BLUR_BLOOM, RT_RUN_PRESENT_FRAME_SEQUENCE});
+    connect_resource_chain(p_pipeline_desc, FRAME_SEQUENCE_IMAGE_VIEW, {RT_RUN_PRESENT_FRAME_SEQUENCE, RT_ACQUIRE_FRAME_SEQUENCE});
     connect_resource_chain(p_pipeline_desc,
         REND_RES_SWAP_CHAIN,
         {
@@ -414,6 +420,7 @@ void ApplicationVulkanDeferredPBRTest::add_lighting_graph_resources(RendGraphDes
     constexpr std::string_view RESULT_IMAGE = "result_color_image";
     constexpr std::string_view BLOOM_PING_IMAGE = "bloom_ping_image";
     constexpr std::string_view BLOOM_PONG_IMAGE = "bloom_pong_image";
+    constexpr std::string_view FRAME_SEQUENCE_IMAGE = "frame_sequence_image";
     RendImageDescVK bloom_ping =
         make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, LIGHTING_OUTPUT_FORMAT, bloom_extent);
     bloom_ping.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -452,7 +459,14 @@ void ApplicationVulkanDeferredPBRTest::add_lighting_graph_resources(RendGraphDes
         .add_image_view(INDIRECT_LIGHTING_IMAGE_VIEW, INDIRECT_LIGHTING_IMAGE)
         .add_image_view(RESULT_IMAGE_VIEW, RESULT_IMAGE)
         .add_image_view(BLOOM_PING_IMAGE_VIEW, BLOOM_PING_IMAGE)
+        .add_image(FRAME_SEQUENCE_IMAGE,
+            [render_data = base_render_data](const RendGraphContextVK& p_context) {
+                // The present pipeline renders in the swap-chain format, so the sequence matches the presented image.
+                return make_graph_image_desc(
+                    RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, render_data->swap_chain_format, p_context.swap_chain_extent);
+            })
         .add_image_view(BLOOM_PONG_IMAGE_VIEW, BLOOM_PONG_IMAGE)
+        .add_image_view(FRAME_SEQUENCE_IMAGE_VIEW, FRAME_SEQUENCE_IMAGE)
         .add_sampler(BLOOM_SAMPLER,
             [=](const RendGraphContextVK& /*p_context*/) {
                 return clamped_linear_sampler;
@@ -580,7 +594,9 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
     // The factory takes the handle the bloom readback triggers again every time the graph recreates the task.
     task_desc.factory = [this, p_use_summed_area_table](const RendGraphContextVK& /*p_context*/) {
         auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(
-            render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW, std::span<uint8_t>(bloom_acquire_buffer), &bloom_acquire_completed);
+            render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW, [this](RTCPUInFlightAcquireVK::AcquiredImage p_image) {
+                write_completed_bloom_acquire(p_image);
+            });
         auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
         bloom_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
         return task;
@@ -603,17 +619,50 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_result_image_tas
     return task_desc;
 }
 
-void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire() {
-    if (!bloom_acquire_completed.try_acquire()) {
-        return;
-    }
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_frame_sequence_task_desc(bool p_use_summed_area_table) {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_RUN_PRESENT_FRAME_SEQUENCE;
+    task_desc.alias(RenderTargetsVK::color_id(0), FRAME_SEQUENCE_IMAGE_VIEW);
+    const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
+    task_desc.factory = [this, clear_values, p_use_summed_area_table](const RendGraphContextVK& p_context) {
+        auto present_task = RTRunGraphicsPipelineVK::Builder(render_allocator)
+                                .set_pipeline(present_post_processing_graphics_pipeline)
+                                .set_render_extent(p_context.swap_chain_extent)
+                                .set_clear_values(clear_values)
+                                .create_unique(base_render_data);
+        auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(present_task));
+        frame_sequence_present_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
+        return task;
+    };
+    return task_desc;
+}
 
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_frame_sequence_acquire_task_desc(bool p_use_summed_area_table) {
+    RendTaskDescVK task_desc(render_allocator);
+    task_desc.task_id = RT_ACQUIRE_FRAME_SEQUENCE;
+    task_desc.factory = [this, p_use_summed_area_table](const RendGraphContextVK& /*p_context*/) {
+        if (frame_sequence_recording) {
+            // A recreated wrapper loses its remaining frames, so the sequence would end early.
+            throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
+        }
+        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(
+            render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW, [this](RTCPUInFlightAcquireVK::AcquiredImage p_image) {
+                write_frame_sequence_frame(std::move(p_image));
+            });
+        auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
+        frame_sequence_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
+        return task;
+    };
+    return task_desc;
+}
+
+void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire(const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
     std::filesystem::path output_directory = std::filesystem::path("test_env") / "descriptor_debug";
     std::filesystem::create_directories(output_directory);
     std::filesystem::path output_path = output_directory / "deferred_bloom.png";
-    std::vector<uint8_t> rgba8 = convert_bloom_to_rgba8(bloom_acquire_buffer);
-    write_image_data_png(output_path, rgba8, bloom_extent.width, bloom_extent.height, 4);
-    bloom_acquire_in_flight = false;
+    std::vector<uint8_t> rgba8 = convert_bloom_to_rgba8(p_image.content);
+    write_image_data_png(output_path, rgba8, p_image.extent.width, p_image.extent.height, 4);
+    bloom_acquire_in_flight.store(false, std::memory_order_release);
     stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Stored deferred bloom acquisition in {}.", output_path.generic_string()));
 }
 

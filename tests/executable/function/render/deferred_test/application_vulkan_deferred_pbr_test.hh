@@ -42,12 +42,14 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "i_octree_render_feature.hh"
 #include "i_post_processing.hh"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
 #include "pixel_sort.hh"
+#include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
 #include <atomic>
@@ -62,7 +64,6 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
-#include <semaphore>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -107,7 +108,11 @@ private:
     static constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
     static constexpr uint32_t BLOOM_BLUR_PASS_COUNT = 4;
     static_assert(BLOOM_BLUR_PASS_COUNT % 2U == 0U);
-    static constexpr size_t BLOOM_BYTES_PER_PIXEL = sizeof(uint16_t) * 4;
+    static constexpr double FRAME_SEQUENCE_FRAMES_PER_SECOND = 30.0;
+    // Recorded frames not yet written before the rendering thread waits. The last recorded frame's readback is submitted
+    // only by the next tick, so the bound must leave room for it and at least one submitted frame.
+    static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
+    static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
     static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
@@ -126,6 +131,7 @@ private:
     static constexpr std::string_view RESULT_IMAGE_VIEW = "result_image";
     static constexpr std::string_view BLOOM_PING_IMAGE_VIEW = "bloom_ping";
     static constexpr std::string_view BLOOM_PONG_IMAGE_VIEW = "bloom_pong";
+    static constexpr std::string_view FRAME_SEQUENCE_IMAGE_VIEW = "frame_sequence";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
     static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
@@ -160,6 +166,8 @@ private:
     static constexpr std::string_view RT_BLUR_BLOOM = "blur_bloom";
     static constexpr std::string_view RT_ACQUIRE_BLOOM = "acquire_bloom";
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
+    static constexpr std::string_view RT_RUN_PRESENT_FRAME_SEQUENCE = "present_frame_sequence";
+    static constexpr std::string_view RT_ACQUIRE_FRAME_SEQUENCE = "acquire_frame_sequence";
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 
@@ -208,10 +216,21 @@ private:
     RendTaskDescVK create_bloom_blur_task_desc() const;
     RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_present_result_image_task_desc() const;
+    RendTaskDescVK create_present_frame_sequence_task_desc(bool p_use_summed_area_table);
+    RendTaskDescVK create_frame_sequence_acquire_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_light_billboard_task_desc() const;
     RendTaskDescVK create_imgui_task_desc();
     CompositionCameraInfo make_composition_camera_info() const;
-    void write_completed_bloom_acquire();
+    // Write a completed bloom acquisition. Runs on a worker thread.
+    void write_completed_bloom_acquire(const RTCPUInFlightAcquireVK::AcquiredImage& p_image);
+    // Start capturing frame_sequence_frame_count_input frames at a fixed delta. Runs on the rendering thread.
+    void start_frame_sequence();
+    // Bound the frames waiting to be written, and end the fixed delta after the last frame is recorded. Runs on the
+    // rendering thread.
+    void poll_frame_sequence();
+    // Write one acquired sequence frame. Runs on a worker thread.
+    void write_frame_sequence_frame(RTCPUInFlightAcquireVK::AcquiredImage p_image);
+    bool is_frame_sequence_in_progress() const;
 
     Unique<DynamicMeshRenderFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
@@ -275,16 +294,26 @@ private:
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
-    std::vector<uint8_t> bloom_acquire_buffer;
     // Render-thread views of graph-owned wrappers, refreshed by each graph factory invocation.
     std::array<RefRaw<RTTriggeredVK>, 2> bloom_acquire_tasks;
     // Input-thread mailbox; render_update forwards requests to the active graph's wrapper.
     std::atomic_bool bloom_acquire_requested = false;
     // Rendering-thread mailbox of the configuration window's bloom button; control() handles it like a B key press.
     std::atomic_bool bloom_acquire_button_pressed = false;
-    std::binary_semaphore bloom_acquire_completed{0};
     bool bloom_acquire_key_was_down = false;
-    bool bloom_acquire_in_flight = false;
+    // Set by control() when it requests an acquisition; cleared by the worker after the image is written.
+    std::atomic_bool bloom_acquire_in_flight = false;
+    // Frame sequence capture. The rendering thread owns everything except the written count, which workers advance.
+    std::array<RefRaw<RTTriggeredVK>, 2> frame_sequence_present_tasks;
+    std::array<RefRaw<RTTriggeredVK>, 2> frame_sequence_acquire_tasks;
+    Path frame_sequence_directory;
+    DeltaSettings frame_sequence_previous_delta_settings{};
+    uint64_t frame_sequence_first_frame = 0;
+    uint32_t frame_sequence_frame_count = 0;
+    std::atomic<uint32_t> frame_sequence_written_count = 0;
+    int frame_sequence_frame_count_input = 60;
+    bool frame_sequence_recording = false;
+    bool frame_sequence_requested = false;
     bool render_graph_switch_key_was_down = false;
     bool voxel_debug_view_key_was_down = false;
     bool frame_capture_key_was_down = false;

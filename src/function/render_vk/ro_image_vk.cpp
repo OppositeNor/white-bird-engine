@@ -623,6 +623,11 @@ std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destinat
         });
 }
 
+size_t ROImageVK::get_content_size() const {
+    validate_image_readback(exposed_fields);
+    return build_image_readback_plan(exposed_fields).output_size;
+}
+
 void ROImageVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
