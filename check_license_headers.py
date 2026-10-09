@@ -26,6 +26,7 @@ LICENSE_HEADER_FILE_EXTENSIONS = {
     ".py",
     ".cmake",
     ".jinja",
+    ".toml",
 }
 
 LICENSE_HEADER_FILE_NAMES = {

@@ -161,7 +161,7 @@ root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 project_files = list_files(root_dir, ignore_dirs=["dependencies", "generated",
                                                   ".cache", ".git", ".github", "__pycache__",
-                                                  "build"])
+                                                  "build", ".codex", ".claude", ".vscode", "test_env", "other"])
 project_sources = [path for path in project_files if Path(path).suffix in source_extensions]
 project_headers = [path for path in project_sources if Path(path).suffix in header_extensions]
 project_files_exclude_tests = list_files(root_dir, ignore_dirs=["tests", "dependencies", "generated",

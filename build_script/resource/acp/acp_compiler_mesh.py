@@ -154,6 +154,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
 
         result = self._copy_runtime_fields(resource)
         result.setdefault("type", "submesh")
+        result["aabb"] = self._compute_aabb(vertices, manifest_path)
         result["vertices"] = vertices_view
         result["indices"] = indices_view
         binary_resource: ManifestResource = {"id": binary_id, "type": "binary", "path": output_rel_path.as_posix()}
@@ -224,6 +225,20 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         vertices_view = {"binary": {"binary_id": "", "start": vertex_start, "size": vertex_size}, "stride": stride, "attributes": attributes}
         indices_view = {"binary": {"binary_id": "", "start": index_start, "size": len(payload) - index_start}}
         return bytes(payload), vertices_view, indices_view
+
+    def _compute_aabb(self, vertices: list[Any], manifest_path: Path) -> dict[str, Any]:
+        if not vertices:
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: cannot compute bounds for a submesh without vertices in {manifest_path}."
+            )
+        positions = [self._read_vertex_vector(vertex, "position", 3, manifest_path, True) for vertex in vertices]
+        minimum = [min(position[axis] for position in positions) for axis in range(3)]
+        maximum = [max(position[axis] for position in positions) for axis in range(3)]
+        return {
+            "center": [(minimum[axis] + maximum[axis]) * 0.5 for axis in range(3)],
+            "width": maximum[0] - minimum[0],
+            "height": maximum[1] - minimum[1],
+        }
 
     def _append_indices(self, payload: bytearray, indices: list[Any], vertex_count: int, manifest_path: Path) -> None:
         if len(indices) % 3 != 0:
