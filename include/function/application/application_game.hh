@@ -30,6 +30,7 @@
 #include <atomic>
 #include <functional>
 #include <future>
+#include <mutex>
 #include <utility>
 namespace WhiteBirdEngine {
 
@@ -69,6 +70,10 @@ public:
     virtual double get_logic_delta() const override {
         return logic_delta.load(std::memory_order_acquire);
     }
+
+    virtual void set_delta_settings(const DeltaSettings& p_delta_settings) override;
+
+    virtual DeltaSettings get_delta_settings() const override;
 
     /**
      * @brief Get the allocator for the renderer.
@@ -126,6 +131,8 @@ private:
     WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
+    mutable std::mutex delta_settings_mutex;
+    DeltaSettings delta_settings;
 
 protected:
     Ref<JobBufferRingMPSC> render_job_buffer;

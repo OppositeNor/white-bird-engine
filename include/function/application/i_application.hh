@@ -26,6 +26,35 @@ namespace WhiteBirdEngine {
  */
 class IApplication {
 public:
+    /**
+     * @struct DeltaSettings
+     * @brief Controls the delta time an application reports to its render and logic updates.
+     *
+     * Trivially copyable value type.
+     */
+    struct DeltaSettings {
+        /**
+         * @brief Whether every render and logic update receives fixed_delta instead of the measured frame duration.
+         *
+         * While fixed, frames shorter than fixed_delta are extended to fixed_delta when sleep_to_delta is set. Frames that
+         * already exceed it are not extended, but still report fixed_delta.
+         */
+        bool is_fixed = false;
+
+        /**
+         * @brief Whether the frame freezer sleeps so that fixed frames last at least fixed_delta.
+         *
+         * Only used while is_fixed is set. When cleared, fixed render and logic frames run without sleeping, including the
+         * logic thread's regular frame limit, while still reporting fixed_delta.
+         */
+        bool sleep_to_delta = true;
+
+        /**
+         * @brief The delta time in seconds reported while is_fixed is set. Must be positive when is_fixed is set.
+         */
+        double fixed_delta = 0.0;
+    };
+
     IApplication() = default;
     virtual ~IApplication() = default;
     IApplication(const IApplication&) = default;
@@ -51,6 +80,25 @@ public:
      * @return The difference between pair of logic frames.
      */
     virtual double get_logic_delta() const = 0;
+
+    /**
+     * @brief Set how the render and logic deltas are produced.
+     *
+     * Thread-safe. Takes effect from the next render and logic frame.
+     *
+     * @param p_delta_settings The new delta settings.
+     * @throws std::runtime_error If p_delta_settings is fixed with a non-positive fixed_delta.
+     */
+    virtual void set_delta_settings(const DeltaSettings& p_delta_settings) = 0;
+
+    /**
+     * @brief Get the current delta settings.
+     *
+     * Thread-safe.
+     *
+     * @return The current delta settings.
+     */
+    virtual DeltaSettings get_delta_settings() const = 0;
 
     /**
      * @brief The function called every render frame.

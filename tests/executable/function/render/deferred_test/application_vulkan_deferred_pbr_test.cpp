@@ -453,7 +453,10 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     if (ImGui::Button("Save bloom image (B)")) {
         bloom_acquire_button_pressed.store(true, std::memory_order_relaxed);
     }
-    ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    // The measured frame rate reflects the fixed delta rather than the real frame cost.
+    if (!get_delta_settings().is_fixed) {
+        ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0F / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    }
     ImGui::End();
 }
 

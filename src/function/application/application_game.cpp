@@ -34,6 +34,8 @@
 #include <chrono>
 #include <cstddef>
 #include <format>
+#include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -118,7 +120,16 @@ void ApplicationGame::run_render() {
         window->tick_render();
         renderer->tick(render_delta.load(std::memory_order_relaxed));
         end_time = global_clock->get_duration();
-        render_delta.store(end_time - start_time, std::memory_order_release);
+        const double frame_duration = end_time - start_time;
+        const DeltaSettings local_delta_settings = get_delta_settings();
+        if (local_delta_settings.is_fixed) {
+            if (local_delta_settings.sleep_to_delta && frame_duration < local_delta_settings.fixed_delta) {
+                std::this_thread::sleep_for(std::chrono::duration<double>(local_delta_settings.fixed_delta - frame_duration));
+            }
+            render_delta.store(local_delta_settings.fixed_delta, std::memory_order_release);
+        } else {
+            render_delta.store(frame_duration, std::memory_order_release);
+        }
         local_should_close = should_close.load(std::memory_order_acquire);
     }
 }
@@ -126,23 +137,49 @@ void ApplicationGame::run_render() {
 void ApplicationGame::run_logic() {
     bool local_should_close = false;
     using LogicClock = std::chrono::steady_clock;
-    const auto logic_frame_interval = std::chrono::duration<double>(LOGIC_FRAME_INTERVAL_SEC);
     while (!local_should_close) {
         LogicClock::time_point frame_start = LogicClock::now();
         local_should_close = window->should_close();
         should_close.store(local_should_close, std::memory_order_release);
         window->tick_logic();
         logic_update(logic_delta.load(std::memory_order_relaxed));
+        const DeltaSettings local_delta_settings = get_delta_settings();
+        const auto logic_frame_interval = std::chrono::duration<double>(
+            local_delta_settings.is_fixed ? local_delta_settings.fixed_delta : LOGIC_FRAME_INTERVAL_SEC);
         LogicClock::time_point frame_end = LogicClock::now();
         auto frame_duration = frame_end - frame_start;
-        if (frame_duration < logic_frame_interval) {
-            std::this_thread::sleep_until(frame_start + logic_frame_interval);
+        const bool should_sleep = !local_delta_settings.is_fixed || local_delta_settings.sleep_to_delta;
+        if (should_sleep && frame_duration < logic_frame_interval) {
+            std::this_thread::sleep_until(
+                frame_start + std::chrono::duration_cast<LogicClock::duration>(logic_frame_interval));
             frame_end = LogicClock::now();
             frame_duration = frame_end - frame_start;
         }
-        logic_delta.store(std::chrono::duration<double>(frame_duration).count(), std::memory_order_release);
+        if (local_delta_settings.is_fixed) {
+            logic_delta.store(local_delta_settings.fixed_delta, std::memory_order_release);
+        } else {
+            logic_delta.store(std::chrono::duration<double>(frame_duration).count(), std::memory_order_release);
+        }
     }
     worker->wait();
+}
+
+void ApplicationGame::set_delta_settings(const DeltaSettings& p_delta_settings) {
+    if (p_delta_settings.is_fixed && !(p_delta_settings.fixed_delta > 0.0)) {
+        throw std::runtime_error(std::format("Fixed delta must be positive, got {}.", p_delta_settings.fixed_delta));
+    }
+    std::lock_guard lock(delta_settings_mutex);
+    delta_settings = p_delta_settings;
+    if (p_delta_settings.is_fixed) {
+        // The next frames must not observe a measured delta once the delta is fixed.
+        render_delta.store(p_delta_settings.fixed_delta, std::memory_order_release);
+        logic_delta.store(p_delta_settings.fixed_delta, std::memory_order_release);
+    }
+}
+
+ApplicationGame::DeltaSettings ApplicationGame::get_delta_settings() const {
+    std::lock_guard lock(delta_settings_mutex);
+    return delta_settings;
 }
 
 WindowProperties ApplicationGame::get_window_properties_from_game_config_options(const GameConfigOptions& p_game_config_options) {
