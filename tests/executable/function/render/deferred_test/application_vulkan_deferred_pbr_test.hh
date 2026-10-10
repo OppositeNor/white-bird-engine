@@ -64,7 +64,10 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
+#include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -134,6 +137,7 @@ private:
     static constexpr std::string_view FRAME_SEQUENCE_IMAGE_VIEW = "frame_sequence";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
+    // Task-local id of the shadow passes' light camera; each light's passes alias it to that light's buffer.
     static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
     static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_infos";
     static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
@@ -170,6 +174,36 @@ private:
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 
+    // Number of spot lights in the scene; T switches which one the light controls move.
+    static constexpr uint32_t SPOT_LIGHT_COUNT = 2;
+    static_assert(SPOT_LIGHT_COUNT >= 1U && SPOT_LIGHT_COUNT <= MAX_SPOT_LIGHT_INFO_COUNT);
+
+    // Graph resource and task ids owned by one spot light. Every id is the shared base name suffixed with the light index.
+    struct SpotLightGraphIds {
+        std::string shadowmap_depth_image;
+        std::string shadowmap_color_image;
+        std::string rsm_normal_image;
+        std::string shadow_moments_image;
+        std::string shadow_moments_summed_area_table_horizontal_image;
+        std::string shadow_moments_summed_area_table_image;
+        std::string shadowmap_depth;
+        std::string shadowmap_color;
+        std::string rsm_normal;
+        std::string shadow_moments;
+        std::string shadow_moments_sampled;
+        std::string shadow_moments_summed_area_table_horizontal;
+        std::string shadow_moments_summed_area_table;
+        std::string shadow_light_info;
+        std::string light_billboard_info;
+        std::string run_shadow_opaque;
+        std::string run_shadow_double_sided;
+        std::string run_dynamic_shadow;
+        std::string run_dynamic_shadow_second;
+        std::string generate_shadow_mipmaps;
+        std::string build_shadow_moments_summed_area_table;
+        std::string run_light_billboard;
+    };
+
     struct CompositionCameraInfo {
         glm::mat4 inverse_view_projection;
         glm::vec4 camera_world_position;
@@ -191,23 +225,33 @@ private:
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
-    RendTaskDescVK create_shadow_task(bool p_load_existing, bool p_double_sided = false) const;
+    static SpotLightGraphIds make_spot_light_graph_ids(uint32_t p_light_index);
+    RendTaskDescVK create_shadow_task(uint32_t p_light_index, bool p_load_existing, bool p_double_sided = false) const;
+    // Map every slot of a lighting shader's lights[] array to a light's shadow resources. Each pair maps the indexed
+    // task-local base id `<first>[<slot>]` to the light's graph resource `<second>_<light>`; slots past SPOT_LIGHT_COUNT
+    // reuse light zero so that every reflected descriptor binds.
+    static void alias_spot_light_resources(
+        RendTaskDescVK& p_task_desc, std::span<const std::pair<std::string_view, std::string_view>> p_resource_ids);
+    // Advance the spot light the light controls move, as the T key does.
+    void select_next_controlled_spot_light();
     RendTaskDescVK create_gbuffer_task(bool p_load_existing, bool p_double_sided = false) const;
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(
-        std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task);
+    void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_gbuffer_opaque_task);
+    void add_spot_light_shadow_tasks(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const;
+    void connect_spot_light_shadow_tasks(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const;
     void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     void add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const;
     void add_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
+    void add_spot_light_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index) const;
     static void add_gbuffer_graph_resources(RendGraphDescVK& p_pipeline_desc);
     void add_lighting_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
     void connect_deferred_render_tasks(
         RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const;
-    RendTaskDescVK create_shadow_mipmap_task_desc() const;
-    RendTaskDescVK create_shadow_moments_summed_area_table_task_desc() const;
+    RendTaskDescVK create_shadow_mipmap_task_desc(uint32_t p_light_index) const;
+    RendTaskDescVK create_shadow_moments_summed_area_table_task_desc(uint32_t p_light_index) const;
     RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;
     RendTaskDescVK create_indirect_lighting_task_desc() const;
     RendTaskDescVK create_combine_lighting_task_desc() const;
@@ -217,7 +261,7 @@ private:
     RendTaskDescVK create_present_result_image_task_desc() const;
     RendTaskDescVK create_present_frame_sequence_task_desc(bool p_use_summed_area_table);
     RendTaskDescVK create_frame_sequence_acquire_task_desc(bool p_use_summed_area_table);
-    RendTaskDescVK create_light_billboard_task_desc() const;
+    RendTaskDescVK create_light_billboard_task_desc(uint32_t p_light_index) const;
     RendTaskDescVK create_imgui_task_desc();
     CompositionCameraInfo make_composition_camera_info() const;
     // Write a completed bloom acquisition. Runs on a worker thread.
@@ -283,12 +327,16 @@ private:
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
     Ref<ROCMultislotsVK> spot_light_info_buffers;
-    Ref<ROBufferVK> light_billboard_ubo;
+    // One light camera per spot light, read by that light's shadow passes as shadow_light_info.
+    std::array<Ref<ROCMultislotsVK>, SPOT_LIGHT_COUNT> shadow_light_info_buffers;
+    std::array<Ref<ROBufferVK>, SPOT_LIGHT_COUNT> light_billboard_ubos;
     Ref<ROImageViewVK> light_billboard_texture_view;
 
-    ComponentSpotLight spot_light_component{};
-    float spot_light_yaw = 0.0F;
-    float spot_light_pitch = 0.0F;
+    std::array<ComponentSpotLight, SPOT_LIGHT_COUNT> spot_light_components{};
+    std::array<float, SPOT_LIGHT_COUNT> spot_light_yaws{};
+    std::array<float, SPOT_LIGHT_COUNT> spot_light_pitches{};
+    // Index of the spot light moved by the light controls. Written by the input thread and the configuration window.
+    std::atomic<uint32_t> controlled_spot_light = 0;
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
@@ -313,6 +361,7 @@ private:
     bool frame_sequence_recording = false;
     bool frame_sequence_requested = false;
     bool render_graph_switch_key_was_down = false;
+    bool spot_light_switch_key_was_down = false;
     bool voxel_debug_view_key_was_down = false;
     bool frame_capture_key_was_down = false;
     bool post_processing_key_was_down = false;

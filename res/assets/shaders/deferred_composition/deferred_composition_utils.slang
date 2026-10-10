@@ -19,14 +19,6 @@
 #define WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS 0
 #endif
 
-#ifndef WBE_SHADOWMAP_RESOURCE_ID
-#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-#define WBE_SHADOWMAP_RESOURCE_ID "shadow_moments"
-#else
-#define WBE_SHADOWMAP_RESOURCE_ID "shadow_moments_sampled"
-#endif
-#endif
-
 #include "light/light_utils.slang"
 #include "utils.slang"
 
@@ -45,15 +37,19 @@ struct CompositionCamera {
 };
 
 struct LightParamDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image", WBE_SHADOWMAP_RESOURCE_ID)]
+#if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
+    [WBE_DESCRIPTOR("sampled_image", "shadow_moments[]")]
+#else
+    [WBE_DESCRIPTOR("sampled_image", "shadow_moments_sampled[]")]
+#endif
     uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [WBE_DESCRIPTOR("sampled_image", "shadow_sat")]
+    [WBE_DESCRIPTOR("sampled_image", "shadow_sat[]")]
     uint2 shadow_moments_summed_area_table;
 #endif
-    [WBE_DESCRIPTOR("sampled_image", "shadowmap_color")]
+    [WBE_DESCRIPTOR("sampled_image", "shadowmap_color[]")]
     uint2 rsm_flux;
-    [WBE_DESCRIPTOR("sampled_image", "rsm_normal")]
+    [WBE_DESCRIPTOR("sampled_image", "rsm_normal[]")]
     uint2 rsm_octa_normal;
     [WBE_DESCRIPTOR("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;

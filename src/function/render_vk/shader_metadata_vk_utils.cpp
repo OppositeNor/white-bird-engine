@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -179,9 +180,30 @@ void append_default_push_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDef
     p_layout.default_fields.push_back(std::move(p_field));
 }
 
+// A resource id ending in "[]" is resolved per element of the nearest enclosing descriptor struct array.
+constexpr std::string_view INDEXED_RESOURCE_ID_SUFFIX = "[]";
+
+std::string resolve_descriptor_resource_id(
+    std::string_view p_resource_id, std::optional<uint32_t> p_array_index, std::string_view p_field_path) {
+    if (!p_resource_id.ends_with(INDEXED_RESOURCE_ID_SUFFIX)) {
+        return std::string(p_resource_id);
+    }
+    if (p_resource_id.size() == INDEXED_RESOURCE_ID_SUFFIX.size()) {
+        throw std::runtime_error(
+            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has an indexed resource id without a name.", p_field_path));
+    }
+    if (!p_array_index.has_value()) {
+        throw std::runtime_error(std::format(
+            "Failed to resolve WBE_DESCRIPTOR: field '{}' has an indexed resource id outside a descriptor struct array.", p_field_path));
+    }
+    p_resource_id.remove_suffix(INDEXED_RESOURCE_ID_SUFFIX.size());
+    return std::format("{}[{}]", p_resource_id, *p_array_index);
+}
+
 uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeField>& p_fields,
     std::string_view p_parent_path,
     uint32_t p_parent_offset,
+    std::optional<uint32_t> p_array_index,
     ShaderDescriptorHeapLayoutVK& p_layout) {
     uint64_t extent = p_parent_offset;
     for (const ShaderMetadataTypeField& field : p_fields) {
@@ -226,7 +248,7 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                 ShaderDescriptorHeapFieldVK{
                     .field_path = field_path,
                     .type = type,
-                    .resource_id = arguments[1].string_value,
+                    .resource_id = resolve_descriptor_resource_id(arguments[1].string_value, p_array_index, field_path),
                     .offset = static_cast<uint32_t>(field_offset),
                     .access = descriptor_access(type, *descriptor_attribute, field_path),
                 });
@@ -264,12 +286,15 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                         "Failed to resolve WBE_DESCRIPTOR: descriptor struct array '{}' exceeds push data.", field_path));
                 }
                 extent = std::max<uint64_t>(extent,
-                    collect_descriptor_heap_fields(
-                        field.fields, std::format("{}[{}]", field_path, i), static_cast<uint32_t>(element_offset), p_layout));
+                    collect_descriptor_heap_fields(field.fields,
+                        std::format("{}[{}]", field_path, i),
+                        static_cast<uint32_t>(element_offset),
+                        static_cast<uint32_t>(i),
+                        p_layout));
             }
         } else {
             extent = std::max<uint64_t>(extent,
-                collect_descriptor_heap_fields(field.fields, field_path, static_cast<uint32_t>(field_offset), p_layout));
+                collect_descriptor_heap_fields(field.fields, field_path, static_cast<uint32_t>(field_offset), p_array_index, p_layout));
         }
     }
     return static_cast<uint32_t>(extent);
@@ -392,7 +417,7 @@ ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
             std::format("Shader push-data parameter '{}': expected constantBuffer type metadata.", push_data->name));
     }
     result.stage_flags = shader_stage_flag_from_metadata_stage(entry_point.stage);
-    result.size = collect_descriptor_heap_fields(push_data->type.fields, {}, 0, result);
+    result.size = collect_descriptor_heap_fields(push_data->type.fields, {}, 0, std::nullopt, result);
     return result;
 }
 

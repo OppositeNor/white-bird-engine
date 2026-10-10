@@ -65,7 +65,9 @@
 #include <filesystem>
 #include <format>
 #include <stdexcept>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -89,11 +91,21 @@ BillboardInfoGPU make_light_billboard_info(const ComponentSpotLight& p_spot_ligh
     };
 }
 
-SpotLightInfosGPU make_spot_light_infos_gpu(const ComponentSpotLight& p_spot_light_component) {
+SpotLightInfosGPU make_spot_light_infos_gpu(std::span<const ComponentSpotLight> p_spot_light_components) {
     SpotLightInfosGPU result;
-    result.spot_light_info[0] = make_spot_light_info_gpu(p_spot_light_component);
-    result.spot_light_count = 1;
+    for (size_t i = 0; i < p_spot_light_components.size(); ++i) {
+        result.spot_light_info[i] = make_spot_light_info_gpu(p_spot_light_components[i]);
+    }
+    result.spot_light_count = static_cast<uint32_t>(p_spot_light_components.size());
     return result;
+}
+
+// Point a spot light's shadow camera along its direction from its position.
+void update_spot_light_view(ComponentSpotLight& p_spot_light_component) {
+    glm::vec3 light_up =
+        std::abs(p_spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
+    p_spot_light_component.view =
+        glm::lookAt(p_spot_light_component.position, p_spot_light_component.position + p_spot_light_component.direction, light_up);
 }
 
 Ref<ROCMultislotsVK> create_per_frame_buffers(
@@ -136,6 +148,12 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         summed_area_table_requested.store(requested, std::memory_order_relaxed);
     }
     render_graph_switch_key_was_down = render_graph_switch_key_down;
+
+    bool spot_light_switch_key_down = input_manager->get_input_status(KEYCODE_T).is_down();
+    if (spot_light_switch_key_down && !spot_light_switch_key_was_down) {
+        select_next_controlled_spot_light();
+    }
+    spot_light_switch_key_was_down = spot_light_switch_key_down;
 
     bool voxel_debug_view_key_down = input_manager->get_input_status(KEYCODE_V).is_down();
     if (voxel_debug_view_key_down && !voxel_debug_view_key_was_down) {
@@ -215,6 +233,10 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         camera_position -= up * move_delta;
     }
 
+    const uint32_t spot_light_index = controlled_spot_light.load(std::memory_order_relaxed);
+    ComponentSpotLight& spot_light_component = spot_light_components[spot_light_index];
+    float& spot_light_yaw = spot_light_yaws[spot_light_index];
+    float& spot_light_pitch = spot_light_pitches[spot_light_index];
     bool spot_light_changed = false;
     glm::vec3 spot_light_forward = test_camera_forward(spot_light_yaw, 0.0F);
     glm::vec3 spot_light_right = glm::normalize(glm::cross(spot_light_forward, glm::vec3(0.0F, 1.0F, 0.0F)));
@@ -261,28 +283,39 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
     if (spot_light_changed) {
         spot_light_pitch = std::clamp(spot_light_pitch, -TEST_CAMERA_PITCH_LIMIT, TEST_CAMERA_PITCH_LIMIT);
         spot_light_component.direction = test_camera_forward(spot_light_yaw, spot_light_pitch);
-        glm::vec3 light_up =
-            std::abs(spot_light_component.direction.y) > 0.99F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::vec3(0.0F, 1.0F, 0.0F);
-        spot_light_component.view =
-            glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
+        update_spot_light_view(spot_light_component);
     }
+}
+
+void ApplicationVulkanDeferredPBRTest::select_next_controlled_spot_light() {
+    const uint32_t current = controlled_spot_light.load(std::memory_order_relaxed);
+    controlled_spot_light.store((current + 1) % SPOT_LIGHT_COUNT, std::memory_order_relaxed);
 }
 
 void ApplicationVulkanDeferredPBRTest::update_descriptors() {
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
     CameraInfoGPU gbuffer_camera_info = make_camera_info_gpu(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
-    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
-    BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
-    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_info] {
-        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL ||
-            spot_light_info_buffers == MEM_NULL || light_billboard_ubo == MEM_NULL) {
+    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_components);
+    std::array<BillboardInfoGPU, SPOT_LIGHT_COUNT> light_billboard_infos{};
+    for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
+        light_billboard_infos[i] = make_light_billboard_info(spot_light_components[i]);
+    }
+    add_render_job([this, gbuffer_camera_info, composition_camera_info, spot_light_infos, light_billboard_infos] {
+        if (gbuffer_camera_info_ubos == MEM_NULL || composition_camera_info_ubos == MEM_NULL || spot_light_info_buffers == MEM_NULL) {
             throw std::runtime_error("Failed to update deferred descriptors: per-frame buffers are not initialized.");
         }
         gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
         composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
         spot_light_info_buffers->publish_buffer_update(&spot_light_infos, 0, sizeof(spot_light_infos));
-        light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
+        for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
+            if (shadow_light_info_buffers[i] == MEM_NULL || light_billboard_ubos[i] == MEM_NULL) {
+                throw std::runtime_error("Failed to update deferred descriptors: spot light buffers are not initialized.");
+            }
+            shadow_light_info_buffers[i]->publish_buffer_update(
+                &spot_light_infos.spot_light_info[i], 0, sizeof(spot_light_infos.spot_light_info[i]));
+            light_billboard_ubos[i]->update_buffer(&light_billboard_infos[i], sizeof(light_billboard_infos[i]));
+        }
     });
 }
 
@@ -460,19 +493,13 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
             .metric = PixelSortMetric::SATURATION,
             .scope = PixelSortScope::SPAN,
         });
-    auto mipmap_shadow_opaque_task = create_shadow_task(false);
-    auto summed_area_table_shadow_opaque_task = create_shadow_task(false);
     auto mipmap_gbuffer_opaque_task = create_gbuffer_task(false);
     auto summed_area_table_gbuffer_opaque_task = create_gbuffer_task(false);
     write_dynamic_camera_descriptors();
     write_dynamic_light_descriptors();
     setup_light_billboard_overlay_resources();
-    register_deferred_render_graph(
-        DEFERRED_MIPMAP_RENDER_GRAPH, false, std::move(mipmap_shadow_opaque_task), std::move(mipmap_gbuffer_opaque_task));
-    register_deferred_render_graph(DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH,
-        true,
-        std::move(summed_area_table_shadow_opaque_task),
-        std::move(summed_area_table_gbuffer_opaque_task));
+    register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false, std::move(mipmap_gbuffer_opaque_task));
+    register_deferred_render_graph(DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true, std::move(summed_area_table_gbuffer_opaque_task));
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
 }
 
@@ -506,6 +533,11 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     if (ImGui::Combo(
             "Shadow filtering (R)", &shadow_filtering, SHADOW_FILTERING_NAMES.data(), static_cast<int>(SHADOW_FILTERING_NAMES.size()))) {
         summed_area_table_requested.store(shadow_filtering == 1, std::memory_order_relaxed);
+    }
+    static constexpr std::array<const char*, SPOT_LIGHT_COUNT> SPOT_LIGHT_NAMES{"Light 0 (warm)", "Light 1 (blue)"};
+    int controlled_light = static_cast<int>(controlled_spot_light.load(std::memory_order_relaxed));
+    if (ImGui::Combo("Controlled light (T)", &controlled_light, SPOT_LIGHT_NAMES.data(), static_cast<int>(SPOT_LIGHT_NAMES.size()))) {
+        controlled_spot_light.store(static_cast<uint32_t>(controlled_light), std::memory_order_relaxed);
     }
     // The combo lists the modes in the order the V key cycles through them.
     int voxel_debug_view = 0;
@@ -696,12 +728,26 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
-    spot_light_component = make_default_test_spot_light_component(128.0F);
-    spot_light_yaw = std::atan2(spot_light_component.direction.z, spot_light_component.direction.x);
-    spot_light_pitch = std::asin(std::clamp(spot_light_component.direction.y, -1.0F, 1.0F));
+    spot_light_components[0] = make_default_test_spot_light_component(128.0F);
+    // The second light mirrors the first across the x axis and is tinted blue, so each light's contribution is visible.
+    ComponentSpotLight second_spot_light = make_default_test_spot_light_component(128.0F);
+    second_spot_light.position.x = -second_spot_light.position.x;
+    second_spot_light.direction.x = -second_spot_light.direction.x;
+    second_spot_light.color = glm::vec3(0.55F, 0.7F, 1.0F);
+    update_spot_light_view(second_spot_light);
+    static_assert(SPOT_LIGHT_COUNT == 2, "Every spot light needs an initial configuration.");
+    spot_light_components[1] = second_spot_light;
+    for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
+        const glm::vec3 direction = spot_light_components[i].direction;
+        spot_light_yaws[i] = std::atan2(direction.z, direction.x);
+        spot_light_pitches[i] = std::asin(std::clamp(direction.y, -1.0F, 1.0F));
+        if (spot_light_components[i].shadow_map_resolution != spot_light_components[0].shadow_map_resolution) {
+            throw std::runtime_error("Failed to set up deferred spot lights: every light must use the same shadow-map resolution.");
+        }
+    }
     shadow_extent = VkExtent2D{
-        .width = spot_light_component.shadow_map_resolution,
-        .height = spot_light_component.shadow_map_resolution,
+        .width = spot_light_components[0].shadow_map_resolution,
+        .height = spot_light_components[0].shadow_map_resolution,
     };
     shadow_mipmap_level_count = std::bit_width(std::max(shadow_extent.width, shadow_extent.height));
 }
@@ -718,11 +764,13 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
         throw std::runtime_error("Failed to setup deferred light billboard overlay: texture resource was not found.");
     }
 
-    BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_component);
-    light_billboard_ubo = ROBufferVK::Builder()
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .initial_data(&light_billboard_info, sizeof(light_billboard_info))
-                              .create_ref(base_render_data);
+    for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
+        BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_components[i]);
+        light_billboard_ubos[i] = ROBufferVK::Builder()
+                                      .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                                      .initial_data(&light_billboard_info, sizeof(light_billboard_info))
+                                      .create_ref(base_render_data);
+    }
 
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
@@ -742,7 +790,38 @@ void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
     bloom_extent = base_render_data->swap_chain_extent;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_existing, bool p_double_sided) const {
+ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBRTest::make_spot_light_graph_ids(uint32_t p_light_index) {
+    auto id = [p_light_index](std::string_view p_base) {
+        return std::format("{}_{}", p_base, p_light_index);
+    };
+    return SpotLightGraphIds{
+        .shadowmap_depth_image = id("shadowmap_depth_image"),
+        .shadowmap_color_image = id("shadowmap_color_image"),
+        .rsm_normal_image = id("rsm_normal_image"),
+        .shadow_moments_image = id("shadow_moments_image"),
+        .shadow_moments_summed_area_table_horizontal_image = id("shadow_moments_sat_horizontal_image"),
+        .shadow_moments_summed_area_table_image = id("shadow_moments_sat_image"),
+        .shadowmap_depth = id(SHADOWMAP_DEPTH_IMAGE_VIEW),
+        .shadowmap_color = id(SHADOWMAP_COLOR_IMAGE_VIEW),
+        .rsm_normal = id(RSM_NORMAL_IMAGE_VIEW),
+        .shadow_moments = id(SHADOW_MOMENTS_IMAGE_VIEW),
+        .shadow_moments_sampled = id(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW),
+        .shadow_moments_summed_area_table_horizontal = id(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW),
+        .shadow_moments_summed_area_table = id(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW),
+        .shadow_light_info = id(SHADOW_LIGHT_INFO_BUFFER),
+        .light_billboard_info = id(LIGHT_BILLBOARD_INFO_BUFFER),
+        .run_shadow_opaque = id(RT_RUN_DEFERRED_SHADOW_OPAQUE),
+        .run_shadow_double_sided = id(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED),
+        .run_dynamic_shadow = id(RT_RUN_DYNAMIC_SHADOW),
+        .run_dynamic_shadow_second = id(RT_RUN_DYNAMIC_SHADOW_SECOND),
+        .generate_shadow_mipmaps = id(RT_GENERATE_SHADOW_MIPMAPS),
+        .build_shadow_moments_summed_area_table = id(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE),
+        .run_light_billboard = id(RT_RUN_LIGHT_BILLBOARD),
+    };
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(uint32_t p_light_index, bool p_load_existing, bool p_double_sided) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
     VkClearValue shadow_color_clear{};
     VkClearValue shadow_normal_clear{};
     VkClearValue shadow_moments_clear{};
@@ -750,20 +829,21 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_task(bool p_load_
     shadow_moments_clear.color.float32[1] = 1.0F;
     VkClearValue shadow_depth_clear{.depthStencil = {.depth = 0.0F, .stencil = 0}};
     std::array<VkClearValue, 4> clear_values{shadow_color_clear, shadow_normal_clear, shadow_moments_clear, shadow_depth_clear};
-    std::array<std::string_view, 3> color_attachments{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
+    std::array<std::string_view, 3> color_attachments{ids.shadowmap_color, ids.rsm_normal, ids.shadow_moments};
     RendTaskDescVK descriptor = make_mesh_task_desc(render_allocator,
         base_render_data,
-        p_double_sided ? RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED : RT_RUN_DEFERRED_SHADOW_OPAQUE,
+        p_double_sided ? ids.run_shadow_double_sided : ids.run_shadow_opaque,
         static_mesh_resources,
         p_double_sided ? shadow_double_sided_graphics_pipeline : shadow_opaque_graphics_pipeline,
         false,
         clear_values,
         make_fixed_extent_factory(shadow_extent),
         color_attachments,
-        SHADOWMAP_DEPTH_IMAGE_VIEW,
+        ids.shadowmap_depth,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
         p_load_existing ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR,
         p_double_sided);
+    descriptor.alias(SHADOW_LIGHT_INFO_BUFFER, ids.shadow_light_info);
     return descriptor;
 }
 
@@ -813,6 +893,10 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         base_render_data,
         sizeof(SpotLightInfosGPU),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    for (Ref<ROCMultislotsVK>& shadow_light_info_buffer : shadow_light_info_buffers) {
+        shadow_light_info_buffer =
+            create_per_frame_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    }
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
     direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
@@ -855,10 +939,15 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
-    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
+    SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_components);
 
     spot_light_info_buffers->publish_buffer_update(&spot_light_infos, 0, sizeof(spot_light_infos));
     log_uniform_buffer_descriptors(spot_light_info_buffers, "Spot light buffer");
+    for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
+        shadow_light_info_buffers[i]->publish_buffer_update(
+            &spot_light_infos.spot_light_info[i], 0, sizeof(spot_light_infos.spot_light_info[i]));
+        log_uniform_buffer_descriptors(shadow_light_info_buffers[i], std::format("Spot light {} shadow camera buffer", i));
+    }
 }
 
 } // namespace WhiteBirdEngine

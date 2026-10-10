@@ -54,6 +54,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -152,7 +153,7 @@ RendImageDescVK make_graph_image_desc(RendResPrimaryUsageVK p_usage, VkFormat p_
 } // namespace
 
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
-    std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_shadow_opaque_task, RendTaskDescVK p_gbuffer_opaque_task) {
+    std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_gbuffer_opaque_task) {
     RendGraphDescVK pipeline_desc(render_allocator);
     add_render_graph_resources(pipeline_desc);
     if (mesh_acceleration_structure != MEM_NULL) {
@@ -170,17 +171,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
                 return make_unique<RTTriggeredVK>(render_allocator, std::move(build), true);
             }));
     }
-    pipeline_desc.add_task(std::move(p_shadow_opaque_task));
-    pipeline_desc.add_task(create_shadow_task(true, true));
-    const std::array<std::string_view, 3> shadow_colors{SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW};
-    pipeline_desc.add_task(dynamic_mesh->make_task(
-        RT_RUN_DYNAMIC_SHADOW, 0, shadow_dynamic_graphics_pipeline, make_fixed_extent_factory(shadow_extent), shadow_colors, SHADOWMAP_DEPTH_IMAGE_VIEW));
-    pipeline_desc.add_task(dynamic_mesh->make_task(
-        RT_RUN_DYNAMIC_SHADOW_SECOND, 1, shadow_dynamic_graphics_pipeline, make_fixed_extent_factory(shadow_extent), shadow_colors, SHADOWMAP_DEPTH_IMAGE_VIEW));
-    if (p_use_summed_area_table) {
-        pipeline_desc.add_task(create_shadow_moments_summed_area_table_task_desc());
-    } else {
-        pipeline_desc.add_task(create_shadow_mipmap_task_desc());
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        add_spot_light_shadow_tasks(pipeline_desc, light_index, p_use_summed_area_table);
     }
     pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
     pipeline_desc.add_task(create_gbuffer_task(true, true));
@@ -202,9 +194,11 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
         .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table))
         .add_task(svo->get_debug_draw_render_task_desc())
-        .add_task(svo->get_pre_deferred_debug_draw_render_task_desc())
-        .add_task(create_light_billboard_task_desc())
-        .add_task(create_imgui_task_desc());
+        .add_task(svo->get_pre_deferred_debug_draw_render_task_desc());
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        pipeline_desc.add_task(create_light_billboard_task_desc(light_index));
+    }
+    pipeline_desc.add_task(create_imgui_task_desc());
     connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
     svo->connect_render_tasks(pipeline_desc);
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
@@ -212,36 +206,68 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
 }
 
+void ApplicationVulkanDeferredPBRTest::add_spot_light_shadow_tasks(
+    RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
+    p_pipeline_desc.add_task(create_shadow_task(p_light_index, false));
+    p_pipeline_desc.add_task(create_shadow_task(p_light_index, true, true));
+    const std::array<std::string_view, 3> shadow_colors{ids.shadowmap_color, ids.rsm_normal, ids.shadow_moments};
+    RendTaskDescVK dynamic_shadow = dynamic_mesh->make_task(
+        ids.run_dynamic_shadow, 0, shadow_dynamic_graphics_pipeline, make_fixed_extent_factory(shadow_extent), shadow_colors, ids.shadowmap_depth);
+    dynamic_shadow.alias(SHADOW_LIGHT_INFO_BUFFER, ids.shadow_light_info);
+    p_pipeline_desc.add_task(std::move(dynamic_shadow));
+    RendTaskDescVK dynamic_shadow_second = dynamic_mesh->make_task(
+        ids.run_dynamic_shadow_second, 1, shadow_dynamic_graphics_pipeline, make_fixed_extent_factory(shadow_extent), shadow_colors, ids.shadowmap_depth);
+    dynamic_shadow_second.alias(SHADOW_LIGHT_INFO_BUFFER, ids.shadow_light_info);
+    p_pipeline_desc.add_task(std::move(dynamic_shadow_second));
+    if (p_use_summed_area_table) {
+        p_pipeline_desc.add_task(create_shadow_moments_summed_area_table_task_desc(p_light_index));
+    } else {
+        p_pipeline_desc.add_task(create_shadow_mipmap_task_desc(p_light_index));
+    }
+}
+
+void ApplicationVulkanDeferredPBRTest::connect_spot_light_shadow_tasks(
+    RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const {
+    constexpr std::string_view DIRECT_LIGHTING = RT_RUN_DIRECT_LIGHTING;
+    constexpr std::string_view INDIRECT_LIGHTING = RT_RUN_INDIRECT_LIGHTING;
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
+    const std::array<std::string_view, 4> shadow_passes{
+        ids.run_shadow_opaque, ids.run_shadow_double_sided, ids.run_dynamic_shadow, ids.run_dynamic_shadow_second};
+
+    // Shadow and reflective-shadow-map passes of this light.
+    for (std::string_view shadow_target : {std::string_view(ids.shadowmap_color),
+             std::string_view(ids.rsm_normal),
+             std::string_view(ids.shadow_moments),
+             std::string_view(ids.shadowmap_depth)}) {
+        connect_resource_chain(p_pipeline_desc, shadow_target, shadow_passes);
+    }
+    for (std::string_view shadow_color : {std::string_view(ids.shadowmap_color), std::string_view(ids.rsm_normal)}) {
+        connect_resource_chain(p_pipeline_desc, shadow_color, {ids.run_dynamic_shadow_second, DIRECT_LIGHTING});
+        connect_resource_chain(p_pipeline_desc, shadow_color, {ids.run_dynamic_shadow_second, INDIRECT_LIGHTING});
+    }
+    if (p_use_summed_area_table) {
+        connect_resource_chain(
+            p_pipeline_desc, ids.shadow_moments, {ids.run_dynamic_shadow_second, ids.build_shadow_moments_summed_area_table});
+        connect_resource_chain(p_pipeline_desc, ids.shadow_moments, {ids.run_dynamic_shadow_second, DIRECT_LIGHTING});
+        connect_resource_chain(p_pipeline_desc, ids.shadow_moments, {ids.run_dynamic_shadow_second, INDIRECT_LIGHTING});
+        connect_resource_chain(
+            p_pipeline_desc, ids.shadow_moments_summed_area_table, {ids.build_shadow_moments_summed_area_table, DIRECT_LIGHTING});
+    } else {
+        connect_resource_chain(
+            p_pipeline_desc, ids.shadow_moments, {ids.run_dynamic_shadow_second, ids.generate_shadow_mipmaps, INDIRECT_LIGHTING});
+        // Direct lighting samples the complete mip chain through a second view of the moments image.
+        connect_resource_chain(p_pipeline_desc, ids.shadow_moments_sampled, {ids.generate_shadow_mipmaps, DIRECT_LIGHTING});
+    }
+}
+
 void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const { // NOLINT
     constexpr std::string_view DIRECT_LIGHTING = RT_RUN_DIRECT_LIGHTING;
     constexpr std::string_view INDIRECT_LIGHTING = RT_RUN_INDIRECT_LIGHTING;
 
-    // Shadow and reflective-shadow-map passes.
-    for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW}) {
-        connect_resource_chain(p_pipeline_desc,
-            shadow_color,
-            {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW, RT_RUN_DYNAMIC_SHADOW_SECOND});
-    }
-    connect_resource_chain(p_pipeline_desc,
-        SHADOWMAP_DEPTH_IMAGE_VIEW,
-        {RT_RUN_DEFERRED_SHADOW_OPAQUE, RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED, RT_RUN_DYNAMIC_SHADOW, RT_RUN_DYNAMIC_SHADOW_SECOND});
-    for (std::string_view shadow_color : {SHADOWMAP_COLOR_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW}) {
-        connect_resource_chain(p_pipeline_desc, shadow_color, {RT_RUN_DYNAMIC_SHADOW_SECOND, DIRECT_LIGHTING});
-        connect_resource_chain(p_pipeline_desc, shadow_color, {RT_RUN_DYNAMIC_SHADOW_SECOND, INDIRECT_LIGHTING});
-    }
-    if (p_use_summed_area_table) {
-        connect_resource_chain(
-            p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW_SECOND, RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE});
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW_SECOND, DIRECT_LIGHTING});
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW_SECOND, INDIRECT_LIGHTING});
-        connect_resource_chain(
-            p_pipeline_desc, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, {RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE, DIRECT_LIGHTING});
-    } else {
-        connect_resource_chain(
-            p_pipeline_desc, SHADOW_MOMENTS_IMAGE_VIEW, {RT_RUN_DYNAMIC_SHADOW_SECOND, RT_GENERATE_SHADOW_MIPMAPS, INDIRECT_LIGHTING});
-        // Direct lighting samples the complete mip chain through a second view of the moments image.
-        connect_resource_chain(p_pipeline_desc, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, {RT_GENERATE_SHADOW_MIPMAPS, DIRECT_LIGHTING});
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        connect_spot_light_shadow_tasks(p_pipeline_desc, light_index, p_use_summed_area_table);
     }
 
     // G-buffer passes.
@@ -259,9 +285,14 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     // Overlays depth-test against the G-buffer depth after lighting has sampled it.
     constexpr std::string_view SVO_DEBUG_DEPTH = ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW;
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, SVO_DEBUG_DEPTH});
-    connect_resource_chain(p_pipeline_desc,
-        GBUFFER_DEPTH_IMAGE_VIEW,
-        {INDIRECT_LIGHTING, SVO_DEBUG_DEPTH, ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW, RT_RUN_LIGHT_BILLBOARD});
+    // Overlays that draw into the swap chain after the lighting passes, in drawing order.
+    std::vector<std::string> overlay_task_ids;
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        overlay_task_ids.push_back(make_spot_light_graph_ids(light_index).run_light_billboard);
+    }
+    std::vector<std::string_view> depth_overlay_chain{INDIRECT_LIGHTING, SVO_DEBUG_DEPTH, ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW};
+    depth_overlay_chain.insert(depth_overlay_chain.end(), overlay_task_ids.begin(), overlay_task_ids.end());
+    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, depth_overlay_chain);
 
     // Lighting composition and post-processing.
     connect_resource_chain(p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_DIRECT_LIGHTING, RT_COMBINE_LIGHTING});
@@ -276,15 +307,14 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {p_post_processing_last_task_id, RT_RUN_PRESENT_FRAME_SEQUENCE});
     connect_resource_chain(p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_BLUR_BLOOM, RT_RUN_PRESENT_FRAME_SEQUENCE});
     connect_resource_chain(p_pipeline_desc, FRAME_SEQUENCE_IMAGE_VIEW, {RT_RUN_PRESENT_FRAME_SEQUENCE, RT_ACQUIRE_FRAME_SEQUENCE});
-    connect_resource_chain(p_pipeline_desc,
-        REND_RES_SWAP_CHAIN,
-        {
-            RT_RUN_PRESENT_RESULT_IMAGE,
-            ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW,
-            ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW,
-            RT_RUN_LIGHT_BILLBOARD,
-            RT_DRAW_IMGUI,
-        });
+    std::vector<std::string_view> swap_chain_chain{
+        RT_RUN_PRESENT_RESULT_IMAGE,
+        ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW,
+        ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW,
+    };
+    swap_chain_chain.insert(swap_chain_chain.end(), overlay_task_ids.begin(), overlay_task_ids.end());
+    swap_chain_chain.push_back(RT_DRAW_IMGUI);
+    connect_resource_chain(p_pipeline_desc, REND_RES_SWAP_CHAIN, swap_chain_chain);
 }
 
 void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
@@ -296,10 +326,13 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
     p_pipeline_desc.add_resource(REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
         .add_resource(GBUFFER_CAMERA_INFO_BUFFER, *gbuffer_camera_info_ubos)
         .add_resource(COMPOSITION_CAMERA_INFO_BUFFER, *composition_camera_info_ubos)
-        .add_resource(SHADOW_LIGHT_INFO_BUFFER, *spot_light_info_buffers)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_buffers)
-        .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, *light_billboard_ubo)
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view);
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        const SpotLightGraphIds ids = make_spot_light_graph_ids(light_index);
+        p_pipeline_desc.add_resource(ids.shadow_light_info, *shadow_light_info_buffers[light_index])
+            .add_resource(ids.light_billboard_info, *light_billboard_ubos[light_index]);
+    }
     add_graph_owned_resources(p_pipeline_desc);
     svo->register_render_graph_data(p_pipeline_desc);
 }
@@ -311,63 +344,65 @@ void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK
 }
 
 void ApplicationVulkanDeferredPBRTest::add_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc) const {
-    constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
-    constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
-    constexpr std::string_view RSM_NORMAL_IMAGE = "rsm_normal_image";
-    constexpr std::string_view SHADOW_MOMENTS_IMAGE = "shadow_moments_image";
-    constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE = "shadow_moments_sat_horizontal_image";
-    constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE = "shadow_moments_sat_image";
+    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+        add_spot_light_shadow_graph_resources(p_pipeline_desc, light_index);
+    }
+    // Every light shares one shadow sampler.
+    p_pipeline_desc.add_sampler(SHADOW_SAMPLER, [mip_level_count = shadow_mipmap_level_count](const RendGraphContextVK& /*p_context*/) {
+        return RendSamplerDescVK{
+            .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .min_lod = 0.0F,
+            .max_lod = static_cast<float>(mip_level_count - 1),
+        };
+    });
+}
+
+void ApplicationVulkanDeferredPBRTest::add_spot_light_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
     RendImageDescVK shadow_moments =
         make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, SHADOW_MOMENTS_FORMAT, shadow_extent);
     shadow_moments.additional_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     shadow_moments.mip_levels = shadow_mipmap_level_count;
 
-    // Shadow and reflective-shadow-map targets.
+    // Shadow and reflective-shadow-map targets of this light.
     p_pipeline_desc
-        .add_image(SHADOWMAP_DEPTH_IMAGE,
+        .add_image(ids.shadowmap_depth_image,
             [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
                 return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET, SHADOWMAP_DEPTH_FORMAT, extent);
             })
-        .add_image(SHADOWMAP_COLOR_IMAGE,
+        .add_image(ids.shadowmap_color_image,
             [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
                 return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_FLUX_FORMAT, extent);
             })
-        .add_image(RSM_NORMAL_IMAGE,
+        .add_image(ids.rsm_normal_image,
             [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
                 return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_RENDER_TARGET, RSM_NORMAL_FORMAT, extent);
             })
-        .add_image(SHADOW_MOMENTS_IMAGE,
+        .add_image(ids.shadow_moments_image,
             [shadow_moments](const RendGraphContextVK& /*p_context*/) {
                 return shadow_moments;
             })
-        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE,
+        .add_image(ids.shadow_moments_summed_area_table_horizontal_image,
             [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
                 return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
             })
-        .add_image(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE,
+        .add_image(ids.shadow_moments_summed_area_table_image,
             [extent = shadow_extent](const RendGraphContextVK& /*p_context*/) {
                 return make_graph_image_desc(RendResPrimaryUsageVK::IMAGE_READ_WRITE, SHADOW_MOMENTS_FORMAT, extent);
             })
-        .add_image_view(SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
-        .add_image_view(SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
-        .add_image_view(RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE)
-        .add_image_view(SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE)
-        .add_image_view(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW,
-            SHADOW_MOMENTS_IMAGE,
+        .add_image_view(ids.shadowmap_depth, ids.shadowmap_depth_image)
+        .add_image_view(ids.shadowmap_color, ids.shadowmap_color_image)
+        .add_image_view(ids.rsm_normal, ids.rsm_normal_image)
+        .add_image_view(ids.shadow_moments, ids.shadow_moments_image)
+        .add_image_view(ids.shadow_moments_sampled,
+            ids.shadow_moments_image,
             [=](const RendGraphContextVK& /*p_context*/) {
                 return RendImageViewDescVK{.mip_level_count = VK_REMAINING_MIP_LEVELS};
             })
-        .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE)
-        .add_image_view(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE)
-        .add_sampler(SHADOW_SAMPLER, [mip_level_count = shadow_mipmap_level_count](const RendGraphContextVK& /*p_context*/) {
-            return RendSamplerDescVK{
-                .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                .min_lod = 0.0F,
-                .max_lod = static_cast<float>(mip_level_count - 1),
-            };
-        });
+        .add_image_view(ids.shadow_moments_summed_area_table_horizontal, ids.shadow_moments_summed_area_table_horizontal_image)
+        .add_image_view(ids.shadow_moments_summed_area_table, ids.shadow_moments_summed_area_table_image);
 }
 
 void ApplicationVulkanDeferredPBRTest::add_gbuffer_graph_resources(RendGraphDescVK& p_pipeline_desc) {
@@ -475,9 +510,13 @@ void ApplicationVulkanDeferredPBRTest::add_lighting_graph_resources(RendGraphDes
         });
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc() const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_area_table_task_desc(uint32_t p_light_index) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE;
+    task_desc.task_id = ids.build_shadow_moments_summed_area_table;
+    task_desc.alias(SHADOW_MOMENTS_IMAGE_VIEW, ids.shadow_moments)
+        .alias(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW, ids.shadow_moments_summed_area_table_horizontal)
+        .alias(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, ids.shadow_moments_summed_area_table);
     VkExtent3D horizontal_dispatch_group_count{
         .width = (shadow_extent.height + 63U) / 64U,
         .height = 1,
@@ -497,12 +536,13 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_moments_summed_ar
     return task_desc;
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc() const {
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_shadow_mipmap_task_desc(uint32_t p_light_index) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_GENERATE_SHADOW_MIPMAPS;
-    task_desc.factory = [this](const RendGraphContextVK& /*p_context*/) {
+    task_desc.task_id = ids.generate_shadow_mipmaps;
+    task_desc.factory = [this, ids](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTGenerateMipmapsVK>(
-            render_allocator, base_render_data, SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, shadow_extent, shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
+            render_allocator, base_render_data, ids.shadow_moments, ids.shadow_moments_sampled, shadow_extent, shadow_mipmap_level_count, SHADOW_MOMENTS_FORMAT);
     };
     return task_desc;
 }
@@ -512,6 +552,22 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
     task_desc.task_id = RT_RUN_DIRECT_LIGHTING;
     Ref<ROComputePipelineVK> pipeline =
         p_use_summed_area_table ? direct_lighting_summed_area_table_compute_pipeline : direct_lighting_compute_pipeline;
+    if (p_use_summed_area_table) {
+        constexpr std::array<std::pair<std::string_view, std::string_view>, 4> LIGHT_RESOURCES{{
+            {SHADOW_MOMENTS_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW},
+            {SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW, SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW},
+            {SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE_VIEW},
+            {RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW},
+        }};
+        alias_spot_light_resources(task_desc, LIGHT_RESOURCES);
+    } else {
+        constexpr std::array<std::pair<std::string_view, std::string_view>, 3> LIGHT_RESOURCES{{
+            {SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW},
+            {SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE_VIEW},
+            {RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW},
+        }};
+        alias_spot_light_resources(task_desc, LIGHT_RESOURCES);
+    }
     task_desc.factory = [this, pipeline](const RendGraphContextVK& p_context) {
         return make_unique<RTRunComputePipelineVK>(
             render_allocator, base_render_data, pipeline, make_screen_tile_group_count(p_context), QueueFamilyVK::COMPUTE_1);
@@ -522,6 +578,14 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_direct_lighting_task_des
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_indirect_lighting_task_desc() const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_RUN_INDIRECT_LIGHTING;
+    // Indirect lighting only loads mip level zero of the moments, so its mip-chain slot binds the base moments view, which
+    // the summed-area-table graph orders without a mip generation pass.
+    constexpr std::array<std::pair<std::string_view, std::string_view>, 3> LIGHT_RESOURCES{{
+        {SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW, SHADOW_MOMENTS_IMAGE_VIEW},
+        {SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE_VIEW},
+        {RSM_NORMAL_IMAGE_VIEW, RSM_NORMAL_IMAGE_VIEW},
+    }};
+    alias_spot_light_resources(task_desc, LIGHT_RESOURCES);
     task_desc.factory = [this](const RendGraphContextVK& p_context) {
         const VkExtent3D dispatch_group_count = make_screen_tile_group_count(p_context);
         Unique<IRenderTaskVK> task = make_unique<RTRunComputePipelineVK>(
@@ -665,9 +729,21 @@ void ApplicationVulkanDeferredPBRTest::write_completed_bloom_acquire(const RTCPU
     stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Stored deferred bloom acquisition in {}.", output_path.generic_string()));
 }
 
-RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc() const {
+void ApplicationVulkanDeferredPBRTest::alias_spot_light_resources(
+    RendTaskDescVK& p_task_desc, std::span<const std::pair<std::string_view, std::string_view>> p_resource_ids) {
+    for (uint32_t slot = 0; slot < MAX_SPOT_LIGHT_INFO_COUNT; ++slot) {
+        const uint32_t light_index = slot < SPOT_LIGHT_COUNT ? slot : 0U;
+        for (const auto& [task_resource_id, graph_resource_id] : p_resource_ids) {
+            p_task_desc.alias(std::format("{}[{}]", task_resource_id, slot), std::format("{}_{}", graph_resource_id, light_index));
+        }
+    }
+}
+
+RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_light_billboard_task_desc(uint32_t p_light_index) const {
+    const SpotLightGraphIds ids = make_spot_light_graph_ids(p_light_index);
     RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
+    task_desc.task_id = ids.run_light_billboard;
+    task_desc.alias(LIGHT_BILLBOARD_INFO_BUFFER, ids.light_billboard_info);
     const std::array<std::string_view, 1> color_targets{REND_RES_SWAP_CHAIN};
     alias_render_targets(task_desc, color_targets, GBUFFER_DEPTH_IMAGE_VIEW);
     task_desc.factory = [this](const RendGraphContextVK& p_context) {

@@ -131,6 +131,9 @@ VertexInputDescriptionVK build_vertex_input_description_vk(
  * A descriptor-free entry point produces an empty layout. Otherwise it may use exactly one pushConstantBuffer parameter.
  * WBE_DESCRIPTOR fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments, and an
  * optional access argument: `read`, `write`, or `read_write`. Only storage buffers and storage images may be written.
+ * A resource id ending in `[]` is per element: inside element `i` of the nearest enclosing descriptor struct array,
+ * `shadowmap[]` resolves to `shadowmap[i]`, so each element can be aliased to its own graph resource. Other resource ids
+ * are shared by every element. An indexed resource id outside a descriptor struct array, or one without a name, is rejected.
  * WBE_DEFAULT_PUSH fields must be four-byte scalars with a supported renderer value identifier.
  *
  * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.

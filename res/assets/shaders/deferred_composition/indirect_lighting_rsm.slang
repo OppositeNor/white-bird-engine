@@ -12,7 +12,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#define WBE_SHADOWMAP_RESOURCE_ID "shadow_moments"
 #include "deferred_composition/deferred_composition_utils.slang"
 
 struct IndirectLightingDescriptorIndices {

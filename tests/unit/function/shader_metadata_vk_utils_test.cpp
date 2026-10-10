@@ -303,6 +303,62 @@ TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPath
     EXPECT_EQ(layout.fields[3].offset, 32U);
 }
 
+TEST(WBEShaderMetadataVKUtilsTest, ResolvesIndexedResourceIdsPerDescriptorStructArrayElement) {
+    ShaderMetadataTypeField shadow;
+    shadow.name = "shadow";
+    shadow.type.kind = "struct";
+    shadow.binding.kind = "uniform";
+    shadow.binding.offset = 8;
+    shadow.binding.size = 8;
+    shadow.fields.push_back(make_descriptor_heap_field("moments", "sampled_image", 0, "shadow_moments[]"));
+    ShaderMetadataTypeField lights;
+    lights.name = "lights";
+    lights.type.kind = "array";
+    lights.type.element_count = 2;
+    lights.binding.kind = "uniform";
+    lights.binding.offset = 0;
+    lights.binding.size = 48;
+    lights.binding.element_stride = 24;
+    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]"));
+    lights.fields.push_back(shadow);
+    lights.fields.push_back(make_descriptor_heap_field("sampler", "sampler", 16, "shadow_sampler"));
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&lights, 1));
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    ASSERT_EQ(layout.fields.size(), 6U);
+    EXPECT_EQ(layout.fields[0].resource_id, "shadowmap[0]");
+    // Nested non-array structs use the index of the enclosing array element.
+    EXPECT_EQ(layout.fields[1].field_path, "lights[0].shadow.moments");
+    EXPECT_EQ(layout.fields[1].resource_id, "shadow_moments[0]");
+    // Resource ids without the suffix stay shared by every element.
+    EXPECT_EQ(layout.fields[2].resource_id, "shadow_sampler");
+    EXPECT_EQ(layout.fields[3].resource_id, "shadowmap[1]");
+    EXPECT_EQ(layout.fields[4].resource_id, "shadow_moments[1]");
+    EXPECT_EQ(layout.fields[5].resource_id, "shadow_sampler");
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdOutsideDescriptorStructArray) {
+    ShaderMetadataTypeField field = make_descriptor_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]");
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&field, 1));
+
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdWithoutName) {
+    ShaderMetadataTypeField lights;
+    lights.name = "lights";
+    lights.type.kind = "array";
+    lights.type.element_count = 1;
+    lights.binding.kind = "uniform";
+    lights.binding.size = 8;
+    lights.binding.element_stride = 8;
+    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 0, "[]"));
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&lights, 1));
+
+    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+}
+
 TEST(WBEShaderMetadataVKUtilsTest, ReturnsEmptyLayoutForDescriptorFreeEntryPoint) {
     ShaderMetadata metadata;
     ShaderMetadataEntryPoint entry_point;
