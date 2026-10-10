@@ -234,6 +234,7 @@ protected:
     WBE::RUSchemaSubmesh3D make_triangle_submesh_scheme() {
         WBE::RUSchemaSubmesh3D scheme;
         scheme.material_id = "unused_material";
+        scheme.aabb = {.center = {0.0F, 0.0F, 0.0F}, .width = 1.0F, .height = 1.0F};
         scheme.vertices.binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 15};
         scheme.vertices.stride = sizeof(float) * 5;
         scheme.vertices.attributes = {
@@ -575,6 +576,9 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     WBE::RUSubmesh3D* captured_submesh = captured_mesh->opaque_instances.submeshes.get();
     EXPECT_EQ(captured_submesh->first_instance, 0U);
     EXPECT_EQ(captured_submesh->instance_count, 1U);
+    EXPECT_EQ(captured_submesh->aabb.center, glm::vec3(0.0F));
+    EXPECT_FLOAT_EQ(captured_submesh->aabb.width, 1.0F);
+    EXPECT_FLOAT_EQ(captured_submesh->aabb.height, 1.0F);
     const WBE::RUVertexView& vertex_data = captured_submesh->vertices;
     ASSERT_NE(vertex_data.binary.binary, nullptr);
     EXPECT_EQ(vertex_data.vertex_count, 3U);
@@ -826,6 +830,38 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
             .attributes = {{.role = "position", .type = "vec3", .offset = 0}},
         },
         {.binary = {.binary_id = "loaded_geometry", .start = sizeof(float) * 15, .size = sizeof(uint32_t) * 2}});
+}
+
+TEST_F(ResourcePopulatorTest, SubmeshAABBLoadsIntoSubmesh) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
+    scheme.aabb = {.center = {1.5F, -2.0F, 3.25F}, .width = 4.0F, .height = 5.5F};
+    WBE::ResourceUnitLoaderMesh loader;
+
+    loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme));
+
+    ASSERT_NE(captured_mesh, nullptr);
+    ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
+    const WBE::RUAABB3D& aabb = captured_mesh->opaque_instances.submeshes.get()[0].aabb;
+    EXPECT_EQ(aabb.center, glm::vec3(1.5F, -2.0F, 3.25F));
+    EXPECT_FLOAT_EQ(aabb.width, 4.0F);
+    EXPECT_FLOAT_EQ(aabb.height, 5.5F);
+}
+
+TEST_F(ResourcePopulatorTest, SubmeshAABBRejectsInvalidCenter) {
+    WBE::ResourceUnitLoaderMesh loader;
+    for (const std::vector<float>& center : {std::vector<float>{}, std::vector<float>{1.0F, 2.0F}, std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F}}) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
+        scheme.aabb.center = center;
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme)), std::runtime_error);
+    }
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {

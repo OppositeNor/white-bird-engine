@@ -72,14 +72,14 @@ Use [check_deferred.py](../../../../.codex/skills/white-bird-render-testing/scri
 From the repository root:
 
 ```sh
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 1
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 2 --mode stability --duration 25
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --octree 1 --full-scene-reconstruct
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2 --mode stability --duration 25
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1 --full-scene-reconstruct
 ```
 
-`--full-scene-reconstruct` sets `WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1`, which rebuilds the static octree every frame
-instead of once. Use it for octree construction races, which otherwise run only on the first build. Without it the helper
+`--full-scene-reconstruct` sets `WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1`, which rebuilds the static SVO every frame
+instead of once. Use it for SVO construction races, which otherwise run only on the first build. Without it the helper
 forces the variable to `0`.
 
 Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
@@ -90,4 +90,4 @@ The helper limits the owned process to four available CPUs by default (`--cpus` 
 
 The demo always renders two animated instances of the cube mesh. Use `--target`, `--repo`, and `--output-dir` for another build or artifact location. Read `--help` for timing controls.
 
-On device loss or shader overflow, inspect that run's log before continuing the matrix. Do not silently increase octree capacity or alter shaders merely to obtain a capture. Report failed configurations separately from successful captures and capture-free stability runs.
+On device loss or shader overflow, inspect that run's log before continuing the matrix. Do not silently increase SVO capacity or alter shaders merely to obtain a capture. Report failed configurations separately from successful captures and capture-free stability runs.

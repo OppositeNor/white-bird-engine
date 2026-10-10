@@ -39,10 +39,10 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
     parser.add_argument('--target', default='debug')
-    parser.add_argument('--octree', choices=('1', '2'), default='2')
+    parser.add_argument('--svo', choices=('1', '2'), default='2')
     parser.add_argument('--mode', choices=('capture', 'stability'), default='capture')
     parser.add_argument('--full-scene-reconstruct', action='store_true',
-                        help='Rebuild the static octree every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)')
+                        help='Rebuild the static SVO every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)')
     parser.add_argument('--duration', type=float, default=25.0, help='Capture-free stability duration in seconds')
     parser.add_argument('--settle', type=float, default=5.0,
                         help='Seconds after the first logic tick before scripted input starts (capture mode)')
@@ -62,10 +62,10 @@ def main() -> int:
     parent = (args.output_dir or root / 'build/render_checks').resolve()
     parent.mkdir(parents=True, exist_ok=True)
     reconstruct_tag = '_reconstruct' if args.full_scene_reconstruct else ''
-    output = Path(tempfile.mkdtemp(prefix=f'octree{args.octree}{reconstruct_tag}_{args.mode}_', dir=parent))
+    output = Path(tempfile.mkdtemp(prefix=f'svo{args.svo}{reconstruct_tag}_{args.mode}_', dir=parent))
     capture = output / 'mipmap.png'
     log_path = output / 'application.log'
-    env = dict(os.environ, WBE_WAIT_PROCESS_INJECT='0', WBE_OCTREE_IMPLEMENTATION=args.octree,
+    env = dict(os.environ, WBE_WAIT_PROCESS_INJECT='0', WBE_SVO_IMPLEMENTATION=args.svo,
                WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT='1' if args.full_scene_reconstruct else '0')
     for name in ('WBE_CAPTURE_PNG', 'WBE_CAPTURE_FRAME', 'WBE_EXEC_TEST_INPUT_SEQUENCE'):
         env.pop(name, None)
@@ -78,7 +78,7 @@ def main() -> int:
     command: list[str] = [str(binary)]
     if shutil.which('stdbuf') is not None:
         command = ['stdbuf', '-oL', '-eL', *command]
-    result: dict[str, object] = {'octree': args.octree, 'mode': args.mode,
+    result: dict[str, object] = {'svo': args.svo, 'mode': args.mode,
                                  'full_scene_reconstruct': args.full_scene_reconstruct, 'cpus': cpus,
                                  'input_sequence': sequence, 'clean_exit': False, 'captures': []}
     started = time.monotonic()
@@ -105,7 +105,7 @@ def main() -> int:
 
         try:
             deadline = time.monotonic() + args.startup_timeout
-            while 'Octree construction:' not in log_text():
+            while 'SVO construction:' not in log_text():
                 if time.monotonic() >= deadline:
                     raise RuntimeError('Startup timed out')
                 pause(0.2)

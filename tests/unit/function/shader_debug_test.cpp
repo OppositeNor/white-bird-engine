@@ -28,11 +28,11 @@ TEST(WBEShaderDebugTest, BufferLayoutReservesHeaderAndEntries) {
 
 TEST(WBEShaderDebugTest, ErrorNamesAreStable) {
     EXPECT_EQ(shader_debug_error_name(ShaderDebugError::DEBUG_BUFFER_FULL), "DEBUG_BUFFER_FULL");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW), "OCTREE_NODE_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW), "OCTREE_LEAF_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW), "OCTREE_DEFERRED_TASK_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED), "OCTREE_DEEPER_THAN_EXPECTED");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED), "OCTREE_SHALLOWER_THAN_EXPECTED");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_NODE_INDEX_OVERFLOW), "SVO_NODE_INDEX_OVERFLOW");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW), "SVO_LEAF_INDEX_OVERFLOW");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW), "SVO_DEFERRED_TASK_INDEX_OVERFLOW");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEEPER_THAN_EXPECTED), "SVO_DEEPER_THAN_EXPECTED");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED), "SVO_SHALLOWER_THAN_EXPECTED");
     EXPECT_EQ(shader_debug_error_name(static_cast<ShaderDebugError>(UINT32_MAX)), "UNKNOWN_SHADER_DEBUG_ERROR");
 }
 

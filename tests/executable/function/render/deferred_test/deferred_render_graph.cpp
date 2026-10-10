@@ -39,7 +39,7 @@
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
-#include "i_octree_render_feature.hh"
+#include "i_svo_render_feature.hh"
 #include "resource/resource_utils.hh"
 #include "rt_imgui_vk.hh"
 #include <algorithm>
@@ -190,9 +190,9 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(dynamic_mesh->make_task(
         RT_RUN_DYNAMIC_GBUFFER_SECOND, 1, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
-    octree->add_construction_render_tasks(pipeline_desc, *dynamic_mesh);
-    pipeline_desc.add_task(octree->get_deferred_construction_render_task_desc());
-    pipeline_desc.add_task(octree->get_debug_draw_setup_render_task_desc()).add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
+    svo->add_construction_render_tasks(pipeline_desc, *dynamic_mesh);
+    pipeline_desc.add_task(svo->get_deferred_construction_render_task_desc());
+    pipeline_desc.add_task(svo->get_debug_draw_setup_render_task_desc()).add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
     const std::string_view post_processing_last_task_id =
         post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
     pipeline_desc.add_task(create_bloom_extract_task_desc())
@@ -201,12 +201,12 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_present_result_image_task_desc())
         .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
         .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table))
-        .add_task(octree->get_debug_draw_render_task_desc())
-        .add_task(octree->get_pre_deferred_debug_draw_render_task_desc())
+        .add_task(svo->get_debug_draw_render_task_desc())
+        .add_task(svo->get_pre_deferred_debug_draw_render_task_desc())
         .add_task(create_light_billboard_task_desc())
         .add_task(create_imgui_task_desc());
     connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
-    octree->connect_render_tasks(pipeline_desc);
+    svo->connect_render_tasks(pipeline_desc);
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
     deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
@@ -257,11 +257,11 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
         {RT_RUN_DEFERRED_GBUFFER, RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, RT_RUN_DYNAMIC_GBUFFER, RT_RUN_DYNAMIC_GBUFFER_SECOND, DIRECT_LIGHTING});
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {RT_RUN_DYNAMIC_GBUFFER_SECOND, INDIRECT_LIGHTING});
     // Overlays depth-test against the G-buffer depth after lighting has sampled it.
-    constexpr std::string_view OCTREE_DEBUG_DEPTH = IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW;
-    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, OCTREE_DEBUG_DEPTH});
+    constexpr std::string_view SVO_DEBUG_DEPTH = ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW;
+    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, SVO_DEBUG_DEPTH});
     connect_resource_chain(p_pipeline_desc,
         GBUFFER_DEPTH_IMAGE_VIEW,
-        {INDIRECT_LIGHTING, OCTREE_DEBUG_DEPTH, IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW, RT_RUN_LIGHT_BILLBOARD});
+        {INDIRECT_LIGHTING, SVO_DEBUG_DEPTH, ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW, RT_RUN_LIGHT_BILLBOARD});
 
     // Lighting composition and post-processing.
     connect_resource_chain(p_pipeline_desc, DIRECT_LIGHTING_IMAGE_VIEW, {RT_RUN_DIRECT_LIGHTING, RT_COMBINE_LIGHTING});
@@ -280,8 +280,8 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
         REND_RES_SWAP_CHAIN,
         {
             RT_RUN_PRESENT_RESULT_IMAGE,
-            IOctreeRenderFeature::RT_RUN_OCTREE_DEBUG_DRAW,
-            IOctreeRenderFeature::RT_RUN_OCTREE_PRE_DEFERRED_DEBUG_DRAW,
+            ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW,
+            ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW,
             RT_RUN_LIGHT_BILLBOARD,
             RT_DRAW_IMGUI,
         });
@@ -302,7 +302,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, *light_billboard_ubo)
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view);
     add_graph_owned_resources(p_pipeline_desc);
-    octree->register_render_graph_data(p_pipeline_desc);
+    svo->register_render_graph_data(p_pipeline_desc);
 }
 
 void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const {

@@ -43,10 +43,10 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
-#include "i_octree_render_feature.hh"
+#include "i_svo_render_feature.hh"
 #include "imgui.h"
-#include "octree_render_feature_atomic.hh"
-#include "octree_render_feature_pass_published.hh"
+#include "svo_render_feature_atomic.hh"
+#include "svo_render_feature_pass_published.hh"
 #include "pixel_sort.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -142,9 +142,9 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
         VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
         switch (mode) {
         case VoxelDebugViewMode::DISABLED:
-            mode = VoxelDebugViewMode::POST_OCTREE_BUILD;
+            mode = VoxelDebugViewMode::POST_SVO_BUILD;
             break;
-        case VoxelDebugViewMode::POST_OCTREE_BUILD:
+        case VoxelDebugViewMode::POST_SVO_BUILD:
             mode = VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
             break;
         case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
@@ -429,26 +429,26 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         2);
     setup_spot_light();
     setup_bloom_acquisition();
-    bool use_atomic_octree = false;
-    if (const char* selection = std::getenv("WBE_OCTREE_IMPLEMENTATION")) {
+    bool use_atomic_svo = false;
+    if (const char* selection = std::getenv("WBE_SVO_IMPLEMENTATION")) {
         if (std::string_view(selection) == "1") {
-            use_atomic_octree = true;
+            use_atomic_svo = true;
         } else if (std::string_view(selection) != "2") {
-            throw std::runtime_error("WBE_OCTREE_IMPLEMENTATION must be 1 or 2.");
+            throw std::runtime_error("WBE_SVO_IMPLEMENTATION must be 1 or 2.");
         }
     }
     const bool rebuild_static_every_frame = exec_test_requested("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT");
-    if (use_atomic_octree) {
-        octree = make_unique<OctreeRenderFeatureAtomic>(
+    if (use_atomic_svo) {
+        svo = make_unique<SVORenderFeatureAtomic>(
             render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
     } else {
-        octree = make_unique<OctreeRenderFeaturePassPublished>(
+        svo = make_unique<SVORenderFeaturePassPublished>(
             render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
     }
-    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Octree construction: {}.", octree->get_name()));
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("SVO construction: {}.", svo->get_name()));
     stdout_log(WBE_CHANNEL_DEBUG)
-        ->message(rebuild_static_every_frame ? "Octree static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
-                                             : "Octree static scene: built once.");
+        ->message(rebuild_static_every_frame ? "SVO static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
+                                             : "SVO static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     post_processing = make_unique<PixelSort>(render_allocator,
@@ -500,7 +500,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
 
 void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     static constexpr std::array<const char*, 2> SHADOW_FILTERING_NAMES{"Mipmaps", "Summed-area table"};
-    static constexpr std::array<const char*, 3> VOXEL_DEBUG_VIEW_NAMES{"Disabled", "Post octree build", "Pre deferred propagation"};
+    static constexpr std::array<const char*, 3> VOXEL_DEBUG_VIEW_NAMES{"Disabled", "Post SVO build", "Pre deferred propagation"};
     ImGui::Begin("Deferred Rendering", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     // Every control writes the request its shortcut key writes, so the window and the keys stay in sync.
     int shadow_filtering = summed_area_table_requested.load(std::memory_order_relaxed) ? 1 : 0;
@@ -514,7 +514,7 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     case VoxelDebugViewMode::DISABLED:
         voxel_debug_view = 0;
         break;
-    case VoxelDebugViewMode::POST_OCTREE_BUILD:
+    case VoxelDebugViewMode::POST_SVO_BUILD:
         voxel_debug_view = 1;
         break;
     case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
@@ -525,7 +525,7 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
             "Voxel debug view (V)", &voxel_debug_view, VOXEL_DEBUG_VIEW_NAMES.data(), static_cast<int>(VOXEL_DEBUG_VIEW_NAMES.size()))) {
         constexpr std::array<VoxelDebugViewMode, 3> MODES{
             VoxelDebugViewMode::DISABLED,
-            VoxelDebugViewMode::POST_OCTREE_BUILD,
+            VoxelDebugViewMode::POST_SVO_BUILD,
             VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
         };
         voxel_debug_view_mode.store(MODES[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);

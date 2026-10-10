@@ -137,7 +137,7 @@ inline void write_descriptor_debug_output(std::string_view p_name, const DebugDa
  *
  * Known switches: WBE_WAIT_PROCESS_INJECT waits for Enter before initialization, WBE_EXEC_TEST_RAY_TRACING builds and
  * imports ray-tracing acceleration structures, WBE_EXEC_TEST_TIMESTAMP_QUERY samples GPU task times and writes a report on
- * exit, and WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT rebuilds the deferred test's static octree every frame.
+ * exit, and WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT rebuilds the deferred test's static SVO every frame.
  *
  * @param p_variable The environment variable name.
  * @return True when the variable is "1"; false when it is unset, empty, or "0".

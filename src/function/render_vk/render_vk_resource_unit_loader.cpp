@@ -389,6 +389,18 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
     return saved_resource;
 }
 
+RUAABB3D resolve_aabb(const RUSchemaAABB3D& p_scheme) {
+    if (p_scheme.center.size() != 3) {
+        throw std::runtime_error(
+            std::format("Failed to populate mesh: submesh aabb center must contain 3 values, got {}.", p_scheme.center.size()));
+    }
+    return RUAABB3D{
+        .center = glm::vec3(p_scheme.center[0], p_scheme.center[1], p_scheme.center[2]),
+        .width = p_scheme.width,
+        .height = p_scheme.height,
+    };
+}
+
 void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
     if (!p_scheme.material_id.has_value()) {
         if (!p_scheme.material.has_value()) {
@@ -396,6 +408,7 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& 
         }
         p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material.value());
     }
+    p_resource_unit.aabb = resolve_aabb(p_scheme.aabb);
     populate_vertex_view(p_res_chunk, p_scheme.vertices, p_resource_unit.vertices);
     populate_index_view(p_scheme.indices, p_resource_unit.indices);
     p_resource_unit.first_instance = p_scheme.first_instance;

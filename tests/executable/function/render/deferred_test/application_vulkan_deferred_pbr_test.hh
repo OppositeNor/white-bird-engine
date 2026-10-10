@@ -44,7 +44,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "i_octree_render_feature.hh"
+#include "i_svo_render_feature.hh"
 #include "i_post_processing.hh"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
@@ -234,7 +234,7 @@ private:
 
     Unique<DynamicMeshRenderFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
-    Unique<IOctreeRenderFeature> octree;
+    Unique<ISVORenderFeature> svo;
     // Applied in place to the result image after lighting composition; toggled with the 1 key.
     Unique<PixelSort> post_processing;
     // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table.

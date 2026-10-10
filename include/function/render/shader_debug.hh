@@ -37,16 +37,16 @@ inline constexpr uint32_t SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
 enum class ShaderDebugError : uint32_t {
     /** The report buffer ran out of entry storage. */
     DEBUG_BUFFER_FULL = 1,
-    /** An octree node allocation would exceed its buffer. */
-    OCTREE_NODE_INDEX_OVERFLOW = 2,
-    /** An octree leaf allocation would exceed its buffer. */
-    OCTREE_LEAF_INDEX_OVERFLOW = 3,
-    /** An octree deferred task would exceed its ping-pong buffer. */
-    OCTREE_DEFERRED_TASK_INDEX_OVERFLOW = 4,
-    /** An octree branch extends beyond its configured maximum depth. */
-    OCTREE_DEEPER_THAN_EXPECTED = 5,
-    /** An octree branch terminates before its configured maximum depth. */
-    OCTREE_SHALLOWER_THAN_EXPECTED = 6,
+    /** An SVO node allocation would exceed its buffer. */
+    SVO_NODE_INDEX_OVERFLOW = 2,
+    /** An SVO leaf allocation would exceed its buffer. */
+    SVO_LEAF_INDEX_OVERFLOW = 3,
+    /** An SVO deferred task would exceed its ping-pong buffer. */
+    SVO_DEFERRED_TASK_INDEX_OVERFLOW = 4,
+    /** An SVO branch extends beyond its configured maximum depth. */
+    SVO_DEEPER_THAN_EXPECTED = 5,
+    /** An SVO branch terminates before its configured maximum depth. */
+    SVO_SHALLOWER_THAN_EXPECTED = 6,
 };
 
 /**
@@ -58,16 +58,16 @@ constexpr std::string_view shader_debug_error_name(ShaderDebugError p_error) {
     switch (p_error) {
     case ShaderDebugError::DEBUG_BUFFER_FULL:
         return "DEBUG_BUFFER_FULL";
-    case ShaderDebugError::OCTREE_NODE_INDEX_OVERFLOW:
-        return "OCTREE_NODE_INDEX_OVERFLOW";
-    case ShaderDebugError::OCTREE_LEAF_INDEX_OVERFLOW:
-        return "OCTREE_LEAF_INDEX_OVERFLOW";
-    case ShaderDebugError::OCTREE_DEFERRED_TASK_INDEX_OVERFLOW:
-        return "OCTREE_DEFERRED_TASK_INDEX_OVERFLOW";
-    case ShaderDebugError::OCTREE_DEEPER_THAN_EXPECTED:
-        return "OCTREE_DEEPER_THAN_EXPECTED";
-    case ShaderDebugError::OCTREE_SHALLOWER_THAN_EXPECTED:
-        return "OCTREE_SHALLOWER_THAN_EXPECTED";
+    case ShaderDebugError::SVO_NODE_INDEX_OVERFLOW:
+        return "SVO_NODE_INDEX_OVERFLOW";
+    case ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW:
+        return "SVO_LEAF_INDEX_OVERFLOW";
+    case ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW:
+        return "SVO_DEFERRED_TASK_INDEX_OVERFLOW";
+    case ShaderDebugError::SVO_DEEPER_THAN_EXPECTED:
+        return "SVO_DEEPER_THAN_EXPECTED";
+    case ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED:
+        return "SVO_SHALLOWER_THAN_EXPECTED";
     }
     return "UNKNOWN_SHADER_DEBUG_ERROR";
 }

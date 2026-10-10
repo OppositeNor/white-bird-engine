@@ -250,6 +250,22 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaIndexView {
 };
 
 /**
+ * @class RUSchemaAABB3D
+ * @brief The scheme of RUAABB3D.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaAABB3D {
+    /** Box center as exactly three floats `[x, y, z]`. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<float> center{0.0F, 0.0F, 0.0F};
+    /** Full X extent. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float width = 0.0F;
+    /** Full Y extent. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float height = 0.0F;
+};
+
+/**
  * @class RUSchemaSubmesh3D
  * @brief The scheme of RUSubmesh3D.
  */
@@ -260,6 +276,9 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3D {
     /** Referenced material for this submesh. */
     WBE_META(WBE_REFLECT)
     std::optional<std::string> material_id;
+    /** Axis-aligned bounds of the submesh vertex positions. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaAABB3D aabb;
     /** Binary-backed vertex data. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaVertexView vertices;
@@ -560,6 +579,21 @@ struct RUIndexView {
 };
 
 /**
+ * @class RUAABB3D
+ * @brief Axis-aligned bounds of a submesh's vertex positions, in the same space as its vertices.
+ *
+ * Bounds describe the geometry before the submesh's instance transforms are applied.
+ */
+struct RUAABB3D {
+    /** Box center. */
+    glm::vec3 center{0.0F};
+    /** Full X extent. */
+    float width = 0.0F;
+    /** Full Y extent. */
+    float height = 0.0F;
+};
+
+/**
  * @class RUSubmesh3D
  * @brief One material, geometry range, and instance range of a mesh category.
  *
@@ -569,6 +603,8 @@ struct RUIndexView {
 struct RUSubmesh3D {
     /** Referenced material. */
     RefRes<RUMaterial> material;
+    /** Axis-aligned bounds of the vertex positions. */
+    RUAABB3D aabb;
     /** Binary-backed interleaved vertices and fixed layout. */
     RUVertexView vertices;
     /** Binary-backed uint32 indices. */
