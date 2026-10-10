@@ -281,8 +281,7 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
         }
         gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
         composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
-        spot_light_info_buffers->publish_buffer_update(
-            spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
+        spot_light_info_buffers->publish_buffer_update(&spot_light_infos, 0, sizeof(spot_light_infos));
         light_billboard_ubo->update_buffer(&light_billboard_info, sizeof(light_billboard_info));
     });
 }
@@ -812,11 +811,8 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(render_allocator,
         base_render_data,
-        sizeof(SpotLightInfoGPU) * MAX_SPOT_LIGHT_INFO_COUNT,
+        sizeof(SpotLightInfosGPU),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    uint32_t spot_light_count = 1;
-    spot_light_count_buffer =
-        create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &spot_light_count, sizeof(spot_light_count));
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
     direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
@@ -861,7 +857,7 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descriptors() {
     SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_component);
 
-    spot_light_info_buffers->publish_buffer_update(spot_light_infos.spot_light_info.data(), 0, sizeof(spot_light_infos.spot_light_info));
+    spot_light_info_buffers->publish_buffer_update(&spot_light_infos, 0, sizeof(spot_light_infos));
     log_uniform_buffer_descriptors(spot_light_info_buffers, "Spot light buffer");
 }
 

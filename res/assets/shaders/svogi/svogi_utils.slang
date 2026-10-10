@@ -12,16 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_VXGI_UTILS_SLANG
-#define WBE_FILE_VXGI_UTILS_SLANG
+#ifndef WBE_FILE_SVOGI_UTILS_SLANG
+#define WBE_FILE_SVOGI_UTILS_SLANG
 
-struct BlockVoxelData {
-    float4 color_occlusion;
-    float3 average_vector;
-};
+struct SVOGIData {
 
-struct VxgiNodeData {
-    BlockVoxelData voxel_data[3][3][3];
 };
 
 #endif

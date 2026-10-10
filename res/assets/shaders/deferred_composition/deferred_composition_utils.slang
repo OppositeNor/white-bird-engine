@@ -62,8 +62,18 @@ struct LightParamDescriptorIndices {
 // Structured-buffer matrices use ordinary mul(). The uniform-buffer scalar-load workaround
 // transposes these matrices and must not be applied to this returned value.
 SpotLightInfo get_spot_light_info(uint2 p_light_infos, uint p_spot_light_index) {
-    StructuredBuffer<SpotLightInfo> light_infos = ResourceDescriptorHeap[p_light_infos.x];
-    return light_infos[p_spot_light_index];
+    StructuredBuffer<SpotLightInfoBuffer> light_infos = ResourceDescriptorHeap[p_light_infos.x];
+    return light_infos[0].spot_light_info[p_spot_light_index];
+}
+
+/**
+ * @brief Read the number of active spot lights stored in a spot light table, clamped to WBE_MAX_SPOT_LIGHT_COUNT.
+ * @param p_light_infos Descriptor indices of a storage buffer holding one SpotLightInfoBuffer.
+ * @return The number of spot light entries to evaluate.
+ */
+uint get_spot_light_count(uint2 p_light_infos) {
+    StructuredBuffer<SpotLightInfoBuffer> light_infos = ResourceDescriptorHeap[p_light_infos.x];
+    return min(light_infos[0].spot_light_count, WBE_MAX_SPOT_LIGHT_COUNT);
 }
 
 VSOutput build_fullscreen_triangle(uint p_vertex_id) {

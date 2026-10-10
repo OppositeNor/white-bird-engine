@@ -298,7 +298,6 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
         .add_resource(COMPOSITION_CAMERA_INFO_BUFFER, *composition_camera_info_ubos)
         .add_resource(SHADOW_LIGHT_INFO_BUFFER, *spot_light_info_buffers)
         .add_resource(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_buffers)
-        .add_resource(SPOT_LIGHT_COUNT_BUFFER, *spot_light_count_buffer)
         .add_resource(LIGHT_BILLBOARD_INFO_BUFFER, *light_billboard_ubo)
         .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view);
     add_graph_owned_resources(p_pipeline_desc);

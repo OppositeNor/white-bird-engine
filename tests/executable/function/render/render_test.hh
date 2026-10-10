@@ -668,7 +668,13 @@ struct SpotLightInfosGPU {
      * @brief Number of active entries in spot_light_info.
      */
     uint32_t spot_light_count = 0;
+    /**
+     * @brief Pads the table to the 16-byte-aligned size of the shader `SpotLightInfoBuffer` struct.
+     */
+    std::array<uint32_t, 3> padding{};
 };
+
+static_assert(sizeof(SpotLightInfosGPU) == MAX_SPOT_LIGHT_INFO_COUNT * sizeof(SpotLightInfoGPU) + 16);
 
 inline CameraInfoGPU make_camera_info_gpu(const WBE::ComponentCamera& p_camera_component) {
     return CameraInfoGPU{

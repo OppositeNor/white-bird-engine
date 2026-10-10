@@ -136,7 +136,6 @@ private:
     static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
     static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
     static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_infos";
-    static constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
     static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
     static constexpr std::string_view GBUFFER_SAMPLER = "gbuffer_sampler";
     static constexpr std::string_view BLOOM_SAMPLER = "bloom_sampler";
@@ -284,7 +283,6 @@ private:
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
     Ref<ROCMultislotsVK> spot_light_info_buffers;
-    Ref<ROBufferVK> spot_light_count_buffer;
     Ref<ROBufferVK> light_billboard_ubo;
     Ref<ROImageViewVK> light_billboard_texture_view;
 

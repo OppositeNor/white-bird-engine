@@ -14,8 +14,8 @@
 include = []
 
 [[resources]]
-id = "vxgi_injection"
+id = "svogi_injection"
 source_type = "shader"
-src = "assets/shaders/vxgi/vxgi_injection.slang"
-dst = "assets/shaders/vxgi/vxgi_injection.spv"
-metadata = "assets/shaders/vxgi/vxgi_injection.json"
+src = "assets/shaders/svogi/svogi_injection.slang"
+dst = "assets/shaders/svogi/svogi_injection.spv"
+metadata = "assets/shaders/svogi/svogi_injection.json"
