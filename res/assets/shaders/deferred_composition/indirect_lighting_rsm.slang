@@ -70,9 +70,8 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 indirect_irradiance = float3(0.0);
     uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        indirect_irradiance += compute_rsm_indirect(descriptor_indices.light_infos,
-            descriptor_indices.lights[spot_light_index],
-            spot_light_index, uv, world_pos, normal);
+        SpotLight spot_light = SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[spot_light_index], spot_light_index);
+        indirect_irradiance += compute_rsm_indirect(spot_light, uv, world_pos, normal);
     }
     float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;
 #if WBE_VOXEL_DEBUG_VIEW

@@ -35,6 +35,9 @@ struct DescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+
+    [WBE_PUSH_CONSTANT("light_index")]
+    uint light_index;
 };
 
 [vk::push_constant]
@@ -53,10 +56,16 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
     uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
-    for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLightInfo spot_light_info = get_spot_light_info(descriptor_indices.light_infos, spot_light_index);
-        LightParamDescriptorIndices light = descriptor_indices.lights[spot_light_index];
-        Texture2D<float> shadowmap_depth = ResourceDescriptorHeap[light.shadowmap.x];
-        // TODO
+    SpotLight spot_light =
+        SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[descriptor_indices.light_index], descriptor_indices.light_index);
+    uint2 shadow_size = spot_light.get_shadow_size();
+    if (dispatch_thread_id.x >= shadow_size.x || dispatch_thread_id.y >= shadow_size.y) {
+        return;
     }
+    float shadow_depth = spot_light.shadow_moments.Load(int3(dispatch_thread_id, 0)).x;
+    if (shadow_depth <= 0.0) {
+        return; // Same convention as the RSM pass: no surface was rasterized here.
+    }
+    float2 texel_uv = (float2(dispatch_thread_id) + 0.5) / float2(shadow_size);
+    float3 world_position = spot_light.shadow_texel_world_position(texel_uv, shadow_depth);
 }

@@ -25,7 +25,7 @@ struct ForwardDescriptorIndices {
     uint2 camera_info;
     [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
     uint2 material_params;
-    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    ForwardLightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
     [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
     uint2 light_count;
     [WBE_DESCRIPTOR("sampler", "material_sampler")]

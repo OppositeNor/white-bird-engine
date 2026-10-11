@@ -73,15 +73,15 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float3 direct_lighting = float3(0.0);
     uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLightInfo spot_light_info = get_spot_light_info(descriptor_indices.light_infos, spot_light_index);
-        float3 to_light = spot_light_info.position - world_pos;
+        SpotLight spot_light = SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[spot_light_index], spot_light_index);
+        float3 to_light = spot_light.info.position - world_pos;
         float light_distance = length(to_light);
         float3 light_direction = to_light / max(light_distance, 0.0001);
-        float3 spot_axis = normalize(spot_light_info.direction);
+        float3 spot_axis = normalize(spot_light.info.direction);
         float spot_cos = dot(-light_direction, spot_axis);
         float cone_falloff =
-            saturate((spot_cos - spot_light_info.outer_cone_cos) / max(spot_light_info.inner_cone_cos - spot_light_info.outer_cone_cos, 0.0001));
-        float distance_falloff = saturate(1.0 - light_distance / max(spot_light_info.range, 0.0001));
+            saturate((spot_cos - spot_light.info.outer_cone_cos) / max(spot_light.info.inner_cone_cos - spot_light.info.outer_cone_cos, 0.0001));
+        float distance_falloff = saturate(1.0 - light_distance / max(spot_light.info.range, 0.0001));
         distance_falloff *= distance_falloff;
         float3 half_vector = normalize(view_direction + light_direction);
         float ndotl = max(dot(normal, light_direction), 0.0);
@@ -90,9 +90,8 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         float3 fresnel = fresnel_schlick(max(dot(half_vector, view_direction), 0.0), f0);
         float3 specular = ndf * geometry * fresnel / max(4.0 * max(dot(normal, view_direction), 0.0) * ndotl, 0.0001);
         float3 diffuse = (1.0 - fresnel) * (1.0 - metallic) * base_color / WBE_PI;
-        float3 radiance = spot_light_info.color * spot_light_info.intensity * cone_falloff * distance_falloff;
-        float shadow = compute_spot_shadow(
-            descriptor_indices.light_infos, descriptor_indices.lights[spot_light_index], spot_light_index, world_pos);
+        float3 radiance = spot_light.info.color * spot_light.info.intensity * cone_falloff * distance_falloff;
+        float shadow = spot_light.compute_shadow(world_pos);
         direct_lighting += (diffuse + specular) * radiance * ndotl * shadow;
     }
     direct_lighting_output[dispatch_thread_id] = float4(direct_lighting, 1.0);

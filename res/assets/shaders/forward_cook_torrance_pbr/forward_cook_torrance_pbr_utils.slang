@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_FORWARD_COOK_TORRANCE_PBR_UTILS_SLANG
 #define WBE_FILE_FORWARD_COOK_TORRANCE_PBR_UTILS_SLANG
 
-#include "light/light_utils.slang"
+#include "light/spot_light_utils.slang"
 #include "utils.slang"
 
 /**
@@ -52,7 +52,7 @@ struct VSOutput {
     float4 light_space_pos  : TEXCOORD5;
 };
 
-struct LightParamDescriptorIndices {
+struct ForwardLightParamDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "spot_light_info")]
     uint2 info;
     [WBE_DESCRIPTOR("sampled_image", "shadowmap")]
