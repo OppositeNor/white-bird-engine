@@ -40,20 +40,17 @@ def rng() -> np.random.Generator:
 def run_trace_data(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_dynamic_nodes: np.ndarray,
         p_leaves: np.ndarray, p_dynamic_leaves: np.ndarray, p_tree_info: np.ndarray, p_voxels: list[Voxel],
         p_traverse_dynamic: bool) -> tuple[np.ndarray, np.ndarray]:
-    """Trace every voxel center and return the traced data and final traces; data element i holds 1000 + i."""
+    """Trace every voxel center and return the traced data indices and final traces."""
     max_depth = int(p_tree_info[0]["max_depth"])
     kernel = p_load_kernel("svo_trace_data.slang", {"TRAVERSE_DYNAMIC": int(p_traverse_dynamic)})
     positions = np.zeros((len(p_voxels), 4), dtype=np.float32)
     for index, voxel in enumerate(p_voxels):
         positions[index, :3] = voxel_center(voxel, max_depth)
-    data_count = 1 + max(int(p_nodes["data_index"].max()), int(p_dynamic_nodes["data_index"].max()),
-        int(p_leaves["data_index"].max()), int(p_dynamic_leaves["leaves"]["data_index"].max()))
-    data = np.arange(1000, 1000 + data_count, dtype=np.uint32)
     results = make_buffer(p_device, np.zeros(len(p_voxels), dtype=np.uint32))
     traces = make_buffer(p_device, np.zeros(len(p_voxels), dtype=TRACE_DTYPE))
     kernel.dispatch(thread_count=[len(p_voxels), 1, 1], vars={"nodes": make_buffer(p_device, p_nodes),
         "dynamic_nodes": make_buffer(p_device, p_dynamic_nodes), "leaves": make_buffer(p_device, p_leaves),
-        "dynamic_leaves": make_buffer(p_device, p_dynamic_leaves), "data": make_buffer(p_device, data),
+        "dynamic_leaves": make_buffer(p_device, p_dynamic_leaves),
         "tree_info": make_buffer(p_device, p_tree_info), "positions": make_buffer(p_device, positions),
         "results": results, "traces": traces})
     return read_buffer(results, np.uint32), read_buffer(traces, TRACE_DTYPE)
@@ -83,7 +80,7 @@ def test_trace_data_static(device: spy.Device, load_kernel: KernelLoader, rng: n
             index = tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))]
             index_type = INDEX_STATIC_NODE
             data_index = int(nodes[index]["data_index"])
-        assert result == 1000 + data_index
+        assert result == data_index
         assert_trace(trace, index, index_type, stop_depth, p_max_depth - stop_depth,
             np.modf(voxel_center(voxel, p_max_depth) * float(1 << stop_depth))[0])
 
@@ -117,5 +114,5 @@ def test_trace_data_dynamic(device: spy.Device, load_kernel: KernelLoader, p_tra
     }
     for (voxel, with_dynamic, without_dynamic), result, trace in zip(DYNAMIC_TRACE_CASES, results, traces):
         index, index_type, depth = with_dynamic if p_traverse_dynamic else without_dynamic
-        assert result == 1000 + expected_data[index_type](index)
+        assert result == expected_data[index_type](index)
         assert_trace(trace, index, index_type, depth, 3 - depth, np.modf(voxel_center(voxel, 3) * float(1 << depth))[0])

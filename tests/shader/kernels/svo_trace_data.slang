@@ -14,7 +14,7 @@
 */
 /**
  * @file svo_trace_data.slang
- * @brief Test kernel that runs SVO<uint>::trace_data() once per query position and writes the data and final traces.
+ * @brief Test kernel that runs SVO::trace_data() once per query position and writes the data indices and final traces.
  * @details Required define: TRAVERSE_DYNAMIC, the traverse_dynamic flag of the SVO.
  */
 #include "utils/utils.slang"
@@ -24,7 +24,6 @@ RWStructuredBuffer<SVONode> nodes;
 RWStructuredBuffer<SVONode> dynamic_nodes;
 StructuredBuffer<SVOLeaf> leaves;
 StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves;
-StructuredBuffer<uint> data;
 RWStructuredBuffer<SVOInfo> tree_info;
 StructuredBuffer<float4> positions;
 RWStructuredBuffer<uint> results;
@@ -40,7 +39,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (index >= position_count) {
         return;
     }
-    SVO<uint> svo = SVO<uint>(nodes, dynamic_nodes, leaves, dynamic_leaves, data, tree_info[0], TRAVERSE_DYNAMIC != 0);
+    SVO svo = SVO(nodes, dynamic_nodes, leaves, dynamic_leaves, tree_info[0], TRAVERSE_DYNAMIC != 0);
     SVONodeTraceInfo trace_info;
     results[index] = svo.trace_data(positions[index].xyz, trace_info);
     traces[index] = trace_info;

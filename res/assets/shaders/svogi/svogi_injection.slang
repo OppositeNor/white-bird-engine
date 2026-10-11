@@ -51,7 +51,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     StructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
 
-    SVO<SVOGIData> svo(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svogi_data, svo_info, true);
+    SVO svo(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
     ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
     // TODO
