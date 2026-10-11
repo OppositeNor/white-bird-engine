@@ -30,6 +30,9 @@ DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("original_children_data", "<u4"), ("leaves
 # Data indices are offset per storage so a result identifies the storage it was read from.
 DYNAMIC_NODE_DATA_OFFSET = 50
 DYNAMIC_LEAF_DATA_OFFSET = 200
+# A non-unit SVO placement, exactly representable so world positions map back to voxel centers without rounding.
+SVO_ORIGIN = np.array([-3.0, 1.5, 2.0], dtype=np.float32)
+SVO_WIDTH = 8.0
 
 
 @pytest.fixture
@@ -40,18 +43,21 @@ def rng() -> np.random.Generator:
 def run_trace_data(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_dynamic_nodes: np.ndarray,
         p_leaves: np.ndarray, p_dynamic_leaves: np.ndarray, p_tree_info: np.ndarray, p_voxels: list[Voxel],
         p_traverse_dynamic: bool) -> tuple[np.ndarray, np.ndarray]:
-    """Trace every voxel center and return the traced data indices and final traces."""
+    """Trace every voxel center in world space and return the traced data indices and final traces."""
     max_depth = int(p_tree_info[0]["max_depth"])
     kernel = p_load_kernel("svo_trace_data.slang", {"TRAVERSE_DYNAMIC": int(p_traverse_dynamic)})
+    tree_info = p_tree_info.copy()
+    tree_info["origin"] = SVO_ORIGIN
+    tree_info["width"] = SVO_WIDTH
     positions = np.zeros((len(p_voxels), 4), dtype=np.float32)
     for index, voxel in enumerate(p_voxels):
-        positions[index, :3] = voxel_center(voxel, max_depth)
+        positions[index, :3] = SVO_ORIGIN + voxel_center(voxel, max_depth) * SVO_WIDTH
     results = make_buffer(p_device, np.zeros(len(p_voxels), dtype=np.uint32))
     traces = make_buffer(p_device, np.zeros(len(p_voxels), dtype=TRACE_DTYPE))
     kernel.dispatch(thread_count=[len(p_voxels), 1, 1], vars={"nodes": make_buffer(p_device, p_nodes),
         "dynamic_nodes": make_buffer(p_device, p_dynamic_nodes), "leaves": make_buffer(p_device, p_leaves),
         "dynamic_leaves": make_buffer(p_device, p_dynamic_leaves),
-        "tree_info": make_buffer(p_device, p_tree_info), "positions": make_buffer(p_device, positions),
+        "tree_info": make_buffer(p_device, tree_info), "positions": make_buffer(p_device, positions),
         "results": results, "traces": traces})
     return read_buffer(results, np.uint32), read_buffer(traces, TRACE_DTYPE)
 

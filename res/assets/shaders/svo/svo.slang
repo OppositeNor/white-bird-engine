@@ -69,17 +69,26 @@ struct SVO {
     }
 
     /**
+     * @brief Convert a world-space position into the SVO's unit cube.
+     * @param p_world_position Position in world space.
+     * @return The position relative to info.origin, scaled by 1 / info.width.
+     */
+    float3 get_svo_position(float3 p_world_position) {
+        return (p_world_position - info.origin) / info.width;
+    }
+
+    /**
      * @brief Trace from the root to the deepest stored node or occupied leaf containing a position, and return its data index.
      * @details The trace stops at an occupied leaf, or at the deepest node whose child containing the position is empty or
      * an unoccupied leaf, so unoccupied regions return the data index of their coarsest stored ancestor. Dynamic children
      * are followed only when traverse_dynamic is true.
-     * @param p_svo_position Position in the SVO's unit cube; every component must lie in [0, 1).
+     * @param p_world_position Position in world space; every component must lie in [info.origin, info.origin + info.width).
      * @param p_trace_info Receives the final traversal state: the storage and index of the reached node or leaf, and its
      * depth.
      * @return The data_index of the reached node or leaf.
      */
-    uint trace_data(float3 p_svo_position, out SVONodeTraceInfo p_trace_info) {
-        p_trace_info = get_svo_root_trace_info(p_svo_position, info.max_depth);
+    uint trace_data(float3 p_world_position, out SVONodeTraceInfo p_trace_info) {
+        p_trace_info = get_svo_root_trace_info(get_svo_position(p_world_position), info.max_depth);
         traverse_svo(nodes, dynamic_nodes, info, traverse_dynamic, p_trace_info);
         return get_data_index(p_trace_info);
     }

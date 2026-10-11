@@ -68,4 +68,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     }
     float2 texel_uv = (float2(dispatch_thread_id) + 0.5) / float2(shadow_size);
     float3 world_position = spot_light.shadow_texel_world_position(texel_uv, shadow_depth);
+    SVONodeTraceInfo trace_info;
+    uint data_index = svo.trace_data(world_position, trace_info);
+    // TODO
 }

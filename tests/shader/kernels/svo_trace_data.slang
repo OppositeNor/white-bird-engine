@@ -14,7 +14,8 @@
 */
 /**
  * @file svo_trace_data.slang
- * @brief Test kernel that runs SVO::trace_data() once per query position and writes the data indices and final traces.
+ * @brief Test kernel that runs SVO::trace_data() once per world-space query position and writes the data indices and final
+ * traces.
  * @details Required define: TRAVERSE_DYNAMIC, the traverse_dynamic flag of the SVO.
  */
 #include "utils/utils.slang"
