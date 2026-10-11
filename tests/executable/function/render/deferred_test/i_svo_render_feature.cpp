@@ -20,6 +20,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
+#include "rt_voxel_debug_view_vk.hh"
+#include "rt_voxel_frame_begin_vk.hh"
+#include "rt_voxel_static_stage_vk.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
@@ -44,177 +47,13 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-namespace {
-
-/**
- * @brief Shares static-build completion across graph variants; neither copyable nor movable.
- */
-class RTSVOStaticStageVK final : public IRenderTaskVK {
-public:
-    RTSVOStaticStageVK() = delete;
-    RTSVOStaticStageVK(Unique<IRenderTaskVK> p_task, Ref<bool> p_completed, bool p_finish)
-        : task(std::move(p_task)), completed(std::move(p_completed)), finish(p_finish) {
-        WBE_DEBUG_ASSERT(task != MEM_NULL && completed != MEM_NULL);
-    }
-    virtual ~RTSVOStaticStageVK() override = default;
-    RTSVOStaticStageVK(const RTSVOStaticStageVK&) = delete;
-    RTSVOStaticStageVK(RTSVOStaticStageVK&&) = delete;
-    RTSVOStaticStageVK& operator=(const RTSVOStaticStageVK&) = delete;
-    RTSVOStaticStageVK& operator=(RTSVOStaticStageVK&&) = delete;
-    virtual QueueFamilyVK queue_family() const override {
-        return task->queue_family();
-    }
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
-        task->append_accesses(p_reads, p_writes);
-    }
-    virtual void bind_resources(const RendResViewVK& p_resources) override {
-        task->bind_resources(p_resources);
-    }
-    virtual void record(VkCommandBuffer p_buffer, double p_delta) override {
-        if (*completed) {
-            return;
-        }
-        task->record(p_buffer, p_delta);
-        if (finish) {
-            *completed = true;
-            stdout_log(WBE_CHANNEL_DEBUG)->message("SVO static construction recorded once.");
-        }
-    }
-
-private:
-    Unique<IRenderTaskVK> task;
-    Ref<bool> completed;
-    bool finish;
-};
-
-/**
- * @brief Orders mutation of the shared tree after the preceding frame's graphics consumers.
- */
-class RTSVOFrameBeginVK final : public IRenderTaskVK {
-public:
-    RTSVOFrameBeginVK() = default;
-    virtual ~RTSVOFrameBeginVK() override = default;
-    RTSVOFrameBeginVK(const RTSVOFrameBeginVK&) = delete;
-    RTSVOFrameBeginVK(RTSVOFrameBeginVK&&) = delete;
-    RTSVOFrameBeginVK& operator=(const RTSVOFrameBeginVK&) = delete;
-    RTSVOFrameBeginVK& operator=(RTSVOFrameBeginVK&&) = delete;
-    virtual QueueFamilyVK queue_family() const override {
-        return QueueFamilyVK::GRAPHICS;
-    }
-    virtual void append_accesses(
-        Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
-        // The full memory barrier below covers every command, which the SVO reset edge synchronizes after.
-        p_writes.push_back({.res_id = std::string(ISVORenderFeature::SVO_INFO), .usage = RendResUsageVK::ALL_COMMANDS});
-    }
-    virtual void record(VkCommandBuffer p_buffer, double) override {
-        VkMemoryBarrier2 barrier{
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .srcAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
-            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
-        };
-        VkDependencyInfo dependency{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .memoryBarrierCount = 1, .pMemoryBarriers = &barrier};
-        vkCmdPipelineBarrier2(p_buffer, &dependency);
-    }
-};
-
-constexpr std::array<uint32_t, 36> SVO_DEBUG_CUBE_INDICES{
-    0,
-    2,
-    3,
-    0,
-    3,
-    1,
-    4,
-    5,
-    7,
-    4,
-    7,
-    6,
-    0,
-    1,
-    5,
-    0,
-    5,
-    4,
-    2,
-    6,
-    7,
-    2,
-    7,
-    3,
-    0,
-    4,
-    6,
-    0,
-    6,
-    2,
-    1,
-    3,
-    7,
-    1,
-    7,
-    5,
-};
-
-/**
- * @brief Records a retained debug task only for the selected view; neither copyable nor movable.
- */
-class RTVoxelDebugView final : public IRenderTaskVK {
-public:
-    RTVoxelDebugView() = delete;
-    /**
-     * @brief Retains the task and borrows debug-mode state that outlives graph execution.
-     */
-    RTVoxelDebugView(Unique<IRenderTaskVK> p_task, const std::atomic<VoxelDebugViewMode>* p_mode, VoxelDebugViewMode p_first_mode, VoxelDebugViewMode p_last_mode)
-        : task(std::move(p_task)), mode(p_mode), first_mode(p_first_mode), last_mode(p_last_mode) {
-        if (task == MEM_NULL || mode == nullptr) {
-            throw std::runtime_error("Failed to create the voxel debug-view task: task or mode state is null.");
-        }
-        if (first_mode > last_mode) {
-            throw std::runtime_error("Failed to create the voxel debug-view task: mode range is invalid.");
-        }
-    }
-    virtual ~RTVoxelDebugView() override = default;
-    RTVoxelDebugView(const RTVoxelDebugView&) = delete;
-    RTVoxelDebugView(RTVoxelDebugView&&) noexcept = delete;
-    RTVoxelDebugView& operator=(const RTVoxelDebugView&) = delete;
-    RTVoxelDebugView& operator=(RTVoxelDebugView&&) noexcept = delete;
-
-    virtual QueueFamilyVK queue_family() const override {
-        return task->queue_family();
-    }
-
-    virtual void bind_resources(const RendResViewVK& p_resources) override {
-        task->bind_resources(p_resources);
-    }
-
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
-        task->append_accesses(p_reads, p_writes);
-    }
-
-    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
-        VoxelDebugViewMode current_mode = mode->load(std::memory_order_relaxed);
-        if (current_mode >= first_mode && current_mode <= last_mode) {
-            task->record(p_command_buffer, p_delta);
-        }
-    }
-
-private:
-    Unique<IRenderTaskVK> task;
-    const std::atomic<VoxelDebugViewMode>* mode;
-    VoxelDebugViewMode first_mode;
-    VoxelDebugViewMode last_mode;
-};
-
-} // namespace
 
 ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     Ref<MeshResourcesVK> p_static_mesh_resources,
@@ -313,9 +152,9 @@ void ISVORenderFeature::create_resources() {
                                     .set_properties(sizeof(uint32_t), SVO_DEFERRED_LIST_ELEMENT_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
                                     .create_ref(base_render_data);
     svo_debug_draw_index_buffer = create_initialized_buffer(
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT, SVO_DEBUG_CUBE_INDICES.data(), sizeof(SVO_DEBUG_CUBE_INDICES));
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_INDICES));
     const VkDrawIndexedIndirectCommand initial_debug_draw_command{
-        .indexCount = SVO_DEBUG_CUBE_INDICES.size(),
+        .indexCount = VOXEL_DEBUG_CUBE_INDICES.size(),
         .instanceCount = 0,
         .firstIndex = 0,
         .vertexOffset = 0,
@@ -419,7 +258,7 @@ RendTaskDescVK ISVORenderFeature::get_debug_capture_render_task_desc(std::string
             svo_pre_deferred_debug_capture_compute_pipeline,
             VkExtent3D{.width = SVO_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1},
             QueueFamilyVK::COMPUTE_1);
-        return make_unique<RTVoxelDebugView>(render_allocator, std::move(task), debug_view_mode, p_mode, p_mode);
+        return make_unique<RTVoxelDebugViewVK>(render_allocator, std::move(task), debug_view_mode, p_mode, p_mode);
     };
     return task_desc;
 }
@@ -448,7 +287,7 @@ RendTaskDescVK ISVORenderFeature::get_debug_draw_render_task_desc() const {
     task_desc.factory = [this, task_builder](const RendGraphContextVK& p_context) {
         RTRunGraphicsPipelineIndirectVK::Builder builder = task_builder;
         builder.set_render_extent(p_context.swap_chain_extent);
-        return make_unique<RTVoxelDebugView>(render_allocator,
+        return make_unique<RTVoxelDebugViewVK>(render_allocator,
             builder.create_unique(base_render_data),
             debug_view_mode,
             VoxelDebugViewMode::POST_SVO_BUILD,
@@ -471,7 +310,7 @@ RendTaskDescVK ISVORenderFeature::get_pre_deferred_debug_draw_render_task_desc()
     task_desc.factory = [this, task_builder](const RendGraphContextVK& p_context) {
         RTRunGraphicsPipelineIndirectVK::Builder builder = task_builder;
         builder.set_render_extent(p_context.swap_chain_extent);
-        return make_unique<RTVoxelDebugView>(render_allocator,
+        return make_unique<RTVoxelDebugViewVK>(render_allocator,
             builder.create_unique(base_render_data),
             debug_view_mode,
             VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
@@ -482,6 +321,31 @@ RendTaskDescVK ISVORenderFeature::get_pre_deferred_debug_draw_render_task_desc()
 
 Ref<ROBufferVK> ISVORenderFeature::create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const {
     return ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size).create_ref(base_render_data);
+}
+
+const char* ISVORenderFeature::get_debug_view_name(VoxelDebugViewMode p_mode) const {
+    switch (p_mode) {
+    case VoxelDebugViewMode::DISABLED:
+        return "Disabled";
+    case VoxelDebugViewMode::POST_SVO_BUILD:
+        return "Post SVO build";
+    case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
+        return "Pre deferred propagation";
+    }
+    throw std::runtime_error("ISVORenderFeature: unknown voxel debug view mode.");
+}
+
+void ISVORenderFeature::add_build_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
+    add_construction_render_tasks(p_graph, p_dynamic_mesh);
+    p_graph.add_task(get_deferred_construction_render_task_desc()).add_task(get_debug_draw_setup_render_task_desc());
+}
+
+void ISVORenderFeature::add_overlay_render_tasks(RendGraphDescVK& p_graph) const {
+    p_graph.add_task(get_debug_draw_render_task_desc()).add_task(get_pre_deferred_debug_draw_render_task_desc());
+}
+
+std::span<const std::string_view> ISVORenderFeature::get_overlay_render_task_ids() const {
+    return OVERLAY_RENDER_TASK_IDS;
 }
 
 void ISVORenderFeature::register_render_graph_data(RendGraphDescVK& p_graph) const {
@@ -503,7 +367,7 @@ void ISVORenderFeature::add_construction_render_tasks(RendGraphDescVK& p_graph, 
     RendTaskDescVK begin(render_allocator);
     begin.task_id = RT_SVO_FRAME_BEGIN;
     begin.factory = [this](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTSVOFrameBeginVK>(render_allocator);
+        return make_unique<RTVoxelFrameBeginVK>(render_allocator, SVO_INFO);
     };
     p_graph.add_task(std::move(begin));
     p_graph.add_task(make_static_once(get_reset_render_task_desc()))
@@ -568,7 +432,8 @@ RendTaskDescVK ISVORenderFeature::make_static_once(RendTaskDescVK p_task, bool p
         return p_task;
     }
     p_task.factory = [this, task_factory = p_task.factory, p_finish](const RendGraphContextVK& p_context) {
-        auto stage = make_unique<RTSVOStaticStageVK>(render_allocator, task_factory(p_context), static_build_completed, p_finish);
+        auto stage = make_unique<RTVoxelStaticStageVK>(
+            render_allocator, task_factory(p_context), static_build_completed, p_finish, "SVO static construction recorded once.");
         return make_unique<RTTriggeredVK>(render_allocator, std::move(stage), true);
     };
     return p_task;

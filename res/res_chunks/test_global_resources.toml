@@ -23,6 +23,7 @@ include = [
     "assets/shaders/deferred_composition/deferred_composition_shader.toml",
     "assets/shaders/svo/svo.toml",
     "assets/shaders/svo_2/svo_2.toml",
+    "assets/shaders/octree/octree.toml",
     "assets/shaders/bloom/bloom_shader.toml",
     "assets/shaders/sort/sort.toml",
     "assets/shaders/pixel_sort/pixel_sort_shader.toml",

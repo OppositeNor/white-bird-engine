@@ -26,27 +26,20 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/vector_float3.hpp"
+#include "i_voxel_render_feature.hh"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <glm/vec3.hpp>
+#include <span>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 class DynamicMeshRenderFeature;
-
-/**
- * @enum VoxelDebugViewMode
- * @brief Selects the SVO construction state visualized by the deferred rendering test.
- */
-enum class VoxelDebugViewMode : uint32_t {
-    DISABLED,
-    POST_SVO_BUILD,
-    PRE_DEFERRED_PROPAGATION,
-};
 
 /**
  * @class ISVORenderFeature
@@ -56,23 +49,32 @@ enum class VoxelDebugViewMode : uint32_t {
  * ordering. Neither copyable nor movable. All methods and destruction are confined to the rendering thread. Registered
  * graphs retain their resource handles and task factories; borrowed renderer and debug state must remain alive.
  */
-class ISVORenderFeature {
+class ISVORenderFeature : public IVoxelRenderFeature {
 public:
     ISVORenderFeature() = delete;
-    virtual ~ISVORenderFeature() = default;
+    virtual ~ISVORenderFeature() override = default;
     ISVORenderFeature(const ISVORenderFeature&) = delete;
     ISVORenderFeature(ISVORenderFeature&&) = delete;
     ISVORenderFeature& operator=(const ISVORenderFeature&) = delete;
     ISVORenderFeature& operator=(ISVORenderFeature&&) = delete;
 
     /**
-     * @brief Human-readable name of the construction algorithm.
+     * @brief Names the completed-tree view and the pre-deferred-propagation view.
      */
-    virtual std::string_view get_name() const = 0;
+    virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
     /**
      * @brief Registers all implementation-owned buffers with their stable shader resource names.
      */
-    void register_render_graph_data(RendGraphDescVK& p_graph) const;
+    virtual void register_render_graph_data(RendGraphDescVK& p_graph) const override;
+    /**
+     * @brief Adds the construction tasks, the dynamic deferred retries, and the debug-draw setup.
+     */
+    virtual void add_build_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const override;
+    /**
+     * @brief Adds the completed-tree overlay followed by the pre-deferred overlay.
+     */
+    virtual void add_overlay_render_tasks(RendGraphDescVK& p_graph) const override;
+    virtual std::span<const std::string_view> get_overlay_render_task_ids() const override;
     /**
      * @brief Adds reset, static and dynamic raster draws, publication when required, and pre-deferred capture.
      */
@@ -82,7 +84,7 @@ public:
      * @details Call after all construction, deferred, and debug-draw tasks were added to p_graph.
      * @param p_graph Graph descriptor containing the SVO tasks.
      */
-    void connect_render_tasks(RendGraphDescVK& p_graph) const;
+    virtual void connect_render_tasks(RendGraphDescVK& p_graph) const override;
     /**
      * @brief Creates the per-frame reset.
      */
@@ -140,6 +142,7 @@ public:
     static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_INFO_BUFFER = "svo_pre_deferred_debug_info_buffer";
     static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_LIST_BUFFER = "svo_pre_deferred_debug_list_buffer";
     static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER = "svo_pre_deferred_debug_draw_indirect_buffer";
+    static constexpr std::array<std::string_view, 2> OVERLAY_RENDER_TASK_IDS{RT_RUN_SVO_DEBUG_DRAW, RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW};
 
 protected:
     /**

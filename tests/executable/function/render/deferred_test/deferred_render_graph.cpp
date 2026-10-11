@@ -39,7 +39,7 @@
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
-#include "i_svo_render_feature.hh"
+#include "i_voxel_render_feature.hh"
 #include "resource/resource_utils.hh"
 #include "rt_imgui_vk.hh"
 #include <algorithm>
@@ -182,9 +182,8 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     pipeline_desc.add_task(dynamic_mesh->make_task(
         RT_RUN_DYNAMIC_GBUFFER_SECOND, 1, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
     pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
-    svo->add_construction_render_tasks(pipeline_desc, *dynamic_mesh);
-    pipeline_desc.add_task(svo->get_deferred_construction_render_task_desc());
-    pipeline_desc.add_task(svo->get_debug_draw_setup_render_task_desc()).add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
+    voxel_structure->add_build_render_tasks(pipeline_desc, *dynamic_mesh);
+    pipeline_desc.add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
     const std::string_view post_processing_last_task_id =
         post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
     pipeline_desc.add_task(create_bloom_extract_task_desc())
@@ -192,15 +191,14 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
         .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
         .add_task(create_present_result_image_task_desc())
         .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
-        .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table))
-        .add_task(svo->get_debug_draw_render_task_desc())
-        .add_task(svo->get_pre_deferred_debug_draw_render_task_desc());
+        .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table));
+    voxel_structure->add_overlay_render_tasks(pipeline_desc);
     for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
         pipeline_desc.add_task(create_light_billboard_task_desc(light_index));
     }
     pipeline_desc.add_task(create_imgui_task_desc());
     connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
-    svo->connect_render_tasks(pipeline_desc);
+    voxel_structure->connect_render_tasks(pipeline_desc);
     Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
     deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
@@ -283,14 +281,18 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
         {RT_RUN_DEFERRED_GBUFFER, RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED, RT_RUN_DYNAMIC_GBUFFER, RT_RUN_DYNAMIC_GBUFFER_SECOND, DIRECT_LIGHTING});
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {RT_RUN_DYNAMIC_GBUFFER_SECOND, INDIRECT_LIGHTING});
     // Overlays depth-test against the G-buffer depth after lighting has sampled it.
-    constexpr std::string_view SVO_DEBUG_DEPTH = ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW;
-    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, SVO_DEBUG_DEPTH});
+    const std::span<const std::string_view> voxel_overlay_task_ids = voxel_structure->get_overlay_render_task_ids();
+    if (voxel_overlay_task_ids.empty()) {
+        throw std::runtime_error("Failed to connect the deferred render graph: the voxel structure has no overlays.");
+    }
+    connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, {DIRECT_LIGHTING, voxel_overlay_task_ids.front()});
     // Overlays that draw into the swap chain after the lighting passes, in drawing order.
     std::vector<std::string> overlay_task_ids;
     for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
         overlay_task_ids.push_back(make_spot_light_graph_ids(light_index).run_light_billboard);
     }
-    std::vector<std::string_view> depth_overlay_chain{INDIRECT_LIGHTING, SVO_DEBUG_DEPTH, ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW};
+    std::vector<std::string_view> depth_overlay_chain{INDIRECT_LIGHTING};
+    depth_overlay_chain.insert(depth_overlay_chain.end(), voxel_overlay_task_ids.begin(), voxel_overlay_task_ids.end());
     depth_overlay_chain.insert(depth_overlay_chain.end(), overlay_task_ids.begin(), overlay_task_ids.end());
     connect_resource_chain(p_pipeline_desc, GBUFFER_DEPTH_IMAGE_VIEW, depth_overlay_chain);
 
@@ -307,11 +309,8 @@ void ApplicationVulkanDeferredPBRTest::connect_deferred_render_tasks(
     connect_resource_chain(p_pipeline_desc, RESULT_IMAGE_VIEW, {p_post_processing_last_task_id, RT_RUN_PRESENT_FRAME_SEQUENCE});
     connect_resource_chain(p_pipeline_desc, BLOOM_PING_IMAGE_VIEW, {RT_BLUR_BLOOM, RT_RUN_PRESENT_FRAME_SEQUENCE});
     connect_resource_chain(p_pipeline_desc, FRAME_SEQUENCE_IMAGE_VIEW, {RT_RUN_PRESENT_FRAME_SEQUENCE, RT_ACQUIRE_FRAME_SEQUENCE});
-    std::vector<std::string_view> swap_chain_chain{
-        RT_RUN_PRESENT_RESULT_IMAGE,
-        ISVORenderFeature::RT_RUN_SVO_DEBUG_DRAW,
-        ISVORenderFeature::RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW,
-    };
+    std::vector<std::string_view> swap_chain_chain{RT_RUN_PRESENT_RESULT_IMAGE};
+    swap_chain_chain.insert(swap_chain_chain.end(), voxel_overlay_task_ids.begin(), voxel_overlay_task_ids.end());
     swap_chain_chain.insert(swap_chain_chain.end(), overlay_task_ids.begin(), overlay_task_ids.end());
     swap_chain_chain.push_back(RT_DRAW_IMGUI);
     connect_resource_chain(p_pipeline_desc, REND_RES_SWAP_CHAIN, swap_chain_chain);
@@ -334,7 +333,7 @@ void ApplicationVulkanDeferredPBRTest::add_render_graph_resources(RendGraphDescV
             .add_resource(ids.light_billboard_info, *light_billboard_ubos[light_index]);
     }
     add_graph_owned_resources(p_pipeline_desc);
-    svo->register_render_graph_data(p_pipeline_desc);
+    voxel_structure->register_render_graph_data(p_pipeline_desc);
 }
 
 void ApplicationVulkanDeferredPBRTest::add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const {

@@ -76,11 +76,16 @@ python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2 --mode stability --duration 25
 python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1 --full-scene-reconstruct
+python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo octree
 ```
 
 `--full-scene-reconstruct` sets `WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1`, which rebuilds the static SVO every frame
 instead of once. Use it for SVO construction races, which otherwise run only on the first build. Without it the helper
 forces the variable to `0`.
+
+`--svo` sets `WBE_SVO_IMPLEMENTATION`: `1` (atomic SVO), `2` (pass-published SVO, the default), or `octree` (mipmapped 3D
+texture octree). For the octree, the first `V` view draws its leaves and bounds, and the second adds its occupied nodes
+colored by depth; both read the octree textures, and the helper captures only the first.
 
 Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
 

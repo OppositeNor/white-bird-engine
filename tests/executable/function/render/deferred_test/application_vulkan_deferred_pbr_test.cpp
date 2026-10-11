@@ -43,10 +43,11 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
-#include "i_svo_render_feature.hh"
+#include "i_voxel_render_feature.hh"
 #include "imgui.h"
 #include "svo_render_feature_atomic.hh"
 #include "svo_render_feature_pass_published.hh"
+#include "voxel_render_feature_octree.hh"
 #include "pixel_sort.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
@@ -461,26 +462,27 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         2);
     setup_spot_light();
     setup_bloom_acquisition();
-    bool use_atomic_svo = false;
+    std::string_view voxel_structure_selection = "2";
     if (const char* selection = std::getenv("WBE_SVO_IMPLEMENTATION")) {
-        if (std::string_view(selection) == "1") {
-            use_atomic_svo = true;
-        } else if (std::string_view(selection) != "2") {
-            throw std::runtime_error("WBE_SVO_IMPLEMENTATION must be 1 or 2.");
-        }
+        voxel_structure_selection = selection;
     }
     const bool rebuild_static_every_frame = exec_test_requested("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT");
-    if (use_atomic_svo) {
-        svo = make_unique<SVORenderFeatureAtomic>(
+    if (voxel_structure_selection == "1") {
+        voxel_structure = make_unique<SVORenderFeatureAtomic>(
+            render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+    } else if (voxel_structure_selection == "2") {
+        voxel_structure = make_unique<SVORenderFeaturePassPublished>(
+            render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+    } else if (voxel_structure_selection == "octree") {
+        voxel_structure = make_unique<VoxelRenderFeatureOctree>(
             render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
     } else {
-        svo = make_unique<SVORenderFeaturePassPublished>(
-            render_allocator, renderer_vk, static_mesh_resources, &voxel_debug_view_mode, rebuild_static_every_frame);
+        throw std::runtime_error("WBE_SVO_IMPLEMENTATION must be 1, 2, or octree.");
     }
-    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("SVO construction: {}.", svo->get_name()));
+    stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Voxel construction: {}.", voxel_structure->get_name()));
     stdout_log(WBE_CHANNEL_DEBUG)
-        ->message(rebuild_static_every_frame ? "SVO static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
-                                             : "SVO static scene: built once.");
+        ->message(rebuild_static_every_frame ? "Voxel static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
+                                             : "Voxel static scene: built once.");
     compile_shadow_moments_summed_area_table_pipelines();
     compile_lighting_pipelines();
     post_processing = make_unique<PixelSort>(render_allocator,
@@ -526,7 +528,6 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_gbuffer_task(bool p_load
 
 void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     static constexpr std::array<const char*, 2> SHADOW_FILTERING_NAMES{"Mipmaps", "Summed-area table"};
-    static constexpr std::array<const char*, 3> VOXEL_DEBUG_VIEW_NAMES{"Disabled", "Post SVO build", "Pre deferred propagation"};
     ImGui::Begin("Deferred Rendering", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     // Every control writes the request its shortcut key writes, so the window and the keys stay in sync.
     int shadow_filtering = summed_area_table_requested.load(std::memory_order_relaxed) ? 1 : 0;
@@ -552,14 +553,20 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
         voxel_debug_view = 2;
         break;
     }
-    if (ImGui::Combo(
-            "Voxel debug view (V)", &voxel_debug_view, VOXEL_DEBUG_VIEW_NAMES.data(), static_cast<int>(VOXEL_DEBUG_VIEW_NAMES.size()))) {
-        constexpr std::array<VoxelDebugViewMode, 3> MODES{
-            VoxelDebugViewMode::DISABLED,
-            VoxelDebugViewMode::POST_SVO_BUILD,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
-        };
-        voxel_debug_view_mode.store(MODES[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);
+    constexpr std::array<VoxelDebugViewMode, 3> VOXEL_DEBUG_VIEW_MODES{
+        VoxelDebugViewMode::DISABLED,
+        VoxelDebugViewMode::POST_SVO_BUILD,
+        VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+    };
+    std::array<const char*, VOXEL_DEBUG_VIEW_MODES.size()> voxel_debug_view_names{};
+    for (size_t i = 0; i < VOXEL_DEBUG_VIEW_MODES.size(); ++i) {
+        voxel_debug_view_names[i] = voxel_structure->get_debug_view_name(VOXEL_DEBUG_VIEW_MODES[i]);
+    }
+    if (ImGui::Combo("Voxel debug view (V)",
+            &voxel_debug_view,
+            voxel_debug_view_names.data(),
+            static_cast<int>(voxel_debug_view_names.size()))) {
+        voxel_debug_view_mode.store(VOXEL_DEBUG_VIEW_MODES[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);
     }
     bool post_processing_enabled = post_processing_requested.load(std::memory_order_relaxed);
     const std::string post_processing_label = std::format("Post-processing: {} (1)", post_processing->get_name());

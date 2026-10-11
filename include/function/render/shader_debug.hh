@@ -47,6 +47,10 @@ enum class ShaderDebugError : uint32_t {
     SVO_DEEPER_THAN_EXPECTED = 5,
     /** An SVO branch terminates before its configured maximum depth. */
     SVO_SHALLOWER_THAN_EXPECTED = 6,
+    /** An octree leaf would exceed its static or dynamic leaf list. */
+    OCTREE_LEAF_LIST_OVERFLOW = 7,
+    /** An octree debug node would exceed the debug node list. */
+    OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
 };
 
 /**
@@ -68,6 +72,10 @@ constexpr std::string_view shader_debug_error_name(ShaderDebugError p_error) {
         return "SVO_DEEPER_THAN_EXPECTED";
     case ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED:
         return "SVO_SHALLOWER_THAN_EXPECTED";
+    case ShaderDebugError::OCTREE_LEAF_LIST_OVERFLOW:
+        return "OCTREE_LEAF_LIST_OVERFLOW";
+    case ShaderDebugError::OCTREE_DEBUG_NODE_LIST_OVERFLOW:
+        return "OCTREE_DEBUG_NODE_LIST_OVERFLOW";
     }
     return "UNKNOWN_SHADER_DEBUG_ERROR";
 }

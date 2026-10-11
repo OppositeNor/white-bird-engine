@@ -33,6 +33,8 @@ TEST(WBEShaderDebugTest, ErrorNamesAreStable) {
     EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW), "SVO_DEFERRED_TASK_INDEX_OVERFLOW");
     EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEEPER_THAN_EXPECTED), "SVO_DEEPER_THAN_EXPECTED");
     EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED), "SVO_SHALLOWER_THAN_EXPECTED");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_LEAF_LIST_OVERFLOW), "OCTREE_LEAF_LIST_OVERFLOW");
+    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_DEBUG_NODE_LIST_OVERFLOW), "OCTREE_DEBUG_NODE_LIST_OVERFLOW");
     EXPECT_EQ(shader_debug_error_name(static_cast<ShaderDebugError>(UINT32_MAX)), "UNKNOWN_SHADER_DEBUG_ERROR");
 }
 

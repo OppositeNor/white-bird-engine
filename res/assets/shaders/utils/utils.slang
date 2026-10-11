@@ -41,6 +41,8 @@ enum class ShaderDebugError {
     SVO_DEFERRED_TASK_INDEX_OVERFLOW = 4,
     SVO_DEEPER_THAN_EXPECTED = 5,
     SVO_SHALLOWER_THAN_EXPECTED = 6,
+    OCTREE_LEAF_LIST_OVERFLOW = 7,
+    OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */

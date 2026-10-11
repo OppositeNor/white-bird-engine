@@ -39,10 +39,10 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
     parser.add_argument('--target', default='debug')
-    parser.add_argument('--svo', choices=('1', '2'), default='2')
+    parser.add_argument('--svo', choices=('1', '2', 'octree'), default='2')
     parser.add_argument('--mode', choices=('capture', 'stability'), default='capture')
     parser.add_argument('--full-scene-reconstruct', action='store_true',
-                        help='Rebuild the static SVO every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)')
+                        help='Rebuild the static voxel structure every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)')
     parser.add_argument('--duration', type=float, default=25.0, help='Capture-free stability duration in seconds')
     parser.add_argument('--settle', type=float, default=5.0,
                         help='Seconds after the first logic tick before scripted input starts (capture mode)')
@@ -105,7 +105,7 @@ def main() -> int:
 
         try:
             deadline = time.monotonic() + args.startup_timeout
-            while 'SVO construction:' not in log_text():
+            while 'Voxel construction:' not in log_text():
                 if time.monotonic() >= deadline:
                     raise RuntimeError('Startup timed out')
                 pause(0.2)
