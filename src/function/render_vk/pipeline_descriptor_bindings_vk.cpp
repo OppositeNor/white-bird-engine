@@ -125,12 +125,41 @@ uint32_t descriptor_index(ShaderDescriptorHeapTypeVK p_type, Ref<IRenderObject> 
 
 PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout)
     : render_data(p_render_data), layout(p_layout), push_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
-      containers(p_render_data != nullptr ? p_render_data->allocator : nullptr) {
+      containers(p_render_data != nullptr ? p_render_data->allocator : nullptr),
+      custom_values_set(p_render_data != nullptr ? p_render_data->allocator : nullptr) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to construct pipeline descriptor bindings: render data is missing.");
     }
     push_data.resize(layout.size, uint8_t{0});
     containers.resize(layout.fields.size(), MEM_NULL);
+    custom_values_set.resize(layout.default_fields.size(), false);
+}
+
+bool PipelineDescriptorBindingsVK::try_set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    bool declared = false;
+    for (size_t i = 0; i < layout.default_fields.size(); ++i) {
+        const ShaderDefaultPushFieldVK& field = layout.default_fields[i];
+        if (field.value != ShaderDefaultPushValueVK::CUSTOM || field.name != p_name) {
+            continue;
+        }
+        if (field.type != p_value.type) {
+            throw std::runtime_error(std::format(
+                "Failed to set push constant '{}': value type does not match reflected field '{}'.", p_name, field.field_path));
+        }
+        if (field.offset > push_data.size() || sizeof(p_value.bits) > push_data.size() - field.offset) {
+            throw std::runtime_error("Failed to set push constant: reflected offset is out of bounds.");
+        }
+        std::memcpy(push_data.data() + field.offset, &p_value.bits, sizeof(p_value.bits));
+        custom_values_set[i] = true;
+        declared = true;
+    }
+    return declared;
+}
+
+void PipelineDescriptorBindingsVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    if (!try_set_push_constant(p_name, p_value)) {
+        throw std::runtime_error(std::format("Failed to set push constant '{}': pipeline does not declare it.", p_name));
+    }
 }
 
 void PipelineDescriptorBindingsVK::append_accesses(
@@ -188,7 +217,8 @@ void PipelineDescriptorBindingsVK::push(VkCommandBuffer p_command_buffer) {
         std::memcpy(push_data.data() + field.offset, index_data, DESCRIPTOR_INDEX_SIZE);
     }
     constexpr size_t DEFAULT_PUSH_VALUE_SIZE = sizeof(uint32_t);
-    for (const ShaderDefaultPushFieldVK& field : layout.default_fields) {
+    for (size_t i = 0; i < layout.default_fields.size(); ++i) {
+        const ShaderDefaultPushFieldVK& field = layout.default_fields[i];
         if (field.offset > push_data.size() || DEFAULT_PUSH_VALUE_SIZE > push_data.size() - field.offset) {
             throw std::runtime_error("Failed to push renderer default value: reflected offset is out of bounds.");
         }
@@ -200,6 +230,13 @@ void PipelineDescriptorBindingsVK::push(VkCommandBuffer p_command_buffer) {
         }
         case ShaderDefaultPushValueVK::FRAME_SLOT:
             std::memcpy(push_data.data() + field.offset, &render_data->current_frame_slot, sizeof(render_data->current_frame_slot));
+            break;
+        case ShaderDefaultPushValueVK::CUSTOM:
+            // Custom values are written into push data when set.
+            if (!custom_values_set[i]) {
+                throw std::runtime_error(
+                    std::format("Failed to push pipeline data: custom push constant '{}' was not set.", field.name));
+            }
             break;
         }
     }

@@ -95,10 +95,13 @@ struct WBE_DESCRIPTORAttribute {
     string access = "";
 };
 
-/** Marks a push-data scalar whose value is supplied automatically by the renderer. */
+/**
+ * Marks a four-byte push-data scalar. "time" (float) and "frame_slot" (uint) are supplied by the renderer; any other
+ * identifier is a custom uint, int, or float value the owning render task sets with set_push_constant().
+ */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_DEFAULT_PUSHAttribute {
-    /** Renderer default value identifier. */
+struct WBE_PUSH_CONSTANTAttribute {
+    /** Renderer value identifier or custom push-constant identifier. */
     string value;
 };
 

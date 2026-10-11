@@ -37,7 +37,7 @@ struct DescriptorIndices {
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 [shader("compute")]
@@ -56,9 +56,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
         SpotLightInfo spot_light_info = get_spot_light_info(descriptor_indices.light_infos, spot_light_index);
         LightParamDescriptorIndices light = descriptor_indices.lights[spot_light_index];
-        Texture2D<float> shadowmap = ResourceDescriptorHeap[light.shadowmap.x];
+        Texture2D<float> shadowmap_depth = ResourceDescriptorHeap[light.shadowmap.x];
         // TODO
     }
-    
-    
 }

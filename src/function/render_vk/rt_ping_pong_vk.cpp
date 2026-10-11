@@ -24,7 +24,9 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstdint>
+#include <format>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -149,6 +151,18 @@ void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) 
             };
             vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
         }
+    }
+}
+
+void RTPingPongVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    bool declared = ping_descriptor_bindings->try_set_push_constant(p_name, p_value);
+    declared = pong_descriptor_bindings->try_set_push_constant(p_name, p_value) || declared;
+    if (ping_prefix_descriptor_bindings != MEM_NULL) {
+        declared = ping_prefix_descriptor_bindings->try_set_push_constant(p_name, p_value) || declared;
+        declared = pong_prefix_descriptor_bindings->try_set_push_constant(p_name, p_value) || declared;
+    }
+    if (!declared) {
+        throw std::runtime_error(std::format("RTPingPongVK: no compute pipeline declares push constant '{}'.", p_name));
     }
 }
 

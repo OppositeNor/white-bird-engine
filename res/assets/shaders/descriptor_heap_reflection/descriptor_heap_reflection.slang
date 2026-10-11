@@ -37,7 +37,7 @@ struct DescriptorHeapProbeIndices {
     uint2 scalar_uniform;
     [WBE_DESCRIPTOR("acceleration_structure", "acceleration_structure")]
     uint2 acceleration_structure;
-    [WBE_DEFAULT_PUSH("time")]
+    [WBE_PUSH_CONSTANT("time")]
     float time;
 };
 

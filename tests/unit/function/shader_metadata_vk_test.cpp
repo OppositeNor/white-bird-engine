@@ -335,7 +335,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(time.binding.offset, 56);
     EXPECT_EQ(time.binding.size, 4);
     ASSERT_EQ(time.user_attributes.size(), 1U);
-    EXPECT_EQ(time.user_attributes[0].name, "WBE_DEFAULT_PUSH");
+    EXPECT_EQ(time.user_attributes[0].name, "WBE_PUSH_CONSTANT");
     ASSERT_EQ(time.user_attributes[0].arguments.size(), 1U);
     EXPECT_EQ(time.user_attributes[0].arguments[0].string_value, "time");
 }

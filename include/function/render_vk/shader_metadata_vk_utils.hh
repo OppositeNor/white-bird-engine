@@ -71,31 +71,46 @@ struct ShaderDescriptorHeapFieldVK {
 };
 
 /**
- * @brief Renderer-provided value selected by a reflected WBE_DEFAULT_PUSH annotation.
+ * @brief Value source selected by a reflected WBE_PUSH_CONSTANT annotation.
  */
 enum class ShaderDefaultPushValueVK : uint8_t {
     /** Elapsed renderer time as a float. */
     TIME,
     /** Current frame-in-flight slot as a uint32. */
     FRAME_SLOT,
+    /** Task-supplied 32-bit value identified by ShaderDefaultPushFieldVK::name. */
+    CUSTOM,
+};
+
+/**
+ * @brief Scalar type of a reflected four-byte WBE_PUSH_CONSTANT field.
+ */
+enum class ShaderPushConstantTypeVK : uint8_t {
+    UINT32,
+    INT32,
+    FLOAT32,
 };
 
 /**
  * @class ShaderDefaultPushFieldVK
- * @brief One renderer-provided scalar stored in reflected pipeline push data.
+ * @brief One renderer-provided or task-supplied scalar stored in reflected pipeline push data.
  */
 struct ShaderDefaultPushFieldVK {
     /** Path relative to the push-data parameter. */
     std::string field_path;
-    /** Renderer value copied into this field for every recorded pipeline. */
+    /** Source of the value copied into this field for every recorded pipeline. */
     ShaderDefaultPushValueVK value = ShaderDefaultPushValueVK::TIME;
+    /** Custom push-constant identifier; empty unless value is CUSTOM. */
+    std::string name;
+    /** Reflected scalar type of the field. */
+    ShaderPushConstantTypeVK type = ShaderPushConstantTypeVK::FLOAT32;
     /** Byte offset of the four-byte scalar inside push data. */
     uint32_t offset = 0;
 };
 
 /**
  * @class ShaderDescriptorHeapLayoutVK
- * @brief Reflected descriptor-index and renderer-default push-data contract for one pipeline.
+ * @brief Reflected descriptor-index and push-constant contract for one pipeline.
  */
 struct ShaderDescriptorHeapLayoutVK {
     /** Total byte size required by the reflected push-data block. */
@@ -104,7 +119,7 @@ struct ShaderDescriptorHeapLayoutVK {
     VkShaderStageFlags stage_flags = 0;
     /** Descriptor-index fields in declaration order. */
     std::vector<ShaderDescriptorHeapFieldVK> fields;
-    /** Renderer-provided scalar fields in declaration order. */
+    /** Renderer-provided and custom scalar fields in declaration order. */
     std::vector<ShaderDefaultPushFieldVK> default_fields;
 };
 
@@ -134,7 +149,8 @@ VertexInputDescriptionVK build_vertex_input_description_vk(
  * A resource id ending in `[]` is per element: inside element `i` of the nearest enclosing descriptor struct array,
  * `shadowmap[]` resolves to `shadowmap[i]`, so each element can be aliased to its own graph resource. Other resource ids
  * are shared by every element. An indexed resource id outside a descriptor struct array, or one without a name, is rejected.
- * WBE_DEFAULT_PUSH fields must be four-byte scalars with a supported renderer value identifier.
+ * WBE_PUSH_CONSTANT fields must be four-byte scalars with one non-empty identifier. `time` (float) and `frame_slot` (uint) are
+ * renderer-provided; every other identifier declares a custom uint, int, or float value supplied by the owning task.
  *
  * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.
  */
@@ -144,7 +160,8 @@ ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
 /**
  * @brief Collect and merge explicit descriptor-heap push-data contracts from all supported graphics stages.
  *
- * Equal field paths must agree on descriptor category, resource id, and byte offset; their accesses are combined. Distinct
+ * Equal field paths must agree on descriptor category, resource id, and byte offset; their accesses are combined. Equal
+ * push-constant field paths must agree on value source, custom identifier, scalar type, and byte offset. Distinct
  * fields must not overlap in push data.
  *
  * @throws std::runtime_error When stage contracts conflict.

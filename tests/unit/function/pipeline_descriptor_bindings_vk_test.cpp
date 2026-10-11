@@ -84,6 +84,54 @@ TEST(WBEPipelineDescriptorBindingsVKTest, PushesCurrentRendererDefaultValues) {
     EXPECT_EQ(frame_slot, 3U);
 }
 
+TEST(WBEPipelineDescriptorBindingsVKTest, PushesTaskSuppliedCustomValues) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    render_data.command_push_data = capture_push_data;
+    ShaderDescriptorHeapLayoutVK layout;
+    layout.size = captured_push_data.size();
+    layout.default_fields = {
+        ShaderDefaultPushFieldVK{.field_path = "level",
+            .value = ShaderDefaultPushValueVK::CUSTOM,
+            .name = "level",
+            .type = ShaderPushConstantTypeVK::UINT32,
+            .offset = 0},
+        ShaderDefaultPushFieldVK{.field_path = "scale",
+            .value = ShaderDefaultPushValueVK::CUSTOM,
+            .name = "scale",
+            .type = ShaderPushConstantTypeVK::FLOAT32,
+            .offset = 4},
+    };
+    PipelineDescriptorBindingsVK bindings(&render_data, layout);
+
+    // Every declared custom value must be set before the first push.
+    EXPECT_THROW(bindings.push(VK_NULL_HANDLE), std::runtime_error);
+    bindings.set_push_constant("level", PushConstantValueVK::from_uint32(7));
+    EXPECT_THROW(bindings.push(VK_NULL_HANDLE), std::runtime_error);
+    EXPECT_THROW(bindings.set_push_constant("scale", PushConstantValueVK::from_int32(1)), std::runtime_error);
+    EXPECT_THROW(bindings.set_push_constant("missing", PushConstantValueVK::from_uint32(1)), std::runtime_error);
+    EXPECT_FALSE(bindings.try_set_push_constant("missing", PushConstantValueVK::from_uint32(1)));
+    EXPECT_TRUE(bindings.try_set_push_constant("scale", PushConstantValueVK::from_float32(0.5F)));
+
+    bindings.push(VK_NULL_HANDLE);
+
+    ASSERT_EQ(captured_push_data_size, captured_push_data.size());
+    uint32_t level = 0;
+    std::memcpy(&level, captured_push_data.data(), sizeof(level));
+    EXPECT_EQ(level, 7U);
+    float scale = 0.0F;
+    std::memcpy(&scale, captured_push_data.data() + sizeof(level), sizeof(scale));
+    EXPECT_FLOAT_EQ(scale, 0.5F);
+
+    // Values persist across pushes until they are set again.
+    bindings.set_push_constant("level", PushConstantValueVK::from_uint32(9));
+    bindings.push(VK_NULL_HANDLE);
+    std::memcpy(&level, captured_push_data.data(), sizeof(level));
+    EXPECT_EQ(level, 9U);
+    std::memcpy(&scale, captured_push_data.data() + sizeof(level), sizeof(scale));
+    EXPECT_FLOAT_EQ(scale, 0.5F);
+}
+
 namespace {
 
 ShaderDescriptorHeapLayoutVK make_mapping_layout() {

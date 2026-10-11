@@ -102,7 +102,7 @@ struct SVODescriptorIndices {
 #endif
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list;
-    [WBE_DEFAULT_PUSH("frame_slot")]
+    [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 
     MeshDescriptorIndices mesh;

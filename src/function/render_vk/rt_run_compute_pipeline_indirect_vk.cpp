@@ -74,4 +74,8 @@ void RTRunComputePipelineIndirectVK::record(VkCommandBuffer p_command_buffer, do
     vkCmdDispatchIndirect(p_command_buffer, resolved_indirect_buffer->get_buffer(), indirect_offset);
 }
 
+void RTRunComputePipelineIndirectVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    descriptor_bindings->set_push_constant(p_name, p_value);
+}
+
 } // namespace WhiteBirdEngine

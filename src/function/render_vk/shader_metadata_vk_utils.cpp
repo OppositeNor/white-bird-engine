@@ -156,17 +156,42 @@ ShaderDefaultPushValueVK default_push_value_from_name(std::string_view p_name) {
     if (p_name == "frame_slot") {
         return ShaderDefaultPushValueVK::FRAME_SLOT;
     }
-    throw std::runtime_error(std::format("Failed to resolve WBE_DEFAULT_PUSH: unsupported value '{}'.", p_name));
+    return ShaderDefaultPushValueVK::CUSTOM;
+}
+
+std::optional<ShaderPushConstantTypeVK> push_constant_type_from_scalar_type(std::string_view p_scalar_type) {
+    if (p_scalar_type == "uint32") {
+        return ShaderPushConstantTypeVK::UINT32;
+    }
+    if (p_scalar_type == "int32") {
+        return ShaderPushConstantTypeVK::INT32;
+    }
+    if (p_scalar_type == "float32") {
+        return ShaderPushConstantTypeVK::FLOAT32;
+    }
+    return std::nullopt;
+}
+
+bool push_constant_type_is_valid(ShaderDefaultPushValueVK p_value, ShaderPushConstantTypeVK p_type) {
+    switch (p_value) {
+    case ShaderDefaultPushValueVK::TIME:
+        return p_type == ShaderPushConstantTypeVK::FLOAT32;
+    case ShaderDefaultPushValueVK::FRAME_SLOT:
+        return p_type == ShaderPushConstantTypeVK::UINT32;
+    case ShaderDefaultPushValueVK::CUSTOM:
+        return true;
+    }
+    return false;
 }
 
 void append_default_push_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDefaultPushFieldVK p_field) {
     for (const ShaderDefaultPushFieldVK& existing : p_layout.default_fields) {
         if (existing.field_path == p_field.field_path) {
             throw std::runtime_error(std::format(
-                "Failed to resolve WBE_DEFAULT_PUSH: field path '{}' is declared more than once.", p_field.field_path));
+                "Failed to resolve WBE_PUSH_CONSTANT: field path '{}' is declared more than once.", p_field.field_path));
         }
         if (fields_overlap(existing, p_field)) {
-            throw std::runtime_error(std::format("Failed to resolve WBE_DEFAULT_PUSH: fields '{}' and '{}' overlap in push data.",
+            throw std::runtime_error(std::format("Failed to resolve WBE_PUSH_CONSTANT: fields '{}' and '{}' overlap in push data.",
                 existing.field_path,
                 p_field.field_path));
         }
@@ -221,10 +246,10 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
 
         std::string field_path = p_parent_path.empty() ? field.name : std::format("{}.{}", p_parent_path, field.name);
         const ShaderMetadataUserAttribute* descriptor_attribute = find_unique_attribute(field, "WBE_DESCRIPTOR");
-        const ShaderMetadataUserAttribute* default_push_attribute = find_unique_attribute(field, "WBE_DEFAULT_PUSH");
+        const ShaderMetadataUserAttribute* default_push_attribute = find_unique_attribute(field, "WBE_PUSH_CONSTANT");
         if (descriptor_attribute != nullptr && default_push_attribute != nullptr) {
             throw std::runtime_error(
-                std::format("Failed to resolve push data: field '{}' has both WBE_DESCRIPTOR and WBE_DEFAULT_PUSH.", field_path));
+                std::format("Failed to resolve push data: field '{}' has both WBE_DESCRIPTOR and WBE_PUSH_CONSTANT.", field_path));
         }
         if (descriptor_attribute != nullptr) {
             const std::vector<ShaderMetadataUserAttributeArgument>& arguments = descriptor_attribute->arguments;
@@ -257,20 +282,23 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
             if (default_push_attribute->arguments.size() != 1 || default_push_attribute->arguments[0].kind != "string" ||
                 default_push_attribute->arguments[0].string_value.empty()) {
                 throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_DEFAULT_PUSH: field '{}' requires one non-empty string argument.", field_path));
+                    "Failed to resolve WBE_PUSH_CONSTANT: field '{}' requires one non-empty string argument.", field_path));
             }
-            ShaderDefaultPushValueVK value = default_push_value_from_name(default_push_attribute->arguments[0].string_value);
-            const bool valid_scalar_type = (value == ShaderDefaultPushValueVK::TIME && field.type.scalar_type == "float32") ||
-                                           (value == ShaderDefaultPushValueVK::FRAME_SLOT && field.type.scalar_type == "uint32");
-            if (field.type.kind != "scalar" || !valid_scalar_type || field.binding.kind != "uniform" ||
-                std::cmp_not_equal(field.binding.size, sizeof(uint32_t)) || field_offset % sizeof(uint32_t) != 0) {
+            const std::string& value_name = default_push_attribute->arguments[0].string_value;
+            const ShaderDefaultPushValueVK value = default_push_value_from_name(value_name);
+            const std::optional<ShaderPushConstantTypeVK> type = push_constant_type_from_scalar_type(field.type.scalar_type);
+            if (field.type.kind != "scalar" || !type.has_value() || !push_constant_type_is_valid(value, *type) ||
+                field.binding.kind != "uniform" || std::cmp_not_equal(field.binding.size, sizeof(uint32_t)) ||
+                field_offset % sizeof(uint32_t) != 0) {
                 throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_DEFAULT_PUSH: field '{}' has an invalid type or four-byte scalar layout.", field_path));
+                    "Failed to resolve WBE_PUSH_CONSTANT: field '{}' has an invalid type or four-byte scalar layout.", field_path));
             }
             append_default_push_field(p_layout,
                 ShaderDefaultPushFieldVK{
                     .field_path = field_path,
                     .value = value,
+                    .name = value == ShaderDefaultPushValueVK::CUSTOM ? value_name : std::string(),
+                    .type = *type,
                     .offset = static_cast<uint32_t>(field_offset),
                 });
         }
@@ -334,7 +362,8 @@ void merge_descriptor_heap_layout(ShaderDescriptorHeapLayoutVK& p_result, const 
             return p_existing.field_path == field.field_path;
         });
         if (existing != p_result.default_fields.end()) {
-            if (existing->value != field.value || existing->offset != field.offset) {
+            if (existing->value != field.value || existing->name != field.name || existing->type != field.type ||
+                existing->offset != field.offset) {
                 throw std::runtime_error(std::format("Conflicting default push-data declarations for field '{}'.", field.field_path));
             }
             continue;

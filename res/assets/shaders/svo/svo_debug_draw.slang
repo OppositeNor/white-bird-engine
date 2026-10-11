@@ -36,7 +36,7 @@ struct SVODebugDrawDescriptorIndices {
 
     [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_DEFAULT_PUSH("frame_slot")]
+    [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

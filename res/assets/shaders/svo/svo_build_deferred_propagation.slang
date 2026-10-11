@@ -48,11 +48,11 @@ struct SVODescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong")]
     uint2 deferred_list_write;
 #endif
-    [WBE_DEFAULT_PUSH("frame_slot")]
+    [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<SVODescriptorIndices> descriptor_indices;
 
 [shader("compute")]

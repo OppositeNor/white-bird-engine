@@ -22,12 +22,48 @@
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include <bit>
 #include <cstdint>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
 class RendResViewVK;
+
+/**
+ * @class PushConstantValueVK
+ * @brief Typed 32-bit value for a custom WBE_PUSH_CONSTANT field.
+ *
+ * The type must match the reflected scalar type of every field receiving the value. Copyable and movable.
+ */
+struct PushConstantValueVK {
+    /** Scalar type of the value. */
+    ShaderPushConstantTypeVK type = ShaderPushConstantTypeVK::UINT32;
+    /** Raw 32-bit representation copied into push data. */
+    uint32_t bits = 0;
+
+    /**
+     * @brief Create a value for a shader `uint` field.
+     */
+    static PushConstantValueVK from_uint32(uint32_t p_value) {
+        return {.type = ShaderPushConstantTypeVK::UINT32, .bits = p_value};
+    }
+
+    /**
+     * @brief Create a value for a shader `int` field.
+     */
+    static PushConstantValueVK from_int32(int32_t p_value) {
+        return {.type = ShaderPushConstantTypeVK::INT32, .bits = std::bit_cast<uint32_t>(p_value)};
+    }
+
+    /**
+     * @brief Create a value for a shader `float` field.
+     */
+    static PushConstantValueVK from_float32(float p_value) {
+        return {.type = ShaderPushConstantTypeVK::FLOAT32, .bits = std::bit_cast<uint32_t>(p_value)};
+    }
+};
 
 /**
  * @class PipelineDescriptorBindingsVK
@@ -70,8 +106,30 @@ public:
     void bind_resources(const RendResViewVK& p_resources);
 
     /**
-     * @brief Resolve the current frame slot and push descriptor indices and renderer default values for this pipeline.
+     * @brief Set every custom WBE_PUSH_CONSTANT field with the identifier, if this pipeline declares any.
+     *
+     * The value is retained and pushed by every later push() call until it is set again.
+     *
+     * @param p_name Custom push-constant identifier.
+     * @param p_value Value whose type must match each reflected field.
+     * @return Whether this pipeline declares the identifier.
+     * @throws std::runtime_error If a declared field has a different scalar type.
+     */
+    bool try_set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
+
+    /**
+     * @brief Set every custom WBE_PUSH_CONSTANT field with the identifier.
+     *
+     * @param p_name Custom push-constant identifier.
+     * @param p_value Value whose type must match each reflected field.
+     * @throws std::runtime_error If this pipeline does not declare the identifier or a field has a different scalar type.
+     */
+    void set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
+
+    /**
+     * @brief Resolve the current frame slot and push descriptor indices, renderer default values, and custom values.
      * @param p_command_buffer Command buffer receiving push data.
+     * @throws std::runtime_error If a binding is unresolved or a custom push constant was never set.
      */
     void push(VkCommandBuffer p_command_buffer);
 
@@ -80,6 +138,7 @@ private:
     ShaderDescriptorHeapLayoutVK layout;
     Vector<uint8_t, RenderAllocator> push_data;
     Vector<Ref<RenderObjectContainerVK>, RenderAllocator> containers;
+    Vector<bool, RenderAllocator> custom_values_set;
 };
 
 } // namespace WhiteBirdEngine

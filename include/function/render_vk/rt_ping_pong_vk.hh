@@ -24,6 +24,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstdint>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -76,6 +77,19 @@ struct RTPingPongVK final : public IRenderTaskVK {
     void set_iteration_prefixes(Ref<ROComputePipelineVK> p_ping_prefix_pipeline,
         Ref<ROComputePipelineVK> p_pong_prefix_pipeline,
         VkExtent3D p_dispatch_group_count);
+
+    /**
+     * @brief Set a custom WBE_PUSH_CONSTANT value for every pipeline that declares the identifier.
+     *
+     * The value is pushed with every later dispatch. Call on the rendering thread; values set before graph construction are
+     * retained. Prefix pipelines
+     * configured later by set_iteration_prefixes() do not receive earlier values.
+     *
+     * @param p_name Custom push-constant identifier.
+     * @param p_value Value whose type must match each reflected field.
+     * @throws std::runtime_error If no pipeline declares the identifier or a field type does not match.
+     */
+    void set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

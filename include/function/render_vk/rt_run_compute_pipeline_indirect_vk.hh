@@ -62,6 +62,17 @@ struct RTRunComputePipelineIndirectVK final : public IRenderTaskVK {
         VkDeviceSize p_indirect_offset,
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
+    /**
+     * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.
+     *
+     * Call on the rendering thread; values set before graph construction are retained.
+     *
+     * @param p_name Custom push-constant identifier declared by the pipeline.
+     * @param p_value Value whose type must match the reflected field.
+     * @throws std::runtime_error If the pipeline does not declare the identifier or the type does not match.
+     */
+    void set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
+
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
     }

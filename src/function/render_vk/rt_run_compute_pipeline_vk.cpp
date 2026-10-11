@@ -24,6 +24,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -53,6 +54,10 @@ void RTRunComputePipelineVK::record(VkCommandBuffer p_command_buffer, double /*p
     vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->get_pipeline());
     descriptor_bindings->push(p_command_buffer);
     vkCmdDispatch(p_command_buffer, dispatch_group_count.width, dispatch_group_count.height, dispatch_group_count.depth);
+}
+
+void RTRunComputePipelineVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    descriptor_bindings->set_push_constant(p_name, p_value);
 }
 
 } // namespace WhiteBirdEngine

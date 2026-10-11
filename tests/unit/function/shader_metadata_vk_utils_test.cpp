@@ -150,7 +150,7 @@ ShaderMetadataTypeField make_default_push_field(
     field.binding.offset = p_offset;
     field.binding.size = 4;
     ShaderMetadataUserAttribute attribute;
-    attribute.name = "WBE_DEFAULT_PUSH";
+    attribute.name = "WBE_PUSH_CONSTANT";
     ShaderMetadataUserAttributeArgument argument;
     argument.kind = "string";
     argument.string_value = p_value;
@@ -238,8 +238,34 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsRendererDefaultPushFields) {
     EXPECT_EQ(layout.default_fields[1].offset, 4U);
 }
 
+TEST(WBEShaderMetadataVKUtilsTest, CollectsCustomPushConstantFields) {
+    const std::array<ShaderMetadataTypeField, 4> fields{{
+        make_default_push_field("level", "level", "uint32", 0),
+        make_default_push_field("offset", "offset", "int32", 4),
+        make_default_push_field("scale", "scale", "float32", 8),
+        make_default_push_field("frame_slot", "frame_slot", "uint32", 12),
+    }};
+    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+
+    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+
+    EXPECT_EQ(layout.size, 16U);
+    ASSERT_EQ(layout.default_fields.size(), 4U);
+    EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::CUSTOM);
+    EXPECT_EQ(layout.default_fields[0].name, "level");
+    EXPECT_EQ(layout.default_fields[0].type, ShaderPushConstantTypeVK::UINT32);
+    EXPECT_EQ(layout.default_fields[1].value, ShaderDefaultPushValueVK::CUSTOM);
+    EXPECT_EQ(layout.default_fields[1].type, ShaderPushConstantTypeVK::INT32);
+    EXPECT_EQ(layout.default_fields[1].offset, 4U);
+    EXPECT_EQ(layout.default_fields[2].value, ShaderDefaultPushValueVK::CUSTOM);
+    EXPECT_EQ(layout.default_fields[2].name, "scale");
+    EXPECT_EQ(layout.default_fields[2].type, ShaderPushConstantTypeVK::FLOAT32);
+    EXPECT_EQ(layout.default_fields[3].value, ShaderDefaultPushValueVK::FRAME_SLOT);
+    EXPECT_TRUE(layout.default_fields[3].name.empty());
+}
+
 TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedRendererDefaultPushFields) {
-    ShaderMetadataTypeField malformed = make_default_push_field("value", "unknown", "float32", 0);
+    ShaderMetadataTypeField malformed = make_default_push_field("value", "custom", "float64", 0);
     ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
     EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 

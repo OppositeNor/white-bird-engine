@@ -121,7 +121,7 @@ struct SVODescriptorIndices {
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
-    [WBE_DEFAULT_PUSH("frame_slot")]
+    [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 
     MeshDescriptorIndices mesh;

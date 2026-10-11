@@ -16,7 +16,7 @@
 #include "utils.slang"
 
 struct DrawTrianglePushData {
-    [WBE_DEFAULT_PUSH("time")]
+    [WBE_PUSH_CONSTANT("time")]
     float time;
 };
 

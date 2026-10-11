@@ -24,7 +24,9 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstddef>
+#include <format>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -98,6 +100,24 @@ void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer,
         };
         vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
     }
+}
+
+void RTRunComputePipelinesSequentialVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    bool declared = false;
+    for (Unique<PipelineDescriptorBindingsVK>& bindings : descriptor_bindings) {
+        declared = bindings->try_set_push_constant(p_name, p_value) || declared;
+    }
+    if (!declared) {
+        throw std::runtime_error(
+            std::format("RTRunComputePipelinesSequentialVK: no compute pipeline declares push constant '{}'.", p_name));
+    }
+}
+
+void RTRunComputePipelinesSequentialVK::set_push_constant(size_t p_entry_index, std::string_view p_name, PushConstantValueVK p_value) {
+    if (p_entry_index >= descriptor_bindings.size()) {
+        throw std::runtime_error("RTRunComputePipelinesSequentialVK: push-constant entry index is out of range.");
+    }
+    descriptor_bindings[p_entry_index]->set_push_constant(p_name, p_value);
 }
 
 } // namespace WhiteBirdEngine

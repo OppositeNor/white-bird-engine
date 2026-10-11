@@ -106,12 +106,16 @@ Relevant files:
 - `src/function/render/vertex_input_contract_resolver.cpp`
 - `tests/unit/function/shader_metadata_vk_utils_test.cpp`
 
-### `WBE_DEFAULT_PUSH`
+### `WBE_PUSH_CONSTANT`
 
-`WBE_DEFAULT_PUSH` marks a four-byte scalar in the pipeline push-data block whose value is supplied by the renderer for every
+`WBE_PUSH_CONSTANT` marks a four-byte scalar in the pipeline push-data block whose value is supplied by the renderer for every
 recorded pipeline. It requires one string argument. `"time"` requires a shader `float` and receives elapsed renderer-update time
-converted from CPU `double` to GPU `float`. Default fields share layout and overlap validation with `WBE_DESCRIPTOR` fields and
-merge consistently across graphics stages.
+converted from CPU `double` to GPU `float`; `"frame_slot"` requires a shader `uint` and receives the frame-in-flight slot. Any
+other identifier declares a custom `uint`, `int`, or `float` constant that compute dispatch tasks (`RTRunComputePipelineVK`,
+`RTRunComputePipelineIndirectVK`, `RTRunComputePipelinesSequentialVK`, `RTPingPongVK`) set with
+`set_push_constant(name, PushConstantValueVK::from_uint32(...))`; recording crashes if a declared custom constant was never set.
+Push-constant fields share layout and overlap validation with `WBE_DESCRIPTOR` fields and merge consistently across graphics
+stages.
 
 Relevant files:
 
