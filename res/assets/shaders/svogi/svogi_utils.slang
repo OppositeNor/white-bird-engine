@@ -16,7 +16,14 @@
 #define WBE_FILE_SVOGI_UTILS_SLANG
 
 struct SVOGIData {
-
+    /**
+     * @brief RGB color, alpha used for opacity.
+     */
+    float4 color;
+    /**
+     * @brief The average vector. The length encodes the variance: var = (1 - |average_vector|) / |average_vector|.
+     */
+    float3 average_vector;
 };
 
 #endif

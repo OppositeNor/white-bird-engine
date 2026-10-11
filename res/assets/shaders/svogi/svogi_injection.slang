@@ -13,12 +13,13 @@
    limitations under the License.
 */
 
-#include "light/light_utils.slang"
+#include "deferred_composition/deferred_composition_utils.slang"
+#include "svo/svo.slang"
 #include "svo/svo_utils.slang"
 #include "svo/svo_dynamic_read.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_pre_deferred_debug_info_buffer")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
@@ -31,11 +32,9 @@ struct DescriptorIndices {
 
     [WBE_DESCRIPTOR("storage_buffer", "svogi_data_buffer", "read")]
     uint2 svogi_data;
-    [WBE_DESCRIPTOR("uniform_buffer", "shadow_light_info")]
-    uint2 light_camera_info;
+    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
+    uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
-    uint2 light_count;
 };
 
 [[vk::push_constant]]
@@ -45,14 +44,21 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [numthreads(8, 8, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
-    StructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
 
-    SVO svo(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
+    SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    // TODO
+    uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
+    for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
+        SpotLightInfo spot_light_info = get_spot_light_info(descriptor_indices.light_infos, spot_light_index);
+        LightParamDescriptorIndices light = descriptor_indices.lights[spot_light_index];
+        Texture2D<float> shadowmap = ResourceDescriptorHeap[light.shadowmap.x];
+        // TODO
+    }
+    
+    
 }
