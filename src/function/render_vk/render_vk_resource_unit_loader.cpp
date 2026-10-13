@@ -140,6 +140,36 @@ void validate_index_view_schema(const RUSchemaIndexView& p_indices) {
     }
 }
 
+constexpr std::string_view JOINT_BINDING_IDS_ROLE = "joint_binding_ids";
+constexpr std::string_view JOINT_BINDING_WEIGHTS_ROLE = "joint_binding_weights";
+
+void validate_joint_binding_attribute(const RUSchemaVertexView& p_joint_bindings, std::string_view p_role, std::string_view p_type) {
+    const auto attribute = std::ranges::find_if(p_joint_bindings.attributes, [p_role](const RUSchemaVertexAttribute& p_attribute) {
+        return p_attribute.role == p_role;
+    });
+    if (attribute == p_joint_bindings.attributes.end()) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: joint bindings require the '{}' attribute.", p_role));
+    }
+    if (attribute->type != p_type) {
+        throw std::runtime_error(std::format("Failed to populate submesh resource unit: joint binding attribute '{}' must have type '{}', got '{}'.",
+            p_role,
+            p_type,
+            attribute->type));
+    }
+}
+
+void validate_joint_bindings_schema(const RUSchemaVertexView& p_joint_bindings, const RUSchemaVertexView& p_vertices) {
+    validate_vertex_view_schema(p_joint_bindings);
+    validate_joint_binding_attribute(p_joint_bindings, JOINT_BINDING_IDS_ROLE, "ivec4");
+    validate_joint_binding_attribute(p_joint_bindings, JOINT_BINDING_WEIGHTS_ROLE, "vec4");
+    const size_t joint_binding_count = p_joint_bindings.binary.size / p_joint_bindings.stride;
+    const size_t vertex_count = p_vertices.binary.size / p_vertices.stride;
+    if (joint_binding_count != vertex_count) {
+        throw std::runtime_error(std::format(
+            "Failed to populate submesh resource unit: joint binding count {} does not match vertex count {}.", joint_binding_count, vertex_count));
+    }
+}
+
 RUShaderRole populate_shader_role(IResourceChunk& p_res_chunk, std::string_view p_role_name) {
     if (p_role_name.empty() || p_role_name.contains('\0')) {
         throw std::runtime_error("Failed to populate shader role: role name must be non-empty and must not contain NUL.");
@@ -401,7 +431,7 @@ RUAABB3D resolve_aabb(const RUSchemaAABB3D& p_scheme) {
     };
 }
 
-void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& p_scheme, RUSubmesh3D& p_resource_unit) {
+void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& p_scheme, bool p_has_skeleton, RUSubmesh3D& p_resource_unit) {
     if (!p_scheme.material_id.has_value()) {
         if (!p_scheme.material.has_value()) {
             throw std::runtime_error("Failed to populate mesh: submesh material_id or inline material is required.");
@@ -411,6 +441,14 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& 
     p_resource_unit.aabb = resolve_aabb(p_scheme.aabb);
     populate_vertex_view(p_res_chunk, p_scheme.vertices, p_resource_unit.vertices);
     populate_index_view(p_scheme.indices, p_resource_unit.indices);
+    if (p_scheme.joint_bindings.has_value()) {
+        if (!p_has_skeleton) {
+            throw std::runtime_error("Failed to populate mesh: submesh joint_bindings require the mesh to declare skeleton_id.");
+        }
+        // The vertex view was validated by populate_vertex_view above.
+        validate_joint_bindings_schema(p_scheme.joint_bindings.value(), p_scheme.vertices);
+        populate_vertex_view(p_res_chunk, p_scheme.joint_bindings.value(), p_resource_unit.joint_bindings.emplace());
+    }
     p_resource_unit.first_instance = p_scheme.first_instance;
     p_resource_unit.instance_count = p_scheme.instance_count;
 }
@@ -421,9 +459,13 @@ void create_submesh_refs(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_un
     }
     p_res_chunk.create_ref_to(p_resource_unit.vertices.binary.binary, p_scheme.vertices.binary.binary_id);
     p_res_chunk.create_ref_to(p_resource_unit.indices.binary.binary, p_scheme.indices.binary.binary_id);
+    if (p_scheme.joint_bindings.has_value()) {
+        WBE_DEBUG_ASSERT(p_resource_unit.joint_bindings.has_value());
+        p_res_chunk.create_ref_to(p_resource_unit.joint_bindings->binary.binary, p_scheme.joint_bindings->binary.binary_id);
+    }
 }
 
-RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, const RUSchemaSubmeshInstance3D& p_scheme) {
+RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, const RUSchemaSubmeshInstance3D& p_scheme, bool p_has_skeleton) {
     RUSubmeshInstance3D result;
     std::vector<RUSubmesh3D> submeshes;
     submeshes.reserve(p_scheme.submeshes.size());
@@ -433,7 +475,7 @@ RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, cons
             throw std::runtime_error("Failed to populate mesh: submesh instance range is out of bounds.");
         }
         RUSubmesh3D submesh;
-        resolve_submesh_data(p_res_chunk, submesh_scheme, submesh);
+        resolve_submesh_data(p_res_chunk, submesh_scheme, p_has_skeleton, submesh);
         submeshes.push_back(submesh);
     }
     if (!submeshes.empty()) {
@@ -532,11 +574,23 @@ std::span<const std::string> ResourceUnitLoaderMesh::get_supported_resource_type
 
 std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemaMesh3D>(p_scheme, "mesh");
+    const bool has_skeleton = typed_scheme.skeleton_id.has_value();
+    if (has_skeleton && typed_scheme.skeleton_id->empty()) {
+        throw std::runtime_error("Failed to populate mesh: skeleton_id must be non-empty.");
+    }
+    if (has_skeleton && typed_scheme.skeleton_id->contains('\0')) {
+        throw std::runtime_error("Failed to populate mesh: skeleton_id must not contain NUL.");
+    }
     RUMesh3D resource_unit;
-    resource_unit.opaque_instances = populate_submesh_instances(p_res_chunk, typed_scheme.opaque_instances);
-    resource_unit.masked_instances = populate_submesh_instances(p_res_chunk, typed_scheme.masked_instances);
-    resource_unit.double_sided_opaque_instances = populate_submesh_instances(p_res_chunk, typed_scheme.double_sided_opaque_instances);
-    return p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUMesh3D>();
+    resource_unit.opaque_instances = populate_submesh_instances(p_res_chunk, typed_scheme.opaque_instances, has_skeleton);
+    resource_unit.masked_instances = populate_submesh_instances(p_res_chunk, typed_scheme.masked_instances, has_skeleton);
+    resource_unit.double_sided_opaque_instances =
+        populate_submesh_instances(p_res_chunk, typed_scheme.double_sided_opaque_instances, has_skeleton);
+    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUMesh3D>();
+    if (has_skeleton) {
+        p_res_chunk.create_ref_to(saved_resource->skeleton, typed_scheme.skeleton_id.value());
+    }
+    return saved_resource;
 }
 
 void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {

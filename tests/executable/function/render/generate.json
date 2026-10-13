@@ -28,6 +28,10 @@
                 {
                     "name" : "vulkan_pixel_sorting_test",
                     "sources" : ["vulkan_pixel_sorting_test.cpp"]
+                },
+                {
+                    "name" : "vulkan_draw_skinned_mesh_test",
+                    "sources" : ["vulkan_draw_skinned_mesh_test.cpp"]
                 }
 
             ]

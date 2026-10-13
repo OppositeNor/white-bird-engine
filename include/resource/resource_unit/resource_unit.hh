@@ -19,6 +19,7 @@
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "resource/ktx_texture.hh"
 #include "utils/utils.hh"
 #include <bitset>
@@ -27,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 namespace WhiteBirdEngine {
 
 /**
@@ -150,6 +152,30 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaImage : public RUSchema {
     // The path to the image file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
+};
+
+/**
+ * @class RUSchemaSkeletonJoint
+ * @brief One joint of a skeleton scheme.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSkeletonJoint {
+    /** Index of the parent joint, or -1 for the root joint. Parents must precede their children. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    int32_t parent_index = -1;
+    /** Column-major bind-pose transform relative to the parent joint, or to the mesh space for the root joint. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    glm::mat4 bind_local_transform{1.0F};
+};
+
+/**
+ * @class RUSchemaSkeleton
+ * @brief The scheme of RUSkeleton.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaSkeleton : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaSkeleton)
+    /** Non-empty joint array forming one tree. The first joint is the only root. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<RUSchemaSkeletonJoint> joints;
 };
 
 /**
@@ -291,6 +317,29 @@ struct RUImage : public ResourceUnit {
     std::bitset<TOTAL_CONFIG_BIT> config;
     // The image data.
     RefRes<char> image_data;
+};
+
+/**
+ * @class RUSkeleton
+ * @brief Skeleton resource unit: a joint tree stored as a parent-before-child array.
+ *
+ * Joint 0 is the only root. Every other joint's parent index is smaller than its own index, so global bind transforms can be
+ * accumulated in array order. The joint storage belongs to the resource chunk; the unit is a shallow chunk view.
+ */
+struct RUSkeleton : public ResourceUnit {
+    /**
+     * @brief One joint of the skeleton.
+     */
+    struct Joint {
+        /** Index of the parent joint, or -1 for the root joint. */
+        int32_t parent_index = -1;
+        /** Column-major bind-pose transform relative to the parent joint, or to the mesh space for the root joint. */
+        glm::mat4 bind_local_transform{1.0F};
+    };
+    /** Chunk-owned contiguous joint storage. */
+    RefRes<Joint> joints;
+    /** Number of entries in joints. */
+    size_t joint_count = 0;
 };
 
 /**

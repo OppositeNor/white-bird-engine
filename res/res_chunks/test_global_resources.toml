@@ -19,6 +19,7 @@ include = [
     "assets/shaders/billboard/billboard_shader.toml",
     "assets/shaders/draw_triangle/draw_triangle_shader.toml",
     "assets/shaders/draw_cube_unshaded/draw_cube_unshaded_shader.toml",
+    "assets/shaders/draw_skinned_mesh/draw_skinned_mesh_shader.toml",
     "assets/shaders/deferred_gbuffer/deferred_gbuffer_shader.toml",
     "assets/shaders/deferred_composition/deferred_composition_shader.toml",
     "assets/shaders/svo/svo.toml",

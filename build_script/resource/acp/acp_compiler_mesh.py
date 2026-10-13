@@ -293,6 +293,13 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             )
         self._validate_runtime_vertex_view(vertices, manifest_path)
         self._validate_runtime_index_view(indices, manifest_path)
+        joint_bindings = resource.get("joint_bindings")
+        if joint_bindings is not None:
+            if not isinstance(joint_bindings, dict):
+                raise RuntimeError(
+                    f"WBEACPCompilerMesh: runtime submesh joint_bindings must be an object in {manifest_path}."
+                )
+            self._validate_runtime_vertex_view(joint_bindings, manifest_path)
 
     def _validate_runtime_vertex_view(self, vertices: ManifestResource, manifest_path: Path) -> None:
         self._validate_binary_view(vertices.get("binary"), manifest_path, "vertices")

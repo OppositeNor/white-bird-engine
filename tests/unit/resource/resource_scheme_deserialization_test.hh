@@ -17,12 +17,14 @@
 
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "test_global.hh"
 #include <exception>
 #include <gtest/gtest.h>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace WBE = WhiteBirdEngine;
@@ -351,6 +353,117 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshRequiresEveryCategory) 
     WBE::ParserJSON parser;
     parser.parse_from_buffer(json_buffer);
     WBE::RUSchemaMesh3D scheme;
+    EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshSkeletonAndJointBindings) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_skinned_mesh",
+        "type": "mesh",
+        "skeleton_id": "test_skeleton",
+        "opaque_instances": {
+            "submeshes": [
+                {
+                    "aabb": {"center": [0.0, 0.0, 0.0], "width": 1.0, "height": 1.0},
+                    "vertices": {
+                        "binary": {"binary_id": "test_skinned_mesh.geometry", "start": 0, "size": 36},
+                        "stride": 12,
+                        "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
+                    },
+                    "indices": {"binary": {"binary_id": "test_skinned_mesh.geometry", "start": 36, "size": 12}},
+                    "joint_bindings": {
+                        "binary": {"binary_id": "test_skinned_mesh.joint_bindings", "start": 0, "size": 96},
+                        "stride": 32,
+                        "attributes": [
+                            {"role": "joint_binding_ids", "type": "ivec4", "offset": 0},
+                            {"role": "joint_binding_weights", "type": "vec4", "offset": 16}
+                        ]
+                    },
+                    "first_instance": 0,
+                    "instance_count": 1
+                }
+            ],
+            "instances": [{"global_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]}]
+        },
+        "masked_instances": {"submeshes": [], "instances": []},
+        "double_sided_opaque_instances": {"submeshes": [], "instances": []}
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaMesh3D scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_TRUE(scheme.skeleton_id.has_value());
+    ASSERT_EQ(scheme.skeleton_id.value(), "test_skeleton");
+    ASSERT_EQ(scheme.opaque_instances.submeshes.size(), 1U);
+    const std::optional<WBE::RUSchemaVertexView>& joint_bindings = scheme.opaque_instances.submeshes[0].joint_bindings;
+    ASSERT_TRUE(joint_bindings.has_value());
+    ASSERT_EQ(joint_bindings->binary.binary_id, "test_skinned_mesh.joint_bindings");
+    ASSERT_EQ(joint_bindings->binary.size, 96U);
+    ASSERT_EQ(joint_bindings->stride, 32U);
+    ASSERT_EQ(joint_bindings->attributes.size(), 2U);
+    ASSERT_EQ(joint_bindings->attributes[0].role, "joint_binding_ids");
+    ASSERT_EQ(joint_bindings->attributes[0].type, "ivec4");
+    ASSERT_EQ(joint_bindings->attributes[1].role, "joint_binding_weights");
+    ASSERT_EQ(joint_bindings->attributes[1].type, "vec4");
+    ASSERT_EQ(joint_bindings->attributes[1].offset, 16U);
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshWithoutSkeleton) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_mesh_static",
+        "type": "mesh",
+        "opaque_instances": {"submeshes": [], "instances": []},
+        "masked_instances": {"submeshes": [], "instances": []},
+        "double_sided_opaque_instances": {"submeshes": [], "instances": []}
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaMesh3D scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_FALSE(scheme.skeleton_id.has_value());
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSkeletonGeneral) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_skeleton",
+        "type": "skeleton",
+        "joints": [
+            {"parent_index": -1, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 3, 4, 1]}
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaSkeleton scheme;
+    scheme.deserialize(parser.get_data());
+    ASSERT_EQ(scheme.id, "test_skeleton");
+    ASSERT_EQ(scheme.type, "skeleton");
+    ASSERT_EQ(scheme.joints.size(), 2U);
+    ASSERT_EQ(scheme.joints[0].parent_index, -1);
+    ASSERT_EQ(scheme.joints[0].bind_local_transform, glm::mat4(1.0F));
+    ASSERT_EQ(scheme.joints[1].parent_index, 0);
+    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][0], 2.0F);
+    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][1], 3.0F);
+    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][2], 4.0F);
+}
+
+TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSkeletonRequiresJointFields) {
+    std::string json_buffer = R"(
+    {
+        "id": "test_skeleton_missing_transform",
+        "type": "skeleton",
+        "joints": [{"parent_index": -1}]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(json_buffer);
+    WBE::RUSchemaSkeleton scheme;
     EXPECT_THROW(scheme.deserialize(parser.get_data()), std::exception);
 }
 

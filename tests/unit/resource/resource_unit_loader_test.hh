@@ -51,6 +51,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <numbers>
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -247,6 +248,20 @@ protected:
         return scheme;
     }
 
+    static constexpr size_t JOINT_BINDING_STRIDE = sizeof(int32_t) * 4 + sizeof(float) * 4;
+
+    static WBE::RUSchemaVertexView make_triangle_joint_bindings_scheme() {
+        return {
+            .binary = {.binary_id = "loaded_geometry", .start = 0, .size = JOINT_BINDING_STRIDE * 3},
+            .stride = JOINT_BINDING_STRIDE,
+            .attributes =
+                {
+                    {.role = "joint_binding_ids", .type = "ivec4", .offset = 0},
+                    {.role = "joint_binding_weights", .type = "vec4", .offset = sizeof(int32_t) * 4},
+                },
+        };
+    }
+
     WBE::RUSchemaMesh3D make_single_submesh_mesh_scheme(WBE::RUSchemaSubmesh3D p_submesh) {
         WBE::RUSchemaMesh3D scheme;
         scheme.id = "loaded_mesh";
@@ -408,6 +423,7 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderBinary binary_loader;
     WBE::ResourceUnitLoaderFont font_loader;
     WBE::ResourceUnitLoaderImage image_loader;
+    WBE::ResourceUnitLoaderSkeleton skeleton_loader;
     WBE::ResourceUnitLoaderTexture texture_loader;
     WBE::ResourceUnitLoaderText text_loader;
     WBE::ResourceUnitLoaderVideo video_loader;
@@ -420,11 +436,12 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
     WBE::ResourceUnitLoaderPrefab prefab_loader;
     WBE::ResourceUnitLoaderWorld world_loader;
     WBE::ResourceUnitLoaderScene scene_loader;
-    const std::array<const WBE::IResourceUnitLoader*, 16> loaders = {
+    const std::array<const WBE::IResourceUnitLoader*, 17> loaders = {
         &audio_loader,
         &binary_loader,
         &font_loader,
         &image_loader,
+        &skeleton_loader,
         &texture_loader,
         &text_loader,
         &video_loader,
@@ -438,11 +455,12 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
         &world_loader,
         &scene_loader,
     };
-    const std::array<std::string_view, 16> expected_resource_types = {
+    const std::array<std::string_view, 17> expected_resource_types = {
         "audio",
         "binary",
         "font",
         "image",
+        "skeleton",
         "texture",
         "text",
         "video",
@@ -981,6 +999,209 @@ TEST_F(ResourcePopulatorTest, MeshLoadsEmptyCategories) {
         EXPECT_EQ(category->submeshes, nullptr);
         EXPECT_EQ(category->instances, nullptr);
     }
+}
+
+TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
+    auto resource_chunk = MockResourceChunk::Builder()
+                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
+                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
+                              })
+                              .set_reserve_res_unit_storage_callback(
+                                  [&stack_allocator, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                                      if (p_id == "loaded_skeleton") {
+                                          captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
+                                      }
+                                      return resource;
+                                  })
+                              .build(stream);
+    constexpr std::string_view JSON_BUFFER = R"(
+    {
+        "id": "loaded_skeleton",
+        "type": "skeleton",
+        "joints": [
+            {"parent_index": -1, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]},
+            {"parent_index": 1, "bind_local_transform": [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 1, 0, 1]},
+            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1]}
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(JSON_BUFFER);
+    WBE::ResourceUnitLoaderSkeleton loader;
+
+    loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
+
+    ASSERT_NE(captured_skeleton, nullptr);
+    ASSERT_EQ(captured_skeleton->joint_count, 4U);
+    ASSERT_NE(captured_skeleton->joints, nullptr);
+    const WBE::RUSkeleton::Joint* joints = captured_skeleton->joints.get();
+    EXPECT_EQ(joints[0].parent_index, -1);
+    EXPECT_EQ(joints[1].parent_index, 0);
+    EXPECT_EQ(joints[2].parent_index, 1);
+    EXPECT_EQ(joints[3].parent_index, 0);
+    EXPECT_EQ(joints[0].bind_local_transform, glm::mat4(1.0F));
+    EXPECT_EQ(joints[1].bind_local_transform[3], glm::vec4(0.0F, 1.0F, 0.0F, 1.0F));
+    EXPECT_EQ(joints[2].bind_local_transform[0][0], 2.0F);
+    EXPECT_EQ(joints[3].bind_local_transform[3][0], 3.0F);
+}
+
+TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
+    WBE::ResourceUnitLoaderSkeleton loader;
+    auto expect_invalid = [&loader](std::vector<int32_t> p_parent_indices) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        auto resource_chunk = MockResourceChunk::Builder()
+                                  .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                      std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
+                                      return WBE::RefRes<char>(mem_id, &stack_allocator);
+                                  })
+                                  .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) {
+                                      return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
+                                  })
+                                  .build(stream);
+        WBE::RUSchemaSkeleton scheme;
+        scheme.id = "invalid_skeleton";
+        scheme.type = "skeleton";
+        for (int32_t parent_index : p_parent_indices) {
+            scheme.joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
+        }
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+    };
+
+    expect_invalid({});
+    expect_invalid({0});
+    expect_invalid({-1, -1});
+    expect_invalid({-1, -2});
+    expect_invalid({-1, 1});
+    expect_invalid({-1, 2, 0});
+}
+
+TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    std::vector<std::string> created_ref_keys;
+    WBE::RUSkeleton skeleton;
+    skeleton.joint_count = 2;
+    WBE::RefRes<WBE::RUSkeleton> stored_skeleton = push_test_object(stack_allocator, skeleton);
+    std::array<uint8_t, 256> binary_data{};
+    WBE::RUBinary binary;
+    binary.data = push_test_object(stack_allocator, binary_data).force_cast<char>();
+    binary.size = binary_data.size();
+    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_object(stack_allocator, binary);
+    auto resource_chunk = MockResourceChunk::Builder()
+                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
+                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
+                              })
+                              .set_reserve_res_unit_storage_callback(
+                                  [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                                      if (p_id == "loaded_mesh") {
+                                          captured_mesh = resource.force_cast<WBE::RUMesh3D>();
+                                      }
+                                      return resource;
+                                  })
+                              .set_create_ref_to_callback([&created_ref_keys, &stored_skeleton, &stored_binary](
+                                                              std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                                  created_ref_keys.emplace_back(p_key);
+                                  if (p_key == "loaded_skeleton") {
+                                      p_assign_ref(stored_skeleton.force_cast<char>());
+                                  } else if (p_key == "loaded_geometry" || p_key == "loaded_joint_bindings") {
+                                      p_assign_ref(stored_binary.force_cast<char>());
+                                  }
+                              })
+                              .build(stream);
+    WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
+    submesh_scheme.joint_bindings = make_triangle_joint_bindings_scheme();
+    submesh_scheme.joint_bindings->binary.binary_id = "loaded_joint_bindings";
+    WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(submesh_scheme);
+    scheme.skeleton_id = "loaded_skeleton";
+    WBE::ResourceUnitLoaderMesh loader;
+
+    loader.populate_scheme(*resource_chunk, scheme);
+
+    ASSERT_NE(captured_mesh, nullptr);
+    EXPECT_EQ(captured_mesh->skeleton, stored_skeleton);
+    ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
+    const WBE::RUSubmesh3D& submesh = captured_mesh->opaque_instances.submeshes.get()[0];
+    ASSERT_TRUE(submesh.joint_bindings.has_value());
+    const WBE::RUVertexView& joint_bindings = submesh.joint_bindings.value();
+    EXPECT_EQ(joint_bindings.binary.binary, stored_binary);
+    EXPECT_EQ(joint_bindings.vertex_count, 3U);
+    EXPECT_EQ(joint_bindings.vertex_stride, JOINT_BINDING_STRIDE);
+    ASSERT_EQ(joint_bindings.attribute_count, 2U);
+    EXPECT_STREQ(joint_bindings.attributes.get()[0].role.name.get(), "joint_binding_ids");
+    EXPECT_EQ(joint_bindings.attributes.get()[0].format, WBE::RUVertexAttributeFormat::INT4);
+    EXPECT_STREQ(joint_bindings.attributes.get()[1].role.name.get(), "joint_binding_weights");
+    EXPECT_EQ(joint_bindings.attributes.get()[1].format, WBE::RUVertexAttributeFormat::FLOAT4);
+    EXPECT_EQ(joint_bindings.get_vertex_attribute_offset("joint_binding_weights"), sizeof(int32_t) * 4);
+    EXPECT_NE(std::ranges::find(created_ref_keys, "loaded_joint_bindings"), created_ref_keys.end());
+    EXPECT_NE(std::ranges::find(created_ref_keys, "loaded_skeleton"), created_ref_keys.end());
+}
+
+TEST_F(ResourcePopulatorTest, MeshWithoutSkeletonHasNoSkeletonOrJointBindings) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    WBE::ResourceUnitLoaderMesh loader;
+
+    loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(make_triangle_submesh_scheme()));
+
+    ASSERT_NE(captured_mesh, nullptr);
+    EXPECT_EQ(captured_mesh->skeleton, nullptr);
+    EXPECT_FALSE(captured_mesh->opaque_instances.submeshes.get()[0].joint_bindings.has_value());
+}
+
+TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
+    WBE::ResourceUnitLoaderMesh loader;
+    auto expect_invalid = [this, &loader](std::optional<std::string> p_skeleton_id, WBE::RUSchemaVertexView p_joint_bindings) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
+        submesh_scheme.joint_bindings = std::move(p_joint_bindings);
+        WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(submesh_scheme);
+        scheme.skeleton_id = std::move(p_skeleton_id);
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+    };
+    const WBE::RUSchemaVertexView valid_joint_bindings = make_triangle_joint_bindings_scheme();
+
+    expect_invalid(std::nullopt, valid_joint_bindings);
+    expect_invalid(std::string(), valid_joint_bindings);
+
+    WBE::RUSchemaVertexView missing_ids = valid_joint_bindings;
+    missing_ids.attributes[0].role = "other_role";
+    expect_invalid("loaded_skeleton", missing_ids);
+
+    WBE::RUSchemaVertexView missing_weights = valid_joint_bindings;
+    missing_weights.attributes[1].role = "other_role";
+    expect_invalid("loaded_skeleton", missing_weights);
+
+    WBE::RUSchemaVertexView unsigned_ids = valid_joint_bindings;
+    unsigned_ids.attributes[0].type = "uvec4";
+    expect_invalid("loaded_skeleton", unsigned_ids);
+
+    WBE::RUSchemaVertexView scalar_weights = valid_joint_bindings;
+    scalar_weights.attributes[1].type = "float";
+    expect_invalid("loaded_skeleton", scalar_weights);
+
+    WBE::RUSchemaVertexView too_few_bindings = valid_joint_bindings;
+    too_few_bindings.binary.size = JOINT_BINDING_STRIDE * 2;
+    expect_invalid("loaded_skeleton", too_few_bindings);
 }
 
 TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {

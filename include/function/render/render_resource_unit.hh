@@ -285,6 +285,14 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3D {
     /** Binary-backed uint32 indices. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaIndexView indices;
+    /**
+     * @brief Binary-backed per-vertex skeleton joint bindings.
+     *
+     * Requires the mesh to reference a skeleton. The view must hold one entry per vertex and declare the `ivec4`
+     * `joint_binding_ids` and `vec4` `joint_binding_weights` attributes.
+     */
+    WBE_META(WBE_REFLECT)
+    std::optional<RUSchemaVertexView> joint_bindings;
     /** First transform entry used by this submesh. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     size_t first_instance = 0;
@@ -331,6 +339,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
     /** Opaque submeshes drawn without face culling. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaSubmeshInstance3D double_sided_opaque_instances;
+    /** Resource ID of the skeleton the submesh joint bindings index. */
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> skeleton_id;
 };
 
 /**
@@ -609,6 +620,13 @@ struct RUSubmesh3D {
     RUVertexView vertices;
     /** Binary-backed uint32 indices. */
     RUIndexView indices;
+    /**
+     * @brief Per-vertex skeleton joint bindings, present only for meshes that reference a skeleton.
+     *
+     * Each entry stores the `ivec4` `joint_binding_ids` indexing the mesh skeleton joints and the matching `vec4`
+     * `joint_binding_weights`. The view has the same vertex count as vertices.
+     */
+    std::optional<RUVertexView> joint_bindings;
     /** First transform entry used by this submesh. */
     size_t first_instance = 0;
     /** Number of transform entries used by this submesh. */
@@ -689,6 +707,8 @@ struct RUMesh3D : public ResourceUnit {
     RUSubmeshInstance3D masked_instances;
     /** Opaque submeshes drawn without face culling. */
     RUSubmeshInstance3D double_sided_opaque_instances;
+    /** Referenced skeleton, or null when the mesh is not skinned. */
+    RefRes<RUSkeleton> skeleton;
 };
 
 } // namespace WhiteBirdEngine

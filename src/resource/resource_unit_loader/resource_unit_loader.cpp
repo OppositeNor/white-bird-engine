@@ -262,6 +262,46 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUImage>();
 }
 
+std::any ResourceUnitLoaderSkeleton::populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaSkeleton& p_scheme) const {
+    if (p_scheme.joints.empty()) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: at least one joint is required.", p_scheme.id));
+    }
+    if (p_scheme.joints.size() > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: joint count {} exceeds the int32 index range.",
+            p_scheme.id,
+            p_scheme.joints.size()));
+    }
+    if (p_scheme.joints.front().parent_index != -1) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: joint 0 must be the root joint with parent_index -1.", p_scheme.id));
+    }
+    std::vector<RUSkeleton::Joint> joints;
+    joints.reserve(p_scheme.joints.size());
+    for (size_t i = 0; i < p_scheme.joints.size(); ++i) {
+        const RUSchemaSkeletonJoint& joint_scheme = p_scheme.joints[i];
+        if (i > 0 && joint_scheme.parent_index == -1) {
+            throw std::runtime_error(std::format("Failed to populate skeleton {}: joint {} is a second root joint.", p_scheme.id, i));
+        }
+        if (i > 0 && joint_scheme.parent_index < 0) {
+            throw std::runtime_error(std::format(
+                "Failed to populate skeleton {}: joint {} has negative parent_index {}.", p_scheme.id, i, joint_scheme.parent_index));
+        }
+        if (i > 0 && std::cmp_greater_equal(joint_scheme.parent_index, i)) {
+            throw std::runtime_error(std::format("Failed to populate skeleton {}: joint {} has parent_index {}, which does not precede it.",
+                p_scheme.id,
+                i,
+                joint_scheme.parent_index));
+        }
+        joints.push_back(RUSkeleton::Joint{
+            .parent_index = joint_scheme.parent_index,
+            .bind_local_transform = joint_scheme.bind_local_transform,
+        });
+    }
+    RUSkeleton resource_unit;
+    resource_unit.joints = p_res_chunk.push_data(joints.size() * sizeof(RUSkeleton::Joint), joints.data()).force_cast<RUSkeleton::Joint>();
+    resource_unit.joint_count = joints.size();
+    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUSkeleton>();
+}
+
 std::any ResourceUnitLoaderTexture::populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaTexture& p_scheme) const {
     auto file_path = get_resource_path(p_scheme.path);
     return p_res_chunk.emplace_res_unit<RUTexture>(p_scheme.id, file_path.string());
