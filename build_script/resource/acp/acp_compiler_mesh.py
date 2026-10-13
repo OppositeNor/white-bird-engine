@@ -42,6 +42,8 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         "int", "ivec2", "ivec3", "ivec4",
         "uint", "uvec2", "uvec3", "uvec4",
     }
+    _JOINT_BINDING_TYPES = {"joint_binding_ids": "ivec4", "joint_binding_weights": "vec4"}
+    _LEGACY_VERTEX_FIELDS = ("vertices", "joint_bindings")
 
     @override
     def get_supported_resource_types(self) -> list[str]:
@@ -115,9 +117,14 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         return result
 
     def _compile_submesh(self, resource: ManifestResource, manifest_path: Path, res_output_dir: Path) -> list[ManifestResource]:
+        for legacy_field in self._LEGACY_VERTEX_FIELDS:
+            if legacy_field in resource:
+                raise RuntimeError(
+                    f"WBEACPCompilerMesh: submesh field '{legacy_field}' is no longer supported; declare vertex views in vertex_bindings in {manifest_path}."
+                )
         has_inline_vertices = "vertices_data" in resource
         has_inline_indices = "indices_data" in resource
-        has_runtime_geometry = "vertices" in resource or "indices" in resource
+        has_runtime_geometry = "vertex_bindings" in resource or "indices" in resource
         if has_runtime_geometry and (has_inline_vertices or has_inline_indices):
             raise RuntimeError(
                 f"WBEACPCompilerMesh: submesh cannot mix inline geometry and runtime views in {manifest_path}."
@@ -133,7 +140,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             )
         if not has_inline_vertices:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: submesh requires vertices/indices views or vertices_data/indices_data in {manifest_path}."
+                f"WBEACPCompilerMesh: submesh requires vertex_bindings/indices views or vertices_data/indices_data in {manifest_path}."
             )
 
         vertices = resource["vertices_data"]
@@ -155,7 +162,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         result = self._copy_runtime_fields(resource)
         result.setdefault("type", "submesh")
         result["aabb"] = self._compute_aabb(vertices, manifest_path)
-        result["vertices"] = vertices_view
+        result["vertex_bindings"] = [vertices_view]
         result["indices"] = indices_view
         binary_resource: ManifestResource = {"id": binary_id, "type": "binary", "path": output_rel_path.as_posix()}
         return [result, binary_resource]
@@ -285,23 +292,46 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         return tuple(values)
 
     def _validate_runtime_submesh(self, resource: ManifestResource, manifest_path: Path) -> None:
-        vertices = resource.get("vertices")
-        indices = resource.get("indices")
-        if not isinstance(vertices, dict) or not isinstance(indices, dict):
+        vertex_bindings = resource.get("vertex_bindings")
+        if not isinstance(vertex_bindings, list):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: runtime submesh requires vertices and indices objects in {manifest_path}."
+                f"WBEACPCompilerMesh: runtime submesh vertex_bindings must be an array in {manifest_path}."
             )
-        self._validate_runtime_vertex_view(vertices, manifest_path)
-        self._validate_runtime_index_view(indices, manifest_path)
-        joint_bindings = resource.get("joint_bindings")
-        if joint_bindings is not None:
-            if not isinstance(joint_bindings, dict):
+        if not vertex_bindings:
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: runtime submesh vertex_bindings must not be empty in {manifest_path}."
+            )
+        indices = resource.get("indices")
+        if not isinstance(indices, dict):
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: runtime submesh requires an indices object in {manifest_path}."
+            )
+        seen_roles: set[str] = set()
+        vertex_count: int | None = None
+        for vertex_binding in vertex_bindings:
+            if not isinstance(vertex_binding, dict):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: runtime submesh joint_bindings must be an object in {manifest_path}."
+                    f"WBEACPCompilerMesh: runtime submesh vertex_bindings entries must be objects in {manifest_path}."
                 )
-            self._validate_runtime_vertex_view(joint_bindings, manifest_path)
+            self._validate_runtime_vertex_view(vertex_binding, seen_roles, manifest_path)
+            binding_vertex_count = self._runtime_vertex_count(vertex_binding, manifest_path)
+            if vertex_count is not None and binding_vertex_count != vertex_count:
+                raise RuntimeError(
+                    f"WBEACPCompilerMesh: runtime submesh vertex_bindings must all hold the same vertex count in {manifest_path}."
+                )
+            vertex_count = binding_vertex_count
+        self._validate_runtime_index_view(indices, manifest_path)
 
-    def _validate_runtime_vertex_view(self, vertices: ManifestResource, manifest_path: Path) -> None:
+    def _runtime_vertex_count(self, vertex_binding: ManifestResource, manifest_path: Path) -> int:
+        size = vertex_binding["binary"]["size"]
+        stride = vertex_binding["stride"]
+        if size % stride != 0:
+            raise RuntimeError(
+                f"WBEACPCompilerMesh: vertex binding size must be a multiple of its stride in {manifest_path}."
+            )
+        return size // stride
+
+    def _validate_runtime_vertex_view(self, vertices: ManifestResource, seen_roles: set[str], manifest_path: Path) -> None:
         self._validate_binary_view(vertices.get("binary"), manifest_path, "vertices")
         stride = vertices.get("stride")
         if not isinstance(stride, int) or isinstance(stride, bool) or stride <= 0:
@@ -313,7 +343,6 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             raise RuntimeError(
                 f"WBEACPCompilerMesh: vertices attributes must be a non-empty array in {manifest_path}."
             )
-        seen_roles: set[str] = set()
         for attribute in attributes:
             if not isinstance(attribute, dict):
                 raise RuntimeError(
@@ -326,13 +355,18 @@ class WBEACPCompilerMesh(WBEACPCompiler):
                 )
             if role in seen_roles:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: duplicate vertex attribute role '{role}' in {manifest_path}."
+                    f"WBEACPCompilerMesh: duplicate vertex attribute role '{role}' across the submesh vertex_bindings in {manifest_path}."
                 )
             seen_roles.add(role)
             attribute_type = attribute.get("type")
             if attribute_type not in self._RUNTIME_VERTEX_TYPES:
                 raise RuntimeError(
                     f"WBEACPCompilerMesh: vertex attribute '{role}' has invalid type in {manifest_path}."
+                )
+            joint_binding_type = self._JOINT_BINDING_TYPES.get(role)
+            if joint_binding_type is not None and attribute_type != joint_binding_type:
+                raise RuntimeError(
+                    f"WBEACPCompilerMesh: vertex attribute '{role}' must have type {joint_binding_type} in {manifest_path}."
                 )
             offset = attribute.get("offset")
             if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:

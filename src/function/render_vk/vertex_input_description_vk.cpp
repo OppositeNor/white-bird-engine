@@ -53,27 +53,34 @@ static VkFormat get_vertex_format_vk(RUVertexAttributeFormat p_format) {
 }
 
 VertexInputDescriptionVK VertexInputDescriptionVK::from_contract(const VertexInputContract& p_contract) {
-    if (p_contract.vertex_stride > std::numeric_limits<uint32_t>::max()) {
-        throw std::runtime_error("Failed to translate vertex input contract: vertex stride exceeds Vulkan limits.");
-    }
     VertexInputDescriptionVK result;
+    result.bindings.reserve(p_contract.bindings.size());
+    result.source_bindings.reserve(p_contract.bindings.size());
+    for (size_t i = 0; i < p_contract.bindings.size(); ++i) {
+        const VertexInputContract::Binding& binding = p_contract.bindings[i];
+        if (binding.vertex_stride > std::numeric_limits<uint32_t>::max()) {
+            throw std::runtime_error("Failed to translate vertex input contract: vertex stride exceeds Vulkan limits.");
+        }
+        result.bindings.push_back(VkVertexInputBindingDescription2EXT{.sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT,
+            .binding = static_cast<uint32_t>(i),
+            .stride = static_cast<uint32_t>(binding.vertex_stride),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+            .divisor = 1});
+        result.source_bindings.push_back(binding.source_binding);
+    }
     result.attributes.reserve(p_contract.attributes.size());
     for (const VertexInputContract::Attribute& attribute : p_contract.attributes) {
         if (attribute.offset > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error("Failed to translate vertex input contract: vertex attribute offset exceeds Vulkan limits.");
         }
+        if (attribute.binding >= p_contract.bindings.size()) {
+            throw std::runtime_error("Failed to translate vertex input contract: vertex attribute references a missing binding.");
+        }
         result.attributes.push_back(VkVertexInputAttributeDescription2EXT{.sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT,
             .location = attribute.location,
-            .binding = 0,
+            .binding = attribute.binding,
             .format = get_vertex_format_vk(attribute.format),
             .offset = static_cast<uint32_t>(attribute.offset)});
-    }
-    if (!result.attributes.empty()) {
-        result.bindings.push_back(VkVertexInputBindingDescription2EXT{.sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT,
-            .binding = 0,
-            .stride = static_cast<uint32_t>(p_contract.vertex_stride),
-            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-            .divisor = 1});
     }
     return result;
 }

@@ -29,6 +29,8 @@
 #include <cstring>
 #include <format>
 #include <limits>
+#include <optional>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -139,19 +141,10 @@ static const RUVertexView::Attribute& find_vertex_attribute(const RUVertexView& 
     return *result;
 }
 
-static RUVertexView& get_submesh_vertex_data(RUSubmesh3D& p_submesh) {
-    return p_submesh.vertices;
-}
-
-static const RUVertexView& get_submesh_vertex_data(const RUSubmesh3D& p_submesh) {
-    return p_submesh.vertices;
-}
-
 template <typename TValue>
 static void set_vertex_attribute_value(
     RUSubmesh3D& p_submesh, size_t p_vertex_index, std::string_view p_role, RUVertexAttributeFormat p_expected_format, const TValue& p_value) {
-    RUVertexView& vertex_data = get_submesh_vertex_data(p_submesh);
-    validate_vertex_storage(vertex_data);
+    RUVertexView& vertex_data = p_submesh.get_vertex_bindings()[p_submesh.get_vertex_binding_index(p_role)];
     if (p_vertex_index >= vertex_data.vertex_count) {
         throw std::runtime_error(std::format("Failed to set vertex attribute '{}': vertex {} is out of bounds for {} vertices.",
             p_role,
@@ -193,7 +186,9 @@ size_t RUVertexView::get_vertex_attribute_offset(std::string_view p_role) const 
 }
 
 void RUSubmesh3D::swap_vertices(size_t p_first, size_t p_second) {
-    get_submesh_vertex_data(*this).swap_vertices(p_first, p_second);
+    for (RUVertexView& binding : get_vertex_bindings()) {
+        binding.swap_vertices(p_first, p_second);
+    }
 }
 
 void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, float p_value) {
@@ -244,20 +239,60 @@ void RUSubmesh3D::set_vertex_attribute(size_t p_vertex_index, std::string_view p
     set_vertex_attribute_value(*this, p_vertex_index, p_role, RUVertexAttributeFormat::UINT4, p_value);
 }
 
-size_t RUSubmesh3D::get_vertex_attribute_offset(std::string_view p_role) const {
-    return get_submesh_vertex_data(*this).get_vertex_attribute_offset(p_role);
+std::span<const RUVertexView> RUSubmesh3D::get_vertex_bindings() const {
+    if (vertex_binding_count > 0 && vertex_bindings == nullptr) {
+        throw std::runtime_error("Failed to access vertex bindings: binding storage is missing.");
+    }
+    return {vertex_bindings.get(), vertex_binding_count};
 }
 
-size_t RUSubmesh3D::get_vertex_stride() const {
-    const RUVertexView& vertex_data = get_submesh_vertex_data(*this);
-    validate_vertex_storage(vertex_data);
-    return vertex_data.vertex_stride;
+std::span<RUVertexView> RUSubmesh3D::get_vertex_bindings() {
+    if (vertex_binding_count > 0 && vertex_bindings == nullptr) {
+        throw std::runtime_error("Failed to access vertex bindings: binding storage is missing.");
+    }
+    return {vertex_bindings.get(), vertex_binding_count};
+}
+
+size_t RUSubmesh3D::get_vertex_binding_index(std::string_view p_role) const {
+    if (p_role.empty()) {
+        throw std::runtime_error("Failed to access vertex attribute: role is empty.");
+    }
+    const std::span<const RUVertexView> bindings = get_vertex_bindings();
+    const HashCode role_hash = dynam_hash(p_role);
+    std::optional<size_t> result;
+    for (size_t binding_index = 0; binding_index < bindings.size(); ++binding_index) {
+        const RUVertexView& binding = bindings[binding_index];
+        validate_vertex_storage(binding);
+        for (size_t i = 0; i < binding.attribute_count; ++i) {
+            const RUShaderRole& role = binding.attributes.get()[i].role;
+            if (role.hash != role_hash || !role.matches(p_role)) {
+                continue;
+            }
+            if (result.has_value()) {
+                throw std::runtime_error(
+                    std::format("Failed to access vertex attribute: role '{}' is declared by more than one vertex binding.", p_role));
+            }
+            result = binding_index;
+        }
+    }
+    if (!result.has_value()) {
+        throw std::runtime_error(std::format("Failed to access vertex attribute: role '{}' does not exist.", p_role));
+    }
+    return *result;
+}
+
+size_t RUSubmesh3D::get_vertex_attribute_offset(std::string_view p_role) const {
+    return get_vertex_bindings()[get_vertex_binding_index(p_role)].get_vertex_attribute_offset(p_role);
 }
 
 size_t RUSubmesh3D::get_vertices_num() const {
-    const RUVertexView& vertex_data = get_submesh_vertex_data(*this);
-    validate_vertex_storage(vertex_data);
-    return vertex_data.vertex_count;
+    for (const RUVertexView& binding : get_vertex_bindings()) {
+        validate_vertex_storage(binding);
+        if (binding.vertex_count != vertex_count) {
+            throw std::runtime_error("Failed to access vertex data: a vertex binding holds a different number of vertices.");
+        }
+    }
+    return vertex_count;
 }
 
 } // namespace WhiteBirdEngine

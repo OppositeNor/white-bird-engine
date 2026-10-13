@@ -16,10 +16,23 @@
 #define WBE_FILE_VERTEX_INPUT_DESCRIPTION_VK_HH
 
 #include "function/render/vertex_input_contract.hh"
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+/**
+ * @struct VertexBufferBindingVK
+ * @brief The vertex buffer and byte offset bound for one dynamic vertex-input binding. Copyable and movable.
+ */
+struct VertexBufferBindingVK {
+    /** Index of the buffer in the drawing task's vertex buffer list. */
+    uint32_t buffer_index = 0;
+    /** Byte offset bound for the buffer. */
+    VkDeviceSize offset = 0;
+};
+
 
 /**
  * @class VertexInputDescriptionVK
@@ -57,8 +70,10 @@ struct VertexInputDescriptionVK {
      */
     static VertexInputDescriptionVK from_contract(const VertexInputContract& p_contract);
 
-    /** Dynamic binding descriptions; empty for a vertex-less draw. */
+    /** Dynamic binding descriptions numbered from zero; empty for a vertex-less draw. */
     std::vector<VkVertexInputBindingDescription2EXT> bindings;
+    /** Index of the resource vertex binding each Vulkan binding reads, parallel to bindings. */
+    std::vector<size_t> source_bindings;
     /** Dynamic shader attribute descriptions in reflected-location order. */
     std::vector<VkVertexInputAttributeDescription2EXT> attributes;
 };

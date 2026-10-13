@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -138,32 +139,42 @@ static RUVertexAttributeFormat reflect_vertex_format(const ShaderMetadataTypeAto
         "Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' has unsupported scalar type '{}'.", p_field_name, scalar_type));
 }
 
-static const VertexAttributeLayoutView& find_vertex_attribute(const VertexLayoutView& p_vertex_layout, const ShaderRole& p_role) {
-    const VertexAttributeLayoutView* result = nullptr;
-    for (const VertexAttributeLayoutView& attribute : p_vertex_layout.attributes) {
-        if (!p_role.matches(attribute.role_name, attribute.role_hash)) {
-            continue;
+struct VertexAttributeMatch {
+    const VertexAttributeLayoutView* attribute = nullptr;
+    size_t source_binding = 0;
+};
+
+static VertexAttributeMatch find_vertex_attribute(std::span<const VertexLayoutView> p_vertex_layouts, const ShaderRole& p_role) {
+    VertexAttributeMatch result;
+    for (size_t binding_index = 0; binding_index < p_vertex_layouts.size(); ++binding_index) {
+        for (const VertexAttributeLayoutView& attribute : p_vertex_layouts[binding_index].attributes) {
+            if (!p_role.matches(attribute.role_name, attribute.role_hash)) {
+                continue;
+            }
+            if (result.attribute != nullptr) {
+                throw std::runtime_error(
+                    std::format("Failed to resolve vertex input contract: resource role '{}' is duplicated.", p_role.get_name()));
+            }
+            result = VertexAttributeMatch{.attribute = &attribute, .source_binding = binding_index};
         }
-        if (result != nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to resolve vertex input contract: resource role '{}' is duplicated.", p_role.get_name()));
-        }
-        result = &attribute;
     }
-    if (result == nullptr) {
+    if (result.attribute == nullptr) {
         throw std::runtime_error(
             std::format("Failed to resolve vertex input contract: resource role '{}' is missing.", p_role.get_name()));
     }
-    return *result;
+    return result;
 }
 
 static VertexInputContract resolve_vertex_input_contract(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const VertexLayoutView& p_vertex_layout) {
-    validate_vertex_layout(p_vertex_layout);
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const VertexLayoutView> p_vertex_layouts) {
+    for (const VertexLayoutView& vertex_layout : p_vertex_layouts) {
+        validate_vertex_layout(vertex_layout);
+    }
     const ShaderMetadataEntryPoint& entry_point = ShaderMetadataQuery().resolve_entry_point(p_metadata, "vertex", p_entry_name);
     ShaderRoleFieldResolver role_resolver;
     VertexInputContract result;
-    result.vertex_stride = p_vertex_layout.vertex_stride;
+    // The source binding of each matched attribute, parallel to result.attributes until bindings are compacted.
+    std::vector<size_t> attribute_source_bindings;
     for (const ShaderMetadataParameter& parameter : entry_point.parameters) {
         std::vector<ShaderRoleFieldResolver::Field> fields =
             role_resolver.collect_fields(parameter.type.fields, "WBE_VERTEX_INPUT", ShaderRoleFieldResolver::Traversal::RECURSIVE);
@@ -190,13 +201,28 @@ static VertexInputContract resolve_vertex_input_contract(
                 }
             }
             const RUVertexAttributeFormat format = reflect_vertex_format(field.metadata->type, field.metadata->name);
-            const VertexAttributeLayoutView& resource_attribute = find_vertex_attribute(p_vertex_layout, field.role);
-            if (resource_attribute.format != format) {
+            const VertexAttributeMatch match = find_vertex_attribute(p_vertex_layouts, field.role);
+            if (match.attribute->format != format) {
                 throw std::runtime_error(std::format("Failed to resolve vertex input contract: shader role '{}' is incompatible with the resource format.",
                     field.role.get_name()));
             }
             result.attributes.push_back(VertexInputContract::Attribute{
-                .role = std::move(field.role), .format = format, .location = location, .offset = resource_attribute.offset});
+                .role = std::move(field.role), .format = format, .location = location, .offset = match.attribute->offset});
+            attribute_source_bindings.push_back(match.source_binding);
+        }
+    }
+    // Keep only the bindings the shader reads, in source order.
+    for (size_t source_binding = 0; source_binding < p_vertex_layouts.size(); ++source_binding) {
+        if (std::ranges::find(attribute_source_bindings, source_binding) == attribute_source_bindings.end()) {
+            continue;
+        }
+        const uint32_t binding = static_cast<uint32_t>(result.bindings.size());
+        result.bindings.push_back(VertexInputContract::Binding{
+            .source_binding = source_binding, .vertex_stride = p_vertex_layouts[source_binding].vertex_stride});
+        for (size_t i = 0; i < result.attributes.size(); ++i) {
+            if (attribute_source_bindings[i] == source_binding) {
+                result.attributes[i].binding = binding;
+            }
         }
     }
     std::sort(result.attributes.begin(), result.attributes.end(), [](const auto& p_left, const auto& p_right) {
@@ -206,8 +232,13 @@ static VertexInputContract resolve_vertex_input_contract(
 }
 
 VertexInputContract VertexInputContractResolver::resolve(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const {
-    return resolve_vertex_input_contract(p_metadata, p_entry_name, make_vertex_layout_view(p_vertex_data));
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings) const {
+    std::vector<VertexLayoutView> vertex_layouts;
+    vertex_layouts.reserve(p_vertex_bindings.size());
+    for (const RUVertexView& vertex_binding : p_vertex_bindings) {
+        vertex_layouts.push_back(make_vertex_layout_view(vertex_binding));
+    }
+    return resolve_vertex_input_contract(p_metadata, p_entry_name, vertex_layouts);
 }
 
 } // namespace WhiteBirdEngine

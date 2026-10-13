@@ -143,11 +143,21 @@ void validate_index_view_schema(const RUSchemaIndexView& p_indices) {
 constexpr std::string_view JOINT_BINDING_IDS_ROLE = "joint_binding_ids";
 constexpr std::string_view JOINT_BINDING_WEIGHTS_ROLE = "joint_binding_weights";
 
-void validate_joint_binding_attribute(const RUSchemaVertexView& p_joint_bindings, std::string_view p_role, std::string_view p_type) {
-    const auto attribute = std::ranges::find_if(p_joint_bindings.attributes, [p_role](const RUSchemaVertexAttribute& p_attribute) {
-        return p_attribute.role == p_role;
-    });
-    if (attribute == p_joint_bindings.attributes.end()) {
+const RUSchemaVertexAttribute* find_vertex_bindings_attribute(std::span<const RUSchemaVertexView> p_bindings, std::string_view p_role) {
+    for (const RUSchemaVertexView& binding : p_bindings) {
+        const auto attribute = std::ranges::find_if(binding.attributes, [p_role](const RUSchemaVertexAttribute& p_attribute) {
+            return p_attribute.role == p_role;
+        });
+        if (attribute != binding.attributes.end()) {
+            return &*attribute;
+        }
+    }
+    return nullptr;
+}
+
+void validate_joint_binding_attribute(std::span<const RUSchemaVertexView> p_bindings, std::string_view p_role, std::string_view p_type) {
+    const RUSchemaVertexAttribute* attribute = find_vertex_bindings_attribute(p_bindings, p_role);
+    if (attribute == nullptr) {
         throw std::runtime_error(std::format("Failed to populate submesh resource unit: joint bindings require the '{}' attribute.", p_role));
     }
     if (attribute->type != p_type) {
@@ -158,16 +168,36 @@ void validate_joint_binding_attribute(const RUSchemaVertexView& p_joint_bindings
     }
 }
 
-void validate_joint_bindings_schema(const RUSchemaVertexView& p_joint_bindings, const RUSchemaVertexView& p_vertices) {
-    validate_vertex_view_schema(p_joint_bindings);
-    validate_joint_binding_attribute(p_joint_bindings, JOINT_BINDING_IDS_ROLE, "ivec4");
-    validate_joint_binding_attribute(p_joint_bindings, JOINT_BINDING_WEIGHTS_ROLE, "vec4");
-    const size_t joint_binding_count = p_joint_bindings.binary.size / p_joint_bindings.stride;
-    const size_t vertex_count = p_vertices.binary.size / p_vertices.stride;
-    if (joint_binding_count != vertex_count) {
-        throw std::runtime_error(std::format(
-            "Failed to populate submesh resource unit: joint binding count {} does not match vertex count {}.", joint_binding_count, vertex_count));
+/**
+ * Validate the vertex bindings of one submesh as a whole; each binding was validated by validate_vertex_view_schema().
+ */
+void validate_vertex_bindings_schema(std::span<const RUSchemaVertexView> p_bindings, bool p_has_skeleton) {
+    const size_t vertex_count = p_bindings.front().binary.size / p_bindings.front().stride;
+    for (size_t binding_index = 1; binding_index < p_bindings.size(); ++binding_index) {
+        const RUSchemaVertexView& binding = p_bindings[binding_index];
+        if (binding.binary.size / binding.stride != vertex_count) {
+            throw std::runtime_error(std::format("Failed to populate submesh resource unit: vertex binding {} holds {} vertices, but binding 0 holds {}.",
+                binding_index,
+                binding.binary.size / binding.stride,
+                vertex_count));
+        }
+        for (const RUSchemaVertexAttribute& attribute : binding.attributes) {
+            if (find_vertex_bindings_attribute(p_bindings.first(binding_index), attribute.role) != nullptr) {
+                throw std::runtime_error(std::format(
+                    "Failed to populate submesh resource unit: vertex role '{}' is declared by more than one vertex binding.", attribute.role));
+            }
+        }
     }
+    const bool has_joint_binding_ids = find_vertex_bindings_attribute(p_bindings, JOINT_BINDING_IDS_ROLE) != nullptr;
+    const bool has_joint_binding_weights = find_vertex_bindings_attribute(p_bindings, JOINT_BINDING_WEIGHTS_ROLE) != nullptr;
+    if (!has_joint_binding_ids && !has_joint_binding_weights) {
+        return;
+    }
+    if (!p_has_skeleton) {
+        throw std::runtime_error("Failed to populate mesh: submesh joint bindings require the mesh to declare skeleton_id.");
+    }
+    validate_joint_binding_attribute(p_bindings, JOINT_BINDING_IDS_ROLE, "ivec4");
+    validate_joint_binding_attribute(p_bindings, JOINT_BINDING_WEIGHTS_ROLE, "vec4");
 }
 
 RUShaderRole populate_shader_role(IResourceChunk& p_res_chunk, std::string_view p_role_name) {
@@ -439,16 +469,19 @@ void resolve_submesh_data(IResourceChunk& p_res_chunk, const RUSchemaSubmesh3D& 
         p_resource_unit.material = resolve_material(p_res_chunk, p_scheme.material.value());
     }
     p_resource_unit.aabb = resolve_aabb(p_scheme.aabb);
-    populate_vertex_view(p_res_chunk, p_scheme.vertices, p_resource_unit.vertices);
-    populate_index_view(p_scheme.indices, p_resource_unit.indices);
-    if (p_scheme.joint_bindings.has_value()) {
-        if (!p_has_skeleton) {
-            throw std::runtime_error("Failed to populate mesh: submesh joint_bindings require the mesh to declare skeleton_id.");
-        }
-        // The vertex view was validated by populate_vertex_view above.
-        validate_joint_bindings_schema(p_scheme.joint_bindings.value(), p_scheme.vertices);
-        populate_vertex_view(p_res_chunk, p_scheme.joint_bindings.value(), p_resource_unit.joint_bindings.emplace());
+    if (p_scheme.vertex_bindings.empty()) {
+        throw std::runtime_error("Failed to populate submesh resource unit: at least one vertex binding is required.");
     }
+    std::vector<RUVertexView> vertex_bindings(p_scheme.vertex_bindings.size());
+    for (size_t i = 0; i < p_scheme.vertex_bindings.size(); ++i) {
+        populate_vertex_view(p_res_chunk, p_scheme.vertex_bindings[i], vertex_bindings[i]);
+    }
+    validate_vertex_bindings_schema(p_scheme.vertex_bindings, p_has_skeleton);
+    p_resource_unit.vertex_bindings =
+        p_res_chunk.push_data(vertex_bindings.size() * sizeof(RUVertexView), vertex_bindings.data()).force_cast<RUVertexView>();
+    p_resource_unit.vertex_binding_count = vertex_bindings.size();
+    p_resource_unit.vertex_count = vertex_bindings.front().vertex_count;
+    populate_index_view(p_scheme.indices, p_resource_unit.indices);
     p_resource_unit.first_instance = p_scheme.first_instance;
     p_resource_unit.instance_count = p_scheme.instance_count;
 }
@@ -457,12 +490,12 @@ void create_submesh_refs(IResourceChunk& p_res_chunk, RUSubmesh3D& p_resource_un
     if (p_scheme.material_id.has_value()) {
         p_res_chunk.create_ref_to(p_resource_unit.material, p_scheme.material_id.value());
     }
-    p_res_chunk.create_ref_to(p_resource_unit.vertices.binary.binary, p_scheme.vertices.binary.binary_id);
-    p_res_chunk.create_ref_to(p_resource_unit.indices.binary.binary, p_scheme.indices.binary.binary_id);
-    if (p_scheme.joint_bindings.has_value()) {
-        WBE_DEBUG_ASSERT(p_resource_unit.joint_bindings.has_value());
-        p_res_chunk.create_ref_to(p_resource_unit.joint_bindings->binary.binary, p_scheme.joint_bindings->binary.binary_id);
+    // The chunk-owned binding array is stable, so references can be resolved into it directly.
+    WBE_DEBUG_ASSERT(p_resource_unit.vertex_binding_count == p_scheme.vertex_bindings.size());
+    for (size_t i = 0; i < p_scheme.vertex_bindings.size(); ++i) {
+        p_res_chunk.create_ref_to(p_resource_unit.vertex_bindings.get()[i].binary.binary, p_scheme.vertex_bindings[i].binary.binary_id);
     }
+    p_res_chunk.create_ref_to(p_resource_unit.indices.binary.binary, p_scheme.indices.binary.binary_id);
 }
 
 RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, const RUSchemaSubmeshInstance3D& p_scheme, bool p_has_skeleton) {

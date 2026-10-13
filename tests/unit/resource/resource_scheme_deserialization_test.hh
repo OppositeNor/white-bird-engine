@@ -245,7 +245,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
                     "material": {"id": "material_01", "type": "material"},
                     "material_id": "mat_ref_01",
                     "aabb": {"center": [1.0, 2.0, 3.0], "width": 4.0, "height": 5.0},
-                    "vertices": {
+                    "vertex_bindings": [{
                         "binary": {"binary_id": "test_mesh_01.vertices", "start": 0, "size": 96},
                         "stride": 32,
                         "attributes": [
@@ -253,7 +253,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
                             {"role": "normal", "type": "vec3", "offset": 12},
                             {"role": "uv", "type": "vec2", "offset": 24}
                         ]
-                    },
+                    }],
                     "indices": {"binary": {"binary_id": "test_mesh_01.indices", "start": 96, "size": 12}},
                     "first_instance": 1,
                     "instance_count": 2
@@ -269,11 +269,11 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
             "submeshes": [
                 {
                     "aabb": {"center": [0.0, 0.0, 0.0], "width": 0.0, "height": 0.0},
-                    "vertices": {
+                    "vertex_bindings": [{
                         "binary": {"binary_id": "test_mesh_01.vertices", "start": 96, "size": 12},
                         "stride": 12,
                         "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
-                    },
+                    }],
                     "indices": {"binary": {"binary_id": "test_mesh_01.indices", "start": 108, "size": 0}},
                     "first_instance": 0,
                     "instance_count": 1
@@ -299,13 +299,15 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
     ASSERT_EQ(submesh.aabb.center, (std::vector<float>{1.0F, 2.0F, 3.0F}));
     ASSERT_EQ(submesh.aabb.width, 4.0F);
     ASSERT_EQ(submesh.aabb.height, 5.0F);
-    ASSERT_EQ(submesh.vertices.binary.binary_id, "test_mesh_01.vertices");
-    ASSERT_EQ(submesh.vertices.binary.size, 96U);
-    ASSERT_EQ(submesh.vertices.stride, 32U);
-    ASSERT_EQ(submesh.vertices.attributes.size(), 3U);
-    ASSERT_EQ(submesh.vertices.attributes[2].role, "uv");
-    ASSERT_EQ(submesh.vertices.attributes[2].type, "vec2");
-    ASSERT_EQ(submesh.vertices.attributes[2].offset, 24U);
+    ASSERT_EQ(submesh.vertex_bindings.size(), 1U);
+    const WBE::RUSchemaVertexView& vertices = submesh.vertex_bindings[0];
+    ASSERT_EQ(vertices.binary.binary_id, "test_mesh_01.vertices");
+    ASSERT_EQ(vertices.binary.size, 96U);
+    ASSERT_EQ(vertices.stride, 32U);
+    ASSERT_EQ(vertices.attributes.size(), 3U);
+    ASSERT_EQ(vertices.attributes[2].role, "uv");
+    ASSERT_EQ(vertices.attributes[2].type, "vec2");
+    ASSERT_EQ(vertices.attributes[2].offset, 24U);
     ASSERT_EQ(submesh.indices.binary.binary_id, "test_mesh_01.indices");
     ASSERT_EQ(submesh.indices.binary.start, 96U);
     ASSERT_EQ(submesh.first_instance, 1U);
@@ -366,20 +368,22 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshSkeletonAndJointBinding
             "submeshes": [
                 {
                     "aabb": {"center": [0.0, 0.0, 0.0], "width": 1.0, "height": 1.0},
-                    "vertices": {
-                        "binary": {"binary_id": "test_skinned_mesh.geometry", "start": 0, "size": 36},
-                        "stride": 12,
-                        "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
-                    },
+                    "vertex_bindings": [
+                        {
+                            "binary": {"binary_id": "test_skinned_mesh.geometry", "start": 0, "size": 36},
+                            "stride": 12,
+                            "attributes": [{"role": "position", "type": "vec3", "offset": 0}]
+                        },
+                        {
+                            "binary": {"binary_id": "test_skinned_mesh.joint_bindings", "start": 0, "size": 96},
+                            "stride": 32,
+                            "attributes": [
+                                {"role": "joint_binding_ids", "type": "ivec4", "offset": 0},
+                                {"role": "joint_binding_weights", "type": "vec4", "offset": 16}
+                            ]
+                        }
+                    ],
                     "indices": {"binary": {"binary_id": "test_skinned_mesh.geometry", "start": 36, "size": 12}},
-                    "joint_bindings": {
-                        "binary": {"binary_id": "test_skinned_mesh.joint_bindings", "start": 0, "size": 96},
-                        "stride": 32,
-                        "attributes": [
-                            {"role": "joint_binding_ids", "type": "ivec4", "offset": 0},
-                            {"role": "joint_binding_weights", "type": "vec4", "offset": 16}
-                        ]
-                    },
                     "first_instance": 0,
                     "instance_count": 1
                 }
@@ -397,17 +401,20 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshSkeletonAndJointBinding
     ASSERT_TRUE(scheme.skeleton_id.has_value());
     ASSERT_EQ(scheme.skeleton_id.value(), "test_skeleton");
     ASSERT_EQ(scheme.opaque_instances.submeshes.size(), 1U);
-    const std::optional<WBE::RUSchemaVertexView>& joint_bindings = scheme.opaque_instances.submeshes[0].joint_bindings;
-    ASSERT_TRUE(joint_bindings.has_value());
-    ASSERT_EQ(joint_bindings->binary.binary_id, "test_skinned_mesh.joint_bindings");
-    ASSERT_EQ(joint_bindings->binary.size, 96U);
-    ASSERT_EQ(joint_bindings->stride, 32U);
-    ASSERT_EQ(joint_bindings->attributes.size(), 2U);
-    ASSERT_EQ(joint_bindings->attributes[0].role, "joint_binding_ids");
-    ASSERT_EQ(joint_bindings->attributes[0].type, "ivec4");
-    ASSERT_EQ(joint_bindings->attributes[1].role, "joint_binding_weights");
-    ASSERT_EQ(joint_bindings->attributes[1].type, "vec4");
-    ASSERT_EQ(joint_bindings->attributes[1].offset, 16U);
+    const std::vector<WBE::RUSchemaVertexView>& vertex_bindings = scheme.opaque_instances.submeshes[0].vertex_bindings;
+    ASSERT_EQ(vertex_bindings.size(), 2U);
+    ASSERT_EQ(vertex_bindings[0].binary.binary_id, "test_skinned_mesh.geometry");
+    ASSERT_EQ(vertex_bindings[0].stride, 12U);
+    const WBE::RUSchemaVertexView& joint_bindings = vertex_bindings[1];
+    ASSERT_EQ(joint_bindings.binary.binary_id, "test_skinned_mesh.joint_bindings");
+    ASSERT_EQ(joint_bindings.binary.size, 96U);
+    ASSERT_EQ(joint_bindings.stride, 32U);
+    ASSERT_EQ(joint_bindings.attributes.size(), 2U);
+    ASSERT_EQ(joint_bindings.attributes[0].role, "joint_binding_ids");
+    ASSERT_EQ(joint_bindings.attributes[0].type, "ivec4");
+    ASSERT_EQ(joint_bindings.attributes[1].role, "joint_binding_weights");
+    ASSERT_EQ(joint_bindings.attributes[1].type, "vec4");
+    ASSERT_EQ(joint_bindings.attributes[1].offset, 16U);
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshWithoutSkeleton) {

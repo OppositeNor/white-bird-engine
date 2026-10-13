@@ -23,19 +23,21 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {
 
 struct MeshDrawBinaries {
-    RefRes<RUBinary> vertex_binary = MEM_NULL;
+    std::vector<RefRes<RUBinary>> vertex_binaries;
     RefRes<RUBinary> index_binary = MEM_NULL;
 };
 
@@ -51,26 +53,33 @@ void validate_binary_view(const RUBinaryView& p_view, std::string_view p_context
     }
 }
 
-void validate_submesh_views(const RUVertexView& p_vertices, const RUIndexView& p_indices) {
-    validate_binary_view(p_vertices.binary, "vertex");
-    validate_binary_view(p_indices.binary, "index");
-    if (p_vertices.vertex_stride == 0 || p_vertices.binary.size != p_vertices.vertex_count * p_vertices.vertex_stride) {
-        throw std::runtime_error("Failed to compile mesh buffer: vertex view count, stride, and size do not match.");
+void validate_submesh_views(const RUSubmesh3D& p_submesh, const RUIndexView& p_indices) {
+    if (p_submesh.get_vertex_bindings().empty()) {
+        throw std::runtime_error("Failed to compile mesh buffer: submesh has no vertex bindings.");
     }
+    for (const RUVertexView& binding : p_submesh.get_vertex_bindings()) {
+        validate_binary_view(binding.binary, "vertex");
+        if (binding.vertex_stride == 0 || binding.binary.size != binding.vertex_count * binding.vertex_stride) {
+            throw std::runtime_error("Failed to compile mesh buffer: vertex view count, stride, and size do not match.");
+        }
+        if (binding.vertex_count != p_submesh.vertex_count) {
+            throw std::runtime_error("Failed to compile mesh buffer: vertex bindings hold different numbers of vertices.");
+        }
+    }
+    validate_binary_view(p_indices.binary, "index");
     if (p_indices.binary.start % sizeof(uint32_t) != 0 || p_indices.binary.size != p_indices.index_count * sizeof(uint32_t)) {
         throw std::runtime_error("Failed to compile mesh buffer: index view is not a uint32 range.");
     }
 }
 
-void accumulate_shared_binaries(MeshDrawBinaries& p_binaries, const RUVertexView& p_vertices, const RUIndexView& p_indices) {
-    if (p_binaries.vertex_binary == nullptr) {
-        p_binaries.vertex_binary = p_vertices.binary.binary;
+void accumulate_shared_binaries(MeshDrawBinaries& p_binaries, const RUSubmesh3D& p_submesh, const RUIndexView& p_indices) {
+    for (const RUVertexView& binding : p_submesh.get_vertex_bindings()) {
+        if (std::ranges::find(p_binaries.vertex_binaries, binding.binary.binary) == p_binaries.vertex_binaries.end()) {
+            p_binaries.vertex_binaries.push_back(binding.binary.binary);
+        }
     }
     if (p_binaries.index_binary == nullptr) {
         p_binaries.index_binary = p_indices.binary.binary;
-    }
-    if (p_vertices.binary.binary != p_binaries.vertex_binary) {
-        throw std::runtime_error("Failed to compile mesh buffer: all drawable submeshes must share one vertex binary resource.");
     }
     if (p_indices.binary.binary != p_binaries.index_binary) {
         throw std::runtime_error("Failed to compile mesh buffer: all drawable submeshes must share one index binary resource.");
@@ -86,13 +95,13 @@ void accumulate_category_binaries(MeshDrawBinaries& p_binaries, const RUSubmeshI
     }
     for (size_t i = 0; i < p_category.submesh_count; ++i) {
         const RUSubmesh3D& submesh = p_category.submeshes.get()[i];
-        validate_submesh_views(submesh.vertices, submesh.indices);
+        validate_submesh_views(submesh, submesh.indices);
         if (submesh.first_instance > p_category.instance_count ||
             submesh.instance_count > p_category.instance_count - submesh.first_instance) {
             throw std::runtime_error("Failed to compile mesh buffer: submesh instance range is out of bounds.");
         }
         if (submesh.indices.index_count > 0) {
-            accumulate_shared_binaries(p_binaries, submesh.vertices, submesh.indices);
+            accumulate_shared_binaries(p_binaries, submesh, submesh.indices);
         }
     }
 }
@@ -142,11 +151,14 @@ MeshBufferCompilerVK::BuildResult build_shared_buffers(const BaseRenderDataVK* p
     const MeshDrawBinaries& p_binaries,
     VkBufferUsageFlags p_vertex_usage,
     VkBufferUsageFlags p_index_usage) {
-    if (p_binaries.vertex_binary == nullptr || p_binaries.index_binary == nullptr) {
+    if (p_binaries.vertex_binaries.empty() || p_binaries.index_binary == nullptr) {
         return {};
     }
     MeshBufferCompilerVK::BuildResult result;
-    result.vertex_buffer = build_binary_buffer(p_render_data, p_binaries.vertex_binary, p_vertex_usage, "vertex");
+    for (RefRes<RUBinary> vertex_binary : p_binaries.vertex_binaries) {
+        result.vertex_buffers.push_back(build_binary_buffer(p_render_data, vertex_binary, p_vertex_usage, "vertex"));
+        result.vertex_binaries.push_back(vertex_binary);
+    }
     result.index_buffer = build_binary_buffer(p_render_data, p_binaries.index_binary, p_index_usage, "index");
     return result;
 }

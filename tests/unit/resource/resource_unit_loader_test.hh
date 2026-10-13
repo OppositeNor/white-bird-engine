@@ -236,9 +236,10 @@ protected:
         WBE::RUSchemaSubmesh3D scheme;
         scheme.material_id = "unused_material";
         scheme.aabb = {.center = {0.0F, 0.0F, 0.0F}, .width = 1.0F, .height = 1.0F};
-        scheme.vertices.binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 15};
-        scheme.vertices.stride = sizeof(float) * 5;
-        scheme.vertices.attributes = {
+        scheme.vertex_bindings.resize(1);
+        scheme.vertex_bindings[0].binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 15};
+        scheme.vertex_bindings[0].stride = sizeof(float) * 5;
+        scheme.vertex_bindings[0].attributes = {
             {.role = "position", .type = "vec3", .offset = 0},
             {.role = "uv", .type = "vec2", .offset = sizeof(float) * 3},
         };
@@ -367,9 +368,10 @@ protected:
         std::string_view p_vertex_binary_id = "loaded_geometry", std::string_view p_index_binary_id = "loaded_geometry") {
         WBE::RUSchemaSubmesh3D scheme;
         scheme.material_id = "loaded_material";
-        scheme.vertices.binary = {.binary_id = std::string(p_vertex_binary_id), .start = 0, .size = sizeof(float) * 9};
-        scheme.vertices.stride = sizeof(float) * 3;
-        scheme.vertices.attributes = {{.role = "position", .type = "vec3", .offset = 0}};
+        scheme.vertex_bindings.resize(1);
+        scheme.vertex_bindings[0].binary = {.binary_id = std::string(p_vertex_binary_id), .start = 0, .size = sizeof(float) * 9};
+        scheme.vertex_bindings[0].stride = sizeof(float) * 3;
+        scheme.vertex_bindings[0].attributes = {{.role = "position", .type = "vec3", .offset = 0}};
         scheme.indices.binary = {.binary_id = std::string(p_index_binary_id), .start = 0, .size = sizeof(uint32_t) * 3};
         scheme.first_instance = 1;
         scheme.instance_count = 2;
@@ -597,7 +599,7 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     EXPECT_EQ(captured_submesh->aabb.center, glm::vec3(0.0F));
     EXPECT_FLOAT_EQ(captured_submesh->aabb.width, 1.0F);
     EXPECT_FLOAT_EQ(captured_submesh->aabb.height, 1.0F);
-    const WBE::RUVertexView& vertex_data = captured_submesh->vertices;
+    const WBE::RUVertexView& vertex_data = captured_submesh->get_vertex_bindings()[0];
     ASSERT_NE(vertex_data.binary.binary, nullptr);
     EXPECT_EQ(vertex_data.vertex_count, 3U);
     EXPECT_EQ(vertex_data.vertex_stride, sizeof(float) * 5);
@@ -641,7 +643,7 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     EXPECT_EQ(indices[1], 1U);
     EXPECT_EQ(indices[2], 2U);
     EXPECT_EQ(captured_submesh->get_vertex_attribute_offset("uv"), sizeof(float) * 3);
-    EXPECT_EQ(captured_submesh->get_vertex_stride(), sizeof(float) * 5);
+    EXPECT_EQ(captured_submesh->get_vertex_bindings()[0].vertex_stride, sizeof(float) * 5);
     EXPECT_EQ(captured_submesh->get_vertices_num(), 3U);
 
     captured_submesh->set_vertex_attribute(1, "position", glm::vec3(2.0F, 3.0F, 4.0F));
@@ -693,20 +695,20 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
         auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
-        scheme.vertices.binary.start = format_case.section_start;
-        scheme.vertices.binary.size = format_case.element_size * 3;
-        scheme.vertices.stride = format_case.element_size;
-        scheme.vertices.attributes = {{.role = "custom_role", .type = std::string(format_case.type), .offset = 0}};
+        scheme.vertex_bindings[0].binary.start = format_case.section_start;
+        scheme.vertex_bindings[0].binary.size = format_case.element_size * 3;
+        scheme.vertex_bindings[0].stride = format_case.element_size;
+        scheme.vertex_bindings[0].attributes = {{.role = "custom_role", .type = std::string(format_case.type), .offset = 0}};
 
         loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme));
 
         ASSERT_NE(captured_mesh, nullptr);
         WBE::RUSubmesh3D* captured_submesh = captured_mesh->opaque_instances.submeshes.get();
-        ASSERT_EQ(captured_submesh->vertices.attribute_count, 1U);
-        EXPECT_EQ(captured_submesh->vertices.attributes->format, format_case.format);
-        EXPECT_EQ(captured_submesh->vertices.attributes->size, format_case.element_size);
-        EXPECT_EQ(captured_submesh->vertices.vertex_stride, format_case.element_size);
-        EXPECT_EQ(captured_submesh->vertices.vertex_count, 3U);
+        ASSERT_EQ(captured_submesh->get_vertex_bindings()[0].attribute_count, 1U);
+        EXPECT_EQ(captured_submesh->get_vertex_bindings()[0].attributes->format, format_case.format);
+        EXPECT_EQ(captured_submesh->get_vertex_bindings()[0].attributes->size, format_case.element_size);
+        EXPECT_EQ(captured_submesh->get_vertex_bindings()[0].vertex_stride, format_case.element_size);
+        EXPECT_EQ(captured_submesh->get_vertex_bindings()[0].vertex_count, 3U);
 
         switch (format_case.format) {
         case WBE::RUVertexAttributeFormat::FLOAT:
@@ -757,7 +759,7 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
         auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
-        scheme.vertices = std::move(p_vertices);
+        scheme.vertex_bindings = {std::move(p_vertices)};
         scheme.indices = std::move(p_indices);
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme)), std::runtime_error);
     };
@@ -925,12 +927,12 @@ TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {
         ASSERT_NE(loaded.instances, nullptr);
         const WBE::RUSubmesh3D& submesh = loaded.submeshes.get()[0];
         ASSERT_NE(submesh.material, nullptr);
-        ASSERT_NE(submesh.vertices.binary.binary, nullptr);
+        ASSERT_NE(submesh.get_vertex_bindings()[0].binary.binary, nullptr);
         ASSERT_NE(submesh.indices.binary.binary, nullptr);
-        EXPECT_EQ(submesh.vertices.vertex_count, 3U);
-        EXPECT_EQ(submesh.vertices.vertex_stride, sizeof(float) * 3);
-        ASSERT_EQ(submesh.vertices.attribute_count, 1U);
-        EXPECT_STREQ(submesh.vertices.attributes->role.name.get(), "position");
+        EXPECT_EQ(submesh.get_vertex_bindings()[0].vertex_count, 3U);
+        EXPECT_EQ(submesh.get_vertex_bindings()[0].vertex_stride, sizeof(float) * 3);
+        ASSERT_EQ(submesh.get_vertex_bindings()[0].attribute_count, 1U);
+        EXPECT_STREQ(submesh.get_vertex_bindings()[0].attributes->role.name.get(), "position");
         EXPECT_EQ(submesh.indices.index_count, 3U);
         EXPECT_EQ(submesh.first_instance, 1U);
         EXPECT_EQ(submesh.instance_count, 2U);
@@ -960,12 +962,12 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSeparateVertexAndIndexBinaries) {
     ASSERT_NE(captured_mesh, nullptr);
     ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
     const WBE::RUSubmesh3D& submesh = captured_mesh->opaque_instances.submeshes.get()[0];
-    ASSERT_NE(submesh.vertices.binary.binary, nullptr);
+    ASSERT_NE(submesh.get_vertex_bindings()[0].binary.binary, nullptr);
     ASSERT_NE(submesh.indices.binary.binary, nullptr);
-    EXPECT_NE(submesh.vertices.binary.binary, submesh.indices.binary.binary);
-    EXPECT_EQ(submesh.vertices.binary.size, sizeof(float) * 9);
+    EXPECT_NE(submesh.get_vertex_bindings()[0].binary.binary, submesh.indices.binary.binary);
+    EXPECT_EQ(submesh.get_vertex_bindings()[0].binary.size, sizeof(float) * 9);
     EXPECT_EQ(submesh.indices.binary.size, sizeof(uint32_t) * 3);
-    EXPECT_EQ(submesh.vertices.binary.start, 0U);
+    EXPECT_EQ(submesh.get_vertex_bindings()[0].binary.start, 0U);
     EXPECT_EQ(submesh.indices.binary.start, 0U);
 }
 
@@ -1124,8 +1126,8 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
                               })
                               .build(stream);
     WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
-    submesh_scheme.joint_bindings = make_triangle_joint_bindings_scheme();
-    submesh_scheme.joint_bindings->binary.binary_id = "loaded_joint_bindings";
+    submesh_scheme.vertex_bindings.push_back(make_triangle_joint_bindings_scheme());
+    submesh_scheme.vertex_bindings[1].binary.binary_id = "loaded_joint_bindings";
     WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(submesh_scheme);
     scheme.skeleton_id = "loaded_skeleton";
     WBE::ResourceUnitLoaderMesh loader;
@@ -1136,8 +1138,11 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
     EXPECT_EQ(captured_mesh->skeleton, stored_skeleton);
     ASSERT_EQ(captured_mesh->opaque_instances.submesh_count, 1U);
     const WBE::RUSubmesh3D& submesh = captured_mesh->opaque_instances.submeshes.get()[0];
-    ASSERT_TRUE(submesh.joint_bindings.has_value());
-    const WBE::RUVertexView& joint_bindings = submesh.joint_bindings.value();
+    ASSERT_EQ(submesh.vertex_binding_count, 2U);
+    EXPECT_EQ(submesh.get_vertices_num(), 3U);
+    EXPECT_EQ(submesh.get_vertex_binding_index("position"), 0U);
+    EXPECT_EQ(submesh.get_vertex_binding_index("joint_binding_ids"), 1U);
+    const WBE::RUVertexView& joint_bindings = submesh.get_vertex_bindings()[1];
     EXPECT_EQ(joint_bindings.binary.binary, stored_binary);
     EXPECT_EQ(joint_bindings.vertex_count, 3U);
     EXPECT_EQ(joint_bindings.vertex_stride, JOINT_BINDING_STRIDE);
@@ -1162,7 +1167,7 @@ TEST_F(ResourcePopulatorTest, MeshWithoutSkeletonHasNoSkeletonOrJointBindings) {
 
     ASSERT_NE(captured_mesh, nullptr);
     EXPECT_EQ(captured_mesh->skeleton, nullptr);
-    EXPECT_FALSE(captured_mesh->opaque_instances.submeshes.get()[0].joint_bindings.has_value());
+    EXPECT_EQ(captured_mesh->opaque_instances.submeshes.get()[0].vertex_binding_count, 1U);
 }
 
 TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
@@ -1173,7 +1178,7 @@ TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
         auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
-        submesh_scheme.joint_bindings = std::move(p_joint_bindings);
+        submesh_scheme.vertex_bindings.push_back(std::move(p_joint_bindings));
         WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(submesh_scheme);
         scheme.skeleton_id = std::move(p_skeleton_id);
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
@@ -1202,6 +1207,23 @@ TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
     WBE::RUSchemaVertexView too_few_bindings = valid_joint_bindings;
     too_few_bindings.binary.size = JOINT_BINDING_STRIDE * 2;
     expect_invalid("loaded_skeleton", too_few_bindings);
+
+    WBE::RUSchemaVertexView duplicated_position = valid_joint_bindings;
+    duplicated_position.attributes.push_back({.role = "position", .type = "vec3", .offset = JOINT_BINDING_STRIDE});
+    duplicated_position.stride = JOINT_BINDING_STRIDE + sizeof(float) * 3;
+    duplicated_position.binary.size = duplicated_position.stride * 3;
+    expect_invalid("loaded_skeleton", duplicated_position);
+}
+
+TEST_F(ResourcePopulatorTest, MeshRejectsSubmeshWithoutVertexBindings) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
+    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
+    submesh_scheme.vertex_bindings.clear();
+    WBE::ResourceUnitLoaderMesh loader;
+    EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(submesh_scheme)), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {

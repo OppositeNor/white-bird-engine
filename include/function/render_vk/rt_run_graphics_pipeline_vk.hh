@@ -32,6 +32,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -40,6 +41,18 @@ struct IndexedDrawRegionVK {
     uint32_t first_index = 0;
     uint32_t index_count = 0;
     int32_t vertex_offset = 0;
+};
+
+/**
+ * @struct VertexBufferSourceVK
+ * @brief A task-local vertex buffer resource and the byte offset bound for it. Copyable; the id must outlive the call it is
+ * passed to.
+ */
+struct VertexBufferSourceVK {
+    /** Task-local vertex buffer resource id. */
+    std::string_view resource_id;
+    /** Byte offset bound for the buffer. */
+    VkDeviceSize offset = 0;
 };
 
 /**
@@ -94,17 +107,17 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
         Builder& set_depth_load_op(VkAttachmentLoadOp p_load_op);
 
         /**
-         * @brief Draw indexed vertices from task-local vertex and index buffer resources.
-         * @param p_vertex_buffer_id Vertex buffer resource.
+         * @brief Draw indexed vertices read from task-local vertex buffers, one per vertex-input binding.
+         * @param p_vertex_buffers The buffer bound for each vertex-input binding, in binding order; there must be one per
+         * binding of p_vertex_input.
          * @param p_index_buffer_id Index buffer resource.
          * @param p_vertex_input Dynamic vertex-input state.
-         * @param p_vertex_buffer_offset Byte offset bound for the vertex buffer.
          * @param p_indexed_draw_region Optional subregion; the whole index buffer is drawn when omitted.
+         * @throws std::runtime_error If a resource id is empty or the buffer and binding counts differ.
          */
-        Builder& set_indexed_draw(std::string_view p_vertex_buffer_id,
+        Builder& set_indexed_draw(std::span<const VertexBufferSourceVK> p_vertex_buffers,
             std::string_view p_index_buffer_id,
             VertexInputDescriptionVK p_vertex_input,
-            VkDeviceSize p_vertex_buffer_offset = 0,
             std::optional<IndexedDrawRegionVK> p_indexed_draw_region = std::nullopt);
 
         /**
@@ -126,11 +139,11 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
         Vector<VkClearValue, RenderAllocator> clear_values;
         VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
         VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        std::optional<std::string> vertex_buffer_id;
+        std::vector<std::string> vertex_buffer_ids;
+        std::vector<VkDeviceSize> vertex_buffer_offsets;
         std::optional<std::string> index_buffer_id;
         std::optional<IndexedDrawRegionVK> indexed_draw_region;
         VertexInputDescriptionVK vertex_input;
-        VkDeviceSize vertex_buffer_offset = 0;
         uint32_t draw_vertex_count = 3;
     };
 
@@ -162,13 +175,14 @@ private:
     Ref<ROGraphicsPipelineVK> graphics_pipeline;
     RenderTargetsVK render_targets;
     Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
-    std::optional<std::string> vertex_buffer_id;
+    std::vector<std::string> vertex_buffer_ids;
+    std::vector<VkDeviceSize> vertex_buffer_offsets;
     std::optional<std::string> index_buffer_id;
-    Ref<RenderObjectContainerVK> vertex_buffer_container;
+    std::vector<Ref<RenderObjectContainerVK>> vertex_buffer_containers;
+    std::vector<VkBuffer> bound_vertex_buffers;
     Ref<RenderObjectContainerVK> index_buffer_container;
     std::optional<IndexedDrawRegionVK> indexed_draw_region;
     VertexInputDescriptionVK vertex_input;
-    VkDeviceSize vertex_buffer_offset = 0;
     uint32_t draw_vertex_count = 3;
 };
 

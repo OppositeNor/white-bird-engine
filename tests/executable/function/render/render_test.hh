@@ -30,6 +30,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
+#include "function/render_vk/mesh_buffer_compiler_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
@@ -42,6 +43,9 @@
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "platform/file_system/path.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -406,7 +410,8 @@ inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(
     batch.first_draw = p_source.first_draw;
     batch.draw_count = p_source.draw_count;
     batch.vertex_input = p_source.vertex_input;
-    batch.vertex_buffer_offset = p_source.vertex_buffer_offset;
+    // The task registers the mesh vertex buffers in MeshResourcesVK order, so the buffer indices carry over.
+    batch.vertex_buffers = p_source.vertex_buffers;
     return batch;
 }
 
@@ -496,6 +501,96 @@ inline RenderTestExtentFactory make_fixed_extent_factory(VkExtent2D p_extent) {
     };
 }
 
+/**
+ * @struct SubmeshDrawBuffersVK
+ * @brief The graph resources and vertex input that draw one submesh with RTRunGraphicsPipelineVK. Copyable and movable.
+ */
+struct SubmeshDrawBuffersVK {
+    /** Vertex input matched against the submesh vertex bindings. */
+    VertexInputDescriptionVK vertex_input;
+    /** The imported vertex buffer read by each vertex-input binding, parallel to vertex_input.bindings. */
+    std::vector<std::string> vertex_buffer_ids;
+    /** Byte offset of the submesh vertices in each vertex buffer, parallel to vertex_buffer_ids. */
+    std::vector<VkDeviceSize> vertex_buffer_offsets;
+    /** The imported index buffer. */
+    std::string index_buffer_id;
+    /** The submesh's range of the index buffer. */
+    IndexedDrawRegionVK indexed_draw_region;
+
+    /**
+     * @brief Return the vertex buffers in the form RTRunGraphicsPipelineVK::Builder::set_indexed_draw() takes.
+     *
+     * The returned ids view this object, which must outlive the call they are passed to.
+     */
+    std::vector<VertexBufferSourceVK> get_vertex_buffer_sources() const {
+        std::vector<VertexBufferSourceVK> result;
+        result.reserve(vertex_buffer_ids.size());
+        for (size_t i = 0; i < vertex_buffer_ids.size(); ++i) {
+            result.push_back(VertexBufferSourceVK{.resource_id = vertex_buffer_ids[i], .offset = vertex_buffer_offsets[i]});
+        }
+        return result;
+    }
+};
+
+/**
+ * @brief Import the compiled vertex and index buffers of a mesh into a graph and wire one of its submeshes to a vertex entry.
+ *
+ * The mesh binaries are compiled, or reused from the render database, by MeshBufferCompilerVK and imported without copying:
+ * vertex buffer i as `<p_key>.vertices.<i>` and the index buffer as `<p_key>.indices`. Only the vertex bindings the entry
+ * reads are bound.
+ *
+ * @param p_renderer The renderer owning the buffers.
+ * @param p_graph The graph descriptor to import the buffers into.
+ * @param p_key Prefix of the imported resource ids.
+ * @param p_mesh The mesh whose binaries are compiled.
+ * @param p_submesh The drawn submesh of p_mesh.
+ * @param p_vertex_metadata Metadata of the vertex shader.
+ * @param p_vertex_entry Name of the vertex entry point.
+ * @return The resources and vertex input of the draw.
+ * @throws std::runtime_error If the mesh has no indexed geometry, the submesh index range is not uint32 aligned, or the vertex
+ * input cannot be matched.
+ */
+inline SubmeshDrawBuffersVK import_submesh_draw_buffers(RendererVK* p_renderer,
+    RendGraphDescVK& p_graph,
+    std::string_view p_key,
+    RefRes<RUMesh3D> p_mesh,
+    const RUSubmesh3D& p_submesh,
+    const ShaderMetadata& p_vertex_metadata,
+    std::string_view p_vertex_entry) {
+    if (p_submesh.indices.binary.start % sizeof(uint32_t) != 0) {
+        throw std::runtime_error("Failed to import submesh draw buffers: the index range is not uint32 aligned.");
+    }
+    MeshBufferCompilerVK::BuildResult buffers = MeshBufferCompilerVK(p_renderer->get_base_render_data())
+                                                    .build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    if (buffers.vertex_buffers.empty() || buffers.index_buffer == MEM_NULL) {
+        throw std::runtime_error("Failed to import submesh draw buffers: the mesh has no indexed geometry.");
+    }
+    std::vector<std::string> buffer_ids;
+    for (size_t i = 0; i < buffers.vertex_buffers.size(); ++i) {
+        buffer_ids.push_back(IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::get_vertex_buffer_member(i)));
+        p_graph.add_resource(buffer_ids.back(), *buffers.vertex_buffers[i]);
+    }
+    SubmeshDrawBuffersVK result;
+    result.index_buffer_id = IBindableRenderResourceVK::make_member_resource_id(p_key, MeshResourcesVK::INDICES);
+    p_graph.add_resource(result.index_buffer_id, *buffers.index_buffer);
+    result.vertex_input = build_vertex_input_description_vk(p_vertex_metadata, p_vertex_entry, p_submesh.get_vertex_bindings());
+    for (size_t source_binding : result.vertex_input.source_bindings) {
+        const RUVertexView& binding = p_submesh.get_vertex_bindings()[source_binding];
+        const auto buffer = std::ranges::find(buffers.vertex_binaries, binding.binary.binary);
+        if (buffer == buffers.vertex_binaries.end()) {
+            throw std::runtime_error("Failed to import submesh draw buffers: a vertex binding reads a binary that was not compiled.");
+        }
+        result.vertex_buffer_ids.push_back(buffer_ids[static_cast<size_t>(buffer - buffers.vertex_binaries.begin())]);
+        result.vertex_buffer_offsets.push_back(binding.binary.start);
+    }
+    result.indexed_draw_region = IndexedDrawRegionVK{
+        .first_index = static_cast<uint32_t>(p_submesh.indices.binary.start / sizeof(uint32_t)),
+        .index_count = static_cast<uint32_t>(p_submesh.indices.index_count),
+        .vertex_offset = 0,
+    };
+    return result;
+}
+
 inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLINT
     const BaseRenderDataVK* p_render_data,
     std::string_view p_task_id,
@@ -519,8 +614,11 @@ inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLIN
         return p_masked ? MeshResourcesVK::MASKED_DRAW_BATCHES : MeshResourcesVK::OPAQUE_DRAW_BATCHES;
     }();
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
-    task_builder.set_vertex_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::VERTICES))
-        .set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INDICES))
+    for (size_t i = 0; i < p_resources->get_vertex_buffer_count(); ++i) {
+        task_builder.add_vertex_buffer(
+            IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::get_vertex_buffer_member(i)));
+    }
+    task_builder.set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INDICES))
         .set_indirect_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, indirect_buffer_member))
         .set_clear_values(p_clear_values)
         .set_color_load_op(p_color_load_op)

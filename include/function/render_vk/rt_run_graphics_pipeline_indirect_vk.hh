@@ -34,6 +34,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -67,8 +68,8 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         uint32_t draw_count = 0;
         /** Dynamic vertex-input state used by this command range. */
         VertexInputDescriptionVK vertex_input;
-        /** Byte offset bound for the shared vertex buffer. */
-        VkDeviceSize vertex_buffer_offset = 0;
+        /** The task vertex buffer and offset bound for each vertex-input binding, parallel to vertex_input.bindings. */
+        std::vector<VertexBufferBindingVK> vertex_buffers;
     };
 
     /**
@@ -112,11 +113,12 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_depth_load_op(VkAttachmentLoadOp p_load_op);
 
         /**
-         * @brief Resolve the optional vertex buffer from a graph resource.
+         * @brief Append a vertex buffer resolved from a graph resource; batches select buffers by their index in append
+         * order.
          *
-         * Omit this for vertex shaders that derive all positions from vertex and instance IDs.
+         * Omit vertex buffers for vertex shaders that derive all positions from vertex and instance IDs.
          */
-        Builder& set_vertex_buffer(std::string_view p_resource_id);
+        Builder& add_vertex_buffer(std::string_view p_resource_id);
 
         /**
          * @brief Resolve the index buffer from a graph resource.
@@ -129,21 +131,18 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_indirect_buffer(std::string_view p_resource_id);
 
         /**
-         * @brief Replace the draw plan with one graphics pipeline batch beginning at command zero.
+         * @brief Replace the draw plan with one vertex-less graphics pipeline batch beginning at command zero.
+         *
+         * Batches with a vertex input are added through add_pipeline_batch(PipelineBatch).
          */
-        Builder& set_pipeline(Ref<ROGraphicsPipelineVK> p_pipeline,
-            uint32_t p_draw_count,
-            VertexInputDescriptionVK p_vertex_input = {},
-            VkDeviceSize p_vertex_buffer_offset = 0);
+        Builder& set_pipeline(Ref<ROGraphicsPipelineVK> p_pipeline, uint32_t p_draw_count);
 
         /**
-         * @brief Append one graphics pipeline batch.
+         * @brief Append one vertex-less graphics pipeline batch.
+         *
+         * Batches with a vertex input are added through add_pipeline_batch(PipelineBatch).
          */
-        Builder& add_pipeline_batch(Ref<ROGraphicsPipelineVK> p_pipeline,
-            uint32_t p_first_draw,
-            uint32_t p_draw_count,
-            VertexInputDescriptionVK p_vertex_input = {},
-            VkDeviceSize p_vertex_buffer_offset = 0);
+        Builder& add_pipeline_batch(Ref<ROGraphicsPipelineVK> p_pipeline, uint32_t p_first_draw, uint32_t p_draw_count);
 
         /**
          * @brief Append one preconfigured graphics pipeline batch.
@@ -163,7 +162,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Vector<VkClearValue, RenderAllocator> clear_values;
         VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
         VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        std::string vertex_buffer_id;
+        Vector<std::string, RenderAllocator> vertex_buffer_ids;
         std::string index_buffer_id;
         std::string indirect_buffer_id;
         Vector<PipelineBatch, RenderAllocator> pipeline_batches;
@@ -196,10 +195,13 @@ private:
     VkExtent2D render_extent{};
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     RenderTargetsVK render_targets;
-    std::string vertex_buffer_id;
+    Vector<std::string, RenderAllocator> vertex_buffer_ids;
     std::string index_buffer_id;
     std::string indirect_buffer_id;
-    Ref<RenderObjectContainerVK> vertex_buffer_container = MEM_NULL;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> vertex_buffer_containers;
+    // Per-record scratch storage for the buffers and offsets bound by one batch, sized for the largest batch.
+    Vector<VkBuffer, RenderAllocator> bound_vertex_buffers;
+    Vector<VkDeviceSize, RenderAllocator> bound_vertex_buffer_offsets;
     Ref<RenderObjectContainerVK> index_buffer_container;
     Ref<RenderObjectContainerVK> indirect_buffer_container;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;

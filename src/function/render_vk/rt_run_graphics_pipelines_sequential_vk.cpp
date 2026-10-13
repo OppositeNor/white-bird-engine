@@ -24,6 +24,7 @@
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -39,18 +40,18 @@ RTRunGraphicsPipelinesSequentialVK::DispatchBase::DispatchBase(RenderAllocator* 
 RTRunGraphicsPipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator, RegularDispatch p_dispatch)
     : base(p_allocator), vertex_input(std::move(p_dispatch.vertex_input)) {
     base = std::move(p_dispatch);
-    vertex_buffer_id = std::move(p_dispatch.vertex_buffer_id);
+    vertex_buffer_ids = std::move(p_dispatch.vertex_buffer_ids);
+    vertex_buffer_offsets = std::move(p_dispatch.vertex_buffer_offsets);
     index_buffer_id = std::move(p_dispatch.index_buffer_id);
     indexed_draw_region = p_dispatch.indexed_draw_region;
-    vertex_buffer_offset = p_dispatch.vertex_buffer_offset;
     draw_vertex_count = p_dispatch.draw_vertex_count;
 }
 
 RTRunGraphicsPipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator, IndirectDispatch p_dispatch)
-    : base(p_allocator), type(DispatchType::INDIRECT), vertex_buffer_id(std::move(p_dispatch.vertex_buffer_id)),
-      index_buffer_id(std::move(p_dispatch.index_buffer_id)), indirect_buffer_id(std::move(p_dispatch.indirect_buffer_id)),
-      first_indirect_draw(p_dispatch.first_indirect_draw), indirect_draw_count(p_dispatch.indirect_draw_count),
-      vertex_input(std::move(p_dispatch.vertex_input)), vertex_buffer_offset(p_dispatch.vertex_buffer_offset) {
+    : base(p_allocator), type(DispatchType::INDIRECT), vertex_buffer_ids(std::move(p_dispatch.vertex_buffer_ids)),
+      vertex_buffer_offsets(std::move(p_dispatch.vertex_buffer_offsets)), index_buffer_id(std::move(p_dispatch.index_buffer_id)),
+      indirect_buffer_id(std::move(p_dispatch.indirect_buffer_id)), first_indirect_draw(p_dispatch.first_indirect_draw),
+      indirect_draw_count(p_dispatch.indirect_draw_count), vertex_input(std::move(p_dispatch.vertex_input)) {
     base = std::move(p_dispatch);
 }
 
@@ -102,20 +103,32 @@ RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const Bas
         if (!entries.empty() && !entries.front().render_targets.matches(*dispatch_base.pipeline)) {
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: passes do not share one attachment layout.");
         }
+        if (dispatch.vertex_buffer_ids.size() != dispatch.vertex_input.bindings.size()) {
+            throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: a dispatch must bind one vertex buffer per vertex-input binding.");
+        }
+        if (dispatch.vertex_buffer_offsets.size() != dispatch.vertex_buffer_ids.size()) {
+            throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: a dispatch must set one offset per vertex buffer.");
+        }
         if (dispatch.type == DispatchType::REGULAR) {
-            if (dispatch.vertex_buffer_id.has_value() != dispatch.index_buffer_id.has_value()) {
-                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: vertex and index buffers must be configured together.");
+            if (!dispatch.vertex_buffer_ids.empty() && !dispatch.index_buffer_id.has_value()) {
+                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: vertex buffers require an index buffer.");
             }
             if (dispatch.indexed_draw_region.has_value() && !dispatch.index_buffer_id.has_value()) {
-                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: indexed draw region requires draw buffers.");
+                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: indexed draw region requires an index buffer.");
             }
-            if (!dispatch.vertex_buffer_id.has_value() && dispatch.draw_vertex_count == 0) {
+            if (!dispatch.index_buffer_id.has_value() && dispatch.draw_vertex_count == 0) {
                 throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: vertex-less draw count must be non-zero.");
             }
-        } else if (!dispatch.vertex_buffer_id.has_value() || !dispatch.index_buffer_id.has_value() ||
-                   dispatch.indirect_buffer_id.empty() || dispatch.indirect_draw_count == 0) {
-            throw std::runtime_error(
-                "RTRunGraphicsPipelinesSequentialVK: indirect draws require vertex, index, and command buffers and a non-zero draw count.");
+        } else {
+            if (!dispatch.index_buffer_id.has_value() || dispatch.index_buffer_id->empty()) {
+                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: indirect draws require an index buffer.");
+            }
+            if (dispatch.indirect_buffer_id.empty()) {
+                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: indirect draws require a command buffer.");
+            }
+            if (dispatch.indirect_draw_count == 0) {
+                throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: indirect draws require a non-zero draw count.");
+            }
         }
         entries.emplace_back(p_render_data, dispatch);
     }
@@ -126,8 +139,13 @@ void RTRunGraphicsPipelinesSequentialVK::append_accesses(
     for (const BoundEntry& bound_entry : entries) {
         const Dispatch& dispatch = bound_entry.dispatch;
         bound_entry.render_targets.append_accesses(p_reads, p_writes);
-        if (dispatch.vertex_buffer_id.has_value()) {
-            p_reads.push_back({.res_id = *dispatch.vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+        for (size_t i = 0; i < dispatch.vertex_buffer_ids.size(); ++i) {
+            const auto previous = dispatch.vertex_buffer_ids.begin() + static_cast<std::ptrdiff_t>(i);
+            if (std::find(dispatch.vertex_buffer_ids.begin(), previous, dispatch.vertex_buffer_ids[i]) == previous) {
+                p_reads.push_back({.res_id = dispatch.vertex_buffer_ids[i], .usage = RendResUsageVK::VERTEX_BUFFER});
+            }
+        }
+        if (dispatch.index_buffer_id.has_value()) {
             p_reads.push_back({.res_id = *dispatch.index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
         }
         if (dispatch.type == DispatchType::INDIRECT) {
@@ -142,14 +160,34 @@ void RTRunGraphicsPipelinesSequentialVK::bind_resources(const RendResViewVK& p_r
         const Dispatch& dispatch = bound_entry.dispatch;
         bound_entry.descriptor_bindings->bind_resources(p_resources);
         bound_entry.render_targets.bind_resources(p_resources);
-        if (dispatch.vertex_buffer_id.has_value()) {
-            bound_entry.vertex_buffer_container = p_resources.get(*dispatch.vertex_buffer_id).container;
+        bound_entry.vertex_buffer_containers.clear();
+        for (const std::string& vertex_buffer_id : dispatch.vertex_buffer_ids) {
+            bound_entry.vertex_buffer_containers.push_back(p_resources.get(vertex_buffer_id).container);
+        }
+        bound_entry.bound_vertex_buffers.resize(dispatch.vertex_buffer_ids.size());
+        if (dispatch.index_buffer_id.has_value()) {
             bound_entry.index_buffer_container = p_resources.get(*dispatch.index_buffer_id).container;
         }
         if (dispatch.type == DispatchType::INDIRECT) {
             bound_entry.indirect_buffer_container = p_resources.get(dispatch.indirect_buffer_id).container;
         }
     }
+}
+
+void RTRunGraphicsPipelinesSequentialVK::bind_vertex_buffers(VkCommandBuffer p_command_buffer, BoundEntry& p_bound_entry) const {
+    if (p_bound_entry.vertex_buffer_containers.empty()) {
+        return;
+    }
+    for (size_t i = 0; i < p_bound_entry.vertex_buffer_containers.size(); ++i) {
+        Ref<ROBufferVK> vertex_buffer = WBE_REQUIRES_VALID(
+            p_bound_entry.vertex_buffer_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+        p_bound_entry.bound_vertex_buffers[i] = vertex_buffer->get_buffer();
+    }
+    vkCmdBindVertexBuffers(p_command_buffer,
+        VERTEX_BUFFER_BINDPOINT,
+        static_cast<uint32_t>(p_bound_entry.bound_vertex_buffers.size()),
+        p_bound_entry.bound_vertex_buffers.data(),
+        p_bound_entry.dispatch.vertex_buffer_offsets.data());
 }
 
 void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) { // NOLINT
@@ -172,14 +210,11 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
             throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: dynamic vertex-input command is unavailable.");
         }
         if (dispatch.type == DispatchType::INDIRECT) {
-            Ref<ROBufferVK> vertex_buffer = WBE_REQUIRES_VALID(
-                bound_entry.vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
             Ref<ROBufferVK> index_buffer = WBE_REQUIRES_VALID(
                 bound_entry.index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
             Ref<ROBufferVK> indirect_buffer = WBE_REQUIRES_VALID(
                 bound_entry.indirect_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-            VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
-            vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &dispatch.vertex_buffer_offset);
+            bind_vertex_buffers(p_command_buffer, bound_entry);
             render_data->command_set_vertex_input(p_command_buffer,
                 static_cast<uint32_t>(dispatch.vertex_input.bindings.size()),
                 dispatch.vertex_input.bindings.data(),
@@ -195,13 +230,10 @@ void RTRunGraphicsPipelinesSequentialVK::record(VkCommandBuffer p_command_buffer
             }
             vkCmdDrawIndexedIndirect(
                 p_command_buffer, indirect_buffer->get_buffer(), indirect_offset, dispatch.indirect_draw_count, sizeof(VkDrawIndexedIndirectCommand));
-        } else if (dispatch.vertex_buffer_id.has_value()) {
-            Ref<ROBufferVK> vertex_buffer = WBE_REQUIRES_VALID(
-                bound_entry.vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+        } else if (dispatch.index_buffer_id.has_value()) {
             Ref<ROBufferVK> index_buffer = WBE_REQUIRES_VALID(
                 bound_entry.index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-            VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
-            vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &dispatch.vertex_buffer_offset);
+            bind_vertex_buffers(p_command_buffer, bound_entry);
             render_data->command_set_vertex_input(p_command_buffer,
                 static_cast<uint32_t>(dispatch.vertex_input.bindings.size()),
                 dispatch.vertex_input.bindings.data(),

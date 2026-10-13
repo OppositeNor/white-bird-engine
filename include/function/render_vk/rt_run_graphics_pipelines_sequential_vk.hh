@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -88,16 +89,16 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         RegularDispatch& operator=(const RegularDispatch&) = default;
         RegularDispatch& operator=(RegularDispatch&&) noexcept = default;
 
-        /** Optional vertex-buffer graph-resource identifier. */
-        std::optional<std::string> vertex_buffer_id;
-        /** Optional index-buffer graph-resource identifier. */
+        /** The vertex-buffer graph-resource identifier bound for each vertex-input binding, parallel to vertex_input.bindings. */
+        std::vector<std::string> vertex_buffer_ids;
+        /** The byte offset bound for each vertex buffer, parallel to vertex_buffer_ids. */
+        std::vector<VkDeviceSize> vertex_buffer_offsets;
+        /** Optional index-buffer graph-resource identifier; vertex buffers and an indexed region require it. */
         std::optional<std::string> index_buffer_id;
-        /** Optional indexed subregion; valid only when vertex and index buffers are configured. */
+        /** Optional indexed subregion; valid only when an index buffer is configured. */
         std::optional<IndexedDrawRegionVK> indexed_draw_region;
         /** Dynamic vertex-input state for indexed draws. */
         VertexInputDescriptionVK vertex_input;
-        /** Byte offset bound for the optional vertex buffer. */
-        VkDeviceSize vertex_buffer_offset = 0;
         /** Vertex count used when no vertex and index buffers are configured. */
         uint32_t draw_vertex_count = 3;
     };
@@ -115,8 +116,10 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         IndirectDispatch& operator=(const IndirectDispatch&) = default;
         IndirectDispatch& operator=(IndirectDispatch&&) noexcept = default;
 
-        /** Vertex-buffer graph-resource identifier. */
-        std::string vertex_buffer_id;
+        /** The vertex-buffer graph-resource identifier bound for each vertex-input binding, parallel to vertex_input.bindings. */
+        std::vector<std::string> vertex_buffer_ids;
+        /** The byte offset bound for each vertex buffer, parallel to vertex_buffer_ids. */
+        std::vector<VkDeviceSize> vertex_buffer_offsets;
         /** Index-buffer graph-resource identifier. */
         std::string index_buffer_id;
         /** Indexed-indirect command-buffer graph-resource identifier. */
@@ -127,8 +130,6 @@ struct RTRunGraphicsPipelinesSequentialVK final : public IRenderTaskVK {
         uint32_t indirect_draw_count = 0;
         /** Dynamic vertex-input state for indexed draws. */
         VertexInputDescriptionVK vertex_input;
-        /** Byte offset bound for the vertex buffer. */
-        VkDeviceSize vertex_buffer_offset = 0;
     };
 
 private:
@@ -148,14 +149,14 @@ private:
 
         DispatchBase base;
         DispatchType type = DispatchType::REGULAR;
-        std::optional<std::string> vertex_buffer_id;
+        std::vector<std::string> vertex_buffer_ids;
+        std::vector<VkDeviceSize> vertex_buffer_offsets;
         std::optional<std::string> index_buffer_id;
         std::string indirect_buffer_id;
         uint32_t first_indirect_draw = 0;
         uint32_t indirect_draw_count = 0;
         std::optional<IndexedDrawRegionVK> indexed_draw_region;
         VertexInputDescriptionVK vertex_input;
-        VkDeviceSize vertex_buffer_offset = 0;
         uint32_t draw_vertex_count = 3;
     };
 
@@ -236,7 +237,8 @@ private:
 
         Dispatch dispatch;
         RenderTargetsVK render_targets;
-        Ref<RenderObjectContainerVK> vertex_buffer_container;
+        std::vector<Ref<RenderObjectContainerVK>> vertex_buffer_containers;
+        std::vector<VkBuffer> bound_vertex_buffers;
         Ref<RenderObjectContainerVK> index_buffer_container;
         Ref<RenderObjectContainerVK> indirect_buffer_container;
         Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
@@ -244,6 +246,8 @@ private:
 
     const BaseRenderDataVK* render_data = nullptr;
     Vector<BoundEntry, RenderAllocator> entries;
+
+    void bind_vertex_buffers(VkCommandBuffer p_command_buffer, BoundEntry& p_bound_entry) const;
 };
 
 } // namespace WhiteBirdEngine

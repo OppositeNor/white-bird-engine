@@ -21,6 +21,7 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -36,7 +37,10 @@ public:
      * @brief Shared Vulkan buffers compiled for one mesh.
      */
     struct BuildResult {
-        Ref<ROBufferVK> vertex_buffer = MEM_NULL;
+        /** One buffer per distinct vertex binary, in first-use order. */
+        std::vector<Ref<ROBufferVK>> vertex_buffers;
+        /** The binary each vertex buffer was compiled from, parallel to vertex_buffers. */
+        std::vector<RefRes<RUBinary>> vertex_binaries;
         Ref<ROBufferVK> index_buffer = MEM_NULL;
     };
 
@@ -53,11 +57,12 @@ public:
     explicit MeshBufferCompilerVK(const BaseRenderDataVK* p_render_data);
 
     /**
-     * @brief Compile or reuse the vertex and index buffers shared by every category of one mesh.
+     * @brief Compile or reuse one vertex buffer per vertex binary and the index buffer shared by every category of one mesh.
      *
-     * Returns empty references when the mesh is null or has no submesh with indices.
+     * Every binary read by a vertex binding of an indexed submesh becomes one vertex buffer. Returns empty results when the
+     * mesh is null or has no submesh with indices.
      * @throws std::runtime_error When storage is missing, views or instance ranges are malformed, or indexed submeshes use
-     * different binaries.
+     * different index binaries.
      */
     BuildResult build(RefRes<RUMesh3D> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const;
 

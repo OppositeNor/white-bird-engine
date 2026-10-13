@@ -30,6 +30,15 @@ namespace WhiteBirdEngine {
 class VertexInputContract final {
 public:
     /**
+     * @brief One resource vertex binding read by the shader.
+     */
+    struct Binding {
+        /** Index of the binding in the resource's vertex bindings. */
+        size_t source_binding = 0;
+        /** Resource byte stride between vertices of the binding. */
+        size_t vertex_stride = 0;
+    };
+    /**
      * @brief One shader-consumed resource attribute.
      */
     struct Attribute {
@@ -39,7 +48,9 @@ public:
         RUVertexAttributeFormat format = RUVertexAttributeFormat::FLOAT;
         /** Reflected shader varying-input location. */
         uint32_t location = 0;
-        /** Byte offset inside one resource vertex. */
+        /** Index of the attribute's binding in bindings. */
+        uint32_t binding = 0;
+        /** Byte offset inside one vertex of the attribute's binding. */
         size_t offset = 0;
     };
 
@@ -68,10 +79,10 @@ public:
      */
     VertexInputContract& operator=(VertexInputContract&&) noexcept = default;
 
+    /** Resource bindings read by the shader, in resource binding order; empty when the shader consumes no attributes. */
+    std::vector<Binding> bindings;
     /** Matched attributes sorted by shader location. */
     std::vector<Attribute> attributes;
-    /** Resource byte stride, even when the shader consumes no attributes. */
-    size_t vertex_stride = 0;
 };
 
 } // namespace WhiteBirdEngine

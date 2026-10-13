@@ -194,6 +194,7 @@ MeshBufferCompilerVK::BuildResult compile_geometry_buffers(
 }
 
 DrawPlan plan_draws(const BaseRenderDataVK* p_render_data,
+    const MeshResourcesVK& p_resources,
     std::span<const MeshDrawBatchPlannerVK::Draw> p_draws,
     const ShaderMetadata& p_vertex_metadata,
     std::string_view p_vertex_entry) {
@@ -207,7 +208,13 @@ DrawPlan plan_draws(const BaseRenderDataVK* p_render_data,
         draw_batch.first_draw = source_batch.first_draw;
         draw_batch.draw_count = source_batch.draw_count;
         draw_batch.vertex_input = std::move(source_batch.vertex_input);
-        draw_batch.vertex_buffer_offset = source_batch.vertex_buffer_offset;
+        draw_batch.vertex_buffers.reserve(source_batch.vertex_binaries.size());
+        for (size_t i = 0; i < source_batch.vertex_binaries.size(); ++i) {
+            draw_batch.vertex_buffers.push_back(VertexBufferBindingVK{
+                .buffer_index = static_cast<uint32_t>(p_resources.get_vertex_buffer_index(source_batch.vertex_binaries[i])),
+                .offset = source_batch.vertex_buffer_offsets[i],
+            });
+        }
         result.batches.push_back(std::move(draw_batch));
     }
     return result;
@@ -386,7 +393,7 @@ Vector<MeshDrawBatchPlannerVK::Draw, RenderAllocator> make_static_draws(
             throw std::runtime_error("Failed to compile static-mesh resources: draw instance count exceeds uint32.");
         }
         MeshDrawBatchPlannerVK::Draw draw;
-        draw.vertices = submesh.vertices;
+        draw.vertex_bindings = submesh.get_vertex_bindings();
         draw.indices = submesh.indices;
         draw.instance_count = static_cast<uint32_t>(submesh.instance_count);
         draw.first_instance = p_first_instances[i];
@@ -440,10 +447,13 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
     result->mesh = p_mesh;
 
     MeshBufferCompilerVK::BuildResult geometry_buffers = compile_geometry_buffers(render_data, p_mesh, p_config);
-    if (geometry_buffers.vertex_buffer == MEM_NULL || geometry_buffers.index_buffer == MEM_NULL) {
-        throw std::runtime_error("Failed to compile static-mesh resources: shared vertex or index buffer is missing.");
+    if (geometry_buffers.vertex_buffers.empty() || geometry_buffers.index_buffer == MEM_NULL) {
+        throw std::runtime_error("Failed to compile static-mesh resources: vertex or index buffers are missing.");
     }
-    result->vertices = std::move(geometry_buffers.vertex_buffer);
+    for (size_t i = 0; i < geometry_buffers.vertex_buffers.size(); ++i) {
+        result->vertex_buffers.push_back(std::move(geometry_buffers.vertex_buffers[i]));
+        result->vertex_binaries.push_back(geometry_buffers.vertex_binaries[i]);
+    }
     result->indices = std::move(geometry_buffers.index_buffer);
 
     const auto material_indexer = [](std::vector<RefRes<RUMaterial>>& p_materials, RefRes<RUMaterial> p_material) {
@@ -457,14 +467,14 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
     result->instances =
         create_storage_buffer(render_data, instance_data.instances.data(), instance_data.instances.size() * sizeof(GeometryInstanceGPU));
 
-    const auto compile_category = [render_data](const RUSubmeshInstance3D& p_category,
+    const auto compile_category = [render_data, &result](const RUSubmeshInstance3D& p_category,
                                       std::span<const uint32_t> p_first_instances,
                                       const ShaderMetadata& p_vertex_metadata,
                                       std::string_view p_vertex_entry,
                                       Ref<ROBufferVK>& p_draw_buffer,
                                       Vector<MeshDrawBatchVK, RenderAllocator>& p_batches) {
         auto draws = make_static_draws(render_data->allocator, p_category, p_first_instances);
-        DrawPlan plan = plan_draws(render_data, draws, p_vertex_metadata, p_vertex_entry);
+        DrawPlan plan = plan_draws(render_data, *result, draws, p_vertex_metadata, p_vertex_entry);
         p_draw_buffer = create_indirect_buffer(render_data, plan.commands);
         p_batches = std::move(plan.batches);
     };

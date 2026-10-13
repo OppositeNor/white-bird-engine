@@ -18,6 +18,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/vertex_input_contract.hh"
+#include <span>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -54,10 +55,15 @@ public:
     VertexInputContractResolver& operator=(VertexInputContractResolver&&) noexcept = default;
 
     /**
-     * @brief Resolve a vertex shader entry against a resource vertex block.
-     * @throws std::runtime_error When shader annotations or the resource layout are malformed or incompatible.
+     * @brief Resolve a vertex shader entry against the vertex bindings of a submesh.
+     *
+     * Each shader role must be declared by exactly one binding. Only the bindings the shader reads appear in the contract,
+     * in binding order.
+     * @throws std::runtime_error When shader annotations or a binding layout are malformed or incompatible, or a role is
+     * missing or declared by more than one binding.
      */
-    VertexInputContract resolve(const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) const;
+    VertexInputContract resolve(
+        const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings) const;
 };
 
 } // namespace WhiteBirdEngine

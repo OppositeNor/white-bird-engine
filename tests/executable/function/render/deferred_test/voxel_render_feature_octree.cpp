@@ -407,7 +407,7 @@ RendTaskDescVK VoxelRenderFeatureOctree::get_debug_draw_render_task_desc(std::st
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
     task_builder.set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
         .set_indirect_buffer(p_indirect_buffer_id)
-        .set_pipeline(p_pipeline, p_draw_count, VertexInputDescriptionVK{})
+        .set_pipeline(p_pipeline, p_draw_count)
         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     task_desc.factory = [this, task_builder, p_first_mode](const RendGraphContextVK& p_context) {

@@ -26,6 +26,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -418,8 +419,8 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 }
 
 VertexInputDescriptionVK build_vertex_input_description_vk(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data) {
-    const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_data);
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings) {
+    const VertexInputContract contract = VertexInputContractResolver().resolve(p_metadata, p_entry_name, p_vertex_bindings);
     return VertexInputDescriptionVK::from_contract(contract);
 }
 

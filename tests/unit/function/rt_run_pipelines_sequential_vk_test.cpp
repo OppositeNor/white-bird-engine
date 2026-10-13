@@ -49,7 +49,8 @@ TEST(WBERunPipelinesSequentialVKTest, GraphicsSequenceKeepsRegularAndIndirectDis
     RTRunGraphicsPipelinesSequentialVK::RegularDispatch regular_dispatch(&allocator);
     regular_dispatch.render_extent = {.width = 1280, .height = 720};
     RTRunGraphicsPipelinesSequentialVK::IndirectDispatch indirect_dispatch(&allocator);
-    indirect_dispatch.vertex_buffer_id = "vertices";
+    indirect_dispatch.vertex_buffer_ids = {"vertices"};
+    indirect_dispatch.vertex_buffer_offsets = {0};
     indirect_dispatch.index_buffer_id = "indices";
     indirect_dispatch.indirect_buffer_id = "draw_batches";
     indirect_dispatch.first_indirect_draw = 4;

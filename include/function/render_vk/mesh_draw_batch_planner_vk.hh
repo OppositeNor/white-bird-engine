@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -77,9 +78,14 @@ public:
          */
         VertexInputDescriptionVK vertex_input;
         /**
-         * @brief Shared vertex-buffer base offset; command vertex offsets are relative to this base.
+         * @brief The vertex binary read by each vertex-input binding, parallel to vertex_input.bindings.
          */
-        VkDeviceSize vertex_buffer_offset = 0;
+        std::vector<RefRes<RUBinary>> vertex_binaries;
+        /**
+         * @brief The byte offset bound for each vertex-input binding, parallel to vertex_input.bindings; command vertex
+         * offsets are relative to these bases.
+         */
+        std::vector<VkDeviceSize> vertex_buffer_offsets;
     };
 
     /**
@@ -94,9 +100,9 @@ public:
         Draw& operator=(const Draw&) = default;
         Draw& operator=(Draw&&) noexcept = default;
         /**
-         * @brief Interleaved vertices drawn by the command.
+         * @brief Vertex bindings of the drawn submesh; the viewed storage must outlive the build() call.
          */
-        RUVertexView vertices;
+        std::span<const RUVertexView> vertex_bindings;
         /**
          * @brief Uint32 indices drawn by the command.
          */

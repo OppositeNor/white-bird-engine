@@ -34,6 +34,7 @@
 #include <glm/glm.hpp>
 #include <optional>
 #include <string>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -279,20 +280,18 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaSubmesh3D {
     /** Axis-aligned bounds of the submesh vertex positions. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaAABB3D aabb;
-    /** Binary-backed vertex data. */
+    /**
+     * @brief Binary-backed vertex bindings, each an interleaved view with its own binary range, stride, and attributes.
+     *
+     * At least one binding is required. Every binding holds the same number of vertices in the same order, and a role is
+     * declared by at most one binding. Bindings declaring the `ivec4` `joint_binding_ids` and `vec4`
+     * `joint_binding_weights` roles require the mesh to reference a skeleton.
+     */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    RUSchemaVertexView vertices;
+    std::vector<RUSchemaVertexView> vertex_bindings;
     /** Binary-backed uint32 indices. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaIndexView indices;
-    /**
-     * @brief Binary-backed per-vertex skeleton joint bindings.
-     *
-     * Requires the mesh to reference a skeleton. The view must hold one entry per vertex and declare the `ivec4`
-     * `joint_binding_ids` and `vec4` `joint_binding_weights` attributes.
-     */
-    WBE_META(WBE_REFLECT)
-    std::optional<RUSchemaVertexView> joint_bindings;
     /** First transform entry used by this submesh. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     size_t first_instance = 0;
@@ -534,7 +533,7 @@ struct RUBinaryView {
 
 /**
  * @class RUVertexView
- * @brief Binary-backed mutable interleaved vertex data and its fixed layout.
+ * @brief Binary-backed mutable interleaved vertex data and its fixed layout; one vertex binding of a submesh.
  *
  * The layout is immutable after loading. Vertex bytes may be changed by the mutation methods, which are not thread-safe. A
  * renderer update is required before changes reach the GPU. The resource is a non-owning view into its resource chunk and is
@@ -616,22 +615,29 @@ struct RUSubmesh3D {
     RefRes<RUMaterial> material;
     /** Axis-aligned bounds of the vertex positions. */
     RUAABB3D aabb;
-    /** Binary-backed interleaved vertices and fixed layout. */
-    RUVertexView vertices;
+    /**
+     * @brief Chunk-owned vertex bindings in declaration order.
+     *
+     * Each binding is an interleaved view with its own binary range and stride. All bindings hold vertex_count vertices in
+     * the same order, and each role is declared by at most one binding. Skinned submeshes declare the `ivec4`
+     * `joint_binding_ids` indexing the mesh skeleton joints and the matching `vec4` `joint_binding_weights`.
+     */
+    RefRes<RUVertexView> vertex_bindings;
+    /** Number of entries in vertex_bindings. */
+    size_t vertex_binding_count = 0;
+    /** Number of vertices held by every binding. */
+    size_t vertex_count = 0;
     /** Binary-backed uint32 indices. */
     RUIndexView indices;
-    /**
-     * @brief Per-vertex skeleton joint bindings, present only for meshes that reference a skeleton.
-     *
-     * Each entry stores the `ivec4` `joint_binding_ids` indexing the mesh skeleton joints and the matching `vec4`
-     * `joint_binding_weights`. The view has the same vertex count as vertices.
-     */
-    std::optional<RUVertexView> joint_bindings;
     /** First transform entry used by this submesh. */
     size_t first_instance = 0;
     /** Number of transform entries used by this submesh. */
     size_t instance_count = 0;
 
+    /**
+     * @brief Swap two vertices in every vertex binding.
+     * @throws std::runtime_error When storage is missing or either vertex is out of bounds.
+     */
     void swap_vertices(size_t p_first, size_t p_second);
     /** Set an exact float scalar attribute. */
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, float p_value);
@@ -658,13 +664,30 @@ struct RUSubmesh3D {
     /** Set an exact unsigned 32-bit integer4 attribute. */
     void set_vertex_attribute(size_t p_vertex_index, std::string_view p_role, const glm::uvec4& p_value);
 
+    /**
+     * @brief Return the vertex bindings.
+     * @throws std::runtime_error When binding storage is missing.
+     */
+    std::span<const RUVertexView> get_vertex_bindings() const;
+    /**
+     * @brief Return the vertex bindings for mutation.
+     * @throws std::runtime_error When binding storage is missing.
+     */
+    std::span<RUVertexView> get_vertex_bindings();
+    /**
+     * @brief Return the index of the vertex binding declaring a role.
+     * @throws std::runtime_error When the role is empty, absent, or declared by more than one binding, or storage is
+     * invalid.
+     */
+    size_t get_vertex_binding_index(std::string_view p_role) const;
+    /**
+     * @brief Return the byte offset of a role inside one vertex of the binding declaring it.
+     * @throws std::runtime_error Under the conditions of get_vertex_binding_index().
+     */
     size_t get_vertex_attribute_offset(std::string_view p_role) const;
     /**
-     * @brief Return the byte stride between vertices.
-     */
-    size_t get_vertex_stride() const;
-    /**
      * @brief Return the number of vertices.
+     * @throws std::runtime_error When a binding's storage is invalid or holds a different number of vertices.
      */
     size_t get_vertices_num() const;
 };

@@ -62,6 +62,7 @@
 #include <glm/matrix.hpp>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -69,8 +70,8 @@
 
 namespace WBE = WhiteBirdEngine;
 
-inline constexpr std::string_view REND_RES_SKINNED_MESH_VERTEX_BUFFER = "skinned_mesh_vertex_buffer";
-inline constexpr std::string_view REND_RES_SKINNED_MESH_INDEX_BUFFER = "skinned_mesh_index_buffer";
+// Prefix of the imported skinned mesh buffers.
+inline constexpr std::string_view REND_RES_SKINNED_MESH = "skinned_mesh";
 inline constexpr std::string_view REND_RES_SKINNED_MESH_CAMERA_INFO = "skinned_mesh_camera_info";
 inline constexpr std::string_view REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS = "skinned_mesh_skinning_transforms";
 inline constexpr std::string_view RT_DRAW_SKINNED_MESH = "draw_skinned_mesh";
@@ -80,22 +81,6 @@ inline constexpr std::string_view RT_DRAW_SKINNED_MESH_IMGUI = "draw_skinned_mes
 inline constexpr size_t JOINT_BINDING_INFLUENCE_COUNT = 4;
 // The rate, in blend units per second, at which the left and right arrow keys move the blend slider.
 inline constexpr float BLEND_KEY_SPEED = 0.5F;
-
-/**
- * @struct JointBindingGPU
- * @brief The joint binding attributes appended to every vertex of the skinned vertex buffer, read by the shader as the
- * int4 `joint_binding_ids` and float4 `joint_binding_weights` vertex inputs.
- */
-struct JointBindingGPU {
-    /**
-     * @brief The indices of the influencing joints in the skeleton.
-     */
-    glm::ivec4 joint_ids{0};
-    /**
-     * @brief The influence weight of each joint.
-     */
-    glm::vec4 joint_weights{0.0F};
-};
 
 /**
  * @struct SkinningTransformGPU
@@ -117,7 +102,6 @@ struct SkinningTransformGPU {
     glm::vec4 row_2{0.0F, 0.0F, 1.0F, 0.0F};
 };
 
-static_assert(sizeof(JointBindingGPU) == 32, "JointBindingGPU must hold exactly the int4 ids and float4 weights.");
 static_assert(sizeof(SkinningTransformGPU) == 48, "SkinningTransformGPU must match the std430 layout of the shader SkinningTransform.");
 
 /**
@@ -270,11 +254,11 @@ public:
             throw std::runtime_error("Failed to setup skinned mesh test: the mesh has no skeleton.");
         }
         const WBE::RUSubmesh3D& submesh = mesh->opaque_instances.submeshes.get()[0];
-        if (!submesh.joint_bindings.has_value()) {
+        if (submesh.vertex_binding_count < 2) {
             throw std::runtime_error("Failed to setup skinned mesh test: the submesh has no joint bindings.");
         }
         load_skeleton(*mesh->skeleton);
-        load_joint_bindings(submesh);
+        validate_joint_bindings(submesh);
         mesh_transform = mesh->opaque_instances.instances.get()[0].global_transform;
         evaluate_skinning_transforms();
         skinned_blend = blend;
@@ -296,17 +280,6 @@ public:
         };
         auto graphics_pipeline =
             WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_skinned_mesh_pipeline", pipeline_resource).graphics_pipeline;
-        WBE::VertexInputDescriptionVK vertex_input =
-            build_skinned_vertex_input(WBE::ShaderMetadataLoader().load(shader_resource), submesh);
-        std::vector<uint8_t> vertex_bytes = build_skinned_vertex_bytes(submesh);
-        const char* index_data = submesh.indices.binary.binary->data.get() + submesh.indices.binary.start;
-        std::vector<uint8_t> index_bytes(index_data, index_data + submesh.indices.binary.size);
-        const WBE::IndexedDrawRegionVK indexed_draw_region{
-            .first_index = 0,
-            .index_count = static_cast<uint32_t>(submesh.indices.index_count),
-            .vertex_offset = 0,
-        };
-
         CameraInfoGPU camera_info{
             .view = glm::lookAt(glm::vec3(0.0F, 1.0F, 4.5F), glm::vec3(0.0F, 1.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
             .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), base_render_data->swap_chain_aspect_ratio, 10.0F, 0.1F),
@@ -316,21 +289,16 @@ public:
         camera_info.proj[1][1] *= -1;
 
         WBE::RendGraphDescVK graph_desc(render_allocator);
+        // The shader reads position from the geometry binding and the joint ids and weights from the joint-binding
+        // binding, so the draw binds the buffers compiled from both binaries.
+        const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
+            graph_desc,
+            REND_RES_SKINNED_MESH,
+            mesh,
+            submesh,
+            WBE::ShaderMetadataLoader().load(shader_resource),
+            "vertex_main");
         graph_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-            .add_buffer(REND_RES_SKINNED_MESH_VERTEX_BUFFER,
-                [vertex_bytes = std::move(vertex_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_VERTEX,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = vertex_bytes,
-                        };
-                })
-            .add_buffer(REND_RES_SKINNED_MESH_INDEX_BUFFER,
-                [index_bytes = std::move(index_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_INDEX,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = index_bytes,
-                        };
-                })
             .add_buffer(REND_RES_SKINNED_MESH_CAMERA_INFO,
                 [initial_data = WBE::to_initial_data(camera_info)](const WBE::RendGraphContextVK& /*p_context*/) {
                     return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
@@ -355,8 +323,10 @@ public:
                 .set_pipeline(graphics_pipeline)
                 .set_render_extent(p_context.swap_chain_extent)
                 .set_clear_values(clear_values)
-                .set_indexed_draw(
-                    REND_RES_SKINNED_MESH_VERTEX_BUFFER, REND_RES_SKINNED_MESH_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
+                .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
+                    draw_buffers.index_buffer_id,
+                    draw_buffers.vertex_input,
+                    draw_buffers.indexed_draw_region)
                 .create_unique(base_render_data);
         };
         graph_desc.add_task(std::move(draw_task_desc));
@@ -385,7 +355,6 @@ private:
     std::vector<JointPose> first_frame_pose;
     std::vector<JointPose> second_frame_pose;
     // The joint binding of every vertex, the instance transform of the mesh, and the skinning transform of every joint.
-    std::vector<JointBindingGPU> joint_bindings;
     glm::mat4 mesh_transform{1.0F};
     std::vector<SkinningTransformGPU> skinning_transforms;
     // The blend factor set by the slider, and the one the skinning transform buffer holds; owned by the rendering thread.
@@ -427,83 +396,21 @@ private:
         return std::vector<uint8_t>(bytes, bytes + p_elements.size() * sizeof(TElement));
     }
 
-    void load_joint_bindings(const WBE::RUSubmesh3D& p_submesh) {
-        const WBE::RUVertexView& view = p_submesh.joint_bindings.value();
-        if (view.vertex_count != p_submesh.vertices.vertex_count) {
-            throw std::runtime_error("Failed to setup skinned mesh test: joint binding and vertex counts differ.");
-        }
+    // Check that every joint binding references a skeleton joint, since the shader indexes the skinning transforms with
+    // them.
+    void validate_joint_bindings(const WBE::RUSubmesh3D& p_submesh) const {
+        const WBE::RUVertexView& view = p_submesh.get_vertex_bindings()[p_submesh.get_vertex_binding_index("joint_binding_ids")];
         const size_t joint_ids_offset = view.get_vertex_attribute_offset("joint_binding_ids");
-        const size_t joint_weights_offset = view.get_vertex_attribute_offset("joint_binding_weights");
         const char* binding_data = view.binary.binary->data.get() + view.binary.start;
         for (size_t i = 0; i < view.vertex_count; ++i) {
             std::array<int32_t, JOINT_BINDING_INFLUENCE_COUNT> ids{};
-            std::array<float, JOINT_BINDING_INFLUENCE_COUNT> weights{};
             std::memcpy(ids.data(), binding_data + i * view.vertex_stride + joint_ids_offset, sizeof(ids));
-            std::memcpy(weights.data(), binding_data + i * view.vertex_stride + joint_weights_offset, sizeof(weights));
             for (int32_t id : ids) {
                 if (id < 0 || static_cast<size_t>(id) >= joint_parents.size()) {
                     throw std::runtime_error("Failed to setup skinned mesh test: a vertex references a joint outside the skeleton.");
                 }
             }
-            joint_bindings.push_back(JointBindingGPU{
-                .joint_ids = glm::ivec4(ids[0], ids[1], ids[2], ids[3]),
-                .joint_weights = glm::vec4(weights[0], weights[1], weights[2], weights[3]),
-            });
         }
-    }
-
-    /**
-     * Interleave every bind-pose vertex of the submesh with its joint binding, so one vertex holds the submesh vertex
-     * followed by a JointBindingGPU.
-     */
-    std::vector<uint8_t> build_skinned_vertex_bytes(const WBE::RUSubmesh3D& p_submesh) const {
-        const WBE::RUVertexView& vertices = p_submesh.vertices;
-        const size_t skinned_stride = vertices.vertex_stride + sizeof(JointBindingGPU);
-        const char* vertex_data = vertices.binary.binary->data.get() + vertices.binary.start;
-        std::vector<uint8_t> result(vertices.vertex_count * skinned_stride);
-        for (size_t i = 0; i < vertices.vertex_count; ++i) {
-            std::memcpy(result.data() + i * skinned_stride, vertex_data + i * vertices.vertex_stride, vertices.vertex_stride);
-            std::memcpy(result.data() + i * skinned_stride + vertices.vertex_stride, &joint_bindings[i], sizeof(JointBindingGPU));
-        }
-        return result;
-    }
-
-    /**
-     * Match the vertex shader inputs against the interleaved layout of build_skinned_vertex_bytes(): the submesh
-     * attributes, followed by the joint binding ids and weights.
-     */
-    static WBE::VertexInputDescriptionVK build_skinned_vertex_input(
-        const WBE::ShaderMetadata& p_shader_metadata, const WBE::RUSubmesh3D& p_submesh) {
-        const WBE::RUVertexView& vertices = p_submesh.vertices;
-        const WBE::RUVertexView& bindings = p_submesh.joint_bindings.value();
-        const size_t attribute_count = vertices.attribute_count + bindings.attribute_count;
-        WBE::MemID attributes_memory = WBE::global_allocator()->allocate(sizeof(WBE::RUVertexView::Attribute) * attribute_count);
-        auto* attributes = static_cast<WBE::RUVertexView::Attribute*>(WBE::global_allocator()->get(attributes_memory));
-        for (size_t i = 0; i < vertices.attribute_count; ++i) {
-            std::construct_at(attributes + i, vertices.attributes.get()[i]);
-        }
-        for (size_t i = 0; i < bindings.attribute_count; ++i) {
-            // Reuse the chunk-owned role and format, but place the attribute where JointBindingGPU stores it.
-            WBE::RUVertexView::Attribute attribute = bindings.attributes.get()[i];
-            if (attribute.role.matches("joint_binding_ids")) {
-                attribute.offset = vertices.vertex_stride + offsetof(JointBindingGPU, joint_ids);
-            } else if (attribute.role.matches("joint_binding_weights")) {
-                attribute.offset = vertices.vertex_stride + offsetof(JointBindingGPU, joint_weights);
-            } else {
-                throw std::runtime_error("Failed to setup skinned mesh test: the joint bindings have an unexpected attribute.");
-            }
-            std::construct_at(attributes + vertices.attribute_count + i, attribute);
-        }
-        WBE::RUVertexView skinned_vertices;
-        skinned_vertices.attributes = WBE::RefRes<WBE::RUVertexView::Attribute>(attributes_memory, WBE::global_allocator());
-        skinned_vertices.attribute_count = attribute_count;
-        skinned_vertices.vertex_stride = vertices.vertex_stride + sizeof(JointBindingGPU);
-        skinned_vertices.vertex_count = vertices.vertex_count;
-        WBE::VertexInputDescriptionVK result =
-            WBE::build_vertex_input_description_vk(p_shader_metadata, "vertex_main", skinned_vertices);
-        std::destroy_n(attributes, attribute_count);
-        WBE::global_allocator()->deallocate(attributes_memory);
-        return result;
     }
 
     void evaluate_skinning_transforms() {

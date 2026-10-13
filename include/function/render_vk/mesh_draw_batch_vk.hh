@@ -17,6 +17,7 @@
 
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -39,8 +40,11 @@ struct MeshDrawBatchVK {
     uint32_t draw_count = 0;
     /** Dynamic vertex-input layout shared by the commands. */
     VertexInputDescriptionVK vertex_input;
-    /** Shared byte offset used when binding the vertex buffer. */
-    VkDeviceSize vertex_buffer_offset = 0;
+    /**
+     * @brief The mesh vertex buffer, by MeshResourcesVK vertex buffer index, and byte offset bound for each vertex-input
+     * binding; parallel to vertex_input.bindings.
+     */
+    std::vector<VertexBufferBindingVK> vertex_buffers;
 };
 
 } // namespace WhiteBirdEngine

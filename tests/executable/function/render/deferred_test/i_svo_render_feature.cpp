@@ -281,7 +281,7 @@ RendTaskDescVK ISVORenderFeature::get_debug_draw_render_task_desc() const {
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
     task_builder.set_index_buffer(SVO_DEBUG_DRAW_INDEX_BUFFER)
         .set_indirect_buffer(SVO_DEBUG_DRAW_INDIRECT_BUFFER)
-        .set_pipeline(svo_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .set_pipeline(svo_debug_draw_graphics_pipeline, 1)
         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     task_desc.factory = [this, task_builder](const RendGraphContextVK& p_context) {
@@ -304,7 +304,7 @@ RendTaskDescVK ISVORenderFeature::get_pre_deferred_debug_draw_render_task_desc()
     RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
     task_builder.set_index_buffer(SVO_DEBUG_DRAW_INDEX_BUFFER)
         .set_indirect_buffer(SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER)
-        .set_pipeline(svo_pre_deferred_debug_draw_graphics_pipeline, 1, VertexInputDescriptionVK{})
+        .set_pipeline(svo_pre_deferred_debug_draw_graphics_pipeline, 1)
         .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
         .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
     task_desc.factory = [this, task_builder](const RendGraphContextVK& p_context) {

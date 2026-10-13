@@ -20,6 +20,7 @@
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <string>
+#include <span>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -129,16 +130,18 @@ struct ShaderDescriptorHeapLayoutVK {
 VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_stage);
 
 /**
- * @brief Reflect and match one vertex entry point against a resource-defined vertex layout.
+ * @brief Reflect and match one vertex entry point against the vertex bindings of a submesh.
  *
- * Every field marked WBE_VERTEX_INPUT must match an exact resource role and format. Extra resource attributes are allowed.
- * Locations come from the reflected varying-input binding indices. A vertex entry without annotated fields produces an empty
- * vertex-less state.
+ * Every field marked WBE_VERTEX_INPUT must match an exact resource role and format declared by exactly one binding. Extra
+ * resource attributes and bindings are allowed. Locations come from the reflected varying-input binding indices. Only the
+ * bindings the entry reads become Vulkan bindings, numbered from zero in binding order; source_bindings maps them back to
+ * p_vertex_bindings. A vertex entry without annotated fields produces an empty vertex-less state.
  *
- * @throws std::runtime_error When attributes, roles, locations, formats, arguments, or resource layout metadata are invalid.
+ * @throws std::runtime_error When attributes, roles, locations, formats, arguments, or resource layout metadata are invalid,
+ * or a role is declared by more than one binding.
  */
 VertexInputDescriptionVK build_vertex_input_description_vk(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, const RUVertexView& p_vertex_data);
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings);
 
 /**
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.

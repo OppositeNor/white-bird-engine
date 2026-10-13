@@ -78,8 +78,12 @@ VkTransformMatrixKHR to_vk_transform(const glm::mat4& p_transform) {
     return result;
 }
 
-const RUVertexView::Attribute& get_position_attribute(const RUSubmesh3D& p_submesh) {
-    std::span<const RUVertexView::Attribute> attributes(p_submesh.vertices.attributes.get(), p_submesh.vertices.attribute_count);
+const RUVertexView& get_position_binding(const RUSubmesh3D& p_submesh) {
+    return p_submesh.get_vertex_bindings()[p_submesh.get_vertex_binding_index("position")];
+}
+
+const RUVertexView::Attribute& get_position_attribute(const RUVertexView& p_position_binding) {
+    std::span<const RUVertexView::Attribute> attributes(p_position_binding.attributes.get(), p_position_binding.attribute_count);
     auto position_attribute = std::ranges::find_if(attributes, [](const RUVertexView::Attribute& p_attribute) {
         return p_attribute.role.get_name() == "position";
     });
@@ -96,11 +100,12 @@ void validate_submesh(const RUSubmesh3D& p_submesh, size_t p_instance_count) {
     if (p_submesh.indices.index_count % 3 != 0) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: index count must form complete triangles.");
     }
-    if (p_submesh.vertices.attribute_count == 0 || p_submesh.vertices.attributes == nullptr) {
+    const RUVertexView& position_binding = get_position_binding(p_submesh);
+    if (position_binding.attribute_count == 0 || position_binding.attributes == nullptr) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: vertex attributes are missing.");
     }
-    if (p_submesh.vertices.vertex_stride == 0 ||
-        p_submesh.vertices.binary.size != p_submesh.vertices.vertex_count * p_submesh.vertices.vertex_stride) {
+    if (position_binding.vertex_stride == 0 ||
+        position_binding.binary.size != position_binding.vertex_count * position_binding.vertex_stride) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: invalid vertex range.");
     }
     if (p_submesh.indices.binary.start % sizeof(uint32_t) != 0 ||
@@ -110,7 +115,7 @@ void validate_submesh(const RUSubmesh3D& p_submesh, size_t p_instance_count) {
     if (p_submesh.first_instance > p_instance_count || p_submesh.instance_count > p_instance_count - p_submesh.first_instance) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: instance range is out of bounds.");
     }
-    if (p_submesh.vertices.vertex_count == 0 || p_submesh.vertices.vertex_count - 1 > std::numeric_limits<uint32_t>::max()) {
+    if (position_binding.vertex_count == 0 || position_binding.vertex_count - 1 > std::numeric_limits<uint32_t>::max()) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: vertex count exceeds uint32.");
     }
 }
@@ -118,7 +123,7 @@ void validate_submesh(const RUSubmesh3D& p_submesh, size_t p_instance_count) {
 void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
     const RUSubmeshInstance3D& p_mesh,
     const glm::mat4& p_mesh_transform,
-    VkDeviceAddress p_vertex_buffer_address,
+    const MeshResourcesVK& p_static_mesh,
     VkDeviceAddress p_index_buffer_address) {
     if ((p_mesh.submesh_count > 0 && p_mesh.submeshes == nullptr) || (p_mesh.instance_count > 0 && p_mesh.instances == nullptr)) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: mesh storage is missing.");
@@ -130,7 +135,10 @@ void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
             continue;
         }
         validate_submesh(submesh, p_mesh.instance_count);
-        const RUVertexView::Attribute& position_attribute = get_position_attribute(submesh);
+        const RUVertexView& position_binding = get_position_binding(submesh);
+        const RUVertexView::Attribute& position_attribute = get_position_attribute(position_binding);
+        const VkDeviceAddress vertex_buffer_address =
+            p_static_mesh.acquire_vertex_buffer(p_static_mesh.get_vertex_buffer_index(position_binding.binary.binary))->get_device_address();
         BottomLevelInput input;
         input.geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
         input.geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
@@ -138,9 +146,9 @@ void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
         auto& triangles = input.geometry.geometry.triangles;
         triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
         triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-        triangles.vertexData.deviceAddress = p_vertex_buffer_address + submesh.vertices.binary.start + position_attribute.offset;
-        triangles.vertexStride = submesh.vertices.vertex_stride;
-        triangles.maxVertex = static_cast<uint32_t>(submesh.vertices.vertex_count - 1);
+        triangles.vertexData.deviceAddress = vertex_buffer_address + position_binding.binary.start + position_attribute.offset;
+        triangles.vertexStride = position_binding.vertex_stride;
+        triangles.maxVertex = static_cast<uint32_t>(position_binding.vertex_count - 1);
         triangles.indexType = VK_INDEX_TYPE_UINT32;
         triangles.indexData.deviceAddress = p_index_buffer_address + submesh.indices.binary.start;
         input.primitive_count = static_cast<uint32_t>(submesh.indices.index_count / 3);
@@ -191,8 +199,10 @@ Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(
     if (p_static_mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: static mesh is null.");
     }
-    require_build_input_usage(p_static_mesh->acquire_vertices(),
-        "Failed to compile static-mesh acceleration structure: vertex buffer lacks acceleration-structure input usage.");
+    for (size_t i = 0; i < p_static_mesh->get_vertex_buffer_count(); ++i) {
+        require_build_input_usage(p_static_mesh->acquire_vertex_buffer(i),
+            "Failed to compile static-mesh acceleration structure: vertex buffer lacks acceleration-structure input usage.");
+    }
     require_build_input_usage(p_static_mesh->acquire_indices(),
         "Failed to compile static-mesh acceleration structure: index buffer lacks acceleration-structure input usage.");
     const VkDeviceSize scratch_alignment = ray_tracing_data->min_acceleration_structure_scratch_offset_alignment;
@@ -200,15 +210,14 @@ Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: invalid scratch-buffer alignment.");
     }
 
-    const VkDeviceAddress vertex_buffer_address = p_static_mesh->acquire_vertices()->get_device_address();
     const VkDeviceAddress index_buffer_address = p_static_mesh->acquire_indices()->get_device_address();
     std::vector<BottomLevelInput> inputs;
     RefRes<RUMesh3D> mesh = p_static_mesh->get_mesh();
     if (mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: the source mesh is missing.");
     }
-    append_bottom_level_inputs(inputs, mesh->opaque_instances, p_mesh_transform, vertex_buffer_address, index_buffer_address);
-    append_bottom_level_inputs(inputs, mesh->double_sided_opaque_instances, p_mesh_transform, vertex_buffer_address, index_buffer_address);
+    append_bottom_level_inputs(inputs, mesh->opaque_instances, p_mesh_transform, *p_static_mesh, index_buffer_address);
+    append_bottom_level_inputs(inputs, mesh->double_sided_opaque_instances, p_mesh_transform, *p_static_mesh, index_buffer_address);
     if (inputs.empty()) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: the mesh has no drawable opaque geometry.");
     }

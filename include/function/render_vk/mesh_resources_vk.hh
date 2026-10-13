@@ -27,6 +27,7 @@
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -56,7 +57,7 @@ inline constexpr std::string_view REND_RES_MESH_MATERIAL_SAMPLER = "material_sam
  */
 class MeshResourcesVK final : public IBindableRenderResourceVK {
 public:
-    /** Member name of the shared vertex buffer. */
+    /** Member name prefix of the vertex buffers; vertex buffer i is the member `vertices.<i>`. */
     static constexpr std::string_view VERTICES = "vertices";
     /** Member name of the shared uint32 index buffer. */
     static constexpr std::string_view INDICES = "indices";
@@ -89,10 +90,24 @@ public:
     /** @brief Construct empty allocator-owned mesh resource storage. */
     explicit MeshResourcesVK(RenderAllocator* p_allocator);
 
-    /** @brief Acquire the shared vertex buffer. */
-    Ref<ROBufferVK> acquire_vertices() const {
-        return vertices;
+    /**
+     * @brief Return the member name of one vertex buffer, `vertices.<p_index>`.
+     */
+    static std::string get_vertex_buffer_member(size_t p_index);
+    /** @brief Return the number of vertex buffers, one per vertex binary the mesh's vertex bindings read. */
+    size_t get_vertex_buffer_count() const {
+        return vertex_buffers.size();
     }
+    /**
+     * @brief Acquire one vertex buffer.
+     * @throws std::runtime_error If p_index is out of bounds.
+     */
+    Ref<ROBufferVK> acquire_vertex_buffer(size_t p_index) const;
+    /**
+     * @brief Return the index of the vertex buffer compiled from a vertex binary.
+     * @throws std::runtime_error If no vertex buffer was compiled from p_binary.
+     */
+    size_t get_vertex_buffer_index(RefRes<RUBinary> p_binary) const;
 
     /** @brief Acquire the shared uint32 index buffer. */
     Ref<ROBufferVK> acquire_indices() const {
@@ -190,7 +205,8 @@ private:
 
     RenderAllocator* allocator = nullptr;
     RefRes<RUMesh3D> mesh = MEM_NULL;
-    Ref<ROBufferVK> vertices = MEM_NULL;
+    Vector<Ref<ROBufferVK>, RenderAllocator> vertex_buffers;
+    Vector<RefRes<RUBinary>, RenderAllocator> vertex_binaries;
     Ref<ROBufferVK> indices = MEM_NULL;
     Ref<ROBufferVK> opaque_draw_batches = MEM_NULL;
     Ref<ROBufferVK> opaque_double_sided_draw_batches = MEM_NULL;

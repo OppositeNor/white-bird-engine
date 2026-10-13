@@ -53,8 +53,8 @@
 
 namespace WBE = WhiteBirdEngine;
 
-inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER = "draw_triangle_vertex_buffer";
-inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER = "draw_triangle_index_buffer";
+// Prefix of the imported triangle mesh buffers.
+inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_MESH = "draw_triangle_mesh";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
@@ -79,10 +79,7 @@ public:
             triangle_mesh->opaque_instances.submeshes == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: expected exactly one opaque triangle submesh.");
         }
-        const WBE::RUSubmesh3D* triangle_submesh = triangle_mesh->opaque_instances.submeshes.get();
-        if (triangle_submesh->vertices.binary.binary == nullptr || triangle_submesh->indices.binary.binary == nullptr) {
-            throw std::runtime_error("Failed to setup draw triangle test: triangle geometry storage is missing.");
-        }
+        const WBE::RUSubmesh3D& triangle_submesh = triangle_mesh->opaque_instances.submeshes.get()[0];
 
         auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
         if (pipeline_resource == nullptr) {
@@ -98,34 +95,15 @@ public:
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_triangle_pipeline", pipeline_resource);
         auto graphics_pipeline = compiled.graphics_pipeline;
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
-        WBE::VertexInputDescriptionVK vertex_input = WBE::build_vertex_input_description_vk(
-            WBE::ShaderMetadataLoader().load(shader_resource), "vertex_main", triangle_submesh->vertices);
-
-        const char* vertex_data = triangle_submesh->vertices.binary.binary->data.get() + triangle_submesh->vertices.binary.start;
-        const char* index_data = triangle_submesh->indices.binary.binary->data.get() + triangle_submesh->indices.binary.start;
-        // Copied once, because the buffer factories may run again after the mesh resource is gone.
-        std::vector<uint8_t> vertex_bytes(vertex_data, vertex_data + triangle_submesh->vertices.binary.size);
-        std::vector<uint8_t> index_bytes(index_data, index_data + triangle_submesh->indices.binary.size);
-
-        const WBE::IndexedDrawRegionVK indexed_draw_region{
-            .first_index = 0,
-            .index_count = static_cast<uint32_t>(triangle_submesh->indices.index_count),
-            .vertex_offset = 0,
-        };
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-            .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER,
-                [vertex_bytes = std::move(vertex_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_VERTEX,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = vertex_bytes};
-                })
-            .add_buffer(REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER,
-                [index_bytes = std::move(index_bytes)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_INDEX,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = index_bytes};
-                });
+        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
+        const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
+            pipeline_desc,
+            REND_RES_TEST_DRAW_TRIANGLE_MESH,
+            triangle_mesh,
+            triangle_submesh,
+            WBE::ShaderMetadataLoader().load(shader_resource),
+            "vertex_main");
         WBE::RendTaskDescVK task_desc(render_allocator);
         task_desc.task_id = RT_RUN_PIPELINE;
         task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
@@ -135,8 +113,10 @@ public:
                 .set_pipeline(graphics_pipeline)
                 .set_render_extent(p_context.swap_chain_extent)
                 .set_clear_values(clear_values)
-                .set_indexed_draw(
-                    REND_RES_TEST_DRAW_TRIANGLE_VERTEX_BUFFER, REND_RES_TEST_DRAW_TRIANGLE_INDEX_BUFFER, vertex_input, 0, indexed_draw_region)
+                .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
+                    draw_buffers.index_buffer_id,
+                    draw_buffers.vertex_input,
+                    draw_buffers.indexed_draw_region)
                 .create_unique(base_render_data);
         };
         pipeline_desc.tasks.emplace_back(std::move(task_desc));

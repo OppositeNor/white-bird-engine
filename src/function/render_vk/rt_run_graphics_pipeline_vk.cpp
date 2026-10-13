@@ -27,6 +27,8 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -65,18 +67,27 @@ RTRunGraphicsPipelineVK::Builder& RTRunGraphicsPipelineVK::Builder::set_depth_lo
     return *this;
 }
 
-RTRunGraphicsPipelineVK::Builder& RTRunGraphicsPipelineVK::Builder::set_indexed_draw(std::string_view p_vertex_buffer_id,
+RTRunGraphicsPipelineVK::Builder& RTRunGraphicsPipelineVK::Builder::set_indexed_draw(std::span<const VertexBufferSourceVK> p_vertex_buffers,
     std::string_view p_index_buffer_id,
     VertexInputDescriptionVK p_vertex_input,
-    VkDeviceSize p_vertex_buffer_offset,
     std::optional<IndexedDrawRegionVK> p_indexed_draw_region) {
-    if (p_vertex_buffer_id.empty() || p_index_buffer_id.empty()) {
-        throw std::runtime_error("RTRunGraphicsPipelineVK::Builder: vertex and index buffer resource ids must not be empty.");
+    if (p_index_buffer_id.empty()) {
+        throw std::runtime_error("RTRunGraphicsPipelineVK::Builder: index buffer resource id must not be empty.");
     }
-    vertex_buffer_id = p_vertex_buffer_id;
+    if (p_vertex_buffers.size() != p_vertex_input.bindings.size()) {
+        throw std::runtime_error("RTRunGraphicsPipelineVK::Builder: one vertex buffer is required per vertex-input binding.");
+    }
+    vertex_buffer_ids.clear();
+    vertex_buffer_offsets.clear();
+    for (const VertexBufferSourceVK& vertex_buffer : p_vertex_buffers) {
+        if (vertex_buffer.resource_id.empty()) {
+            throw std::runtime_error("RTRunGraphicsPipelineVK::Builder: vertex buffer resource ids must not be empty.");
+        }
+        vertex_buffer_ids.emplace_back(vertex_buffer.resource_id);
+        vertex_buffer_offsets.push_back(vertex_buffer.offset);
+    }
     index_buffer_id = p_index_buffer_id;
     vertex_input = std::move(p_vertex_input);
-    vertex_buffer_offset = p_vertex_buffer_offset;
     indexed_draw_region = p_indexed_draw_region;
     return *this;
 }
@@ -110,9 +121,10 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
           require_pipeline(p_builder.pipeline),
           RenderTargetsVK::Config{
               .clear_values = p_builder.clear_values, .color_load_op = p_builder.color_load_op, .depth_load_op = p_builder.depth_load_op}),
-      vertex_buffer_id(p_builder.vertex_buffer_id), index_buffer_id(p_builder.index_buffer_id),
+      vertex_buffer_ids(p_builder.vertex_buffer_ids), vertex_buffer_offsets(p_builder.vertex_buffer_offsets),
+      index_buffer_id(p_builder.index_buffer_id), bound_vertex_buffers(p_builder.vertex_buffer_ids.size()),
       indexed_draw_region(p_builder.indexed_draw_region), vertex_input(p_builder.vertex_input),
-      vertex_buffer_offset(p_builder.vertex_buffer_offset), draw_vertex_count(p_builder.draw_vertex_count) {
+      draw_vertex_count(p_builder.draw_vertex_count) {
     if (render_extent.width == 0 || render_extent.height == 0) {
         throw std::runtime_error("RTRunGraphicsPipelineVK: render extent is empty.");
     }
@@ -123,8 +135,11 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
 void RTRunGraphicsPipelineVK::append_accesses(
     Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     render_targets.append_accesses(p_reads, p_writes);
-    if (vertex_buffer_id.has_value()) {
-        p_reads.push_back({.res_id = *vertex_buffer_id, .usage = RendResUsageVK::VERTEX_BUFFER});
+    for (size_t i = 0; i < vertex_buffer_ids.size(); ++i) {
+        if (std::find(vertex_buffer_ids.begin(), vertex_buffer_ids.begin() + static_cast<std::ptrdiff_t>(i), vertex_buffer_ids[i]) ==
+            vertex_buffer_ids.begin() + static_cast<std::ptrdiff_t>(i)) {
+            p_reads.push_back({.res_id = vertex_buffer_ids[i], .usage = RendResUsageVK::VERTEX_BUFFER});
+        }
     }
     if (index_buffer_id.has_value()) {
         p_reads.push_back({.res_id = *index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
@@ -135,8 +150,9 @@ void RTRunGraphicsPipelineVK::append_accesses(
 void RTRunGraphicsPipelineVK::bind_resources(const RendResViewVK& p_resources) {
     descriptor_bindings->bind_resources(p_resources);
     render_targets.bind_resources(p_resources);
-    if (vertex_buffer_id.has_value()) {
-        vertex_buffer_container = p_resources.get(*vertex_buffer_id).container;
+    vertex_buffer_containers.clear();
+    for (const std::string& vertex_buffer_id : vertex_buffer_ids) {
+        vertex_buffer_containers.push_back(p_resources.get(vertex_buffer_id).container);
     }
     if (index_buffer_id.has_value()) {
         index_buffer_container = p_resources.get(*index_buffer_id).container;
@@ -159,13 +175,21 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
 
     descriptor_bindings->push(p_command_buffer);
 
-    if (vertex_buffer_id.has_value()) {
-        Ref<ROBufferVK> vertex_buffer =
-            WBE_REQUIRES_VALID(vertex_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+    if (index_buffer_id.has_value()) {
         Ref<ROBufferVK> index_buffer =
             WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-        VkBuffer vertex_buffer_handle = vertex_buffer->get_buffer();
-        vkCmdBindVertexBuffers(p_command_buffer, VERTEX_BUFFER_BINDPOINT, 1, &vertex_buffer_handle, &vertex_buffer_offset);
+        if (!vertex_buffer_containers.empty()) {
+            for (size_t i = 0; i < vertex_buffer_containers.size(); ++i) {
+                Ref<ROBufferVK> vertex_buffer =
+                    WBE_REQUIRES_VALID(vertex_buffer_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+                bound_vertex_buffers[i] = vertex_buffer->get_buffer();
+            }
+            vkCmdBindVertexBuffers(p_command_buffer,
+                VERTEX_BUFFER_BINDPOINT,
+                static_cast<uint32_t>(bound_vertex_buffers.size()),
+                bound_vertex_buffers.data(),
+                vertex_buffer_offsets.data());
+        }
         render_data->command_set_vertex_input(p_command_buffer,
             static_cast<uint32_t>(vertex_input.bindings.size()),
             vertex_input.bindings.data(),

@@ -25,7 +25,10 @@ TEST(WBEMeshResourcesVKTest, StartsWithIndependentEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
     MeshResourcesVK resources(&allocator);
 
-    EXPECT_EQ(resources.acquire_vertices(), MEM_NULL);
+    EXPECT_EQ(resources.get_vertex_buffer_count(), 0U);
+    EXPECT_THROW(resources.acquire_vertex_buffer(0), std::runtime_error);
+    EXPECT_THROW(resources.get_vertex_buffer_index(MEM_NULL), std::runtime_error);
+    EXPECT_EQ(MeshResourcesVK::get_vertex_buffer_member(1), "vertices.1");
     EXPECT_EQ(resources.acquire_indices(), MEM_NULL);
     EXPECT_EQ(resources.acquire_opaque_draw_batches(), MEM_NULL);
     EXPECT_EQ(resources.acquire_opaque_double_sided_draw_batches(), MEM_NULL);
