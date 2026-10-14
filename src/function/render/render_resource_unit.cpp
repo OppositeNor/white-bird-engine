@@ -15,6 +15,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render/vertex_attribute_format_info.hh"
 #include "glm/ext/vector_float2.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/ext/vector_int2.hpp"
@@ -23,7 +24,9 @@
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
 #include "glm/ext/vector_uint4.hpp"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -37,29 +40,8 @@
 
 namespace WhiteBirdEngine {
 
-std::string_view RUShaderRole::get_name() const {
-    if (name == nullptr) {
-        throw std::runtime_error("Failed to access shader role: role name is missing.");
-    }
-    const std::string_view role_name(name.get());
-    if (role_name.empty()) {
-        throw std::runtime_error("Failed to access shader role: role name is empty.");
-    }
-    if (hash != dynam_hash(role_name)) {
-        throw std::runtime_error("Failed to access shader role: role hash does not match its name.");
-    }
-    return role_name;
-}
-
-bool RUShaderRole::matches(std::string_view p_name) const {
-    if (p_name.empty() || p_name.contains('\0')) {
-        throw std::runtime_error("Failed to match shader role: requested role name is invalid.");
-    }
-    const std::string_view retained_name = get_name();
-    return hash == dynam_hash(p_name) && retained_name == p_name;
-}
-
-static void validate_binary_view(const RUBinaryView& p_binary_view, std::string_view p_context) {
+namespace {
+void validate_binary_view(const RUBinaryView& p_binary_view, std::string_view p_context) {
     if (p_binary_view.binary == nullptr) {
         throw std::runtime_error(std::format("Failed to access {}: binary is missing.", p_context));
     }
@@ -71,13 +53,13 @@ static void validate_binary_view(const RUBinaryView& p_binary_view, std::string_
     }
 }
 
-static uint8_t* get_binary_view_data(RUBinaryView& p_binary_view, std::string_view p_context) {
+uint8_t* get_binary_view_data(RUBinaryView& p_binary_view, std::string_view p_context) {
     validate_binary_view(p_binary_view, p_context);
     RefRes<char> binary_data = p_binary_view.binary->data;
     return reinterpret_cast<uint8_t*>(binary_data.get()) + p_binary_view.start;
 }
 
-static void validate_vertex_storage(const RUVertexView& p_vertex_data) {
+void validate_vertex_storage(const RUVertexView& p_vertex_data) {
     if (p_vertex_data.vertex_stride == 0) {
         if (p_vertex_data.vertex_count != 0 || p_vertex_data.binary.size != 0) {
             throw std::runtime_error("Failed to access vertex data: zero stride has non-empty vertex storage.");
@@ -115,7 +97,7 @@ static void validate_vertex_storage(const RUVertexView& p_vertex_data) {
     }
 }
 
-static const RUVertexView::Attribute& find_vertex_attribute(const RUVertexView& p_vertex_data, std::string_view p_role) {
+const RUVertexView::Attribute& find_vertex_attribute(const RUVertexView& p_vertex_data, std::string_view p_role) {
     validate_vertex_storage(p_vertex_data);
     if (p_role.empty()) {
         throw std::runtime_error("Failed to access vertex attribute: role is empty.");
@@ -142,7 +124,7 @@ static const RUVertexView::Attribute& find_vertex_attribute(const RUVertexView& 
 }
 
 template <typename TValue>
-static void set_vertex_attribute_value(
+void set_vertex_attribute_value(
     RUSubmesh3D& p_submesh, size_t p_vertex_index, std::string_view p_role, RUVertexAttributeFormat p_expected_format, const TValue& p_value) {
     RUVertexView& vertex_data = p_submesh.get_vertex_bindings()[p_submesh.get_vertex_binding_index(p_role)];
     if (p_vertex_index >= vertex_data.vertex_count) {
@@ -163,6 +145,30 @@ static void set_vertex_attribute_value(
     }
     std::memcpy(get_binary_view_data(vertex_data.binary, "vertex data") + vertex_offset + attribute.offset, &p_value, sizeof(TValue));
 }
+} // namespace
+
+std::string_view RUShaderRole::get_name() const {
+    if (name == nullptr) {
+        throw std::runtime_error("Failed to access shader role: role name is missing.");
+    }
+    const std::string_view role_name(name.get());
+    if (role_name.empty()) {
+        throw std::runtime_error("Failed to access shader role: role name is empty.");
+    }
+    if (hash != dynam_hash(role_name)) {
+        throw std::runtime_error("Failed to access shader role: role hash does not match its name.");
+    }
+    return role_name;
+}
+
+bool RUShaderRole::matches(std::string_view p_name) const {
+    if (p_name.empty() || p_name.contains('\0')) {
+        throw std::runtime_error("Failed to match shader role: requested role name is invalid.");
+    }
+    const std::string_view retained_name = get_name();
+    return hash == dynam_hash(p_name) && retained_name == p_name;
+}
+
 
 void RUVertexView::swap_vertices(size_t p_first, size_t p_second) {
     validate_vertex_storage(*this);
@@ -293,6 +299,43 @@ size_t RUSubmesh3D::get_vertices_num() const {
         }
     }
     return vertex_count;
+}
+
+RUSkeleton::Joint RUSkeleton::get_joint(size_t p_index) const {
+    if (p_index >= joint_count) {
+        throw std::runtime_error(std::format("Failed to read skeleton joint {}: the skeleton has {} joints.", p_index, joint_count));
+    }
+    if (joints.binary == nullptr) {
+        throw std::runtime_error("Failed to read skeleton joint: the joint binary is missing.");
+    }
+    if (joints.start > joints.binary->size || joints.size > joints.binary->size - joints.start) {
+        throw std::runtime_error("Failed to read skeleton joint: the joint range exceeds the binary size.");
+    }
+    if (joints.binary->data == nullptr) {
+        throw std::runtime_error("Failed to read skeleton joint: the joint binary data is missing.");
+    }
+    WBE_DEBUG_ASSERT(joints.size == joint_count * JOINT_BYTE_SIZE);
+    const char* joint_data = joints.binary->data.get() + joints.start + (p_index * JOINT_BYTE_SIZE);
+    Joint result;
+    std::memcpy(&result.parent_index, joint_data, sizeof(result.parent_index));
+    std::array<float, 16> bind_local_transform{};
+    std::memcpy(bind_local_transform.data(), joint_data + sizeof(result.parent_index), sizeof(bind_local_transform));
+    result.bind_local_transform = glm::make_mat4(bind_local_transform.data());
+    if (p_index == 0 && result.parent_index != -1) {
+        throw std::runtime_error("Failed to read skeleton joint 0: the root joint must have parent_index -1.");
+    }
+    if (p_index > 0 && result.parent_index == -1) {
+        throw std::runtime_error(std::format("Failed to read skeleton joint {}: it is a second root joint.", p_index));
+    }
+    if (p_index > 0 && result.parent_index < 0) {
+        throw std::runtime_error(
+            std::format("Failed to read skeleton joint {}: it has negative parent_index {}.", p_index, result.parent_index));
+    }
+    if (p_index > 0 && std::cmp_greater_equal(result.parent_index, p_index)) {
+        throw std::runtime_error(std::format(
+            "Failed to read skeleton joint {}: its parent_index {} does not precede it.", p_index, result.parent_index));
+    }
+    return result;
 }
 
 } // namespace WhiteBirdEngine

@@ -23,6 +23,7 @@
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "function/scene/scene_resource_unit.hh"
 #include "function/scene/scene_resource_unit_loader.hh"
+#include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/ext/vector_int2.hpp"
 #include "glm/ext/vector_int3.hpp"
@@ -278,6 +279,59 @@ protected:
         auto* object = static_cast<T*>(p_stack_allocator.get(mem_id));
         std::construct_at(object, p_value);
         return WBE::RefRes<T>(mem_id, &p_stack_allocator);
+    }
+
+    // Pack joints in the skeleton binary layout after p_prefix_size zero bytes.
+    static std::vector<char> encode_skeleton_joints(const std::vector<WBE::RUSkeleton::Joint>& p_joints, size_t p_prefix_size) {
+        std::vector<char> result(p_prefix_size + (p_joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE));
+        char* joint_data = result.data() + p_prefix_size;
+        for (const WBE::RUSkeleton::Joint& joint : p_joints) {
+            std::memcpy(joint_data, &joint.parent_index, sizeof(joint.parent_index));
+            std::memcpy(joint_data + sizeof(joint.parent_index), &joint.bind_local_transform[0][0], 16 * sizeof(float));
+            joint_data += WBE::RUSkeleton::JOINT_BYTE_SIZE;
+        }
+        return result;
+    }
+
+    WBE::RefRes<WBE::RUBinary> push_test_binary(WBE::StackAllocator& p_stack_allocator, const std::vector<char>& p_data) {
+        WBE::MemID data_mem_id = p_stack_allocator.allocate(p_data.size());
+        std::memcpy(p_stack_allocator.get(data_mem_id), p_data.data(), p_data.size());
+        WBE::RUBinary binary;
+        binary.data = WBE::RefRes<char>(data_mem_id, &p_stack_allocator);
+        binary.size = p_data.size();
+        return push_test_object(p_stack_allocator, binary);
+    }
+
+    // Load a skeleton scheme whose joints reference p_binary under the id "loaded_skeleton_joints".
+    WBE::RefRes<WBE::RUSkeleton> load_test_skeleton(
+        WBE::StackAllocator& p_stack_allocator, const WBE::RUSchemaSkeleton& p_scheme, WBE::RefRes<WBE::RUBinary> p_binary) {
+        std::stringstream stream;
+        WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
+        auto resource_chunk = MockResourceChunk::Builder()
+                                  .set_reserve_res_unit_storage_callback(
+                                      [&p_stack_allocator, &captured_skeleton](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                          WBE::RefRes<char> resource(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+                                          captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
+                                          return resource;
+                                      })
+                                  .set_create_ref_to_callback(
+                                      [&p_binary](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                                          if (p_key == "loaded_skeleton_joints") {
+                                              p_assign_ref(p_binary.force_cast<char>());
+                                          }
+                                      })
+                                  .build(stream);
+        WBE::ResourceUnitLoaderSkeleton loader;
+        loader.populate_scheme(*resource_chunk, p_scheme);
+        return captured_skeleton;
+    }
+
+    static WBE::RUSchemaSkeleton make_skeleton_scheme(size_t p_start, size_t p_size) {
+        WBE::RUSchemaSkeleton scheme;
+        scheme.id = "loaded_skeleton";
+        scheme.type = "skeleton";
+        scheme.joints = {.binary_id = "loaded_skeleton_joints", .start = p_start, .size = p_size};
+        return scheme;
     }
 
     std::unique_ptr<MockResourceChunk> create_static_mesh_test_chunk(
@@ -1007,12 +1061,19 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
+    std::vector<std::string> created_ref_keys;
+    glm::mat4 scaled(2.0F);
+    scaled[3] = glm::vec4(0.0F, 1.0F, 0.0F, 1.0F);
+    const std::vector<WBE::RUSkeleton::Joint> source_joints = {
+        {.parent_index = -1, .bind_local_transform = glm::mat4(1.0F)},
+        {.parent_index = 0, .bind_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(0.0F, 1.0F, 0.0F))},
+        {.parent_index = 1, .bind_local_transform = scaled},
+        {.parent_index = 0, .bind_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(3.0F, 0.0F, 0.0F))},
+    };
+    constexpr size_t JOINTS_START = 8;
+    WBE::RefRes<WBE::RUBinary> stored_binary =
+        push_test_binary(stack_allocator, encode_skeleton_joints(source_joints, JOINTS_START));
     auto resource_chunk = MockResourceChunk::Builder()
-                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
-                              })
                               .set_reserve_res_unit_storage_callback(
                                   [&stack_allocator, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
                                       WBE::MemID mem_id = stack_allocator.allocate(p_size);
@@ -1022,17 +1083,19 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
                                       }
                                       return resource;
                                   })
+                              .set_create_ref_to_callback([&created_ref_keys, &stored_binary](
+                                                              std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                                  created_ref_keys.emplace_back(p_key);
+                                  if (p_key == "loaded_skeleton_joints") {
+                                      p_assign_ref(stored_binary.force_cast<char>());
+                                  }
+                              })
                               .build(stream);
     constexpr std::string_view JSON_BUFFER = R"(
     {
         "id": "loaded_skeleton",
         "type": "skeleton",
-        "joints": [
-            {"parent_index": -1, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
-            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]},
-            {"parent_index": 1, "bind_local_transform": [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 1, 0, 1]},
-            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1]}
-        ]
+        "joints": {"binary_id": "loaded_skeleton_joints", "start": 8, "size": 272}
     }
     )";
     WBE::ParserJSON parser;
@@ -1042,49 +1105,83 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
     loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
 
     ASSERT_NE(captured_skeleton, nullptr);
+    EXPECT_EQ(created_ref_keys, std::vector<std::string>{"loaded_skeleton_joints"});
     ASSERT_EQ(captured_skeleton->joint_count, 4U);
-    ASSERT_NE(captured_skeleton->joints, nullptr);
-    const WBE::RUSkeleton::Joint* joints = captured_skeleton->joints.get();
-    EXPECT_EQ(joints[0].parent_index, -1);
-    EXPECT_EQ(joints[1].parent_index, 0);
-    EXPECT_EQ(joints[2].parent_index, 1);
-    EXPECT_EQ(joints[3].parent_index, 0);
-    EXPECT_EQ(joints[0].bind_local_transform, glm::mat4(1.0F));
-    EXPECT_EQ(joints[1].bind_local_transform[3], glm::vec4(0.0F, 1.0F, 0.0F, 1.0F));
-    EXPECT_EQ(joints[2].bind_local_transform[0][0], 2.0F);
-    EXPECT_EQ(joints[3].bind_local_transform[3][0], 3.0F);
+    EXPECT_EQ(captured_skeleton->joints.binary, stored_binary);
+    EXPECT_EQ(captured_skeleton->joints.start, JOINTS_START);
+    EXPECT_EQ(captured_skeleton->joints.size, 4 * WBE::RUSkeleton::JOINT_BYTE_SIZE);
+    for (size_t i = 0; i < source_joints.size(); ++i) {
+        const WBE::RUSkeleton::Joint joint = captured_skeleton->get_joint(i);
+        EXPECT_EQ(joint.parent_index, source_joints[i].parent_index);
+        EXPECT_EQ(joint.bind_local_transform, source_joints[i].bind_local_transform);
+    }
+    EXPECT_EQ(captured_skeleton->get_joint(1).bind_local_transform[3], glm::vec4(0.0F, 1.0F, 0.0F, 1.0F));
+    EXPECT_EQ(captured_skeleton->get_joint(2).bind_local_transform[0][0], 2.0F);
+    EXPECT_EQ(captured_skeleton->get_joint(3).bind_local_transform[3][0], 3.0F);
+    EXPECT_THROW(captured_skeleton->get_joint(4), std::runtime_error);
 }
 
-TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
+TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointViews) {
     WBE::ResourceUnitLoaderSkeleton loader;
-    auto expect_invalid = [&loader](std::vector<int32_t> p_parent_indices) {
+    auto expect_invalid = [&loader](const WBE::RUSchemaSkeleton& p_scheme) {
         WBE::StackAllocator stack_allocator(8192);
         std::stringstream stream;
         auto resource_chunk = MockResourceChunk::Builder()
-                                  .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                                      return WBE::RefRes<char>(mem_id, &stack_allocator);
-                                  })
                                   .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) {
                                       return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
                                   })
                                   .build(stream);
-        WBE::RUSchemaSkeleton scheme;
-        scheme.id = "invalid_skeleton";
-        scheme.type = "skeleton";
-        for (int32_t parent_index : p_parent_indices) {
-            scheme.joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
-        }
-        EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, p_scheme), std::runtime_error);
     };
 
-    expect_invalid({});
-    expect_invalid({0});
-    expect_invalid({-1, -1});
-    expect_invalid({-1, -2});
-    expect_invalid({-1, 1});
-    expect_invalid({-1, 2, 0});
+    expect_invalid(make_skeleton_scheme(0, 0));
+    expect_invalid(make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE + 1));
+    WBE::RUSchemaSkeleton missing_binary = make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE);
+    missing_binary.joints.binary_id.clear();
+    expect_invalid(missing_binary);
+    WBE::RUSchemaSkeleton nul_binary = make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE);
+    nul_binary.joints.binary_id = std::string("loaded\0joints", 13);
+    expect_invalid(nul_binary);
+}
+
+TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
+    auto expect_invalid = [this](std::vector<int32_t> p_parent_indices, size_t p_invalid_joint_index) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::vector<WBE::RUSkeleton::Joint> joints;
+        for (int32_t parent_index : p_parent_indices) {
+            joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
+        }
+        WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_allocator, encode_skeleton_joints(joints, 0));
+        WBE::RefRes<WBE::RUSkeleton> skeleton = load_test_skeleton(
+            stack_allocator, make_skeleton_scheme(0, joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
+        ASSERT_NE(skeleton, nullptr);
+        for (size_t i = 0; i < p_invalid_joint_index; ++i) {
+            EXPECT_NO_THROW(skeleton->get_joint(i));
+        }
+        EXPECT_THROW(skeleton->get_joint(p_invalid_joint_index), std::runtime_error);
+    };
+
+    expect_invalid({0}, 0);
+    expect_invalid({-1, -1}, 1);
+    expect_invalid({-1, -2}, 1);
+    expect_invalid({-1, 1}, 1);
+    expect_invalid({-1, 2, 0}, 1);
+}
+
+TEST_F(ResourcePopulatorTest, SkeletonRejectsJointRangeOutsideBinary) {
+    WBE::StackAllocator stack_allocator(8192);
+    const std::vector<WBE::RUSkeleton::Joint> joints = {{.parent_index = -1, .bind_local_transform = glm::mat4(1.0F)}};
+    WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_allocator, encode_skeleton_joints(joints, 0));
+
+    WBE::RefRes<WBE::RUSkeleton> overflowing_skeleton =
+        load_test_skeleton(stack_allocator, make_skeleton_scheme(4, WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
+    ASSERT_NE(overflowing_skeleton, nullptr);
+    EXPECT_THROW(overflowing_skeleton->get_joint(0), std::runtime_error);
+
+    WBE::RefRes<WBE::RUSkeleton> unresolved_skeleton =
+        load_test_skeleton(stack_allocator, make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE), WBE::MEM_NULL);
+    ASSERT_NE(unresolved_skeleton, nullptr);
+    EXPECT_THROW(unresolved_skeleton->get_joint(0), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {

@@ -439,10 +439,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSkeletonGeneral) {
     {
         "id": "test_skeleton",
         "type": "skeleton",
-        "joints": [
-            {"parent_index": -1, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
-            {"parent_index": 0, "bind_local_transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 3, 4, 1]}
-        ]
+        "joints": {"binary_id": "test_skeleton_joints", "start": 16, "size": 136}
     }
     )";
     WBE::ParserJSON parser;
@@ -451,21 +448,17 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSkeletonGeneral) {
     scheme.deserialize(parser.get_data());
     ASSERT_EQ(scheme.id, "test_skeleton");
     ASSERT_EQ(scheme.type, "skeleton");
-    ASSERT_EQ(scheme.joints.size(), 2U);
-    ASSERT_EQ(scheme.joints[0].parent_index, -1);
-    ASSERT_EQ(scheme.joints[0].bind_local_transform, glm::mat4(1.0F));
-    ASSERT_EQ(scheme.joints[1].parent_index, 0);
-    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][0], 2.0F);
-    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][1], 3.0F);
-    ASSERT_EQ(scheme.joints[1].bind_local_transform[3][2], 4.0F);
+    ASSERT_EQ(scheme.joints.binary_id, "test_skeleton_joints");
+    ASSERT_EQ(scheme.joints.start, 16U);
+    ASSERT_EQ(scheme.joints.size, 136U);
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaSkeletonRequiresJointFields) {
     std::string json_buffer = R"(
     {
-        "id": "test_skeleton_missing_transform",
+        "id": "test_skeleton_missing_size",
         "type": "skeleton",
-        "joints": [{"parent_index": -1}]
+        "joints": {"binary_id": "test_skeleton_joints", "start": 0}
     }
     )";
     WBE::ParserJSON parser;

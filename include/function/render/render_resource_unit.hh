@@ -209,6 +209,20 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaBinaryView {
 };
 
 /**
+ * @class RUSchemaSkeleton
+ * @brief The scheme of RUSkeleton.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaSkeleton : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaSkeleton)
+    /**
+     * Non-empty byte range of packed joints forming one tree, laid out as described by RUSkeleton::JOINT_BYTE_SIZE. The first
+     * joint is the only root.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaBinaryView joints;
+};
+
+/**
  * @class RUSchemaVertexAttribute
  * @brief One vertex attribute inside a binary-backed interleaved vertex view.
  */
@@ -529,6 +543,45 @@ struct RUBinaryView {
     size_t start = 0;
     /** Byte length of this view. */
     size_t size = 0;
+};
+
+/**
+ * @class RUSkeleton
+ * @brief Skeleton resource unit: a joint tree stored as a parent-before-child array in a binary resource.
+ *
+ * Joint 0 is the only root. Every other joint's parent index is smaller than its own index, so global bind transforms can be
+ * accumulated in array order. The joints are packed in a chunk-owned binary resource, which is resolved after the resource
+ * chunk loads; read them with get_joint(). The unit is a shallow chunk view and is copyable and movable.
+ */
+struct RUSkeleton : public ResourceUnit {
+    /**
+     * @brief Byte size of one packed joint: a little-endian `int32` parent index followed by the 16 column-major `float32`
+     * values of the bind-local transform, without padding.
+     */
+    static constexpr size_t JOINT_BYTE_SIZE = sizeof(int32_t) + (16 * sizeof(float));
+
+    /**
+     * @brief One joint of the skeleton.
+     */
+    struct Joint {
+        /** Index of the parent joint, or -1 for the root joint. */
+        int32_t parent_index = -1;
+        /** Column-major bind-pose transform relative to the parent joint, or to the mesh space for the root joint. */
+        glm::mat4 bind_local_transform{1.0F};
+    };
+    /** Byte range of the packed joints, exactly joint_count * JOINT_BYTE_SIZE bytes long. */
+    RUBinaryView joints;
+    /** Number of joints in the skeleton. */
+    size_t joint_count = 0;
+
+    /**
+     * @brief Read one joint from the backing binary.
+     * @param p_index Index of the joint.
+     * @return The decoded joint.
+     * @throws std::runtime_error If the index is out of range, the backing binary is missing or smaller than the joint range, or
+     * the joint breaks the single-root, parent-before-child order.
+     */
+    Joint get_joint(size_t p_index) const;
 };
 
 /**

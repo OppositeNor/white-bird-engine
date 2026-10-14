@@ -373,7 +373,7 @@ private:
         }
         std::vector<glm::mat4> bind_globals;
         for (size_t i = 0; i < p_skeleton.joint_count; ++i) {
-            const WBE::RUSkeleton::Joint& joint = p_skeleton.joints.get()[i];
+            const WBE::RUSkeleton::Joint joint = p_skeleton.get_joint(i);
             joint_parents.push_back(joint.parent_index);
             if (joint.parent_index < 0) {
                 bind_globals.push_back(joint.bind_local_transform);

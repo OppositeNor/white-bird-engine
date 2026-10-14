@@ -632,6 +632,48 @@ void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chu
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
+std::span<const std::string> ResourceUnitLoaderSkeleton::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"skeleton"};
+    return supported_resource_types;
+}
+
+std::any ResourceUnitLoaderSkeleton::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaSkeleton>(p_scheme, "skeleton");
+    if (typed_scheme.joints.binary_id.empty()) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: joints binary_id must be non-empty.", typed_scheme.id));
+    }
+    if (typed_scheme.joints.binary_id.contains('\0')) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: joints binary_id must not contain NUL.", typed_scheme.id));
+    }
+    if (typed_scheme.joints.size == 0) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: at least one joint is required.", typed_scheme.id));
+    }
+    if (typed_scheme.joints.size % RUSkeleton::JOINT_BYTE_SIZE != 0) {
+        throw std::runtime_error(std::format("Failed to populate skeleton {}: joints byte size {} is not a multiple of the joint size {}.",
+            typed_scheme.id,
+            typed_scheme.joints.size,
+            RUSkeleton::JOINT_BYTE_SIZE));
+    }
+    const size_t joint_count = typed_scheme.joints.size / RUSkeleton::JOINT_BYTE_SIZE;
+    if (joint_count > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
+        throw std::runtime_error(
+            std::format("Failed to populate skeleton {}: joint count {} exceeds the int32 index range.", typed_scheme.id, joint_count));
+    }
+    RUSkeleton resource_unit;
+    resource_unit.joints.start = typed_scheme.joints.start;
+    resource_unit.joints.size = typed_scheme.joints.size;
+    resource_unit.joint_count = joint_count;
+    auto saved_resource = p_res_chunk.push_res_unit(typed_scheme.id, resource_unit).force_cast<RUSkeleton>();
+    p_res_chunk.create_ref_to(saved_resource->joints.binary, typed_scheme.joints.binary_id);
+    return saved_resource;
+}
+
+void ResourceUnitLoaderSkeleton::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+    RUSchemaSkeleton scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
+}
+
 void register_renderer_vk_resource_unit_loaders() {
     auto* resource_manager = ResourceManager::get_singleton();
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
@@ -639,6 +681,7 @@ void register_renderer_vk_resource_unit_loaders() {
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderRayTracingPipeline>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMaterial>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
+    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSkeleton>(global_allocator()));
 }
 
 } // namespace WhiteBirdEngine

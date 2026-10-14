@@ -147,23 +147,6 @@ protected:
 };
 
 /**
- * @class ResourceUnitLoaderSkeleton
- * @brief Loads skeleton joint trees.
- */
-class ResourceUnitLoaderSkeleton final : public ResourceUnitLoaderTyped<RUSchemaSkeleton> {
-public:
-    ResourceUnitLoaderSkeleton() : ResourceUnitLoaderTyped("skeleton") {
-    }
-
-protected:
-    /**
-     * @throws std::runtime_error When the joints are empty, joint 0 is not the only root, or a parent index does not refer
-     * to an earlier joint.
-     */
-    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaSkeleton& p_scheme) const override;
-};
-
-/**
  * @class ResourceUnitLoaderTexture
  * @brief Loads KTX 2 texture resources.
  */
