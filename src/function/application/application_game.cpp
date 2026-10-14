@@ -44,19 +44,6 @@ namespace WhiteBirdEngine {
 namespace {
 
 constexpr double LOGIC_FRAME_INTERVAL_SEC = 1.0 / 60.0;
-constexpr size_t LOGIC_THREAD_COUNT = 1;
-
-size_t get_worker_thread_count(size_t p_configured_thread_count, size_t p_render_thread_count) {
-    if (p_configured_thread_count > 0) {
-        return p_configured_thread_count;
-    }
-
-    const size_t cpu_thread_count = std::thread::hardware_concurrency();
-    if (cpu_thread_count <= p_render_thread_count + LOGIC_THREAD_COUNT) {
-        return 1;
-    }
-    return cpu_thread_count - p_render_thread_count - LOGIC_THREAD_COUNT;
-}
 
 } // namespace
 
@@ -80,7 +67,6 @@ void ApplicationGame::run() {
 
 void ApplicationGame::init() {
     const auto& game_config = GameConfig::get_singleton()->get_config_options();
-    const auto& engine_config = EngineCore::get_singleton()->engine_config->get_config_options();
     // Initialize the deltas into a very small number.
     render_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);
@@ -99,11 +85,6 @@ void ApplicationGame::init() {
         stdout_log(WBE_CHANNEL_RENDER)
             ->warning(std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
         renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
-    }
-    // TEST
-    if (false) {
-        worker = make_ref<Worker>(
-            global_allocator(), get_worker_thread_count(engine_config.worker_thread_count, renderer->get_worker_nums()));
     }
     worker = make_ref<Worker>(global_allocator(), 1);
     audio_renderer = make_ref<AudioRendererMA>(global_allocator());
