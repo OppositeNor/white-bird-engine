@@ -72,9 +72,6 @@
 namespace WhiteBirdEngine {
 
 namespace {
-// Each GPU-job batch uses a fresh timeline semaphore that is signaled once, to this value.
-constexpr uint64_t GPU_JOB_COMPLETION_VALUE = 1;
-
 struct ExtensionSupportQueryResult {
     bool success = true;
     std::vector<std::string> unsupported_extensions;
@@ -300,7 +297,9 @@ void RendererVK::terminate() {
     shader_debug_buffer = MEM_NULL;
 
     synchronize_gpu_and_flush_delayed_calls();
-    // The in-flight fences are released after the synchronization waits on them; their destruction is delayed, so flush again.
+    // The in-flight fences and the GPU-job semaphore are released after the synchronization waits on them; their
+    // destruction is delayed, so flush again.
+    gpu_job_semaphore = MEM_NULL;
     base_render_data.in_flight_fence = VK_NULL_HANDLE;
     in_flight_fences.clear();
     flush_delayed_calls();
@@ -1474,11 +1473,13 @@ void RendererVK::run_gpu_jobs() {
         submitted_jobs.back()(gpu_job_command_buffer);
     }
     // A timeline semaphore, because every compute queue waits on it and a binary semaphore allows only one waiter.
-    Ref<SemaphoreVK> completion_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, false);
-    submit_gpu_job_command_buffer(completion_fenses, submission_promises, completion_semaphore);
+    if (gpu_job_semaphore == MEM_NULL) {
+        gpu_job_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, false);
+    }
+    ++gpu_job_semaphore_value;
+    submit_gpu_job_command_buffer(completion_fenses, submission_promises, gpu_job_semaphore_value);
     running_gpu_jobs = std::move(submitted_jobs);
     running_gpu_job_fenses = std::move(completion_fenses);
-    running_gpu_job_semaphore = std::move(completion_semaphore);
 }
 
 void RendererVK::check_shader_debug_buffer() {
@@ -1539,12 +1540,11 @@ void RendererVK::wait_for_running_gpu_jobs() {
     running_gpu_job_fenses.back()->wait();
     running_gpu_jobs.clear();
     running_gpu_job_fenses.clear();
-    running_gpu_job_semaphore = MEM_NULL;
 }
 
 void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, AllocType>& p_completion_fenses, // NOLINT
     std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
-    Ref<SemaphoreVK> p_completion_semaphore) {
+    uint64_t p_completion_value) {
     VkMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
     barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -1568,8 +1568,7 @@ void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, Allo
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &command_buffer_info;
-    VkSemaphoreSubmitInfo signal_info =
-        p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, GPU_JOB_COMPLETION_VALUE);
+    VkSemaphoreSubmitInfo signal_info = gpu_job_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, p_completion_value);
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &signal_info;
     WBE_DEBUG_ASSERT(!p_completion_fenses.empty());
@@ -1588,8 +1587,7 @@ void RendererVK::submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, Allo
         }
         p_submission_promises[i].set_value(p_completion_fenses[i]);
     }
-    VkSemaphoreSubmitInfo wait_info =
-        p_completion_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, GPU_JOB_COMPLETION_VALUE);
+    VkSemaphoreSubmitInfo wait_info = gpu_job_semaphore->get_submit_info(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, p_completion_value);
     VkSubmitInfo2 compute_wait_submit{};
     compute_wait_submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     compute_wait_submit.waitSemaphoreInfoCount = 1;

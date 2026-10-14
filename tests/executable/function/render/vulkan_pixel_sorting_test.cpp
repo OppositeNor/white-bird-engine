@@ -58,6 +58,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <filesystem>
 #include <format>
 #include <future>
@@ -116,6 +117,10 @@ inline constexpr float PIXEL_SORTING_POST_PROCESSING_DEFAULT_GAMMA = 1.0F;
 inline constexpr size_t PIXEL_SORT_RESULT_BYTES_PER_PIXEL = 8;
 // Directory, relative to the working directory, that receives the screenshots.
 inline constexpr std::string_view PIXEL_SORT_SCREENSHOT_DIRECTORY = "build/screenshots";
+// The delta, in seconds, of every frame of a recording, so that the frame sequence plays back at 60 frames per second.
+inline constexpr double PIXEL_SORT_RECORDING_FIXED_DELTA = 1.0 / 60.0;
+// The most frame captures, read back or being written, that a recording keeps in flight; it waits for one beyond that.
+inline constexpr size_t PIXEL_SORT_MAX_CAPTURES_IN_FLIGHT = 8;
 
 namespace {
 
@@ -159,11 +164,21 @@ std::vector<uint8_t> convert_result_to_rgba8(std::span<const uint8_t> p_result_d
     return rgba8;
 }
 
-// A screenshot path named after the current local time, e.g. build/screenshots/pixel_sorting_20261007_183012.png.
-WBE::Path make_screenshot_path() {
+// The current local time as a file name component, e.g. 20261007_183012.
+std::string make_local_time_stamp() {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
     const std::chrono::zoned_time local_time{std::chrono::current_zone(), now};
-    return WBE::Path(PIXEL_SORT_SCREENSHOT_DIRECTORY) / std::format("pixel_sorting_{:%Y%m%d_%H%M%S}.png", local_time);
+    return std::format("{:%Y%m%d_%H%M%S}", local_time);
+}
+
+// A screenshot path named after the current local time, e.g. build/screenshots/pixel_sorting_20261007_183012.png.
+WBE::Path make_screenshot_path() {
+    return WBE::Path(PIXEL_SORT_SCREENSHOT_DIRECTORY) / std::format("pixel_sorting_{}.png", make_local_time_stamp());
+}
+
+// A frame sequence directory named after the current local time, e.g. build/screenshots/pixel_sorting_20261007_183012_sequence.
+WBE::Path make_sequence_directory() {
+    return WBE::Path(PIXEL_SORT_SCREENSHOT_DIRECTORY) / std::format("pixel_sorting_{}_sequence", make_local_time_stamp());
 }
 
 } // namespace
@@ -249,12 +264,15 @@ public:
     virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
-        poll_screenshot();
+        poll_captures();
+        if (recording) {
+            record_frame();
+        }
         if (ui_orientation != built_orientation) {
             rebuild_render_graph();
         }
         imgui_overlay->begin_frame(p_delta);
-        draw_parameter_window();
+        draw_parameter_window(p_delta);
         imgui_overlay->end_frame();
     }
 
@@ -510,7 +528,8 @@ private:
             .add_buffer(REND_RES_RADIX_SORT_DISPATCH,
                 [](const WBE::RendGraphContextVK& /*p_context*/) {
                     return WBE::RendBufferDescVK{
-                        .usage = WBE::RendResPrimaryUsageVK::BUFFER_INDIRECT, .size = RADIX_SORT_DISPATCH_BUFFER_SIZE};
+                        .usage = WBE::RendResPrimaryUsageVK::BUFFER_INDIRECT, .size = RADIX_SORT_DISPATCH_BUFFER_SIZE,
+                    };
                 })
             .add_image(REND_RES_PIXEL_SORT_DESTINATION_IMAGE,
                 [extent = p_layout.source_extent](const WBE::RendGraphContextVK& /*p_context*/) {
@@ -751,73 +770,150 @@ private:
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
     // Graph-owned container of the post-processed result image, the content of the screenshots.
     WBE::Ref<WBE::RenderObjectContainerVK> result_image;
-    // The screenshot in progress, owned by the rendering thread: first the readback of the result image, then the worker
-    // task that converts and writes it.
-    std::optional<std::future<std::vector<uint8_t>>> screenshot_readback;
-    std::future<void> screenshot_write;
-    VkExtent2D screenshot_extent{};
+    // A frame capture whose result image readback has not completed yet.
+    struct PendingCapture {
+        std::future<std::vector<uint8_t>> readback;
+        VkExtent2D extent{};
+        WBE::Path path;
+    };
 
-    bool is_screenshot_in_progress() const {
-        return screenshot_readback.has_value() || screenshot_write.valid();
+    // The captures in progress, owned by the rendering thread: first the readbacks of the result image, then the worker
+    // tasks that convert and write them.
+    std::deque<PendingCapture> capture_readbacks;
+    std::deque<std::future<void>> capture_writes;
+    // Whether every frame is captured into sequence_directory; owned by the rendering thread.
+    bool recording = false;
+    WBE::Path sequence_directory;
+    // The number of frames of the current or last recording.
+    uint64_t sequence_frame_count = 0;
+    // The delta settings before the current recording fixed the delta, restored when it stops.
+    DeltaSettings pre_recording_delta_settings;
+
+    bool animated = false;
+    double curr_time = 0.0;
+
+    bool is_capture_in_progress() const {
+        return !capture_readbacks.empty() || !capture_writes.empty();
     }
 
     /**
-     * @brief Start reading back the result image for a screenshot. Must be called on the rendering thread.
+     * @brief Start reading back the result image into a PNG at p_path. Must be called on the rendering thread.
      *
-     * The result image is the post-processed image before the present and UI passes, so the UI is not in the screenshot.
+     * The result image is the post-processed image before the present and UI passes, so the UI is not in the capture.
      * The readback copies the result of the previous frame at the start of the next one.
+     *
+     * @param p_path The PNG file to write; its directory is created when missing.
+     * @throws std::runtime_error If the result image is not an image.
      */
-    void request_screenshot() {
+    void request_capture(WBE::Path p_path) {
         WBE::Ref<WBE::ROImageVK> image = result_image->get().dynamic_cast_ref<WBE::ROImageVK>();
         if (image == WBE::MEM_NULL) {
-            throw std::runtime_error("Failed to take a pixel sorting screenshot: the result image is not an image.");
+            throw std::runtime_error("Failed to capture the pixel sorting result: the result image is not an image.");
         }
         const VkExtent3D extent = image->fields().extent;
-        screenshot_extent = {.width = extent.width, .height = extent.height};
-        screenshot_readback = image->acquire_image_content();
+        capture_readbacks.push_back(PendingCapture{
+            .readback = image->acquire_image_content(),
+            .extent = {.width = extent.width, .height = extent.height},
+            .path = std::move(p_path),
+        });
     }
 
     /**
-     * @brief Advance the screenshot in progress: hand a completed readback to a worker, and collect a completed write.
+     * @brief Start recording every following frame into a new sequence directory. Must be called on the rendering thread.
+     *
+     * The delta is fixed at 60 frames per second until the recording stops, so the frames advance evenly however long a
+     * capture takes.
+     */
+    void start_recording() {
+        pre_recording_delta_settings = get_delta_settings();
+        set_delta_settings(DeltaSettings{.is_fixed = true, .sleep_to_delta = true, .fixed_delta = PIXEL_SORT_RECORDING_FIXED_DELTA});
+        sequence_directory = make_sequence_directory();
+        sequence_frame_count = 0;
+        recording = true;
+        WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Recording pixel sorting frames to {}.", sequence_directory.string()));
+    }
+
+    /**
+     * @brief Stop recording and restore the delta settings from before it; the captures in flight are still written. Must
+     * be called on the rendering thread.
+     */
+    void stop_recording() {
+        recording = false;
+        set_delta_settings(pre_recording_delta_settings);
+        WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Stopped recording pixel sorting frames: {} captured.", sequence_frame_count));
+    }
+
+    /**
+     * @brief Capture the frame rendered next as the next frame of the sequence. Must be called on the rendering thread.
+     *
+     * The frames are numbered consecutively from 0, and none is skipped: when too many captures are in flight, this waits
+     * for the oldest, so recording slows rendering down to the capture rate. Every earlier readback was submitted by a
+     * renderer tick since it was requested, so the wait does not depend on the rendering thread.
+     *
+     * @throws std::runtime_error If a readback, conversion, or PNG write failed.
+     */
+    void record_frame() {
+        while (capture_readbacks.size() + capture_writes.size() >= PIXEL_SORT_MAX_CAPTURES_IN_FLIGHT) {
+            if (!capture_writes.empty()) {
+                capture_writes.front().wait();
+            } else {
+                capture_readbacks.front().readback.wait();
+            }
+            poll_captures();
+        }
+        request_capture(sequence_directory / std::format("frame_{:06}.png", sequence_frame_count));
+        ++sequence_frame_count;
+    }
+
+    /**
+     * @brief Advance the captures in progress: hand completed readbacks to a worker, and collect completed writes.
      *
      * Must be called on the rendering thread.
      *
-     * @throws std::runtime_error If the readback, conversion, or PNG write failed.
+     * @throws std::runtime_error If a readback, conversion, or PNG write failed.
      */
-    void poll_screenshot() {
+    void poll_captures() {
         constexpr std::chrono::seconds NO_WAIT{0};
-        if (screenshot_readback.has_value() && screenshot_readback->wait_for(NO_WAIT) == std::future_status::ready) {
-            std::vector<uint8_t> result_data = screenshot_readback->get();
-            screenshot_readback.reset();
+        while (!capture_readbacks.empty() && capture_readbacks.front().readback.wait_for(NO_WAIT) == std::future_status::ready) {
+            PendingCapture capture = std::move(capture_readbacks.front());
+            capture_readbacks.pop_front();
+            std::vector<uint8_t> result_data = capture.readback.get();
             const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_base_render_data()->swap_chain_format);
             // Converting and encoding a full-size image takes long enough to stall a frame, so a worker does it.
-            screenshot_write = WBE::Worker::get_singleton()->submit_task(
-                [result_data = std::move(result_data), extent = screenshot_extent, encode_srgb, path = make_screenshot_path()] {
+            capture_writes.push_back(WBE::Worker::get_singleton()->submit_task(
+                [result_data = std::move(result_data), extent = capture.extent, encode_srgb, path = std::move(capture.path)] {
                     const std::vector<uint8_t> rgba8 = convert_result_to_rgba8(result_data, encode_srgb);
                     std::filesystem::create_directories(path.parent_path());
                     WBE::write_image_data_png(path, rgba8, extent.width, extent.height, 4);
-                    WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Saved pixel sorting screenshot to {}.", path.string()));
-                });
+                    WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Saved pixel sorting capture to {}.", path.string()));
+                }));
         }
-        if (screenshot_write.valid() && screenshot_write.wait_for(NO_WAIT) == std::future_status::ready) {
-            screenshot_write.get();
+        while (!capture_writes.empty() && capture_writes.front().wait_for(NO_WAIT) == std::future_status::ready) {
+            capture_writes.front().get();
+            capture_writes.pop_front();
         }
     }
 
     /**
      * @brief Draw the parameter window and upload the contrast and post-processing parameters when they change. Must be called on the rendering thread.
      */
-    void draw_parameter_window() {
+    void draw_parameter_window(double p_delta) {
         static constexpr std::array<const char*, 3> SORT_METRIC_NAMES{"Luminance", "Hue", "Saturation"};
         bool changed = false;
         ImGui::Begin("Pixel Sorting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
         changed |= ImGui::SliderFloat("Min metric", &ui_contrast.min_metric, 0.0F, 1.0F);
         changed |= ImGui::SliderFloat("Max metric", &ui_contrast.max_metric, 0.0F, 1.0F);
+        ImGui::Checkbox("Start animation", &animated);
+        curr_time += p_delta;
+        if (animated) {
+            changed = true;
+            ui_contrast.min_metric = static_cast<float>(std::abs(std::sin(curr_time * 0.25)));
+        }
         int sort_metric = static_cast<int>(ui_contrast.sort_metric);
-        // Switching rebuilds the graph, which would release the result image of a screenshot in progress.
+        // Switching rebuilds the graph, which would release the result image of a capture in progress.
         static constexpr std::array<const char*, 2> ORIENTATION_NAMES{"Vertical", "Horizontal"};
         int selected_orientation = static_cast<int>(ui_orientation);
-        ImGui::BeginDisabled(is_screenshot_in_progress());
+        ImGui::BeginDisabled(recording || is_capture_in_progress());
         if (ImGui::Combo("Orientation", &selected_orientation, ORIENTATION_NAMES.data(), static_cast<int>(ORIENTATION_NAMES.size()))) {
             ui_orientation = static_cast<PixelSortOrientation>(selected_orientation);
         }
@@ -830,15 +926,26 @@ private:
             ui_post_processing_params.gamma = std::max(ui_post_processing_params.gamma, 0.1F);
             post_processing_params_buffer->update_buffer(&ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
         }
-        const bool screenshot_in_progress = is_screenshot_in_progress();
-        ImGui::BeginDisabled(screenshot_in_progress);
+        const bool capture_in_progress = is_capture_in_progress();
+        ImGui::BeginDisabled(recording);
         if (ImGui::Button("Screenshot")) {
-            request_screenshot();
+            request_capture(make_screenshot_path());
         }
         ImGui::EndDisabled();
-        if (screenshot_in_progress) {
+        ImGui::SameLine();
+        if (ImGui::Button(recording ? "Stop recording" : "Record")) {
+            if (recording) {
+                stop_recording();
+            } else {
+                start_recording();
+            }
+        }
+        if (capture_in_progress) {
             ImGui::SameLine();
             ImGui::TextUnformatted("Saving...");
+        }
+        if (recording || sequence_frame_count != 0) {
+            ImGui::Text("%s %llu frames", recording ? "Recording" : "Recorded", static_cast<unsigned long long>(sequence_frame_count));
         }
         // The measured frame rate reflects the fixed delta rather than the real frame cost.
         if (!get_delta_settings().is_fixed) {

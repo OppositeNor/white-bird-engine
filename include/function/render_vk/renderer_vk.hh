@@ -384,7 +384,11 @@ private:
     std::array<RegisteredGPUJob, MAX_GPU_JOBS> gpu_jobs;
     Vector<GPUJobVK, AllocType> running_gpu_jobs;
     Vector<Ref<ROFenseVK>, AllocType> running_gpu_job_fenses;
-    Ref<SemaphoreVK> running_gpu_job_semaphore;
+    // Every GPU-job batch signals the next value of this timeline semaphore. The compute queues wait on it in batches
+    // without a fence, so it is kept until termination rather than replaced per batch, which would destroy it while those
+    // waits may be pending.
+    Ref<SemaphoreVK> gpu_job_semaphore;
+    uint64_t gpu_job_semaphore_value = 0;
 
     void init(RendererCapabilities& p_capabilities);
     void terminate();
@@ -439,7 +443,7 @@ private:
     void wait_for_running_gpu_jobs();
     void submit_gpu_job_command_buffer(const Vector<Ref<ROFenseVK>, AllocType>& p_completion_fenses,
         std::vector<std::promise<Ref<ROFenseVK>>>& p_submission_promises,
-        Ref<SemaphoreVK> p_completion_semaphore);
+        uint64_t p_completion_value);
     void present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph);
     void capture_swap_chain_image(uint32_t p_image_index);
 };
