@@ -19,7 +19,6 @@
 #include "core/async/worker.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/ecs/components.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/device_memory_vk.hh"
@@ -391,18 +390,6 @@ ROImageVK::Builder& ROImageVK::Builder::image_3d(VkExtent3D p_extent) {
     image_type = VK_IMAGE_TYPE_3D;
     extent = p_extent;
     return *this;
-}
-
-ROImageVK::Builder& ROImageVK::Builder::shadow_map_depth(const ComponentSpotLight& p_spot_light) {
-    return set_properties_2d(SHADOW_MAP_DEPTH_FORMAT,
-        VkExtent2D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution},
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-}
-
-ROImageVK::Builder& ROImageVK::Builder::shadow_map_color(const ComponentSpotLight& p_spot_light) {
-    return set_properties_2d(SHADOW_MAP_COLOR_FORMAT,
-        VkExtent2D{.width = p_spot_light.shadow_map_resolution, .height = p_spot_light.shadow_map_resolution},
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 }
 
 ROImageVK::Builder& ROImageVK::Builder::rgb() {

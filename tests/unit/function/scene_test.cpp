@@ -301,6 +301,32 @@ TEST_F(WBEWorldTest, SceneNodeUsesWorldComponentListsForComponentState) {
     EXPECT_THROW(node->remove_component(transform_type_id), std::runtime_error);
 }
 
+TEST_F(WBEWorldTest, SceneNodeAddComponentConstructsComponentOnEntity) {
+    auto world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
+    auto node = WBE::make_ref<WBE::SceneNode>(get_allocator(), world);
+    const WBE::TypeID transform_type_id = get_component_type_id<WBE::ComponentTransform>();
+
+    WBE::ComponentTransform& transform = node->add_component<WBE::ComponentTransform>(make_transform());
+
+    EXPECT_TRUE(node->has_component(transform_type_id));
+    EXPECT_EQ(&transform, &world->get_entities().get<WBE::ComponentTransform>(node->get_entity()));
+    EXPECT_EQ(transform.translation, make_transform().translation);
+    WBE::ComponentHierarchy& hierarchy = node->add_component<WBE::ComponentHierarchy>();
+    EXPECT_TRUE(hierarchy.parent == entt::null);
+    EXPECT_EQ(node->get_component_type_ids().size(), 2U);
+}
+
+TEST_F(WBEWorldTest, SceneNodeAddComponentRejectsDuplicateComponent) {
+    auto world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
+    auto node = WBE::make_ref<WBE::SceneNode>(get_allocator(), world);
+    node->add_component<WBE::ComponentTransform>(make_transform());
+
+    EXPECT_THROW(node->add_component<WBE::ComponentTransform>(make_transform()), std::runtime_error);
+
+    node->remove_component(get_component_type_id<WBE::ComponentTransform>());
+    EXPECT_NO_THROW(node->add_component<WBE::ComponentTransform>(make_transform()));
+}
+
 TEST_F(WBEWorldTest, SceneNodeComponentQueriesHandleUnknownTypesAndRemovedComponents) {
     auto world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
     auto node = WBE::make_ref<WBE::SceneNode>(get_allocator(), world);

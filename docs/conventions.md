@@ -13,7 +13,7 @@
 - Only upper layer depending lower layer is allowed. Lower layer depending on upper layer is
 prohibited.
 
-- Template use in layers above function layer (including function layer) is prohibited.
+- Template use in the exposed API of the global layer is prohibited.
 
 - `rma` is an accepted abbreviation for the roughness, metallic, and ambient-occlusion texture channel pack. Use `rma` for the
 project-owned identifier and material texture role.

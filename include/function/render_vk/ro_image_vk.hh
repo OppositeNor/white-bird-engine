@@ -20,7 +20,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/ecs/components.hh"
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -108,16 +107,6 @@ public:
         Builder& image_3d(glm::uvec3 p_size);
         // Make a 3D image.
         Builder& image_3d(VkExtent3D p_extent);
-        // Configure this image as the depth attachment of a spot light's
-        // shadow map: 2D, square, sized from the light's
-        // `shadow_map_resolution`, format `SHADOW_MAP_DEPTH_FORMAT`, usage
-        // depth-stencil attachment + sampled.
-        Builder& shadow_map_depth(const ComponentSpotLight& p_spot_light);
-        // Configure this image as the color attachment that pairs with
-        // `shadow_map_depth`: 2D, square, sized from the light's
-        // `shadow_map_resolution`, format `SHADOW_MAP_COLOR_FORMAT`, usage
-        // color attachment.
-        Builder& shadow_map_color(const ComponentSpotLight& p_spot_light);
         // Make an RGB image with each element 8 bit wide.
         Builder& rgb();
         // Make an SRGB image with each element 8 bit wide.

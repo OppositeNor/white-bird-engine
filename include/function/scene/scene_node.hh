@@ -22,6 +22,8 @@
 #include "function/function_utils.hh"
 #include "utils/utils.hh"
 #include "world.hh"
+#include <stdexcept>
+#include <utility>
 namespace WhiteBirdEngine {
 /**
  * @class SceneNode
@@ -69,6 +71,31 @@ public:
      */
     Ref<World> get_world() const {
         return world;
+    }
+
+    /**
+     * @brief Construct a component on this node's entity.
+     *
+     * The component is stored in the world registry under its entt type, so has_component(), remove_component(), and
+     * get_component_type_ids() observe it. The returned reference is invalidated when components of the same type are added
+     * to or removed from the world.
+     *
+     * @tparam TComponent The component type to construct.
+     * @tparam TArgs The constructor argument types.
+     * @param p_args Arguments forwarded to the component constructor or aggregate initializer.
+     * @return The constructed component.
+     * @throws std::runtime_error If this node has no entity or the entity already has a TComponent.
+     */
+    template <typename TComponent, typename... TArgs>
+    TComponent& add_component(TArgs&&... p_args) {
+        if (world.is_null() || entity == entt::null) {
+            throw std::runtime_error("Failed to add component: the scene node has no entity.");
+        }
+        entt::registry& entities = world->get_entities();
+        if (entities.all_of<TComponent>(entity)) {
+            throw std::runtime_error("Failed to add component: the entity already has a component of this type.");
+        }
+        return entities.emplace<TComponent>(entity, std::forward<TArgs>(p_args)...);
     }
 
     /**

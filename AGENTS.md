@@ -93,7 +93,7 @@ Layers, from upper to lower. Upper layers may depend on lower layers; the revers
 | 5 | `platform` | OS / windowing / file system / renderer backends.                   |
 
 Rules:
-- Templates are **forbidden in the exposed APIs** of `function` and any layer above it (i.e. `function` and `global`) — public headers, member functions, free functions, and types of these layers must not be templated. Internal helper functions / implementation details (e.g. file-local `static` helpers in a `.cpp`, anonymous-namespace utilities) **may** use templates. Templates are unrestricted in `resource`, `core`, and `platform`.
+- Templates are **forbidden in the exposed APIs** of `global` — its public headers, member functions, free functions, and types must not be templated. Internal helper functions / implementation details (e.g. file-local `static` helpers in a `.cpp`, anonymous-namespace utilities) **may** use templates. Templates are unrestricted in `function`, `resource`, `core`, and `platform`.
 - Do not catch exceptions outside tests. All engine errors are thrown as `std::runtime_error` and must crash the program.
 
 ## Validation
