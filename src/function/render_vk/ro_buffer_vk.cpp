@@ -28,6 +28,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstdint>
 #include <cstring>
@@ -39,6 +40,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -50,6 +52,8 @@ namespace {
 
 struct BufferReadbackOperation {
     std::future<Ref<ROFenseVK>> submission_future;
+    // Set by copy_device_buffer_readback() once the GPU copy has completed.
+    Ref<ROFenseVK> completion_fense;
     Ref<ROStagingBufferVK> staging_buffer;
     const void* mapped_memory = nullptr;
     size_t size = 0;
@@ -128,16 +132,27 @@ BufferReadbackOperation begin_device_buffer_readback(
         .size = p_size};
 }
 
-void finish_device_buffer_readback(BufferReadbackOperation p_operation, std::span<uint8_t> p_destination) {
-    Ref<ROFenseVK> completion_fense = p_operation.submission_future.get();
-    completion_fense->wait();
+void copy_device_buffer_readback(BufferReadbackOperation& p_operation, std::span<uint8_t> p_destination) {
+    p_operation.completion_fense = p_operation.submission_future.get();
+    p_operation.completion_fense->wait();
     std::memcpy(p_destination.data(), p_operation.mapped_memory, p_operation.size);
-    RendererVK::get_singleton()->add_job([completion_fense, staging_buffer = p_operation.staging_buffer]() {
-        static_cast<void>(completion_fense);
-        static_cast<void>(staging_buffer);
-    });
 }
 
+// Staging buffers and fences are render objects, so hand their last references to the rendering thread. They are moved,
+// not copied, so the worker never ends up holding the final reference. A renderer that has stopped accepting jobs drops
+// the job, and with it the references, here.
+void release_device_buffer_readback(BufferReadbackOperation& p_operation) {
+    RendererVK* renderer = RendererVK::get_singleton();
+    WBE_DEBUG_ASSERT(renderer != nullptr);
+    static_cast<void>(renderer->try_add_job(
+        [completion_fense = std::move(p_operation.completion_fense), staging_buffer = std::move(p_operation.staging_buffer)]() {
+            static_cast<void>(completion_fense);
+            static_cast<void>(staging_buffer);
+        }));
+}
+
+// The returned future is ready once the bytes are copied, before the staging release is queued on the rendering thread. A
+// rendering thread waiting on it therefore never waits for room in its own full job buffer.
 template <typename TCompletion>
 auto schedule_device_buffer_readback(const BaseRenderDataVK* p_render_data,
     VkBuffer p_source_buffer,
@@ -155,9 +170,16 @@ auto schedule_device_buffer_readback(const BaseRenderDataVK* p_render_data,
         throw std::runtime_error("Failed to acquire buffer content: buffer was not created with transfer-source usage.");
     }
     BufferReadbackOperation operation = begin_device_buffer_readback(p_render_data, p_source_buffer, p_source_offset, p_size);
-    return worker->submit_task([operation = std::move(operation), completion = std::move(p_completion)]() mutable {
-        return completion(std::move(operation));
-    });
+    using Result = std::invoke_result_t<TCompletion&, BufferReadbackOperation&>;
+    // The packaged task stores the copy's result or exception in the returned future.
+    std::packaged_task<Result(BufferReadbackOperation&)> copy_task(std::move(p_completion));
+    std::future<Result> result = copy_task.get_future();
+    // Failures after the copy have no future to report to, so they terminate the program.
+    static_cast<void>(worker->submit_task([operation = std::move(operation), copy_task = std::move(copy_task)]() mutable noexcept {
+        copy_task(operation);
+        release_device_buffer_readback(operation);
+    }));
+    return result;
 }
 
 } // namespace
@@ -450,9 +472,9 @@ uint32_t ROBufferVK::get_storage_view_index() const {
 
 std::future<std::vector<uint8_t>> ROBufferVK::acquire_buffer_content() const {
     return schedule_device_buffer_readback(
-        render_data, buffer, exposed_fields.buffer_size, usage, 0, exposed_fields.buffer_size, [](BufferReadbackOperation p_operation) {
+        render_data, buffer, exposed_fields.buffer_size, usage, 0, exposed_fields.buffer_size, [](BufferReadbackOperation& p_operation) {
             std::vector<uint8_t> content(p_operation.size);
-            finish_device_buffer_readback(std::move(p_operation), content);
+            copy_device_buffer_readback(p_operation, content);
             return content;
         });
 }
@@ -468,8 +490,8 @@ std::future<void> ROBufferVK::acquire_buffer_content(std::span<uint8_t> p_destin
 
 std::future<void> ROBufferVK::acquire_buffer_content(size_t p_source_offset, std::span<uint8_t> p_destination) const {
     return schedule_device_buffer_readback(
-        render_data, buffer, exposed_fields.buffer_size, usage, p_source_offset, p_destination.size_bytes(), [p_destination](BufferReadbackOperation p_operation) {
-            finish_device_buffer_readback(std::move(p_operation), p_destination);
+        render_data, buffer, exposed_fields.buffer_size, usage, p_source_offset, p_destination.size_bytes(), [p_destination](BufferReadbackOperation& p_operation) {
+            copy_device_buffer_readback(p_operation, p_destination);
         });
 }
 

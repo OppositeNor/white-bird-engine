@@ -24,6 +24,8 @@
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <typeindex>
 #include <utility>
@@ -82,7 +84,14 @@ EventManager::~EventManager() {
     singleton = nullptr;
 }
 
-EventSubscriptionID EventManager::subscribe_erased(std::type_index p_event_id, ErasedCallback p_callback) {
+std::string EventManager::make_event_key(std::string_view p_event_id, std::type_index p_payload_type) {
+    if (p_event_id.empty()) {
+        throw std::runtime_error("Failed to build event key: the event id is empty.");
+    }
+    return std::format("{}_{}", p_event_id, p_payload_type.name());
+}
+
+EventSubscriptionID EventManager::subscribe_erased(std::string p_event_key, ErasedCallback p_callback) {
     const EventSubscriptionID subscription_id = next_subscription_id.fetch_add(1, std::memory_order_relaxed);
     ListenerRef listener = make_ref<Listener>(allocator, allocator);
     listener->id = subscription_id;
@@ -90,14 +99,14 @@ EventSubscriptionID EventManager::subscribe_erased(std::type_index p_event_id, E
 
     std::unique_lock lock(table_mutex);
     ListenerListRef updated_listeners = make_ref<ListenerList>(allocator, allocator);
-    auto existing = listeners_by_event.find(p_event_id);
+    auto existing = listeners_by_event.find(p_event_key);
     if (existing != listeners_by_event.end()) {
         updated_listeners->reserve(existing->second->size() + 1);
         updated_listeners->assign(existing->second->begin(), existing->second->end());
     }
     updated_listeners->push_back(std::move(listener));
-    listeners_by_event.insert_or_assign(p_event_id, std::move(updated_listeners));
-    event_by_subscription.emplace(subscription_id, p_event_id);
+    listeners_by_event.insert_or_assign(p_event_key, std::move(updated_listeners));
+    event_by_subscription.emplace(subscription_id, std::move(p_event_key));
     return subscription_id;
 }
 
@@ -110,10 +119,8 @@ void EventManager::unsubscribe(EventSubscriptionID p_subscription) {
             throw std::runtime_error(
                 std::format("Failed to unsubscribe event subscription {}: no subscription has this id.", p_subscription));
         }
-        const std::type_index event_id = subscription->second;
+        auto listeners = listeners_by_event.find(subscription->second);
         event_by_subscription.erase(subscription);
-
-        auto listeners = listeners_by_event.find(event_id);
         WBE_DEBUG_ASSERT(listeners != listeners_by_event.end());
         ListenerListRef remaining_listeners = make_ref<ListenerList>(allocator, allocator);
         remaining_listeners->reserve(listeners->second->size());
@@ -144,11 +151,11 @@ void EventManager::unsubscribe(EventSubscriptionID p_subscription) {
     });
 }
 
-void EventManager::emit_erased(std::type_index p_event_id, const void* p_event) const {
+void EventManager::emit_erased(const std::string& p_event_key, const void* p_payload) const {
     ListenerListRef listeners;
     {
         std::shared_lock lock(table_mutex);
-        auto entry = listeners_by_event.find(p_event_id);
+        auto entry = listeners_by_event.find(p_event_key);
         if (entry == listeners_by_event.end()) {
             return;
         }
@@ -160,13 +167,13 @@ void EventManager::emit_erased(std::type_index p_event_id, const void* p_event) 
         if (!guard.get_is_entered()) {
             continue;
         }
-        listener->callback(p_event);
+        listener->callback(p_payload);
     }
 }
 
-size_t EventManager::get_subscriber_count_erased(std::type_index p_event_id) const {
+size_t EventManager::get_subscriber_count_erased(const std::string& p_event_key) const {
     std::shared_lock lock(table_mutex);
-    auto entry = listeners_by_event.find(p_event_id);
+    auto entry = listeners_by_event.find(p_event_key);
     return entry == listeners_by_event.end() ? 0 : entry->second->size();
 }
 

@@ -16,15 +16,14 @@
 #define WBE_FILE_RT_CPU_IN_FLIGHT_BUFFER_ACQUIRE_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include <atomic>
 #include <cstdint>
-#include <semaphore>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -35,11 +34,31 @@ namespace WhiteBirdEngine {
  * @class RTCPUInFlightBufferAcquireVK
  * @brief Starts an asynchronous CPU acquisition of a graph buffer on every recording.
  *
- * Acquires into caller-owned storage and releases the CPU completion semaphore after population.
- * Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
+ * Every recording starts an independent acquisition into memory it allocates itself, and emits the completed result as an
+ * AcquiredBuffer payload through the EventManager, using the source buffer resource id as the event id. Subscribe with
+ * `subscribe<RTCPUInFlightBufferAcquireVK::AcquiredBuffer>(buffer_id, ...)`. Acquisitions never share memory, so consecutive recordings may be in flight
+ * together. Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
  */
 class RTCPUInFlightBufferAcquireVK final : public IRenderTaskVK {
 public:
+    /**
+     * @struct AcquiredBuffer
+     * @brief Event payload of one completed acquisition. Movable; copying duplicates the content.
+     *
+     * Emitted on the rendering thread once the frame slot that recorded the copy is reused, so subscribers must not block
+     * it; hand long work to a worker. An exception thrown by a subscriber propagates to the renderer.
+     */
+    struct AcquiredBuffer {
+        /**
+         * @brief The renderer's current frame when the acquisition was recorded.
+         */
+        uint64_t frame = 0;
+        /**
+         * @brief The complete buffer contents. Allocated from the global allocator.
+         */
+        Vector<uint8_t, HeapAllocatorGlobal> content;
+    };
+
     RTCPUInFlightBufferAcquireVK() = delete;
     virtual ~RTCPUInFlightBufferAcquireVK() override = default;
     RTCPUInFlightBufferAcquireVK(const RTCPUInFlightBufferAcquireVK&) = delete;
@@ -50,19 +69,14 @@ public:
     /**
      * @brief Construct an in-flight CPU buffer-acquisition task.
      *
-     * The source buffer must have transfer-source usage. The completion semaphore and destination storage are
-     * non-owning and must outlive the task and every acquisition it starts. The semaphore must be acquired before
-     * recording another acquisition.
+     * The source buffer must have transfer-source usage. The task may be destroyed while acquisitions are in flight; their
+     * events are still emitted. The EventManager must outlive every acquisition the task starts.
      *
      * @param p_render_data Base Vulkan render data.
-     * @param p_buffer_id Render-graph resource id of the source buffer.
-     * @param p_destination CPU storage that receives the complete buffer.
-     * @param p_completion_semaphore CPU semaphore released after the destination has been populated.
+     * @param p_buffer_id Render-graph resource id of the source buffer; it is also the event id of every acquisition.
+     * @throws std::runtime_error If the render data is unavailable, the id is empty, or no EventManager exists.
      */
-    RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data,
-        std::string_view p_buffer_id,
-        std::span<uint8_t> p_destination,
-        std::binary_semaphore* p_completion_semaphore);
+    RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -77,10 +91,8 @@ public:
 private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string buffer_id;
-    std::span<uint8_t> destination;
-    std::binary_semaphore* completion_semaphore = nullptr;
+    EventManager* event_manager = nullptr;
     Ref<RenderObjectContainerVK> buffer_container;
-    Ref<std::atomic_bool> pending_completion;
 };
 
 } // namespace WhiteBirdEngine

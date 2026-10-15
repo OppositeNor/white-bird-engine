@@ -20,6 +20,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/ecs/components.hh"
+#include "function/event/event_manager.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
@@ -795,6 +796,16 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
     bloom_extent = base_render_data->swap_chain_extent;
+    // Each acquisition task emits under the id of the image view it reads.
+    EventManager* event_manager = EventManager::get_singleton();
+    bloom_acquire_registration = event_manager->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(
+        BLOOM_PING_IMAGE_VIEW, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
+            write_completed_bloom_acquire(p_image);
+        });
+    frame_sequence_acquire_registration = event_manager->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(
+        FRAME_SEQUENCE_IMAGE_VIEW, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
+            write_frame_sequence_frame(p_image);
+        });
 }
 
 ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBRTest::make_spot_light_graph_ids(uint32_t p_light_index) {

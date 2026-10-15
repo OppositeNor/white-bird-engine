@@ -655,10 +655,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(
     task_desc.task_id = RT_ACQUIRE_BLOOM;
     // The factory takes the handle the bloom readback triggers again every time the graph recreates the task.
     task_desc.factory = [this, p_use_summed_area_table](const RendGraphContextVK& /*p_context*/) {
-        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(
-            render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW, [this](RTCPUInFlightAcquireVK::AcquiredImage p_image) {
-                write_completed_bloom_acquire(p_image);
-            });
+        // Completed acquisitions reach write_completed_bloom_acquire() through the event registered in setup_bloom_acquisition().
+        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW);
         auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
         bloom_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
         return task;
@@ -707,10 +705,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_frame_sequence_acquire_t
             // A recreated wrapper loses its remaining frames, so the sequence would end early.
             throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
         }
-        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(
-            render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW, [this](RTCPUInFlightAcquireVK::AcquiredImage p_image) {
-                write_frame_sequence_frame(std::move(p_image));
-            });
+        // Completed acquisitions reach write_frame_sequence_frame() through the event registered in setup_bloom_acquisition().
+        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW);
         auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
         frame_sequence_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
         return task;

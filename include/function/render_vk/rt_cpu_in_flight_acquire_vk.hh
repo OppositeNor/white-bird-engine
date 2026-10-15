@@ -18,12 +18,12 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>
-#include <functional>
 #include <future>
 #include <string>
 #include <string_view>
@@ -35,16 +35,20 @@ namespace WhiteBirdEngine {
  * @class RTCPUInFlightAcquireVK
  * @brief Starts an asynchronous CPU acquisition of a graph image on every recording.
  *
- * Every recording starts an independent acquisition into memory it allocates itself, and hands the result to a callback
- * that takes ownership of it. Acquisitions never share memory, so consecutive recordings may be in flight together; wrap
- * in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
+ * Every recording starts an independent acquisition into memory it allocates itself, and emits the completed result as an
+ * AcquiredImage payload through the EventManager, using the source image-view resource id as the event id. Subscribe with
+ * `subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(image_view_id, ...)`. Acquisitions never share memory, so consecutive recordings may be in flight together;
+ * wrap in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
  * Instances are neither copyable nor movable.
  */
 class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
     /**
      * @struct AcquiredImage
-     * @brief One completed acquisition. Movable; copying duplicates the content.
+     * @brief Event payload of one completed acquisition. Movable; copying duplicates the content.
+     *
+     * Emitted on an engine worker thread. Events of different acquisitions may be emitted concurrently and out of recording
+     * order; order them by frame. An exception thrown by a subscriber is rethrown by a later recording of the task.
      */
     struct AcquiredImage {
         /**
@@ -67,13 +71,6 @@ public:
         Vector<uint8_t, HeapAllocatorGlobal> content;
     };
 
-    /**
-     * @brief Callback receiving the ownership of one completed acquisition.
-     *
-     * Runs on an engine worker thread. Callbacks of different acquisitions may run concurrently and out of recording
-     * order; order them by AcquiredImage::frame. An exception thrown by the callback is rethrown by a later recording.
-     */
-    using Callback = std::function<void(AcquiredImage p_image)>;
 
     RTCPUInFlightAcquireVK() = delete;
     virtual ~RTCPUInFlightAcquireVK() override = default;
@@ -85,14 +82,14 @@ public:
     /**
      * @brief Construct an in-flight CPU image-acquisition task.
      *
-     * Each acquisition holds its own copy of the callback, so the task may be destroyed while acquisitions are in flight;
-     * everything the callback references must outlive every acquisition the task starts.
+     * The task may be destroyed while acquisitions are in flight; their events are still emitted. The EventManager must
+     * outlive every acquisition the task starts.
      *
      * @param p_render_data Base Vulkan render data.
-     * @param p_image_view_id Render-graph resource id of the source image view.
-     * @param p_on_acquired Callback receiving each completed acquisition; empty throws.
+     * @param p_image_view_id Render-graph resource id of the source image view; it is also the event id of every acquisition.
+     * @throws std::runtime_error If the render data is unavailable, the id is empty, or no EventManager exists.
      */
-    RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id, Callback p_on_acquired);
+    RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -107,7 +104,7 @@ public:
 private:
     const BaseRenderDataVK* render_data = nullptr;
     std::string image_view_id;
-    Callback on_acquired;
+    EventManager* event_manager = nullptr;
     Ref<RenderObjectContainerVK> image_view_container;
     Vector<std::future<void>, RenderAllocator> pending_acquisitions;
 };

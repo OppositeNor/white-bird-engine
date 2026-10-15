@@ -1,4 +1,4 @@
-/* Copyright 2026 OppositeNor
+/* Copyright 2025 OppositeNor
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,28 +14,55 @@
 */
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
+#include "function/event/event_manager.hh"
+#include "function/event/event_registration.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "global/global.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
-#include <array>
-#include <cstdint>
+#include <atomic>
 #include <gtest/gtest.h>
-#include <semaphore>
-#include <span>
+#include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-TEST(WBERTCPUInFlightBufferAcquireVKTest, DirectRecordRequiresBoundSource) {
+namespace {
+
+// The task emits through the EventManager singleton, which the test global owns.
+class WBERTCPUInFlightBufferAcquireVKTest : public ::testing::Test {
+protected:
+    virtual void SetUp() override {
+        global = make_test_global();
+    }
+
+    virtual void TearDown() override {
+        global.reset();
+    }
+
+    EventRegistration count_acquisitions(std::atomic<int>& p_count) {
+        return EventManager::get_singleton()->subscribe<RTCPUInFlightBufferAcquireVK::AcquiredBuffer>("source_buffer", 
+            [&p_count](const RTCPUInFlightBufferAcquireVK::AcquiredBuffer& /*p_buffer*/) {
+                p_count.fetch_add(1);
+            });
+    }
+
+    std::unique_ptr<Global> global;
+};
+
+} // namespace
+
+TEST_F(WBERTCPUInFlightBufferAcquireVKTest, DirectRecordRequiresBoundSource) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    std::array<uint8_t, 4> destination{};
-    std::binary_semaphore completion_semaphore(0);
-    RTCPUInFlightBufferAcquireVK task(&render_data, "source_buffer", destination, &completion_semaphore);
+    std::atomic<int> acquisitions = 0;
+    const EventRegistration registration = count_acquisitions(acquisitions);
+    RTCPUInFlightBufferAcquireVK task(&render_data, "source_buffer");
 
     ASSERT_EQ(task.queue_family(), QueueFamilyVK::GRAPHICS);
     Vector<ResAccessVK, RenderAllocator> reads(&allocator);
@@ -47,33 +74,36 @@ TEST(WBERTCPUInFlightBufferAcquireVKTest, DirectRecordRequiresBoundSource) {
     EXPECT_TRUE(writes.empty());
 
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
-    EXPECT_FALSE(completion_semaphore.try_acquire());
+    EXPECT_EQ(acquisitions.load(), 0);
 }
 
-TEST(WBERTCPUInFlightBufferAcquireVKTest, RejectsInvalidNonOwningInputs) {
+TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RejectsInvalidInputs) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    std::array<uint8_t, 4> destination{};
-    std::binary_semaphore completion_semaphore(0);
 
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(nullptr, "source_buffer", destination, &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "", destination, &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "source_buffer", std::span<uint8_t>(), &completion_semaphore), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "source_buffer", destination, nullptr), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(nullptr, "source_buffer"), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, ""), std::runtime_error);
 }
 
-TEST(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
+TEST_F(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    std::array<uint8_t, 4> destination{};
-    std::binary_semaphore completion_semaphore(0);
-    RTTriggeredVK task(
-        make_unique<RTCPUInFlightBufferAcquireVK>(&allocator, &render_data, "source_buffer", destination, &completion_semaphore));
+    std::atomic<int> acquisitions = 0;
+    const EventRegistration registration = count_acquisitions(acquisitions);
+    RTTriggeredVK task(make_unique<RTCPUInFlightBufferAcquireVK>(&allocator, &render_data, "source_buffer"));
     EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
     task.trigger();
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
     EXPECT_EQ(task.get_remaining_frames(), 0U);
-    EXPECT_FALSE(completion_semaphore.try_acquire());
+    EXPECT_EQ(acquisitions.load(), 0);
+}
+
+// Runs without a test global, so no EventManager exists.
+TEST(WBERTCPUInFlightBufferAcquireVKStandaloneTest, RequiresEventManager) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ASSERT_EQ(EventManager::get_singleton(), nullptr);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "source_buffer"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

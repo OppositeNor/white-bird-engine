@@ -47,6 +47,7 @@
 #include <set>
 #include <span>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -73,6 +74,8 @@ struct ImageReadbackPlan {
 
 struct ImageReadbackOperation {
     std::future<Ref<ROFenseVK>> submission_future;
+    // Set by copy_image_readback() once the GPU copy has completed.
+    Ref<ROFenseVK> completion_fense;
     Ref<ROStagingBufferVK> staging_buffer;
     const void* mapped_memory = nullptr;
     size_t output_size = 0;
@@ -277,10 +280,10 @@ ImageReadbackOperation begin_image_readback(
         .segments = std::move(p_plan.segments)};
 }
 
-void finish_image_readback(ImageReadbackOperation p_operation, std::span<uint8_t> p_destination) {
+void copy_image_readback(ImageReadbackOperation& p_operation, std::span<uint8_t> p_destination) {
     // Wait until queue submission has finished before accessing its externally synchronized Vulkan fence.
-    Ref<ROFenseVK> completion_fense = p_operation.submission_future.get();
-    completion_fense->wait();
+    p_operation.completion_fense = p_operation.submission_future.get();
+    p_operation.completion_fense->wait();
 
     // Remove Vulkan's per-mip alignment gaps while assembling the tightly packed CPU result.
     for (const ImageReadbackSegment& segment : p_operation.segments) {
@@ -289,13 +292,23 @@ void finish_image_readback(ImageReadbackOperation p_operation, std::span<uint8_t
             segment.size);
     }
 
-    // Transfer final render-object ownership back to the rendering thread for delayed destruction.
-    RendererVK::get_singleton()->add_job([completion_fense, staging_buffer = p_operation.staging_buffer]() {
-        static_cast<void>(completion_fense);
-        static_cast<void>(staging_buffer);
-    });
 }
 
+// Transfer final render-object ownership back to the rendering thread for delayed destruction. The references are moved,
+// not copied, so the worker never ends up holding the final one. A renderer that has stopped accepting jobs drops the job,
+// and with it the references, here.
+void release_image_readback(ImageReadbackOperation& p_operation) {
+    RendererVK* renderer = RendererVK::get_singleton();
+    WBE_DEBUG_ASSERT(renderer != nullptr);
+    static_cast<void>(renderer->try_add_job(
+        [completion_fense = std::move(p_operation.completion_fense), staging_buffer = std::move(p_operation.staging_buffer)]() {
+            static_cast<void>(completion_fense);
+            static_cast<void>(staging_buffer);
+        }));
+}
+
+// The returned future is ready once the bytes are copied, before the staging release is queued on the rendering thread. A
+// rendering thread waiting on it therefore never waits for room in its own full job buffer.
 template <typename TCompletion>
 auto schedule_image_readback(
     const ROImageVK::ExposedFields& p_fields, const BaseRenderDataVK* p_render_data, size_t p_destination_size, TCompletion p_completion) {
@@ -313,10 +326,17 @@ auto schedule_image_readback(
     }
     ImageReadbackOperation operation = begin_image_readback(p_fields, p_render_data, std::move(plan));
 
-    // Use one worker task for the fence wait, CPU copy, and overload-specific result assembly.
-    return worker->submit_task([operation = std::move(operation), completion = std::move(p_completion)]() mutable {
-        return completion(std::move(operation));
-    });
+    // Use one worker task for the fence wait, CPU copy, and overload-specific result assembly. The packaged task stores the
+    // copy's result or exception in the returned future.
+    using Result = std::invoke_result_t<TCompletion&, ImageReadbackOperation&>;
+    std::packaged_task<Result(ImageReadbackOperation&)> copy_task(std::move(p_completion));
+    std::future<Result> result = copy_task.get_future();
+    // Failures after the copy have no future to report to, so they terminate the program.
+    static_cast<void>(worker->submit_task([operation = std::move(operation), copy_task = std::move(copy_task)]() mutable noexcept {
+        copy_task(operation);
+        release_image_readback(operation);
+    }));
+    return result;
 }
 
 } // namespace
@@ -596,17 +616,17 @@ void ROImageVK::set_image_data_immediate(VkCommandBuffer p_command_buffer, Ref<R
 }
 
 std::future<std::vector<uint8_t>> ROImageVK::acquire_image_content() const {
-    return schedule_image_readback(exposed_fields, render_data, std::numeric_limits<size_t>::max(), [](ImageReadbackOperation p_operation) {
+    return schedule_image_readback(exposed_fields, render_data, std::numeric_limits<size_t>::max(), [](ImageReadbackOperation& p_operation) {
         std::vector<uint8_t> content(p_operation.output_size);
-        finish_image_readback(std::move(p_operation), content);
+        copy_image_readback(p_operation, content);
         return content;
     });
 }
 
 std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destination) const {
     return schedule_image_readback(
-        exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation p_operation) {
-            finish_image_readback(std::move(p_operation), p_destination);
+        exposed_fields, render_data, p_destination.size_bytes(), [p_destination](ImageReadbackOperation& p_operation) {
+            copy_image_readback(p_operation, p_destination);
         });
 }
 

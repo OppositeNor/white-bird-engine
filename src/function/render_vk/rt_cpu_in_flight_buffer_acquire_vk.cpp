@@ -15,7 +15,9 @@
 #include "function/render_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -25,11 +27,8 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
-#include <atomic>
 #include <cstdint>
 #include <cstring>
-#include <semaphore>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -38,20 +37,16 @@
 
 namespace WhiteBirdEngine {
 
-RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(
-    const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id, std::span<uint8_t> p_destination, std::binary_semaphore* p_completion_semaphore)
-    : render_data(p_render_data), buffer_id(p_buffer_id), destination(p_destination), completion_semaphore(p_completion_semaphore) {
+RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id)
+    : render_data(p_render_data), buffer_id(p_buffer_id), event_manager(EventManager::get_singleton()) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
     }
     if (buffer_id.empty()) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: buffer resource id is empty.");
     }
-    if (destination.empty()) {
-        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: CPU destination is empty.");
-    }
-    if (completion_semaphore == nullptr) {
-        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: completion semaphore is required.");
+    if (event_manager == nullptr) {
+        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: no EventManager exists to emit acquisitions through.");
     }
 }
 
@@ -69,14 +64,6 @@ void RTCPUInFlightBufferAcquireVK::bind_resources(const RendResViewVK& p_resourc
 }
 
 void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
-    if (pending_completion != MEM_NULL && pending_completion->load(std::memory_order_acquire)) {
-        pending_completion = MEM_NULL;
-    }
-
-    if (pending_completion != MEM_NULL) {
-        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: a new acquisition was requested before the previous one completed.");
-    }
-
     if (buffer_container == MEM_NULL) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: source resource has not been bound.");
     }
@@ -86,9 +73,6 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: buffer resource is unavailable.");
     }
     const size_t buffer_size = buffer->fields().buffer_size;
-    if (destination.size_bytes() < buffer_size) {
-        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: CPU destination is smaller than the source buffer.");
-    }
 
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(buffer_size);
     Ref<ROStagingBufferVK> staging_buffer =
@@ -114,21 +98,24 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
     destination_dependency.pBufferMemoryBarriers = &destination_barrier;
     vkCmdPipelineBarrier2(p_command_buffer, &destination_dependency);
 
-    pending_completion = make_ref<std::atomic_bool>(render_data->allocator, false);
+    // Each acquisition owns its memory, which its event carries, so it never waits for the ones still in flight.
+    AcquiredBuffer acquired_buffer{
+        .frame = render_data->current_frame,
+        .content = Vector<uint8_t, HeapAllocatorGlobal>(buffer_size, global_allocator()),
+    };
     WBE_DEBUG_ASSERT(render_data->frames_in_flight > 0);
     // The copy belongs to the current frame slot. Reaching this callback after the other frame slots have advanced means the
     // renderer has wrapped to this slot and waited for its fence, so host reads cannot race the recorded transfer. This is one
     // frame earlier than the staging allocation's normal delayed release, keeping its mapped region reserved during the copy.
     render_data->register_delayed_call(
-        [completion = pending_completion,
-            staging_buffer,
+        [staging_buffer,
             mapped_memory = staging_allocation.data,
             buffer_size,
-            destination = destination,
-            completion_semaphore = completion_semaphore]() mutable {
-            std::memcpy(destination.data(), mapped_memory, buffer_size);
-            completion->store(true, std::memory_order_release);
-            completion_semaphore->release();
+            acquired_buffer = std::move(acquired_buffer),
+            event_manager = event_manager,
+            event_id = buffer_id]() mutable {
+            std::memcpy(acquired_buffer.content.data(), mapped_memory, buffer_size);
+            event_manager->emit(event_id, acquired_buffer);
         },
         render_data->frames_in_flight - 1);
 }

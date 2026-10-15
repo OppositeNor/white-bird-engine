@@ -18,6 +18,7 @@
 #include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -51,14 +52,14 @@ RenderAllocator* get_render_data_allocator(const BaseRenderDataVK* p_render_data
 
 } // namespace
 
-RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id, Callback p_on_acquired)
-    : render_data(p_render_data), image_view_id(p_image_view_id), on_acquired(std::move(p_on_acquired)),
+RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id)
+    : render_data(p_render_data), image_view_id(p_image_view_id), event_manager(EventManager::get_singleton()),
       pending_acquisitions(get_render_data_allocator(p_render_data)) {
     if (image_view_id.empty()) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: image-view resource id is empty.");
     }
-    if (!on_acquired) {
-        throw std::runtime_error("RTCPUInFlightAcquireVK: acquisition callback is required.");
+    if (event_manager == nullptr) {
+        throw std::runtime_error("RTCPUInFlightAcquireVK: no EventManager exists to emit acquisitions through.");
     }
 }
 
@@ -95,7 +96,7 @@ void RTCPUInFlightAcquireVK::record(VkCommandBuffer /*p_command_buffer*/, double
     }
     const Ref<ROImageVK>& image = image_view->fields().image;
 
-    // Each acquisition owns its memory, which the callback receives, so it never waits for the ones still in flight.
+    // Each acquisition owns its memory, which its event carries, so it never waits for the ones still in flight.
     AcquiredImage acquired_image{
         .frame = render_data->current_frame,
         .format = image->fields().format,
@@ -108,9 +109,12 @@ void RTCPUInFlightAcquireVK::record(VkCommandBuffer /*p_command_buffer*/, double
     Worker* worker = Worker::get_singleton();
     WBE_DEBUG_ASSERT(worker != nullptr);
     pending_acquisitions.push_back(worker->submit_task(
-        [acquire_future = std::move(acquire_future), acquired_image = std::move(acquired_image), on_acquired = on_acquired]() mutable {
+        [acquire_future = std::move(acquire_future),
+            acquired_image = std::move(acquired_image),
+            event_manager = event_manager,
+            event_id = image_view_id]() mutable {
             acquire_future.get();
-            on_acquired(std::move(acquired_image));
+            event_manager->emit(event_id, acquired_image);
         }));
 }
 

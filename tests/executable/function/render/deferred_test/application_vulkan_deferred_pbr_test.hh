@@ -24,6 +24,7 @@
 #include "dynamic_mesh_render_feature.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
+#include "function/event/event_registration.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
@@ -271,7 +272,7 @@ private:
     // Bound the frames waiting to be written, and end the fixed delta after the last frame is recorded. Runs on the
     // rendering thread.
     void poll_frame_sequence();
-    // Write one acquired sequence frame. Runs on a worker thread.
+    // Write one acquired sequence frame. Runs on a worker thread; takes a copy because it converts the pixels in place.
     void write_frame_sequence_frame(RTCPUInFlightAcquireVK::AcquiredImage p_image);
     bool is_frame_sequence_in_progress() const;
 
@@ -379,6 +380,10 @@ private:
     glm::vec3 camera_position = TEST_DEFAULT_CAMERA_POSITION;
     float camera_yaw = default_test_camera_yaw();
     float camera_pitch = default_test_camera_pitch();
+    // Deliver completed bloom and frame-sequence acquisitions. Declared last, so they are destroyed first and no handler
+    // runs against members that are already destroyed.
+    EventRegistration bloom_acquire_registration;
+    EventRegistration frame_sequence_acquire_registration;
 };
 
 } // namespace WhiteBirdEngine

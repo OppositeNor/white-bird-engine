@@ -27,6 +27,8 @@
 #include <functional>
 #include <mutex>
 #include <shared_mutex>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <typeindex>
@@ -36,12 +38,14 @@ namespace WhiteBirdEngine {
 
 /**
  * @class EventManager
- * @brief Thread-safe publish/subscribe table that delivers events to callbacks by the event's exact C++ type.
+ * @brief Thread-safe publish/subscribe table that delivers events to callbacks by event id and payload type.
  *
- * An event is any value; its type, compared through std::type_index after removing references and cv-qualifiers, is its
- * event id. subscribe<TEvent>() registers a callback for one event type and returns the EventRegistration that owns it;
- * destroying or resetting the registration unsubscribes. emit() calls every callback registered for the emitted value's
- * type, in subscription order, on the emitting thread. Base and derived types are different events.
+ * An event is a non-empty string event id plus a payload of any type. The pair selects one entry of the table, keyed
+ * `"<event_id>_<payload type>"`, where the payload type is the std::type_index name of the payload's type after removing
+ * references and cv-qualifiers (see get_event_key()). subscribe<TPayload>(event_id, ...) registers a callback for one key and
+ * returns the EventRegistration that owns it; destroying or resetting the registration unsubscribes. emit(event_id, payload)
+ * calls every callback registered for the key, in subscription order, on the emitting thread. The same id with different
+ * payload types, the same payload type under different ids, and base and derived payload types are all different events.
  *
  * All methods may be called from any thread, including from inside a callback. emit() calls the callbacks that were
  * subscribed when it started: callbacks subscribed during an emission are not called by it, and callbacks unsubscribed
@@ -82,46 +86,55 @@ public:
     }
 
     /**
-     * @brief Get the event id of an event type.
-     * @tparam TEvent The event type; references and cv-qualifiers are ignored.
+     * @brief Get the table key of an event: `"<event_id>_<payload type>"`.
+     * @tparam TPayload The payload type; references and cv-qualifiers are ignored. Its part of the key is the
+     * implementation-defined std::type_index name, so keys are only meaningful within one running process.
+     * @param p_event_id The event id; non-empty.
+     * @throws std::runtime_error If p_event_id is empty.
      */
-    template <typename TEvent>
-    static std::type_index get_event_id() {
-        return std::type_index(typeid(std::remove_cvref_t<TEvent>));
+    template <typename TPayload>
+    static std::string get_event_key(std::string_view p_event_id) {
+        return make_event_key(p_event_id, std::type_index(typeid(std::remove_cvref_t<TPayload>)));
     }
 
     /**
-     * @brief Register a callback for an event type.
-     * @tparam TEvent The event type; references and cv-qualifiers are ignored.
-     * @param p_callback Callable invoked as `p_callback(const TEvent&)` for every emitted TEvent. It is copied or moved into
-     * the manager and may be invoked concurrently from several threads.
+     * @brief Register a callback for an event id and payload type.
+     * @tparam TPayload The payload type; references and cv-qualifiers are ignored.
+     * @param p_event_id The event id; non-empty.
+     * @param p_callback Callable invoked as `p_callback(const TPayload&)` for every TPayload emitted under p_event_id. It is
+     * copied or moved into the manager and may be invoked concurrently from several threads.
      * @return The registration that owns the subscription; the callback stays subscribed until it is destroyed or reset.
+     * @throws std::runtime_error If p_event_id is empty.
      */
-    template <typename TEvent, typename TCallback>
-        requires std::invocable<std::remove_cvref_t<TCallback>&, const std::remove_cvref_t<TEvent>&>
-    [[nodiscard]] EventRegistration subscribe(TCallback&& p_callback) {
-        using EventType = std::remove_cvref_t<TEvent>;
-        return EventRegistration(this, subscribe_erased(get_event_id<EventType>(), [callback = std::forward<TCallback>(p_callback)](const void* p_event) mutable {
-            callback(*static_cast<const EventType*>(p_event));
-        }));
+    template <typename TPayload, typename TCallback>
+        requires std::invocable<std::remove_cvref_t<TCallback>&, const std::remove_cvref_t<TPayload>&>
+    [[nodiscard]] EventRegistration subscribe(std::string_view p_event_id, TCallback&& p_callback) {
+        using PayloadType = std::remove_cvref_t<TPayload>;
+        return EventRegistration(this,
+            subscribe_erased(get_event_key<PayloadType>(p_event_id), [callback = std::forward<TCallback>(p_callback)](const void* p_payload) mutable {
+                callback(*static_cast<const PayloadType*>(p_payload));
+            }));
     }
 
     /**
-     * @brief Call every callback subscribed to the event's type with the event.
-     * @param p_event The event; its exact type, ignoring references and cv-qualifiers, selects the callbacks.
+     * @brief Call every callback subscribed to the event id and the payload's type with the payload.
+     * @param p_event_id The event id; non-empty.
+     * @param p_payload The payload; its exact type, ignoring references and cv-qualifiers, is part of the event.
+     * @throws std::runtime_error If p_event_id is empty.
      * @throws Whatever a callback throws.
      */
-    template <typename TEvent>
-    void emit(const TEvent& p_event) {
-        emit_erased(get_event_id<TEvent>(), &p_event);
+    template <typename TPayload>
+    void emit(std::string_view p_event_id, const TPayload& p_payload) {
+        emit_erased(get_event_key<TPayload>(p_event_id), &p_payload);
     }
 
     /**
-     * @brief Get the number of callbacks currently subscribed to an event type.
+     * @brief Get the number of callbacks currently subscribed to an event id and payload type.
+     * @throws std::runtime_error If p_event_id is empty.
      */
-    template <typename TEvent>
-    size_t get_subscriber_count() const {
-        return get_subscriber_count_erased(get_event_id<TEvent>());
+    template <typename TPayload>
+    size_t get_subscriber_count(std::string_view p_event_id) const {
+        return get_subscriber_count_erased(get_event_key<TPayload>(p_event_id));
     }
 
 private:
@@ -159,16 +172,17 @@ private:
     // Immutable once published; subscribe() and unsubscribe() replace the whole list, so emit() iterates a stable copy.
     using ListenerListRef = Ref<ListenerList, HeapAllocatorDefault>;
 
-    EventSubscriptionID subscribe_erased(std::type_index p_event_id, ErasedCallback p_callback);
+    static std::string make_event_key(std::string_view p_event_id, std::type_index p_payload_type);
+    EventSubscriptionID subscribe_erased(std::string p_event_key, ErasedCallback p_callback);
     // Removes a subscription and waits for its invocations on other threads; throws if the id is unknown.
     void unsubscribe(EventSubscriptionID p_subscription);
-    void emit_erased(std::type_index p_event_id, const void* p_event) const;
-    size_t get_subscriber_count_erased(std::type_index p_event_id) const;
+    void emit_erased(const std::string& p_event_key, const void* p_payload) const;
+    size_t get_subscriber_count_erased(const std::string& p_event_key) const;
 
     HeapAllocatorDefault* allocator;
     mutable std::shared_mutex table_mutex;
-    HashMap<std::type_index, ListenerListRef, HeapAllocatorDefault> listeners_by_event;
-    HashMap<EventSubscriptionID, std::type_index, HeapAllocatorDefault> event_by_subscription;
+    HashMap<std::string, ListenerListRef, HeapAllocatorDefault> listeners_by_event;
+    HashMap<EventSubscriptionID, std::string, HeapAllocatorDefault> event_by_subscription;
     std::atomic<EventSubscriptionID> next_subscription_id = 1;
 
     inline static EventManager* singleton = nullptr;

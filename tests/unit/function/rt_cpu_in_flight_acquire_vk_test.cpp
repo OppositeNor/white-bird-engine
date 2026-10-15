@@ -14,26 +14,55 @@
 */
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
+#include "function/event/event_manager.hh"
+#include "function/event/event_registration.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "global/global.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
-#include <cstdint>
+#include <atomic>
 #include <gtest/gtest.h>
+#include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-TEST(WBERTCPUInFlightAcquireVKTest, DirectRecordRequiresBoundSource) {
+namespace {
+
+// The task emits through the EventManager singleton, which the test global owns.
+class WBERTCPUInFlightAcquireVKTest : public ::testing::Test {
+protected:
+    virtual void SetUp() override {
+        global = make_test_global();
+    }
+
+    virtual void TearDown() override {
+        global.reset();
+    }
+
+    EventRegistration count_acquisitions(std::atomic<int>& p_count) {
+        return EventManager::get_singleton()->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>("source_image", 
+            [&p_count](const RTCPUInFlightAcquireVK::AcquiredImage& /*p_image*/) {
+                p_count.fetch_add(1);
+            });
+    }
+
+    std::unique_ptr<Global> global;
+};
+
+} // namespace
+
+TEST_F(WBERTCPUInFlightAcquireVKTest, DirectRecordRequiresBoundSource) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    int acquisitions = 0;
-    RTCPUInFlightAcquireVK task(&render_data, "source_image", [&acquisitions](RTCPUInFlightAcquireVK::AcquiredImage /*p_image*/) {
-        ++acquisitions;
-    });
+    std::atomic<int> acquisitions = 0;
+    const EventRegistration registration = count_acquisitions(acquisitions);
+    RTCPUInFlightAcquireVK task(&render_data, "source_image");
 
     ASSERT_EQ(task.queue_family(), QueueFamilyVK::GRAPHICS);
     Vector<ResAccessVK, RenderAllocator> reads(&allocator);
@@ -45,33 +74,36 @@ TEST(WBERTCPUInFlightAcquireVKTest, DirectRecordRequiresBoundSource) {
     EXPECT_TRUE(writes.empty());
 
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
-    EXPECT_EQ(acquisitions, 0);
+    EXPECT_EQ(acquisitions.load(), 0);
 }
 
-TEST(WBERTCPUInFlightAcquireVKTest, RejectsInvalidInputs) {
+TEST_F(WBERTCPUInFlightAcquireVKTest, RejectsInvalidInputs) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    const RTCPUInFlightAcquireVK::Callback callback = [](RTCPUInFlightAcquireVK::AcquiredImage /*p_image*/) {
-    };
 
-    EXPECT_THROW(RTCPUInFlightAcquireVK(nullptr, "source_image", callback), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "", callback), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image", RTCPUInFlightAcquireVK::Callback()), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(nullptr, "source_image"), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, ""), std::runtime_error);
 }
 
-TEST(WBERTCPUInFlightAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
+TEST_F(WBERTCPUInFlightAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    int acquisitions = 0;
-    RTTriggeredVK task(make_unique<RTCPUInFlightAcquireVK>(
-        &allocator, &render_data, "source_image", [&acquisitions](RTCPUInFlightAcquireVK::AcquiredImage /*p_image*/) {
-            ++acquisitions;
-        }));
+    std::atomic<int> acquisitions = 0;
+    const EventRegistration registration = count_acquisitions(acquisitions);
+    RTTriggeredVK task(make_unique<RTCPUInFlightAcquireVK>(&allocator, &render_data, "source_image"));
     EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
     task.trigger();
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
     EXPECT_EQ(task.get_remaining_frames(), 0U);
-    EXPECT_EQ(acquisitions, 0);
+    EXPECT_EQ(acquisitions.load(), 0);
+}
+
+// Runs without a test global, so no EventManager exists.
+TEST(WBERTCPUInFlightAcquireVKStandaloneTest, RequiresEventManager) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ASSERT_EQ(EventManager::get_singleton(), nullptr);
+    EXPECT_THROW(RTCPUInFlightAcquireVK(&render_data, "source_image"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine
