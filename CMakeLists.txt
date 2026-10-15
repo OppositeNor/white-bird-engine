@@ -152,6 +152,9 @@ if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
     add_subdirectory(dependencies/google-benchmark)
 endif()
+# Setup Lua
+add_subdirectory(dependencies/lua)
+
 # Setup miniaudio
 add_library(WBE_MINIAUDIO_BUILD_LIB
     src/resource/miniaudio_instantiation.c
@@ -249,6 +252,7 @@ set(libs ${libs}
     boost_program_options
     WBE_MINIAUDIO_BUILD_LIB
     ktx
+    lua
 )
 
 # Add engine source
