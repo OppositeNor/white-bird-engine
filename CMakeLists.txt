@@ -25,6 +25,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(WBE_MAKE_TEST "Export test for White Bird Engine" ON)
 set(WBE_BINARY_DIR ${CMAKE_BINARY_DIR}/bin CACHE STRING "The binary output directory.")
 option(WBE_BUILD_SHARED "Should build shared library" ON)
+option(WBE_ENABLE_TSAN "Build with ThreadSanitizer" OFF)
 
 # Output pathes
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${WBE_BINARY_DIR})
@@ -152,6 +153,15 @@ if (WBE_MAKE_TEST)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument")
     add_subdirectory(dependencies/google-benchmark)
 endif()
+# Instrument everything built below: Lua, the engine, and the tests. The vendored CMake projects above stay uninstrumented,
+# because some (SDL2) link shared libraries with --no-undefined and cannot resolve the sanitizer runtime, which only
+# executables link. ThreadSanitizer still intercepts their pthread and libc calls.
+if (WBE_ENABLE_TSAN)
+    message("Building with ThreadSanitizer.")
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+endif()
+
 # Setup Lua
 add_subdirectory(dependencies/lua)
 

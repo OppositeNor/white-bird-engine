@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/unique.hh"
+#include "function/event/event_manager.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
@@ -43,7 +44,7 @@ public:
      *
      * @param p_game_config_file_path The path to the game configurations.
      */
-    EngineFunction(const Path& p_game_config_file_path);
+    explicit EngineFunction(const Path& p_game_config_file_path);
 
     /**
      * @brief Get the singleton instance.
@@ -58,6 +59,10 @@ public:
      * @brief The game configuration.
      */
     Unique<GameConfig> game_config = MEM_NULL;
+    /**
+     * @brief The engine-wide event manager, also reachable through EventManager::get_singleton().
+     */
+    Unique<EventManager> event_manager = MEM_NULL;
 
 private:
     inline static EngineFunction* singleton;

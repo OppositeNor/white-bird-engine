@@ -44,7 +44,7 @@ public:
 
     enum class Format {
         R8G8B8A8_UNORM,
-        R32_SFLOAT
+        R32_SFLOAT,
     };
 
     ROImageSoftware(glm::uvec2 p_extent, uint32_t p_mipmap_lod = 1);

@@ -54,6 +54,7 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
         result.append("-DWBE_MAKE_TEST=ON")
     else:
         result.append("-DWBE_MAKE_TEST=OFF")
+    result.append(f"-DWBE_ENABLE_TSAN={"ON" if build_info.get("enable-tsan", False) else "OFF"}")
     if build_info.get("additional-cmake-args") is not None:
         result.append(build_info["additional-cmake-args"])
     return result

@@ -16,6 +16,7 @@ from pathlib import Path
 from build_script.utils import list_files
 
 # enable_shader_debug defaults to False when omitted by a target.
+# enable-tsan defaults to False when omitted by a target; True builds everything with ThreadSanitizer.
 target_info = {
     "debug" : {
         "c-compiler" : "clang",
@@ -52,6 +53,15 @@ target_info = {
         "build-shared" : True,
         "generator" : "Ninja",
         "generate-tests" : True,
+    },
+    "debug-tsan" : {
+        "c-compiler" : "clang",
+        "cpp-compiler" : "clang++",
+        "export-directory" : "debug-tsan",
+        "cmake-build-type" : "Debug",
+        "build-shared" : True,
+        "generate-tests" : True,
+        "enable-tsan" : True,
     },
     "deploy" : {
         "c-compiler" : "clang",

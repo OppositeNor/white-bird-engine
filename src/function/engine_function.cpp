@@ -15,6 +15,7 @@
 #include "function/engine_function.hh"
 #include "core/engine_core.hh"
 #include "core/memory/unique.hh"
+#include "function/event/event_manager.hh"
 #include "function/game_config/game_config.hh"
 #include "platform/file_system/path.hh"
 
@@ -23,9 +24,11 @@ namespace WhiteBirdEngine {
 EngineFunction::EngineFunction(const Path& p_game_config_file_path) {
     singleton = this;
     game_config = make_unique<GameConfig>(EngineCore::get_singleton()->pool_allocator, p_game_config_file_path);
+    event_manager = make_unique<EventManager>(EngineCore::get_singleton()->pool_allocator, EngineCore::get_singleton()->pool_allocator);
 }
 
 EngineFunction::~EngineFunction() {
+    event_manager.reset();
     singleton = nullptr;
 }
 } // namespace WhiteBirdEngine
