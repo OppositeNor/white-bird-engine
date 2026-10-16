@@ -23,11 +23,41 @@ import build_config
 from build_script.reflection.code_gen import WBEGenFileInfo
 import build_setup
 
+def _get_clang_resource_dir() -> str:
+    """Return the resource directory of the system clang.
+
+    The libclang Python package ships without clang's builtin headers (such as stddef.h). Without them the standard
+    library fails to parse and every type that depends on it is reported as int.
+    """
+    result = subprocess.run(["clang", "-print-resource-dir"], capture_output=True, text=True, check=False)
+    resource_dir = result.stdout.strip()
+    if result.returncode != 0 or not os.path.isfile(os.path.join(resource_dir, "include", "stddef.h")):
+        raise RuntimeError("Failed to locate clang's builtin headers for the metaparser: `clang -print-resource-dir` must name a "
+                           "directory containing include/stddef.h.")
+    return resource_dir
+
+def _get_dependency_include_dirs(p_relative_dirs: list[str]) -> list[str]:
+    """Resolve dependency include directories declared in build_config relative to the dependencies directory."""
+    return [os.path.join(build_setup.dependencies_dir, relative_dir) for relative_dir in p_relative_dirs]
+
+# Every dependency include directory, declared once in build_config and shared with CMake.
+metaparser_dependency_include_dirs: list[str] = _get_dependency_include_dirs(
+    build_config.dependency_include_dirs + build_config.test_dependency_include_dirs)
+
+# Test include directories, mirroring tests/CMakeLists.txt and tests/executable/utilities/CMakeLists.txt.
+metaparser_test_include_dirs: list[str] = [
+    os.path.join(build_setup.root_dir, "tests", "unit"),
+    os.path.join(build_setup.root_dir, "tests", "executable", "utilities"),
+]
+
+# Matches CMAKE_CXX_STANDARD.
 metaparser_clang_args: list[str] = [
-    "-std=c++20",
+    "-std=c++23",
+    "-resource-dir", _get_clang_resource_dir(),
     f"-I{build_setup.include_dir}",
     f"-I{build_setup.per_target_include_dir}",
-    f"-I{os.path.join(build_setup.dependencies_dir, 'KTX-Software', 'lib', 'include')}",
+    *[f"-I{include_dir}" for include_dir in metaparser_test_include_dirs],
+    *[f"-isystem{include_dir}" for include_dir in metaparser_dependency_include_dirs],
     "-DWBE_REFLECTION_PARSER"
 ]
 
@@ -55,6 +85,10 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     else:
         result.append("-DWBE_MAKE_TEST=OFF")
     result.append(f"-DWBE_ENABLE_TSAN={"ON" if build_info.get("enable-tsan", False) else "OFF"}")
+    # CMake lists are semicolon-separated; the arguments are passed without a shell, so no quoting is needed.
+    result.append(f"-DWBE_DEPENDENCY_INCLUDE_DIRS={';'.join(_get_dependency_include_dirs(build_config.dependency_include_dirs))}")
+    result.append(
+        f"-DWBE_TEST_DEPENDENCY_INCLUDE_DIRS={';'.join(_get_dependency_include_dirs(build_config.test_dependency_include_dirs))}")
     if build_info.get("additional-cmake-args") is not None:
         result.append(build_info["additional-cmake-args"])
     return result

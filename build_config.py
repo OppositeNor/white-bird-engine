@@ -132,6 +132,29 @@ resource_dir = "res"
 # Build dependencies (build_script/build_dependency) are built once, with these settings, into build/dependencies for
 # every target. slang-rhi in slangpy always compiles with -Werror, and GCC reports warnings in it that clang does not.
 dependency_build_dir = "dependencies"
+# Include directories of the vendored dependencies, relative to the dependencies directory. build.py hands them to CMake as
+# WBE_DEPENDENCY_INCLUDE_DIRS and WBE_TEST_DEPENDENCY_INCLUDE_DIRS, and to the reflection metaparser; declare them only here.
+dependency_include_dirs = [
+    "entt/single_include",
+    "glm",
+    "json/single_include",
+    "toml++/include",
+    "stb",
+    "boost-headers",
+    "miniaudio",
+    "thread-pool/include",
+    "SDL2/include",
+    "lua/src",
+    "VulkanMemoryAllocator/include",
+    "KTX-Software/lib/include",
+]
+# Added only when tests are built.
+test_dependency_include_dirs = [
+    "googletest/googletest/include",
+    "google-benchmark/include",
+    "imgui",
+    "imgui/backends",
+]
 dependency_build_info = {
     "c-compiler" : "clang",
     "cpp-compiler" : "clang++",

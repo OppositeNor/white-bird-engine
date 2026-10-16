@@ -76,7 +76,7 @@ public:
     T& get_field(SerializableType& p_serializable, std::string_view p_name) const {
         {% for field in serializable.fields %}
         if (p_name == "{{ field.name }}") {
-            if constexpr (std::same_as<T, {{ field.type }}>) {
+            if constexpr (std::same_as<T, decltype(SerializableType::{{ field.name }})>) {
                 return p_serializable.{{ field.name }};
             } else {
                 throw std::runtime_error("Field type mismatch: " + std::string(p_name));
@@ -97,7 +97,7 @@ public:
     const T& get_field(const SerializableType& p_serializable, std::string_view p_name) const {
         {% for field in serializable.fields %}
         if (p_name == "{{ field.name }}") {
-            if constexpr (std::same_as<T, {{ field.type }}>) {
+            if constexpr (std::same_as<T, decltype(SerializableType::{{ field.name }})>) {
                 return p_serializable.{{ field.name }};
             } else {
                 throw std::runtime_error("Field type mismatch: " + std::string(p_name));
@@ -117,7 +117,7 @@ public:
     T SerializableType::* get_pointer_to_member(std::string_view p_name) const {
         {% for field in serializable.fields %}
         if (p_name == "{{ field.name }}") {
-            if constexpr (std::same_as<T, {{ field.type }}>) {
+            if constexpr (std::same_as<T, decltype(SerializableType::{{ field.name }})>) {
                 return &SerializableType::{{ field.name }};
             } else {
                 throw std::runtime_error("Field type mismatch: " + std::string(p_name));

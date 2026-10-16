@@ -222,37 +222,29 @@ add_definitions(-DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
 # Report toml++ parse failures through toml::parse_result instead of exceptions.
 add_definitions(-DTOML_EXCEPTIONS=0)
 
-# Set include directories
-set(include_dirs 
+# Set include directories. The dependency include directories are declared once in build_config.py and passed in by
+# build.py, which also hands them to the reflection metaparser.
+if (NOT DEFINED WBE_DEPENDENCY_INCLUDE_DIRS OR NOT DEFINED WBE_TEST_DEPENDENCY_INCLUDE_DIRS)
+    message(FATAL_ERROR "WBE_DEPENDENCY_INCLUDE_DIRS and WBE_TEST_DEPENDENCY_INCLUDE_DIRS are not set; configure through build.py.")
+endif()
+set(include_dirs
     ${Vulkan_INCLUDE_DIR}
     ${WBE_INCLUDE_DIR}
     ${WBE_PER_TARGET_INCLUDE_DIR}
-    ${PROJECT_SOURCE_DIR}/dependencies/entt/single_include
-    ${PROJECT_SOURCE_DIR}/dependencies/glm
-    ${PROJECT_SOURCE_DIR}/dependencies/json/single_include
-    ${PROJECT_SOURCE_DIR}/dependencies/toml++/include
-    ${PROJECT_SOURCE_DIR}/dependencies/stb
-    ${PROJECT_SOURCE_DIR}/dependencies/boost-headers
-    ${PROJECT_SOURCE_DIR}/dependencies/miniaudio
-    ${PROJECT_SOURCE_DIR}/dependencies/thread-pool/include
+    ${WBE_DEPENDENCY_INCLUDE_DIRS}
 )
-if (WBE_MAKE_TEST)
-    set(include_dirs
-        ${include_dirs}
-        ${PROJECT_SOURCE_DIR}/dependencies/googletest/googletest
-        ${PROJECT_SOURCE_DIR}/dependencies/google-benchmark/include
-    )
-endif()
 
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
-    # TODO: Android include directories
-else()
-    set(include_dirs ${include_dirs} ${PROJECT_SOURCE_DIR}/dependencies/SDL2/include)
+    # TODO: Android include directories. SDL2/include comes from build_config.dependency_include_dirs on every platform.
 endif()
 
 include_directories(
     ${include_dirs}
 )
+# Test-only third-party headers (googletest, benchmark, imgui) are system headers, so -Werror does not apply to them.
+if (WBE_MAKE_TEST)
+    include_directories(SYSTEM ${WBE_TEST_DEPENDENCY_INCLUDE_DIRS})
+endif()
 
 set(libs ${libs}
     Vulkan::Vulkan

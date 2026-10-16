@@ -409,6 +409,71 @@ struct WBE_META(WBE_SERIALIZABLE) TestNestedRequired final : public Serializable
     std::vector<TestStaticWithRequired> required_static_vector;
 };
 
+// Exercises method reflection; the metaparser collects only the methods annotated with WBE_REFLECT.
+class WBE_META(WBE_TEST_METHODS) TestReflectedMethods final {
+public:
+    WBE_META(WBE_REFLECT)
+    int32_t add(int32_t p_left, int32_t p_right) const {
+        return p_left + p_right;
+    }
+
+    WBE_META(WBE_REFLECT, WBE_ALIASES = [ make, build ])
+    static TestReflectedMethods create(const std::string& p_name, glm::vec3 p_offset) {
+        TestReflectedMethods result;
+        result.name = p_name;
+        result.offset = p_offset;
+        return result;
+    }
+
+    WBE_META(WBE_REFLECT)
+    void reset() {
+        name.clear();
+    }
+
+    WBE_META(WBE_REFLECT)
+    void set(int32_t p_value) {
+        value = p_value;
+    }
+
+    WBE_META(WBE_REFLECT)
+    void set(const std::string& p_value) {
+        name = p_value;
+    }
+
+    WBE_META(WBE_REFLECT)
+    void ignore(float /*unnamed*/) {
+    }
+
+    WBE_META(WBE_REFLECT)
+    const std::string& get_name() const {
+        return name;
+    }
+
+    WBE_META(WBE_REFLECT)
+    static const int32_t* find(const std::vector<int32_t>& p_values, int32_t p_target) {
+        for (const int32_t& value : p_values) {
+            if (value == p_target) {
+                return &value;
+            }
+        }
+        return nullptr;
+    }
+
+    int32_t not_annotated() const {
+        return value;
+    }
+
+    WBE_META(WBE_TEST_ONLY)
+    int32_t annotated_without_reflect() const {
+        return value;
+    }
+
+private:
+    std::string name;
+    glm::vec3 offset{0.0F};
+    int32_t value = 0;
+};
+
 } // namespace WhiteBirdEngine
 
 #endif

@@ -30,16 +30,23 @@ class WBEMethodMetadata(BaseModel):
     """Method metadata.
 
     Attributes: 
+        attribute: The WBE_META attributes of the method.
+        aliases: The aliases declared with WBE_ALIASES.
         method_name: The name of the method.
-        args_name: The name of the arguments.
-        args_type: The types of the arguments.
-        ret_type: The return type.
+        name: The names of the arguments, in declaration order; an unnamed argument has an empty name.
+        type: The types of the arguments, in declaration order, as clang spells them.
+        ret_type: The return type, as clang spells it.
+        is_static: Whether the method is static.
+        is_const: Whether the method is const-qualified.
     """
     attribute : list[str] = Field(default_factory=list)
+    aliases : list[str] = Field(default_factory=list[str])
     method_name : str = ""
     name : list[str] = Field(default_factory=list)
     type : list[str] = Field(default_factory=list)
     ret_type : str = ""
+    is_static : bool = False
+    is_const : bool = False
 
 class WBEClassMetadata(BaseModel):
     """Class metadata.
@@ -76,12 +83,15 @@ class WBEFileMetadata(BaseModel):
     Attributes: 
         file_path: The path of the file.
         hashcode: The hashcode of the file's content.
+        parser_signature: The metaparser version and clang arguments that produced this metadata; caches with another
+            signature are reparsed.
         deps: The dependencies of the file. Usually from include or import module.
         labels: The registered labels metadata.
         classes: The registered classes metadata.
     """
     file_path : str = ""
     hashcode : str = ""
+    parser_signature : str = ""
     deps : list[str] = Field(default_factory=list)
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)

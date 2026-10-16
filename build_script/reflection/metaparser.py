@@ -18,10 +18,14 @@ from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata, WBEMethodMetadata
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
+
+# Bump whenever the extracted metadata changes, so cached metadata of unchanged headers is reparsed. Changes to the clang
+# arguments invalidate the cache on their own.
+METAPARSER_VERSION = 1
 
 META_PARAMETER_PATTERN = re.compile(r"\s*(?P<parameter>[A-Za-z_][A-Za-z0-9_]*(?:\s*=\s*\[[^\]]*\])?)\s*(?:,|$)")
 ALIASES_ATTRIBUTE_PATTERN = re.compile(r"^WBE_ALIASES\s*=\s*\[(?P<aliases>[^\]]*)\]$")
@@ -50,6 +54,7 @@ class WBEMetaparser:
         self.sources = sources
         self._metadata: dict[str, WBEFileMetadata] = {}
         self._class_table: dict[str, WBEClassMetadata] = {}
+        self._parser_signature = hash_str_sha256("\0".join([str(METAPARSER_VERSION), *clang_args]))
 
     def parse(self, cpp_file_path : str) -> None:
         """Parse the C++ file.
@@ -85,7 +90,7 @@ class WBEMetaparser:
                 data = json.load(f)
             metadata = WBEFileMetadata(**data)
             file_content_hashcode = hash_file(cpp_file_path)
-            if metadata.hashcode != file_content_hashcode:
+            if metadata.hashcode != file_content_hashcode or metadata.parser_signature != self._parser_signature:
                 return self._register_from_clang(cpp_file_path, cache_path)
             self._metadata[cpp_file_path] = metadata
             return metadata
@@ -119,6 +124,7 @@ class WBEMetaparser:
         metadata.file_path = cpp_file_path
         self._register_metadata(tu, metadata, cpp_file_path)
         metadata.hashcode = hash_file(cpp_file_path)
+        metadata.parser_signature = self._parser_signature
         self._metadata[cpp_file_path] = metadata
         with open(cache_path, "w") as f:
             json.dump(metadata.model_dump(), f, indent=4)
@@ -207,7 +213,37 @@ class WBEMetaparser:
                         result.fields.append(WBEFieldMetadata(attribute=attributes,
                                                               aliases=aliases,
                                                               name=field.spelling, type=field.type.spelling))
+            if field.kind == clang.cindex.CursorKind.CXX_METHOD:
+                method_metadata = self._get_method_metadata(field)
+                if method_metadata is not None:
+                    result.methods.append(method_metadata)
         return result
+
+    def _get_method_metadata(self, cursor: clang.cindex.Cursor) -> WBEMethodMetadata | None:
+        """Get the metadata of a method annotated with WBE_META(WBE_REFLECT, ...), like reflected fields.
+
+        Args:
+            cursor: The CXX_METHOD cursor.
+
+        Returns:
+            The method metadata, or None when the method is not reflected.
+        """
+        for attr in cursor.get_children():
+            if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
+                continue
+            attributes, aliases = self._get_attributes(attr.spelling)
+            if WBE_REFLECT not in attributes:
+                continue
+            arguments = list(cursor.get_arguments())
+            return WBEMethodMetadata(attribute=attributes,
+                                     aliases=aliases,
+                                     method_name=cursor.spelling,
+                                     name=[argument.spelling for argument in arguments],
+                                     type=[argument.type.spelling for argument in arguments],
+                                     ret_type=cursor.result_type.spelling,
+                                     is_static=cursor.is_static_method(),
+                                     is_const=cursor.is_const_method())
+        return None
 
     def _split_meta_parameters(self, attr_spelling: str) -> list[str]:
         parameters: list[str] = []
