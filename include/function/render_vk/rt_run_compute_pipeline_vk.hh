@@ -18,11 +18,16 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/rt_params_run_compute_pipeline_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 
@@ -33,7 +38,7 @@ namespace WhiteBirdEngine {
  * @brief Render task that binds a compute pipeline and dispatches workgroups.
  * The task reports its reflected shader accesses; map reflected resource ids to graph resources with RendTaskDescVK::alias().
  */
-struct RTRunComputePipelineVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline]) RTRunComputePipelineVK final : public IRenderTaskVK {
     RTRunComputePipelineVK() = delete;
     virtual ~RTRunComputePipelineVK() override = default;
     RTRunComputePipelineVK(const RTRunComputePipelineVK&) = delete;
@@ -53,6 +58,18 @@ struct RTRunComputePipelineVK final : public IRenderTaskVK {
         Ref<ROComputePipelineVK> p_pipeline,
         VkExtent3D p_dispatch_group_count,
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipeline.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, or no compute pipeline is compiled
+     * under p_params.pipeline.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
 
     /**
      * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.

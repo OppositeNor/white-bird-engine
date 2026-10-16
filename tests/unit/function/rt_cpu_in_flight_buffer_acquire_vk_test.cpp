@@ -14,10 +14,13 @@
 */
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
+#include "core/script/script_value.hh"
 #include "function/event/event_manager.hh"
 #include "function/event/event_registration.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
@@ -28,6 +31,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -96,6 +100,25 @@ TEST_F(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUn
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
     EXPECT_EQ(task.get_remaining_frames(), 0U);
     EXPECT_EQ(acquisitions.load(), 0);
+}
+
+TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RegistryCreatesTaskFromParameters) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ScriptValue params;
+    params.set_entry("buffer", ScriptValue::make_string("source_buffer"));
+    for (std::string_view task_type : {"RTCPUInFlightBufferAcquireVK", "cpu_acquire_buffer"}) {
+        const Unique<IRenderTaskVK> task = RenderTaskRegistryVK::create_factory(task_type, params, &render_data)(RendGraphContextVK{});
+        ASSERT_NE(dynamic_cast<const RTCPUInFlightBufferAcquireVK*>(task.get()), nullptr) << task_type;
+        Vector<ResAccessVK, RenderAllocator> reads(&allocator);
+        Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+        task->append_accesses(reads, writes);
+        ASSERT_EQ(reads.size(), 1U);
+        EXPECT_EQ(reads[0].res_id, "source_buffer");
+        EXPECT_EQ(reads[0].usage, RendResUsageVK::TRANSFER_SRC);
+    }
+    // The resource id is required.
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("cpu_acquire_buffer", ScriptValue::make_map(), &render_data), std::runtime_error);
 }
 
 // Runs without a test global, so no EventManager exists.

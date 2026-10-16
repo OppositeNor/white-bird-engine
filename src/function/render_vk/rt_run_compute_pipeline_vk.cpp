@@ -17,12 +17,16 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/render_database.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include <format>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -39,6 +43,26 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(
     }
     descriptor_bindings =
         make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, pipeline->get_descriptor_layout());
+}
+
+Unique<IRenderTaskVK> RTRunComputePipelineVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
+        throw std::runtime_error("RTRunComputePipelineVK: render data is unavailable.");
+    }
+    if (p_render_data->render_database == nullptr) {
+        throw std::runtime_error("RTRunComputePipelineVK: the render database is unavailable.");
+    }
+    Ref<ROComputePipelineVK> pipeline =
+        p_render_data->render_database->get_compiled_render_resource(p_params.pipeline, TypeUUID<ROComputePipelineVK>::UUID)
+            .dynamic_cast_ref<ROComputePipelineVK>();
+    if (pipeline == MEM_NULL) {
+        throw std::runtime_error(std::format("RTRunComputePipelineVK: no compute pipeline is compiled under '{}'.", p_params.pipeline));
+    }
+    return make_unique<RTRunComputePipelineVK>(p_render_data->allocator,
+        p_render_data,
+        std::move(pipeline),
+        VkExtent3D{.width = p_params.group_count_x, .height = p_params.group_count_y, .depth = p_params.group_count_z});
 }
 
 void RTRunComputePipelineVK::bind_resources(const RendResViewVK& p_resources) {

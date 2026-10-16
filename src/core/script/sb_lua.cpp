@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <format>
 #include <lua.hpp>
+#include <print>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -90,7 +91,7 @@ int traceback_message_handler(lua_State* p_state) {
 // Prints unprotected errors before Lua aborts the process.
 int report_panic(lua_State* p_state) {
     const char* message = lua_tostring(p_state, -1);
-    std::fprintf(stderr, "Unrecoverable Lua error: %s\n", message != nullptr ? message : "(error object is not a string)");
+    std::println(stderr, "Unrecoverable Lua error: %s\n", message != nullptr ? message : "(error object is not a string)");
     return 0;
 }
 
@@ -154,7 +155,7 @@ void push_script_value(lua_State* p_state, const ScriptValue& p_value, size_t p_
 ScriptValue to_script_value(
     lua_State* p_state, int p_index, const std::string& p_path, std::vector<const void*>& p_active_tables, size_t p_depth);
 
-ScriptValue table_to_script_value(
+ScriptValue table_to_script_value( // NOLINT
     lua_State* p_state, int p_index, const std::string& p_path, std::vector<const void*>& p_active_tables, size_t p_depth) {
     const void* table_identity = lua_topointer(p_state, p_index);
     if (std::ranges::find(p_active_tables, table_identity) != p_active_tables.end()) {
@@ -379,7 +380,7 @@ void SBLua::count_instructions(lua_State* p_state, lua_Debug* /*p_debug*/) {
     backend->executed_instructions += INSTRUCTION_HOOK_INTERVAL;
     if (backend->executed_instructions > backend->config.instruction_limit) {
         // Leaves this frame through Lua's error mechanism; the frame holds no objects with destructors.
-        luaL_error(p_state, "instruction limit of %llu exceeded", static_cast<unsigned long long>(backend->config.instruction_limit));
+        luaL_error(p_state, "instruction limit of %llu exceeded", backend->config.instruction_limit);
     }
 }
 

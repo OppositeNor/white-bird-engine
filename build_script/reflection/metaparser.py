@@ -13,7 +13,6 @@
 # limitations under the License.
 import os
 import re
-from typing import Callable
 from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
@@ -25,7 +24,7 @@ WBE_COMPONENT = "WBE_COMPONENT"
 
 # Bump whenever the extracted metadata changes, so cached metadata of unchanged headers is reparsed. Changes to the clang
 # arguments invalidate the cache on their own.
-METAPARSER_VERSION = 1
+METAPARSER_VERSION = 2
 
 META_PARAMETER_PATTERN = re.compile(r"\s*(?P<parameter>[A-Za-z_][A-Za-z0-9_]*(?:\s*=\s*\[[^\]]*\])?)\s*(?:,|$)")
 ALIASES_ATTRIBUTE_PATTERN = re.compile(r"^WBE_ALIASES\s*=\s*\[(?P<aliases>[^\]]*)\]$")
@@ -77,7 +76,7 @@ class WBEMetaparser:
     def _get_metadata(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         preloaded = self._metadata.get(cpp_file_path)
         if preloaded is not None:
-            result = preloaded
+            return preloaded
         if os.path.exists(cache_path):
             result = self._register_from_cache(cpp_file_path, cache_path)
         else:
@@ -123,6 +122,9 @@ class WBEMetaparser:
         metadata.deps = self._get_include_deps(tu)
         metadata.file_path = cpp_file_path
         self._register_metadata(tu, metadata, cpp_file_path)
+        # A translation unit of an engine header holds the whole include closure; release it before the next parse.
+        del tu
+        del index
         metadata.hashcode = hash_file(cpp_file_path)
         metadata.parser_signature = self._parser_signature
         self._metadata[cpp_file_path] = metadata
@@ -142,8 +144,16 @@ class WBEMetaparser:
             self._handle_visit_class_decl(metadata, cursor, in_file)
 
         for child in cursor.get_children():
-            if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
+            # Every header registers only what it declares itself; included headers register their own declarations
+            # when they are parsed, so declarations from other files are skipped together with their children.
+            if child.kind != clang.cindex.CursorKind.ANNOTATE_ATTR and WBEMetaparser._is_declared_in(child, in_file):
                 self._visit_attributes(metadata, child, in_file)
+
+    @staticmethod
+    def _is_declared_in(cursor: clang.cindex.Cursor, in_file: str) -> bool:
+        """Whether a cursor is located in the given file."""
+        location_file = cursor.location.file
+        return location_file is not None and os.path.abspath(location_file.name) == os.path.abspath(in_file)
 
     @staticmethod
     def _is_in_namelist(name: str, namelist: list) -> bool:
@@ -152,8 +162,7 @@ class WBEMetaparser:
     def _handle_visit_var_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor) -> None:
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                if not self._any_all(metadata, lambda curr_metadata:
-                        WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.labels)):
+                if not WBEMetaparser._is_in_namelist(cursor.spelling, metadata.labels):
                     attributes, aliases = self._get_attributes(attr.spelling)
                     label_metadata = WBELabelMetadata(name=cursor.spelling, attribute=attributes, aliases=aliases)
                     metadata.labels.append(label_metadata)
@@ -161,8 +170,7 @@ class WBEMetaparser:
     def _handle_visit_class_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:
         for attr in cursor.get_children():
             if attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
-                if not self._any_all(metadata, lambda curr_metadata:
-                        WBEMetaparser._is_in_namelist(cursor.spelling, curr_metadata.classes)):
+                if not WBEMetaparser._is_in_namelist(cursor.spelling, metadata.classes):
                     attributes, aliases = self._get_attributes(attr.spelling)
                     class_metadata = self._get_class_metadata(cursor, attributes, aliases, in_file)
                     metadata.classes.append(class_metadata)
@@ -181,16 +189,6 @@ class WBEMetaparser:
             if incl_path_abs in self.sources:
                 deps.add(incl_path_abs)
         return list(deps)
-
-    def _any_all(self, metadata: WBEFileMetadata, predicate: Callable[[WBEFileMetadata], bool]) -> bool:
-        if predicate(metadata):
-            return True
-        for dep in metadata.deps:
-            dep_metadata_file_path = os.path.join(self.cache_dir, f"{hash_str_sha256(dep)}.json")
-            dep_metadata = self._get_metadata(dep, dep_metadata_file_path)
-            if predicate(dep_metadata):
-                return True
-        return False
 
     def _get_class_metadata(self, cursor: clang.cindex.Cursor, attributes: list[str], aliases: list[str],
                             in_file: str) -> WBEClassMetadata:

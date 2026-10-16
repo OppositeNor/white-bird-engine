@@ -18,9 +18,13 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/rt_params_cpu_in_flight_acquire_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>
@@ -41,7 +45,7 @@ namespace WhiteBirdEngine {
  * wrap in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
  * Instances are neither copyable nor movable.
  */
-class RTCPUInFlightAcquireVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [cpu_acquire_image]) RTCPUInFlightAcquireVK final : public IRenderTaskVK {
 public:
     /**
      * @struct AcquiredImage
@@ -90,6 +94,16 @@ public:
      * @throws std::runtime_error If the render data is unavailable, the id is empty, or no EventManager exists.
      */
     RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id);
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base Vulkan render data.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error Under the conditions of the constructor.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(const BaseRenderDataVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

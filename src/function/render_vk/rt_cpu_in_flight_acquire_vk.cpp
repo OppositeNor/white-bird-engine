@@ -18,6 +18,7 @@
 #include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
@@ -61,6 +62,14 @@ RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_
     if (event_manager == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: no EventManager exists to emit acquisitions through.");
     }
+}
+
+Unique<IRenderTaskVK> RTCPUInFlightAcquireVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
+        throw std::runtime_error("RTCPUInFlightAcquireVK: render data is unavailable.");
+    }
+    return make_unique<RTCPUInFlightAcquireVK>(p_render_data->allocator, p_render_data, p_params.image_view);
 }
 
 void RTCPUInFlightAcquireVK::append_accesses(

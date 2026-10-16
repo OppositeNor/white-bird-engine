@@ -185,6 +185,10 @@ gen_info = {
     "cla_configurations" : [
         "WBE_CLA_CONFIGURATION",
     ],
+    # Classes registered in RenderTaskRegistryVK; see include/function/render_vk/render_task_registry_vk.hh.
+    "render_tasks" : [
+        "WBE_RENDER_TASK",
+    ],
 }
 
 gen_info["static_serializables"].extend(gen_info["serializables"])
