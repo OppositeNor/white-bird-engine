@@ -169,6 +169,19 @@ protected:
     virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaText& p_scheme) const override;
 };
 
+/**
+ * @class ResourceUnitLoaderScript
+ * @brief Loads script resources: the source file becomes chunk-owned text of an RUScript.
+ */
+class ResourceUnitLoaderScript final : public ResourceUnitLoaderTyped<RUSchemaScript> {
+public:
+    ResourceUnitLoaderScript() : ResourceUnitLoaderTyped("script") {
+    }
+
+protected:
+    virtual std::any populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaScript& p_scheme) const override;
+};
+
 class ResourceUnitLoaderVideo final : public ResourceUnitLoaderTyped<RUSchemaVideo> {
 public:
     ResourceUnitLoaderVideo() : ResourceUnitLoaderTyped("video") {

@@ -31,4 +31,5 @@ include = [
 ]
 resources = [
     { id = "test_text", source_type = "text", source_file = "test_text_files/test_file_utf8.txt" },
+    { id = "test_script", source_type = "script", source_file = "test_scripts/test_script.lua" },
 ]

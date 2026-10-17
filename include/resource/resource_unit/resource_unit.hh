@@ -180,6 +180,17 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaText : public RUSchema {
 };
 
 /**
+ * @class RUSchemaScript
+ * @brief The scheme of RUScript.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaScript : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaScript)
+    // The path to the script source file.
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+};
+
+/**
  * @class RUSchemaVideo
  * @brief The scheme of RUVideo.
  */
@@ -334,6 +345,19 @@ struct RUText : public ResourceUnit {
     RefRes<char> text_data;
     // The size of the text data, including the NUL terminator.
     size_t size;
+};
+
+/**
+ * @class RUScript
+ * @brief Script resource unit: the source of a script, for a script backend such as SBLua to load.
+ *
+ * The source is chunk-owned, UTF-8, and NUL-terminated. The unit is a shallow chunk view, copyable and movable.
+ */
+struct RUScript : public ResourceUnit {
+    // The script source.
+    RefRes<char> source;
+    // The size of the source, including the NUL terminator.
+    size_t size = 0;
 };
 
 /**

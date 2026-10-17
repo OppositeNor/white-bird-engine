@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include "core/script/sb_lua.hh"
 #include <gtest/gtest.h>
 #include <memory>
 #include <numbers>
@@ -1486,6 +1487,48 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     ASSERT_NE(captured_ru_text, nullptr);
     EXPECT_EQ(captured_ru_text->size, test_file_content.size() + 1);
     EXPECT_EQ(text_content_storage, test_file_content);
+}
+
+TEST_F(ResourcePopulatorTest, ScriptResourceGeneral) {
+    WBE::ResourceUnitLoaderScript loader;
+    std::stringstream ss;
+    std::string source_storage;
+    WBE::StackAllocator stack_allocator(1024);
+    WBE::RefRes<WBE::RUScript> captured_ru_script = WBE::MEM_NULL;
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
+                             [&source_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(static_cast<const char*>(p_res)[p_res_size - 1], '\0');
+                                 source_storage.assign(static_cast<const char*>(p_res), p_res_size - 1);
+                                 return WBE::MEM_NULL;
+                             }))
+                         .set_reserve_res_unit_storage_callback(
+                             [&captured_ru_script, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 EXPECT_EQ(p_size, sizeof(WBE::RUScript));
+                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                 captured_ru_script = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUScript>();
+                                 return captured_ru_script.force_cast<char>();
+                             })
+                         .build(ss);
+    WBE::RUSchemaScript script_scheme;
+    script_scheme.path = "test_scripts/test_script.lua";
+    loader.populate_scheme(*res_chunk, script_scheme);
+    ASSERT_NE(captured_ru_script, nullptr);
+    EXPECT_EQ(captured_ru_script->size, source_storage.size() + 1);
+
+    // The loaded source is a module a script backend can run.
+    WBE::SBLua backend;
+    backend.load_module("test_script", source_storage);
+    EXPECT_EQ(backend.call("test_script", "answer", {}).as_integer(), 42);
+}
+
+TEST_F(ResourcePopulatorTest, ScriptSchemeRequiresPath) {
+    WBE::ResourceUnitLoaderScript loader;
+    std::stringstream ss;
+    auto res_chunk = MockResourceChunk::Builder().build(ss);
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(R"({"type": "script", "id": "missing_path"})");
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, parser.get_data()), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {

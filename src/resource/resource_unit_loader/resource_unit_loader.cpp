@@ -278,6 +278,15 @@ std::any ResourceUnitLoaderText::populate_typed_scheme_ptr(IResourceChunk& p_res
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUText>();
 }
 
+std::any ResourceUnitLoaderScript::populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaScript& p_scheme) const {
+    auto file_path = get_resource_path(p_scheme.path);
+    std::string source = load_text_file(file_path.string().c_str());
+    RUScript resource_unit;
+    resource_unit.source = populate_text(p_res_chunk, source);
+    resource_unit.size = source.size() + 1;
+    return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUScript>();
+}
+
 std::any ResourceUnitLoaderVideo::populate_typed_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchemaVideo& p_scheme) const {
     (void)p_res_chunk;
     (void)p_scheme;
