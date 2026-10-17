@@ -12,18 +12,20 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/render_task_registry_vk.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "core/script/script_value.hh"
 #include "function/render/render_database.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "render_task_registry_vk_test_tasks.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string_view>
@@ -32,10 +34,10 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-ScriptValue make_probe_params(std::string_view p_label, int64_t p_count) {
-    ScriptValue params;
-    params.set_entry("label", ScriptValue::make_string(p_label));
-    params.set_entry("count", ScriptValue::make_integer(p_count));
+DataValue make_probe_params(std::string_view p_label, int64_t p_count) {
+    DataValue params;
+    params.set_entry("label", DataValue::make_string(p_label));
+    params.set_entry("count", DataValue::make_integer(p_count));
     return params;
 }
 
@@ -48,7 +50,8 @@ const RTRegistryProbeVK& as_probe(const Unique<IRenderTaskVK>& p_task) {
 } // namespace
 
 TEST(WBERenderTaskRegistryVKTest, RegistersClassNamesAndAliases) {
-    for (std::string_view name : {"RTRegistryProbeVK", "registry_probe", "registry_probe_alias", "RTRunComputePipelineVK", "run_compute_pipeline"}) {
+    for (std::string_view name :
+        {"RTRegistryProbeVK", "registry_probe", "registry_probe_alias", "RTRunComputePipelineVK", "run_compute_pipeline"}) {
         EXPECT_TRUE(RenderTaskRegistryVK::contains(name)) << name;
         const auto task_types = RenderTaskRegistryVK::get_task_types();
         EXPECT_NE(std::ranges::find(task_types, name), task_types.end()) << name;
@@ -90,9 +93,10 @@ TEST(WBERenderTaskRegistryVKTest, ClassNameAndAliasesCreateTheSameTaskType) {
 TEST(WBERenderTaskRegistryVKTest, OptionalParametersKeepTheirDefaults) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ScriptValue params;
-    params.set_entry("label", ScriptValue::make_string("defaults"));
-    const Unique<IRenderTaskVK> task = RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data)(RendGraphContextVK{});
+    DataValue params;
+    params.set_entry("label", DataValue::make_string("defaults"));
+    const Unique<IRenderTaskVK> task =
+        RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data)(RendGraphContextVK{});
     EXPECT_EQ(as_probe(task).get_params().count, 1U);
 }
 
@@ -102,7 +106,7 @@ TEST(WBERenderTaskRegistryVKTest, CreateFactoryRejectsInvalidRequests) {
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("missing_task", make_probe_params("x", 1), &render_data), std::runtime_error);
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("x", 1), nullptr), std::runtime_error);
     // The required label is missing, so deserialization fails before any factory exists.
-    EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", ScriptValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", DataValue::make_map(), &render_data), std::runtime_error);
     // A count that does not fit the field's type is rejected while deserializing.
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("x", -1), &render_data), std::runtime_error);
 }
@@ -110,13 +114,13 @@ TEST(WBERenderTaskRegistryVKTest, CreateFactoryRejectsInvalidRequests) {
 TEST(WBERenderTaskRegistryVKTest, RejectsMisspeltParameters) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ScriptValue params = make_probe_params("x", 1);
-    params.set_entry("cuont", ScriptValue::make_integer(2));
+    DataValue params = make_probe_params("x", 1);
+    params.set_entry("cuont", DataValue::make_integer(2));
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data), std::runtime_error);
 
-    ScriptValue compute_params;
-    compute_params.set_entry("pipeline", ScriptValue::make_string("pipelines/blur"));
-    compute_params.set_entry("group_count", ScriptValue::make_integer(8));
+    DataValue compute_params;
+    compute_params.set_entry("pipeline", DataValue::make_string("pipelines/blur"));
+    compute_params.set_entry("group_count", DataValue::make_integer(8));
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", compute_params, &render_data), std::runtime_error);
 }
 
@@ -130,9 +134,9 @@ TEST(WBERenderTaskRegistryVKTest, CreateFailuresSurfaceWhenTheFactoryRuns) {
 TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ScriptValue params;
-    params.set_entry("pipeline", ScriptValue::make_string("pipelines/missing"));
-    params.set_entry("group_count_x", ScriptValue::make_integer(8));
+    DataValue params;
+    params.set_entry("pipeline", DataValue::make_string("pipelines/missing"));
+    params.set_entry("group_count_x", DataValue::make_integer(8));
 
     // Without a render database the pipeline cannot be looked up.
     const RendTaskFactoryVK factory = RenderTaskRegistryVK::create_factory("run_compute_pipeline", params, &render_data);
@@ -144,14 +148,15 @@ TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) 
     render_data.render_database = nullptr;
 
     // The pipeline key is required.
-    EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", ScriptValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", DataValue::make_map(), &render_data), std::runtime_error);
 }
 
 TEST(WBERenderTaskRegistryVKTest, AddTaskCallsPrepareGraphAndAddsTheTask) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK graph(&allocator);
-    RendTaskDescVK& first = RenderTaskRegistryVK::add_task(graph, "first", "registry_preparing_probe", make_probe_params("shared", 1), &render_data);
+    RendTaskDescVK& first =
+        RenderTaskRegistryVK::add_task(graph, "first", "registry_preparing_probe", make_probe_params("shared", 1), &render_data);
     EXPECT_EQ(first.task_id, "first");
     EXPECT_EQ(first.resource_map.resolve(RTRegistryPreparingProbeVK::INPUT_ID), "shared.prepared");
     // A second task reuses the buffer the first one declared.
@@ -178,11 +183,12 @@ TEST(WBERenderTaskRegistryVKTest, AddTaskRejectsInvalidRequests) {
     BaseRenderDataVK render_data(&allocator);
     RendGraphDescVK graph(&allocator);
     RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data);
-    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data),
+        std::runtime_error);
     EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "", "registry_probe", make_probe_params("x", 1), &render_data), std::runtime_error);
     EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "missing_task", make_probe_params("x", 1), &render_data), std::runtime_error);
     EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "registry_probe", make_probe_params("x", 1), nullptr), std::runtime_error);
-    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "registry_probe", ScriptValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "registry_probe", DataValue::make_map(), &render_data), std::runtime_error);
     EXPECT_EQ(graph.tasks.size(), 1U);
 }
 

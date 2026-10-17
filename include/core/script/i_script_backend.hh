@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_I_SCRIPT_BACKEND_HH
 #define WBE_FILE_I_SCRIPT_BACKEND_HH
 
-#include "core/reflection/reflection_defs.hh"
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
+#include "core/reflection/serializable_sd.hh"
 #include <array>
 #include <cstddef>
 #include <span>
@@ -27,15 +27,15 @@ namespace WhiteBirdEngine {
 
 /**
  * @class IScriptBackend
- * @brief One isolated script runtime that loads modules and calls their functions with ScriptValue arguments.
+ * @brief One isolated script runtime that loads modules and calls their functions with DataValue arguments.
  *
  * A module is a script whose top-level chunk returns a table, or the language's equivalent, of exported functions. Each
  * module runs in its own global environment, so modules of one backend cannot overwrite each other's globals. Scripts
  * cannot reach files, the operating system, other modules' loaders, or the engine; no native functions are exposed to
- * them. Only ScriptValue data crosses the boundary in either direction.
+ * them. Only DataValue data crosses the boundary in either direction.
  *
  * A backend is confined to the thread that uses it; its methods are not synchronized. Backends are neither copyable nor
- * movable. Script errors, values the ScriptValue model cannot represent, and exceeded ScriptSandboxConfig limits throw
+ * movable. Script errors, values the DataValue model cannot represent, and exceeded ScriptSandboxConfig limits throw
  * std::runtime_error with the script's message or the offending value's path.
  */
 class IScriptBackend {
@@ -68,7 +68,7 @@ public:
      * @throws std::runtime_error If the module is not loaded, the export is missing or not a function, the call fails, or
      * an argument or the result cannot be converted.
      */
-    virtual ScriptValue call(std::string_view p_module, std::string_view p_function, std::span<const ScriptValue> p_args) = 0;
+    virtual DataValue call(std::string_view p_module, std::string_view p_function, std::span<const DataValue> p_args) = 0;
 
     /**
      * @brief Check whether a loaded module exports a function under the name.
@@ -79,17 +79,17 @@ public:
     /**
      * @brief Call an exported function with reflected C++ arguments and result.
      *
-     * Each argument is serialized into a ScriptValue and the result is deserialized into TResult, both through
+     * Each argument is serialized into a DataValue and the result is deserialized into TResult, both through
      * SerializableSD. Include the generated serializer header for reflected types before instantiating this.
      * @tparam TResult Result type, or void to discard the result.
      * @throws std::runtime_error Under the conditions of call(), or if serialization or deserialization fails.
      */
     template <typename TResult, typename... TArgs>
     TResult invoke(std::string_view p_module, std::string_view p_function, const TArgs&... p_args) {
-        std::array<ScriptValue, sizeof...(TArgs)> args{};
-        size_t arg_index = 0;
+        std::array<DataValue, sizeof...(TArgs)> args{};
+        [[maybe_unused]] size_t arg_index = 0; // Unused when TArgs is empty.
         (SerializableSD<TArgs>::serialize(args[arg_index++], p_args), ...);
-        ScriptValue result = call(p_module, p_function, std::span<const ScriptValue>(args.data(), args.size()));
+        DataValue result = call(p_module, p_function, std::span<const DataValue>(args.data(), args.size()));
         if constexpr (!std::is_void_v<TResult>) {
             TResult typed_result{};
             SerializableSD<TResult>::deserialize(result, typed_result);

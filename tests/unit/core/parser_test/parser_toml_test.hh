@@ -16,18 +16,23 @@
 #define WBE_FILE_PARSER_TOML_TEST_HH
 
 #include "core/parser/parser_toml.hh"
+#include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/quaternion_float.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "parser_test_general.hh"
+#include "platform/file_system/path.hh"
 #include "utils/utils.hh"
 #include <cstdint>
+#include <cstring>
 #include <gtest/gtest.h>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -79,19 +84,18 @@ TEST(ParserTOMLTest, ParseFromBufferEdgeCases) {
     parser.parse_from_buffer("");
     ASSERT_TRUE(parser.get_all_keys().empty());
     parser.parse_from_buffer("empty_table = {}\n");
-    ASSERT_TRUE(parser.get_value<WBE::TOMLData>("empty_table").get_all_keys().empty());
+    ASSERT_TRUE(parser.get_value<WBE::DataValue>("empty_table").get_all_keys().empty());
     parser.parse_from_buffer("[level1.level2.level3]\nlevel4 = \"deep_value\"\n");
-    ASSERT_EQ(parser.get_value<WBE::TOMLData>("level1")
-                  .get_value<WBE::TOMLData>("level2")
-                  .get_value<WBE::TOMLData>("level3")
-                  .get_value<std::string>("level4"),
+    ASSERT_EQ(
+        parser.get_value<WBE::DataValue>("level1").get_value<WBE::DataValue>("level2").get_value<WBE::DataValue>("level3").get_value<std::string>(
+            "level4"),
         "deep_value");
     ASSERT_FALSE(parser.contains("missing"));
     ASSERT_THROW(parser.get_value<std::string>("missing"), std::runtime_error);
 }
 
 TEST(ParserTOMLTest, DefaultDataIsEmpty) {
-    WBE::TOMLData data;
+    WBE::DataValue data;
     ASSERT_TRUE(data.get_all_keys().empty());
     ASSERT_FALSE(data.contains("key"));
     ASSERT_THROW(data.get<int32_t>(), std::runtime_error);
@@ -116,13 +120,13 @@ name = "Mouse"
 active = false
 tags = []
 )");
-    auto products = parser.get_value<std::vector<WBE::TOMLData>>("products");
+    auto products = parser.get_value<std::vector<WBE::DataValue>>("products");
     ASSERT_EQ(products.size(), 2);
     ASSERT_EQ(products[0].get_value<int>("id"), 101);
     ASSERT_EQ(products[0].get_value<std::string>("name"), "Laptop");
-    auto details = products[0].get_value<WBE::TOMLData>("details");
+    auto details = products[0].get_value<WBE::DataValue>("details");
     ASSERT_EQ(details.get_value<std::string>("brand"), "TechCorp");
-    ASSERT_EQ(details.get_value<WBE::TOMLData>("specs").get_value<std::string>("storage"), "512GB SSD");
+    ASSERT_EQ(details.get_value<WBE::DataValue>("specs").get_value<std::string>("storage"), "512GB SSD");
     auto tags = products[0].get_value<std::vector<std::string>>("tags");
     ASSERT_EQ(tags, (std::vector<std::string>{"electronics", "computers", "portable"}));
     ASSERT_EQ(products[1].get_value<int>("id"), 102);
@@ -199,7 +203,7 @@ TEST(ParserTOMLTest, GLMMat4RoundTripAndValidation) {
             matrix[column][row] = static_cast<float>((column * 4) + row);
         }
     }
-    WBE::TOMLData data;
+    WBE::DataValue data;
     data.set_value("matrix", matrix);
     ASSERT_EQ(data.get_value<glm::mat4>("matrix"), matrix);
     WBE::ParserTOML parser;
@@ -208,7 +212,7 @@ TEST(ParserTOMLTest, GLMMat4RoundTripAndValidation) {
 }
 
 TEST(ParserTOMLTest, SetAndSetValue) {
-    WBE::TOMLData data;
+    WBE::DataValue data;
     data.set_value("name", std::string("engine"));
     data.set_value("literal", "text");
     data.set_value("count", static_cast<uint32_t>(42));
@@ -219,11 +223,11 @@ TEST(ParserTOMLTest, SetAndSetValue) {
     WBE::Buffer<16> buffer{};
     strncpy(buffer.buffer, "buffered", sizeof(buffer.buffer));
     data.set_value("buffer", buffer);
-    WBE::TOMLData child;
+    WBE::DataValue child;
     child.set_value("value", 7);
     data.set_value("child", child);
-    data.set_value("children", std::vector<WBE::TOMLData>{child, child});
-    data.set_value("empty_child", WBE::TOMLData());
+    data.set_value("children", std::vector<WBE::DataValue>{child, child});
+    data.set_value("empty_child", WBE::DataValue());
 
     ASSERT_EQ(data.get_value<std::string>("name"), "engine");
     ASSERT_EQ(data.get_value<std::string>("literal"), "text");
@@ -233,43 +237,40 @@ TEST(ParserTOMLTest, SetAndSetValue) {
     ASSERT_EQ(data.get_value<glm::vec3>("position"), glm::vec3(1.0F, 2.0F, 3.0F));
     ASSERT_EQ(data.get_value<std::vector<int32_t>>("ids"), (std::vector<int32_t>{1, 2, 3}));
     ASSERT_EQ(data.get_value<std::string>("buffer"), "buffered");
-    ASSERT_EQ(data.get_value<WBE::TOMLData>("child").get_value<int32_t>("value"), 7);
-    ASSERT_EQ(data.get_value<std::vector<WBE::TOMLData>>("children").size(), 2);
-    ASSERT_TRUE(data.get_value<WBE::TOMLData>("empty_child").get_all_keys().empty());
+    ASSERT_EQ(data.get_value<WBE::DataValue>("child").get_value<int32_t>("value"), 7);
+    ASSERT_EQ(data.get_value<std::vector<WBE::DataValue>>("children").size(), 2);
+    ASSERT_TRUE(data.get_value<WBE::DataValue>("empty_child").get_all_keys().empty());
 
-    // Assigning a key on a non-table value replaces it with a table.
-    WBE::TOMLData scalar;
+    // Assigning a key on a scalar does not silently discard the scalar.
+    WBE::DataValue scalar;
     scalar.set(5);
     ASSERT_EQ(scalar.get<int32_t>(), 5);
-    scalar.set_value("key", 1);
-    ASSERT_EQ(scalar.get_value<int32_t>("key"), 1);
+    ASSERT_THROW(scalar.set_value("key", 1), std::runtime_error);
 
     ASSERT_THROW(data.set_value("too_large", std::numeric_limits<uint64_t>::max()), std::runtime_error);
 }
 
 TEST(ParserTOMLTest, CopyIsDeep) {
-    WBE::TOMLData original;
+    WBE::DataValue original;
     original.set_value("value", 1);
-    WBE::TOMLData copy = original;
+    WBE::DataValue copy = original;
     copy.set_value("value", 2);
     ASSERT_EQ(original.get_value<int32_t>("value"), 1);
     ASSERT_EQ(copy.get_value<int32_t>("value"), 2);
-    WBE::TOMLData moved = std::move(copy);
+    WBE::DataValue moved = std::move(copy);
     ASSERT_EQ(moved.get_value<int32_t>("value"), 2);
 }
 
 TEST(ParserTOMLTest, OutputIsReparsable) {
-    WBE::TOMLData data;
+    WBE::DataValue data;
     data.set_value("name", std::string("demo"));
-    WBE::TOMLData child;
+    WBE::DataValue child;
     child.set_value("value", 3);
     data.set_value("child", child);
-    std::ostringstream stream;
-    stream << data;
     WBE::ParserTOML parser;
-    parser.parse_from_buffer(stream.str());
+    parser.parse_from_buffer(WBE::ParserTOML::write(data));
     ASSERT_EQ(parser.get_value<std::string>("name"), "demo");
-    ASSERT_EQ(parser.get_value<WBE::TOMLData>("child").get_value<int32_t>("value"), 3);
+    ASSERT_EQ(parser.get_value<WBE::DataValue>("child").get_value<int32_t>("value"), 3);
 }
 
 TEST(ParserTOMLTest, MalformedInputThrows) {

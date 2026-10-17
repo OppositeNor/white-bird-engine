@@ -12,10 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "core/parser/parser_toml.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "core/script/script_value.hh"
+#include "core/reflection/serializable_sd.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/rend_buffer_params_vk.hh"
 #include "function/render_vk/rend_image_params_vk.hh"
@@ -144,9 +145,9 @@ TEST(WBERendResourceParamsVKTest, AcceptsTOMLAndScriptValue) {
     SerializableSD<RendImageParamsVK>::deserialize(toml.get_data(), toml_result);
     EXPECT_EQ(toml_result.to_desc(RendGraphContextVK{}).format, VK_FORMAT_B8G8R8A8_SRGB);
 
-    ScriptValue script;
-    script.set_entry("size", ScriptValue::make_integer(64));
-    script.set_entry("usage", ScriptValue::make_string("buffer_uniform"));
+    DataValue script;
+    script.set_entry("size", DataValue::make_integer(64));
+    script.set_entry("usage", DataValue::make_string("buffer_uniform"));
     RendBufferParamsVK script_result;
     SerializableSD<RendBufferParamsVK>::deserialize(script, script_result);
     EXPECT_EQ(script_result.to_desc().usage, RendResPrimaryUsageVK::BUFFER_UNIFORM);

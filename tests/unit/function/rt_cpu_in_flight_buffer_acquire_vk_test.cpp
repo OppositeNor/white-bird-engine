@@ -13,8 +13,8 @@
    limitations under the License.
 */
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
-#include "core/script/script_value.hh"
 #include "function/event/event_manager.hh"
 #include "function/event/event_registration.hh"
 #include "function/render/render_defs.hh"
@@ -50,8 +50,8 @@ protected:
     }
 
     EventRegistration count_acquisitions(std::atomic<int>& p_count) {
-        return EventManager::get_singleton()->subscribe<RTCPUInFlightBufferAcquireVK::AcquiredBuffer>("source_buffer", 
-            [&p_count](const RTCPUInFlightBufferAcquireVK::AcquiredBuffer& /*p_buffer*/) {
+        return EventManager::get_singleton()->subscribe<RTCPUInFlightBufferAcquireVK::AcquiredBuffer>(
+            "source_buffer", [&p_count](const RTCPUInFlightBufferAcquireVK::AcquiredBuffer& /*p_buffer*/) {
                 p_count.fetch_add(1);
             });
     }
@@ -105,10 +105,11 @@ TEST_F(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUn
 TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RegistryCreatesTaskFromParameters) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ScriptValue params;
-    params.set_entry("buffer", ScriptValue::make_string("source_buffer"));
+    DataValue params;
+    params.set_entry("buffer", DataValue::make_string("source_buffer"));
     for (std::string_view task_type : {"RTCPUInFlightBufferAcquireVK", "cpu_acquire_buffer"}) {
-        const Unique<IRenderTaskVK> task = RenderTaskRegistryVK::create_factory(task_type, params, &render_data)(RendGraphContextVK{});
+        const Unique<IRenderTaskVK> task =
+            RenderTaskRegistryVK::create_factory(task_type, params, &render_data)(RendGraphContextVK{});
         ASSERT_NE(dynamic_cast<const RTCPUInFlightBufferAcquireVK*>(task.get()), nullptr) << task_type;
         Vector<ResAccessVK, RenderAllocator> reads(&allocator);
         Vector<ResAccessVK, RenderAllocator> writes(&allocator);
@@ -118,7 +119,7 @@ TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RegistryCreatesTaskFromParameters) {
         EXPECT_EQ(reads[0].usage, RendResUsageVK::TRANSFER_SRC);
     }
     // The resource id is required.
-    EXPECT_THROW(RenderTaskRegistryVK::create_factory("cpu_acquire_buffer", ScriptValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("cpu_acquire_buffer", DataValue::make_map(), &render_data), std::runtime_error);
 }
 
 // Runs without a test global, so no EventManager exists.

@@ -15,9 +15,10 @@
 #ifndef WBE_FILE_STRICT_DESERIALIZATION_TEST_HH
 #define WBE_FILE_STRICT_DESERIALIZATION_TEST_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "core/parser/parser_toml.hh"
-#include "core/script/script_value.hh"
+#include "core/reflection/serializable_sd.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "reflection_test_data.hh"
 #include <gtest/gtest.h>
@@ -29,14 +30,14 @@ namespace WBE = WhiteBirdEngine;
 
 namespace {
 
-WBE::JSONData parse_strict_test_json(std::string_view p_json) {
+WBE::DataValue parse_strict_test_json(std::string_view p_json) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(p_json);
     return parser.get_data();
 }
 
 template <typename T>
-std::string strict_deserialization_error(const WBE::JSONData& p_data) {
+std::string strict_deserialization_error(const WBE::DataValue& p_data) {
     T result{};
     try {
         WBE::SerializableSD<T>::deserialize(p_data, result);
@@ -111,12 +112,12 @@ TEST(WBEStrictDeserializationTest, AppliesToTOMLAndScriptValue) {
     WBE::TestStrictBase toml_result;
     EXPECT_THROW(WBE::SerializableSD<WBE::TestStrictBase>::deserialize(toml.get_data(), toml_result), std::runtime_error);
 
-    WBE::ScriptValue script;
-    script.set_entry("base_value", WBE::ScriptValue::make_integer(1));
+    WBE::DataValue script;
+    script.set_entry("base_value", WBE::DataValue::make_integer(1));
     WBE::TestStrictBase script_result;
     WBE::SerializableSD<WBE::TestStrictBase>::deserialize(script, script_result);
     EXPECT_EQ(script_result.base_value, 1);
-    script.set_entry("base_valeu", WBE::ScriptValue::make_integer(2));
+    script.set_entry("base_valeu", WBE::DataValue::make_integer(2));
     EXPECT_THROW(WBE::SerializableSD<WBE::TestStrictBase>::deserialize(script, script_result), std::runtime_error);
 }
 

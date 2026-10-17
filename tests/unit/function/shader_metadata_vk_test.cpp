@@ -12,11 +12,12 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
-#include "function/render/shader_metadata.hh"
-#include "function/render/shader_metadata_query.hh"
 #include "function/render/mesh_node_contract.hh"
 #include "function/render/mesh_node_contract_resolver.hh"
+#include "function/render/shader_metadata.hh"
+#include "function/render/shader_metadata_query.hh"
 #include "platform/file_system/path.hh"
 #include <algorithm>
 #include <array>
@@ -431,8 +432,8 @@ void expect_deferred_masked_pipeline_resource(const Path& p_directory) {
     ParserJSON parser;
     parser.parse((p_directory / "deferred_gbuffer_shader.json"));
 
-    std::vector<JSONData> resources = parser.get_value<std::vector<JSONData>>("resources");
-    auto resource = std::ranges::find_if(resources, [](const JSONData& p_resource) {
+    std::vector<DataValue> resources = parser.get_value<std::vector<DataValue>>("resources");
+    auto resource = std::ranges::find_if(resources, [](const DataValue& p_resource) {
         return p_resource.contains("id") && p_resource.get_value<std::string>("id") == "deferred_gbuffer_masked";
     });
     ASSERT_NE(resource, resources.end());

@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RESOURCE_UNIT_LOADER_HH
 #define WBE_FILE_RESOURCE_UNIT_LOADER_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -64,7 +65,7 @@ public:
      * @param p_res_chunk The resource chunk to populate the scheme into.
      * @param p_scheme_data The parser node to populate.
      */
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const = 0;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const = 0;
 
     /**
      * @brief Populates a scheme into the input chunk and returns a type-erased reference to the result.
@@ -87,7 +88,7 @@ public:
         return supported_resource_types;
     }
 
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override {
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override {
         SchemaType scheme;
         scheme.deserialize(p_scheme_data);
         (void)populate_typed_scheme_ptr(p_res_chunk, scheme);

@@ -24,7 +24,7 @@
 #include "{{ task.in_header }}"
 {% endfor %}
 #include "core/memory/unique.hh"
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -73,7 +73,7 @@ struct RenderTaskCreateTraits<Unique<IRenderTaskVK> (*)(const BaseRenderDataVK*,
 };
 
 template <typename TTask>
-RendTaskFactoryVK make_render_task_factory(const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
+RendTaskFactoryVK make_render_task_factory(const DataValue& p_params, const BaseRenderDataVK* p_render_data) {
     using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
     static_assert(Traits::IS_VALID,
         "A WBE_RENDER_TASK must declare static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const TParams&, const RendGraphContextVK&).");
@@ -85,7 +85,7 @@ RendTaskFactoryVK make_render_task_factory(const ScriptValue& p_params, const Ba
 }
 
 template <typename TTask>
-RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_task_id, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
+RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_task_id, const DataValue& p_params, const BaseRenderDataVK* p_render_data) {
     using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
     typename Traits::Params params{};
     SerializableSD<typename Traits::Params>::deserialize(p_params, params);
@@ -101,8 +101,8 @@ RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_tas
 
 struct RenderTaskTypeEntry {
     std::string_view name;
-    RendTaskFactoryVK (*make_factory)(const ScriptValue&, const BaseRenderDataVK*);
-    RendTaskDescVK& (*add_task)(RendGraphDescVK&, std::string_view, const ScriptValue&, const BaseRenderDataVK*);
+    RendTaskFactoryVK (*make_factory)(const DataValue&, const BaseRenderDataVK*);
+    RendTaskDescVK& (*add_task)(RendGraphDescVK&, std::string_view, const DataValue&, const BaseRenderDataVK*);
 };
 
 // The dispatch table, in the same order as RENDER_TASK_TYPE_NAMES.
@@ -133,7 +133,7 @@ const RenderTaskTypeEntry* find_render_task_type(std::string_view p_task_type) {
 
 } // namespace
 
-RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_type, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
+RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_type, const DataValue& p_params, const BaseRenderDataVK* p_render_data) {
     const RenderTaskTypeEntry* entry = find_render_task_type(p_task_type);
     if (entry == nullptr) {
         throw std::runtime_error(std::format("Failed to create render task factory: unknown render task type '{}'.", p_task_type));
@@ -147,7 +147,7 @@ RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_t
 RendTaskDescVK& RenderTaskRegistryVK::add_task(RendGraphDescVK& p_graph,
     std::string_view p_task_id,
     std::string_view p_task_type,
-    const ScriptValue& p_params,
+    const DataValue& p_params,
     const BaseRenderDataVK* p_render_data) {
     const RenderTaskTypeEntry* entry = find_render_task_type(p_task_type);
     if (entry == nullptr) {

@@ -16,9 +16,9 @@
 #define WBE_FILE_SB_LUA_TEST_HH
 
 #include "../reflection_test/reflection_test_data.hh"
+#include "core/data/data_value.hh"
 #include "core/script/sb_lua.hh"
 #include "core/script/script_sandbox_config.hh"
-#include "core/script/script_value.hh"
 #include "glm/ext/vector_float3.hpp"
 #include <array>
 #include <cstdint>
@@ -100,7 +100,7 @@ return exports
 )";
 
 inline int64_t lua_test_add(WBE::SBLua& p_backend, int64_t p_left, int64_t p_right) {
-    const std::array<WBE::ScriptValue, 2> args = {WBE::ScriptValue::make_integer(p_left), WBE::ScriptValue::make_integer(p_right)};
+    const std::array<WBE::DataValue, 2> args = {WBE::DataValue::make_integer(p_left), WBE::DataValue::make_integer(p_right)};
     return p_backend.call("test", "add", args).as_integer();
 }
 
@@ -118,31 +118,31 @@ TEST(WBESBLuaTest, CallsExportedFunctions) {
 TEST(WBESBLuaTest, ConvertsResultKinds) {
     WBE::SBLua backend;
     backend.load_module("test", SB_LUA_TEST_MODULE);
-    const WBE::ScriptValue result = backend.call("test", "kinds", {});
+    const WBE::DataValue result = backend.call("test", "kinds", {});
 
-    ASSERT_EQ(result.get_kind(), WBE::ScriptValueKind::MAP);
-    EXPECT_EQ(result.find("integer")->get_kind(), WBE::ScriptValueKind::INTEGER);
-    EXPECT_EQ(result.find("float")->get_kind(), WBE::ScriptValueKind::FLOAT);
-    EXPECT_EQ(result.find("whole_float")->get_kind(), WBE::ScriptValueKind::FLOAT);
+    ASSERT_EQ(result.get_kind(), WBE::DataValueKind::MAP);
+    EXPECT_EQ(result.find("integer")->get_kind(), WBE::DataValueKind::INTEGER);
+    EXPECT_EQ(result.find("float")->get_kind(), WBE::DataValueKind::FLOAT);
+    EXPECT_EQ(result.find("whole_float")->get_kind(), WBE::DataValueKind::FLOAT);
     EXPECT_EQ(result.find("text")->as_string(), std::string("a\0b", 3));
     EXPECT_FALSE(result.find("flag")->as_boolean());
     ASSERT_EQ(result.find("list")->as_list().size(), 2U);
     EXPECT_EQ(result.find("list")->as_list()[1].as_integer(), 20);
-    EXPECT_EQ(result.find("empty")->get_kind(), WBE::ScriptValueKind::LIST);
+    EXPECT_EQ(result.find("empty")->get_kind(), WBE::DataValueKind::LIST);
     EXPECT_TRUE(result.find("empty")->as_list().empty());
 }
 
 TEST(WBESBLuaTest, ArgumentsRoundTrip) {
     WBE::SBLua backend;
     backend.load_module("test", SB_LUA_TEST_MODULE);
-    WBE::ScriptValue argument;
-    argument.set_entry("name", WBE::ScriptValue::make_string("value"));
-    argument.set_entry("number", WBE::ScriptValue::make_float(0.5));
-    WBE::ScriptValue nested;
-    nested.push_back(WBE::ScriptValue::make_integer(1));
-    nested.push_back(WBE::ScriptValue::make_boolean(true));
+    WBE::DataValue argument;
+    argument.set_entry("name", WBE::DataValue::make_string("value"));
+    argument.set_entry("number", WBE::DataValue::make_float(0.5));
+    WBE::DataValue nested;
+    nested.push_back(WBE::DataValue::make_integer(1));
+    nested.push_back(WBE::DataValue::make_boolean(true));
     argument.set_entry("nested", nested);
-    const std::array<WBE::ScriptValue, 1> args = {argument};
+    const std::array<WBE::DataValue, 1> args = {argument};
 
     EXPECT_EQ(backend.call("test", "echo", args), argument);
 }
@@ -150,17 +150,17 @@ TEST(WBESBLuaTest, ArgumentsRoundTrip) {
 TEST(WBESBLuaTest, BuildsDescriptionsFromInputs) {
     WBE::SBLua backend;
     backend.load_module("test", SB_LUA_TEST_MODULE);
-    WBE::ScriptValue settings;
+    WBE::DataValue settings;
     settings.set_value("light_count", 3);
     settings.set_value("base_size", 1024);
-    const std::array<WBE::ScriptValue, 1> args = {settings};
-    const WBE::ScriptValue result = backend.call("test", "describe", args);
+    const std::array<WBE::DataValue, 1> args = {settings};
+    const WBE::DataValue result = backend.call("test", "describe", args);
 
-    const WBE::ScriptValue::List& tasks = result.find("tasks")->as_list();
+    const WBE::DataValue::List& tasks = result.find("tasks")->as_list();
     ASSERT_EQ(tasks.size(), 3U);
     EXPECT_EQ(tasks[2].get_value<std::string>("id"), "shadow_3");
     // Lua's division always produces a float; integral reads still accept the exact value.
-    EXPECT_EQ(result.find("size")->get_kind(), WBE::ScriptValueKind::FLOAT);
+    EXPECT_EQ(result.find("size")->get_kind(), WBE::DataValueKind::FLOAT);
     EXPECT_EQ(result.get_value<uint32_t>("size"), 512U);
 }
 
@@ -230,7 +230,7 @@ TEST(WBESBLuaTest, RejectsUnrepresentableResults) {
     EXPECT_THROW(backend.call("test", "return_cycle", {}), std::runtime_error);
     EXPECT_THROW(backend.call("test", "return_nan", {}), std::runtime_error);
     // A table reached twice without a cycle is copied twice.
-    const WBE::ScriptValue shared = backend.call("test", "return_shared", {});
+    const WBE::DataValue shared = backend.call("test", "return_shared", {});
     EXPECT_EQ(*shared.find("first"), *shared.find("second"));
 }
 
@@ -254,7 +254,7 @@ return {
     end,
 }
 )");
-    const WBE::ScriptValue globals = backend.call("probe", "globals", {});
+    const WBE::DataValue globals = backend.call("probe", "globals", {});
     for (const std::string& key : globals.get_all_keys()) {
         EXPECT_TRUE(globals.find(key)->as_boolean()) << key;
     }
@@ -294,13 +294,13 @@ TEST(WBESBLuaTest, MemoryLimitStopsLargeAllocations) {
 TEST(WBESBLuaTest, RejectsArgumentsNestedTooDeeply) {
     WBE::SBLua backend;
     backend.load_module("test", SB_LUA_TEST_MODULE);
-    WBE::ScriptValue deep = WBE::ScriptValue::make_integer(0);
+    WBE::DataValue deep = WBE::DataValue::make_integer(0);
     for (size_t i = 0; i <= WBE::SBLua::MAX_VALUE_DEPTH + 1; ++i) {
-        WBE::ScriptValue wrapper;
+        WBE::DataValue wrapper;
         wrapper.push_back(std::move(deep));
         deep = std::move(wrapper);
     }
-    const std::array<WBE::ScriptValue, 1> args = {deep};
+    const std::array<WBE::DataValue, 1> args = {deep};
     EXPECT_THROW(backend.call("test", "echo", args), std::runtime_error);
     EXPECT_EQ(lua_test_add(backend, 2, 2), 4);
 }

@@ -15,9 +15,10 @@
 #ifndef WBE_FILE_ENUM_REFLECTION_TEST_HH
 #define WBE_FILE_ENUM_REFLECTION_TEST_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "core/parser/parser_toml.hh"
-#include "core/script/script_value.hh"
+#include "core/reflection/enum_reflection.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "reflection_test_data.hh"
@@ -28,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
@@ -47,7 +49,7 @@ static_assert(std::is_same_v<Unsigned64Reflection::UnderlyingType, uint64_t>);
 static_assert(SignedReflection::try_string_to_enum("minus") == WBE::TestEnumSigned::NEGATIVE);
 static_assert(SignedReflection::try_enum_to_string(WBE::TestEnumSigned::POSITIVE) == "POSITIVE");
 
-WBE::JSONData parse_enum_test_json(std::string_view p_json) {
+WBE::DataValue parse_enum_test_json(std::string_view p_json) {
     WBE::ParserJSON parser;
     parser.parse_from_buffer(p_json);
     return parser.get_data();
@@ -107,7 +109,7 @@ TEST(WBEEnumReflectionTest, JSONSerializesCanonicalNames) {
     source.unsigned_value = WBE::TestEnumUnsigned64::LARGE;
     source.optional_value = WBE::TestEnumSigned::SAME_AS_ZERO;
     source.nested_values = {WBE::TestEnumHolder::NESTED_B, WBE::TestEnumHolder::NESTED_A};
-    WBE::JSONData data;
+    WBE::DataValue data;
     WBE::SerializableSD<WBE::TestEnumFields>::serialize(data, source);
     EXPECT_EQ(data.get_value<std::string>("signed_value"), "NEGATIVE");
     EXPECT_EQ(data.get_value<std::string>("unsigned_value"), "LARGE");
@@ -124,7 +126,7 @@ TEST(WBEEnumReflectionTest, JSONSerializesCanonicalNames) {
 TEST(WBEEnumReflectionTest, JSONDeserializesAliasesAndIntegers) {
     WBE::TestEnumFields result;
     WBE::SerializableSD<WBE::TestEnumFields>::deserialize(
-        parse_enum_test_json(R"({"signed_value": -3, "unsigned_value": 18446744073709551600, "nested_values": ["b", 0]})"), result);
+        parse_enum_test_json(R"({"signed_value": -3, "unsigned_value": "LARGE", "nested_values": ["b", 0]})"), result);
     EXPECT_EQ(result.signed_value, WBE::TestEnumSigned::NEGATIVE);
     EXPECT_EQ(result.unsigned_value, WBE::TestEnumUnsigned64::LARGE);
     EXPECT_EQ(result.nested_values,
@@ -156,15 +158,15 @@ TEST(WBEEnumReflectionTest, TOMLAndScriptValueDeserialize) {
     EXPECT_EQ(toml_result.unsigned_value, WBE::TestEnumUnsigned64::SMALL);
     EXPECT_EQ(toml_result.nested_values, (std::vector<WBE::TestEnumHolder::Nested>{WBE::TestEnumHolder::NESTED_B}));
 
-    WBE::ScriptValue script;
-    script.set_entry("signed_value", WBE::ScriptValue::make_integer(100));
-    script.set_entry("optional_value", WBE::ScriptValue::make_string("minus"));
+    WBE::DataValue script;
+    script.set_entry("signed_value", WBE::DataValue::make_integer(100));
+    script.set_entry("optional_value", WBE::DataValue::make_string("minus"));
     WBE::TestEnumFields script_result;
     WBE::SerializableSD<WBE::TestEnumFields>::deserialize(script, script_result);
     EXPECT_EQ(script_result.signed_value, WBE::TestEnumSigned::POSITIVE);
     EXPECT_EQ(script_result.optional_value, std::optional<WBE::TestEnumSigned>(WBE::TestEnumSigned::NEGATIVE));
 
-    WBE::ScriptValue serialized;
+    WBE::DataValue serialized;
     WBE::SerializableSD<WBE::TestEnumFields>::serialize(serialized, script_result);
     EXPECT_EQ(serialized.get_value<std::string>("signed_value"), "POSITIVE");
 }

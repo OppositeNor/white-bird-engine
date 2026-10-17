@@ -16,7 +16,7 @@
 #define WBE_FILE_SCRIPT_VALUE_TEST_HH
 
 #include "../reflection_test/reflection_test_data.hh"
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -28,83 +28,84 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace WBE = WhiteBirdEngine;
 
-TEST(WBEScriptValueTest, FactoriesCreateEachKind) {
-    EXPECT_TRUE(WBE::ScriptValue().is_nil());
-    EXPECT_EQ(WBE::ScriptValue::make_boolean(true).as_boolean(), true);
-    EXPECT_EQ(WBE::ScriptValue::make_integer(-7).as_integer(), -7);
-    EXPECT_EQ(WBE::ScriptValue::make_float(2.5).as_float(), 2.5);
-    EXPECT_EQ(WBE::ScriptValue::make_string("text").as_string(), "text");
-    EXPECT_EQ(WBE::ScriptValue::make_list().get_kind(), WBE::ScriptValueKind::LIST);
-    EXPECT_EQ(WBE::ScriptValue::make_map().get_kind(), WBE::ScriptValueKind::MAP);
+TEST(WBEDataValueTest, FactoriesCreateEachKind) {
+    EXPECT_TRUE(WBE::DataValue().is_nil());
+    EXPECT_EQ(WBE::DataValue::make_boolean(true).as_boolean(), true);
+    EXPECT_EQ(WBE::DataValue::make_integer(-7).as_integer(), -7);
+    EXPECT_EQ(WBE::DataValue::make_float(2.5).as_float(), 2.5);
+    EXPECT_EQ(WBE::DataValue::make_string("text").as_string(), "text");
+    EXPECT_EQ(WBE::DataValue::make_list().get_kind(), WBE::DataValueKind::LIST);
+    EXPECT_EQ(WBE::DataValue::make_map().get_kind(), WBE::DataValueKind::MAP);
 }
 
-TEST(WBEScriptValueTest, AccessorsRejectOtherKinds) {
-    const WBE::ScriptValue string_value = WBE::ScriptValue::make_string("1");
+TEST(WBEDataValueTest, AccessorsRejectOtherKinds) {
+    const WBE::DataValue string_value = WBE::DataValue::make_string("1");
     EXPECT_THROW((void)string_value.as_boolean(), std::runtime_error);
     EXPECT_THROW((void)string_value.as_integer(), std::runtime_error);
     EXPECT_THROW((void)string_value.as_float(), std::runtime_error);
     EXPECT_THROW((void)string_value.as_list(), std::runtime_error);
     EXPECT_THROW((void)string_value.as_map(), std::runtime_error);
-    EXPECT_THROW((void)WBE::ScriptValue::make_integer(1).as_string(), std::runtime_error);
-    EXPECT_EQ(WBE::ScriptValue::make_integer(4).as_float(), 4.0);
+    EXPECT_THROW((void)WBE::DataValue::make_integer(1).as_string(), std::runtime_error);
+    EXPECT_EQ(WBE::DataValue::make_integer(4).as_float(), 4.0);
 }
 
-TEST(WBEScriptValueTest, MapKeepsEntriesSortedAndReplacesKeys) {
-    WBE::ScriptValue map;
-    map.set_entry("zeta", WBE::ScriptValue::make_integer(1));
-    map.set_entry("alpha", WBE::ScriptValue::make_integer(2));
-    map.set_entry("mid", WBE::ScriptValue::make_integer(3));
-    map.set_entry("alpha", WBE::ScriptValue::make_integer(4));
+TEST(WBEDataValueTest, MapKeepsEntriesSortedAndReplacesKeys) {
+    WBE::DataValue map;
+    map.set_entry("zeta", WBE::DataValue::make_integer(1));
+    map.set_entry("alpha", WBE::DataValue::make_integer(2));
+    map.set_entry("mid", WBE::DataValue::make_integer(3));
+    map.set_entry("alpha", WBE::DataValue::make_integer(4));
 
     EXPECT_EQ(map.get_all_keys(), (std::vector<std::string>{"alpha", "mid", "zeta"}));
     EXPECT_EQ(map.get_value<int32_t>("alpha"), 4);
     EXPECT_TRUE(map.contains("mid"));
     EXPECT_FALSE(map.contains("missing"));
     EXPECT_THROW((void)map.get_value<int32_t>("missing"), std::runtime_error);
-    EXPECT_THROW(map.push_back(WBE::ScriptValue()), std::runtime_error);
+    EXPECT_THROW(map.push_back(WBE::DataValue()), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, ListAppendsAndRejectsEntries) {
-    WBE::ScriptValue list;
-    list.push_back(WBE::ScriptValue::make_integer(1));
-    list.push_back(WBE::ScriptValue::make_string("two"));
+TEST(WBEDataValueTest, ListAppendsAndRejectsEntries) {
+    WBE::DataValue list;
+    list.push_back(WBE::DataValue::make_integer(1));
+    list.push_back(WBE::DataValue::make_string("two"));
     ASSERT_EQ(list.as_list().size(), 2U);
     EXPECT_EQ(list.as_list()[1].as_string(), "two");
     EXPECT_FALSE(list.contains("two"));
     EXPECT_TRUE(list.get_all_keys().empty());
-    EXPECT_THROW(list.set_entry("key", WBE::ScriptValue()), std::runtime_error);
+    EXPECT_THROW(list.set_entry("key", WBE::DataValue()), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, EmptyListAndEmptyMapReadAsEachOther) {
-    WBE::ScriptValue empty_list = WBE::ScriptValue::make_list();
+TEST(WBEDataValueTest, EmptyListAndEmptyMapReadAsEachOther) {
+    WBE::DataValue empty_list = WBE::DataValue::make_list();
     EXPECT_FALSE(empty_list.contains("key"));
-    empty_list.set_entry("key", WBE::ScriptValue::make_integer(1));
-    EXPECT_EQ(empty_list.get_kind(), WBE::ScriptValueKind::MAP);
+    empty_list.set_entry("key", WBE::DataValue::make_integer(1));
+    EXPECT_EQ(empty_list.get_kind(), WBE::DataValueKind::MAP);
 
-    const WBE::ScriptValue empty_map = WBE::ScriptValue::make_map();
-    EXPECT_TRUE(empty_map.get<std::vector<WBE::ScriptValue>>().empty());
-    EXPECT_THROW((void)WBE::ScriptValue::make_map().as_list(), std::runtime_error);
+    const WBE::DataValue empty_map = WBE::DataValue::make_map();
+    EXPECT_TRUE(empty_map.get<std::vector<WBE::DataValue>>().empty());
+    EXPECT_THROW((void)WBE::DataValue::make_map().as_list(), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, IntegralReadsAcceptExactFloatsAndCheckRanges) {
-    EXPECT_EQ(WBE::ScriptValue::make_float(512.0).get<int32_t>(), 512);
-    EXPECT_THROW((void)WBE::ScriptValue::make_float(1.5).get<int32_t>(), std::runtime_error);
-    EXPECT_THROW((void)WBE::ScriptValue::make_float(std::numeric_limits<double>::infinity()).get<int64_t>(), std::runtime_error);
-    EXPECT_THROW((void)WBE::ScriptValue::make_float(1.0E30).get<int64_t>(), std::runtime_error);
-    EXPECT_THROW((void)WBE::ScriptValue::make_integer(300).get<uint8_t>(), std::runtime_error);
-    EXPECT_THROW((void)WBE::ScriptValue::make_integer(-1).get<uint32_t>(), std::runtime_error);
-    EXPECT_EQ(WBE::ScriptValue::make_integer(7).get<double>(), 7.0);
-    EXPECT_THROW((void)WBE::ScriptValue::make_string("7").get<int32_t>(), std::runtime_error);
+TEST(WBEDataValueTest, IntegralReadsAcceptExactFloatsAndCheckRanges) {
+    EXPECT_EQ(WBE::DataValue::make_float(512.0).get<int32_t>(), 512);
+    EXPECT_THROW((void)WBE::DataValue::make_float(1.5).get<int32_t>(), std::runtime_error);
+    EXPECT_THROW((void)WBE::DataValue::make_float(std::numeric_limits<double>::infinity()).get<int64_t>(), std::runtime_error);
+    EXPECT_THROW((void)WBE::DataValue::make_float(1.0E30).get<int64_t>(), std::runtime_error);
+    EXPECT_THROW((void)WBE::DataValue::make_integer(300).get<uint8_t>(), std::runtime_error);
+    EXPECT_THROW((void)WBE::DataValue::make_integer(-1).get<uint32_t>(), std::runtime_error);
+    EXPECT_EQ(WBE::DataValue::make_integer(7).get<double>(), 7.0);
+    EXPECT_THROW((void)WBE::DataValue::make_string("7").get<int32_t>(), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, SetConvertsCppValues) {
-    WBE::ScriptValue value;
+TEST(WBEDataValueTest, SetConvertsCppValues) {
+    WBE::DataValue value;
     value.set(true);
-    EXPECT_EQ(value.get_kind(), WBE::ScriptValueKind::BOOLEAN);
+    EXPECT_EQ(value.get_kind(), WBE::DataValueKind::BOOLEAN);
     value.set(uint32_t{42});
     EXPECT_EQ(value.as_integer(), 42);
     value.set(1.25F);
@@ -116,44 +117,44 @@ TEST(WBEScriptValueTest, SetConvertsCppValues) {
     EXPECT_THROW(value.set(std::numeric_limits<uint64_t>::max()), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, GlmValuesRoundTrip) {
-    WBE::ScriptValue vector_value;
+TEST(WBEDataValueTest, GlmValuesRoundTrip) {
+    WBE::DataValue vector_value;
     vector_value.set(glm::vec3(1.0F, -2.0F, 3.0F));
     EXPECT_EQ(vector_value.get_all_keys(), (std::vector<std::string>{"x", "y", "z"}));
     EXPECT_EQ(vector_value.get<glm::vec3>(), glm::vec3(1.0F, -2.0F, 3.0F));
 
-    WBE::ScriptValue uv_value;
-    uv_value.set_entry("u", WBE::ScriptValue::make_float(0.25));
-    uv_value.set_entry("v", WBE::ScriptValue::make_integer(1));
+    WBE::DataValue uv_value;
+    uv_value.set_entry("u", WBE::DataValue::make_float(0.25));
+    uv_value.set_entry("v", WBE::DataValue::make_integer(1));
     EXPECT_EQ(uv_value.get<glm::vec2>(), glm::vec2(0.25F, 1.0F));
 
     glm::mat4 matrix(1.0F);
     matrix[3] = glm::vec4(4.0F, 5.0F, 6.0F, 1.0F);
-    WBE::ScriptValue matrix_value;
+    WBE::DataValue matrix_value;
     matrix_value.set(matrix);
     ASSERT_EQ(matrix_value.as_list().size(), 16U);
     EXPECT_EQ(matrix_value.as_list()[12].as_float(), 4.0);
     EXPECT_EQ(matrix_value.get<glm::mat4>(), matrix);
-    EXPECT_THROW((void)WBE::ScriptValue::make_list().get<glm::mat4>(), std::runtime_error);
+    EXPECT_THROW((void)WBE::DataValue::make_list().get<glm::mat4>(), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, BufferRejectsStringsLongerThanCapacity) {
-    WBE::ScriptValue value = WBE::ScriptValue::make_string("1234567");
+TEST(WBEDataValueTest, BufferRejectsStringsLongerThanCapacity) {
+    WBE::DataValue value = WBE::DataValue::make_string("1234567");
     WBE::Buffer<8> buffer{};
     value.get(buffer);
     EXPECT_EQ(std::string(buffer.buffer), "1234567");
-    value = WBE::ScriptValue::make_string("12345678");
+    value = WBE::DataValue::make_string("12345678");
     EXPECT_THROW(value.get(buffer), std::runtime_error);
 }
 
-TEST(WBEScriptValueTest, MoveLeavesSourceNil) {
-    WBE::ScriptValue source = WBE::ScriptValue::make_string("moved");
-    WBE::ScriptValue target = std::move(source);
+TEST(WBEDataValueTest, MoveLeavesSourceNil) {
+    WBE::DataValue source = WBE::DataValue::make_string("moved");
+    WBE::DataValue target = std::move(source);
     EXPECT_EQ(target.as_string(), "moved");
     EXPECT_TRUE(source.is_nil()); // NOLINT(bugprone-use-after-move)
 }
 
-TEST(WBEScriptValueTest, ReflectedStructRoundTripsThroughSerializableSD) {
+TEST(WBEDataValueTest, ReflectedStructRoundTripsThroughSerializableSD) {
     WBE::TestSerializable source;
     source.si32_test = -3;
     source.si64_test = 1LL << 40;
@@ -165,10 +166,10 @@ TEST(WBEScriptValueTest, ReflectedStructRoundTripsThroughSerializableSD) {
     source.vec4_test = glm::vec4(-1.0F, 0.0F, 1.0F, 2.0F);
     source.str_test = "hello";
     source.optional_str_test = "optional";
-    WBE::ScriptValue value;
+    WBE::DataValue value;
     WBE::SerializableSD<WBE::TestSerializable>::serialize(value, source);
 
-    EXPECT_EQ(value.get_kind(), WBE::ScriptValueKind::MAP);
+    EXPECT_EQ(value.get_kind(), WBE::DataValueKind::MAP);
     EXPECT_EQ(value.get_value<std::string>("str_test"), "hello");
     WBE::TestSerializable result;
     WBE::SerializableSD<WBE::TestSerializable>::deserialize(value, result);
@@ -185,13 +186,13 @@ TEST(WBEScriptValueTest, ReflectedStructRoundTripsThroughSerializableSD) {
     EXPECT_EQ(result.optional_str_test.value(), "optional");
 }
 
-TEST(WBEScriptValueTest, NestedAndVectorStructsRoundTrip) {
+TEST(WBEDataValueTest, NestedAndVectorStructsRoundTrip) {
     WBE::TestVectorContainer source;
     source.ints = {1, 2, 3};
     source.strs = {"a", "b"};
     source.children.resize(2);
     source.children[1].str_test = "child";
-    WBE::ScriptValue value;
+    WBE::DataValue value;
     WBE::SerializableSD<WBE::TestVectorContainer>::serialize(value, source);
 
     WBE::TestVectorContainer result;
@@ -202,10 +203,9 @@ TEST(WBEScriptValueTest, NestedAndVectorStructsRoundTrip) {
     EXPECT_EQ(result.children[1].str_test, "child");
 }
 
-TEST(WBEScriptValueTest, DeserializingRequiredFieldFromEmptyValueThrows) {
+TEST(WBEDataValueTest, DeserializingRequiredFieldFromEmptyValueThrows) {
     WBE::TestSerializableAliases result;
-    EXPECT_THROW(WBE::SerializableSD<WBE::TestSerializableAliases>::deserialize(WBE::ScriptValue::make_map(), result),
-        std::runtime_error);
+    EXPECT_THROW(WBE::SerializableSD<WBE::TestSerializableAliases>::deserialize(WBE::DataValue::make_map(), result), std::runtime_error);
 }
 
 #endif

@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RENDER_TASK_REGISTRY_VK_HH
 #define WBE_FILE_RENDER_TASK_REGISTRY_VK_HH
 
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <span>
@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class RenderTaskRegistryVK
- * @brief Creates render-task factories from a task type name and ScriptValue parameters.
+ * @brief Creates render-task factories from a task type name and DataValue parameters.
  *
  * The registry is generated from every class annotated with WBE_META(WBE_RENDER_TASK). A task type is registered under its
  * class name and under each WBE_ALIASES entry; a name used twice fails the build. Every such class must declare
@@ -70,7 +70,7 @@ public:
      * @throws std::runtime_error If the task type is unknown, p_render_data is null, or the parameters cannot be
      * deserialized.
      */
-    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data);
+    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const DataValue& p_params, const BaseRenderDataVK* p_render_data);
 
     /**
      * @brief Add one render task to a graph descriptor.
@@ -84,13 +84,13 @@ public:
      * @param p_params The task parameters.
      * @param p_render_data Render data passed to create() and prepare_graph(); it must outlive the graph.
      * @return The added task descriptor, for aliases and edges; invalidated when another task is added.
-     * @throws std::runtime_error Under the conditions of create_factory(), if p_task_id is empty or already used in p_graph, or
-     * whatever prepare_graph() throws.
+     * @throws std::runtime_error Under the conditions of create_factory(), if p_task_id is empty or already used in p_graph,
+     * or whatever prepare_graph() throws.
      */
     static RendTaskDescVK& add_task(RendGraphDescVK& p_graph,
         std::string_view p_task_id,
         std::string_view p_task_type,
-        const ScriptValue& p_params,
+        const DataValue& p_params,
         const BaseRenderDataVK* p_render_data);
 
     /**

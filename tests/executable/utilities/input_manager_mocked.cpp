@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "input_manager_mocked.hh"
+#include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/parser/parser_json.hh"
 #include "function/input_manager/i_input_manager.hh"
@@ -49,7 +50,7 @@ KeyCode key_code_from_name(std::string_view p_name) {
     return *key_code;
 }
 
-std::chrono::steady_clock::duration read_seconds(const JSONData& p_entry, std::string_view p_field, bool p_allow_zero) {
+std::chrono::steady_clock::duration read_seconds(const DataValue& p_entry, std::string_view p_field, bool p_allow_zero) {
     double seconds = p_entry.get_value<double>(p_field);
     // Also rejects NaN; the upper bound keeps the tick conversion in range.
     if (!(seconds >= 0.0 && seconds <= 1.0e6) || (!p_allow_zero && seconds == 0.0)) {
@@ -78,10 +79,10 @@ InputManagerMocked::InputManagerMocked(HeapAllocatorGlobal* p_allocator, std::st
     // Wrongly typed values fail inside the parser and crash like any other malformed sequence.
     ParserJSON parser;
     parser.parse_from_buffer(p_input_sequence);
-    std::vector<JSONData> entries = parser.get<std::vector<JSONData>>();
+    std::vector<DataValue> entries = parser.get<std::vector<DataValue>>();
     sequence.reserve(entries.size());
     for (size_t i = 0; i < entries.size(); ++i) {
-        const JSONData& entry = entries[i];
+        const DataValue& entry = entries[i];
         if (!entry.contains("key") || entry.contains("count") == entry.contains("duration")) {
             throw std::runtime_error(std::format("InputManagerMocked: input sequence entry {} must be an object with a \"key\" and "
                                                  "exactly one of \"count\" or \"duration\".",

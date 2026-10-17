@@ -16,6 +16,7 @@
 #define WBE_FILE_RESOURCE_CHUNK_LOADER_HH
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
 #include "core/object/object.hh"
 #include "core/parser/parser_json.hh"
@@ -125,8 +126,6 @@ public:
     }
 
 protected:
-    using ParserDataType = ParserResource::DataType;
-
     virtual void create_ref_to_resolver(std::function<void(RefRes<char>)> p_assign_ref, std::string_view p_id) override {
         auto entry = resource_map.find(p_id);
         if (entry != resource_map.end()) {
@@ -216,8 +215,7 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
     ParserResource parser;
     parser.parse(rc_file_path);
 
-    std::vector<ParserDataType> resources = parser.template get_value<std::vector<ParserDataType>>("resources");
-    for (auto& res : resources) {
+    for (const DataValue& res : parser.get_data().get_entry("resources").as_list_or_empty()) {
         // Use generic scheme only for quick type/id extraction during dispatch.
         RUSchema resource_scheme;
         resource_scheme.deserialize(res);

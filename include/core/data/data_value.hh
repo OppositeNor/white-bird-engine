@@ -12,10 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_SCRIPT_VALUE_HH
-#define WBE_FILE_SCRIPT_VALUE_HH
+#ifndef WBE_FILE_DATA_VALUE_HH
+#define WBE_FILE_DATA_VALUE_HH
 
-#include "core/parser/parser.hh"
 #include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -24,6 +23,7 @@
 #include "glm/ext/vector_float4.hpp"
 #include "utils/utils.hh"
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <format>
@@ -38,10 +38,16 @@
 namespace WhiteBirdEngine {
 
 /**
- * @enum ScriptValueKind
- * @brief The kinds of values a ScriptValue can hold.
+ * @brief Whether a type is a std::vector, which DataValue converts element by element.
  */
-enum class ScriptValueKind : uint8_t {
+template <typename T>
+concept DataValueStdVectorConcept = requires { typename T::value_type; } && std::same_as<T, std::vector<typename T::value_type>>;
+
+/**
+ * @enum DataValueKind
+ * @brief The kinds of values a DataValue can hold.
+ */
+enum class DataValueKind : uint8_t {
     NIL,
     BOOLEAN,
     INTEGER,
@@ -52,40 +58,41 @@ enum class ScriptValueKind : uint8_t {
 };
 
 /**
- * @class ScriptValue
- * @brief Language-neutral value exchanged with script backends.
+ * @class DataValue
+ * @brief Format-neutral structured data: the value tree every parser, serializer, and script backend exchanges.
  *
  * A value is nil, a boolean, a signed 64-bit integer, a double, a string, a list of values, or a map from string keys to
  * values. Maps keep their entries sorted by key, so iteration order is deterministic. The value is a deep, self-contained
- * tree that owns no backend state; it is copyable and movable, and a moved-from value is nil. Like the other parser data
- * types it uses standard containers.
+ * tree that owns no format or backend state; it is copyable and movable, and a moved-from value is nil. It uses standard
+ * containers.
  *
- * ScriptValue implements the ParserData interface, so reflection-generated SerializableSD specializations read and write it
- * directly. Reads convert between integers and floats when the conversion is exact, and an empty list and an empty map read
- * as each other. Accessors throw std::runtime_error when the held kind does not match.
+ * Formats are the parsers' concern: ParserJSON and ParserTOML read text into a DataValue and write it back, and script
+ * backends convert their values to and from it. Reflection-generated SerializableSD specializations read and write it.
+ * Reads convert between integers and floats when the conversion is exact, and an empty list and an empty map read as each
+ * other. Accessors throw std::runtime_error when the held kind does not match.
  */
-class ScriptValue final : public ParserData<ScriptValue> {
+class DataValue final {
 public:
     /**
      * @brief List storage.
      */
-    using List = std::vector<ScriptValue>;
+    using List = std::vector<DataValue>;
     /**
      * @brief One map entry.
      */
-    using MapEntry = std::pair<std::string, ScriptValue>;
+    using MapEntry = std::pair<std::string, DataValue>;
     /**
      * @brief Map storage, sorted by key with unique keys.
      */
     using Map = std::vector<MapEntry>;
 
-    ScriptValue() = default;
-    ~ScriptValue() = default;
-    ScriptValue(const ScriptValue&) = default;
-    ScriptValue(ScriptValue&& p_other) noexcept : value(std::exchange(p_other.value, std::monostate{})) {
+    DataValue() = default;
+    ~DataValue() = default;
+    DataValue(const DataValue&) = default;
+    DataValue(DataValue&& p_other) noexcept : value(std::exchange(p_other.value, std::monostate{})) {
     }
-    ScriptValue& operator=(const ScriptValue&) = default;
-    ScriptValue& operator=(ScriptValue&& p_other) noexcept {
+    DataValue& operator=(const DataValue&) = default;
+    DataValue& operator=(DataValue&& p_other) noexcept {
         if (this != &p_other) {
             value = std::exchange(p_other.value, std::monostate{});
         }
@@ -95,44 +102,44 @@ public:
     /**
      * @brief Create a boolean value.
      */
-    static ScriptValue make_boolean(bool p_value);
+    static DataValue make_boolean(bool p_value);
     /**
      * @brief Create an integer value.
      */
-    static ScriptValue make_integer(int64_t p_value);
+    static DataValue make_integer(int64_t p_value);
     /**
      * @brief Create a float value.
      */
-    static ScriptValue make_float(double p_value);
+    static DataValue make_float(double p_value);
     /**
      * @brief Create a string value.
      */
-    static ScriptValue make_string(std::string_view p_value);
+    static DataValue make_string(std::string_view p_value);
     /**
      * @brief Create an empty list.
      */
-    static ScriptValue make_list();
+    static DataValue make_list();
     /**
      * @brief Create an empty map.
      */
-    static ScriptValue make_map();
+    static DataValue make_map();
 
     /**
      * @brief Get the name of a kind, e.g. "integer".
      */
-    static std::string_view get_kind_name(ScriptValueKind p_kind);
+    static std::string_view get_kind_name(DataValueKind p_kind);
 
     /**
      * @brief Get the kind of the held value.
      */
-    ScriptValueKind get_kind() const {
-        return static_cast<ScriptValueKind>(value.index());
+    DataValueKind get_kind() const {
+        return static_cast<DataValueKind>(value.index());
     }
     /**
      * @brief Check whether the value is nil.
      */
     bool is_nil() const {
-        return get_kind() == ScriptValueKind::NIL;
+        return get_kind() == DataValueKind::NIL;
     }
     /**
      * @brief Get the held boolean.
@@ -160,6 +167,11 @@ public:
      */
     const List& as_list() const;
     /**
+     * @brief Get the held list; an empty map reads as an empty list.
+     * @throws std::runtime_error If the value is neither a list nor an empty map.
+     */
+    const List& as_list_or_empty() const;
+    /**
      * @brief Get the held map entries, sorted by key.
      * @throws std::runtime_error If the value is not a map.
      */
@@ -168,22 +180,27 @@ public:
      * @brief Append an element. A nil value becomes an empty list first.
      * @throws std::runtime_error If the value is neither nil nor a list.
      */
-    void push_back(ScriptValue p_element);
+    void push_back(DataValue p_element);
     /**
      * @brief Insert or replace a map entry. A nil value, or an empty list, becomes an empty map first.
      * @throws std::runtime_error If the value is neither nil, an empty list, nor a map.
      */
-    void set_entry(std::string_view p_key, ScriptValue p_entry);
+    void set_entry(std::string_view p_key, DataValue p_entry);
     /**
      * @brief Find a map entry.
      * @return The entry, or null when the value is not a map or has no entry for the key.
      */
-    const ScriptValue* find(std::string_view p_key) const;
+    const DataValue* find(std::string_view p_key) const;
+    /**
+     * @brief Get a map entry.
+     * @throws std::runtime_error If the value is not a map or has no entry for the key.
+     */
+    const DataValue& get_entry(std::string_view p_key) const;
 
     /**
      * @brief Compare two values structurally. Integers and floats are different kinds and never compare equal.
      */
-    bool operator==(const ScriptValue& p_other) const;
+    bool operator==(const DataValue& p_other) const;
 
     /**
      * @brief Get the keys of a map value in sorted order; other kinds have no keys.
@@ -199,7 +216,7 @@ public:
      * @brief Check whether the value is a string.
      */
     bool is_string() const {
-        return get_kind() == ScriptValueKind::STRING;
+        return get_kind() == DataValueKind::STRING;
     }
 
     /**
@@ -208,7 +225,7 @@ public:
      */
     template <typename T>
     void set_value(std::string_view p_key, T&& p_value) {
-        ScriptValue entry;
+        DataValue entry;
         entry.set(std::forward<T>(p_value));
         set_entry(p_key, std::move(entry));
     }
@@ -216,25 +233,27 @@ public:
     /**
      * @brief Replace this value with a converted C++ value.
      *
-     * Supports ScriptValue, std::vector<ScriptValue>, bool, integral and floating-point types, enums, strings, Buffer,
-     * glm::vec2, glm::vec3, glm::vec4, glm::quat, and glm::mat4. Vectors and quaternions become maps of `x`, `y`, `z`, `w`;
-     * matrices become a list of 16 column-major floats.
+     * Supports DataValue, std::nullptr_t (nil), bool, integral and floating-point types, enums, strings, Buffer, glm::vec2,
+     * glm::vec3, glm::vec4, glm::quat, glm::mat4, and std::vector of any supported type, which becomes a list. Vectors and
+     * quaternions become maps of `x`, `y`, `z`, `w`; matrices become a list of 16 column-major floats.
      * @throws std::runtime_error If an unsigned integer exceeds the signed 64-bit range.
      */
     template <typename T>
     void set(T&& p_value) { // NOLINT
         using Type = std::remove_cvref_t<T>;
-        if constexpr (std::same_as<Type, ScriptValue>) {
+        if constexpr (std::same_as<Type, DataValue>) {
             *this = std::forward<T>(p_value);
         } else if constexpr (std::same_as<Type, List>) {
             value = List(std::forward<T>(p_value));
+        } else if constexpr (std::same_as<Type, std::nullptr_t>) {
+            value = std::monostate{};
         } else if constexpr (std::same_as<Type, bool>) {
             value = p_value;
         } else if constexpr (std::is_enum_v<Type>) {
             set(static_cast<std::underlying_type_t<Type>>(p_value));
         } else if constexpr (std::integral<Type>) {
             if (!std::in_range<int64_t>(p_value)) {
-                throw std::runtime_error(std::format("Failed to set script value: integer {} exceeds the signed 64-bit range.", p_value));
+                throw std::runtime_error(std::format("Failed to set data value: integer {} exceeds the signed 64-bit range.", p_value));
             }
             value = static_cast<int64_t>(p_value);
         } else if constexpr (std::floating_point<Type>) {
@@ -258,8 +277,17 @@ public:
                 }
             }
             value = std::move(matrix);
+        } else if constexpr (DataValueStdVectorConcept<Type>) {
+            List list;
+            list.reserve(p_value.size());
+            for (const auto& element : p_value) {
+                DataValue element_value;
+                element_value.set(element);
+                list.push_back(std::move(element_value));
+            }
+            value = std::move(list);
         } else {
-            static_assert(sizeof(Type) == 0, "Unsupported type for ScriptValue::set.");
+            static_assert(sizeof(Type) == 0, "Unsupported type for DataValue::set.");
         }
     }
 
@@ -289,16 +317,22 @@ public:
      * @brief Convert this value into p_value; supports the types listed for set().
      *
      * Integral targets accept integers and floats with an exact integral value in range. Vectors accept maps of `x`, `y`,
-     * `z`, `w`; glm::vec2 also accepts `u`, `v`. Strings longer than a Buffer's capacity are rejected.
+     * `z`, `w`; glm::vec2 also accepts `u`, `v`. std::nullptr_t accepts only nil. Strings longer than a Buffer's capacity
+     * are rejected.
      * @throws std::runtime_error If the value has an incompatible kind or is out of range.
      */
     template <typename T>
     void get(T& p_value) const { // NOLINT
         using Type = std::remove_cvref_t<T>;
-        if constexpr (std::same_as<Type, ScriptValue>) {
+        if constexpr (std::same_as<Type, DataValue>) {
             p_value = *this;
         } else if constexpr (std::same_as<Type, List>) {
-            p_value = get_list_or_empty();
+            p_value = as_list_or_empty();
+        } else if constexpr (std::same_as<Type, std::nullptr_t>) {
+            if (!is_nil()) {
+                throw_kind_mismatch("nil");
+            }
+            p_value = nullptr;
         } else if constexpr (std::same_as<Type, bool>) {
             p_value = as_boolean();
         } else if constexpr (std::is_enum_v<Type>) {
@@ -313,7 +347,7 @@ public:
             const std::string& string_value = as_string();
             if (string_value.size() > Type::BUFFER_SIZE - 1) {
                 throw std::runtime_error(std::format(
-                    "Failed to get script value: string of length {} exceeds buffer capacity {}.", string_value.size(), Type::BUFFER_SIZE));
+                    "Failed to get data value: string of length {} exceeds buffer capacity {}.", string_value.size(), Type::BUFFER_SIZE));
             }
             std::memcpy(p_value.buffer, string_value.data(), string_value.size());
             p_value.buffer[string_value.size()] = '\0';
@@ -333,15 +367,24 @@ public:
             const List& matrix = as_list();
             if (matrix.size() != 16) {
                 throw std::runtime_error(
-                    std::format("Failed to get glm::mat4 from script value: expected 16 values but got {}.", matrix.size()));
+                    std::format("Failed to get glm::mat4 from data value: expected 16 values but got {}.", matrix.size()));
             }
             for (glm::length_t column = 0; column < 4; ++column) {
                 for (glm::length_t row = 0; row < 4; ++row) {
                     p_value[column][row] = static_cast<float>(matrix[(column * 4) + row].as_float());
                 }
             }
+        } else if constexpr (DataValueStdVectorConcept<Type>) {
+            const List& list = as_list_or_empty();
+            p_value.clear();
+            p_value.reserve(list.size());
+            for (const DataValue& element : list) {
+                typename Type::value_type element_value{};
+                element.get(element_value);
+                p_value.push_back(std::move(element_value));
+            }
         } else {
-            static_assert(sizeof(Type) == 0, "Unsupported type for ScriptValue::get.");
+            static_assert(sizeof(Type) == 0, "Unsupported type for DataValue::get.");
         }
     }
 
@@ -351,31 +394,26 @@ public:
      */
     template <typename T>
     void get_value(std::string_view p_key, T& p_value) const {
-        const ScriptValue* entry = find(p_key);
-        if (entry == nullptr) {
-            throw std::runtime_error(std::format("Failed to get script value: key '{}' is missing.", p_key));
-        }
-        entry->get(p_value);
+        get_entry(p_key).get(p_value);
     }
 
 private:
     template <std::integral TIntegral>
     TIntegral get_integral() const {
         int64_t integer = 0;
-        if (get_kind() == ScriptValueKind::FLOAT) {
+        if (get_kind() == DataValueKind::FLOAT) {
             integer = float_to_exact_integer(std::get<double>(value));
         } else {
             integer = as_integer();
         }
         if (!std::in_range<TIntegral>(integer)) {
-            throw std::runtime_error(std::format("Failed to get script value: integer {} is out of range for the target type.", integer));
+            throw std::runtime_error(std::format("Failed to get data value: integer {} is out of range for the target type.", integer));
         }
         return static_cast<TIntegral>(integer);
     }
 
     static int64_t float_to_exact_integer(double p_value);
     void set_vector_components(const float* p_components, size_t p_count);
-    const List& get_list_or_empty() const;
     [[noreturn]] void throw_kind_mismatch(std::string_view p_expected) const;
 
     std::variant<std::monostate, bool, int64_t, double, std::string, List, Map> value;

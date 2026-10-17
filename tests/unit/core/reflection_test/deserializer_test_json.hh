@@ -357,7 +357,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_ExtremeValues) {
         "si32_test": 2147483647,
         "si64_test": -9223372036854775808,
         "ui32_test": 4294967295,
-        "ui64_test": 18446744073709551615,
+        "ui64_test": 9223372036854775807,
         "f32_test": 3.4028235e+38,
         "f64_test": -1.7976931348623157e+308
     })";
@@ -368,7 +368,7 @@ TEST_F(WBEDeserializerJSONTest, EdgeCase_ExtremeValues) {
     EXPECT_EQ(test_obj.si32_test, std::numeric_limits<int32_t>::max());
     EXPECT_EQ(test_obj.si64_test, std::numeric_limits<int64_t>::min());
     EXPECT_EQ(test_obj.ui32_test, std::numeric_limits<uint32_t>::max());
-    EXPECT_EQ(test_obj.ui64_test, std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(test_obj.ui64_test, static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
 }
 
 TEST_F(WBEDeserializerJSONTest, EdgeCase_UnicodeStrings) {
@@ -924,7 +924,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ExtremeValues) {
         "si32_test": 2147483647,
         "si64_test": -9223372036854775808,
         "ui32_test": 4294967295,
-        "ui64_test": 18446744073709551615,
+        "ui64_test": 9223372036854775807,
         "f32_test": 3.4028235e+38,
         "f64_test": -1.7976931348623157e+308
     })";
@@ -935,7 +935,7 @@ TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_ExtremeValues) {
     EXPECT_EQ(test_obj.si32_test, std::numeric_limits<int32_t>::max());
     EXPECT_EQ(test_obj.si64_test, std::numeric_limits<int64_t>::min());
     EXPECT_EQ(test_obj.ui32_test, std::numeric_limits<uint32_t>::max());
-    EXPECT_EQ(test_obj.ui64_test, std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(test_obj.ui64_test, static_cast<uint64_t>(std::numeric_limits<int64_t>::max()));
 }
 
 TEST_F(WBEDeserializerJSONTest, DynamicDeserialization_UnicodeStrings) {
@@ -1637,6 +1637,12 @@ TEST_F(WBEDeserializerJSONTest, NestedRequired_ComplexStructure) {
     EXPECT_EQ(test_obj.required_static_vector[1].required_static_field, "static2");
     EXPECT_EQ(test_obj.required_static_vector[1].optional_static_number, 999);
     EXPECT_EQ(test_obj.required_static_vector[1].required_static_vector, glm::vec3(10.0F, 11.0F, 12.0F));
+}
+
+TEST_F(WBEDeserializerJSONTest, RejectsIntegersAboveTheSignedRange) {
+    // DataValue integers are signed 64-bit, so JSON integers above INT64_MAX are rejected when the document is read.
+    WBE::ParserJSON parser;
+    EXPECT_THROW(parser.parse_from_buffer(R"({"ui64_test": 9223372036854775808})"), std::runtime_error);
 }
 
 #endif

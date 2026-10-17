@@ -16,10 +16,11 @@
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include <sstream>
 #include <stdexcept>
-#include <string_view>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace WhiteBirdEngine {
@@ -34,9 +35,7 @@ std::string descriptor_rows_to_string(const DebugDataRows& p_rows) {
     }
     DebugData root;
     root.set(std::move(rows));
-    std::ostringstream stream;
-    stream << root;
-    return stream.str();
+    return ParserJSON::write(root);
 }
 
 } // namespace

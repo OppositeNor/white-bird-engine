@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
 #define WBE_FILE_RENDER_VK_RESOURCE_UNIT_LOADER_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -29,7 +30,7 @@ namespace WhiteBirdEngine {
 class ResourceUnitLoaderShader final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
@@ -39,7 +40,7 @@ protected:
 class ResourceUnitLoaderGraphicsPipeline final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
@@ -58,7 +59,7 @@ public:
     /**
      * @brief Deserialize and populate a ray-tracing pipeline resource.
      */
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
@@ -68,7 +69,7 @@ protected:
 class ResourceUnitLoaderMaterial final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
@@ -77,7 +78,7 @@ protected:
 class ResourceUnitLoaderMesh final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
@@ -90,12 +91,12 @@ protected:
 class ResourceUnitLoaderSkeleton final : public IResourceUnitLoader {
 public:
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
 
 protected:
     /**
-     * @throws std::runtime_error When the joints binary_id is empty or contains NUL, or the joint byte range is empty, is not
-     * a multiple of RUSkeleton::JOINT_BYTE_SIZE, or holds more joints than the int32 index range.
+     * @throws std::runtime_error When the joints binary_id is empty or contains NUL, or the joint byte range is empty, is
+     * not a multiple of RUSkeleton::JOINT_BYTE_SIZE, or holds more joints than the int32 index range.
      */
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };

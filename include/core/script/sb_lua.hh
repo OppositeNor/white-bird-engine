@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_SB_LUA_HH
 #define WBE_FILE_SB_LUA_HH
 
+#include "core/data/data_value.hh"
 #include "core/script/i_script_backend.hh"
 #include "core/script/script_sandbox_config.hh"
-#include "core/script/script_value.hh"
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
  * a table of functions; each module runs with its own global table whose missing names fall back to the shared standard
  * libraries. The hash seed is fixed, so table iteration order is reproducible between runs.
  *
- * Conversions to ScriptValue map nil, booleans, integers, floats, and strings directly. A table whose keys are exactly
+ * Conversions to DataValue map nil, booleans, integers, floats, and strings directly. A table whose keys are exactly
  * 1..n becomes a list and a table whose keys are all strings becomes a map; an empty table becomes an empty list.
  * Metatables are ignored. Functions, userdata, threads, non-finite numbers, mixed or non-string keys, cyclic tables, and
  * nesting deeper than MAX_VALUE_DEPTH fail with the value's path.
@@ -68,7 +68,7 @@ public:
     SBLua& operator=(SBLua&&) noexcept = delete;
 
     virtual void load_module(std::string_view p_module, std::string_view p_source) override;
-    virtual ScriptValue call(std::string_view p_module, std::string_view p_function, std::span<const ScriptValue> p_args) override;
+    virtual DataValue call(std::string_view p_module, std::string_view p_function, std::span<const DataValue> p_args) override;
     virtual bool has_function(std::string_view p_module, std::string_view p_function) const override;
 
 private:

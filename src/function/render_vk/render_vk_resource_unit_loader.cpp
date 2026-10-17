@@ -14,6 +14,7 @@
 */
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
@@ -524,7 +525,7 @@ std::any ResourceUnitLoaderShader::populate_scheme_ptr(IResourceChunk& p_res_chu
     return populate_shader_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderShader::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderShader::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaShader scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -540,8 +541,7 @@ std::any ResourceUnitLoaderGraphicsPipeline::populate_scheme_ptr(IResourceChunk&
     return populate_graphics_pipeline_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(
-    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderGraphicsPipeline::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaGraphicsPipeline scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -557,8 +557,7 @@ std::any ResourceUnitLoaderRayTracingPipeline::populate_scheme_ptr(IResourceChun
     return populate_ray_tracing_pipeline_resource(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderRayTracingPipeline::populate_scheme_from_data(
-    IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderRayTracingPipeline::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaRayTracingPipeline scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -574,7 +573,7 @@ std::any ResourceUnitLoaderMaterial::populate_scheme_ptr(IResourceChunk& p_res_c
     return resolve_material(p_res_chunk, typed_scheme);
 }
 
-void ResourceUnitLoaderMaterial::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderMaterial::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaMaterial scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -606,7 +605,7 @@ std::any ResourceUnitLoaderMesh::populate_scheme_ptr(IResourceChunk& p_res_chunk
     return saved_resource;
 }
 
-void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderMesh::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaMesh3D scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -650,7 +649,7 @@ std::any ResourceUnitLoaderSkeleton::populate_scheme_ptr(IResourceChunk& p_res_c
     return saved_resource;
 }
 
-void ResourceUnitLoaderSkeleton::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderSkeleton::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaSkeleton scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);

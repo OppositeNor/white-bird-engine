@@ -13,8 +13,9 @@
    limitations under the License.
 */
 #include "function/scene/scene_resource_unit_loader.hh"
-#include "function/scene/scene_resource_unit.hh"
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
+#include "function/scene/scene_resource_unit.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <any>
@@ -39,7 +40,7 @@ std::span<const std::string> ResourceUnitLoaderComponent::get_supported_resource
     return supported_resource_types;
 }
 
-void ResourceUnitLoaderComponent::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderComponent::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     (void)p_res_chunk;
     (void)p_scheme_data;
     throw_loader_not_implemented("component");
@@ -56,7 +57,7 @@ std::span<const std::string> ResourceUnitLoaderPrefab::get_supported_resource_ty
     return supported_resource_types;
 }
 
-void ResourceUnitLoaderPrefab::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderPrefab::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     (void)p_res_chunk;
     (void)p_scheme_data;
     throw_loader_not_implemented("prefab");
@@ -73,7 +74,7 @@ std::span<const std::string> ResourceUnitLoaderWorld::get_supported_resource_typ
     return supported_resource_types;
 }
 
-void ResourceUnitLoaderWorld::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderWorld::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     RUSchemaWorld scheme;
     scheme.deserialize(p_scheme_data);
     populate_scheme_ptr(p_res_chunk, scheme);
@@ -86,10 +87,12 @@ std::any ResourceUnitLoaderWorld::populate_scheme_ptr(IResourceChunk& p_res_chun
     }
     const std::string& static_mesh_render = typed_scheme->static_component.static_mesh_render;
     if (static_mesh_render.empty()) {
-        throw std::runtime_error("Failed to populate world resource unit " + typed_scheme->id + ": static_component.static_mesh_render must not be empty.");
+        throw std::runtime_error("Failed to populate world resource unit " + typed_scheme->id +
+                                 ": static_component.static_mesh_render must not be empty.");
     }
     RUWorld resource_unit;
-    resource_unit.static_component.static_mesh_render = p_res_chunk.push_data(static_mesh_render.size() + 1, static_mesh_render.c_str());
+    resource_unit.static_component.static_mesh_render =
+        p_res_chunk.push_data(static_mesh_render.size() + 1, static_mesh_render.c_str());
     return p_res_chunk.push_res_unit(typed_scheme->id, resource_unit).force_cast<RUWorld>();
 }
 
@@ -98,7 +101,7 @@ std::span<const std::string> ResourceUnitLoaderScene::get_supported_resource_typ
     return supported_resource_types;
 }
 
-void ResourceUnitLoaderScene::populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const {
+void ResourceUnitLoaderScene::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
     (void)p_res_chunk;
     (void)p_scheme_data;
     throw_loader_not_implemented("scene");

@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_DESERIALIZER_TEST_TOML_HH
 #define WBE_FILE_DESERIALIZER_TEST_TOML_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_toml.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "global/global.hh"
@@ -203,14 +204,12 @@ TEST_F(WBEDeserializerTOMLTest, SerializeRoundTrip) {
     source.nested_test.optional_str_test = "present";
     strncpy(source.nested_test.buffer_test.buffer, "buffer", sizeof(source.nested_test.buffer_test.buffer));
 
-    WBE::TOMLData data;
+    WBE::DataValue data;
     WBE::SerializableSD<WBE::TestSerializableNesting>::serialize(data, source);
 
     // Reparse the emitted document to check it is valid TOML.
-    std::ostringstream stream;
-    stream << data;
     WBE::ParserTOML parser;
-    parser.parse_from_buffer(stream.str());
+    parser.parse_from_buffer(WBE::ParserTOML::write(data));
 
     WBE::TestSerializableNesting result;
     WBE::SerializableSD<WBE::TestSerializableNesting>::deserialize(parser.get_data(), result);

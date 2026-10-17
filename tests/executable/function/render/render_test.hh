@@ -19,6 +19,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/parser/parser_json.hh"
 #include "function/ecs/components.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/material_texture_contract.hh"
@@ -71,7 +72,6 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <print>
 #include <span>
@@ -124,16 +124,14 @@ inline void write_descriptor_debug_output(std::string_view p_name, std::string_v
     if (!output.is_open()) {
         throw std::runtime_error(std::format("Failed to open descriptor debug output file: {}.", output_path.generic_string()));
     }
-    output << nlohmann::json::parse(p_json).dump(2) << '\n';
+    output << ParserJSON::write(ParserJSON::read(p_json), 2) << '\n';
     if (!output.good()) {
         throw std::runtime_error(std::format("Failed to write descriptor debug output file: {}.", output_path.generic_string()));
     }
 }
 
 inline void write_descriptor_debug_output(std::string_view p_name, const DebugData& p_data) {
-    std::ostringstream stream;
-    stream << p_data;
-    write_descriptor_debug_output(p_name, stream.str());
+    write_descriptor_debug_output(p_name, ParserJSON::write(p_data));
 }
 
 /**
@@ -270,8 +268,10 @@ inline constexpr size_t RENDER_TEST_MATERIAL_TABLE_INDEX = 0;
  * material pipeline builds no table.
  * @throws std::runtime_error If the mesh already has material tables, so the table would get another index.
  */
-inline Ref<MeshResourcesVK> create_mesh_resources(
-    RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, const MeshCompilerVK::Config& p_config = {}) {
+inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
+    RefRes<RUMesh3D> p_mesh,
+    RefRes<RUGraphicsPipeline> p_material_pipeline,
+    const MeshCompilerVK::Config& p_config = {}) {
     Ref<MeshResourcesVK> result = MeshCompilerVK(p_renderer).compile(p_mesh, p_config);
     const std::optional<MaterialTextureContract> material_contract =
         p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
@@ -552,8 +552,8 @@ inline SubmeshDrawBuffersVK import_submesh_draw_buffers(RendererVK* p_renderer,
     if (p_submesh.indices.binary.start % sizeof(uint32_t) != 0) {
         throw std::runtime_error("Failed to import submesh draw buffers: the index range is not uint32 aligned.");
     }
-    MeshBufferCompilerVK::BuildResult buffers = MeshBufferCompilerVK(p_renderer->get_base_render_data())
-                                                    .build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    MeshBufferCompilerVK::BuildResult buffers =
+        MeshBufferCompilerVK(p_renderer->get_base_render_data()).build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     if (buffers.vertex_buffers.empty() || buffers.index_buffer == MEM_NULL) {
         throw std::runtime_error("Failed to import submesh draw buffers: the mesh has no indexed geometry.");
     }

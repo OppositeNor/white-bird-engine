@@ -15,7 +15,9 @@
 #ifndef WBE_FILE_ENUM_REFLECTION_HH
 #define WBE_FILE_ENUM_REFLECTION_HH
 
+#include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable_sd.hh"
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -218,8 +220,7 @@ public:
      * @brief Serialize the canonical name.
      * @throws std::runtime_error If no enumerator has the value.
      */
-    template <typename ParserDataType>
-    static void serialize(ParserDataType& p_data, const ObjType& p_serializable) {
+    static void serialize(DataValue& p_data, const ObjType& p_serializable) {
         p_data.set(std::string(EnumReflection<TEnum>::enum_to_string(p_serializable)));
     }
 
@@ -227,16 +228,15 @@ public:
      * @brief Deserialize a name, an alias, or an underlying integer.
      * @throws std::runtime_error If the data is not a known name, or not an integer equal to a declared enumerator.
      */
-    template <typename ParserDataType>
-    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
+    static void deserialize(const DataValue& p_data, ObjType& p_serializable) {
         if (p_data.is_string()) {
-            p_serializable = EnumReflection<TEnum>::string_to_enum(p_data.template get<std::string>());
+            p_serializable = EnumReflection<TEnum>::string_to_enum(p_data.get<std::string>());
             return;
         }
         using UnderlyingType = EnumReflection<TEnum>::UnderlyingType;
         // Read through the widest integer of the same signedness as the underlying type, then range-check.
         using WideType = std::conditional_t<std::is_same_v<UnderlyingType, uint64_t>, uint64_t, int64_t>;
-        const WideType integer = p_data.template get<WideType>();
+        const WideType integer = p_data.get<WideType>();
         if (!std::in_range<UnderlyingType>(integer)) {
             throw std::runtime_error(std::format(
                 "Failed to convert {} to {}: the value does not fit the underlying type.", integer, EnumReflection<TEnum>::TYPE_NAME));

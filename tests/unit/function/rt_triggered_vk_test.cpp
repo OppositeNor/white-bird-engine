@@ -13,20 +13,20 @@
    limitations under the License.
 */
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "core/script/script_value.hh"
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
-#include "render_task_registry_vk_test_tasks.hh"
 #include "global/global.hh"
+#include "render_task_registry_vk_test_tasks.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
 #include <functional>
@@ -123,7 +123,7 @@ TEST(WBERTTriggeredVKTest, ActivationDuringRecordingRemainsPending) {
     RenderAllocator allocator(WBE_KI_B(64));
     TriggerProbeState state;
     RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
-    state.on_record = [&task]() {
+    state.on_record = [&task] {
         task.trigger();
     };
     task.record(VK_NULL_HANDLE, 0.0);
@@ -362,8 +362,8 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryRejectsInvalidInputs) {
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryComposesWithTheTaskRegistry) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);
-    ScriptValue params;
-    params.set_entry("label", ScriptValue::make_string("triggered"));
+    DataValue params;
+    params.set_entry("label", DataValue::make_string("triggered"));
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
         RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data), "probe.registry", &render_data);
     Unique<IRenderTaskVK> task = factory(RendGraphContextVK{});

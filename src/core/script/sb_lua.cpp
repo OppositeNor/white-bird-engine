@@ -13,8 +13,14 @@
    limitations under the License.
 */
 #include "core/script/sb_lua.hh"
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
+#include "core/script/script_sandbox_config.hh"
 #include "utils/defs.hh"
+extern "C" {
+#include "lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
+}
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -22,7 +28,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <format>
-#include <lua.hpp>
 #include <print>
 #include <span>
 #include <stdexcept>
@@ -106,31 +111,31 @@ void ensure_stack(lua_State* p_state, int p_slots, std::string_view p_path) {
     }
 }
 
-void push_script_value(lua_State* p_state, const ScriptValue& p_value, size_t p_depth) {
+void push_script_value(lua_State* p_state, const DataValue& p_value, size_t p_depth) {
     if (p_depth > SBLua::MAX_VALUE_DEPTH) {
         throw std::runtime_error(std::format("Failed to pass script value: nesting exceeds {} levels.", SBLua::MAX_VALUE_DEPTH));
     }
     ensure_stack(p_state, 3, "argument");
     switch (p_value.get_kind()) {
-    case ScriptValueKind::NIL:
+    case DataValueKind::NIL:
         lua_pushnil(p_state);
         return;
-    case ScriptValueKind::BOOLEAN:
+    case DataValueKind::BOOLEAN:
         lua_pushboolean(p_state, p_value.as_boolean() ? 1 : 0);
         return;
-    case ScriptValueKind::INTEGER:
+    case DataValueKind::INTEGER:
         lua_pushinteger(p_state, static_cast<lua_Integer>(p_value.as_integer()));
         return;
-    case ScriptValueKind::FLOAT:
+    case DataValueKind::FLOAT:
         lua_pushnumber(p_state, static_cast<lua_Number>(p_value.as_float()));
         return;
-    case ScriptValueKind::STRING: {
+    case DataValueKind::STRING: {
         const std::string& string_value = p_value.as_string();
         lua_pushlstring(p_state, string_value.data(), string_value.size());
         return;
     }
-    case ScriptValueKind::LIST: {
-        const ScriptValue::List& list = p_value.as_list();
+    case DataValueKind::LIST: {
+        const DataValue::List& list = p_value.as_list();
         lua_createtable(p_state, static_cast<int>(std::min<size_t>(list.size(), INT32_MAX)), 0);
         for (size_t i = 0; i < list.size(); ++i) {
             push_script_value(p_state, list[i], p_depth + 1);
@@ -138,10 +143,10 @@ void push_script_value(lua_State* p_state, const ScriptValue& p_value, size_t p_
         }
         return;
     }
-    case ScriptValueKind::MAP: {
-        const ScriptValue::Map& map = p_value.as_map();
+    case DataValueKind::MAP: {
+        const DataValue::Map& map = p_value.as_map();
         lua_createtable(p_state, 0, static_cast<int>(std::min<size_t>(map.size(), INT32_MAX)));
-        for (const ScriptValue::MapEntry& entry : map) {
+        for (const DataValue::MapEntry& entry : map) {
             lua_pushlstring(p_state, entry.first.data(), entry.first.size());
             push_script_value(p_state, entry.second, p_depth + 1);
             lua_rawset(p_state, -3);
@@ -152,17 +157,22 @@ void push_script_value(lua_State* p_state, const ScriptValue& p_value, size_t p_
     throw std::runtime_error("Failed to pass script value: unknown kind.");
 }
 
-ScriptValue to_script_value(
+DataValue to_script_value(
     lua_State* p_state, int p_index, const std::string& p_path, std::vector<const void*>& p_active_tables, size_t p_depth);
 
-ScriptValue table_to_script_value( // NOLINT
-    lua_State* p_state, int p_index, const std::string& p_path, std::vector<const void*>& p_active_tables, size_t p_depth) {
+DataValue table_to_script_value( // NOLINT
+    lua_State* p_state,
+    int p_index,
+    const std::string& p_path,
+    std::vector<const void*>& p_active_tables,
+    size_t p_depth) {
     const void* table_identity = lua_topointer(p_state, p_index);
     if (std::ranges::find(p_active_tables, table_identity) != p_active_tables.end()) {
         throw std::runtime_error(std::format("Failed to convert script value at {}: the table contains itself.", p_path));
     }
     if (p_depth > SBLua::MAX_VALUE_DEPTH) {
-        throw std::runtime_error(std::format("Failed to convert script value at {}: nesting exceeds {} levels.", p_path, SBLua::MAX_VALUE_DEPTH));
+        throw std::runtime_error(
+            std::format("Failed to convert script value at {}: nesting exceeds {} levels.", p_path, SBLua::MAX_VALUE_DEPTH));
     }
     ensure_stack(p_state, 4, p_path);
 
@@ -185,20 +195,21 @@ ScriptValue table_to_script_value( // NOLINT
         lua_pop(p_state, 1);
     }
     if (entry_count == 0) {
-        return ScriptValue::make_list();
+        return DataValue::make_list();
     }
 
     p_active_tables.push_back(table_identity);
-    ScriptValue result;
+    DataValue result;
     if (has_only_positive_integer_keys && std::cmp_equal(largest_integer_key, entry_count)) {
-        result = ScriptValue::make_list();
+        result = DataValue::make_list();
         for (size_t i = 1; i <= entry_count; ++i) {
             lua_rawgeti(p_state, p_index, static_cast<lua_Integer>(i));
-            result.push_back(to_script_value(p_state, lua_gettop(p_state), std::format("{}[{}]", p_path, i), p_active_tables, p_depth + 1));
+            result.push_back(
+                to_script_value(p_state, lua_gettop(p_state), std::format("{}[{}]", p_path, i), p_active_tables, p_depth + 1));
             lua_pop(p_state, 1);
         }
     } else if (has_only_string_keys) {
-        result = ScriptValue::make_map();
+        result = DataValue::make_map();
         lua_pushnil(p_state);
         while (lua_next(p_state, p_index) != 0) {
             size_t key_length = 0;
@@ -216,27 +227,27 @@ ScriptValue table_to_script_value( // NOLINT
     return result;
 }
 
-ScriptValue to_script_value(
+DataValue to_script_value(
     lua_State* p_state, int p_index, const std::string& p_path, std::vector<const void*>& p_active_tables, size_t p_depth) {
     switch (lua_type(p_state, p_index)) {
     case LUA_TNIL:
         return {};
     case LUA_TBOOLEAN:
-        return ScriptValue::make_boolean(lua_toboolean(p_state, p_index) != 0);
+        return DataValue::make_boolean(lua_toboolean(p_state, p_index) != 0);
     case LUA_TNUMBER: {
         if (lua_isinteger(p_state, p_index) != 0) {
-            return ScriptValue::make_integer(static_cast<int64_t>(lua_tointeger(p_state, p_index)));
+            return DataValue::make_integer(static_cast<int64_t>(lua_tointeger(p_state, p_index)));
         }
         const double number = static_cast<double>(lua_tonumber(p_state, p_index));
         if (!std::isfinite(number)) {
             throw std::runtime_error(std::format("Failed to convert script value at {}: the number is not finite.", p_path));
         }
-        return ScriptValue::make_float(number);
+        return DataValue::make_float(number);
     }
     case LUA_TSTRING: {
         size_t length = 0;
         const char* data = lua_tolstring(p_state, p_index, &length);
-        return ScriptValue::make_string(std::string_view(data, length));
+        return DataValue::make_string(std::string_view(data, length));
     }
     case LUA_TTABLE:
         return table_to_script_value(p_state, p_index, p_path, p_active_tables, p_depth);
@@ -312,7 +323,7 @@ void SBLua::load_module(std::string_view p_module, std::string_view p_source) {
     lua_rawset(state, -3);
 }
 
-ScriptValue SBLua::call(std::string_view p_module, std::string_view p_function, std::span<const ScriptValue> p_args) {
+DataValue SBLua::call(std::string_view p_module, std::string_view p_function, std::span<const DataValue> p_args) {
     LuaStackGuard guard(state);
     reset_instruction_budget();
     lua_pushcfunction(state, &traceback_message_handler);
@@ -324,13 +335,13 @@ ScriptValue SBLua::call(std::string_view p_module, std::string_view p_function, 
     lua_pushlstring(state, p_function.data(), p_function.size());
     lua_rawget(state, -2);
     if (lua_type(state, -1) != LUA_TFUNCTION) {
-        throw std::runtime_error(
-            std::format("Failed to call script function '{}.{}': the module does not export a function with this name.", p_module, p_function));
+        throw std::runtime_error(std::format(
+            "Failed to call script function '{}.{}': the module does not export a function with this name.", p_module, p_function));
     }
     if (p_args.size() > static_cast<size_t>(INT32_MAX)) {
         throw std::runtime_error(std::format("Failed to call script function '{}.{}': too many arguments.", p_module, p_function));
     }
-    for (const ScriptValue& arg : p_args) {
+    for (const DataValue& arg : p_args) {
         push_script_value(state, arg, 0);
     }
     if (lua_pcall(state, static_cast<int>(p_args.size()), 1, message_handler) != LUA_OK) {

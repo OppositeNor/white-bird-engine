@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/script/script_value.hh"
+#include "core/data/data_value.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -37,122 +38,122 @@ constexpr double INT64_UPPER_BOUND = 9223372036854775808.0;
 
 } // namespace
 
-std::string_view ScriptValue::get_kind_name(ScriptValueKind p_kind) {
+std::string_view DataValue::get_kind_name(DataValueKind p_kind) {
     switch (p_kind) {
-    case ScriptValueKind::NIL:
+    case DataValueKind::NIL:
         return "nil";
-    case ScriptValueKind::BOOLEAN:
+    case DataValueKind::BOOLEAN:
         return "boolean";
-    case ScriptValueKind::INTEGER:
+    case DataValueKind::INTEGER:
         return "integer";
-    case ScriptValueKind::FLOAT:
+    case DataValueKind::FLOAT:
         return "float";
-    case ScriptValueKind::STRING:
+    case DataValueKind::STRING:
         return "string";
-    case ScriptValueKind::LIST:
+    case DataValueKind::LIST:
         return "list";
-    case ScriptValueKind::MAP:
+    case DataValueKind::MAP:
         return "map";
     }
-    throw std::runtime_error("Unknown script value kind.");
+    throw std::runtime_error("Unknown data value kind.");
 }
 
-ScriptValue ScriptValue::make_boolean(bool p_value) {
-    ScriptValue result;
+DataValue DataValue::make_boolean(bool p_value) {
+    DataValue result;
     result.value = p_value;
     return result;
 }
 
-ScriptValue ScriptValue::make_integer(int64_t p_value) {
-    ScriptValue result;
+DataValue DataValue::make_integer(int64_t p_value) {
+    DataValue result;
     result.value = p_value;
     return result;
 }
 
-ScriptValue ScriptValue::make_float(double p_value) {
-    ScriptValue result;
+DataValue DataValue::make_float(double p_value) {
+    DataValue result;
     result.value = p_value;
     return result;
 }
 
-ScriptValue ScriptValue::make_string(std::string_view p_value) {
-    ScriptValue result;
+DataValue DataValue::make_string(std::string_view p_value) {
+    DataValue result;
     result.value = std::string(p_value);
     return result;
 }
 
-ScriptValue ScriptValue::make_list() {
-    ScriptValue result;
+DataValue DataValue::make_list() {
+    DataValue result;
     result.value = List();
     return result;
 }
 
-ScriptValue ScriptValue::make_map() {
-    ScriptValue result;
+DataValue DataValue::make_map() {
+    DataValue result;
     result.value = Map();
     return result;
 }
 
-bool ScriptValue::as_boolean() const {
-    if (get_kind() != ScriptValueKind::BOOLEAN) {
+bool DataValue::as_boolean() const {
+    if (get_kind() != DataValueKind::BOOLEAN) {
         throw_kind_mismatch("boolean");
     }
     return std::get<bool>(value);
 }
 
-int64_t ScriptValue::as_integer() const {
-    if (get_kind() != ScriptValueKind::INTEGER) {
+int64_t DataValue::as_integer() const {
+    if (get_kind() != DataValueKind::INTEGER) {
         throw_kind_mismatch("integer");
     }
     return std::get<int64_t>(value);
 }
 
-double ScriptValue::as_float() const {
-    if (get_kind() == ScriptValueKind::INTEGER) {
+double DataValue::as_float() const {
+    if (get_kind() == DataValueKind::INTEGER) {
         return static_cast<double>(std::get<int64_t>(value));
     }
-    if (get_kind() != ScriptValueKind::FLOAT) {
+    if (get_kind() != DataValueKind::FLOAT) {
         throw_kind_mismatch("float");
     }
     return std::get<double>(value);
 }
 
-const std::string& ScriptValue::as_string() const {
-    if (get_kind() != ScriptValueKind::STRING) {
+const std::string& DataValue::as_string() const {
+    if (get_kind() != DataValueKind::STRING) {
         throw_kind_mismatch("string");
     }
     return std::get<std::string>(value);
 }
 
-const ScriptValue::List& ScriptValue::as_list() const {
-    if (get_kind() != ScriptValueKind::LIST) {
+const DataValue::List& DataValue::as_list() const {
+    if (get_kind() != DataValueKind::LIST) {
         throw_kind_mismatch("list");
     }
     return std::get<List>(value);
 }
 
-const ScriptValue::Map& ScriptValue::as_map() const {
-    if (get_kind() != ScriptValueKind::MAP) {
+const DataValue::Map& DataValue::as_map() const {
+    if (get_kind() != DataValueKind::MAP) {
         throw_kind_mismatch("map");
     }
     return std::get<Map>(value);
 }
 
-void ScriptValue::push_back(ScriptValue p_element) {
+void DataValue::push_back(DataValue p_element) {
     if (is_nil()) {
         value = List();
     }
-    if (get_kind() != ScriptValueKind::LIST) {
+    if (get_kind() != DataValueKind::LIST) {
         throw_kind_mismatch("list");
     }
     std::get<List>(value).push_back(std::move(p_element));
 }
 
-void ScriptValue::set_entry(std::string_view p_key, ScriptValue p_entry) {
-    if (is_nil() || (get_kind() == ScriptValueKind::LIST && std::get<List>(value).empty())) {
+void DataValue::set_entry(std::string_view p_key, DataValue p_entry) {
+    if (is_nil() || (get_kind() == DataValueKind::LIST && std::get<List>(value).empty())) {
         value = Map();
     }
-    if (get_kind() != ScriptValueKind::MAP) {
+    if (get_kind() != DataValueKind::MAP) {
         throw_kind_mismatch("map");
     }
     Map& map = std::get<Map>(value);
@@ -164,8 +165,8 @@ void ScriptValue::set_entry(std::string_view p_key, ScriptValue p_entry) {
     map.emplace(position, std::string(p_key), std::move(p_entry));
 }
 
-const ScriptValue* ScriptValue::find(std::string_view p_key) const {
-    if (get_kind() != ScriptValueKind::MAP) {
+const DataValue* DataValue::find(std::string_view p_key) const {
+    if (get_kind() != DataValueKind::MAP) {
         return nullptr;
     }
     const Map& map = std::get<Map>(value);
@@ -176,13 +177,25 @@ const ScriptValue* ScriptValue::find(std::string_view p_key) const {
     return &position->second;
 }
 
-bool ScriptValue::operator==(const ScriptValue& p_other) const {
+const DataValue& DataValue::get_entry(std::string_view p_key) const {
+    const DataValue* entry = find(p_key);
+    if (entry == nullptr) {
+        if (get_kind() != DataValueKind::MAP) {
+            throw std::runtime_error(std::format(
+                "Failed to get data value entry '{}': the value is a {}, not a map.", p_key, get_kind_name(get_kind())));
+        }
+        throw std::runtime_error(std::format("Failed to get data value: key '{}' is missing.", p_key));
+    }
+    return *entry;
+}
+
+bool DataValue::operator==(const DataValue& p_other) const {
     return value == p_other.value;
 }
 
-std::vector<std::string> ScriptValue::get_all_keys() const {
+std::vector<std::string> DataValue::get_all_keys() const {
     std::vector<std::string> keys;
-    if (get_kind() != ScriptValueKind::MAP) {
+    if (get_kind() != DataValueKind::MAP) {
         return keys;
     }
     const Map& map = std::get<Map>(value);
@@ -193,20 +206,20 @@ std::vector<std::string> ScriptValue::get_all_keys() const {
     return keys;
 }
 
-int64_t ScriptValue::float_to_exact_integer(double p_value) {
+int64_t DataValue::float_to_exact_integer(double p_value) {
     if (!std::isfinite(p_value)) {
-        throw std::runtime_error(std::format("Failed to get script value: float {} is not finite.", p_value));
+        throw std::runtime_error(std::format("Failed to get data value: float {} is not finite.", p_value));
     }
     if (std::trunc(p_value) != p_value) {
-        throw std::runtime_error(std::format("Failed to get script value: float {} has a fractional part.", p_value));
+        throw std::runtime_error(std::format("Failed to get data value: float {} has a fractional part.", p_value));
     }
     if (p_value < -INT64_UPPER_BOUND || p_value >= INT64_UPPER_BOUND) {
-        throw std::runtime_error(std::format("Failed to get script value: float {} exceeds the signed 64-bit range.", p_value));
+        throw std::runtime_error(std::format("Failed to get data value: float {} exceeds the signed 64-bit range.", p_value));
     }
     return static_cast<int64_t>(p_value);
 }
 
-void ScriptValue::set_vector_components(const float* p_components, size_t p_count) {
+void DataValue::set_vector_components(const float* p_components, size_t p_count) {
     WBE_DEBUG_ASSERT(p_components != nullptr && p_count <= VECTOR_COMPONENT_KEYS.size());
     Map map;
     map.reserve(p_count);
@@ -216,17 +229,16 @@ void ScriptValue::set_vector_components(const float* p_components, size_t p_coun
     }
 }
 
-const ScriptValue::List& ScriptValue::get_list_or_empty() const {
+const DataValue::List& DataValue::as_list_or_empty() const {
     static const List empty_list;
-    if (get_kind() == ScriptValueKind::MAP && std::get<Map>(value).empty()) {
+    if (get_kind() == DataValueKind::MAP && std::get<Map>(value).empty()) {
         return empty_list;
     }
     return as_list();
 }
 
-void ScriptValue::throw_kind_mismatch(std::string_view p_expected) const {
-    throw std::runtime_error(
-        std::format("Script value kind mismatch: expected {} but got {}.", p_expected, get_kind_name(get_kind())));
+void DataValue::throw_kind_mismatch(std::string_view p_expected) const {
+    throw std::runtime_error(std::format("Data value kind mismatch: expected {} but got {}.", p_expected, get_kind_name(get_kind())));
 }
 
 } // namespace WhiteBirdEngine

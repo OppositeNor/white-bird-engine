@@ -21,7 +21,9 @@
 #include "{{ serializable.in_header }}"
 {% endif %}
 {% endfor %}
+#include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "core/reflection/serializable_sd.hh"
 #include "generated/enum_reflection.gen.hh"
 
 #include <algorithm>
@@ -32,9 +34,8 @@
 
 namespace WhiteBirdEngine {
 
-template <typename ParserDataType>
-std::string_view find_serializable_key(
-        const ParserDataType& p_data, std::string_view p_primary_key, std::initializer_list<std::string_view> p_aliases) {
+inline std::string_view find_serializable_key(
+        const DataValue& p_data, std::string_view p_primary_key, std::initializer_list<std::string_view> p_aliases) {
     if (p_data.contains(p_primary_key)) {
         return p_primary_key;
     }
@@ -45,54 +46,6 @@ std::string_view find_serializable_key(
     }
     return {};
 }
-
-/**
- * @class SerializableSD
- * @brief Serializer/deserializer for vector types.
- * @tparam T The type to serialize/deserialize.
- */
-template <typename T>
-class SerializableSD<std::vector<T>> {
-public:
-
-    using ObjType = std::vector<T>;
-
-    /**
-     * @brief Serialize.
-     *
-     * @param p_key The key to insert into p_data.
-     * @param p_data The data to insert result.
-     * @param p_serializable The object to serialize.
-     */
-    template <typename ParserDataType>
-    static void serialize(ParserDataType& p_data, const ObjType& p_serializable) {
-        std::vector<ParserDataType> result;
-        result.reserve(p_serializable.size());
-        for (auto& val : p_serializable) {
-            ParserDataType val_data{};
-            SerializableSD<T>::serialize(val_data, val);
-            result.push_back(val_data);
-        }
-        p_data.set(result);
-    }
-
-    /**
-     * @brief Deserialize.
-     *
-     * @param p_serializable The object to deserialize.
-     */
-    template <typename ParserDataType>
-    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
-        p_serializable.clear();
-        auto data_vector = p_data.template get<std::vector<ParserDataType>>();
-        for (auto& data : data_vector) {
-            T result{};
-            SerializableSD<T>::deserialize(data, result);
-            p_serializable.push_back(result);
-        }
-    }
-
-};
 
 {#- Every field name and alias of a class and its reflected bases, as a comma-separated list of string literals. #}
 {% macro known_serializable_keys(class_name) -%}
@@ -109,9 +62,8 @@ public:
  * @param p_type_name The name of the type being deserialized, for the error message.
  * @param p_known_keys Every field name and alias the type accepts.
  */
-template <typename ParserDataType>
-void reject_unknown_serializable_keys(
-        const ParserDataType& p_data, std::string_view p_type_name, std::initializer_list<std::string_view> p_known_keys) {
+inline void reject_unknown_serializable_keys(
+        const DataValue& p_data, std::string_view p_type_name, std::initializer_list<std::string_view> p_known_keys) {
     for (const std::string& key : p_data.get_all_keys()) {
         if (std::ranges::find(p_known_keys, std::string_view(key)) == p_known_keys.end()) {
             throw std::runtime_error("Unknown field '" + key + "' for " + std::string(p_type_name) + ".");
@@ -140,13 +92,10 @@ public:
     /**
      * @brief Serialize.
      *
-     * @tparam ParserDataType The type of the data.
-     * @param p_key The key to insert into p_data.
      * @param p_data The data to insert result.
      * @param p_serializable The object to serialize.
      */
-    template <typename ParserDataType>
-    static void serialize(ParserDataType& p_data, const ObjType& p_serializable);
+    static void serialize(DataValue& p_data, const ObjType& p_serializable);
 
     /**
      * @brief Deserialize.
@@ -156,61 +105,54 @@ public:
      * std::runtime_error.
      *
 {% endif %}
-     * @tparam ParserDataType The type of the data.
      * @param p_data The data to retrieve value from.
      * @param p_serializable The object to deserialize.
      */
-    template <typename ParserDataType>
-    static void deserialize(const ParserDataType& p_data, ObjType& p_serializable);
+    static void deserialize(const DataValue& p_data, ObjType& p_serializable);
 
     /**
      * @brief Deserialize the fields of {{ serializable.name }} and its bases without rejecting unknown keys.
      *
      * Used for base classes, whose data also holds the keys of the derived class.
      *
-     * @tparam ParserDataType The type of the data.
      * @param p_data The data to retrieve value from.
      * @param p_serializable The object to deserialize.
      */
-    template <typename ParserDataType>
-    static void deserialize_fields(const ParserDataType& p_data, ObjType& p_serializable);
+    static void deserialize_fields(const DataValue& p_data, ObjType& p_serializable);
 };
 {% endif %}
 {% endfor %}
 
 {% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}
-template <typename ParserDataType>
-void SerializableSD<{{ serializable.name }}>::serialize(ParserDataType& p_data, const ObjType& p_serializable) {
+inline void SerializableSD<{{ serializable.name }}>::serialize(DataValue& p_data, const ObjType& p_serializable) {
     {% for extended_parent in serializable.extended_parents %}
     SerializableSD<{{ extended_parent }}>::serialize(p_data, p_serializable);
     {% endfor %}
-    ParserDataType result{};
+    DataValue result;
     {% for field in serializable.fields %}
     {% if "std::optional<" in field.type %}
     if (p_serializable.{{ field.name }}.has_value()) {
         SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
-        p_data.set_value("{{ field.name }}", result);
-        result = ParserDataType();
+        p_data.set_entry("{{ field.name }}", result);
+        result = DataValue();
     }
     {% else %}
     SerializableSD<decltype(p_serializable.{{ field.name }})>::serialize(result, p_serializable.{{ field.name }});
-    p_data.set_value("{{ field.name }}", result);
-    result = ParserDataType();
+    p_data.set_entry("{{ field.name }}", result);
+    result = DataValue();
     {% endif %}
     {% endfor %}
 }
 
-template <typename ParserDataType>
-void SerializableSD<{{ serializable.name }}>::deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
+inline void SerializableSD<{{ serializable.name }}>::deserialize(const DataValue& p_data, ObjType& p_serializable) {
     {% if serializable.attribute | select("in", strict_deserializations) | list | length > 0 %}
     reject_unknown_serializable_keys(p_data, "{{ serializable.name }}", { {{ known_serializable_keys(serializable.name) }} });
     {% endif %}
     deserialize_fields(p_data, p_serializable);
 }
 
-template <typename ParserDataType>
-void SerializableSD<{{ serializable.name }}>::deserialize_fields(const ParserDataType& p_data, ObjType& p_serializable) {
+inline void SerializableSD<{{ serializable.name }}>::deserialize_fields(const DataValue& p_data, ObjType& p_serializable) {
     {% for extended_parent in serializable.extended_parents %}
     SerializableSD<{{ extended_parent }}>::deserialize_fields(p_data, p_serializable);
     {% endfor %}
@@ -223,11 +165,11 @@ void SerializableSD<{{ serializable.name }}>::deserialize_fields(const ParserDat
     throw std::runtime_error("Required field missing: {{ field.name }}");
     }
     SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
-        p_data.template get_value<ParserDataType>(field_key_{{ field.name }}), p_serializable.{{ field.name }});
+        p_data.get_entry(field_key_{{ field.name }}), p_serializable.{{ field.name }});
     {% else %}
     if (!field_key_{{ field.name }}.empty()) {
         SerializableSD<decltype(p_serializable.{{ field.name }})>::deserialize(
-        p_data.template get_value<ParserDataType>(field_key_{{ field.name }}), p_serializable.{{ field.name }});
+        p_data.get_entry(field_key_{{ field.name }}), p_serializable.{{ field.name }});
     } else {
         reset_if_optional(p_serializable.{{ field.name }});
     }

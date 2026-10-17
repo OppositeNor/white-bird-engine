@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_SCENE_RESOURCE_UNIT_LOADER_HH
 #define WBE_FILE_SCENE_RESOURCE_UNIT_LOADER_HH
 
+#include "core/data/data_value.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -33,7 +34,7 @@ class ResourceUnitLoaderComponent final : public IResourceUnitLoader {
 public:
     /** @return A read-only view containing the component resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
@@ -45,7 +46,7 @@ class ResourceUnitLoaderPrefab final : public IResourceUnitLoader {
 public:
     /** @return A read-only view containing the prefab resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
@@ -59,7 +60,7 @@ class ResourceUnitLoaderWorld final : public IResourceUnitLoader {
 public:
     /** @return A read-only view containing the world resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
@@ -71,7 +72,7 @@ class ResourceUnitLoaderScene final : public IResourceUnitLoader {
 public:
     /** @return A read-only view containing the scene resource type name, valid for the lifetime of the program. */
     virtual std::span<const std::string> get_supported_resource_types() const override;
-    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const ParserJSON::DataType& p_scheme_data) const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 

@@ -12,9 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/script/script_value.hh"
-#include <cstdint>
-#include <nlohmann/json.hpp>
+#include "core/data/data_value.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -25,7 +23,9 @@
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "utils/defs.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -37,38 +37,38 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-// Writes the fixtures below as JSON for readability; the registry takes ScriptValue parameters.
-ScriptValue to_script_value(const nlohmann::json& p_json) {
+// Writes the fixtures below as JSON for readability; the registry takes DataValue parameters.
+DataValue to_script_value(const nlohmann::json& p_json) {
     if (p_json.is_object()) {
-        ScriptValue result = ScriptValue::make_map();
+        DataValue result = DataValue::make_map();
         for (const auto& [key, value] : p_json.items()) {
             result.set_entry(key, to_script_value(value));
         }
         return result;
     }
     if (p_json.is_array()) {
-        ScriptValue result = ScriptValue::make_list();
+        DataValue result = DataValue::make_list();
         for (const nlohmann::json& value : p_json) {
             result.push_back(to_script_value(value));
         }
         return result;
     }
     if (p_json.is_string()) {
-        return ScriptValue::make_string(p_json.get<std::string>());
+        return DataValue::make_string(p_json.get<std::string>());
     }
     if (p_json.is_boolean()) {
-        return ScriptValue::make_boolean(p_json.get<bool>());
+        return DataValue::make_boolean(p_json.get<bool>());
     }
     if (p_json.is_number_integer()) {
-        return ScriptValue::make_integer(p_json.get<int64_t>());
+        return DataValue::make_integer(p_json.get<int64_t>());
     }
     if (p_json.is_number_float()) {
-        return ScriptValue::make_float(p_json.get<double>());
+        return DataValue::make_float(p_json.get<double>());
     }
-    return ScriptValue();
+    return DataValue();
 }
 
-ScriptValue parse_task_params(std::string_view p_json) {
+DataValue parse_task_params(std::string_view p_json) {
     return to_script_value(nlohmann::json::parse(p_json));
 }
 

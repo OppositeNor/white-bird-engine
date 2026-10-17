@@ -16,13 +16,13 @@
 #define WBE_FILE_DEBUG_DATA_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
-#include "core/parser/parser_json.hh"
+#include "core/data/data_value.hh"
 #include "function/render/render_defs.hh"
 #include <vector>
 
 namespace WhiteBirdEngine {
 
-using DebugData = JSONData;
+using DebugData = DataValue;
 using DebugDataRows = Vector<DebugData, RenderAllocator>;
 using DebugDataArray = std::vector<DebugData>;
 
