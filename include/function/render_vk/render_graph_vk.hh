@@ -234,8 +234,11 @@ public:
      * @brief Construct an empty graph bound to the given Vulkan render data.
      *
      * @param p_render_data The base render data.
+     * @param p_resource_key The key the graph is registered under. When it is set and the render data has a RenderDatabase,
+     * every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with `[<slot>]` appended for
+     * each per-frame copy, which also names it.
      */
-    explicit RenderGraphVK(const BaseRenderDataVK* p_render_data);
+    explicit RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key = {});
 
     /**
      * @brief Build the graph from a high-level descriptor: take ownership of
@@ -359,6 +362,8 @@ public:
 
 private:
     const BaseRenderDataVK* render_data;
+    // The key the graph is registered under; empty when its resources are not registered.
+    std::string resource_key;
 
     Vector<Ref<RGNode>, RenderAllocator> nodes;
     Vector<Ref<RGResEdge>, RenderAllocator> resource_edges;
@@ -398,7 +403,9 @@ private:
     void allocate_image_view(const RendImageViewDeclVK& p_view_decl);
     void allocate_sampler(const RendSamplerDeclVK& p_sampler_decl);
     void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
-    Ref<RenderObjectContainerVK> create_container(bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;
+    // Objects the container creates are registered as `<resource_key>.<p_resource_id>`; see RenderGraphVK().
+    Ref<RenderObjectContainerVK> create_container(
+        std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;
     void build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void instantiate_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void normalize_task_accesses(Ref<RGNode> p_node) const;

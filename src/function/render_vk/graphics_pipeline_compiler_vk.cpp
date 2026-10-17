@@ -155,7 +155,7 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_
     if (image_view != MEM_NULL) {
         return image_view;
     }
-    Ref<ROImageVK> image = compile_texture(formatted_resource_key, p_texture_resource);
+    Ref<ROImageVK> image = compile_texture(p_resource_key, p_texture_resource);
     const ROImageVK::ExposedFields& image_fields = image->fields();
     image_view = ROImageViewVK::Builder()
                      .set_image(image)

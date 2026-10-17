@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/async/worker.hh"
 #include "core/core_utils.hh"
@@ -601,6 +602,10 @@ VkBufferMemoryBarrier2 ROBufferVK::MemoryBarrierBuilder::build() const {
 
 void ROBufferVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
+}
+
+void ROBufferVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_BUFFER, buffer, p_name);
 }
 
 } // namespace WhiteBirdEngine

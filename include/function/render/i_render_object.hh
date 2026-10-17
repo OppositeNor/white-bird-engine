@@ -17,6 +17,8 @@
 
 #include "utils/utils.hh"
 
+#include <string_view>
+
 namespace WhiteBirdEngine {
 
 /**
@@ -38,6 +40,19 @@ public:
      * @return The generated UUID of the concrete render-object type.
      */
     virtual TypeID get_type_uuid() const = 0;
+
+    /**
+     * @brief Name the backend objects the render object owns, for debuggers and validation messages.
+     *
+     * RenderDatabase calls this with the key an object is registered under, so registered objects are named after their
+     * database key. Backends without object naming, and render objects that own no backend objects, ignore the call.
+     * Composites register their parts as `<p_name>.<part>`, which names them too. Call on the rendering thread.
+     *
+     * @param p_name The name, normally the resource key the object is registered under.
+     */
+    virtual void set_debug_name(std::string_view p_name) {
+        static_cast<void>(p_name);
+    }
 };
 
 } // namespace WhiteBirdEngine

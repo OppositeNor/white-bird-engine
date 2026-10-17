@@ -30,6 +30,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <string_view>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -205,6 +206,11 @@ public:
     RORayTracingPipelineVK(const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
 
     virtual TypeID get_type_uuid() const override;
+
+    /**
+     * @brief Name the pipeline, and register its shader binding table buffer as `<p_name>.shader_binding_table`.
+     */
+    virtual void set_debug_name(std::string_view p_name) override;
 
 private:
     size_t calculate_sbt_buffer_size(VkPipeline p_ray_pipeline,

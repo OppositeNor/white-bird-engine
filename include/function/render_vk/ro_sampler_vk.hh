@@ -219,6 +219,8 @@ public:
 
     virtual TypeID get_type_uuid() const override;
 
+    virtual void set_debug_name(std::string_view p_name) override;
+
     /**
      * @brief Constructor.
      *

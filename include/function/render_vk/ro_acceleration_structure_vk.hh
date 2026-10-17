@@ -122,6 +122,11 @@ public:
     virtual TypeID get_type_uuid() const override;
 
     /**
+     * @brief Name the acceleration structure, and register its storage buffer as `<p_name>.storage`.
+     */
+    virtual void set_debug_name(std::string_view p_name) override;
+
+    /**
      * @brief Get the owned Vulkan acceleration-structure handle.
      */
     VkAccelerationStructureKHR get_acceleration_structure() const {

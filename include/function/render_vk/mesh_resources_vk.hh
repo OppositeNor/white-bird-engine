@@ -127,6 +127,14 @@ public:
     virtual TypeID get_type_uuid() const override;
 
     /**
+     * @brief Register the members only these resources own as `<p_name>.<member>`, using the member names below.
+     *
+     * Vertex and index buffers are shared through the RenderDatabase and keep the keys of their binaries. Material tables
+     * built later by acquire_material_table() are registered too.
+     */
+    virtual void set_debug_name(std::string_view p_name) override;
+
+    /**
      * @brief Return the member name of one material parameter table, `material_params.<p_index>`.
      */
     static std::string get_material_params_member(size_t p_index);
@@ -308,6 +316,8 @@ private:
     RefRes<RUMaterial> default_material = MEM_NULL;
     std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> texture_views;
     std::vector<MaterialTable> material_tables;
+    // The key the resources are registered under, for material tables built later.
+    std::string debug_name;
     Ref<ROSamplerVK> material_sampler = MEM_NULL;
     Ref<RenderResourceListVK> textures = MEM_NULL;
     Vector<MeshDrawBatchVK, RenderAllocator> opaque_batches;

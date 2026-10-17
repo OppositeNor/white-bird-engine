@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/debug_data_vk.hh"
@@ -263,6 +264,11 @@ DebugDataRows ROImageViewVK::descriptor_debug_data() const {
 
 void ROImageViewVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
+}
+
+void ROImageViewVK::set_debug_name(std::string_view p_name) {
+    // Names only the view; the viewed image is named by whoever registers or allocates it.
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_IMAGE_VIEW, image_view, p_name);
 }
 
 } // namespace WhiteBirdEngine

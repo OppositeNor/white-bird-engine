@@ -241,6 +241,8 @@ private:
 
     // Vulkan properties
     VkInstance vk_instance = VK_NULL_HANDLE;
+    // Whether VK_EXT_debug_utils is enabled on the instance, so Vulkan objects can be named.
+    bool debug_utils_enabled = false;
 
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice logical_device = VK_NULL_HANDLE;

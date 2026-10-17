@@ -20,6 +20,8 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <gtest/gtest.h>
+#include <string_view>
+#include <string>
 
 namespace WhiteBirdEngine {
 
@@ -33,6 +35,12 @@ public:
     RenderDatabaseTestRenderObject& operator=(RenderDatabaseTestRenderObject&&) noexcept = delete;
 
     virtual TypeID get_type_uuid() const override;
+
+    virtual void set_debug_name(std::string_view p_name) override {
+        debug_name = p_name;
+    }
+
+    std::string debug_name;
 };
 
 TypeID RenderDatabaseTestRenderObject::get_type_uuid() const {
@@ -52,6 +60,12 @@ TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObject
 
     EXPECT_TRUE(render_database.contains_compiled_render_resource("test_resource", render_object->get_type_uuid()));
     EXPECT_EQ(render_database.get_compiled_render_resource("test_resource", render_object->get_type_uuid()), render_object);
+}
+
+TEST_F(WBERenderDatabaseTest, NamesRegisteredObjectsAfterTheirResourceKey) {
+    Ref<RenderDatabaseTestRenderObject> object = make_ref<RenderDatabaseTestRenderObject>(&render_allocator);
+    render_database.register_compiled_render_resource("sponza#vk_usage_130", object);
+    EXPECT_EQ(object->debug_name, "sponza#vk_usage_130");
 }
 
 } // namespace WhiteBirdEngine

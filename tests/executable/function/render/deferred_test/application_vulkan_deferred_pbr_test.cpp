@@ -110,13 +110,19 @@ void update_spot_light_view(ComponentSpotLight& p_spot_light_component) {
         glm::lookAt(p_spot_light_component.position, p_spot_light_component.position + p_spot_light_component.direction, light_up);
 }
 
-Ref<ROCMultislotsVK> create_per_frame_buffers(
-    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
+// Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
+Ref<ROCMultislotsVK> create_per_frame_buffers(RenderAllocator* p_allocator,
+    const BaseRenderDataVK* p_render_data,
+    std::string_view p_key,
+    VkDeviceSize p_buffer_size,
+    VkBufferUsageFlags p_usage) {
     return make_ref<ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
-        [p_render_data, p_buffer_size, p_usage](uint32_t /*p_frame_slot*/) -> Ref<IRenderObjectVK> {
-            return ROBufferVK::Builder().set_properties(p_buffer_size, p_usage).create_ref(p_render_data);
+        [p_render_data, key = std::string(p_key), p_buffer_size, p_usage](uint32_t p_frame_slot) -> Ref<IRenderObjectVK> {
+            Ref<ROBufferVK> buffer = ROBufferVK::Builder().set_properties(p_buffer_size, p_usage).create_ref(p_render_data);
+            p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
+            return buffer;
         });
 }
 
@@ -905,14 +911,18 @@ GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present
 
 void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     composition_camera_info_ubos = create_per_frame_buffers(
-        render_allocator, base_render_data, sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        render_allocator, base_render_data, "composition_camera_info", sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(render_allocator,
         base_render_data,
+        "spot_light_infos",
         sizeof(SpotLightInfosGPU),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    for (Ref<ROCMultislotsVK>& shadow_light_info_buffer : shadow_light_info_buffers) {
-        shadow_light_info_buffer =
-            create_per_frame_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    for (size_t light_index = 0; light_index < shadow_light_info_buffers.size(); ++light_index) {
+        shadow_light_info_buffers[light_index] = create_per_frame_buffers(render_allocator,
+            base_render_data,
+            std::format("shadow_light_info.{}", light_index),
+            sizeof(SpotLightInfoGPU),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
@@ -945,7 +955,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
     gbuffer_camera_info_ubos =
-        create_per_frame_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        create_per_frame_buffers(render_allocator, base_render_data, "gbuffer_camera_info", sizeof(CameraInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     CameraInfoGPU gbuffer_camera_info = make_camera_info_gpu(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
 

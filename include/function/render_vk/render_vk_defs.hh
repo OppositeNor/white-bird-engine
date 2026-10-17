@@ -120,6 +120,8 @@ struct BaseRenderDataVK {
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     /** Command for setting dynamic vertex input state. */
     PFN_vkCmdSetVertexInputEXT command_set_vertex_input = nullptr;
+    /** Command for naming Vulkan objects (VK_EXT_debug_utils); null when the extension is unavailable. */
+    PFN_vkSetDebugUtilsObjectNameEXT set_debug_utils_object_name = nullptr;
     /** The VMA allocator used for owned Vulkan buffers and images. */
     VmaAllocator vma_allocator = VK_NULL_HANDLE;
     /** The image format of the swap chain. */

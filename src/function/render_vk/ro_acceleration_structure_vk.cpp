@@ -13,6 +13,8 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
+#include "function/render/render_database.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include <string_view>
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
@@ -125,6 +127,13 @@ DebugDataRows ROAccelerationStructureVK::descriptor_debug_data() const {
 
 void ROAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
+}
+
+void ROAccelerationStructureVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, acceleration_structure, p_name);
+    if (storage_buffer != MEM_NULL && render_data->render_database != nullptr) {
+        render_data->render_database->register_compiled_render_resource(std::format("{}.storage", p_name), storage_buffer);
+    }
 }
 
 } // namespace WhiteBirdEngine

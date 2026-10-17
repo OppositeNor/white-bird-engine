@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
@@ -263,6 +264,10 @@ void ROGraphicsPipelineVK::setup_pipeline_rendering_create_info(const Config& p_
     create_info.depthAttachmentFormat = WBE_REQUIRED(pipeline_rendering_create_info.depth_formats);
     create_info.stencilAttachmentFormat = WBE_REQUIRED(pipeline_rendering_create_info.stencil_formats);
     p_pipeline_create_infos.pipeline_rendering = create_info;
+}
+
+void ROGraphicsPipelineVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, get_pipeline(), p_name);
 }
 
 } // namespace WhiteBirdEngine

@@ -13,6 +13,7 @@
    limitations under the License.
    */
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include <string_view>
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
@@ -637,6 +638,10 @@ size_t ROImageVK::get_content_size() const {
 
 void ROImageVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
+}
+
+void ROImageVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_IMAGE, get_image(), p_name);
 }
 
 } // namespace WhiteBirdEngine

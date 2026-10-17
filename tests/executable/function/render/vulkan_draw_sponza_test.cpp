@@ -50,6 +50,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <array>
+#include <string>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -136,13 +137,17 @@ BillboardInfoGPU make_light_billboard_info(const WBE::ComponentSpotLight& p_spot
     };
 }
 
+// Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
 WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
-    WBE::RenderAllocator* p_allocator, const WBE::BaseRenderDataVK* p_render_data, VkDeviceSize p_buffer_size) {
+    WBE::RenderAllocator* p_allocator, const WBE::BaseRenderDataVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size) {
     return WBE::make_ref<WBE::ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
-        WBE::ROCMultislotsVK::Factory{[p_render_data, p_buffer_size](uint32_t /*p_frame_slot*/) -> WBE::Ref<WBE::IRenderObjectVK> {
-            return WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).create_ref(p_render_data);
+        WBE::ROCMultislotsVK::Factory{[p_render_data, key = std::string(p_key), p_buffer_size](uint32_t p_frame_slot) -> WBE::Ref<WBE::IRenderObjectVK> {
+            WBE::Ref<WBE::ROBufferVK> buffer =
+                WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).create_ref(p_render_data);
+            p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
+            return buffer;
         }});
 }
 
@@ -520,7 +525,7 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     }
 
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "camera_info", sizeof(CameraInfoGPU));
     }
 
     WBE::GraphicsPipelineCompilerVKContext compiler_context{
@@ -538,7 +543,7 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
 
 void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
     if (spot_light_info_ubos == WBE::MEM_NULL) {
-        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU));
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_info", sizeof(SpotLightInfoGPU));
     }
     SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
@@ -547,13 +552,13 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors() {
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(CameraInfoGPU));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "camera_info", sizeof(CameraInfoGPU));
     }
     if (spot_light_count_ubos == WBE::MEM_NULL) {
-        spot_light_count_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(uint32_t));
+        spot_light_count_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_count", sizeof(uint32_t));
     }
     if (spot_light_info_ubos == WBE::MEM_NULL) {
-        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, sizeof(SpotLightInfoGPU));
+        spot_light_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_info", sizeof(SpotLightInfoGPU));
     }
     CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
     SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);

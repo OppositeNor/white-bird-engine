@@ -458,8 +458,8 @@ void require_same_per_frame(std::string_view p_resource_id, bool p_previous, boo
 
 } // namespace
 
-RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data)
-    : render_data(p_render_data), nodes(p_render_data->allocator), resource_edges(p_render_data->allocator),
+RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key)
+    : render_data(p_render_data), resource_key(p_resource_key), nodes(p_render_data->allocator), resource_edges(p_render_data->allocator),
       all_resources(p_render_data->allocator), resource_refreshers(p_render_data->allocator),
       command_buffers(p_render_data->allocator), command_buffer_pools(p_render_data->allocator),
       terminal_semaphores(p_render_data->allocator) {
@@ -775,12 +775,25 @@ void RenderGraphVK::register_resource(std::string_view p_resource_id, Ref<Render
     all_resources.emplace(std::string(p_resource_id), std::move(resource));
 }
 
-Ref<RenderObjectContainerVK> RenderGraphVK::create_container(bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const {
+Ref<RenderObjectContainerVK> RenderGraphVK::create_container(
+    std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const {
+    RenderObjectContainerVK::Factory factory = std::move(p_factory);
+    if (!resource_key.empty() && render_data->render_database != nullptr) {
+        // Register every object the container creates, including ones recreated after the context changes, as
+        // `<graph key>.<id>`, or `<graph key>.<id>[<slot>]` for each frame's copy; registering names the object.
+        factory = [this, inner = std::move(factory), key = std::format("{}.{}", resource_key, p_resource_id), p_per_frame](uint32_t p_slot) {
+            Ref<IRenderObjectVK> result = inner(p_slot);
+            if (result != MEM_NULL) {
+                render_data->render_database->register_compiled_render_resource(p_per_frame ? std::format("{}[{}]", key, p_slot) : key, result);
+            }
+            return result;
+        };
+    }
     if (p_per_frame) {
         const uint32_t frames = std::max<uint32_t>(render_data->frames_in_flight, 1U);
-        return make_ref<ROCMultislotsVK>(render_data->allocator, render_data->allocator, frames, std::move(p_factory));
+        return make_ref<ROCMultislotsVK>(render_data->allocator, render_data->allocator, frames, std::move(factory));
     }
-    return make_ref<ROCSingleVK>(render_data->allocator, std::move(p_factory));
+    return make_ref<ROCSingleVK>(render_data->allocator, std::move(factory));
 }
 
 void RenderGraphVK::allocate_resources(const RendGraphDescVK& p_desc) {
@@ -828,7 +841,7 @@ void RenderGraphVK::allocate_buffer(const RendBufferDeclVK& p_buffer_decl) {
     const RendBufferDescVK desc = p_buffer_decl.factory(context);
     validate_buffer_desc(p_buffer_decl.res_id, desc);
     Ref<RenderObjectContainerVK> container =
-        create_container(desc.per_frame, [this, decl = p_buffer_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+        create_container(p_buffer_decl.res_id, desc.per_frame, [this, decl = p_buffer_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
             return make_buffer(render_data, decl.res_id, decl.factory(context));
         });
     register_resource(p_buffer_decl.res_id, container);
@@ -848,7 +861,7 @@ void RenderGraphVK::allocate_image(const RendImageDeclVK& p_image_decl) {
     const RendImageDescVK desc = p_image_decl.factory(context);
     validate_image_desc(p_image_decl.res_id, desc);
     Ref<RenderObjectContainerVK> container =
-        create_container(desc.per_frame, [this, decl = p_image_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+        create_container(p_image_decl.res_id, desc.per_frame, [this, decl = p_image_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
             return make_image(render_data, decl.res_id, decl.factory(context));
         });
     register_resource(p_image_decl.res_id, container);
@@ -875,7 +888,7 @@ void RenderGraphVK::allocate_image_view(const RendImageViewDeclVK& p_view_decl) 
     Ref<RenderObjectContainerVK> image_container = image_resource->second->container;
     const bool per_frame = image_container.dynamic_cast_ref<ROCMultislotsVK>() != MEM_NULL;
     Ref<RenderObjectContainerVK> container =
-        create_container(per_frame, [this, decl = p_view_decl, image_container](uint32_t p_slot) -> Ref<IRenderObjectVK> {
+        create_container(p_view_decl.res_id, per_frame, [this, decl = p_view_decl, image_container](uint32_t p_slot) -> Ref<IRenderObjectVK> {
             Ref<ROImageVK> image = image_container->get(p_slot).dynamic_cast_ref<ROImageVK>();
             WBE_DEBUG_ASSERT(image != MEM_NULL);
             return make_image_view(render_data, image, decl, decl.factory(context));
@@ -902,7 +915,7 @@ void RenderGraphVK::allocate_image_view(const RendImageViewDeclVK& p_view_decl) 
 
 void RenderGraphVK::allocate_sampler(const RendSamplerDeclVK& p_sampler_decl) {
     Ref<RenderObjectContainerVK> container =
-        create_container(false, [this, decl = p_sampler_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
+        create_container(p_sampler_decl.res_id, false, [this, decl = p_sampler_decl](uint32_t /*p_slot*/) -> Ref<IRenderObjectVK> {
             return make_sampler_builder(decl.factory(context)).create_ref(render_data);
         });
     register_resource(p_sampler_decl.res_id, container);

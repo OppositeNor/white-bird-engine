@@ -43,6 +43,7 @@ void RenderDatabase::register_compiled_render_resource(std::string_view p_resour
     compiled_render_resources.insert_or_assign(CompiledRenderResourceKey{.resource_key = std::string(p_resource_key),
                                                    .render_object_type_id = p_render_object->get_type_uuid()},
         RefWeak<IRenderObject>(p_render_object));
+    p_render_object->set_debug_name(p_resource_key);
 }
 
 Ref<IRenderObject> RenderDatabase::get_compiled_render_resource(std::string_view p_resource_key, HashCode p_render_object_type_id) {

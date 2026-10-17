@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
@@ -52,6 +53,10 @@ ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, 
     }
     set_pipeline(compute_pipeline);
     exposed_fields.compute_shader = shader_stage.shader;
+}
+
+void ROComputePipelineVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, get_pipeline(), p_name);
 }
 
 } // namespace WhiteBirdEngine

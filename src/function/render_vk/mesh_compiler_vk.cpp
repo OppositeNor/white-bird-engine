@@ -172,8 +172,11 @@ void append_texture_views(GraphicsPipelineCompilerVK& p_texture_compiler,
             })) {
             continue;
         }
-        p_texture_views.emplace_back(texture,
-            p_texture_compiler.compile_texture_view(std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(texture.get())), texture));
+        // Keyed by the texture's resource key, which also names the image and view; anonymous textures by address.
+        const std::string texture_key = texture->resource_key != nullptr && texture->resource_key[0] != '\0'
+                                            ? std::string(texture->resource_key)
+                                            : std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(texture.get()));
+        p_texture_views.emplace_back(texture, p_texture_compiler.compile_texture_view(texture_key, texture));
     }
 }
 

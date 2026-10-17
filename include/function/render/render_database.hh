@@ -81,6 +81,8 @@ public:
     /**
      * @brief Register or replace a compiled render object for a resource key.
      *
+     * The object is named after the key through IRenderObject::set_debug_name(). Call on the rendering thread.
+     *
      * @param p_resource_key The source resource key or a derived compiler key.
      * @param p_render_object The compiled render object whose concrete type identifies the registry entry.
      */

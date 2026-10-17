@@ -422,6 +422,20 @@ void RendererVK::create_instance() { // NOLINT
             required_extensions.push_back(required_extension);
         }
     }
+    // Object names for debuggers and validation messages. Optional: not every loader or layer set provides the extension.
+    const std::array<const char* const, 1> debug_utils_extension{VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+    const ExtensionSupportQueryResult debug_utils_support = collect_unsupported_extensions(debug_utils_extension,
+        enabled_layers,
+        "vkEnumerateInstanceExtensionProperties",
+        [](const char* p_layer_name, uint32_t* p_extension_count, VkExtensionProperties* p_extension_properties) {
+            return vkEnumerateInstanceExtensionProperties(p_layer_name, p_extension_count, p_extension_properties);
+        });
+    debug_utils_enabled = debug_utils_support.success && debug_utils_support.unsupported_extensions.empty();
+    if (debug_utils_enabled && std::ranges::none_of(required_extensions, [](const char* p_extension) {
+            return std::string_view(p_extension) == VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+        })) {
+        required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
     create_info.enabledExtensionCount = required_extensions.size();
     create_info.ppEnabledExtensionNames = required_extensions.data();
 
@@ -592,6 +606,8 @@ void RendererVK::create_swap_chain_images() {
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
             make_ref<ROImageVK>(allocator, &base_render_data, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
+        render_database->register_compiled_render_resource(
+            std::format("{}.image[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_images.size() - 1), render_objects->swap_chain_images.back());
         ROImageVK::ExposedFields& fields = render_objects->swap_chain_images.back()->exposed_fields;
         fields.format = swap_chain_image_format;
         fields.extent = VkExtent3D{.width = swap_chain_extent.width, .height = swap_chain_extent.height, .depth = 1};
@@ -645,6 +661,8 @@ void RendererVK::init_swap_chain_image_views() {
             .set_subresource_range(subresource_range);
 
         render_objects->swap_chain_image_views.emplace_back(builder.create_ref(&base_render_data));
+        render_database->register_compiled_render_resource(
+            std::format("{}[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_image_views.size() - 1), render_objects->swap_chain_image_views.back());
     }
 }
 
@@ -807,6 +825,7 @@ void RendererVK::create_shader_debug_buffer() {
                               .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
                               .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
                               .create_ref(&base_render_data);
+    render_database->register_compiled_render_resource("shader_debug", shader_debug_buffer);
     const uint32_t descriptor_index = shader_debug_buffer->get_storage_view_index();
     if (descriptor_index != SHADER_DEBUG_DESCRIPTOR_INDEX) {
         throw std::runtime_error(std::format(
@@ -984,6 +1003,13 @@ void RendererVK::create_logical_device() { // NOLINT
         reinterpret_cast<PFN_vkCmdSetVertexInputEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdSetVertexInputEXT"));
     if (base_render_data.command_set_vertex_input == nullptr) {
         throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
+    }
+    // Objects created before setup_base_render_data(), such as the swap-chain images, are named with this device.
+    base_render_data.logic_device = logical_device;
+    if (debug_utils_enabled) {
+        // An instance-level command; set_debug_object_name_vk() does nothing while it stays null.
+        base_render_data.set_debug_utils_object_name =
+            reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetInstanceProcAddr(vk_instance, "vkSetDebugUtilsObjectNameEXT"));
     }
     base_render_data.write_resource_descriptors =
         reinterpret_cast<PFN_vkWriteResourceDescriptorsEXT>(vkGetDeviceProcAddr(logical_device, "vkWriteResourceDescriptorsEXT"));
@@ -1697,7 +1723,7 @@ Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource
     }
 
     auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
-    auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data);
+    auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data, p_resource_key);
     graph->build_from_descriptor(*desc_ref);
     for (auto& plugin : registered_plugins) {
         plugin->on_render_graph_registered(p_resource_key, *graph);

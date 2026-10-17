@@ -14,6 +14,7 @@
 */
 
 #include "function/render_vk/ro_shader_vk.hh"
+#include "function/render_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_render_object_vk.hh"
@@ -100,6 +101,10 @@ ROShaderVK::~ROShaderVK() {
 
 void ROShaderVK::init(const Builder& p_builder) {
     shader_module = p_builder.create_vk_object(render_data);
+}
+
+void ROShaderVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_SHADER_MODULE, shader_module, p_name);
 }
 
 } // namespace WhiteBirdEngine

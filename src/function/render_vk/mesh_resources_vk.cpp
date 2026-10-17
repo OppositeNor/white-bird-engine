@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render/render_database.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/material_texture_contract.hh"
@@ -203,6 +204,10 @@ size_t MeshResourcesVK::acquire_material_table(const MaterialTextureContract& p_
         .contract = p_contract,
         .buffer = create_material_params_buffer(render_data, material_resources.material_params_data),
     });
+    if (!debug_name.empty() && render_data->render_database != nullptr) {
+        render_data->render_database->register_compiled_render_resource(
+            make_member_resource_id(debug_name, get_material_params_member(material_tables.size() - 1)), material_tables.back().buffer);
+    }
     return material_tables.size() - 1;
 }
 
@@ -211,6 +216,28 @@ Ref<ROBufferVK> MeshResourcesVK::acquire_material_params(size_t p_index) const {
         throw std::runtime_error("Failed to acquire mesh material parameter table: index is out of bounds.");
     }
     return material_tables[p_index].buffer;
+}
+
+void MeshResourcesVK::set_debug_name(std::string_view p_name) {
+    debug_name = p_name;
+    if (render_data->render_database == nullptr) {
+        return;
+    }
+    const auto name_member = [this, p_name](const auto& p_object, std::string_view p_member) {
+        if (p_object != MEM_NULL) {
+            render_data->render_database->register_compiled_render_resource(make_member_resource_id(p_name, p_member), p_object);
+        }
+    };
+    name_member(submeshes, SUBMESHES);
+    name_member(nodes, NODES);
+    name_member(instances, INSTANCES);
+    name_member(opaque_draw_batches, OPAQUE_DRAW_BATCHES);
+    name_member(opaque_double_sided_draw_batches, OPAQUE_DOUBLE_SIDED_DRAW_BATCHES);
+    name_member(masked_draw_batches, MASKED_DRAW_BATCHES);
+    name_member(material_sampler, MATERIAL_SAMPLER);
+    for (size_t i = 0; i < material_tables.size(); ++i) {
+        name_member(material_tables[i].buffer, get_material_params_member(i));
+    }
 }
 
 void MeshResourcesVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {

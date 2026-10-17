@@ -13,6 +13,9 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_ray_tracing_pipeline_vk.hh"
+#include "function/render/render_database.hh"
+#include <format>
+#include "function/render_vk/debug_utils_vk.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/i_ro_ray_tracing_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -108,6 +111,14 @@ void RORayTracingPipelineVK::create_sbt() {
             .set_domain(DeviceDomain::DEVICE)
             .set_size(1024 /* Temporary placeholder: replace with calculate_sbt_buffer_size(...) once record counts are wired. */)
             .create_ref(render_data);
+}
+
+void RORayTracingPipelineVK::set_debug_name(std::string_view p_name) {
+    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, pipeline, p_name);
+    if (shader_binding_table_buffer != MEM_NULL && render_data->render_database != nullptr) {
+        render_data->render_database->register_compiled_render_resource(
+            std::format("{}.shader_binding_table", p_name), shader_binding_table_buffer);
+    }
 }
 
 } // namespace WhiteBirdEngine
