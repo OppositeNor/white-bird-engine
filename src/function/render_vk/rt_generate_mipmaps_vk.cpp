@@ -19,7 +19,6 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/image_format_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
@@ -28,6 +27,7 @@
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_params_generate_mipmaps_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include <algorithm>
 #include <bit>

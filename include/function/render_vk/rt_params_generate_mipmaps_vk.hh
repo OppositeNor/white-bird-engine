@@ -16,8 +16,8 @@
 #define WBE_FILE_RT_PARAMS_GENERATE_MIPMAPS_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/image_format_vk.hh"
-#include "function/render_vk/rt_params_extent_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -45,7 +45,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsGen
      * @brief Extent of the base mip level; the swap chain extent by default.
      */
     WBE_META(WBE_REFLECT)
-    RTParamsExtent2DVK base_extent;
+    RendExtent2DParamsVK base_extent;
     /**
      * @brief Number of mip levels including the base level; the full chain of base_extent by default.
      */

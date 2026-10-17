@@ -16,18 +16,16 @@
 #define WBE_FILE_RENDER_GRAPH_DESCRIPTOR_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
-#include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task_resource_map.hh"
-#include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -42,26 +40,28 @@ namespace WhiteBirdEngine {
 /**
  * @class RendResPrimaryUsageVK
  * @brief Primary usage of a resource allocated by the render graph; it selects the Vulkan usage flags of the resource.
+ *
+ * Reflected; the lowercase aliases are the names used in render graph recipes.
  */
-enum class RendResPrimaryUsageVK : uint32_t {
+enum class WBE_META(WBE_REFLECT_ENUM) RendResPrimaryUsageVK : uint32_t {
     /** Image sampled by shaders; its content is written by transfers. Sampled and transfer-destination usage. */
-    IMAGE_READ_ONLY,
+    IMAGE_READ_ONLY WBE_META(WBE_ALIASES = [image_read_only]),
     /** Image read and written by shaders. Storage and sampled usage. */
-    IMAGE_READ_WRITE,
+    IMAGE_READ_WRITE WBE_META(WBE_ALIASES = [image_read_write]),
     /** Color attachment that is later sampled. Color-attachment and sampled usage. */
-    IMAGE_RENDER_TARGET,
+    IMAGE_RENDER_TARGET WBE_META(WBE_ALIASES = [image_render_target]),
     /** Depth/stencil attachment that is later sampled. Depth-stencil-attachment and sampled usage. */
-    IMAGE_DEPTH_TARGET,
+    IMAGE_DEPTH_TARGET WBE_META(WBE_ALIASES = [image_depth_target]),
     /** Uniform buffer. */
-    BUFFER_UNIFORM,
+    BUFFER_UNIFORM WBE_META(WBE_ALIASES = [buffer_uniform]),
     /** Storage buffer read or written by shaders. */
-    BUFFER_STORAGE,
+    BUFFER_STORAGE WBE_META(WBE_ALIASES = [buffer_storage]),
     /** Indirect command buffer written by shaders. Indirect and storage usage. */
-    BUFFER_INDIRECT,
+    BUFFER_INDIRECT WBE_META(WBE_ALIASES = [buffer_indirect]),
     /** Vertex buffer. */
-    BUFFER_VERTEX,
+    BUFFER_VERTEX WBE_META(WBE_ALIASES = [buffer_vertex]),
     /** Index buffer. */
-    BUFFER_INDEX,
+    BUFFER_INDEX WBE_META(WBE_ALIASES = [buffer_index]),
 };
 
 /**

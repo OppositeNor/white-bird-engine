@@ -19,7 +19,6 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/attachment_load_op_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -32,6 +31,7 @@
 #include "function/render_vk/rt_params_clear_value_vk.hh"
 #include "function/render_vk/rt_params_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

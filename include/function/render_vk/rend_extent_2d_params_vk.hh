@@ -12,8 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_RT_PARAMS_EXTENT_VK_HH
-#define WBE_FILE_RT_PARAMS_EXTENT_VK_HH
+#ifndef WBE_FILE_REND_EXTENT_2D_PARAMS_VK_HH
+#define WBE_FILE_REND_EXTENT_2D_PARAMS_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -24,14 +24,14 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class RTParamsExtent2DVK
- * @brief A two-dimensional extent in render task parameters, fixed or relative to the swap chain. Copyable and movable.
+ * @class RendExtent2DParamsVK
+ * @brief A two-dimensional extent in render task and resource parameters, fixed or relative to the swap chain. Copyable and movable.
  *
  * With width and height both set the extent is fixed. With neither set it is the swap chain extent scaled by
  * swap_chain_scale, so it follows swap chain resizes; each scaled dimension is rounded down and is at least 1.
  * Deserialization is strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsExtent2DVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendExtent2DParamsVK {
     /**
      * @brief Fixed width in pixels; set together with height.
      */

@@ -16,9 +16,9 @@
 #define WBE_FILE_RT_PARAMS_RUN_GRAPHICS_PIPELINE_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/attachment_load_op_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
-#include "function/render_vk/rt_params_extent_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -43,7 +43,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRun
      * @brief Render area; the swap chain extent by default.
      */
     WBE_META(WBE_REFLECT)
-    RTParamsExtent2DVK render_extent;
+    RendExtent2DParamsVK render_extent;
     /**
      * @brief Clear values of the render targets, colors in index order followed by depth.
      */

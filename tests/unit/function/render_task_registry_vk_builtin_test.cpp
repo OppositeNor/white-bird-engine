@@ -14,14 +14,13 @@
 */
 #include "core/parser/parser_json.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/attachment_load_op_vk.hh"
-#include "function/render_vk/image_format_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
-#include "function/render_vk/rt_params_extent_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
@@ -140,9 +139,9 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, CreateValidatesCrossFieldParameters) {
         std::runtime_error);
 }
 
-TEST(WBERTParamsExtent2DVKTest, ResolvesFixedAndSwapChainRelativeExtents) {
+TEST(WBERendExtent2DParamsVKTest, ResolvesFixedAndSwapChainRelativeExtents) {
     const RendGraphContextVK context{.swap_chain_extent = {.width = 1280, .height = 721}};
-    RTParamsExtent2DVK extent;
+    RendExtent2DParamsVK extent;
     EXPECT_EQ(extent.resolve(context).width, 1280U);
     EXPECT_EQ(extent.resolve(context).height, 721U);
     extent.swap_chain_scale = 0.5F;
@@ -156,11 +155,11 @@ TEST(WBERTParamsExtent2DVKTest, ResolvesFixedAndSwapChainRelativeExtents) {
     EXPECT_EQ(extent.resolve(context).height, 16U);
 }
 
-TEST(WBERTParamsExtent2DVKTest, RejectsInvalidExtents) {
+TEST(WBERendExtent2DParamsVKTest, RejectsInvalidExtents) {
     const RendGraphContextVK context{.swap_chain_extent = {.width = 64, .height = 64}};
-    EXPECT_THROW((void)RTParamsExtent2DVK{.width = 4}.resolve(context), std::runtime_error);
-    EXPECT_THROW((void)(RTParamsExtent2DVK{.width = 0, .height = 4}.resolve(context)), std::runtime_error);
-    EXPECT_THROW((void)(RTParamsExtent2DVK{.swap_chain_scale = -1.0F}.resolve(context)), std::runtime_error);
+    EXPECT_THROW((void)RendExtent2DParamsVK{.width = 4}.resolve(context), std::runtime_error);
+    EXPECT_THROW((void)(RendExtent2DParamsVK{.width = 0, .height = 4}.resolve(context)), std::runtime_error);
+    EXPECT_THROW((void)(RendExtent2DParamsVK{.swap_chain_scale = -1.0F}.resolve(context)), std::runtime_error);
 }
 
 TEST(WBERTParamsClearValueVKTest, ConvertsColorAndDepth) {

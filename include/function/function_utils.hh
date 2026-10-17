@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_FUNTION_UTILS_HH
 #define WBE_FILE_FUNTION_UTILS_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include <entt/entt.hpp>
 namespace WhiteBirdEngine {
 
@@ -22,14 +23,16 @@ using EntityID = entt::entity;
 
 /**
  * @brief The device domain.
+ *
+ * Reflected; the lowercase aliases are the names used in render graph recipes.
  */
-enum class DeviceDomain {
+enum class WBE_META(WBE_REFLECT_ENUM) DeviceDomain {
     // The host domain
-    HOST,
+    HOST WBE_META(WBE_ALIASES = [host]),
     // The device domain
-    DEVICE,
+    DEVICE WBE_META(WBE_ALIASES = [device]),
     // Both the host and device domain
-    HOST_DEVICE,
+    HOST_DEVICE WBE_META(WBE_ALIASES = [host_device]),
 };
 
 } // namespace WhiteBirdEngine
