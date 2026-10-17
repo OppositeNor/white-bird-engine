@@ -58,7 +58,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextGeneral) {
     ASSERT_EQ(scheme.id, "test_text_01");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_01.txt");
-    ASSERT_EQ(scheme.encode_type, "utf8");
+    ASSERT_EQ(scheme.encode_type, WBE::EncodeType::UTF8);
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextDefaults) {
@@ -76,7 +76,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaTextDefaults) {
     ASSERT_EQ(scheme.id, "test_text_02");
     ASSERT_EQ(scheme.type, "text");
     ASSERT_EQ(scheme.path, "texts/test_text_02.txt");
-    ASSERT_EQ(scheme.encode_type, "utf8");
+    ASSERT_EQ(scheme.encode_type, WBE::EncodeType::UTF8);
 }
 
 TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaAudioGeneral) {
@@ -150,7 +150,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageGeneral) {
     ASSERT_EQ(scheme.id, "test_image_01");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 4U);
-    ASSERT_EQ(scheme.color_space, "rgb");
+    ASSERT_EQ(scheme.color_space, WBE::ColorSpace::RGB);
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_01.png");
 }
@@ -173,7 +173,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageHDR) {
     ASSERT_EQ(scheme.id, "test_image_hdr");
     ASSERT_EQ(scheme.type, "image");
     ASSERT_EQ(scheme.channel_count, 3U);
-    ASSERT_EQ(scheme.color_space, "rgb");
+    ASSERT_EQ(scheme.color_space, WBE::ColorSpace::RGB);
     ASSERT_TRUE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_image_hdr.hdr");
 }
@@ -195,7 +195,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaImageDefaults) {
     ASSERT_EQ(scheme.channel_count, 0);
     ASSERT_EQ(scheme.flip_h, false);
     ASSERT_EQ(scheme.flip_v, false);
-    ASSERT_EQ(scheme.color_space, "srgb");
+    ASSERT_EQ(scheme.color_space, WBE::ColorSpace::SRGB);
     ASSERT_FALSE(scheme.is_hdr);
     ASSERT_EQ(scheme.path, "images/test_minimal.jpg");
 }

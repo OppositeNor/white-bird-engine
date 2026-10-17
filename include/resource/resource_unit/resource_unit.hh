@@ -146,9 +146,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaImage : public RUSchema {
     // Flip the image vertically.
     WBE_META(WBE_REFLECT)
     bool flip_v = false;
-    // The color space of the image.
+    // The color space of the image, deserialized from a ColorSpace name or alias such as "srgb".
     WBE_META(WBE_REFLECT)
-    std::string color_space = "srgb";
+    ColorSpace color_space = ColorSpace::SRGB;
     // The path to the image file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
@@ -174,9 +174,9 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaText : public RUSchema {
     // The path to the text file.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string path;
-    // The encoding type. UTF8 by default.
+    // The encoding type, deserialized from an EncodeType name or alias such as "utf8". UTF8 by default.
     WBE_META(WBE_REFLECT)
-    std::string encode_type = "utf8";
+    EncodeType encode_type = EncodeType::UTF8;
 };
 
 /**

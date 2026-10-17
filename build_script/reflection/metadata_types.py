@@ -66,6 +66,40 @@ class WBEClassMetadata(BaseModel):
     fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
     methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
 
+class WBEEnumValueMetadata(BaseModel):
+    """Enumerator metadata.
+
+    Attributes:
+        name: The name of the enumerator.
+        value: The value of the enumerator.
+        attribute: The WBE_META attributes of the enumerator.
+        aliases: The aliases declared with WBE_ALIASES on the enumerator.
+    """
+    name : str = ""
+    value : int = 0
+    attribute : list[str] = Field(default_factory=list[str])
+    aliases : list[str] = Field(default_factory=list[str])
+
+class WBEEnumMetadata(BaseModel):
+    """Enum metadata.
+
+    Attributes:
+        name: The unqualified name of the enum.
+        qualified_name: The fully qualified type name of the enum, usable from any scope.
+        in_header: The header that declares the enum.
+        attribute: The WBE_META attributes of the enum.
+        underlying_type: The underlying integer type, as clang spells it.
+        is_scoped: Whether the enum is an enum class.
+        values: The enumerators in declaration order.
+    """
+    name : str = ""
+    qualified_name : str = ""
+    in_header : str = ""
+    attribute : list[str] = Field(default_factory=list[str])
+    underlying_type : str = ""
+    is_scoped : bool = False
+    values : list[WBEEnumValueMetadata] = Field(default_factory=list[WBEEnumValueMetadata])
+
 class WBELabelMetadata(BaseModel):
     """Label metadata.
 
@@ -88,6 +122,7 @@ class WBEFileMetadata(BaseModel):
         deps: The dependencies of the file. Usually from include or import module.
         labels: The registered labels metadata.
         classes: The registered classes metadata.
+        enums: The registered enums metadata.
     """
     file_path : str = ""
     hashcode : str = ""
@@ -95,6 +130,7 @@ class WBEFileMetadata(BaseModel):
     deps : list[str] = Field(default_factory=list)
     labels : list[WBELabelMetadata] = Field(default_factory=list)
     classes : list[WBEClassMetadata] = Field(default_factory=list)
+    enums : list[WBEEnumMetadata] = Field(default_factory=list)
 
 class WBEMetadata(BaseModel):
     """Metadata.
@@ -102,9 +138,11 @@ class WBEMetadata(BaseModel):
     Attributes:
         labels: The registrated lables.
         classes: The registrated classes.
+        enums: The registrated enums.
     """
     labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
     classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
+    enums : list[WBEEnumMetadata] = Field(default_factory=list[WBEEnumMetadata])
 
     def sort(self) -> None:
         """Sor the fields. This may gurantee the order it generates will always be the same,
@@ -113,3 +151,4 @@ class WBEMetadata(BaseModel):
         """
         self.labels = sorted(self.labels, key=lambda label: label.name)
         self.classes = sorted(self.classes, key=lambda cxx_class: cxx_class.name)
+        self.enums = sorted(self.enums, key=lambda cxx_enum: cxx_enum.qualified_name)

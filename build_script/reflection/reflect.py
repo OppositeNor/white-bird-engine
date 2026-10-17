@@ -91,18 +91,20 @@ class WBEReflector:
         """Do checkings."""
         print("WBEReflect: Checking...")
         self._check_redefinition(self.metadata.labels)
+        self._check_redefinition(self.metadata.enums, lambda enum: enum.qualified_name)
         self._check_hashing_collision("channels", self.metadata.labels, lambda label: hash_str(label.name))
 
     def _write_to_file(self, path : str, str_content : str) -> None:
         with open(path, "w+") as channel_file:
             channel_file.write(str_content)
 
-    def _check_redefinition(self, objs: list[Any]) -> None:
+    def _check_redefinition(self, objs: list[Any], get_name: Callable[[Any], str] = lambda obj: obj.name) -> None:
         seen: set[str] = set()
         for check in objs:
-            if check.name in seen:
-                raise RuntimeError(f"\"{check.name}\" is redefined.")
-            seen.add(check.name)
+            name = get_name(check)
+            if name in seen:
+                raise RuntimeError(f"\"{name}\" is redefined.")
+            seen.add(name)
 
     def _check_hashing_collision(self, dict_name: str, objs: list[Any],
                                  hash_function: Callable[[Any], int]) -> None:

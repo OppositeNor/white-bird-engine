@@ -17,6 +17,7 @@
 
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
+#include <ostream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -115,6 +116,13 @@ public:
      */
     bool contains(std::string_view p_key) const {
         return static_cast<const ChildType*>(this)->contains(p_key);
+    }
+
+    /**
+     * @brief Check whether the data is a string value.
+     */
+    bool is_string() const {
+        return static_cast<const ChildType*>(this)->is_string();
     }
 };
 

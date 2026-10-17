@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RESOURCE_UTILS_TEST_HH
 #define WBE_FILE_RESOURCE_UTILS_TEST_HH
 
+#include "generated/enum_reflection.gen.hh"
 #include "global/global.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_utils.hh"
@@ -347,13 +348,15 @@ TEST_F(WBEResourceUtilsTest, ImageRotate180HDR) {
 // Test color space string parsing
 TEST_F(WBEResourceUtilsTest, ColorSpaceFromString) {
     // Test valid color spaces
-    EXPECT_EQ(WBE::get_color_space_from_str("srgb"), WBE::ColorSpace::SRGB);
-    EXPECT_EQ(WBE::get_color_space_from_str("rgb"), WBE::ColorSpace::RGB);
+    using ColorSpaceReflection = WBE::EnumReflection<WBE::ColorSpace>;
+    EXPECT_EQ(ColorSpaceReflection::string_to_enum("srgb"), WBE::ColorSpace::SRGB);
+    EXPECT_EQ(ColorSpaceReflection::string_to_enum("rgb"), WBE::ColorSpace::RGB);
+    EXPECT_EQ(ColorSpaceReflection::string_to_enum("SRGB"), WBE::ColorSpace::SRGB);
 
     // Test invalid color space
-    EXPECT_THROW(WBE::get_color_space_from_str("invalid"), std::runtime_error);
-    EXPECT_THROW(WBE::get_color_space_from_str(""), std::runtime_error);
-    EXPECT_THROW(WBE::get_color_space_from_str("RGB"), std::runtime_error); // Case sensitive
+    EXPECT_THROW((void)ColorSpaceReflection::string_to_enum("invalid"), std::runtime_error);
+    EXPECT_THROW((void)ColorSpaceReflection::string_to_enum(""), std::runtime_error);
+    EXPECT_THROW((void)ColorSpaceReflection::string_to_enum("Rgb"), std::runtime_error); // Case sensitive
 }
 
 // Test combined transformations

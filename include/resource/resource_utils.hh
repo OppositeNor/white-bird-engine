@@ -198,22 +198,6 @@ void img_rotate_ccw_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint
  */
 void img_rotate_180_hdr(float* p_data, uint32_t p_width, uint32_t p_height, uint32_t p_channel);
 
-/**
- * @brief Get the color space from a string.
- *
- * @param p_color_space The string of the color space.
- * @return The according color space.
- */
-inline ColorSpace get_color_space_from_str(std::string_view p_color_space) {
-    if (p_color_space == "srgb") {
-        return ColorSpace::SRGB;
-    }
-    if (p_color_space == "rgb") {
-        return ColorSpace::RGB;
-    }
-    throw std::runtime_error(std::format("Failed to get color space. Color space: \"{}\" is not supported.", p_color_space));
-}
-
 } // namespace WhiteBirdEngine
 
 #endif

@@ -16,6 +16,7 @@
 #define WBE_FILE_I_RENDER_TASK_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include <cstdint>
@@ -31,12 +32,13 @@ namespace WhiteBirdEngine {
  * BaseRenderDataVK.
  *
  * COMPUTE_1 and COMPUTE_2 are two queues of the compute queue family. They are distinct VkQueues when the family exposes
- * enough queues; otherwise they share one VkQueue and the graph orders their tasks with pipeline barriers.
+ * enough queues; otherwise they share one VkQueue and the graph orders their tasks with pipeline barriers. Reflected; the
+ * lowercase aliases are the names used in render graph recipes.
  */
-enum class QueueFamilyVK : uint32_t {
-    GRAPHICS = 0,
-    COMPUTE_1 = 1,
-    COMPUTE_2 = 2,
+enum class WBE_META(WBE_REFLECT_ENUM) QueueFamilyVK : uint32_t {
+    GRAPHICS WBE_META(WBE_ALIASES = [graphics]) = 0,
+    COMPUTE_1 WBE_META(WBE_ALIASES = [compute_1]) = 1,
+    COMPUTE_2 WBE_META(WBE_ALIASES = [compute_2]) = 2,
 };
 
 class RendResViewVK;

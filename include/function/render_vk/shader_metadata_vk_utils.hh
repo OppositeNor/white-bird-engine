@@ -15,12 +15,13 @@
 #ifndef WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 #define WBE_FILE_SHADER_METADATA_VK_UTILS_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
-#include <string>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -29,29 +30,31 @@ namespace WhiteBirdEngine {
 
 /**
  * @brief Resource category selected by a reflected WBE_DESCRIPTOR annotation.
+ *
+ * Reflected; the aliases are the type names written in WBE_DESCRIPTOR.
  */
-enum class ShaderDescriptorHeapTypeVK : uint8_t {
-    UNIFORM_BUFFER,
-    STORAGE_BUFFER,
-    SAMPLED_IMAGE,
-    STORAGE_IMAGE,
-    SAMPLER,
-    ACCELERATION_STRUCTURE,
+enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorHeapTypeVK : uint8_t {
+    UNIFORM_BUFFER WBE_META(WBE_ALIASES = [uniform_buffer]),
+    STORAGE_BUFFER WBE_META(WBE_ALIASES = [storage_buffer]),
+    SAMPLED_IMAGE WBE_META(WBE_ALIASES = [sampled_image]),
+    STORAGE_IMAGE WBE_META(WBE_ALIASES = [storage_image]),
+    SAMPLER WBE_META(WBE_ALIASES = [sampler]),
+    ACCELERATION_STRUCTURE WBE_META(WBE_ALIASES = [acceleration_structure]),
 };
 
 /**
  * @brief Shader access to a descriptor-heap resource, selected by the optional third WBE_DESCRIPTOR argument.
  *
  * Uniform buffers, sampled images, samplers, and acceleration structures are always read. Storage buffers and storage images
- * default to READ_WRITE when the argument is omitted.
+ * default to READ_WRITE when the argument is omitted. Reflected; the aliases are the access names written in WBE_DESCRIPTOR.
  */
-enum class ShaderDescriptorAccessVK : uint8_t {
+enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorAccessVK : uint8_t {
     /** The shader only reads the resource. */
-    READ,
+    READ WBE_META(WBE_ALIASES = [read]),
     /** The shader only writes the resource. */
-    WRITE,
+    WRITE WBE_META(WBE_ALIASES = [write]),
     /** The shader reads and writes the resource. */
-    READ_WRITE,
+    READ_WRITE WBE_META(WBE_ALIASES = [read_write]),
 };
 
 /**

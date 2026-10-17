@@ -240,7 +240,7 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
         resource_unit.width = width;
         resource_unit.height = height;
         resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-        resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+        resource_unit.color_space = p_scheme.color_space;
         resource_unit.config.set(RUImage::IS_HDR);
         WBE_DEBUG_ASSERT(width * height * resource_unit.channel_count == image_data.size());
         auto data = p_res_chunk.push_data(image_data.size() * sizeof(float), image_data.data());
@@ -254,7 +254,7 @@ std::any ResourceUnitLoaderImage::populate_typed_scheme_ptr(IResourceChunk& p_re
         resource_unit.width = width;
         resource_unit.height = height;
         resource_unit.channel_count = p_scheme.channel_count == 0 ? file_channels : p_scheme.channel_count;
-        resource_unit.color_space = get_color_space_from_str(p_scheme.color_space);
+        resource_unit.color_space = p_scheme.color_space;
         auto data = p_res_chunk.push_data(image_data.size(), image_data.data());
         WBE_DEBUG_ASSERT(width * height * resource_unit.channel_count == image_data.size());
         resource_unit.image_data = data;
@@ -274,7 +274,7 @@ std::any ResourceUnitLoaderText::populate_typed_scheme_ptr(IResourceChunk& p_res
     RUText resource_unit;
     resource_unit.text_data = data;
     resource_unit.size = file_content.size() + 1;
-    resource_unit.encode_type = get_encode_type_from_str(p_scheme.encode_type);
+    resource_unit.encode_type = p_scheme.encode_type;
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUText>();
 }
 

@@ -12,6 +12,15 @@
     },
     {
         "out_dir" : "${include_dir}/per_target/${build_target}/generated",
+        "output_name" : "enum_reflection.gen.hh",
+        "template" : "enum_reflection.hh.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "reflected_enums" : ".reflected_enums"
+        }
+    },
+    {
+        "out_dir" : "${include_dir}/per_target/${build_target}/generated",
         "output_name" : "serializables_access.gen.hh",
         "template" : "serializables_access.hh.jinja",
         "data" : {

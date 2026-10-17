@@ -33,8 +33,8 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <optional>
-#include <string>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -215,8 +215,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaBinaryView {
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaSkeleton : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaSkeleton)
     /**
-     * Non-empty byte range of packed joints forming one tree, laid out as described by RUSkeleton::JOINT_BYTE_SIZE. The first
-     * joint is the only root.
+     * Non-empty byte range of packed joints forming one tree, laid out as described by RUSkeleton::JOINT_BYTE_SIZE. The
+     * first joint is the only root.
      */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     RUSchemaBinaryView joints;
@@ -230,7 +230,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaVertexAttribute {
     /** Exact shader-defined vertex role. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string role;
-    /** Exact 32-bit scalar or vector attribute type. */
+    /** Exact 32-bit scalar or vector attribute type: a RUVertexAttributeFormat name or alias, such as "vec3". */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string type;
     /** Byte offset inside one interleaved vertex. */
@@ -516,20 +516,22 @@ struct RUMaterial : public ResourceUnit {
 /**
  * @enum RUVertexAttributeFormat
  * @brief Supported tightly packed 32-bit vertex attribute formats.
+ *
+ * Reflected; the aliases are the shader type names used by RUSchemaVertexAttribute::type.
  */
-enum class RUVertexAttributeFormat : uint8_t {
-    FLOAT,
-    FLOAT2,
-    FLOAT3,
-    FLOAT4,
-    INT,
-    INT2,
-    INT3,
-    INT4,
-    UINT,
-    UINT2,
-    UINT3,
-    UINT4,
+enum class WBE_META(WBE_REFLECT_ENUM) RUVertexAttributeFormat : uint8_t {
+    FLOAT WBE_META(WBE_ALIASES = [float]),
+    FLOAT2 WBE_META(WBE_ALIASES = [vec2]),
+    FLOAT3 WBE_META(WBE_ALIASES = [vec3]),
+    FLOAT4 WBE_META(WBE_ALIASES = [vec4]),
+    INT WBE_META(WBE_ALIASES = [int]),
+    INT2 WBE_META(WBE_ALIASES = [ivec2]),
+    INT3 WBE_META(WBE_ALIASES = [ivec3]),
+    INT4 WBE_META(WBE_ALIASES = [ivec4]),
+    UINT WBE_META(WBE_ALIASES = [uint]),
+    UINT2 WBE_META(WBE_ALIASES = [uvec2]),
+    UINT3 WBE_META(WBE_ALIASES = [uvec3]),
+    UINT4 WBE_META(WBE_ALIASES = [uvec4]),
 };
 
 /**
@@ -578,8 +580,8 @@ struct RUSkeleton : public ResourceUnit {
      * @brief Read one joint from the backing binary.
      * @param p_index Index of the joint.
      * @return The decoded joint.
-     * @throws std::runtime_error If the index is out of range, the backing binary is missing or smaller than the joint range, or
-     * the joint breaks the single-root, parent-before-child order.
+     * @throws std::runtime_error If the index is out of range, the backing binary is missing or smaller than the joint
+     * range, or the joint breaks the single-root, parent-before-child order.
      */
     Joint get_joint(size_t p_index) const;
 };

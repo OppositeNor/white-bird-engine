@@ -16,6 +16,7 @@
 #include "accessor_test.hh"
 #include "deserializer_test_json.hh"
 #include "deserializer_test_toml.hh"
+#include "enum_reflection_test.hh"
 #include "factory_test.hh"
 #include "serializer_test.hh"
 #include "strict_deserialization_test.hh"

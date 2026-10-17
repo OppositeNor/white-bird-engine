@@ -73,9 +73,9 @@ public:
         return *this;
     }
 
-    JSONData(const Json& p_data) : data(p_data) {
+    explicit JSONData(const Json& p_data) : data(p_data) {
     }
-    JSONData(Json&& p_data) : data(std::move(p_data)) {
+    explicit JSONData(Json&& p_data) : data(std::move(p_data)) {
     }
 
     template <typename T>
@@ -216,15 +216,10 @@ public:
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>());
         } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(data.at("x").get<float>(),
-                data.at("y").get<float>(),
-                data.at("z").get<float>(),
-                data.at("w").get<float>());
+            p_value = glm::vec4(
+                data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>(), data.at("w").get<float>());
         } else if constexpr (std::same_as<T, glm::quat>) {
-            p_value = T(data.at("w").get<float>(),
-                data.at("x").get<float>(),
-                data.at("y").get<float>(),
-                data.at("z").get<float>());
+            p_value = T(data.at("w").get<float>(), data.at("x").get<float>(), data.at("y").get<float>(), data.at("z").get<float>());
         } else if constexpr (std::same_as<T, glm::mat4>) {
             if (!data.is_array() || data.size() != 16) {
                 throw std::runtime_error("Failed to get glm::mat4: expected an array containing exactly 16 values.");
@@ -314,6 +309,10 @@ public:
 
     bool contains(std::string_view p_key) const {
         return data.contains(p_key);
+    }
+
+    bool is_string() const {
+        return data.is_string();
     }
 
 private:

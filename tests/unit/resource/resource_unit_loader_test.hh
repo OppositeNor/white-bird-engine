@@ -307,20 +307,20 @@ protected:
         WBE::StackAllocator& p_stack_allocator, const WBE::RUSchemaSkeleton& p_scheme, WBE::RefRes<WBE::RUBinary> p_binary) {
         std::stringstream stream;
         WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
-        auto resource_chunk = MockResourceChunk::Builder()
-                                  .set_reserve_res_unit_storage_callback(
-                                      [&p_stack_allocator, &captured_skeleton](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                                          WBE::RefRes<char> resource(p_stack_allocator.allocate(p_size), &p_stack_allocator);
-                                          captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
-                                          return resource;
-                                      })
-                                  .set_create_ref_to_callback(
-                                      [&p_binary](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
-                                          if (p_key == "loaded_skeleton_joints") {
-                                              p_assign_ref(p_binary.force_cast<char>());
-                                          }
-                                      })
-                                  .build(stream);
+        auto resource_chunk =
+            MockResourceChunk::Builder()
+                .set_reserve_res_unit_storage_callback(
+                    [&p_stack_allocator, &captured_skeleton](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                        WBE::RefRes<char> resource(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+                        captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
+                        return resource;
+                    })
+                .set_create_ref_to_callback([&p_binary](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                    if (p_key == "loaded_skeleton_joints") {
+                        p_assign_ref(p_binary.force_cast<char>());
+                    }
+                })
+                .build(stream);
         WBE::ResourceUnitLoaderSkeleton loader;
         loader.populate_scheme(*resource_chunk, p_scheme);
         return captured_skeleton;
@@ -927,7 +927,8 @@ TEST_F(ResourcePopulatorTest, SubmeshAABBLoadsIntoSubmesh) {
 
 TEST_F(ResourcePopulatorTest, SubmeshAABBRejectsInvalidCenter) {
     WBE::ResourceUnitLoaderMesh loader;
-    for (const std::vector<float>& center : {std::vector<float>{}, std::vector<float>{1.0F, 2.0F}, std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F}}) {
+    for (const std::vector<float>& center :
+        {std::vector<float>{}, std::vector<float>{1.0F, 2.0F}, std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F}}) {
         WBE::StackAllocator stack_allocator(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
@@ -1071,26 +1072,26 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
         {.parent_index = 0, .bind_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(3.0F, 0.0F, 0.0F))},
     };
     constexpr size_t JOINTS_START = 8;
-    WBE::RefRes<WBE::RUBinary> stored_binary =
-        push_test_binary(stack_allocator, encode_skeleton_joints(source_joints, JOINTS_START));
-    auto resource_chunk = MockResourceChunk::Builder()
-                              .set_reserve_res_unit_storage_callback(
-                                  [&stack_allocator, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
-                                      if (p_id == "loaded_skeleton") {
-                                          captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
-                                      }
-                                      return resource;
-                                  })
-                              .set_create_ref_to_callback([&created_ref_keys, &stored_binary](
-                                                              std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
-                                  created_ref_keys.emplace_back(p_key);
-                                  if (p_key == "loaded_skeleton_joints") {
-                                      p_assign_ref(stored_binary.force_cast<char>());
-                                  }
-                              })
-                              .build(stream);
+    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_binary(stack_allocator, encode_skeleton_joints(source_joints, JOINTS_START));
+    auto resource_chunk =
+        MockResourceChunk::Builder()
+            .set_reserve_res_unit_storage_callback(
+                [&stack_allocator, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                    if (p_id == "loaded_skeleton") {
+                        captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
+                    }
+                    return resource;
+                })
+            .set_create_ref_to_callback(
+                [&created_ref_keys, &stored_binary](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                    created_ref_keys.emplace_back(p_key);
+                    if (p_key == "loaded_skeleton_joints") {
+                        p_assign_ref(stored_binary.force_cast<char>());
+                    }
+                })
+            .build(stream);
     constexpr std::string_view JSON_BUFFER = R"(
     {
         "id": "loaded_skeleton",
@@ -1152,8 +1153,8 @@ TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
             joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
         }
         WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_allocator, encode_skeleton_joints(joints, 0));
-        WBE::RefRes<WBE::RUSkeleton> skeleton = load_test_skeleton(
-            stack_allocator, make_skeleton_scheme(0, joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
+        WBE::RefRes<WBE::RUSkeleton> skeleton =
+            load_test_skeleton(stack_allocator, make_skeleton_scheme(0, joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
         ASSERT_NE(skeleton, nullptr);
         for (size_t i = 0; i < p_invalid_joint_index; ++i) {
             EXPECT_NO_THROW(skeleton->get_joint(i));
@@ -1197,31 +1198,32 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
     binary.data = push_test_object(stack_allocator, binary_data).force_cast<char>();
     binary.size = binary_data.size();
     WBE::RefRes<WBE::RUBinary> stored_binary = push_test_object(stack_allocator, binary);
-    auto resource_chunk = MockResourceChunk::Builder()
-                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
-                              })
-                              .set_reserve_res_unit_storage_callback(
-                                  [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
-                                      if (p_id == "loaded_mesh") {
-                                          captured_mesh = resource.force_cast<WBE::RUMesh3D>();
-                                      }
-                                      return resource;
-                                  })
-                              .set_create_ref_to_callback([&created_ref_keys, &stored_skeleton, &stored_binary](
-                                                              std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
-                                  created_ref_keys.emplace_back(p_key);
-                                  if (p_key == "loaded_skeleton") {
-                                      p_assign_ref(stored_skeleton.force_cast<char>());
-                                  } else if (p_key == "loaded_geometry" || p_key == "loaded_joint_bindings") {
-                                      p_assign_ref(stored_binary.force_cast<char>());
-                                  }
-                              })
-                              .build(stream);
+    auto resource_chunk =
+        MockResourceChunk::Builder()
+            .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &stack_allocator);
+            })
+            .set_reserve_res_unit_storage_callback(
+                [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                    if (p_id == "loaded_mesh") {
+                        captured_mesh = resource.force_cast<WBE::RUMesh3D>();
+                    }
+                    return resource;
+                })
+            .set_create_ref_to_callback([&created_ref_keys, &stored_skeleton, &stored_binary](
+                                            std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                created_ref_keys.emplace_back(p_key);
+                if (p_key == "loaded_skeleton") {
+                    p_assign_ref(stored_skeleton.force_cast<char>());
+                } else if (p_key == "loaded_geometry" || p_key == "loaded_joint_bindings") {
+                    p_assign_ref(stored_binary.force_cast<char>());
+                }
+            })
+            .build(stream);
     WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
     submesh_scheme.vertex_bindings.push_back(make_triangle_joint_bindings_scheme());
     submesh_scheme.vertex_bindings[1].binary.binary_id = "loaded_joint_bindings";
@@ -1526,7 +1528,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     WBE::RefRes<WBE::RUImage> captured_ru_image = WBE::MEM_NULL;
     WBE::RUSchemaImage image_scheme;
     image_scheme.path = "assets/images/test_ppm3.ppm";
-    image_scheme.color_space = "srgb";
+    image_scheme.color_space = WBE::ColorSpace::SRGB;
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
                              [&image_data_storage](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
@@ -1547,7 +1549,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     EXPECT_EQ(captured_ru_image->width, 16);
     EXPECT_EQ(captured_ru_image->height, 16);
     EXPECT_EQ(captured_ru_image->channel_count, 3);
-    EXPECT_EQ(captured_ru_image->color_space, WBE::get_color_space_from_str("srgb"));
+    EXPECT_EQ(captured_ru_image->color_space, WBE::ColorSpace::SRGB);
     EXPECT_EQ(image_data_storage.size(), 16 * 16 * 3);
     // Check first pixel: should be red (255, 0, 0)
     EXPECT_EQ(static_cast<unsigned char>(image_data_storage.at(0)), 255);
@@ -1584,7 +1586,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
                          .build(ss);
     loader.populate_scheme(*res_chunk, image_scheme);
     ASSERT_NE(captured_ru_image, nullptr);
-    EXPECT_EQ(captured_ru_image->color_space, WBE::get_color_space_from_str("srgb"));
+    EXPECT_EQ(captured_ru_image->color_space, WBE::ColorSpace::SRGB);
 }
 
 TEST_F(ResourcePopulatorTest, TextureResourceGeneral) {

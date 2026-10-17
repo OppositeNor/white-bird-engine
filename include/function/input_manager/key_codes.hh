@@ -15,14 +15,15 @@
 #ifndef WBE_FILE_KEY_CODES_HH
 #define WBE_FILE_KEY_CODES_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
 
 // Keycodes white bird engine uses. The corresponding keycode enum name reflects
-// the character on a US QWERTY keyboard layout.
-enum KeyCode {
+// the character on a US QWERTY keyboard layout. Reflected; TOTAL_KEYCODES has no reflected name.
+enum WBE_META(WBE_REFLECT_ENUM) KeyCode {
     // Numbers.
     KEYCODE_0,
     KEYCODE_1,
@@ -113,7 +114,7 @@ enum KeyCode {
     KEYCODE_ESCAPE,
 
     // A tracker to track the total number of keycodes.
-    TOTAL_KEYCODES
+    TOTAL_KEYCODES WBE_META(WBE_REFLECT_ENUM_IGNORE),
 };
 
 static_assert(KEYCODE_1 - KEYCODE_0 == 1, "Keycodes of numbers that are differed by 1 must also be differed by 1.");

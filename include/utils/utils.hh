@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_UTILS_HH
 #define WBE_FILE_UTILS_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <cstddef>
@@ -31,20 +32,20 @@
 
 namespace WhiteBirdEngine {
 
-// Types of encoding
-enum class EncodeType {
+// Types of encoding. Reflected; the lowercase aliases are the names used in resource schemes.
+enum class WBE_META(WBE_REFLECT_ENUM) EncodeType {
     // Unknown encode type.
-    UNKNOWN,
+    UNKNOWN WBE_META(WBE_ALIASES = [unknown]),
     // UTF8 (most recommended)
-    UTF8,
+    UTF8 WBE_META(WBE_ALIASES = [utf8]),
     // UTF16 little endian
-    UTF16LE,
+    UTF16LE WBE_META(WBE_ALIASES = [utf16le]),
     // UTF16 big endian
-    UTF16BE,
+    UTF16BE WBE_META(WBE_ALIASES = [utf16be]),
     // UTF32 little endian
-    UTF32LE,
+    UTF32LE WBE_META(WBE_ALIASES = [utf32le]),
     // UTF32 big endian
-    UTF32BE
+    UTF32BE WBE_META(WBE_ALIASES = [utf32be])
 };
 
 // Type of access.
@@ -292,31 +293,6 @@ inline std::vector<std::string> split_string(std::string p_str, std::string_view
 }
 
 /**
- * @brief Get an encode type from a string.
- *
- * @param p_str The string to get the encode type.
- * @return The encode type.
- */
-inline EncodeType get_encode_type_from_str(std::string_view p_str) {
-    if (p_str == "utf8") {
-        return EncodeType::UTF8;
-    }
-    if (p_str == "utf16le") {
-        return EncodeType::UTF16LE;
-    }
-    if (p_str == "utf16be") {
-        return EncodeType::UTF16BE;
-    }
-    if (p_str == "utf32le") {
-        return EncodeType::UTF32LE;
-    }
-    if (p_str == "utf32be") {
-        return EncodeType::UTF32BE;
-    }
-    return EncodeType::UNKNOWN;
-}
-
-/**
  * @brief Load a text file from a path.
  * @todo Test
  *
@@ -460,12 +436,12 @@ inline HashCode dynam_hash_ptr(const void* p_ptr) {
 
 using ChannelID = HashCode;
 
-// Color space
-enum class ColorSpace {
+// Color space. Reflected; the lowercase aliases are the names used in resource schemes.
+enum class WBE_META(WBE_REFLECT_ENUM) ColorSpace {
     // RGB space
-    RGB,
+    RGB WBE_META(WBE_ALIASES = [rgb]),
     // SRGB space
-    SRGB
+    SRGB WBE_META(WBE_ALIASES = [srgb])
 };
 
 /**

@@ -16,6 +16,7 @@
 #define WBE_FILE_SCRIPT_VALUE_HH
 
 #include "core/parser/parser.hh"
+#include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/quaternion_float.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -194,6 +195,12 @@ public:
     bool contains(std::string_view p_key) const {
         return find(p_key) != nullptr;
     }
+    /**
+     * @brief Check whether the value is a string.
+     */
+    bool is_string() const {
+        return get_kind() == ScriptValueKind::STRING;
+    }
 
     /**
      * @brief Convert a C++ value and store it under a key. A nil value becomes a map first.
@@ -305,9 +312,8 @@ public:
         } else if constexpr (BufferBaseConcept<Type>) {
             const std::string& string_value = as_string();
             if (string_value.size() > Type::BUFFER_SIZE - 1) {
-                throw std::runtime_error(std::format("Failed to get script value: string of length {} exceeds buffer capacity {}.",
-                    string_value.size(),
-                    Type::BUFFER_SIZE));
+                throw std::runtime_error(std::format(
+                    "Failed to get script value: string of length {} exceeds buffer capacity {}.", string_value.size(), Type::BUFFER_SIZE));
             }
             std::memcpy(p_value.buffer, string_value.data(), string_value.size());
             p_value.buffer[string_value.size()] = '\0';

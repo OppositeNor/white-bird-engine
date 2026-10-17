@@ -19,6 +19,7 @@
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/vertex_attribute_format_info.hh"
+#include "generated/enum_reflection.gen.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -44,34 +45,7 @@
 namespace WhiteBirdEngine {
 namespace {
 
-struct VertexAttributeTypeName {
-    std::string_view type;
-    RUVertexAttributeFormat format;
-};
-
-constexpr std::array<VertexAttributeTypeName, 12> VERTEX_ATTRIBUTE_TYPE_NAMES{{
-    {.type = "float", .format = RUVertexAttributeFormat::FLOAT},
-    {.type = "vec2", .format = RUVertexAttributeFormat::FLOAT2},
-    {.type = "vec3", .format = RUVertexAttributeFormat::FLOAT3},
-    {.type = "vec4", .format = RUVertexAttributeFormat::FLOAT4},
-    {.type = "int", .format = RUVertexAttributeFormat::INT},
-    {.type = "ivec2", .format = RUVertexAttributeFormat::INT2},
-    {.type = "ivec3", .format = RUVertexAttributeFormat::INT3},
-    {.type = "ivec4", .format = RUVertexAttributeFormat::INT4},
-    {.type = "uint", .format = RUVertexAttributeFormat::UINT},
-    {.type = "uvec2", .format = RUVertexAttributeFormat::UINT2},
-    {.type = "uvec3", .format = RUVertexAttributeFormat::UINT3},
-    {.type = "uvec4", .format = RUVertexAttributeFormat::UINT4},
-}};
-
-const VertexAttributeTypeName* find_vertex_attribute_type_name(std::string_view p_type) {
-    for (const auto& type_name : VERTEX_ATTRIBUTE_TYPE_NAMES) {
-        if (type_name.type == p_type) {
-            return &type_name;
-        }
-    }
-    return nullptr;
-}
+using VertexAttributeFormatReflection = EnumReflection<RUVertexAttributeFormat>;
 
 void validate_binary_view_schema(const RUSchemaBinaryView& p_view, std::string_view p_context) {
     if (p_view.binary_id.empty() || p_view.binary_id.contains('\0')) {
@@ -100,13 +74,13 @@ void validate_vertex_view_schema(const RUSchemaVertexView& p_vertices) {
             throw std::runtime_error(
                 "Failed to populate submesh resource unit: vertex attribute role must be non-empty and must not contain NUL.");
         }
-        const VertexAttributeTypeName* type_name = find_vertex_attribute_type_name(attribute.type);
-        if (type_name == nullptr) {
+        const std::optional<RUVertexAttributeFormat> format = VertexAttributeFormatReflection::try_string_to_enum(attribute.type);
+        if (!format.has_value()) {
             throw std::runtime_error(std::format("Failed to populate submesh resource unit: unsupported vertex attribute type '{}' for role '{}'.",
                 attribute.type,
                 attribute.role));
         }
-        const size_t attribute_size = VertexAttributeFormatInfo::get_size(type_name->format);
+        const size_t attribute_size = VertexAttributeFormatInfo::get_size(*format);
         if (attribute.offset > p_vertices.stride || attribute_size > p_vertices.stride - attribute.offset) {
             throw std::runtime_error(std::format(
                 "Failed to populate submesh resource unit: vertex attribute '{}' exceeds the vertex stride.", attribute.role));
@@ -158,9 +132,11 @@ const RUSchemaVertexAttribute* find_vertex_bindings_attribute(std::span<const RU
 void validate_joint_binding_attribute(std::span<const RUSchemaVertexView> p_bindings, std::string_view p_role, std::string_view p_type) {
     const RUSchemaVertexAttribute* attribute = find_vertex_bindings_attribute(p_bindings, p_role);
     if (attribute == nullptr) {
-        throw std::runtime_error(std::format("Failed to populate submesh resource unit: joint bindings require the '{}' attribute.", p_role));
+        throw std::runtime_error(
+            std::format("Failed to populate submesh resource unit: joint bindings require the '{}' attribute.", p_role));
     }
-    if (attribute->type != p_type) {
+    // Compare formats, so every name or alias of the required format is accepted.
+    if (VertexAttributeFormatReflection::try_string_to_enum(attribute->type) != VertexAttributeFormatReflection::string_to_enum(p_type)) {
         throw std::runtime_error(std::format("Failed to populate submesh resource unit: joint binding attribute '{}' must have type '{}', got '{}'.",
             p_role,
             p_type,
@@ -183,8 +159,8 @@ void validate_vertex_bindings_schema(std::span<const RUSchemaVertexView> p_bindi
         }
         for (const RUSchemaVertexAttribute& attribute : binding.attributes) {
             if (find_vertex_bindings_attribute(p_bindings.first(binding_index), attribute.role) != nullptr) {
-                throw std::runtime_error(std::format(
-                    "Failed to populate submesh resource unit: vertex role '{}' is declared by more than one vertex binding.", attribute.role));
+                throw std::runtime_error(std::format("Failed to populate submesh resource unit: vertex role '{}' is declared by more than one vertex binding.",
+                    attribute.role));
             }
         }
     }
@@ -220,12 +196,15 @@ void populate_vertex_view(IResourceChunk& p_res_chunk, const RUSchemaVertexView&
     std::vector<RUVertexView::Attribute> attributes;
     attributes.reserve(p_scheme.attributes.size());
     for (const RUSchemaVertexAttribute& attribute_scheme : p_scheme.attributes) {
-        const VertexAttributeTypeName* type_name = find_vertex_attribute_type_name(attribute_scheme.type);
-        WBE_DEBUG_ASSERT(type_name != nullptr);
-        attributes.push_back(RUVertexView::Attribute{.role = populate_shader_role(p_res_chunk, attribute_scheme.role),
-            .format = type_name->format,
+        const std::optional<RUVertexAttributeFormat> format =
+            VertexAttributeFormatReflection::try_string_to_enum(attribute_scheme.type);
+        WBE_DEBUG_ASSERT(format.has_value());
+        attributes.push_back(RUVertexView::Attribute{
+            .role = populate_shader_role(p_res_chunk, attribute_scheme.role),
+            .format = *format,
             .offset = attribute_scheme.offset,
-            .size = VertexAttributeFormatInfo::get_size(type_name->format)});
+            .size = VertexAttributeFormatInfo::get_size(*format),
+        });
     }
     p_vertex_view.attributes =
         p_res_chunk.push_data(attributes.size() * sizeof(RUVertexView::Attribute), attributes.data()).force_cast<RUVertexView::Attribute>();
@@ -526,7 +505,8 @@ RUSubmeshInstance3D populate_submesh_instances(IResourceChunk& p_res_chunk, cons
         instances.push_back(RUInstance3D{.global_transform = instance_scheme.global_transform});
     }
     if (!instances.empty()) {
-        result.instances = p_res_chunk.push_data(instances.size() * sizeof(RUInstance3D), instances.data()).force_cast<RUInstance3D>();
+        result.instances =
+            p_res_chunk.push_data(instances.size() * sizeof(RUInstance3D), instances.data()).force_cast<RUInstance3D>();
     }
     result.instance_count = instances.size();
     return result;
@@ -640,10 +620,12 @@ std::span<const std::string> ResourceUnitLoaderSkeleton::get_supported_resource_
 std::any ResourceUnitLoaderSkeleton::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
     const auto& typed_scheme = get_typed_scheme<RUSchemaSkeleton>(p_scheme, "skeleton");
     if (typed_scheme.joints.binary_id.empty()) {
-        throw std::runtime_error(std::format("Failed to populate skeleton {}: joints binary_id must be non-empty.", typed_scheme.id));
+        throw std::runtime_error(
+            std::format("Failed to populate skeleton {}: joints binary_id must be non-empty.", typed_scheme.id));
     }
     if (typed_scheme.joints.binary_id.contains('\0')) {
-        throw std::runtime_error(std::format("Failed to populate skeleton {}: joints binary_id must not contain NUL.", typed_scheme.id));
+        throw std::runtime_error(
+            std::format("Failed to populate skeleton {}: joints binary_id must not contain NUL.", typed_scheme.id));
     }
     if (typed_scheme.joints.size == 0) {
         throw std::runtime_error(std::format("Failed to populate skeleton {}: at least one joint is required.", typed_scheme.id));
@@ -656,8 +638,8 @@ std::any ResourceUnitLoaderSkeleton::populate_scheme_ptr(IResourceChunk& p_res_c
     }
     const size_t joint_count = typed_scheme.joints.size / RUSkeleton::JOINT_BYTE_SIZE;
     if (joint_count > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
-        throw std::runtime_error(
-            std::format("Failed to populate skeleton {}: joint count {} exceeds the int32 index range.", typed_scheme.id, joint_count));
+        throw std::runtime_error(std::format(
+            "Failed to populate skeleton {}: joint count {} exceeds the int32 index range.", typed_scheme.id, joint_count));
     }
     RUSkeleton resource_unit;
     resource_unit.joints.start = typed_scheme.joints.start;

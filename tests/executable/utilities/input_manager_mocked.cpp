@@ -18,6 +18,7 @@
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
 #include "function/input_manager/key_codes.hh"
+#include "generated/enum_reflection.gen.hh"
 #include "utils/defs.hh"
 #include <algorithm>
 #include <array>
@@ -27,106 +28,25 @@
 #include <format>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-#define WBE_KEY_CODE_NAME_ENTRY(key_code) std::pair<KeyCode, std::string_view>(key_code, #key_code)
-
 namespace WhiteBirdEngine {
 
 namespace {
 
-constexpr auto KEY_CODE_NAMES = std::to_array<std::pair<KeyCode, std::string_view>>({
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_0),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_1),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_2),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_3),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_4),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_5),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_6),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_7),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_8),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_9),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_A),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_B),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_C),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_D),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_E),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_G),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_H),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_I),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_J),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_K),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_L),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_M),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_N),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_O),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_P),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_Q),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_R),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_S),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_T),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_U),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_V),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_W),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_X),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_Y),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_Z),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_BACKSPACE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_TAB),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_ENTER),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_SPACE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_DELETE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_EQUAL),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_BACKSLASH),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_UNDERSCORE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_QUOTE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_BACKQUOTE),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_LEFT_BRACKET),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_RIGHT_BRACKET),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_SEMICOLON),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F1),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F2),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F3),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F4),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F5),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F6),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F7),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F8),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F9),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F10),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F11),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_F12),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_LEFT_SHIFT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_LEFT_CONTROL),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_LEFT_ALT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_RIGHT_SHIFT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_RIGHT_CONTROL),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_RIGHT_ALT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_CAPSLOCK),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_HOME),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_END),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_PAGE_UP),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_PAGE_DOWN),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_INSERT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_UP),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_DOWN),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_LEFT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_RIGHT),
-    WBE_KEY_CODE_NAME_ENTRY(KEYCODE_ESCAPE),
-});
-static_assert(KEY_CODE_NAMES.size() == TOTAL_KEYCODES, "Every key code must have a name for input sequences.");
+static_assert(EnumReflection<KeyCode>::get_enumerators().size() == TOTAL_KEYCODES, "Every key code must have a name for input sequences.");
 
 KeyCode key_code_from_name(std::string_view p_name) {
-    const auto* entry = std::ranges::find(KEY_CODE_NAMES, p_name, &std::pair<KeyCode, std::string_view>::second);
-    if (entry == KEY_CODE_NAMES.end()) {
+    const std::optional<KeyCode> key_code = EnumReflection<KeyCode>::try_string_to_enum(p_name);
+    if (!key_code.has_value()) {
         throw std::runtime_error(std::format("InputManagerMocked: unknown key \"{}\" in input sequence.", p_name));
     }
-    return entry->first;
+    return *key_code;
 }
 
 std::chrono::steady_clock::duration read_seconds(const JSONData& p_entry, std::string_view p_field, bool p_allow_zero) {

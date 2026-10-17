@@ -193,6 +193,10 @@ gen_info = {
     "render_tasks" : [
         "WBE_RENDER_TASK",
     ],
+    # Enums given an EnumReflection specialization; see include/core/reflection/enum_reflection.hh.
+    "reflected_enums" : [
+        "WBE_REFLECT_ENUM",
+    ],
 }
 
 gen_info["static_serializables"].extend(gen_info["serializables"])

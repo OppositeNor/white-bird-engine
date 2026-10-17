@@ -17,14 +17,14 @@ from build_script.utils import hash_file, hash_str_sha256
 from build_script.reflection.reflect import WBEReflector
 import clang.cindex
 import json
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata, WBEMethodMetadata
+from build_script.reflection.metadata_types import WBEClassMetadata, WBEEnumMetadata, WBEEnumValueMetadata, WBEFieldMetadata, WBEFileMetadata, WBELabelMetadata, WBEMetadata, WBEMethodMetadata
 
 WBE_REFLECT = "WBE_REFLECT"
 WBE_COMPONENT = "WBE_COMPONENT"
 
 # Bump whenever the extracted metadata changes, so cached metadata of unchanged headers is reparsed. Changes to the clang
 # arguments invalidate the cache on their own.
-METAPARSER_VERSION = 2
+METAPARSER_VERSION = 4
 
 META_PARAMETER_PATTERN = re.compile(r"\s*(?P<parameter>[A-Za-z_][A-Za-z0-9_]*(?:\s*=\s*\[[^\]]*\])?)\s*(?:,|$)")
 ALIASES_ATTRIBUTE_PATTERN = re.compile(r"^WBE_ALIASES\s*=\s*\[(?P<aliases>[^\]]*)\]$")
@@ -71,6 +71,7 @@ class WBEMetaparser:
         for metadata in sorted_metadata:
             result_metadata.labels.extend(metadata.labels)
             result_metadata.classes.extend(metadata.classes)
+            result_metadata.enums.extend(metadata.enums)
         self.reflector.register_metadata(result_metadata)
 
     def _get_metadata(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
@@ -142,6 +143,8 @@ class WBEMetaparser:
             self._handle_visit_var_decl(metadata, cursor)
         elif cursor.kind == clang.cindex.CursorKind.CLASS_DECL or cursor.kind == clang.cindex.CursorKind.STRUCT_DECL:
             self._handle_visit_class_decl(metadata, cursor, in_file)
+        elif cursor.kind == clang.cindex.CursorKind.ENUM_DECL:
+            self._handle_visit_enum_decl(metadata, cursor, in_file)
 
         for child in cursor.get_children():
             # Every header registers only what it declares itself; included headers register their own declarations
@@ -174,6 +177,38 @@ class WBEMetaparser:
                     attributes, aliases = self._get_attributes(attr.spelling)
                     class_metadata = self._get_class_metadata(cursor, attributes, aliases, in_file)
                     metadata.classes.append(class_metadata)
+
+    def _handle_visit_enum_decl(self, metadata: WBEFileMetadata, cursor: clang.cindex.Cursor, in_file: str) -> None:
+        """Register an enum annotated with WBE_META(...), including the WBE_ALIASES of its enumerators."""
+        for attr in cursor.get_children():
+            if attr.kind != clang.cindex.CursorKind.ANNOTATE_ATTR:
+                continue
+            qualified_name = cursor.type.get_canonical().spelling
+            if any(existing.qualified_name == qualified_name for existing in metadata.enums):
+                return
+            attributes, _ = self._get_attributes(attr.spelling)
+            enum_metadata = WBEEnumMetadata(name=cursor.spelling,
+                                            qualified_name=qualified_name,
+                                            in_header=in_file,
+                                            attribute=attributes,
+                                            underlying_type=cursor.enum_type.get_canonical().spelling,
+                                            is_scoped=cursor.is_scoped_enum())
+            for enumerator in cursor.get_children():
+                if enumerator.kind != clang.cindex.CursorKind.ENUM_CONSTANT_DECL:
+                    continue
+                value_attributes: list[str] = []
+                value_aliases: list[str] = []
+                for enumerator_attr in enumerator.get_children():
+                    if enumerator_attr.kind == clang.cindex.CursorKind.ANNOTATE_ATTR:
+                        attributes, aliases = self._get_attributes(enumerator_attr.spelling)
+                        value_attributes.extend(attributes)
+                        value_aliases.extend(aliases)
+                enum_metadata.values.append(WBEEnumValueMetadata(name=enumerator.spelling,
+                                                                 value=enumerator.enum_value,
+                                                                 attribute=value_attributes,
+                                                                 aliases=value_aliases))
+            metadata.enums.append(enum_metadata)
+            return
 
     def _read_from_cache(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
         with open(cache_path) as f:

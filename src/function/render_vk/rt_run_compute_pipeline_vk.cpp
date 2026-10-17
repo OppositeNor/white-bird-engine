@@ -21,10 +21,11 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_compute_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include <format>
 #include <stdexcept>
@@ -62,7 +63,8 @@ Unique<IRenderTaskVK> RTRunComputePipelineVK::create(
     return make_unique<RTRunComputePipelineVK>(p_render_data->allocator,
         p_render_data,
         std::move(pipeline),
-        VkExtent3D{.width = p_params.group_count_x, .height = p_params.group_count_y, .depth = p_params.group_count_z});
+        VkExtent3D{.width = p_params.group_count_x, .height = p_params.group_count_y, .depth = p_params.group_count_z},
+        p_params.queue_family);
 }
 
 void RTRunComputePipelineVK::bind_resources(const RendResViewVK& p_resources) {

@@ -16,6 +16,7 @@
 #define WBE_FILE_RT_PARAMS_RUN_COMPUTE_PIPELINE_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include <cstdint>
 #include <string>
 
@@ -26,8 +27,6 @@ namespace WhiteBirdEngine {
  * @brief Recipe parameters of RTRunComputePipelineVK. Copyable and movable.
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
- *
- * The task always runs on the graphics queue until reflection can map QueueFamilyVK names.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRunComputePipelineVK {
     /**
@@ -50,6 +49,11 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRun
      */
     WBE_META(WBE_REFLECT)
     uint32_t group_count_z = 1;
+    /**
+     * @brief Queue the dispatch is submitted to: a QueueFamilyVK name or alias, such as "compute_1".
+     */
+    WBE_META(WBE_REFLECT)
+    QueueFamilyVK queue_family = QueueFamilyVK::GRAPHICS;
 };
 
 } // namespace WhiteBirdEngine

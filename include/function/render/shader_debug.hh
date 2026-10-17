@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_SHADER_DEBUG_HH
 #define WBE_FILE_SHADER_DEBUG_HH
 
+#include "core/reflection/reflection_defs.hh"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -33,8 +34,10 @@ inline constexpr uint32_t SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
 /**
  * @enum ShaderDebugError
  * @brief Stable error codes reported by GPU shaders.
+ *
+ * Reflected; EnumReflection<ShaderDebugError> gives the stable enumerator names.
  */
-enum class ShaderDebugError : uint32_t {
+enum class WBE_META(WBE_REFLECT_ENUM) ShaderDebugError : uint32_t {
     /** The report buffer ran out of entry storage. */
     DEBUG_BUFFER_FULL = 1,
     /** An SVO node allocation would exceed its buffer. */
@@ -52,33 +55,6 @@ enum class ShaderDebugError : uint32_t {
     /** An octree debug node would exceed the debug node list. */
     OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
 };
-
-/**
- * @brief Return the stable name of a shader-debug error code.
- * @param p_error Error code reported by the GPU.
- * @return The enumerator name, or `UNKNOWN_SHADER_DEBUG_ERROR` for an unknown value.
- */
-constexpr std::string_view shader_debug_error_name(ShaderDebugError p_error) {
-    switch (p_error) {
-    case ShaderDebugError::DEBUG_BUFFER_FULL:
-        return "DEBUG_BUFFER_FULL";
-    case ShaderDebugError::SVO_NODE_INDEX_OVERFLOW:
-        return "SVO_NODE_INDEX_OVERFLOW";
-    case ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW:
-        return "SVO_LEAF_INDEX_OVERFLOW";
-    case ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW:
-        return "SVO_DEFERRED_TASK_INDEX_OVERFLOW";
-    case ShaderDebugError::SVO_DEEPER_THAN_EXPECTED:
-        return "SVO_DEEPER_THAN_EXPECTED";
-    case ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED:
-        return "SVO_SHALLOWER_THAN_EXPECTED";
-    case ShaderDebugError::OCTREE_LEAF_LIST_OVERFLOW:
-        return "OCTREE_LEAF_LIST_OVERFLOW";
-    case ShaderDebugError::OCTREE_DEBUG_NODE_LIST_OVERFLOW:
-        return "OCTREE_DEBUG_NODE_LIST_OVERFLOW";
-    }
-    return "UNKNOWN_SHADER_DEBUG_ERROR";
-}
 
 } // namespace WhiteBirdEngine
 

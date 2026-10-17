@@ -43,6 +43,7 @@
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
+#include "generated/enum_reflection.gen.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
@@ -1293,8 +1294,8 @@ RendererVK::SwapChainSupportDetails RendererVK::get_swap_chain_support_details(V
 }
 
 VkSurfaceFormatKHR RendererVK::choose_swap_surface_format(const Vector<VkSurfaceFormatKHR, AllocType>& p_available_formats) {
-    // Render targets hold linear color, so the swap chain must apply the sRGB encoding on write. Surfaces commonly offer only
-    // one of the two channel orders (e.g. X11 surfaces only offer BGRA).
+    // Render targets hold linear color, so the swap chain must apply the sRGB encoding on write. Surfaces commonly offer
+    // only one of the two channel orders (e.g. X11 surfaces only offer BGRA).
     for (VkFormat preferred_format : {VK_FORMAT_R8G8B8A8_SRGB, VK_FORMAT_B8G8R8A8_SRGB}) {
         for (const auto& available_format : p_available_formats) {
             if (available_format.format == preferred_format && available_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -1524,8 +1525,10 @@ void RendererVK::check_shader_debug_buffer() {
     const size_t entry_count = std::min<size_t>(words[0], SHADER_DEBUG_FRAME_ENTRY_CAPACITY);
     for (size_t i = 0; i < entry_count; ++i) {
         const uint32_t error_value = words[i + 2];
-        const auto error = static_cast<ShaderDebugError>(error_value);
-        stdout_log(WBE_CHANNEL_RENDER)->error(std::format("Shader debug report [{}]: {} ({}).", i, shader_debug_error_name(error), error_value));
+        // The GPU may report a value no enumerator declares, so the name lookup must not throw.
+        const std::string_view error_name =
+            EnumReflection<ShaderDebugError>::try_enum_to_string(static_cast<ShaderDebugError>(error_value)).value_or("UNKNOWN_SHADER_DEBUG_ERROR");
+        stdout_log(WBE_CHANNEL_RENDER)->error(std::format("Shader debug report [{}]: {} ({}).", i, error_name, error_value));
     }
 
     constexpr uint32_t EMPTY_SIZE = 0;

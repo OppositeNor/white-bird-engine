@@ -506,6 +506,60 @@ private:
     int32_t value = 0;
 };
 
+/**
+ * @brief Reflected enum with a signed narrow underlying type, aliases, and two enumerators sharing a value.
+ */
+enum class WBE_META(WBE_REFLECT_ENUM) TestEnumSigned : int8_t {
+    NEGATIVE WBE_META(WBE_ALIASES = [ neg, minus ]) = -3,
+    ZERO = 0,
+    POSITIVE WBE_META(WBE_ALIASES = [pos]) = 100,
+    // Shares the value of ZERO, which stays the canonical name.
+    SAME_AS_ZERO = 0,
+};
+
+/**
+ * @brief Reflected enum with a 64-bit unsigned underlying type and an ignored sentinel.
+ */
+enum class WBE_META(WBE_REFLECT_ENUM) TestEnumUnsigned64 : uint64_t {
+    SMALL = 1,
+    LARGE = 0xFFFF'FFFF'FFFF'FFF0ULL,
+    IGNORED_SENTINEL WBE_META(WBE_REFLECT_ENUM_IGNORE) = 0xFFFF'FFFF'FFFF'FFF1ULL,
+};
+
+/**
+ * @brief Not reflected; used to check ReflectedEnumConcept.
+ */
+enum class TestEnumUnreflected : uint8_t {
+    VALUE,
+};
+
+/**
+ * @brief Holds an unscoped reflected enum nested in a class.
+ */
+struct TestEnumHolder {
+    /**
+     * @brief Nested unscoped reflected enum.
+     */
+    enum WBE_META(WBE_REFLECT_ENUM) Nested : uint8_t {
+        NESTED_A,
+        NESTED_B WBE_META(WBE_ALIASES = [b]),
+    };
+};
+
+/**
+ * @brief Serializable with reflected enum fields.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestEnumFields {
+    WBE_META(WBE_REFLECT)
+    TestEnumSigned signed_value = TestEnumSigned::ZERO;
+    WBE_META(WBE_REFLECT)
+    TestEnumUnsigned64 unsigned_value = TestEnumUnsigned64::SMALL;
+    WBE_META(WBE_REFLECT)
+    std::optional<TestEnumSigned> optional_value;
+    WBE_META(WBE_REFLECT)
+    std::vector<TestEnumHolder::Nested> nested_values;
+};
+
 } // namespace WhiteBirdEngine
 
 #endif

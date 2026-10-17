@@ -89,7 +89,7 @@ public:
      *
      * @param p_node The node to copy.
      */
-    TOMLData(const toml::node& p_node) {
+    explicit TOMLData(const toml::node& p_node) {
         holder.push_back(p_node);
     }
 
@@ -98,7 +98,7 @@ public:
      *
      * @param p_table The table to take.
      */
-    TOMLData(toml::table&& p_table) {
+    explicit TOMLData(toml::table&& p_table) {
         holder.push_back(std::move(p_table));
     }
 
@@ -189,6 +189,10 @@ public:
         return table != nullptr && table->contains(p_key);
     }
 
+    bool is_string() const {
+        return !holder.empty() && holder[0].is_string();
+    }
+
 private:
     // Holds zero or one element: the data's node. toml::array owns polymorphic nodes and deep-copies them.
     toml::array holder;
@@ -264,15 +268,11 @@ private:
         } else if constexpr (std::same_as<T, glm::vec3>) {
             p_value = glm::vec3(read_float_field(p_node, "x"), read_float_field(p_node, "y"), read_float_field(p_node, "z"));
         } else if constexpr (std::same_as<T, glm::vec4>) {
-            p_value = glm::vec4(read_float_field(p_node, "x"),
-                read_float_field(p_node, "y"),
-                read_float_field(p_node, "z"),
-                read_float_field(p_node, "w"));
+            p_value = glm::vec4(
+                read_float_field(p_node, "x"), read_float_field(p_node, "y"), read_float_field(p_node, "z"), read_float_field(p_node, "w"));
         } else if constexpr (std::same_as<T, glm::quat>) {
-            p_value = glm::quat(read_float_field(p_node, "w"),
-                read_float_field(p_node, "x"),
-                read_float_field(p_node, "y"),
-                read_float_field(p_node, "z"));
+            p_value = glm::quat(
+                read_float_field(p_node, "w"), read_float_field(p_node, "x"), read_float_field(p_node, "y"), read_float_field(p_node, "z"));
         } else if constexpr (std::same_as<T, glm::mat4>) {
             const toml::array* array = p_node.as_array();
             if (array == nullptr || array->size() != 16) {

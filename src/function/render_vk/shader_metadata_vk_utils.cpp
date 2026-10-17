@@ -19,14 +19,15 @@
 #include "function/render/vertex_input_contract.hh"
 #include "function/render/vertex_input_contract_resolver.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include "generated/enum_reflection.gen.hh"
 #include <algorithm>
 #include <cstdint>
 #include <format>
 #include <limits>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
-#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -45,25 +46,11 @@ bool entry_point_uses_push_data(const ShaderMetadataEntryPoint& p_entry_point, c
 }
 
 ShaderDescriptorHeapTypeVK descriptor_heap_type_from_name(std::string_view p_name) {
-    if (p_name == "uniform_buffer") {
-        return ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER;
+    const std::optional<ShaderDescriptorHeapTypeVK> type = EnumReflection<ShaderDescriptorHeapTypeVK>::try_string_to_enum(p_name);
+    if (!type.has_value()) {
+        throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
     }
-    if (p_name == "storage_buffer") {
-        return ShaderDescriptorHeapTypeVK::STORAGE_BUFFER;
-    }
-    if (p_name == "sampled_image") {
-        return ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE;
-    }
-    if (p_name == "storage_image") {
-        return ShaderDescriptorHeapTypeVK::STORAGE_IMAGE;
-    }
-    if (p_name == "sampler") {
-        return ShaderDescriptorHeapTypeVK::SAMPLER;
-    }
-    if (p_name == "acceleration_structure") {
-        return ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE;
-    }
-    throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
+    return *type;
 }
 
 bool descriptor_type_is_writable(ShaderDescriptorHeapTypeVK p_type) {
@@ -77,15 +64,12 @@ ShaderDescriptorAccessVK descriptor_access(
         return descriptor_type_is_writable(p_type) ? ShaderDescriptorAccessVK::READ_WRITE : ShaderDescriptorAccessVK::READ;
     }
     const std::string_view name = p_attribute.arguments[2].string_value;
-    ShaderDescriptorAccessVK access = ShaderDescriptorAccessVK::READ;
-    if (name == "write") {
-        access = ShaderDescriptorAccessVK::WRITE;
-    } else if (name == "read_write") {
-        access = ShaderDescriptorAccessVK::READ_WRITE;
-    } else if (name != "read") {
+    const std::optional<ShaderDescriptorAccessVK> parsed_access = EnumReflection<ShaderDescriptorAccessVK>::try_string_to_enum(name);
+    if (!parsed_access.has_value()) {
         throw std::runtime_error(
             std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has unsupported access '{}'.", p_field_path, name));
     }
+    const ShaderDescriptorAccessVK access = *parsed_access;
     if (access != ShaderDescriptorAccessVK::READ && !descriptor_type_is_writable(p_type)) {
         throw std::runtime_error(
             std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' writes a descriptor type that is read-only.", p_field_path));
@@ -315,11 +299,8 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                         "Failed to resolve WBE_DESCRIPTOR: descriptor struct array '{}' exceeds push data.", field_path));
                 }
                 extent = std::max<uint64_t>(extent,
-                    collect_descriptor_heap_fields(field.fields,
-                        std::format("{}[{}]", field_path, i),
-                        static_cast<uint32_t>(element_offset),
-                        static_cast<uint32_t>(i),
-                        p_layout));
+                    collect_descriptor_heap_fields(
+                        field.fields, std::format("{}[{}]", field_path, i), static_cast<uint32_t>(element_offset), static_cast<uint32_t>(i), p_layout));
             }
         } else {
             extent = std::max<uint64_t>(extent,

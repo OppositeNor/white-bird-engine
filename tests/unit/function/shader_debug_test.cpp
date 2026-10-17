@@ -13,9 +13,11 @@
    limitations under the License.
 */
 #include "function/render/shader_debug.hh"
+#include "generated/enum_reflection.gen.hh"
 
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <stdexcept>
 
 namespace WhiteBirdEngine {
 
@@ -27,15 +29,18 @@ TEST(WBEShaderDebugTest, BufferLayoutReservesHeaderAndEntries) {
 }
 
 TEST(WBEShaderDebugTest, ErrorNamesAreStable) {
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::DEBUG_BUFFER_FULL), "DEBUG_BUFFER_FULL");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_NODE_INDEX_OVERFLOW), "SVO_NODE_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW), "SVO_LEAF_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW), "SVO_DEFERRED_TASK_INDEX_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_DEEPER_THAN_EXPECTED), "SVO_DEEPER_THAN_EXPECTED");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED), "SVO_SHALLOWER_THAN_EXPECTED");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_LEAF_LIST_OVERFLOW), "OCTREE_LEAF_LIST_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(ShaderDebugError::OCTREE_DEBUG_NODE_LIST_OVERFLOW), "OCTREE_DEBUG_NODE_LIST_OVERFLOW");
-    EXPECT_EQ(shader_debug_error_name(static_cast<ShaderDebugError>(UINT32_MAX)), "UNKNOWN_SHADER_DEBUG_ERROR");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::DEBUG_BUFFER_FULL), "DEBUG_BUFFER_FULL");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::SVO_NODE_INDEX_OVERFLOW), "SVO_NODE_INDEX_OVERFLOW");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW), "SVO_LEAF_INDEX_OVERFLOW");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW),
+        "SVO_DEFERRED_TASK_INDEX_OVERFLOW");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::SVO_DEEPER_THAN_EXPECTED), "SVO_DEEPER_THAN_EXPECTED");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED), "SVO_SHALLOWER_THAN_EXPECTED");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::OCTREE_LEAF_LIST_OVERFLOW), "OCTREE_LEAF_LIST_OVERFLOW");
+    EXPECT_EQ(EnumReflection<ShaderDebugError>::enum_to_string(ShaderDebugError::OCTREE_DEBUG_NODE_LIST_OVERFLOW),
+        "OCTREE_DEBUG_NODE_LIST_OVERFLOW");
+    EXPECT_FALSE(EnumReflection<ShaderDebugError>::try_enum_to_string(static_cast<ShaderDebugError>(UINT32_MAX)).has_value());
+    EXPECT_THROW((void)EnumReflection<ShaderDebugError>::enum_to_string(static_cast<ShaderDebugError>(UINT32_MAX)), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine
