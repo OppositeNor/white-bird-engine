@@ -23,8 +23,10 @@
 {% endfor %}
 #include "core/reflection/reflection_defs.hh"
 
+#include <algorithm>
 #include <initializer_list>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -91,6 +93,31 @@ public:
 
 };
 
+{#- Every field name and alias of a class and its reflected bases, as a comma-separated list of string literals. #}
+{% macro known_serializable_keys(class_name) -%}
+{%- for known_class in metadata.classes if known_class.name == class_name -%}
+{%- for extended_parent in known_class.extended_parents -%}{{ known_serializable_keys(extended_parent) }}{%- endfor -%}
+{%- for field in known_class.fields -%}"{{ field.name }}", {% for alias in field.aliases %}"{{ alias }}", {% endfor -%}{%- endfor -%}
+{%- endfor -%}
+{%- endmacro %}
+
+/**
+ * @brief Throw if p_data has a key outside p_known_keys. Used by strict deserializers.
+ *
+ * @param p_data The data to check.
+ * @param p_type_name The name of the type being deserialized, for the error message.
+ * @param p_known_keys Every field name and alias the type accepts.
+ */
+template <typename ParserDataType>
+void reject_unknown_serializable_keys(
+        const ParserDataType& p_data, std::string_view p_type_name, std::initializer_list<std::string_view> p_known_keys) {
+    for (const std::string& key : p_data.get_all_keys()) {
+        if (std::ranges::find(p_known_keys, std::string_view(key)) == p_known_keys.end()) {
+            throw std::runtime_error("Unknown field '" + key + "' for " + std::string(p_type_name) + ".");
+        }
+    }
+}
+
 {% for serializable in metadata.classes %}
 {% if serializable.attribute | select("in", static_serializables) | list | length > 0  %}
 /**
@@ -123,12 +150,29 @@ public:
     /**
      * @brief Deserialize.
      *
+{% if serializable.attribute | select("in", strict_deserializations) | list | length > 0 %}
+     * Strict: a key that is neither a field nor a field alias of {{ serializable.name }} or one of its reflected bases throws
+     * std::runtime_error.
+     *
+{% endif %}
      * @tparam ParserDataType The type of the data.
      * @param p_data The data to retrieve value from.
      * @param p_serializable The object to deserialize.
      */
     template <typename ParserDataType>
     static void deserialize(const ParserDataType& p_data, ObjType& p_serializable);
+
+    /**
+     * @brief Deserialize the fields of {{ serializable.name }} and its bases without rejecting unknown keys.
+     *
+     * Used for base classes, whose data also holds the keys of the derived class.
+     *
+     * @tparam ParserDataType The type of the data.
+     * @param p_data The data to retrieve value from.
+     * @param p_serializable The object to deserialize.
+     */
+    template <typename ParserDataType>
+    static void deserialize_fields(const ParserDataType& p_data, ObjType& p_serializable);
 };
 {% endif %}
 {% endfor %}
@@ -158,8 +202,16 @@ void SerializableSD<{{ serializable.name }}>::serialize(ParserDataType& p_data, 
 
 template <typename ParserDataType>
 void SerializableSD<{{ serializable.name }}>::deserialize(const ParserDataType& p_data, ObjType& p_serializable) {
+    {% if serializable.attribute | select("in", strict_deserializations) | list | length > 0 %}
+    reject_unknown_serializable_keys(p_data, "{{ serializable.name }}", { {{ known_serializable_keys(serializable.name) }} });
+    {% endif %}
+    deserialize_fields(p_data, p_serializable);
+}
+
+template <typename ParserDataType>
+void SerializableSD<{{ serializable.name }}>::deserialize_fields(const ParserDataType& p_data, ObjType& p_serializable) {
     {% for extended_parent in serializable.extended_parents %}
-    SerializableSD<{{ extended_parent }}>::deserialize(p_data, p_serializable);
+    SerializableSD<{{ extended_parent }}>::deserialize_fields(p_data, p_serializable);
     {% endfor %}
 
     {% for field in serializable.fields %}

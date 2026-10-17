@@ -142,6 +142,19 @@ TEST(WBERenderTaskRegistryVKTest, CreateFactoryRejectsInvalidRequests) {
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("x", -1), &render_data), std::runtime_error);
 }
 
+TEST(WBERenderTaskRegistryVKTest, RejectsMisspeltParameters) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    ScriptValue params = make_probe_params("x", 1);
+    params.set_entry("cuont", ScriptValue::make_integer(2));
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data), std::runtime_error);
+
+    ScriptValue compute_params;
+    compute_params.set_entry("pipeline", ScriptValue::make_string("pipelines/blur"));
+    compute_params.set_entry("group_count", ScriptValue::make_integer(8));
+    EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", compute_params, &render_data), std::runtime_error);
+}
+
 TEST(WBERenderTaskRegistryVKTest, CreateFailuresSurfaceWhenTheFactoryRuns) {
     RenderAllocator allocator(WBE_KI_B(64));
     BaseRenderDataVK render_data(&allocator);

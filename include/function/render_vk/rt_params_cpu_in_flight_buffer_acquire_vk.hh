@@ -23,8 +23,10 @@ namespace WhiteBirdEngine {
 /**
  * @class RTParamsCPUInFlightBufferAcquireVK
  * @brief Recipe parameters of RTCPUInFlightBufferAcquireVK. Copyable and movable.
+ *
+ * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RTParamsCPUInFlightBufferAcquireVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsCPUInFlightBufferAcquireVK {
     /**
      * @brief Render-graph resource id of the source buffer; it is also the event id of every acquisition.
      */

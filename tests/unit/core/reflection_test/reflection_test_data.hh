@@ -409,6 +409,38 @@ struct WBE_META(WBE_SERIALIZABLE) TestNestedRequired final : public Serializable
     std::vector<TestStaticWithRequired> required_static_vector;
 };
 
+// Strict deserialization: unknown keys throw, including keys of a derived class when a strict base is deserialized alone.
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) TestStrictBase {
+    WBE_META(WBE_REFLECT)
+    int32_t base_value = 0;
+    WBE_META(WBE_REFLECT, WBE_ALIASES = [base_alias])
+    std::string base_name;
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) TestStrictChild : public TestStrictBase {
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    int32_t child_value = 0;
+};
+
+// A lenient class with a lenient base, holding a strict member: only the member's object is checked.
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestLenientHolder {
+    WBE_META(WBE_REFLECT)
+    TestStrictBase strict_member;
+    WBE_META(WBE_REFLECT)
+    int32_t holder_value = 0;
+};
+
+// A strict class whose base is lenient: the base's fields are still known keys.
+struct WBE_META(WBE_SERIALIZABLE_STATIC) TestLenientBase {
+    WBE_META(WBE_REFLECT)
+    int32_t lenient_base_value = 0;
+};
+
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) TestStrictOverLenient : public TestLenientBase {
+    WBE_META(WBE_REFLECT)
+    int32_t strict_value = 0;
+};
+
 // Exercises method reflection; the metaparser collects only the methods annotated with WBE_REFLECT.
 class WBE_META(WBE_TEST_METHODS) TestReflectedMethods final {
 public:

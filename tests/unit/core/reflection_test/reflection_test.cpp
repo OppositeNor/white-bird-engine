@@ -18,4 +18,5 @@
 #include "deserializer_test_toml.hh"
 #include "factory_test.hh"
 #include "serializer_test.hh"
+#include "strict_deserialization_test.hh"
 // NOLINTEND

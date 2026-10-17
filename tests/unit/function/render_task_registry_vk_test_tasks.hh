@@ -31,7 +31,7 @@
 namespace WhiteBirdEngine {
 
 // Parameters of RTRegistryProbeVK.
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RTParamsRegistryProbeVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRegistryProbeVK {
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string label;
     WBE_META(WBE_REFLECT)

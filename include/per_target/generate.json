@@ -6,7 +6,8 @@
         "data" : {
             "metadata" : ".metadata",
             "serializables" : ".serializables",
-            "static_serializables" : ".static_serializables"
+            "static_serializables" : ".static_serializables",
+            "strict_deserializations" : ".strict_deserializations"
         }
     },
     {

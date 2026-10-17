@@ -25,9 +25,11 @@ namespace WhiteBirdEngine {
  * @class RTParamsRunComputePipelineVK
  * @brief Recipe parameters of RTRunComputePipelineVK. Copyable and movable.
  *
+ * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
+ *
  * The task always runs on the graphics queue until reflection can map QueueFamilyVK names.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC) RTParamsRunComputePipelineVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRunComputePipelineVK {
     /**
      * @brief Resource key of the compiled compute pipeline in the renderer's RenderDatabase.
      */
