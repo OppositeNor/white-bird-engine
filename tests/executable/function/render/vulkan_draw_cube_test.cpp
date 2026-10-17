@@ -199,8 +199,7 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     load_resources();
     setup_spot_light();
 
-    static_mesh_resources = WBE::create_mesh_resources(
-        renderer_vk, cube_mesh, main_pipeline_resource, WBE::MEM_NULL, main_pipeline_resource);
+    static_mesh_resources = WBE::create_mesh_resources(renderer_vk, cube_mesh, main_pipeline_resource);
     const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "draw_cube_shadow_pipeline", shadow_pipeline_resource, shadow_formats, SHADOWMAP_DEPTH_FORMAT);

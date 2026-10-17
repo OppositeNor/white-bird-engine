@@ -17,10 +17,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/material_texture_contract.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata.hh"
 #include "function/render_vk/mesh_buffer_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_planner_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -41,12 +39,9 @@
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
-#include "function/render/mesh_node_contract.hh"
-#include "function/render/mesh_node_contract_resolver.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/mesh_material_resource_builder_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -55,13 +50,12 @@
 #include <format>
 #include <string>
 #include "function/render_vk/mesh_gpu_data_vk.hh"
+#include "generated/type_uuid.gen.hh"
+#include <algorithm>
 
 namespace WhiteBirdEngine {
 
 namespace {
-
-/** Name of the reflection-only parameter block that declares the mesh storage-buffer contract. */
-constexpr std::string_view MESH_CONTRACT_PARAMETER_NAME = "mesh";
 
 RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
@@ -71,41 +65,10 @@ RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key)
     return resource_manager->get_resource<RUMaterial>(std::string(p_default_material_key));
 }
 
-Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data, bool p_has_material_contract) {
-    if (!p_has_material_contract) {
-        return MEM_NULL;
-    }
+Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data) {
     const DescriptorArenaLocationVK arena = p_render_data->sampler_descriptor_arena;
     uint32_t sampler_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
     return ROSamplerVK::Builder().set_sampler_index(sampler_index).create_ref(p_render_data);
-}
-
-uint32_t get_material_texture_view_index(GraphicsPipelineCompilerVK& p_pipeline_compiler,
-    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>>& p_material_texture_views,
-    RefRes<RUTexture> p_texture) {
-    for (const auto& [texture, image_view] : p_material_texture_views) {
-        if (texture == p_texture) {
-            return image_view->get_sampled_view_index();
-        }
-    }
-    Ref<ROImageViewVK> image_view = p_pipeline_compiler.compile_texture_view(
-        std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(p_texture.get())), p_texture);
-    uint32_t sampled_view_index = image_view->get_sampled_view_index();
-    p_material_texture_views.emplace_back(p_texture, std::move(image_view));
-    return sampled_view_index;
-}
-
-Ref<ROBufferVK> create_material_params_buffer(const BaseRenderDataVK* p_render_data, std::span<const uint8_t> p_buffer_data) {
-    const DescriptorArenaLocationVK arena = p_render_data->buffer_descriptor_arena;
-    uint32_t uniform_view_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
-                                 .set_domain(DeviceDomain::HOST_DEVICE)
-                                 .set_size(p_buffer_data.size())
-                                 .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                 .set_uniform_view_index(uniform_view_index)
-                                 .create_ref(p_render_data);
-    result->update_buffer(p_buffer_data.data(), p_buffer_data.size());
-    return result;
 }
 
 Ref<ROBufferVK> create_host_buffer(const BaseRenderDataVK* p_render_data, const void* p_data, size_t p_size, VkBufferUsageFlags p_usage) {
@@ -130,30 +93,6 @@ struct DrawPlan {
     Vector<VkDrawIndexedIndirectCommand, RenderAllocator> commands;
     Vector<MeshDrawBatchVK, RenderAllocator> batches;
 };
-
-struct MaterialBuild {
-    Ref<ROBufferVK> material_params = MEM_NULL;
-    Ref<ROSamplerVK> material_sampler = MEM_NULL;
-    Ref<RenderResourceListVK> textures = MEM_NULL;
-};
-
-void validate_node_layout(const ShaderMetadata& p_vertex_metadata) {
-    MeshNodeContract reflected_contract = MeshNodeContractResolver().resolve(p_vertex_metadata, MESH_CONTRACT_PARAMETER_NAME);
-    MeshNodeContract cpu_contract;
-    cpu_contract.element_stride = sizeof(GeometryNodeGPU);
-    cpu_contract.transform_offset = offsetof(GeometryNodeGPU, transform);
-    cpu_contract.normal_transform_offset = offsetof(GeometryNodeGPU, normal_transform);
-    if (cpu_contract.matches(reflected_contract)) {
-        return;
-    }
-    throw std::runtime_error(std::format("Mesh node layout mismatch: shader expects stride={}, transform offset={}, normal_transform offset={}, but CPU uploads stride={}, transform offset={}, normal_transform offset={}.",
-        reflected_contract.element_stride,
-        reflected_contract.transform_offset,
-        reflected_contract.normal_transform_offset,
-        cpu_contract.element_stride,
-        cpu_contract.transform_offset,
-        cpu_contract.normal_transform_offset));
-}
 
 void validate_material(RefRes<RUMaterial> p_material) {
     if (p_material == nullptr) {
@@ -193,13 +132,10 @@ MeshBufferCompilerVK::BuildResult compile_geometry_buffers(
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | p_config.index_buffer_usage);
 }
 
-DrawPlan plan_draws(const BaseRenderDataVK* p_render_data,
-    const MeshResourcesVK& p_resources,
-    std::span<const MeshDrawBatchPlannerVK::Draw> p_draws,
-    const ShaderMetadata& p_vertex_metadata,
-    std::string_view p_vertex_entry) {
-    MeshDrawBatchPlannerVK::BuildResult draw_plan = MeshDrawBatchPlannerVK().build(
-        p_render_data->allocator, p_draws, p_vertex_metadata, p_vertex_entry, p_render_data->max_draw_indirect_count);
+DrawPlan plan_draws(
+    const BaseRenderDataVK* p_render_data, const MeshResourcesVK& p_resources, std::span<const MeshDrawBatchPlannerVK::Draw> p_draws) {
+    MeshDrawBatchPlannerVK::BuildResult draw_plan =
+        MeshDrawBatchPlannerVK().build(p_render_data->allocator, p_draws, p_render_data->max_draw_indirect_count);
     DrawPlan result(p_render_data->allocator);
     result.commands = std::move(draw_plan.commands);
     result.batches.reserve(draw_plan.batches.size());
@@ -207,7 +143,7 @@ DrawPlan plan_draws(const BaseRenderDataVK* p_render_data,
         MeshDrawBatchVK draw_batch;
         draw_batch.first_draw = source_batch.first_draw;
         draw_batch.draw_count = source_batch.draw_count;
-        draw_batch.vertex_input = std::move(source_batch.vertex_input);
+        draw_batch.vertex_bindings = source_batch.vertex_bindings;
         draw_batch.vertex_buffers.reserve(source_batch.vertex_binaries.size());
         for (size_t i = 0; i < source_batch.vertex_binaries.size(); ++i) {
             draw_batch.vertex_buffers.push_back(VertexBufferBindingVK{
@@ -220,17 +156,38 @@ DrawPlan plan_draws(const BaseRenderDataVK* p_render_data,
     return result;
 }
 
-MaterialBuild compile_materials(RendererVK* p_renderer,
-    const std::optional<MaterialTextureContract>& p_material_contract,
-    const MeshCompilerVK::Config& p_config,
-    std::span<const RefRes<RUMaterial>> p_materials) {
-    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
-    MaterialBuild result;
-    result.textures = make_ref<RenderResourceListVK>(render_data->allocator, render_data->allocator);
-    result.material_sampler = create_material_sampler(render_data, p_material_contract.has_value());
-    if (!p_material_contract.has_value()) {
-        return result;
+void append_texture_views(GraphicsPipelineCompilerVK& p_texture_compiler,
+    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>>& p_texture_views,
+    RefRes<RUMaterial> p_material) {
+    if (p_material == nullptr) {
+        return;
     }
+    if (p_material->texture_count > 0 && p_material->textures == nullptr) {
+        throw std::runtime_error("Failed to compile mesh resources: material texture slots are missing.");
+    }
+    for (size_t i = 0; i < p_material->texture_count; ++i) {
+        RefRes<RUTexture> texture = p_material->textures.get()[i].texture;
+        if (texture == nullptr || std::ranges::any_of(p_texture_views, [&texture](const auto& p_view) {
+                return p_view.first == texture;
+            })) {
+            continue;
+        }
+        p_texture_views.emplace_back(texture,
+            p_texture_compiler.compile_texture_view(std::format("texture_resource_{}", reinterpret_cast<uintptr_t>(texture.get())), texture));
+    }
+}
+
+struct MaterialBuild {
+    RefRes<RUMaterial> default_material = MEM_NULL;
+    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> texture_views;
+    Ref<ROSamplerVK> material_sampler = MEM_NULL;
+};
+
+// Compile a sampled view of every texture of every material, so that material tables can later be built for any pipeline's
+// material texture contract.
+MaterialBuild compile_materials(
+    RendererVK* p_renderer, const MeshCompilerVK::Config& p_config, std::span<const RefRes<RUMaterial>> p_materials) {
+    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_data->allocator,
         .render_data = render_data,
@@ -238,26 +195,15 @@ MaterialBuild compile_materials(RendererVK* p_renderer,
         .renderer = p_renderer,
     };
     GraphicsPipelineCompilerVK texture_compiler(compiler_context);
-    std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>> material_texture_views;
-    MeshMaterialResourcesVK material_resources = MeshMaterialResourceBuilderVK().build(p_material_contract,
-        p_materials,
-        get_default_material(p_config.default_material_resource_key),
-        render_data->sampled_image_descriptor_capacity,
-        result.material_sampler,
-        [&texture_compiler, &material_texture_views](RefRes<RUTexture> p_texture) {
-            return get_material_texture_view_index(texture_compiler, material_texture_views, p_texture);
-        });
-    if (material_resources.material_params_data.empty()) {
-        throw std::runtime_error("Failed to compile mesh resources: material parameter buffer is missing.");
+    MaterialBuild result;
+    result.default_material = get_default_material(p_config.default_material_resource_key);
+    append_texture_views(texture_compiler, result.texture_views, result.default_material);
+    for (const RefRes<RUMaterial>& material : p_materials) {
+        append_texture_views(texture_compiler, result.texture_views, material);
     }
-    result.material_params = create_material_params_buffer(render_data, material_resources.material_params_data);
-    for (auto& [texture, image_view] : material_texture_views) {
-        static_cast<void>(texture);
-        result.textures->add_resource(image_view);
-    }
+    result.material_sampler = create_material_sampler(render_data);
     return result;
 }
-
 
 struct StaticInstanceBufferData {
     std::vector<GeometrySubmeshGPU> submeshes;
@@ -410,13 +356,7 @@ MeshCompilerVK::MeshCompilerVK(RendererVK* p_renderer) : renderer(p_renderer) {
     }
 }
 
-Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
-    const ShaderMetadata& p_opaque_vertex_metadata,
-    std::string_view p_opaque_vertex_entry,
-    const ShaderMetadata& p_masked_vertex_metadata,
-    std::string_view p_masked_vertex_entry,
-    const std::optional<MaterialTextureContract>& p_material_contract,
-    const Config& p_config) const {
+Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh, const Config& p_config) const {
     if (p_mesh == MEM_NULL) {
         throw std::runtime_error("Failed to compile static-mesh resources: mesh is null.");
     }
@@ -426,24 +366,17 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
     if (!has_opaque_draws && !has_masked_draws && !has_opaque_double_sided_draws) {
         throw std::runtime_error("Failed to compile static-mesh resources: the mesh has no drawable category.");
     }
-    const auto validate_category = [](const RUSubmeshInstance3D& p_category, const ShaderMetadata& p_vertex_metadata) {
+    const auto validate_category = [](const RUSubmeshInstance3D& p_category) {
         for (size_t i = 0; i < p_category.submesh_count; ++i) {
             validate_material(p_category.submeshes.get()[i].material);
         }
-        validate_node_layout(p_vertex_metadata);
     };
-    if (has_opaque_draws) {
-        validate_category(p_mesh->opaque_instances, p_opaque_vertex_metadata);
-    }
-    if (has_opaque_double_sided_draws) {
-        validate_category(p_mesh->double_sided_opaque_instances, p_opaque_vertex_metadata);
-    }
-    if (has_masked_draws) {
-        validate_category(p_mesh->masked_instances, p_masked_vertex_metadata);
-    }
+    validate_category(p_mesh->opaque_instances);
+    validate_category(p_mesh->double_sided_opaque_instances);
+    validate_category(p_mesh->masked_instances);
 
     const BaseRenderDataVK* render_data = renderer->get_base_render_data();
-    Ref<MeshResourcesVK> result = make_ref<MeshResourcesVK>(render_data->allocator, render_data->allocator);
+    Ref<MeshResourcesVK> result = make_ref<MeshResourcesVK>(render_data->allocator, render_data);
     result->mesh = p_mesh;
 
     MeshBufferCompilerVK::BuildResult geometry_buffers = compile_geometry_buffers(render_data, p_mesh, p_config);
@@ -469,47 +402,72 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh,
 
     const auto compile_category = [render_data, &result](const RUSubmeshInstance3D& p_category,
                                       std::span<const uint32_t> p_first_instances,
-                                      const ShaderMetadata& p_vertex_metadata,
-                                      std::string_view p_vertex_entry,
                                       Ref<ROBufferVK>& p_draw_buffer,
                                       Vector<MeshDrawBatchVK, RenderAllocator>& p_batches) {
         auto draws = make_static_draws(render_data->allocator, p_category, p_first_instances);
-        DrawPlan plan = plan_draws(render_data, *result, draws, p_vertex_metadata, p_vertex_entry);
+        DrawPlan plan = plan_draws(render_data, *result, draws);
         p_draw_buffer = create_indirect_buffer(render_data, plan.commands);
         p_batches = std::move(plan.batches);
     };
     if (has_opaque_draws) {
-        compile_category(p_mesh->opaque_instances,
-            combined_data.opaque_first_instances,
-            p_opaque_vertex_metadata,
-            p_opaque_vertex_entry,
-            result->opaque_draw_batches,
-            result->opaque_batches);
+        compile_category(p_mesh->opaque_instances, combined_data.opaque_first_instances, result->opaque_draw_batches, result->opaque_batches);
     }
     if (has_opaque_double_sided_draws) {
         compile_category(p_mesh->double_sided_opaque_instances,
             combined_data.opaque_double_sided_first_instances,
-            p_opaque_vertex_metadata,
-            p_opaque_vertex_entry,
             result->opaque_double_sided_draw_batches,
             result->opaque_double_sided_batches);
     }
     if (has_masked_draws) {
-        compile_category(p_mesh->masked_instances,
-            combined_data.masked_first_instances,
-            p_masked_vertex_metadata,
-            p_masked_vertex_entry,
-            result->masked_draw_batches,
-            result->masked_batches);
+        compile_category(p_mesh->masked_instances, combined_data.masked_first_instances, result->masked_draw_batches, result->masked_batches);
     }
 
-    MaterialBuild material_build = compile_materials(renderer,
-        p_material_contract,
-        p_config,
-        std::span<const RefRes<RUMaterial>>(instance_data.ordered_materials.data(), instance_data.ordered_materials.size()));
-    result->material_params = std::move(material_build.material_params);
+    result->materials = instance_data.ordered_materials;
+    MaterialBuild material_build = compile_materials(renderer, p_config, result->materials);
+    result->default_material = material_build.default_material;
+    result->texture_views = std::move(material_build.texture_views);
     result->material_sampler = std::move(material_build.material_sampler);
-    result->textures = std::move(material_build.textures);
+    for (const auto& [texture, image_view] : result->texture_views) {
+        static_cast<void>(texture);
+        result->textures->add_resource(image_view);
+    }
+    if (p_mesh->resource_key != nullptr && p_mesh->resource_key[0] != '\0') {
+        renderer->get_render_database()->register_compiled_render_resource(p_mesh->resource_key, result);
+    }
+    return result;
+}
+
+Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh) const {
+    return compile(p_mesh, Config{});
+}
+
+Ref<MeshResourcesVK> MeshCompilerVK::acquire(std::string_view p_mesh_resource_key) const {
+    return acquire(p_mesh_resource_key, Config{});
+}
+
+Ref<MeshResourcesVK> MeshCompilerVK::acquire(std::string_view p_mesh_resource_key, const Config& p_config) const {
+    if (p_mesh_resource_key.empty()) {
+        throw std::runtime_error("Failed to acquire compiled mesh: the mesh resource key is empty.");
+    }
+    Ref<MeshResourcesVK> registered = renderer->get_render_database()
+                                          ->get_compiled_render_resource(p_mesh_resource_key, TypeUUID<MeshResourcesVK>::UUID)
+                                          .dynamic_cast_ref<MeshResourcesVK>();
+    if (registered != MEM_NULL) {
+        return registered;
+    }
+    ResourceManager* resource_manager = ResourceManager::get_singleton();
+    if (resource_manager == nullptr) {
+        throw std::runtime_error(std::format("Failed to acquire compiled mesh '{}': the resource manager is unavailable.", p_mesh_resource_key));
+    }
+    RefRes<RUMesh3D> mesh = resource_manager->get_resource<RUMesh3D>(std::string(p_mesh_resource_key));
+    if (mesh == MEM_NULL) {
+        throw std::runtime_error(std::format("Failed to acquire compiled mesh '{}': no mesh resource has this key.", p_mesh_resource_key));
+    }
+    Ref<MeshResourcesVK> result = compile(mesh, p_config);
+    if (mesh->resource_key == nullptr || std::string_view(mesh->resource_key) != p_mesh_resource_key) {
+        // Register under the requested key too, so later requests find the compiled mesh.
+        renderer->get_render_database()->register_compiled_render_resource(p_mesh_resource_key, result);
+    }
     return result;
 }
 

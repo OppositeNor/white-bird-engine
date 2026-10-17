@@ -46,7 +46,7 @@ DynamicMeshRenderFeature::DynamicMeshRenderFeature(
     if (p_entity_count == 0) {
         throw std::runtime_error("Dynamic mesh feature requires at least one entity.");
     }
-    resources = create_mesh_resources(p_renderer, p_mesh, p_material_pipeline, MEM_NULL, p_material_pipeline);
+    resources = create_mesh_resources(p_renderer, p_mesh, p_material_pipeline);
     entities.reserve(p_entity_count);
     entity_keys.reserve(p_entity_count);
     for (size_t i = 0; i < p_entity_count; ++i) {

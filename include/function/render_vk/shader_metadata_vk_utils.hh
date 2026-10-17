@@ -18,6 +18,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
+#include "function/render/vertex_input_requirement.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <span>
@@ -145,6 +146,18 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
  */
 VertexInputDescriptionVK build_vertex_input_description_vk(
     const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings);
+
+/**
+ * @brief Match a vertex input requirement, such as ROGraphicsPipelineVK::get_vertex_input_requirement(), against the vertex
+ * bindings of a submesh.
+ *
+ * Produces the same description as the overload taking the shader metadata the requirement was resolved from.
+ *
+ * @throws std::runtime_error When the resource layout metadata is invalid, or a required role is missing, has a different
+ * format, or is declared by more than one binding.
+ */
+VertexInputDescriptionVK build_vertex_input_description_vk(
+    const VertexInputRequirement& p_requirement, std::span<const RUVertexView> p_vertex_bindings);
 
 /**
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.

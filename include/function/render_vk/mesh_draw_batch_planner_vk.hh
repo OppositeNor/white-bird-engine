@@ -18,11 +18,8 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <span>
-#include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -30,7 +27,7 @@ namespace WhiteBirdEngine {
 
 /**
  * @class MeshDrawBatchPlannerVK
- * @brief Groups one pipeline's mesh draws by compatible reflected vertex input and buffer offsets.
+ * @brief Groups mesh draws by shared vertex layout and buffer placement, independent of any shader.
  *
  * Stateless and copyable. Planning preserves supplied instance indices when reordering draws.
  */
@@ -38,7 +35,7 @@ class MeshDrawBatchPlannerVK final {
 public:
     /**
      * @class Batch
-     * @brief Copyable owned vertex-input state for a contiguous range of indirect commands.
+     * @brief Copyable vertex layout and buffer placement of a contiguous range of indirect commands.
      */
     struct Batch {
         /**
@@ -74,16 +71,17 @@ public:
          */
         uint32_t draw_count = 0;
         /**
-         * @brief Effective reflected vertex-input state shared by all draws in this batch.
+         * @brief Vertex bindings of one of the batch's draws; every draw of the batch has the same layout. Views the storage
+         * passed to build().
          */
-        VertexInputDescriptionVK vertex_input;
+        std::span<const RUVertexView> vertex_bindings;
         /**
-         * @brief The vertex binary read by each vertex-input binding, parallel to vertex_input.bindings.
+         * @brief The vertex binary read by each vertex binding, parallel to vertex_bindings.
          */
         std::vector<RefRes<RUBinary>> vertex_binaries;
         /**
-         * @brief The byte offset bound for each vertex-input binding, parallel to vertex_input.bindings; command vertex
-         * offsets are relative to these bases.
+         * @brief The byte offset bound for each vertex binding, parallel to vertex_bindings; command vertex offsets are
+         * relative to these bases.
          */
         std::vector<VkDeviceSize> vertex_buffer_offsets;
     };
@@ -177,20 +175,17 @@ public:
     MeshDrawBatchPlannerVK& operator=(MeshDrawBatchPlannerVK&&) noexcept = default;
 
     /**
-     * @brief Plan draws sharing prevalidated vertex and index binaries for one pipeline.
+     * @brief Plan draws sharing prevalidated vertex and index binaries.
      *
-     * Draws without indices or instances are skipped. Compatible groups preserve source order internally and split at
-     * the device's maximum indirect draw count.
+     * Draws batch together when their vertex bindings have the same layout (strides, attribute roles, formats, and offsets)
+     * and the same placement in the vertex binaries up to a shared first vertex. Draws without indices or instances are
+     * skipped. Compatible groups preserve source order internally and split at the device's maximum indirect draw count.
      * @throws std::runtime_error When the draw limit is zero, or Vulkan draw/layout limits are exceeded.
      */
-    BuildResult build(RenderAllocator* p_allocator,
-        std::span<const Draw> p_draws,
-        const ShaderMetadata& p_vertex_metadata,
-        std::string_view p_vertex_entry_name,
-        uint32_t p_max_draw_count) const;
+    BuildResult build(RenderAllocator* p_allocator, std::span<const Draw> p_draws, uint32_t p_max_draw_count) const;
 
     /**
-     * @brief Plan drawable submeshes sharing prevalidated vertex and index binaries for one pipeline.
+     * @brief Plan drawable submeshes sharing prevalidated vertex and index binaries.
      *
      * First-instance entries correspond to input submeshes. Empty draws are skipped. Compatible groups
      * preserve source order internally and split at the device's maximum indirect draw count.
@@ -199,8 +194,6 @@ public:
     BuildResult build(RenderAllocator* p_allocator,
         std::span<const RUSubmesh3D> p_submeshes,
         std::span<const uint32_t> p_first_instances,
-        const ShaderMetadata& p_vertex_metadata,
-        std::string_view p_vertex_entry_name,
         uint32_t p_max_draw_count) const;
 };
 

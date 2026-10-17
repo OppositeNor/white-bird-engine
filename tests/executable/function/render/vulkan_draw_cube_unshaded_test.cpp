@@ -26,6 +26,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
@@ -98,27 +99,11 @@ public:
             throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }
 
-        WBE::Ref<WBE::MeshResourcesVK> static_mesh_resources =
-            WBE::create_mesh_resources(renderer, cube_mesh, pipeline_resource, WBE::MEM_NULL, WBE::MEM_NULL);
-        if (static_mesh_resources->acquire_textures() == WBE::MEM_NULL) {
-            throw std::runtime_error("Failed to setup draw cube unshaded test: static-mesh texture list was not compiled.");
-        }
         const std::array color_formats{base_render_data->swap_chain_format};
-        WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline =
+        // The render database holds the pipeline weakly; it must stay alive until the draw task retains it.
+        const WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline =
             WBE::compile_render_test_graphics_pipeline(renderer, "draw_cube_unshaded_pipeline", pipeline_resource, color_formats);
-        const std::array<VkClearValue, 1> clear_values{};
-        const std::array<std::string_view, 1> color_attachments{WBE::REND_RES_SWAP_CHAIN};
-        WBE::RendTaskDescVK task_desc = WBE::make_mesh_task_desc(render_allocator,
-            base_render_data,
-            "run_static_mesh",
-            static_mesh_resources,
-            graphics_pipeline,
-            false,
-            clear_values,
-            &WBE::RendGraphContextVK::swap_chain_extent,
-            color_attachments);
         WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::STATIC_MESH_KEY, *static_mesh_resources);
         pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add_buffer(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER,
                 [initial_data = WBE::to_initial_data(camera_info)](const WBE::RendGraphContextVK& /*p_context*/) {
@@ -126,7 +111,15 @@ public:
                         .domain = WBE::DeviceDomain::HOST_DEVICE,
                         .initial_data = initial_data};
                 });
-        pipeline_desc.tasks.emplace_back(std::move(task_desc));
+        // The task compiles the mesh by its resource key and imports its buffers into the graph itself.
+        const WBE::RTParamsGraphicsDrawMeshVK draw_params{
+            .mesh = "model_cube_static.mesh",
+            .pipeline = "draw_cube_unshaded_pipeline",
+            .parts = {WBE::MeshPartVK::OPAQUE},
+            .clear_values = {WBE::RTParamsClearValueVK{.color = std::vector<float>{0.0F, 0.0F, 0.0F, 0.0F}}},
+        };
+        WBE::RTGraphicsDrawMeshVK::add_to_graph(pipeline_desc, "run_static_mesh", draw_params, base_render_data)
+            .alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
         WBE::Ref<WBE::RenderGraphVK> graph =
             WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
         camera_info_ubo =

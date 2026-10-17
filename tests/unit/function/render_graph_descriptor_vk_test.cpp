@@ -246,7 +246,8 @@ TEST(WBERenderGraphDescriptorVKTest, ComposesMemberResourceIds) {
 TEST(WBERenderGraphDescriptorVKTest, IncompleteMeshResourcesRefuseToBind) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendGraphDescVK descriptor(&allocator);
-    MeshResourcesVK static_mesh(&allocator);
+    BaseRenderDataVK render_data(&allocator);
+    MeshResourcesVK static_mesh(&render_data);
 
     EXPECT_THROW(descriptor.add_resource("static_mesh", static_mesh), std::runtime_error);
     EXPECT_TRUE(descriptor.resources.empty());

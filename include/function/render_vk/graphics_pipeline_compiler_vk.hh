@@ -34,6 +34,7 @@
 #include <glm/ext/vector_float4.hpp>
 #include <glm/glm.hpp>
 #include <string_view>
+#include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -78,6 +79,14 @@ struct GraphicsPipelineCompilerVKContext {
      * @brief Polygon rasterization mode used by the compiled pipeline.
      */
     VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
+    /**
+     * @brief Name of the global shader variable holding the material texture table; see MaterialTextureContractResolver.
+     */
+    std::string material_textures_variable_name = "material_textures";
+    /**
+     * @brief Name of the global shader variable holding the material parameter table; see MaterialTextureContractResolver.
+     */
+    std::string material_params_variable_name = "material_params";
 };
 
 /**

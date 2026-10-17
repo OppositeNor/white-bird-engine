@@ -459,6 +459,11 @@ struct RendGraphDescVK {
      * @throws std::runtime_error If p_resource_id is empty.
      */
     RendGraphDescVK& add_sampler(std::string_view p_resource_id, RendSamplerFactoryVK p_factory = nullptr);
+    /**
+     * @brief Check whether a resource is already imported or declared under an id.
+     * @param p_resource_id Graph resource identifier; a composite's members are checked by their full `<key>.<member>` ids.
+     */
+    bool contains_resource(std::string_view p_resource_id) const;
 
     RenderAllocator* allocator = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-

@@ -13,6 +13,9 @@
    limitations under the License.
 */
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render/material_texture_contract_resolver.hh"
+#include "function/render/mesh_node_contract_resolver.hh"
+#include "function/render/vertex_input_contract_resolver.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -103,6 +106,15 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
         p_resource_key, *p_pipeline_resource, vertex_shader, geometry_shader, fragment_shader, vertex_entry, geometry_entry, fragment_entry);
 
     graphics_pipeline->set_descriptor_layout(descriptor_layout);
+    graphics_pipeline->vertex_input_requirement = VertexInputContractResolver().resolve_requirement(vertex_metadata, vertex_entry);
+    graphics_pipeline->material_texture_contract = MaterialTextureContractResolver().resolve(vertex_metadata,
+        geometry_metadata.has_value() ? &*geometry_metadata : nullptr,
+        fragment_metadata,
+        context.material_textures_variable_name,
+        context.material_params_variable_name);
+    if (ShaderMetadataQuery().find_parameter(vertex_metadata, MESH_NODE_CONTRACT_PARAMETER_NAME) != nullptr) {
+        graphics_pipeline->mesh_node_contract = MeshNodeContractResolver().resolve(vertex_metadata, MESH_NODE_CONTRACT_PARAMETER_NAME);
+    }
     return CompileResult{.graphics_pipeline = graphics_pipeline};
 }
 

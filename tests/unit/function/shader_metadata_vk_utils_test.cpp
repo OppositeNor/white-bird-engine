@@ -16,6 +16,9 @@
 #include "core/allocator/stack_allocator.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
+#include "function/render/shader_role.hh"
+#include "function/render/vertex_input_contract_resolver.hh"
+#include "function/render/vertex_input_requirement.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -751,6 +754,79 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesDescriptorAccessesAcrossGraphicsStages)
 
     ASSERT_EQ(layout.fields.size(), 1U);
     EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, VertexInputRequirementMatchesLikeTheShaderMetadata) {
+    StackAllocator allocator(WBE_KI_B(16));
+    const VertexAttributeTestSpec position_spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
+    const std::array<VertexAttributeTestSpec, 2> joint_specs{{
+        {.role = "joint_binding_ids", .format = RUVertexAttributeFormat::INT4, .offset = 0, .size = 16},
+        {.role = "joint_binding_weights", .format = RUVertexAttributeFormat::FLOAT4, .offset = 16, .size = 16},
+    }};
+    const std::array<RUVertexView, 2> bindings{
+        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
+        make_vertex_test_data(allocator, joint_specs, 32),
+    };
+    const std::array<ShaderMetadataTypeField, 2> fields{{
+        make_vertex_shader_field("weights", "joint_binding_weights", 1, "vector", "float32", 4),
+        make_vertex_shader_field("position", "", 0, "vector", "float32", 3),
+    }};
+    const ShaderMetadata metadata = make_vertex_shader_metadata(fields);
+
+    // The requirement needs no mesh and keeps the shader's reflection order.
+    const VertexInputRequirement requirement = VertexInputContractResolver().resolve_requirement(metadata, "vertex_main");
+    ASSERT_EQ(requirement.attributes.size(), 2U);
+    EXPECT_EQ(requirement.attributes[0].role.get_name(), "joint_binding_weights");
+    EXPECT_EQ(requirement.attributes[0].format, RUVertexAttributeFormat::FLOAT4);
+    EXPECT_EQ(requirement.attributes[0].location, 1U);
+    EXPECT_EQ(requirement.attributes[1].role.get_name(), "position");
+    EXPECT_EQ(requirement.attributes[1].location, 0U);
+
+    const VertexInputDescriptionVK from_metadata = build_vertex_input_description_vk(metadata, "vertex_main", bindings);
+    const VertexInputDescriptionVK from_requirement = build_vertex_input_description_vk(requirement, bindings);
+    EXPECT_EQ(from_requirement.source_bindings, from_metadata.source_bindings);
+    ASSERT_EQ(from_requirement.bindings.size(), from_metadata.bindings.size());
+    for (size_t i = 0; i < from_metadata.bindings.size(); ++i) {
+        EXPECT_EQ(from_requirement.bindings[i].binding, from_metadata.bindings[i].binding);
+        EXPECT_EQ(from_requirement.bindings[i].stride, from_metadata.bindings[i].stride);
+    }
+    ASSERT_EQ(from_requirement.attributes.size(), from_metadata.attributes.size());
+    for (size_t i = 0; i < from_metadata.attributes.size(); ++i) {
+        EXPECT_EQ(from_requirement.attributes[i].location, from_metadata.attributes[i].location);
+        EXPECT_EQ(from_requirement.attributes[i].binding, from_metadata.attributes[i].binding);
+        EXPECT_EQ(from_requirement.attributes[i].format, from_metadata.attributes[i].format);
+        EXPECT_EQ(from_requirement.attributes[i].offset, from_metadata.attributes[i].offset);
+    }
+}
+
+TEST(WBEShaderMetadataVKUtilsTest, VertexInputRequirementSeparatesShaderAndMeshErrors) {
+    std::array<ShaderMetadataTypeField, 2> duplicate_location_fields{{
+        make_vertex_shader_field("position", "", 0, "vector", "float32", 3),
+        make_vertex_shader_field("uv", "", 0, "vector", "float32", 2),
+    }};
+    EXPECT_THROW(
+        (void)VertexInputContractResolver().resolve_requirement(make_vertex_shader_metadata(duplicate_location_fields), "vertex_main"),
+        std::runtime_error);
+    ShaderMetadataTypeField unsupported = make_vertex_shader_field("position", "", 0, "matrix", "float32", 3);
+    EXPECT_THROW((void)VertexInputContractResolver().resolve_requirement(
+                     make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&unsupported, 1)), "vertex_main"),
+        std::runtime_error);
+
+    StackAllocator allocator(WBE_KI_B(8));
+    const VertexAttributeTestSpec position_spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
+    const RUVertexView vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12);
+    VertexInputRequirement missing;
+    missing.attributes.push_back(VertexInputRequirement::Attribute{.role = ShaderRole("uv"), .format = RUVertexAttributeFormat::FLOAT2, .location = 0});
+    EXPECT_THROW((void)build_vertex_input_description_vk(missing, single_binding(vertex_data)), std::runtime_error);
+    VertexInputRequirement incompatible;
+    incompatible.attributes.push_back(
+        VertexInputRequirement::Attribute{.role = ShaderRole("position"), .format = RUVertexAttributeFormat::UINT3, .location = 0});
+    EXPECT_THROW((void)build_vertex_input_description_vk(incompatible, single_binding(vertex_data)), std::runtime_error);
+
+    // An empty requirement is a vertex-less draw, whatever the mesh declares.
+    const VertexInputDescriptionVK vertex_less = build_vertex_input_description_vk(VertexInputRequirement{}, single_binding(vertex_data));
+    EXPECT_TRUE(vertex_less.bindings.empty());
+    EXPECT_TRUE(vertex_less.attributes.empty());
 }
 
 } // namespace WhiteBirdEngine

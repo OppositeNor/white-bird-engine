@@ -19,6 +19,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render/material_texture_contract.hh"
+#include "function/render/mesh_node_contract.hh"
+#include "function/render/vertex_input_requirement.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
@@ -789,9 +792,46 @@ public:
         return exposed_fields;
     }
 
+    /**
+     * @brief Get the vertex input the pipeline's vertex entry consumes.
+     *
+     * Set by GraphicsPipelineCompilerVK from the vertex shader's reflection; empty for a vertex-less entry and for a pipeline
+     * built without the compiler. Match it against a submesh's vertex bindings with build_vertex_input_description_vk() to draw
+     * the submesh; the pipeline uses dynamic vertex input state, so one pipeline draws any matching layout.
+     */
+    const VertexInputRequirement& get_vertex_input_requirement() const {
+        return vertex_input_requirement;
+    }
+
+    /**
+     * @brief Get the material texture contract the pipeline's shaders declare.
+     *
+     * Set by GraphicsPipelineCompilerVK; std::nullopt when the shaders declare no material tables, and for a pipeline built
+     * without the compiler. A mesh drawn with the pipeline builds its material parameter table for this contract; see
+     * MeshResourcesVK::acquire_material_table().
+     */
+    const std::optional<MaterialTextureContract>& get_material_texture_contract() const {
+        return material_texture_contract;
+    }
+
+    /**
+     * @brief Get the mesh node layout the pipeline's vertex shader declares in its `mesh` parameter block.
+     *
+     * Set by GraphicsPipelineCompilerVK; std::nullopt when the vertex shader declares no `mesh` parameter block, and for a
+     * pipeline built without the compiler. See MeshResourcesVK::validate_node_contract().
+     */
+    const std::optional<MeshNodeContract>& get_mesh_node_contract() const {
+        return mesh_node_contract;
+    }
+
 private:
+    friend class GraphicsPipelineCompilerVK;
+
     Config config;
     ExposedFields exposed_fields;
+    VertexInputRequirement vertex_input_requirement;
+    std::optional<MaterialTextureContract> material_texture_contract;
+    std::optional<MeshNodeContract> mesh_node_contract;
 
     struct PipelineStateCreateInfo {
         VkPipelineViewportStateCreateInfo viewport_state{};

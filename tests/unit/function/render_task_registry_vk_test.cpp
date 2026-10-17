@@ -15,8 +15,6 @@
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "core/parser/parser_json.hh"
-#include "core/parser/parser_toml.hh"
 #include "core/script/script_value.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/i_render_task_vk.hh"
@@ -46,13 +44,6 @@ const RTRegistryProbeVK& as_probe(const Unique<IRenderTaskVK>& p_task) {
     EXPECT_NE(probe, nullptr);
     return *probe;
 }
-
-// The registry is instantiated for exactly these parameter types.
-static_assert(RenderTaskParamsDataConcept<JSONData>);
-static_assert(RenderTaskParamsDataConcept<TOMLData>);
-static_assert(RenderTaskParamsDataConcept<ScriptValue>);
-static_assert(!RenderTaskParamsDataConcept<int>);
-static_assert(!RenderTaskParamsDataConcept<const JSONData&>);
 
 } // namespace
 
@@ -94,32 +85,6 @@ TEST(WBERenderTaskRegistryVKTest, ClassNameAndAliasesCreateTheSameTaskType) {
             RenderTaskRegistryVK::create_factory(name, make_probe_params("named", 1), &render_data)(RendGraphContextVK{});
         EXPECT_EQ(as_probe(task).get_params().label, "named") << name;
     }
-}
-
-TEST(WBERenderTaskRegistryVKTest, AcceptsJSONParameters) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
-    ParserJSON parser;
-    parser.parse_from_buffer(R"({"label": "from json", "count": 4})");
-    const Unique<IRenderTaskVK> task =
-        RenderTaskRegistryVK::create_factory("registry_probe", parser.get_data(), &render_data)(RendGraphContextVK{});
-    EXPECT_EQ(as_probe(task).get_params().label, "from json");
-    EXPECT_EQ(as_probe(task).get_params().count, 4U);
-}
-
-TEST(WBERenderTaskRegistryVKTest, AcceptsTOMLParameters) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
-    ParserTOML parser;
-    parser.parse_from_buffer("label = \"from toml\"\ncount = 5\n");
-    const Unique<IRenderTaskVK> task =
-        RenderTaskRegistryVK::create_factory("registry_probe", parser.get_data(), &render_data)(RendGraphContextVK{});
-    EXPECT_EQ(as_probe(task).get_params().label, "from toml");
-    EXPECT_EQ(as_probe(task).get_params().count, 5U);
-
-    ParserTOML missing_label;
-    missing_label.parse_from_buffer("count = 5\n");
-    EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", missing_label.get_data(), &render_data), std::runtime_error);
 }
 
 TEST(WBERenderTaskRegistryVKTest, OptionalParametersKeepTheirDefaults) {
@@ -180,6 +145,45 @@ TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) 
 
     // The pipeline key is required.
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", ScriptValue::make_map(), &render_data), std::runtime_error);
+}
+
+TEST(WBERenderTaskRegistryVKTest, AddTaskCallsPrepareGraphAndAddsTheTask) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK graph(&allocator);
+    RendTaskDescVK& first = RenderTaskRegistryVK::add_task(graph, "first", "registry_preparing_probe", make_probe_params("shared", 1), &render_data);
+    EXPECT_EQ(first.task_id, "first");
+    EXPECT_EQ(first.resource_map.resolve(RTRegistryPreparingProbeVK::INPUT_ID), "shared.prepared");
+    // A second task reuses the buffer the first one declared.
+    RenderTaskRegistryVK::add_task(graph, "second", "registry_preparing_probe", make_probe_params("shared", 1), &render_data);
+    ASSERT_EQ(graph.tasks.size(), 2U);
+    EXPECT_EQ(graph.buffers.size(), 1U);
+    EXPECT_TRUE(graph.contains_resource("shared.prepared"));
+    EXPECT_FALSE(graph.contains_resource("other.prepared"));
+    EXPECT_NE(graph.get_task("second").factory, nullptr);
+}
+
+TEST(WBERenderTaskRegistryVKTest, AddTaskWithoutPrepareGraphOnlyAddsTheTask) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK graph(&allocator);
+    RendTaskDescVK& task = RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("plain", 2), &render_data);
+    EXPECT_TRUE(graph.buffers.empty());
+    const Unique<IRenderTaskVK> created = task.factory(RendGraphContextVK{});
+    EXPECT_EQ(as_probe(created).get_params().count, 2U);
+}
+
+TEST(WBERenderTaskRegistryVKTest, AddTaskRejectsInvalidRequests) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK graph(&allocator);
+    RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "", "registry_probe", make_probe_params("x", 1), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "missing_task", make_probe_params("x", 1), &render_data), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "registry_probe", make_probe_params("x", 1), nullptr), std::runtime_error);
+    EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "other", "registry_probe", ScriptValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_EQ(graph.tasks.size(), 1U);
 }
 
 } // namespace WhiteBirdEngine

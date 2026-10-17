@@ -21,10 +21,12 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -86,6 +88,46 @@ private:
     const BaseRenderDataVK* render_data;
     RTParamsRegistryProbeVK params;
     VkExtent2D extent;
+};
+
+// A GPU-free render task whose prepare_graph() declares a graph buffer named after its label and aliases it for the task.
+class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [registry_preparing_probe]) RTRegistryPreparingProbeVK final : public IRenderTaskVK {
+public:
+    static constexpr std::string_view INPUT_ID = "probe_input";
+
+    RTRegistryPreparingProbeVK() = default;
+    virtual ~RTRegistryPreparingProbeVK() override = default;
+    RTRegistryPreparingProbeVK(const RTRegistryPreparingProbeVK&) = delete;
+    RTRegistryPreparingProbeVK(RTRegistryPreparingProbeVK&&) noexcept = delete;
+    RTRegistryPreparingProbeVK& operator=(const RTRegistryPreparingProbeVK&) = delete;
+    RTRegistryPreparingProbeVK& operator=(RTRegistryPreparingProbeVK&&) noexcept = delete;
+
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsRegistryProbeVK& /*p_params*/, const RendGraphContextVK& /*p_context*/) {
+        return make_unique<RTRegistryPreparingProbeVK>(p_render_data->allocator);
+    }
+
+    static void prepare_graph(
+        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsRegistryProbeVK& p_params, const BaseRenderDataVK* /*p_render_data*/) {
+        const std::string buffer_id = p_params.label + ".prepared";
+        if (!p_graph.contains_resource(buffer_id)) {
+            p_graph.add_buffer(buffer_id, [](const RendGraphContextVK& /*p_context*/) {
+                return RendBufferDescVK{.size = 16};
+            });
+        }
+        p_task.alias(INPUT_ID, buffer_id);
+    }
+
+    virtual QueueFamilyVK queue_family() const override {
+        return QueueFamilyVK::GRAPHICS;
+    }
+
+    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& /*p_writes*/) const override {
+    }
+
+    virtual void record(VkCommandBuffer /*p_command_buffer*/, double /*p_delta*/) override {
+    }
 };
 
 } // namespace WhiteBirdEngine

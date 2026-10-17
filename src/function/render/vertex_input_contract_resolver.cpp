@@ -19,6 +19,7 @@
 #include "function/render/shader_role_field_resolver.hh"
 #include "function/render/vertex_attribute_format_info.hh"
 #include "function/render/vertex_input_contract.hh"
+#include "function/render/vertex_input_requirement.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <cstddef>
@@ -165,51 +166,21 @@ static VertexAttributeMatch find_vertex_attribute(std::span<const VertexLayoutVi
     return result;
 }
 
-static VertexInputContract resolve_vertex_input_contract(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const VertexLayoutView> p_vertex_layouts) {
-    for (const VertexLayoutView& vertex_layout : p_vertex_layouts) {
-        validate_vertex_layout(vertex_layout);
-    }
-    const ShaderMetadataEntryPoint& entry_point = ShaderMetadataQuery().resolve_entry_point(p_metadata, "vertex", p_entry_name);
-    ShaderRoleFieldResolver role_resolver;
+// The layouts must already be validated.
+static VertexInputContract match_vertex_input_requirement(
+    const VertexInputRequirement& p_requirement, std::span<const VertexLayoutView> p_vertex_layouts) {
     VertexInputContract result;
     // The source binding of each matched attribute, parallel to result.attributes until bindings are compacted.
     std::vector<size_t> attribute_source_bindings;
-    for (const ShaderMetadataParameter& parameter : entry_point.parameters) {
-        std::vector<ShaderRoleFieldResolver::Field> fields =
-            role_resolver.collect_fields(parameter.type.fields, "WBE_VERTEX_INPUT", ShaderRoleFieldResolver::Traversal::RECURSIVE);
-        for (ShaderRoleFieldResolver::Field& field : fields) {
-            if (field.metadata->binding.kind != "varyingInput" || field.metadata->binding.index < 0) {
-                throw std::runtime_error(std::format("Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' is not a located varying input.",
-                    field.metadata->name));
-            }
-            const uint32_t location = static_cast<uint32_t>(field.metadata->binding.index);
-            for (const VertexInputContract::Attribute& existing : result.attributes) {
-                if (existing.role.get_name() == field.role.get_name()) {
-                    throw std::runtime_error(std::format(
-                        "Failed to resolve vertex input contract: shader role '{}' is duplicated.", field.role.get_name()));
-                }
-                if (existing.role.get_hash() == field.role.get_hash()) {
-                    throw std::runtime_error(std::format("Failed to resolve vertex input contract: shader roles '{}' and '{}' collide at hash {}.",
-                        existing.role.get_name(),
-                        field.role.get_name(),
-                        field.role.get_hash()));
-                }
-                if (existing.location == location) {
-                    throw std::runtime_error(
-                        std::format("Failed to resolve vertex input contract: shader location {} is duplicated.", location));
-                }
-            }
-            const RUVertexAttributeFormat format = reflect_vertex_format(field.metadata->type, field.metadata->name);
-            const VertexAttributeMatch match = find_vertex_attribute(p_vertex_layouts, field.role);
-            if (match.attribute->format != format) {
-                throw std::runtime_error(std::format("Failed to resolve vertex input contract: shader role '{}' is incompatible with the resource format.",
-                    field.role.get_name()));
-            }
-            result.attributes.push_back(VertexInputContract::Attribute{
-                .role = std::move(field.role), .format = format, .location = location, .offset = match.attribute->offset});
-            attribute_source_bindings.push_back(match.source_binding);
+    for (const VertexInputRequirement::Attribute& attribute : p_requirement.attributes) {
+        const VertexAttributeMatch match = find_vertex_attribute(p_vertex_layouts, attribute.role);
+        if (match.attribute->format != attribute.format) {
+            throw std::runtime_error(std::format("Failed to resolve vertex input contract: shader role '{}' is incompatible with the resource format.",
+                attribute.role.get_name()));
         }
+        result.attributes.push_back(VertexInputContract::Attribute{
+            .role = attribute.role, .format = attribute.format, .location = attribute.location, .offset = match.attribute->offset});
+        attribute_source_bindings.push_back(match.source_binding);
     }
     // Keep only the bindings the shader reads, in source order.
     for (size_t source_binding = 0; source_binding < p_vertex_layouts.size(); ++source_binding) {
@@ -231,14 +202,62 @@ static VertexInputContract resolve_vertex_input_contract(
     return result;
 }
 
-VertexInputContract VertexInputContractResolver::resolve(
-    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings) const {
+static std::vector<VertexLayoutView> make_validated_vertex_layout_views(std::span<const RUVertexView> p_vertex_bindings) {
     std::vector<VertexLayoutView> vertex_layouts;
     vertex_layouts.reserve(p_vertex_bindings.size());
     for (const RUVertexView& vertex_binding : p_vertex_bindings) {
         vertex_layouts.push_back(make_vertex_layout_view(vertex_binding));
+        validate_vertex_layout(vertex_layouts.back());
     }
-    return resolve_vertex_input_contract(p_metadata, p_entry_name, vertex_layouts);
+    return vertex_layouts;
+}
+
+VertexInputRequirement VertexInputContractResolver::resolve_requirement(const ShaderMetadata& p_metadata, std::string_view p_entry_name) const {
+    const ShaderMetadataEntryPoint& entry_point = ShaderMetadataQuery().resolve_entry_point(p_metadata, "vertex", p_entry_name);
+    ShaderRoleFieldResolver role_resolver;
+    VertexInputRequirement result;
+    for (const ShaderMetadataParameter& parameter : entry_point.parameters) {
+        std::vector<ShaderRoleFieldResolver::Field> fields =
+            role_resolver.collect_fields(parameter.type.fields, "WBE_VERTEX_INPUT", ShaderRoleFieldResolver::Traversal::RECURSIVE);
+        for (ShaderRoleFieldResolver::Field& field : fields) {
+            if (field.metadata->binding.kind != "varyingInput" || field.metadata->binding.index < 0) {
+                throw std::runtime_error(std::format("Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' is not a located varying input.",
+                    field.metadata->name));
+            }
+            const uint32_t location = static_cast<uint32_t>(field.metadata->binding.index);
+            for (const VertexInputRequirement::Attribute& existing : result.attributes) {
+                if (existing.role.get_name() == field.role.get_name()) {
+                    throw std::runtime_error(std::format(
+                        "Failed to resolve vertex input contract: shader role '{}' is duplicated.", field.role.get_name()));
+                }
+                if (existing.role.get_hash() == field.role.get_hash()) {
+                    throw std::runtime_error(std::format("Failed to resolve vertex input contract: shader roles '{}' and '{}' collide at hash {}.",
+                        existing.role.get_name(),
+                        field.role.get_name(),
+                        field.role.get_hash()));
+                }
+                if (existing.location == location) {
+                    throw std::runtime_error(
+                        std::format("Failed to resolve vertex input contract: shader location {} is duplicated.", location));
+                }
+            }
+            const RUVertexAttributeFormat format = reflect_vertex_format(field.metadata->type, field.metadata->name);
+            result.attributes.push_back(VertexInputRequirement::Attribute{.role = std::move(field.role), .format = format, .location = location});
+        }
+    }
+    return result;
+}
+
+VertexInputContract VertexInputContractResolver::resolve(
+    const VertexInputRequirement& p_requirement, std::span<const RUVertexView> p_vertex_bindings) const {
+    return match_vertex_input_requirement(p_requirement, make_validated_vertex_layout_views(p_vertex_bindings));
+}
+
+VertexInputContract VertexInputContractResolver::resolve(
+    const ShaderMetadata& p_metadata, std::string_view p_entry_name, std::span<const RUVertexView> p_vertex_bindings) const {
+    // The resource layouts are validated before the shader, as before the requirement was split out.
+    const std::vector<VertexLayoutView> vertex_layouts = make_validated_vertex_layout_views(p_vertex_bindings);
+    return match_vertex_input_requirement(resolve_requirement(p_metadata, p_entry_name), vertex_layouts);
 }
 
 } // namespace WhiteBirdEngine

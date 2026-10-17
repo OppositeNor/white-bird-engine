@@ -15,9 +15,6 @@
 #include "function/render_vk/mesh_draw_batch_planner_vk.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
 #include <cstddef>
@@ -25,12 +22,13 @@
 #include <limits>
 #include <span>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+namespace {
 
 // The placement of one draw's vertices in a vertex binding, expressed in whole vertices of that binding.
 struct MeshDrawBindingPlacementVK {
@@ -42,11 +40,11 @@ struct MeshDrawBindingPlacementVK {
     int64_t vertex_delta = 0;
 };
 
-// The placement of one draw's vertices in every binding it reads. Draws batch together when their placements match up
-// to a shared first vertex, which the indirect command then supplies as its vertex offset.
+// The placement of one draw's vertices in every vertex binding. Draws batch together when their placements match up to a
+// shared first vertex, which the indirect command then supplies as its vertex offset.
 struct MeshDrawPlacementVK {
     Vector<MeshDrawBindingPlacementVK, RenderAllocator> bindings;
-    // First vertex of the draw in the reference binding.
+    // First vertex of the draw in the reference binding, binding 0.
     VkDeviceSize first_vertex = 0;
 };
 
@@ -59,47 +57,44 @@ struct MeshDrawGroupVK {
     MeshDrawGroupVK& operator=(const MeshDrawGroupVK&) = delete;
     MeshDrawGroupVK(MeshDrawGroupVK&&) noexcept = default;
     MeshDrawGroupVK& operator=(MeshDrawGroupVK&&) noexcept = default;
-    VertexInputDescriptionVK vertex_input;
+    std::span<const RUVertexView> vertex_bindings;
     Vector<MeshDrawBindingPlacementVK, RenderAllocator> bindings;
     VkDeviceSize minimum_first_vertex = 0;
     VkDeviceSize maximum_first_vertex = 0;
     Vector<size_t, RenderAllocator> draw_indices;
 };
 
-static bool mesh_vertex_inputs_equal(const VertexInputDescriptionVK& p_left, const VertexInputDescriptionVK& p_right) {
-    if (p_left.bindings.size() != p_right.bindings.size() || p_left.attributes.size() != p_right.attributes.size() ||
-        p_left.source_bindings != p_right.source_bindings) {
+// Whether two draws read their vertices with the same layout: the same strides and the same attribute roles, formats, and
+// offsets in every binding. Only the layout matters, not where the vertices are.
+bool mesh_vertex_layouts_equal(std::span<const RUVertexView> p_left, std::span<const RUVertexView> p_right) {
+    if (p_left.size() != p_right.size()) {
         return false;
     }
-    for (size_t i = 0; i < p_left.bindings.size(); ++i) {
-        const auto& left = p_left.bindings[i];
-        const auto& right = p_right.bindings[i];
-        if (left.binding != right.binding || left.stride != right.stride || left.inputRate != right.inputRate ||
-            left.divisor != right.divisor) {
+    for (size_t binding_index = 0; binding_index < p_left.size(); ++binding_index) {
+        const RUVertexView& left = p_left[binding_index];
+        const RUVertexView& right = p_right[binding_index];
+        if (left.vertex_stride != right.vertex_stride || left.attribute_count != right.attribute_count) {
             return false;
         }
-    }
-    for (size_t i = 0; i < p_left.attributes.size(); ++i) {
-        const auto& left = p_left.attributes[i];
-        const auto& right = p_right.attributes[i];
-        if (left.location != right.location || left.binding != right.binding || left.format != right.format ||
-            left.offset != right.offset) {
-            return false;
+        for (size_t attribute_index = 0; attribute_index < left.attribute_count; ++attribute_index) {
+            const RUVertexView::Attribute& left_attribute = left.attributes.get()[attribute_index];
+            const RUVertexView::Attribute& right_attribute = right.attributes.get()[attribute_index];
+            if (left_attribute.role.hash != right_attribute.role.hash ||
+                left_attribute.role.get_name() != right_attribute.role.get_name() || left_attribute.format != right_attribute.format ||
+                left_attribute.offset != right_attribute.offset || left_attribute.size != right_attribute.size) {
+                return false;
+            }
         }
     }
     return true;
 }
 
-static MeshDrawPlacementVK make_mesh_draw_placement(
-    RenderAllocator* p_allocator, const MeshDrawBatchPlannerVK::Draw& p_draw, const VertexInputDescriptionVK& p_vertex_input) {
+MeshDrawPlacementVK make_mesh_draw_placement(RenderAllocator* p_allocator, const MeshDrawBatchPlannerVK::Draw& p_draw) {
     MeshDrawPlacementVK result{.bindings = Vector<MeshDrawBindingPlacementVK, RenderAllocator>(p_allocator)};
-    // Vertex-less inputs still count vertex offsets in the first binding, which shaders may read through the vertex index.
-    const RUVertexView& reference =
-        p_draw.vertex_bindings[p_vertex_input.source_bindings.empty() ? 0 : p_vertex_input.source_bindings.front()];
+    const RUVertexView& reference = p_draw.vertex_bindings.front();
     result.first_vertex = reference.binary.start / reference.vertex_stride;
-    result.bindings.reserve(p_vertex_input.source_bindings.size());
-    for (size_t source_binding : p_vertex_input.source_bindings) {
-        const RUVertexView& binding = p_draw.vertex_bindings[source_binding];
+    result.bindings.reserve(p_draw.vertex_bindings.size());
+    for (const RUVertexView& binding : p_draw.vertex_bindings) {
         const VkDeviceSize first_vertex = binding.binary.start / binding.vertex_stride;
         result.bindings.push_back(MeshDrawBindingPlacementVK{
             .binary = binding.binary.binary,
@@ -111,9 +106,9 @@ static MeshDrawPlacementVK make_mesh_draw_placement(
     return result;
 }
 
-static bool mesh_group_accepts(
-    const MeshDrawGroupVK& p_group, const VertexInputDescriptionVK& p_vertex_input, const MeshDrawPlacementVK& p_placement) {
-    if (!mesh_vertex_inputs_equal(p_group.vertex_input, p_vertex_input)) {
+bool mesh_group_accepts(
+    const MeshDrawGroupVK& p_group, std::span<const RUVertexView> p_vertex_bindings, const MeshDrawPlacementVK& p_placement) {
+    if (!mesh_vertex_layouts_equal(p_group.vertex_bindings, p_vertex_bindings)) {
         return false;
     }
     for (size_t i = 0; i < p_group.bindings.size(); ++i) {
@@ -129,7 +124,7 @@ static bool mesh_group_accepts(
     return maximum_first_vertex - minimum_first_vertex <= static_cast<VkDeviceSize>(std::numeric_limits<int32_t>::max());
 }
 
-static void validate_mesh_draw(const MeshDrawBatchPlannerVK::Draw& p_draw) {
+void validate_mesh_draw(const MeshDrawBatchPlannerVK::Draw& p_draw) {
     if (p_draw.indices.binary.start % sizeof(uint32_t) != 0) {
         throw std::runtime_error("Failed to plan mesh draws: index buffer offset is not uint32 aligned.");
     }
@@ -144,18 +139,20 @@ static void validate_mesh_draw(const MeshDrawBatchPlannerVK::Draw& p_draw) {
         if (binding.vertex_stride == 0 || binding.vertex_stride > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error("Failed to plan mesh draws: vertex stride must be nonzero and fit Vulkan uint32 limits.");
         }
+        if (binding.attribute_count > 0 && binding.attributes == nullptr) {
+            throw std::runtime_error("Failed to plan mesh draws: vertex attribute metadata is missing.");
+        }
     }
 }
+
+} // namespace
 
 MeshDrawBatchPlannerVK::BuildResult::BuildResult(RenderAllocator* p_allocator)
     : commands(p_allocator), batches(p_allocator) {
 }
 
-MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocator* p_allocator,
-    std::span<const Draw> p_draws,
-    const ShaderMetadata& p_vertex_metadata,
-    std::string_view p_vertex_entry_name,
-    uint32_t p_max_draw_count) const {
+MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(
+    RenderAllocator* p_allocator, std::span<const Draw> p_draws, uint32_t p_max_draw_count) const {
     if (p_max_draw_count == 0) {
         throw std::runtime_error("Failed to plan mesh draws: maximum indirect draw count must be nonzero.");
     }
@@ -174,16 +171,14 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
             throw std::runtime_error("Failed to plan mesh draws: command count exceeds Vulkan uint32 limits.");
         }
         ++drawable_count;
-        VertexInputDescriptionVK vertex_input =
-            build_vertex_input_description_vk(p_vertex_metadata, p_vertex_entry_name, draw.vertex_bindings);
-        MeshDrawPlacementVK placement = make_mesh_draw_placement(p_allocator, draw, vertex_input);
+        MeshDrawPlacementVK placement = make_mesh_draw_placement(p_allocator, draw);
         auto group = std::find_if(groups.begin(), groups.end(), [&](const MeshDrawGroupVK& p_group) {
-            return mesh_group_accepts(p_group, vertex_input, placement);
+            return mesh_group_accepts(p_group, draw.vertex_bindings, placement);
         });
         if (group == groups.end()) {
             groups.emplace_back(p_allocator);
             group = groups.end() - 1;
-            group->vertex_input = std::move(vertex_input);
+            group->vertex_bindings = draw.vertex_bindings;
             group->bindings = std::move(placement.bindings);
             group->minimum_first_vertex = placement.first_vertex;
             group->maximum_first_vertex = placement.first_vertex;
@@ -201,7 +196,7 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
             if (draws_in_batch == 0 || draws_in_batch == p_max_draw_count) {
                 Batch batch;
                 batch.first_draw = static_cast<uint32_t>(result.commands.size());
-                batch.vertex_input = group.vertex_input;
+                batch.vertex_bindings = group.vertex_bindings;
                 batch.vertex_binaries.reserve(group.bindings.size());
                 batch.vertex_buffer_offsets.reserve(group.bindings.size());
                 for (const MeshDrawBindingPlacementVK& binding : group.bindings) {
@@ -232,8 +227,6 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
 MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocator* p_allocator,
     std::span<const RUSubmesh3D> p_submeshes,
     std::span<const uint32_t> p_first_instances,
-    const ShaderMetadata& p_vertex_metadata,
-    std::string_view p_vertex_entry_name,
     uint32_t p_max_draw_count) const {
     if (p_submeshes.size() != p_first_instances.size()) {
         throw std::runtime_error("Failed to plan mesh draws: first-instance and submesh counts differ.");
@@ -253,7 +246,7 @@ MeshDrawBatchPlannerVK::BuildResult MeshDrawBatchPlannerVK::build(RenderAllocato
         draw.first_instance = p_first_instances[i];
         draws.push_back(std::move(draw));
     }
-    return build(p_allocator, std::span<const Draw>(draws.data(), draws.size()), p_vertex_metadata, p_vertex_entry_name, p_max_draw_count);
+    return build(p_allocator, std::span<const Draw>(draws.data(), draws.size()), p_max_draw_count);
 }
 
 } // namespace WhiteBirdEngine

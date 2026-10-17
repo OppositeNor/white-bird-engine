@@ -40,7 +40,8 @@
 namespace WhiteBirdEngine {
 
 RTRunGraphicsPipelineIndirectVK::Builder::Builder(RenderAllocator* p_allocator)
-    : allocator(p_allocator), clear_values(p_allocator), vertex_buffer_ids(p_allocator), pipeline_batches(p_allocator) {
+    : allocator(p_allocator), clear_values(p_allocator), vertex_buffer_ids(p_allocator), indirect_buffer_ids(p_allocator),
+      pipeline_batches(p_allocator) {
     if (allocator == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: allocator is null.");
     }
@@ -84,11 +85,17 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
 }
 
 RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_indirect_buffer(std::string_view p_resource_id) {
+    indirect_buffer_ids.clear();
+    add_indirect_buffer(p_resource_id);
+    return *this;
+}
+
+uint32_t RTRunGraphicsPipelineIndirectVK::Builder::add_indirect_buffer(std::string_view p_resource_id) {
     if (p_resource_id.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: indirect buffer resource id is empty.");
     }
-    indirect_buffer_id = p_resource_id;
-    return *this;
+    indirect_buffer_ids.emplace_back(p_resource_id);
+    return static_cast<uint32_t>(indirect_buffer_ids.size() - 1);
 }
 
 RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Builder::set_pipeline(
@@ -140,19 +147,24 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
           RenderTargetsVK::Config{
               .clear_values = p_builder.clear_values, .color_load_op = p_builder.color_load_op, .depth_load_op = p_builder.depth_load_op}),
       vertex_buffer_ids(p_builder.vertex_buffer_ids.begin(), p_builder.vertex_buffer_ids.end(), p_render_data->allocator),
-      index_buffer_id(p_builder.index_buffer_id), indirect_buffer_id(p_builder.indirect_buffer_id),
+      index_buffer_id(p_builder.index_buffer_id),
+      indirect_buffer_ids(p_builder.indirect_buffer_ids.begin(), p_builder.indirect_buffer_ids.end(), p_render_data->allocator),
       vertex_buffer_containers(p_render_data->allocator), bound_vertex_buffers(p_render_data->allocator),
-      bound_vertex_buffer_offsets(p_render_data->allocator), descriptor_bindings(p_render_data->allocator) {
+      bound_vertex_buffer_offsets(p_render_data->allocator), indirect_buffer_containers(p_render_data->allocator),
+      descriptor_bindings(p_render_data->allocator) {
     if (render_extent.width == 0 || render_extent.height == 0) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: render extent is empty.");
     }
-    if (index_buffer_id.empty() || indirect_buffer_id.empty()) {
+    if (index_buffer_id.empty() || indirect_buffer_ids.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: index and indirect buffers require resource ids.");
     }
     size_t max_vertex_binding_count = 0;
     for (const PipelineBatch& batch : pipeline_batches) {
         if (batch.vertex_buffers.size() != batch.vertex_input.bindings.size()) {
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: a batch must bind one vertex buffer per vertex-input binding.");
+        }
+        if (batch.indirect_buffer_index >= indirect_buffer_ids.size()) {
+            throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: a batch references an indirect buffer that was not configured.");
         }
         for (const VertexBufferBindingVK& vertex_buffer : batch.vertex_buffers) {
             if (vertex_buffer.buffer_index >= vertex_buffer_ids.size()) {
@@ -187,7 +199,12 @@ void RTRunGraphicsPipelineIndirectVK::append_accesses(
         }
     }
     p_reads.push_back({.res_id = index_buffer_id, .usage = RendResUsageVK::INDEX_BUFFER});
-    p_reads.push_back({.res_id = indirect_buffer_id, .usage = RendResUsageVK::INDIRECT_BUFFER});
+    for (size_t i = 0; i < indirect_buffer_ids.size(); ++i) {
+        if (std::find(indirect_buffer_ids.begin(), indirect_buffer_ids.begin() + static_cast<std::ptrdiff_t>(i), indirect_buffer_ids[i]) ==
+            indirect_buffer_ids.begin() + static_cast<std::ptrdiff_t>(i)) {
+            p_reads.push_back({.res_id = indirect_buffer_ids[i], .usage = RendResUsageVK::INDIRECT_BUFFER});
+        }
+    }
     for (const Unique<PipelineDescriptorBindingsVK>& bindings : descriptor_bindings) {
         bindings->append_accesses(p_reads, p_writes);
     }
@@ -203,7 +220,10 @@ void RTRunGraphicsPipelineIndirectVK::bind_resources(const RendResViewVK& p_reso
         vertex_buffer_containers.push_back(p_resources.get(vertex_buffer_id).container);
     }
     index_buffer_container = p_resources.get(index_buffer_id).container;
-    indirect_buffer_container = p_resources.get(indirect_buffer_id).container;
+    indirect_buffer_containers.clear();
+    for (const std::string& indirect_buffer_id : indirect_buffer_ids) {
+        indirect_buffer_containers.push_back(p_resources.get(indirect_buffer_id).container);
+    }
 }
 
 void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
@@ -211,15 +231,21 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
     double /*p_delta*/) {
     Ref<ROBufferVK> resolved_index_buffer =
         WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-    Ref<ROBufferVK> resolved_indirect_buffer =
-        WBE_REQUIRES_VALID(indirect_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
-    uint64_t required_draw_count = 0;
-    for (const auto& batch : pipeline_batches) {
-        required_draw_count = std::max(required_draw_count, static_cast<uint64_t>(batch.first_draw) + batch.draw_count);
-    }
-    const uint64_t required_indirect_size = required_draw_count * sizeof(VkDrawIndexedIndirectCommand);
-    if (pipeline_batches.empty() || required_draw_count == 0 || resolved_indirect_buffer->fields().buffer_size < required_indirect_size) {
+    if (pipeline_batches.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: indirect command buffer is empty or too small.");
+    }
+    for (size_t buffer_index = 0; buffer_index < indirect_buffer_containers.size(); ++buffer_index) {
+        Ref<ROBufferVK> indirect_buffer = WBE_REQUIRES_VALID(
+            indirect_buffer_containers[buffer_index]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+        uint64_t required_draw_count = 0;
+        for (const auto& batch : pipeline_batches) {
+            if (batch.indirect_buffer_index == buffer_index) {
+                required_draw_count = std::max(required_draw_count, static_cast<uint64_t>(batch.first_draw) + batch.draw_count);
+            }
+        }
+        if (indirect_buffer->fields().buffer_size < required_draw_count * sizeof(VkDrawIndexedIndirectCommand)) {
+            throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: indirect command buffer is empty or too small.");
+        }
     }
 
     render_targets.begin_rendering(render_data, p_command_buffer, render_extent);
@@ -257,9 +283,11 @@ void RTRunGraphicsPipelineIndirectVK::record( // NOLINT
             static_cast<uint32_t>(batch.vertex_input.attributes.size()),
             batch.vertex_input.attributes.data());
         descriptor_bindings[batch_index]->push(p_command_buffer);
+        Ref<ROBufferVK> indirect_buffer = WBE_REQUIRES_VALID(
+            indirect_buffer_containers[batch.indirect_buffer_index]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
         VkDeviceSize indirect_offset = static_cast<VkDeviceSize>(batch.first_draw) * sizeof(VkDrawIndexedIndirectCommand);
         vkCmdDrawIndexedIndirect(
-            p_command_buffer, resolved_indirect_buffer->get_buffer(), indirect_offset, batch.draw_count, sizeof(VkDrawIndexedIndirectCommand));
+            p_command_buffer, indirect_buffer->get_buffer(), indirect_offset, batch.draw_count, sizeof(VkDrawIndexedIndirectCommand));
     }
     vkCmdEndRendering(p_command_buffer);
 }

@@ -26,7 +26,6 @@
 #include "function/render_vk/ktx_vulkan_adapter.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/vma_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
 #include "utils/defs.hh"
@@ -355,7 +354,7 @@ public:
         // Raw image handle used when the render object cannot safely be retained by deferred work.
         VkImage image_handle = VK_NULL_HANDLE;
         VkImageSubresourceRange subresource_range{
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1,};
 
         /**
          * @brief Set the source access.
@@ -440,7 +439,7 @@ public:
                 .baseMipLevel = p_subresource_layers.mipLevel,
                 .levelCount = 1,
                 .baseArrayLayer = p_subresource_layers.baseArrayLayer,
-                .layerCount = p_subresource_layers.layerCount};
+                .layerCount = p_subresource_layers.layerCount,};
             return *this;
         }
 

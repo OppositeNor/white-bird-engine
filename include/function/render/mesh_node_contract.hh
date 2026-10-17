@@ -16,8 +16,14 @@
 #define WBE_FILE_MESH_NODE_CONTRACT_HH
 
 #include <cstddef>
+#include <string_view>
 
 namespace WhiteBirdEngine {
+
+/**
+ * @brief Name of the reflection-only vertex-shader parameter block that declares the mesh storage-buffer contract.
+ */
+inline constexpr std::string_view MESH_NODE_CONTRACT_PARAMETER_NAME = "mesh";
 
 /**
  * @class MeshNodeContract

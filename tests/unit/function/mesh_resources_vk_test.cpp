@@ -23,7 +23,8 @@ namespace WhiteBirdEngine {
 
 TEST(WBEMeshResourcesVKTest, StartsWithIndependentEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
-    MeshResourcesVK resources(&allocator);
+    BaseRenderDataVK render_data(&allocator);
+    MeshResourcesVK resources(&render_data);
 
     EXPECT_EQ(resources.get_vertex_buffer_count(), 0U);
     EXPECT_THROW(resources.acquire_vertex_buffer(0), std::runtime_error);

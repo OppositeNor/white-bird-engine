@@ -24,6 +24,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include <algorithm>
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -93,6 +94,15 @@ RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, const IBindableRenderResourceVK& p_resource) {
     p_resource.bind(*this, p_resource_id);
     return *this;
+}
+
+bool RendGraphDescVK::contains_resource(std::string_view p_resource_id) const {
+    const auto has_id = [p_resource_id](const auto& p_entries) {
+        return std::ranges::any_of(p_entries, [p_resource_id](const auto& p_entry) {
+            return p_entry.res_id == p_resource_id;
+        });
+    };
+    return has_id(resources) || has_id(buffers) || has_id(images) || has_id(image_views) || has_id(samplers);
 }
 
 RendGraphDescVK& RendGraphDescVK::add_buffer(std::string_view p_resource_id, RendBufferFactoryVK p_factory) {

@@ -697,8 +697,7 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
         static_mesh_config.vertex_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
         static_mesh_config.index_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
     }
-    static_mesh_resources = create_mesh_resources(
-        renderer_vk, sponza_mesh, gbuffer_opaque_pipeline_resource, MEM_NULL, gbuffer_opaque_pipeline_resource, static_mesh_config);
+    static_mesh_resources = create_mesh_resources(renderer_vk, sponza_mesh, gbuffer_opaque_pipeline_resource, static_mesh_config);
     if (build_acceleration_structure) {
         mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data())
                                           .compile(static_mesh_resources, glm::mat4(1.0F));

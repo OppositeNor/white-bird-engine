@@ -405,6 +405,11 @@ VertexInputDescriptionVK build_vertex_input_description_vk(
     return VertexInputDescriptionVK::from_contract(contract);
 }
 
+VertexInputDescriptionVK build_vertex_input_description_vk(
+    const VertexInputRequirement& p_requirement, std::span<const RUVertexView> p_vertex_bindings) {
+    return VertexInputDescriptionVK::from_contract(VertexInputContractResolver().resolve(p_requirement, p_vertex_bindings));
+}
+
 ShaderDescriptorHeapLayoutVK collect_shader_descriptor_heap_layout(
     const ShaderMetadata& p_metadata, std::string_view p_stage, std::string_view p_entry_name) {
     const ShaderMetadataEntryPoint& entry_point = ShaderMetadataQuery().resolve_entry_point(p_metadata, p_stage, p_entry_name);

@@ -15,30 +15,17 @@
 #ifndef WBE_FILE_RENDER_TASK_REGISTRY_VK_HH
 #define WBE_FILE_RENDER_TASK_REGISTRY_VK_HH
 
-#include "core/parser/parser_json.hh"
-#include "core/parser/parser_toml.hh"
 #include "core/script/script_value.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include <concepts>
 #include <span>
 #include <string_view>
 
 namespace WhiteBirdEngine {
 
 /**
- * @brief The parser data types RenderTaskRegistryVK accepts task parameters as: JSONData, TOMLData, and ScriptValue.
- *
- * The registry is explicitly instantiated for exactly these types; add a type here and in render_task_registry.cpp.jinja
- * together.
- */
-template <typename TParserData>
-concept RenderTaskParamsDataConcept =
-    std::same_as<TParserData, JSONData> || std::same_as<TParserData, TOMLData> || std::same_as<TParserData, ScriptValue>;
-
-/**
  * @class RenderTaskRegistryVK
- * @brief Creates render-task factories from a task type name and parser data parameters.
+ * @brief Creates render-task factories from a task type name and ScriptValue parameters.
  *
  * The registry is generated from every class annotated with WBE_META(WBE_RENDER_TASK). A task type is registered under its
  * class name and under each WBE_ALIASES entry; a name used twice fails the build. Every such class must declare
@@ -50,7 +37,15 @@ concept RenderTaskParamsDataConcept =
  * @endcode
  *
  * where TParams is a copyable reflected struct (for example WBE_SERIALIZABLE_STATIC). A missing create() or a different
- * signature fails the build. The registry has no state; its methods may be called from any thread.
+ * signature fails the build. A task type that needs graph resources or aliases besides its own may also declare
+ *
+ * @code
+ * static void prepare_graph(RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const TParams& p_params,
+ *     const BaseRenderDataVK* p_render_data);
+ * @endcode
+ *
+ * which add_task() calls before adding the task, for example to import the resources the task reads. The registry has no
+ * state; create_factory() may be called from any thread, and add_task() wherever the task type's prepare_graph() may run.
  */
 class RenderTaskRegistryVK final {
 public:
@@ -68,7 +63,6 @@ public:
      * during graph construction. The factory keeps a copy of them and the render-data pointer, and calls the task type's
      * create() every time the render graph evaluates it.
      *
-     * @tparam TParserData The parser data type of the parameters; see RenderTaskParamsDataConcept.
      * @param p_task_type A registered task type name.
      * @param p_params The task parameters, deserialized through SerializableSD into the task type's TParams.
      * @param p_render_data Render data passed to create(); it must outlive the factory.
@@ -76,8 +70,28 @@ public:
      * @throws std::runtime_error If the task type is unknown, p_render_data is null, or the parameters cannot be
      * deserialized.
      */
-    template <RenderTaskParamsDataConcept TParserData>
-    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const TParserData& p_params, const BaseRenderDataVK* p_render_data);
+    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data);
+
+    /**
+     * @brief Add one render task to a graph descriptor.
+     *
+     * Deserializes the parameters as create_factory() does, calls the task type's prepare_graph() on the new task descriptor
+     * if it declares one, and adds the descriptor to p_graph.
+     *
+     * @param p_graph The graph descriptor to add the task to.
+     * @param p_task_id The task id; unique in p_graph.
+     * @param p_task_type A registered task type name.
+     * @param p_params The task parameters.
+     * @param p_render_data Render data passed to create() and prepare_graph(); it must outlive the graph.
+     * @return The added task descriptor, for aliases and edges; invalidated when another task is added.
+     * @throws std::runtime_error Under the conditions of create_factory(), if p_task_id is empty or already used in p_graph, or
+     * whatever prepare_graph() throws.
+     */
+    static RendTaskDescVK& add_task(RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
+        std::string_view p_task_type,
+        const ScriptValue& p_params,
+        const BaseRenderDataVK* p_render_data);
 
     /**
      * @brief Check whether a task type name is registered.

@@ -245,17 +245,6 @@ inline void on_exec_test_start() {
     }
 }
 
-inline std::string_view mesh_vertex_entry(RefRes<RUGraphicsPipeline> p_pipeline) {
-    if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL) {
-        throw std::runtime_error("Failed to resolve mesh vertex entry: graphics pipeline or vertex stage is null.");
-    }
-    if (p_pipeline->vertex_stage_entry != MEM_NULL && p_pipeline->vertex_stage_entry.get()[0] != '\0') {
-        return p_pipeline->vertex_stage_entry.get();
-    }
-    // An empty entry resolves to the vertex shader's only reflected vertex entry point.
-    return {};
-}
-
 inline std::optional<MaterialTextureContract> load_mesh_material_contract(RefRes<RUGraphicsPipeline> p_pipeline) {
     if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL || p_pipeline->fragment_stage == MEM_NULL) {
         throw std::runtime_error("Failed to load mesh material contract: graphics pipeline stages are missing.");
@@ -271,22 +260,25 @@ inline std::optional<MaterialTextureContract> load_mesh_material_contract(RefRes
 }
 
 /**
- * @brief Compile p_mesh into static-mesh resources with the given pipelines' vertex inputs and material contract.
- * @details A null masked pipeline reuses the opaque pipeline's vertex input for planning masked draws.
+ * @brief Index of the material table create_mesh_resources() builds for its material pipeline.
  */
-inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
-    RefRes<RUMesh3D> p_mesh,
-    RefRes<RUGraphicsPipeline> p_opaque_pipeline,
-    RefRes<RUGraphicsPipeline> p_masked_pipeline,
-    RefRes<RUGraphicsPipeline> p_material_pipeline,
-    const MeshCompilerVK::Config& p_config = {}) {
-    RefRes<RUGraphicsPipeline> masked_pipeline = p_masked_pipeline != MEM_NULL ? p_masked_pipeline : p_opaque_pipeline;
-    const ShaderMetadata opaque_metadata = ShaderMetadataLoader().load(p_opaque_pipeline->vertex_stage);
-    const ShaderMetadata masked_metadata = ShaderMetadataLoader().load(masked_pipeline->vertex_stage);
+inline constexpr size_t RENDER_TEST_MATERIAL_TABLE_INDEX = 0;
+
+/**
+ * @brief Compile p_mesh into static-mesh resources, with the material table of p_material_pipeline's contract.
+ * @details The table is material table RENDER_TEST_MATERIAL_TABLE_INDEX, which make_mesh_resource_keys() names. A null
+ * material pipeline builds no table.
+ * @throws std::runtime_error If the mesh already has material tables, so the table would get another index.
+ */
+inline Ref<MeshResourcesVK> create_mesh_resources(
+    RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, const MeshCompilerVK::Config& p_config = {}) {
+    Ref<MeshResourcesVK> result = MeshCompilerVK(p_renderer).compile(p_mesh, p_config);
     const std::optional<MaterialTextureContract> material_contract =
         p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
-    return MeshCompilerVK(p_renderer)
-        .compile(p_mesh, opaque_metadata, mesh_vertex_entry(p_opaque_pipeline), masked_metadata, mesh_vertex_entry(masked_pipeline), material_contract, p_config);
+    if (material_contract.has_value() && result->acquire_material_table(*material_contract) != RENDER_TEST_MATERIAL_TABLE_INDEX) {
+        throw std::runtime_error("Failed to create render test mesh resources: the material table has an unexpected index.");
+    }
+    return result;
 }
 
 /**
@@ -359,7 +351,8 @@ inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_mesh_key, std
         .nodes = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::NODES),
         .instances = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INSTANCES),
         .transform = std::string(p_transform_id),
-        .material_params = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::MATERIAL_PARAMS),
+        .material_params = IBindableRenderResourceVK::make_member_resource_id(
+            p_mesh_key, MeshResourcesVK::get_material_params_member(RENDER_TEST_MATERIAL_TABLE_INDEX)),
         .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::MATERIAL_SAMPLER),
     };
 }
@@ -409,9 +402,8 @@ inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(
     batch.graphics_pipeline = std::move(p_pipeline);
     batch.first_draw = p_source.first_draw;
     batch.draw_count = p_source.draw_count;
-    batch.vertex_input = p_source.vertex_input;
     // The task registers the mesh vertex buffers in MeshResourcesVK order, so the buffer indices carry over.
-    batch.vertex_buffers = p_source.vertex_buffers;
+    batch.vertex_input = p_source.resolve_vertex_input(batch.graphics_pipeline->get_vertex_input_requirement(), batch.vertex_buffers);
     return batch;
 }
 

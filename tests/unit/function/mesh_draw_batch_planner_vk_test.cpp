@@ -16,8 +16,11 @@
 #include "core/allocator/stack_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata.hh"
+#include "function/render/shader_role.hh"
+#include "function/render/vertex_input_requirement.hh"
 #include "function/render_vk/mesh_draw_batch_planner_vk.hh"
+#include "function/render_vk/mesh_draw_batch_vk.hh"
+#include "function/render_vk/vertex_input_description_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <array>
@@ -32,38 +35,6 @@
 #include <vector>
 
 namespace WhiteBirdEngine {
-
-static ShaderMetadata make_batch_metadata(bool p_reads_weight = false) {
-    ShaderMetadataTypeField position;
-    position.name = "position";
-    position.type.kind = "vector";
-    position.type.element_scalar_type = "float32";
-    position.type.element_count = 3;
-    position.binding.kind = "varyingInput";
-    position.binding.index = 2;
-    ShaderMetadataUserAttribute role;
-    role.name = "WBE_VERTEX_INPUT";
-    position.user_attributes.push_back(role);
-    ShaderMetadataParameter input;
-    input.type.fields.push_back(position);
-    if (p_reads_weight) {
-        ShaderMetadataTypeField weight;
-        weight.name = "weight";
-        weight.type.kind = "scalar";
-        weight.type.scalar_type = "float32";
-        weight.binding.kind = "varyingInput";
-        weight.binding.index = 3;
-        weight.user_attributes.push_back(role);
-        input.type.fields.push_back(weight);
-    }
-    ShaderMetadataEntryPoint entry;
-    entry.name = "vertex_main";
-    entry.stage = "vertex";
-    entry.parameters.push_back(input);
-    ShaderMetadata metadata;
-    metadata.entry_points.push_back(entry);
-    return metadata;
-}
 
 static RUShaderRole make_batch_role(StackAllocator& p_storage, std::string_view p_name) {
     MemID name_memory = p_storage.allocate(p_name.size() + 1);
@@ -150,7 +121,7 @@ TEST(WBEMeshDrawBatchPlannerVKTest, GroupsNonAdjacentLayoutsAndPreservesInstance
     submeshes[2].instance_count = 4;
     const std::array<uint32_t, 3> first_instances{7, 20, 31};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.commands.size(), 3U);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[0].first_draw, 0U);
@@ -176,7 +147,7 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SplitsAtDeviceDrawLimit) {
     std::array submeshes{make_batch_submesh(storage, 0, 0), make_batch_submesh(storage, 36, 12), make_batch_submesh(storage, 72, 24)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 2);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 2);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[0].draw_count, 2U);
     EXPECT_EQ(result.batches[1].first_draw, 2U);
@@ -193,10 +164,10 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SeparatesDifferentAttributeOffsetsAndUnalign
         make_batch_submesh(storage, 148, 24, true)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.batches.size(), 3U);
-    EXPECT_EQ(result.batches[0].vertex_input.attributes[0].offset, 0U);
-    EXPECT_EQ(result.batches[1].vertex_input.attributes[0].offset, 12U);
+    EXPECT_EQ(result.batches[0].vertex_bindings[0].attributes.get()[0].role.get_name(), "position");
+    EXPECT_EQ(result.batches[1].vertex_bindings[0].attributes.get()[0].role.get_name(), "normal");
     EXPECT_EQ(result.batches[2].vertex_buffer_offsets[0], 148U);
 }
 
@@ -208,7 +179,7 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SplitsBeforeSignedVertexOffsetOverflow) {
         make_batch_submesh(storage, 0, 0), make_batch_submesh(storage, boundary, 12), make_batch_submesh(storage, boundary + 12, 24)};
     const std::array<uint32_t, 3> first_instances{0, 1, 2};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.commands[1].vertexOffset, std::numeric_limits<int32_t>::max());
     EXPECT_EQ(result.commands[2].vertexOffset, 0);
@@ -222,16 +193,16 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SkipsEmptyDrawsAndRejectsInvalidArguments) {
     submeshes[1].instance_count = 0;
     const std::array<uint32_t, 2> first_instances{0, 0};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     EXPECT_TRUE(result.commands.empty());
     EXPECT_TRUE(result.batches.empty());
-    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 0),
+    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 0),
         std::runtime_error);
-    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, {}, make_batch_metadata(), "vertex_main", 100),
+    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, {}, 100),
         std::runtime_error);
     submeshes[0].indices.index_count = 3;
     submeshes[0].indices.binary.start = 1;
-    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100),
+    EXPECT_THROW(MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100),
         std::runtime_error);
 }
 
@@ -242,16 +213,12 @@ TEST(WBEMeshDrawBatchPlannerVKTest, BatchesBindingsWhoseFirstVerticesShiftTogeth
     std::array submeshes{make_two_binding_batch_submesh(storage, 0, 0, 0), make_two_binding_batch_submesh(storage, 36, 12, 12)};
     const std::array<uint32_t, 2> first_instances{0, 1};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(true), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.batches.size(), 1U);
     const auto& batch = result.batches[0];
-    ASSERT_EQ(batch.vertex_input.bindings.size(), 2U);
-    EXPECT_EQ(batch.vertex_input.bindings[0].stride, 12U);
-    EXPECT_EQ(batch.vertex_input.bindings[1].stride, 4U);
-    EXPECT_EQ(batch.vertex_input.source_bindings, (std::vector<size_t>{0, 1}));
-    ASSERT_EQ(batch.vertex_input.attributes.size(), 2U);
-    EXPECT_EQ(batch.vertex_input.attributes[0].binding, 0U);
-    EXPECT_EQ(batch.vertex_input.attributes[1].binding, 1U);
+    ASSERT_EQ(batch.vertex_bindings.size(), 2U);
+    EXPECT_EQ(batch.vertex_bindings[0].vertex_stride, 12U);
+    EXPECT_EQ(batch.vertex_bindings[1].vertex_stride, 4U);
     EXPECT_EQ(batch.vertex_binaries.size(), 2U);
     EXPECT_EQ(batch.vertex_buffer_offsets, (std::vector<VkDeviceSize>{0, 0}));
     EXPECT_EQ(result.commands[0].vertexOffset, 0);
@@ -265,7 +232,7 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SeparatesBindingsWhoseFirstVerticesDiffer) {
     std::array submeshes{make_two_binding_batch_submesh(storage, 0, 0, 0), make_two_binding_batch_submesh(storage, 36, 24, 12)};
     const std::array<uint32_t, 2> first_instances{0, 1};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(true), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[1].vertex_buffer_offsets, (std::vector<VkDeviceSize>{36, 24}));
     EXPECT_EQ(result.commands[1].vertexOffset, 0);
@@ -280,25 +247,52 @@ TEST(WBEMeshDrawBatchPlannerVKTest, SeparatesBindingsReadingDifferentBinaries) {
         make_two_binding_batch_submesh(storage, 36, 12, 12, RefRes<RUBinary>(second_binary, &storage))};
     const std::array<uint32_t, 2> first_instances{0, 1};
     auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(true), "vertex_main", 100);
+        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
     ASSERT_EQ(result.batches.size(), 2U);
     EXPECT_EQ(result.batches[0].vertex_binaries[1], RefRes<RUBinary>(first_binary, &storage));
     EXPECT_EQ(result.batches[1].vertex_binaries[1], RefRes<RUBinary>(second_binary, &storage));
 }
 
-TEST(WBEMeshDrawBatchPlannerVKTest, BindsOnlyTheBindingsTheShaderReads) {
+TEST(WBEMeshDrawBatchPlannerVKTest, SeparatesDrawsWhoseUnreadBindingsDiffer) {
     StackAllocator storage(WBE_KI_B(16));
     RenderAllocator allocator(WBE_KI_B(128));
-    // The weight bindings differ, but a shader that reads only positions ignores them.
+    // Planning involves no shader, so the weight bindings split the batch even for a pipeline that reads only positions.
     std::array submeshes{make_two_binding_batch_submesh(storage, 0, 0, 0), make_two_binding_batch_submesh(storage, 36, 40, 12)};
     const std::array<uint32_t, 2> first_instances{0, 1};
-    auto result =
-        MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, make_batch_metadata(), "vertex_main", 100);
-    ASSERT_EQ(result.batches.size(), 1U);
-    ASSERT_EQ(result.batches[0].vertex_input.bindings.size(), 1U);
-    EXPECT_EQ(result.batches[0].vertex_input.source_bindings, (std::vector<size_t>{0}));
-    EXPECT_EQ(result.batches[0].vertex_buffer_offsets, (std::vector<VkDeviceSize>{0}));
-    EXPECT_EQ(result.commands[1].vertexOffset, 3);
+    auto result = MeshDrawBatchPlannerVK().build(&allocator, submeshes, first_instances, 100);
+    ASSERT_EQ(result.batches.size(), 2U);
+    EXPECT_EQ(result.batches[1].vertex_buffer_offsets, (std::vector<VkDeviceSize>{36, 40}));
+}
+
+TEST(WBEMeshDrawBatchVKTest, ResolvesVertexInputAndBindsOnlyTheBindingsTheRequirementReads) {
+    StackAllocator storage(WBE_KI_B(16));
+    const RUSubmesh3D submesh = make_two_binding_batch_submesh(storage, 0, 0, 0);
+    MeshDrawBatchVK batch;
+    batch.vertex_bindings = submesh.get_vertex_bindings();
+    batch.vertex_buffers = {VertexBufferBindingVK{.buffer_index = 0, .offset = 24}, VertexBufferBindingVK{.buffer_index = 1, .offset = 8}};
+
+    VertexInputRequirement weight_only;
+    weight_only.attributes.push_back(
+        VertexInputRequirement::Attribute{.role = ShaderRole("weight"), .format = RUVertexAttributeFormat::FLOAT, .location = 3});
+    std::vector<VertexBufferBindingVK> vertex_buffers;
+    const VertexInputDescriptionVK vertex_input = batch.resolve_vertex_input(weight_only, vertex_buffers);
+    ASSERT_EQ(vertex_input.bindings.size(), 1U);
+    EXPECT_EQ(vertex_input.bindings[0].stride, 4U);
+    EXPECT_EQ(vertex_input.source_bindings, (std::vector<size_t>{1}));
+    ASSERT_EQ(vertex_buffers.size(), 1U);
+    EXPECT_EQ(vertex_buffers[0].buffer_index, 1U);
+    EXPECT_EQ(vertex_buffers[0].offset, 8U);
+
+    // A vertex-less requirement binds nothing.
+    EXPECT_TRUE(batch.resolve_vertex_input(VertexInputRequirement{}, vertex_buffers).bindings.empty());
+    EXPECT_TRUE(vertex_buffers.empty());
+
+    VertexInputRequirement missing;
+    missing.attributes.push_back(
+        VertexInputRequirement::Attribute{.role = ShaderRole("uv"), .format = RUVertexAttributeFormat::FLOAT2, .location = 0});
+    EXPECT_THROW((void)batch.resolve_vertex_input(missing, vertex_buffers), std::runtime_error);
+    batch.vertex_buffers.pop_back();
+    EXPECT_THROW((void)batch.resolve_vertex_input(weight_only, vertex_buffers), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

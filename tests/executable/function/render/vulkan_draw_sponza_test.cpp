@@ -485,7 +485,7 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
 
 void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
     static_mesh_resources =
-        WBE::create_mesh_resources(renderer_vk, sponza_mesh, main_opaque_pipeline, main_masked_pipeline, main_opaque_pipeline);
+        WBE::create_mesh_resources(renderer_vk, sponza_mesh, main_opaque_pipeline);
     const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
     shadow_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "forward_sponza_shadow_opaque", shadow_opaque_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);

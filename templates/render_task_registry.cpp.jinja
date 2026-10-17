@@ -24,8 +24,6 @@
 #include "{{ task.in_header }}"
 {% endfor %}
 #include "core/memory/unique.hh"
-#include "core/parser/parser_json.hh"
-#include "core/parser/parser_toml.hh"
 #include "core/script/script_value.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -74,8 +72,8 @@ struct RenderTaskCreateTraits<Unique<IRenderTaskVK> (*)(const BaseRenderDataVK*,
     using Params = TParams;
 };
 
-template <typename TTask, typename TParserData>
-RendTaskFactoryVK make_render_task_factory(const TParserData& p_params, const BaseRenderDataVK* p_render_data) {
+template <typename TTask>
+RendTaskFactoryVK make_render_task_factory(const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
     using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
     static_assert(Traits::IS_VALID,
         "A WBE_RENDER_TASK must declare static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const TParams&, const RendGraphContextVK&).");
@@ -86,18 +84,34 @@ RendTaskFactoryVK make_render_task_factory(const TParserData& p_params, const Ba
     };
 }
 
-template <typename TParserData>
+template <typename TTask>
+RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_task_id, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
+    using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
+    typename Traits::Params params{};
+    SerializableSD<typename Traits::Params>::deserialize(p_params, params);
+    RendTaskDescVK task(p_graph.allocator, p_task_id, [p_render_data, params](const RendGraphContextVK& p_context) {
+        return TTask::create(p_render_data, params, p_context);
+    });
+    if constexpr (requires { TTask::prepare_graph(p_graph, task, params, p_render_data); }) {
+        TTask::prepare_graph(p_graph, task, params, p_render_data);
+    }
+    p_graph.add_task(std::move(task));
+    return p_graph.get_task(p_task_id);
+}
+
 struct RenderTaskTypeEntry {
     std::string_view name;
-    RendTaskFactoryVK (*make_factory)(const TParserData&, const BaseRenderDataVK*);
+    RendTaskFactoryVK (*make_factory)(const ScriptValue&, const BaseRenderDataVK*);
+    RendTaskDescVK& (*add_task)(RendGraphDescVK&, std::string_view, const ScriptValue&, const BaseRenderDataVK*);
 };
 
-// One dispatch table per parser data type, in the same order as RENDER_TASK_TYPE_NAMES.
-template <typename TParserData>
-constexpr std::array<RenderTaskTypeEntry<TParserData>, {{ registry.names | length }}> RENDER_TASK_TYPES = { {
+// The dispatch table, in the same order as RENDER_TASK_TYPE_NAMES.
+constexpr std::array<RenderTaskTypeEntry, {{ registry.names | length }}> RENDER_TASK_TYPES = { {
 {% for task in registry.entries %}
 {% for name in [task.name] + task.aliases %}
-    {.name = "{{ name }}", .make_factory = &make_render_task_factory<{{ task.name }}, TParserData>},
+    {.name = "{{ name }}",
+        .make_factory = &make_render_task_factory<{{ task.name }}>,
+        .add_task = &add_render_task<{{ task.name }}>},
 {% endfor %}
 {% endfor %}
 } };
@@ -108,9 +122,8 @@ constexpr std::array<std::string_view, {{ registry.names | length }}> RENDER_TAS
 {% endfor %}
 } };
 
-template <typename TParserData>
-const RenderTaskTypeEntry<TParserData>* find_render_task_type(std::string_view p_task_type) {
-    for (const RenderTaskTypeEntry<TParserData>& entry : RENDER_TASK_TYPES<TParserData>) {
+const RenderTaskTypeEntry* find_render_task_type(std::string_view p_task_type) {
+    for (const RenderTaskTypeEntry& entry : RENDER_TASK_TYPES) {
         if (entry.name == p_task_type) {
             return &entry;
         }
@@ -120,9 +133,8 @@ const RenderTaskTypeEntry<TParserData>* find_render_task_type(std::string_view p
 
 } // namespace
 
-template <RenderTaskParamsDataConcept TParserData>
-RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_type, const TParserData& p_params, const BaseRenderDataVK* p_render_data) {
-    const RenderTaskTypeEntry<TParserData>* entry = find_render_task_type<TParserData>(p_task_type);
+RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_type, const ScriptValue& p_params, const BaseRenderDataVK* p_render_data) {
+    const RenderTaskTypeEntry* entry = find_render_task_type(p_task_type);
     if (entry == nullptr) {
         throw std::runtime_error(std::format("Failed to create render task factory: unknown render task type '{}'.", p_task_type));
     }
@@ -132,6 +144,29 @@ RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_t
     return entry->make_factory(p_params, p_render_data);
 }
 
+RendTaskDescVK& RenderTaskRegistryVK::add_task(RendGraphDescVK& p_graph,
+    std::string_view p_task_id,
+    std::string_view p_task_type,
+    const ScriptValue& p_params,
+    const BaseRenderDataVK* p_render_data) {
+    const RenderTaskTypeEntry* entry = find_render_task_type(p_task_type);
+    if (entry == nullptr) {
+        throw std::runtime_error(std::format("Failed to add render task '{}': unknown render task type '{}'.", p_task_id, p_task_type));
+    }
+    if (p_render_data == nullptr) {
+        throw std::runtime_error(std::format("Failed to add render task '{}' of type '{}': render data is null.", p_task_id, p_task_type));
+    }
+    if (p_task_id.empty()) {
+        throw std::runtime_error(std::format("Failed to add render task of type '{}': the task id is empty.", p_task_type));
+    }
+    if (std::ranges::any_of(p_graph.tasks, [p_task_id](const RendTaskDescVK& p_task) {
+            return p_task.task_id == p_task_id;
+        })) {
+        throw std::runtime_error(std::format("Failed to add render task '{}': the graph already has a task with this id.", p_task_id));
+    }
+    return entry->add_task(p_graph, p_task_id, p_params, p_render_data);
+}
+
 bool RenderTaskRegistryVK::contains(std::string_view p_task_type) {
     return std::ranges::find(RENDER_TASK_TYPE_NAMES, p_task_type) != RENDER_TASK_TYPE_NAMES.end();
 }
@@ -139,10 +174,5 @@ bool RenderTaskRegistryVK::contains(std::string_view p_task_type) {
 std::span<const std::string_view> RenderTaskRegistryVK::get_task_types() {
     return RENDER_TASK_TYPE_NAMES;
 }
-
-// Keep in sync with RenderTaskParamsDataConcept.
-template RendTaskFactoryVK RenderTaskRegistryVK::create_factory<JSONData>(std::string_view, const JSONData&, const BaseRenderDataVK*);
-template RendTaskFactoryVK RenderTaskRegistryVK::create_factory<TOMLData>(std::string_view, const TOMLData&, const BaseRenderDataVK*);
-template RendTaskFactoryVK RenderTaskRegistryVK::create_factory<ScriptValue>(std::string_view, const ScriptValue&, const BaseRenderDataVK*);
 
 } // namespace WhiteBirdEngine

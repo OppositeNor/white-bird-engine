@@ -62,7 +62,9 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
 
         /** Graphics pipeline retained directly by the task. */
         Ref<ROGraphicsPipelineVK> graphics_pipeline = MEM_NULL;
-        /** First tightly packed indirect command in the shared command buffer. */
+        /** Index of the command buffer the range reads, in the order the buffers were added to the builder. */
+        uint32_t indirect_buffer_index = 0;
+        /** First tightly packed indirect command in the batch's command buffer. */
         uint32_t first_draw = 0;
         /** Number of indirect commands rendered by this pipeline. */
         uint32_t draw_count = 0;
@@ -126,9 +128,16 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         Builder& set_index_buffer(std::string_view p_resource_id);
 
         /**
-         * @brief Resolve the indexed-indirect command buffer from a graph resource.
+         * @brief Use one graph resource as the only indexed-indirect command buffer, replacing any added before.
          */
         Builder& set_indirect_buffer(std::string_view p_resource_id);
+
+        /**
+         * @brief Add an indexed-indirect command buffer, selected by PipelineBatch::indirect_buffer_index.
+         * @return The buffer's index.
+         * @throws std::runtime_error If p_resource_id is empty.
+         */
+        uint32_t add_indirect_buffer(std::string_view p_resource_id);
 
         /**
          * @brief Replace the draw plan with one vertex-less graphics pipeline batch beginning at command zero.
@@ -164,7 +173,7 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
         VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
         Vector<std::string, RenderAllocator> vertex_buffer_ids;
         std::string index_buffer_id;
-        std::string indirect_buffer_id;
+        Vector<std::string, RenderAllocator> indirect_buffer_ids;
         Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     };
 
@@ -197,13 +206,13 @@ private:
     RenderTargetsVK render_targets;
     Vector<std::string, RenderAllocator> vertex_buffer_ids;
     std::string index_buffer_id;
-    std::string indirect_buffer_id;
+    Vector<std::string, RenderAllocator> indirect_buffer_ids;
     Vector<Ref<RenderObjectContainerVK>, RenderAllocator> vertex_buffer_containers;
     // Per-record scratch storage for the buffers and offsets bound by one batch, sized for the largest batch.
     Vector<VkBuffer, RenderAllocator> bound_vertex_buffers;
     Vector<VkDeviceSize, RenderAllocator> bound_vertex_buffer_offsets;
     Ref<RenderObjectContainerVK> index_buffer_container;
-    Ref<RenderObjectContainerVK> indirect_buffer_container;
+    Vector<Ref<RenderObjectContainerVK>, RenderAllocator> indirect_buffer_containers;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;
 
     void initialize_descriptor_bindings();

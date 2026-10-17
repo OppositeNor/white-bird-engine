@@ -12,7 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/parser/parser_json.hh"
+#include "core/script/script_value.hh"
+#include <cstdint>
+#include <nlohmann/json.hpp>
 #include "function/render/render_defs.hh"
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -35,10 +37,39 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-JSONData parse_task_params(std::string_view p_json) {
-    ParserJSON parser;
-    parser.parse_from_buffer(p_json);
-    return parser.get_data();
+// Writes the fixtures below as JSON for readability; the registry takes ScriptValue parameters.
+ScriptValue to_script_value(const nlohmann::json& p_json) {
+    if (p_json.is_object()) {
+        ScriptValue result = ScriptValue::make_map();
+        for (const auto& [key, value] : p_json.items()) {
+            result.set_entry(key, to_script_value(value));
+        }
+        return result;
+    }
+    if (p_json.is_array()) {
+        ScriptValue result = ScriptValue::make_list();
+        for (const nlohmann::json& value : p_json) {
+            result.push_back(to_script_value(value));
+        }
+        return result;
+    }
+    if (p_json.is_string()) {
+        return ScriptValue::make_string(p_json.get<std::string>());
+    }
+    if (p_json.is_boolean()) {
+        return ScriptValue::make_boolean(p_json.get<bool>());
+    }
+    if (p_json.is_number_integer()) {
+        return ScriptValue::make_integer(p_json.get<int64_t>());
+    }
+    if (p_json.is_number_float()) {
+        return ScriptValue::make_float(p_json.get<double>());
+    }
+    return ScriptValue();
+}
+
+ScriptValue parse_task_params(std::string_view p_json) {
+    return to_script_value(nlohmann::json::parse(p_json));
 }
 
 struct BuiltinTaskCase {
@@ -64,6 +95,7 @@ constexpr BuiltinTaskCase BUILTIN_TASK_CASES[] = {
         .params = R"({"pipeline": "p", "render_extent": {"swap_chain_scale": 0.5}, "clear_values": [{"color": [0, 0, 0, 1]}, {"depth": 1}],
                       "color_load_op": "load", "depth_load_op": "DONT_CARE", "draw_vertex_count": 6})",
     },
+    {.type = "graphics_draw_mesh", .params = R"({"mesh": "sponza", "pipeline": "p", "parts": ["opaque", "masked"]})"},
 };
 
 } // namespace
