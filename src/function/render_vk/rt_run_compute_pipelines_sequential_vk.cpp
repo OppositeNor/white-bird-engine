@@ -20,9 +20,12 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
 #include <cstddef>
 #include <format>
 #include <stdexcept>
@@ -118,6 +121,26 @@ void RTRunComputePipelinesSequentialVK::set_push_constant(size_t p_entry_index, 
         throw std::runtime_error("RTRunComputePipelinesSequentialVK: push-constant entry index is out of range.");
     }
     descriptor_bindings[p_entry_index]->set_push_constant(p_name, p_value);
+}
+
+Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const BaseRenderDataVK* p_render_data,
+    const RTParamsRunComputePipelinesSequentialVK& p_params,
+    const RendGraphContextVK& /*p_context*/) {
+    if (p_params.dispatches.empty()) {
+        throw std::runtime_error("RTRunComputePipelinesSequentialVK: at least one dispatch is required.");
+    }
+    // Validates the render data before its allocator is used.
+    Ref<ROComputePipelineVK> first_pipeline =
+        acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", p_params.dispatches.front().pipeline);
+    Dispatch dispatch(p_render_data->allocator);
+    for (size_t i = 0; i < p_params.dispatches.size(); ++i) {
+        const RTParamsComputeDispatchVK& entry = p_params.dispatches[i];
+        dispatch.add_entry(
+            i == 0 ? first_pipeline
+                   : acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", entry.pipeline),
+            VkExtent3D{.width = entry.group_count_x, .height = entry.group_count_y, .depth = entry.group_count_z});
+    }
+    return make_unique<RTRunComputePipelinesSequentialVK>(p_render_data->allocator, p_render_data, dispatch, p_params.queue_family);
 }
 
 } // namespace WhiteBirdEngine

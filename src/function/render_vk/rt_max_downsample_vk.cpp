@@ -16,17 +16,22 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/rt_params_max_downsample_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <format>
@@ -93,10 +98,8 @@ void dispatch_level(VkCommandBuffer p_command_buffer, VkExtent3D p_base_extent, 
 
 } // namespace
 
-RTMaxDownsampleVK::RTMaxDownsampleVK(const BaseRenderDataVK* p_render_data,
-    Ref<ROComputePipelineVK> p_pipeline,
-    std::span<const std::string> p_mip_view_ids,
-    QueueFamilyVK p_queue_family)
+RTMaxDownsampleVK::RTMaxDownsampleVK(
+    const BaseRenderDataVK* p_render_data, Ref<ROComputePipelineVK> p_pipeline, std::span<const std::string> p_mip_view_ids, QueueFamilyVK p_queue_family)
     : render_data(p_render_data), queue_family_id(p_queue_family), pipeline(std::move(p_pipeline)),
       mip_view_ids(p_render_data != nullptr ? p_render_data->allocator : nullptr),
       mip_view_containers(p_render_data != nullptr ? p_render_data->allocator : nullptr),
@@ -139,8 +142,7 @@ RTMaxDownsampleVK::RTMaxDownsampleVK(const BaseRenderDataVK* p_render_data,
     mip_view_containers.resize(mip_view_ids.size(), MEM_NULL);
 }
 
-void RTMaxDownsampleVK::append_accesses(
-    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+void RTMaxDownsampleVK::append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     // Every level except the last is read as a source; every level except the first is written as a destination.
     for (size_t i = 0; i + 1 < mip_view_ids.size(); ++i) {
         p_reads.push_back({.res_id = mip_view_ids[i], .usage = RendResUsageVK::SAMPLED_IMAGE});
@@ -199,13 +201,15 @@ Vector<Ref<ROImageViewVK>, RenderAllocator> RTMaxDownsampleVK::resolve_mip_views
             throw std::runtime_error(std::format("RTMaxDownsampleVK: image view '{}' has no image.", mip_view_ids[i]));
         }
         if (view->fields().subresource_range.levelCount != 1) {
-            throw std::runtime_error(std::format("RTMaxDownsampleVK: image view '{}' must cover exactly one mip level.", mip_view_ids[i]));
+            throw std::runtime_error(
+                std::format("RTMaxDownsampleVK: image view '{}' must cover exactly one mip level.", mip_view_ids[i]));
         }
         if (i > 0 && view->fields().image != mip_views[0]->fields().image) {
             throw std::runtime_error(std::format("RTMaxDownsampleVK: image view '{}' references a different image.", mip_view_ids[i]));
         }
         if (i > 0 && view->fields().subresource_range.baseMipLevel != mip_views[i - 1]->fields().subresource_range.baseMipLevel + 1) {
-            throw std::runtime_error(std::format("RTMaxDownsampleVK: image view '{}' does not view the mip level after the previous view.", mip_view_ids[i]));
+            throw std::runtime_error(std::format(
+                "RTMaxDownsampleVK: image view '{}' does not view the mip level after the previous view.", mip_view_ids[i]));
         }
         mip_views.push_back(std::move(view));
     }
@@ -224,6 +228,13 @@ void RTMaxDownsampleVK::push_level_descriptors(
         .data = {.address = push_data.data(), .size = push_data.size()},
     };
     render_data->command_push_data(p_command_buffer, &push_data_info);
+}
+
+Unique<IRenderTaskVK> RTMaxDownsampleVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTMaxDownsampleVK", p_params.pipeline);
+    return make_unique<RTMaxDownsampleVK>(
+        p_render_data->allocator, p_render_data, std::move(pipeline), p_params.mip_views, p_params.queue_family);
 }
 
 } // namespace WhiteBirdEngine

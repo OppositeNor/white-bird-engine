@@ -19,11 +19,14 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
 #include <cstddef>
 #include <optional>
 #include <string_view>
@@ -37,7 +40,8 @@ namespace WhiteBirdEngine {
  * The task reports every pass's reflected shader accesses; map reflected resource ids to graph resources with
  * RendTaskDescVK::alias(). Passes that need different mappings belong in separate tasks.
  */
-struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipelines_sequential]) RTRunComputePipelinesSequentialVK final
+    : public IRenderTaskVK {
     /**
      * @class Entry
      * @brief One retained compute pipeline plus its workgroup counts.
@@ -119,10 +123,24 @@ struct RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
      * @param p_entry_index Index of the entry in dispatch order.
      * @param p_name Custom push-constant identifier declared by the entry's pipeline.
      * @param p_value Value whose type must match the reflected field.
-     * @throws std::runtime_error If the index is out of range, the pipeline does not declare the identifier, or the type does
-     * not match.
+     * @throws std::runtime_error If the index is out of range, the pipeline does not declare the identifier, or the type
+     * does not match.
      */
     void set_push_constant(size_t p_entry_index, std::string_view p_name, PushConstantValueVK p_value);
+
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, p_params.dispatches is empty, or
+     * no compute pipeline is compiled under a dispatch pipeline key. The constructor's own validation also applies.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(const BaseRenderDataVK* p_render_data,
+        const RTParamsRunComputePipelinesSequentialVK& p_params,
+        const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

@@ -19,13 +19,18 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/attachment_load_op_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_clear_value_vk.hh"
+#include "function/render_vk/rt_params_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <algorithm>
 #include <cstddef>
@@ -33,8 +38,10 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -120,7 +127,10 @@ RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_rende
       render_targets(p_render_data->allocator,
           require_pipeline(p_builder.pipeline),
           RenderTargetsVK::Config{
-              .clear_values = p_builder.clear_values, .color_load_op = p_builder.color_load_op, .depth_load_op = p_builder.depth_load_op}),
+              .clear_values = p_builder.clear_values,
+              .color_load_op = p_builder.color_load_op,
+              .depth_load_op = p_builder.depth_load_op,
+          }),
       vertex_buffer_ids(p_builder.vertex_buffer_ids), vertex_buffer_offsets(p_builder.vertex_buffer_offsets),
       index_buffer_id(p_builder.index_buffer_id), bound_vertex_buffers(p_builder.vertex_buffer_ids.size()),
       indexed_draw_region(p_builder.indexed_draw_region), vertex_input(p_builder.vertex_input),
@@ -180,8 +190,8 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
             WBE_REQUIRES_VALID(index_buffer_container->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
         if (!vertex_buffer_containers.empty()) {
             for (size_t i = 0; i < vertex_buffer_containers.size(); ++i) {
-                Ref<ROBufferVK> vertex_buffer =
-                    WBE_REQUIRES_VALID(vertex_buffer_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
+                Ref<ROBufferVK> vertex_buffer = WBE_REQUIRES_VALID(
+                    vertex_buffer_containers[i]->get(render_data->current_frame_slot).dynamic_cast_ref<ROBufferVK>());
                 bound_vertex_buffers[i] = vertex_buffer->get_buffer();
             }
             vkCmdBindVertexBuffers(p_command_buffer,
@@ -210,6 +220,24 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
     }
 
     vkCmdEndRendering(p_command_buffer);
+}
+
+Unique<IRenderTaskVK> RTRunGraphicsPipelineVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context) {
+    Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, "RTRunGraphicsPipelineVK", p_params.pipeline);
+    std::vector<VkClearValue> clear_values;
+    clear_values.reserve(p_params.clear_values.size());
+    for (const RTParamsClearValueVK& clear_value : p_params.clear_values) {
+        clear_values.push_back(clear_value.to_vk());
+    }
+    return Builder(p_render_data->allocator)
+        .set_pipeline(std::move(pipeline))
+        .set_render_extent(p_params.render_extent.resolve(p_context))
+        .set_clear_values(clear_values)
+        .set_color_load_op(to_vk_attachment_load_op(p_params.color_load_op))
+        .set_depth_load_op(to_vk_attachment_load_op(p_params.depth_load_op))
+        .set_draw_vertex_count(p_params.draw_vertex_count)
+        .create_unique(p_render_data);
 }
 
 } // namespace WhiteBirdEngine

@@ -16,13 +16,18 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/image_format_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/rt_params_generate_mipmaps_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include <algorithm>
 #include <bit>
@@ -110,7 +115,12 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
                 .set_src_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT)
                 .set_dst_access(VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT)
                 .set_subresource_range(VkImageSubresourceRange{
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = mip_level - 1, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = mip_level - 1,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                })
                 .set_new_layout(VK_IMAGE_LAYOUT_GENERAL)
                 .set_image(image)
                 .apply_barrier(p_command_buffer);
@@ -120,7 +130,12 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
             .set_src_access(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_NONE)
             .set_dst_access(VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_BLIT_BIT)
             .set_subresource_range(VkImageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = mip_level, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1})
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = mip_level,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            })
             .set_new_layout(VK_IMAGE_LAYOUT_GENERAL)
             .set_image(image, true)
             .apply_barrier(p_command_buffer);
@@ -131,10 +146,18 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
         VkImageBlit2 image_blit{};
         image_blit.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
         image_blit.srcSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = mip_level - 1, .baseArrayLayer = 0, .layerCount = 1};
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = mip_level - 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        };
         image_blit.srcOffsets[1] = {.x = source_width, .y = source_height, .z = 1};
         image_blit.dstSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = mip_level, .baseArrayLayer = 0, .layerCount = 1};
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = mip_level,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        };
         image_blit.dstOffsets[1] = {.x = destination_width, .y = destination_height, .z = 1};
         // Record the filtered blit with both subresources in the general layout.
         VkBlitImageInfo2 blit_info{};
@@ -151,6 +174,23 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
         source_width = destination_width;
         source_height = destination_height;
     }
+}
+
+Unique<IRenderTaskVK> RTGenerateMipmapsVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsGenerateMipmapsVK& p_params, const RendGraphContextVK& p_context) {
+    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
+        throw std::runtime_error("RTGenerateMipmapsVK: render data is unavailable.");
+    }
+    const VkExtent2D base_extent = p_params.base_extent.resolve(p_context);
+    const uint32_t mipmap_level_count = p_params.mipmap_level_count.value_or(
+        static_cast<uint32_t>(std::bit_width(std::max(base_extent.width, base_extent.height))));
+    return make_unique<RTGenerateMipmapsVK>(p_render_data->allocator,
+        p_render_data,
+        p_params.source_view,
+        p_params.mip_chain_view,
+        base_extent,
+        mipmap_level_count,
+        to_vk_format(p_params.format));
 }
 
 } // namespace WhiteBirdEngine

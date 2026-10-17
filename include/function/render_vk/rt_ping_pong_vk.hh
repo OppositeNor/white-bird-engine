@@ -18,11 +18,14 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_ping_pong_vk.hh"
 #include <cstdint>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
@@ -37,7 +40,7 @@ namespace WhiteBirdEngine {
  * accesses of every pipeline; map reflected resource ids to graph resources with RendTaskDescVK::alias(). Consecutive
  * dispatches are separated by a barrier that makes storage writes visible to sampled and storage reads.
  */
-struct RTPingPongVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ping_pong]) RTPingPongVK final : public IRenderTaskVK {
     RTPingPongVK() = delete;
     virtual ~RTPingPongVK() override = default;
     RTPingPongVK(const RTPingPongVK&) = delete;
@@ -90,6 +93,19 @@ struct RTPingPongVK final : public IRenderTaskVK {
      * @throws std::runtime_error If no pipeline declares the identifier or a field type does not match.
      */
     void set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
+
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, only one prefix pipeline is set,
+     * or no compute pipeline is compiled under a pipeline key. The constructor's own validation also applies.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

@@ -17,11 +17,15 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_max_downsample_vk.hh"
 #include <cstdint>
 #include <span>
 #include <string>
@@ -49,7 +53,7 @@ class ROImageViewVK;
  * layout is validated while recording, because the graph may reallocate the views. Instances are neither copyable nor
  * movable.
  */
-struct RTMaxDownsampleVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [max_downsample]) RTMaxDownsampleVK final : public IRenderTaskVK {
     RTMaxDownsampleVK() = delete;
     virtual ~RTMaxDownsampleVK() override = default;
     RTMaxDownsampleVK(const RTMaxDownsampleVK&) = delete;
@@ -77,6 +81,19 @@ struct RTMaxDownsampleVK final : public IRenderTaskVK {
         Ref<ROComputePipelineVK> p_pipeline,
         std::span<const std::string> p_mip_view_ids,
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
+
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, or no compute pipeline is compiled
+     * under p_params.pipeline. The constructor's own validation also applies.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

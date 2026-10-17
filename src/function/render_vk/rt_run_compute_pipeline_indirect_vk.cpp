@@ -21,10 +21,13 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_compute_pipeline_indirect_vk.hh"
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -76,6 +79,18 @@ void RTRunComputePipelineIndirectVK::record(VkCommandBuffer p_command_buffer, do
 
 void RTRunComputePipelineIndirectVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
     descriptor_bindings->set_push_constant(p_name, p_value);
+}
+
+Unique<IRenderTaskVK> RTRunComputePipelineIndirectVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    Ref<ROComputePipelineVK> pipeline =
+        acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineIndirectVK", p_params.pipeline);
+    return make_unique<RTRunComputePipelineIndirectVK>(p_render_data->allocator,
+        p_render_data,
+        std::move(pipeline),
+        p_params.indirect_buffer,
+        p_params.indirect_offset,
+        p_params.queue_family);
 }
 
 } // namespace WhiteBirdEngine

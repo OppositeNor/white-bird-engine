@@ -18,14 +18,17 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <optional>
@@ -63,7 +66,7 @@ struct VertexBufferSourceVK {
  * layout, and reports those accesses, its vertex and index buffers, and its reflected shader resources. Map them to graph
  * resources with RendTaskDescVK::alias().
  */
-struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline]) RTRunGraphicsPipelineVK final : public IRenderTaskVK {
     /**
      * @class Builder
      * @brief Configures a graphics draw. Copyable and movable; its allocator must outlive every copy.
@@ -158,6 +161,19 @@ struct RTRunGraphicsPipelineVK final : public IRenderTaskVK {
      * @brief Construct a task from a complete builder configuration.
      */
     RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    /**
+     * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
+     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_params The recipe parameters.
+     * @param p_context The graph context the task is created for.
+     * @return The task.
+     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, no graphics pipeline is compiled under p_params.pipeline, or the render extent or a clear value is invalid. The constructor's own
+     * validation also applies.
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

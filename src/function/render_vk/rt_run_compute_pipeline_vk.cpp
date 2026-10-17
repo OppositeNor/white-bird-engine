@@ -23,6 +23,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipeline_vk.hh"
@@ -48,18 +49,7 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(
 
 Unique<IRenderTaskVK> RTRunComputePipelineVK::create(
     const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& /*p_context*/) {
-    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
-        throw std::runtime_error("RTRunComputePipelineVK: render data is unavailable.");
-    }
-    if (p_render_data->render_database == nullptr) {
-        throw std::runtime_error("RTRunComputePipelineVK: the render database is unavailable.");
-    }
-    Ref<ROComputePipelineVK> pipeline =
-        p_render_data->render_database->get_compiled_render_resource(p_params.pipeline, TypeUUID<ROComputePipelineVK>::UUID)
-            .dynamic_cast_ref<ROComputePipelineVK>();
-    if (pipeline == MEM_NULL) {
-        throw std::runtime_error(std::format("RTRunComputePipelineVK: no compute pipeline is compiled under '{}'.", p_params.pipeline));
-    }
+    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineVK", p_params.pipeline);
     return make_unique<RTRunComputePipelineVK>(p_render_data->allocator,
         p_render_data,
         std::move(pipeline),
