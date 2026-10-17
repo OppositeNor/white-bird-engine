@@ -172,6 +172,13 @@ private:
     static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
     static constexpr std::string_view RT_RUN_PRESENT_FRAME_SEQUENCE = "present_frame_sequence";
     static constexpr std::string_view RT_ACQUIRE_FRAME_SEQUENCE = "acquire_frame_sequence";
+    // Event ids of the RTTriggeredVK::Command that drives each graph's on-demand tasks, indexed like
+    // deferred_render_graphs. Each graph has its own ids so a request never arms the inactive graph.
+    static constexpr std::array<std::string_view, 2> BLOOM_ACQUIRE_EVENT_IDS = {
+        "deferred_pbr_test.mipmap.bloom_acquire", "deferred_pbr_test.summed_area_table.bloom_acquire"};
+    // The frame-sequence present and acquisition tasks share an id, so one command enables both on the same frames.
+    static constexpr std::array<std::string_view, 2> FRAME_SEQUENCE_EVENT_IDS = {
+        "deferred_pbr_test.mipmap.frame_sequence", "deferred_pbr_test.summed_area_table.frame_sequence"};
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 
@@ -342,8 +349,6 @@ private:
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
-    // Render-thread views of graph-owned wrappers, refreshed by each graph factory invocation.
-    std::array<RefRaw<RTTriggeredVK>, 2> bloom_acquire_tasks;
     // Input-thread mailbox; render_update forwards requests to the active graph's wrapper.
     std::atomic_bool bloom_acquire_requested = false;
     // Rendering-thread mailbox of the configuration window's bloom button; control() handles it like a B key press.
@@ -352,8 +357,6 @@ private:
     // Set by control() when it requests an acquisition; cleared by the worker after the image is written.
     std::atomic_bool bloom_acquire_in_flight = false;
     // Frame sequence capture. The rendering thread owns everything except the written count, which workers advance.
-    std::array<RefRaw<RTTriggeredVK>, 2> frame_sequence_present_tasks;
-    std::array<RefRaw<RTTriggeredVK>, 2> frame_sequence_acquire_tasks;
     Path frame_sequence_directory;
     DeltaSettings frame_sequence_previous_delta_settings{};
     uint64_t frame_sequence_first_frame = 0;

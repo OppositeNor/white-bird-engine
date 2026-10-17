@@ -354,11 +354,12 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
         stdout_log(WBE_CHANNEL_DEBUG)->message(std::format("Post-processing {}: {}.", post_processing->get_name(), post_processing_enabled ? "enabled" : "disabled"));
     }
     if (bloom_acquire_requested.exchange(false, std::memory_order_acq_rel)) {
-        auto& task = bloom_acquire_tasks[summed_area_table_active ? 1 : 0];
-        if (task == MEM_NULL) {
+        const std::string_view event_id = BLOOM_ACQUIRE_EVENT_IDS[summed_area_table_active ? 1 : 0];
+        EventManager* event_manager = EventManager::get_singleton();
+        if (event_manager->get_subscriber_count<RTTriggeredVK::Command>(event_id) != 1) {
             throw std::runtime_error("Deferred bloom acquisition task is unavailable.");
         }
-        task->trigger();
+        event_manager->emit(event_id, RTTriggeredVK::Command::trigger());
     }
     if (frame_sequence_requested) {
         frame_sequence_requested = false;
@@ -374,14 +375,11 @@ void ApplicationVulkanDeferredPBRTest::start_frame_sequence() {
         format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("Frame sequence capture supports only RGBA8 and BGRA8 swap-chain formats.");
     }
-    const size_t graph_index = summed_area_table_active ? 1U : 0U;
-    RefRaw<RTTriggeredVK> present_task = frame_sequence_present_tasks[graph_index];
-    RefRaw<RTTriggeredVK> acquire_task = frame_sequence_acquire_tasks[graph_index];
-    if (present_task == MEM_NULL) {
-        throw std::runtime_error("Deferred frame sequence present task is unavailable.");
-    }
-    if (acquire_task == MEM_NULL) {
-        throw std::runtime_error("Deferred frame sequence acquisition task is unavailable.");
+    const std::string_view event_id = FRAME_SEQUENCE_EVENT_IDS[summed_area_table_active ? 1U : 0U];
+    EventManager* event_manager = EventManager::get_singleton();
+    // The present task and the acquisition task both subscribe to the frame-sequence id.
+    if (event_manager->get_subscriber_count<RTTriggeredVK::Command>(event_id) != 2) {
+        throw std::runtime_error("Deferred frame sequence present or acquisition task is unavailable.");
     }
 
     const auto timestamp =
@@ -397,8 +395,8 @@ void ApplicationVulkanDeferredPBRTest::start_frame_sequence() {
     // Every captured frame advances the scene by exactly one sequence frame, however long the capture takes.
     frame_sequence_previous_delta_settings = get_delta_settings();
     set_delta_settings(DeltaSettings{.is_fixed = true, .fixed_delta = 1.0 / FRAME_SEQUENCE_FRAMES_PER_SECOND});
-    present_task->enabled_for(frame_sequence_frame_count);
-    acquire_task->enabled_for(frame_sequence_frame_count);
+    // Emitted on the rendering thread between frames, so both tasks start on the same recording.
+    event_manager->emit(event_id, RTTriggeredVK::Command::enable_for(frame_sequence_frame_count));
     stdout_log(WBE_CHANNEL_DEBUG)
         ->message(std::format("Capturing {} frames at {} FPS to {}.", frame_sequence_frame_count, FRAME_SEQUENCE_FRAMES_PER_SECOND, frame_sequence_directory.generic_string()));
 }
@@ -407,8 +405,10 @@ void ApplicationVulkanDeferredPBRTest::poll_frame_sequence() {
     if (!frame_sequence_recording) {
         return;
     }
-    const uint32_t remaining_frames = frame_sequence_acquire_tasks[summed_area_table_active ? 1U : 0U]->get_remaining_frames();
-    const uint32_t recorded_count = frame_sequence_frame_count - remaining_frames;
+    // The renderer advances current_frame only for frames that execute the graph, so this counts recorded sequence frames.
+    const uint32_t recorded_count = static_cast<uint32_t>(
+        std::min<uint64_t>(base_render_data->current_frame - frame_sequence_first_frame, frame_sequence_frame_count));
+    const uint32_t remaining_frames = frame_sequence_frame_count - recorded_count;
     // Each acquired frame holds a full image until it is written, so wait while too many are pending. The fixed delta
     // keeps the sequence timing unaffected by the wait.
     uint32_t written_count = frame_sequence_written_count.load(std::memory_order_acquire);

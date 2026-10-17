@@ -653,14 +653,14 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_blur_task_desc() c
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_bloom_acquire_task_desc(bool p_use_summed_area_table) {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_ACQUIRE_BLOOM;
-    // The factory takes the handle the bloom readback triggers again every time the graph recreates the task.
-    task_desc.factory = [this, p_use_summed_area_table](const RendGraphContextVK& /*p_context*/) {
-        // Completed acquisitions reach write_completed_bloom_acquire() through the event registered in setup_bloom_acquisition().
-        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW);
-        auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
-        bloom_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
-        return task;
-    };
+    // The recreated task subscribes again, so bloom readback requests keep reaching it after the graph recreates tasks.
+    task_desc.factory = RTTriggeredVK::wrap_factory(
+        [this](const RendGraphContextVK& /*p_context*/) -> Unique<IRenderTaskVK> {
+            // Completed acquisitions reach write_completed_bloom_acquire() through the event registered in setup_bloom_acquisition().
+            return make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, BLOOM_PING_IMAGE_VIEW);
+        },
+        std::string(BLOOM_ACQUIRE_EVENT_IDS[p_use_summed_area_table ? 1U : 0U]),
+        base_render_data);
     return task_desc;
 }
 
@@ -684,33 +684,33 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_present_frame_sequence_t
     task_desc.task_id = RT_RUN_PRESENT_FRAME_SEQUENCE;
     task_desc.alias(RenderTargetsVK::color_id(0), FRAME_SEQUENCE_IMAGE_VIEW);
     const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-    task_desc.factory = [this, clear_values, p_use_summed_area_table](const RendGraphContextVK& p_context) {
-        auto present_task = RTRunGraphicsPipelineVK::Builder(render_allocator)
-                                .set_pipeline(present_post_processing_graphics_pipeline)
-                                .set_render_extent(p_context.swap_chain_extent)
-                                .set_clear_values(clear_values)
-                                .create_unique(base_render_data);
-        auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(present_task));
-        frame_sequence_present_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
-        return task;
-    };
+    task_desc.factory = RTTriggeredVK::wrap_factory(
+        [this, clear_values](const RendGraphContextVK& p_context) -> Unique<IRenderTaskVK> {
+            return RTRunGraphicsPipelineVK::Builder(render_allocator)
+                .set_pipeline(present_post_processing_graphics_pipeline)
+                .set_render_extent(p_context.swap_chain_extent)
+                .set_clear_values(clear_values)
+                .create_unique(base_render_data);
+        },
+        std::string(FRAME_SEQUENCE_EVENT_IDS[p_use_summed_area_table ? 1U : 0U]),
+        base_render_data);
     return task_desc;
 }
 
 RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_frame_sequence_acquire_task_desc(bool p_use_summed_area_table) {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = RT_ACQUIRE_FRAME_SEQUENCE;
-    task_desc.factory = [this, p_use_summed_area_table](const RendGraphContextVK& /*p_context*/) {
-        if (frame_sequence_recording) {
-            // A recreated wrapper loses its remaining frames, so the sequence would end early.
-            throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
-        }
-        // Completed acquisitions reach write_frame_sequence_frame() through the event registered in setup_bloom_acquisition().
-        auto acquire_task = make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW);
-        auto task = make_unique<RTTriggeredVK>(render_allocator, std::move(acquire_task));
-        frame_sequence_acquire_tasks[p_use_summed_area_table ? 1U : 0U] = RefRaw<RTTriggeredVK>(task);
-        return task;
-    };
+    task_desc.factory = RTTriggeredVK::wrap_factory(
+        [this](const RendGraphContextVK& /*p_context*/) -> Unique<IRenderTaskVK> {
+            if (frame_sequence_recording) {
+                // A recreated wrapper loses its remaining frames, so the sequence would end early.
+                throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
+            }
+            // Completed acquisitions reach write_frame_sequence_frame() through the event registered in setup_bloom_acquisition().
+            return make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW);
+        },
+        std::string(FRAME_SEQUENCE_EVENT_IDS[p_use_summed_area_table ? 1U : 0U]),
+        base_render_data);
     return task_desc;
 }
 
