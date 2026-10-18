@@ -18,7 +18,6 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
 #include "function/ecs/components.hh"
 #include "function/render/i_renderer.hh"
@@ -47,6 +46,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/window/i_window.hh"
 #include "platform/file_system/path.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -75,7 +75,6 @@
 #include <optional>
 #include <print>
 #include <span>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -167,11 +166,47 @@ inline bool exec_test_requested(std::string_view p_variable) {
 inline uint64_t parse_exec_test_frame_count(std::string_view p_text, std::string_view p_error_message) {
     const char* text_end = p_text.data() + p_text.size();
     uint64_t value = 0;
-    auto result = std::from_chars(p_text.data(), text_end, value);
+    auto result = std::from_chars(std::string(p_text).c_str(), text_end, value);
     if (result.ec != std::errc{} || result.ptr != text_end) {
         throw std::runtime_error(std::string(p_error_message));
     }
     return value;
+}
+
+/**
+ * @brief Run the logic-thread executable-test hooks configured by the environment.
+ *
+ * WBE_EXEC_TEST_RESIZE=<width>x<height>@<frame> resizes the window to width by height once, when the logic thread reaches
+ * that logic frame, counted from the first call. Call once per logic frame from the logic thread, which is the thread
+ * IWindow::resize() requires.
+ *
+ * @param p_window The window to resize.
+ * @throws std::runtime_error If the variable is malformed.
+ */
+inline void on_exec_test_logic(IWindow& p_window) {
+    static uint64_t logic_frame = 0;
+    static bool resized = false;
+    const char* resize = std::getenv("WBE_EXEC_TEST_RESIZE");
+    if (!resized && resize != nullptr && *resize != '\0') {
+        constexpr std::string_view ERROR_MESSAGE = "WBE_EXEC_TEST_RESIZE must be <width>x<height>@<frame>, such as 1280x720@60.";
+        const std::string_view value(resize);
+        const size_t separator = value.find('x');
+        const size_t at = value.find('@');
+        if (separator == std::string_view::npos || at == std::string_view::npos || at < separator) {
+            throw std::runtime_error(std::string(ERROR_MESSAGE));
+        }
+        const uint64_t width = parse_exec_test_frame_count(value.substr(0, separator), ERROR_MESSAGE);
+        const uint64_t height = parse_exec_test_frame_count(value.substr(separator + 1, at - separator - 1), ERROR_MESSAGE);
+        const uint64_t frame = parse_exec_test_frame_count(value.substr(at + 1), ERROR_MESSAGE);
+        if (width == 0 || height == 0 || width > UINT32_MAX || height > UINT32_MAX) {
+            throw std::runtime_error(std::string(ERROR_MESSAGE));
+        }
+        if (logic_frame >= frame) {
+            p_window.resize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+            resized = true;
+        }
+    }
+    ++logic_frame;
 }
 
 /**

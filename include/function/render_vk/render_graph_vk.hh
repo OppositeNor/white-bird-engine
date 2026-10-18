@@ -43,6 +43,7 @@ namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
 struct RendTaskDescVK;
+enum class RendResRebuildActionVK : uint8_t;
 struct RendBufferDeclVK;
 struct RendImageDeclVK;
 struct RendImageViewDeclVK;
@@ -63,6 +64,15 @@ struct RendResVK {
     // Aggregate CPU-side resource list. Aggregate accesses expand to its indexed graph resources.
     Ref<RenderResourceListVK> resource_list;
 };
+
+/**
+ * @brief Produces the complete descriptor of a render graph for a context.
+ *
+ * Called by the graph when it is built and whenever it rebuilds, on the rendering thread. It must return every task and
+ * resource of the graph, and must be a function of the context and of state its owner controls; everything it captures
+ * must outlive the graph. A throw is not caught and crashes the program.
+ */
+using RendGraphRebuildCallbackVK = std::function<RendGraphDescVK(const RendGraphContextVK&)>;
 
 /**
  * @class RendResViewVK
@@ -241,47 +251,49 @@ public:
     explicit RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key = {});
 
     /**
-     * @brief Build the graph from a high-level descriptor: take ownership of
-     * every task, add the resource dependency edges, reject cycles, validate that
-     * every conflicting declared resource access is ordered by edges on that
-     * resource, derive barriers and semaphores, and allocate the command
-     * buffers. After this call, the graph is ready to execute().
+     * @brief Build the graph from the descriptor a callback produces, and call it again on every rebuild.
      *
-     * @throws std::runtime_error If the descriptor is invalid, cyclic, or
-     * leaves a resource conflict unordered.
+     * Calls p_rebuild for the current context, then builds its descriptor: takes ownership of every task, adds the resource
+     * dependency edges, rejects cycles, validates that every conflicting declared resource access is ordered by edges on
+     * that resource, derives barriers and semaphores, and allocates the command buffers. After this call, the graph is
+     * ready to execute(). The descriptor's resource and task factories are evaluated against the context of each build;
+     * the graph keeps none of them across rebuilds. Each rebuild calls p_rebuild again and diffs the new descriptor against the current graph (see RendGraphResourceDiffVK): a graph-owned
+     * resource whose id, kind, per-frame layout, and configuration are unchanged keeps its container, objects, and content;
+     * one whose configuration changed is recreated in place in its container, so RenderGraphVK::acquire_resource() callers
+     * observe it; one whose kind or per-frame layout changed, or that replaces an import, gets a new container, which
+     * callers must acquire again. Views of recreated images are recreated. Resources missing from the new descriptor are
+     * released, and every task is recreated.
      *
-     * @param p_desc The render graph descriptor. The graph keeps copies of its
-     * resource and task factories to rebuild them when the context changes.
+     * @param p_rebuild The callback.
+     * @throws std::runtime_error If a descriptor is invalid, cyclic, or leaves a resource conflict unordered.
      */
-    void build_from_descriptor(RendGraphDescVK& p_desc);
+    void build_from_callback(RendGraphRebuildCallbackVK p_rebuild);
 
     /**
      * @brief Rebuild the graph against a context.
      *
-     * Every graph-owned resource whose configuration differs from its previous evaluation is reallocated, in declaration
-     * order, and every view of a reallocated image is recreated. New objects replace the old ones in place in their
-     * containers, so RenderGraphVK::acquire_resource() callers observe them. Reallocated resources lose their content.
-     * Then every task is recreated from its factory, and the dependency edges, synchronization, and command buffers are
-     * rebuilt for the new tasks. Does nothing when p_context equals the current context. Must be called on the rendering
-     * thread while none of the graph's submitted work is pending; execute() calls it before recording when the context
-     * changes.
+     * Calls the rebuild callback for p_context and applies the result as build_from_callback() describes: unchanged resources are kept, changed ones are recreated,
+     * and reallocated resources lose their content. Then every task is recreated from its factory, and the dependency
+     * edges, synchronization, and command buffers are rebuilt for the new tasks. Does nothing when p_context equals the
+     * current context. Must be called on the rendering thread while none of the graph's submitted work is pending;
+     * execute() calls it before recording when the context changes.
      *
      * @param p_context The context to evaluate the factories against.
-     * @throws std::runtime_error If a re-evaluated resource configuration is invalid or changes whether a resource is per
-     * frame, or if the recreated tasks do not form a valid graph.
+     * @throws std::runtime_error If a re-evaluated resource configuration is invalid, or if the recreated tasks do not form
+     * a valid graph.
      */
     void update_context(const RendGraphContextVK& p_context);
 
     /**
      * @brief Rebuild the graph against its current context.
      *
-     * Does what update_context() does when the context changes, without a context change: every graph-owned resource
-     * whose factory now yields a different configuration is reallocated, and every task is recreated. Use it after state
-     * that resource or task factories read has changed. Must be called on the rendering thread while none of the graph's
-     * submitted work is pending.
+     * Does what update_context() does when the context changes, without a context change: the rebuild callback runs
+     * again, every graph-owned resource whose configuration now differs is reallocated, and every task is recreated. Use
+     * it after state that the callback or the factories read has changed. Must be called on the rendering thread while
+     * none of the graph's submitted work is pending.
      *
-     * @throws std::runtime_error If a re-evaluated resource configuration is invalid or changes whether a resource is per
-     * frame, or if the recreated tasks do not form a valid graph.
+     * @throws std::runtime_error If a re-evaluated resource configuration is invalid, or if the recreated tasks do not form
+     * a valid graph.
      */
     void rebuild();
 
@@ -342,7 +354,7 @@ public:
     /**
      * @brief Take a snapshot of the compiled graph's tasks and resource dependency edges.
      *
-     * Before build_from_descriptor(), the snapshot is empty. Must be called on the rendering thread.
+     * Before build_from_callback(), the snapshot is empty. Must be called on the rendering thread.
      *
      * @return The tasks in execution order and the edges with the stages and accesses the graph derived for them.
      */
@@ -371,12 +383,10 @@ private:
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
     // The context the graph-owned resources were last built for.
     RendGraphContextVK context;
-    // One per graph-owned resource, in declaration order: re-evaluates its factory against the current context and
-    // recreates its container when its configuration, or the image it views, changed.
-    Vector<std::function<void()>, RenderAllocator> resource_refreshers;
-    // Recreates every task from the copied task descriptors of the graph descriptor, and rebuilds the edges,
-    // synchronization, and command buffers for them.
-    std::function<void()> task_builder;
+    // The rebuild callback, the resource signatures and graph-owned containers of the current build, and its task
+    // descriptors; defined in the source file, because it holds descriptor types.
+    struct RebuildState;
+    Unique<RebuildState> rebuild_state;
 
     // Per-node primary command buffer (parallel to `nodes`).
     Vector<VkCommandBuffer, RenderAllocator> command_buffers;
@@ -396,12 +406,9 @@ private:
     void add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std::string p_resource_id);
 
     Map<std::string, Ref<RendResVK>, RenderAllocator> index_resources(const RendGraphDescVK& p_desc);
-    void allocate_resources(const RendGraphDescVK& p_desc);
-    void validate_graph_resource_ids(const RendGraphDescVK& p_desc) const;
-    void allocate_buffer(const RendBufferDeclVK& p_buffer_decl);
-    void allocate_image(const RendImageDeclVK& p_image_decl);
-    void allocate_image_view(const RendImageViewDeclVK& p_view_decl);
-    void allocate_sampler(const RendSamplerDeclVK& p_sampler_decl);
+    void apply_descriptor(const RendGraphDescVK& p_desc);
+    void apply_owned_resource(std::string_view p_resource_id, RendResRebuildActionVK p_action);
+    Ref<IRenderObjectVK> create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const;
     void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
     // Objects the container creates are registered as `<resource_key>.<p_resource_id>`; see RenderGraphVK().
     Ref<RenderObjectContainerVK> create_container(

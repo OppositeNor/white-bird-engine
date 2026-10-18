@@ -156,13 +156,17 @@ public:
     virtual void drain_job_buffer_tasks() override;
 
     /**
-     * @brief Register a Vulkan render graph descriptor under a resource key.
+     * @brief Register a Vulkan render graph that a callback builds, under a resource key.
+     *
+     * The graph calls p_rebuild for its first build and again whenever it rebuilds, such as when the swap chain is
+     * resized; see RenderGraphVK::build_from_callback(). Call on the rendering thread.
      *
      * @param p_resource_key The resource key to register under.
-     * @param p_desc The render graph descriptor.
+     * @param p_rebuild Produces the graph's descriptor for a context; everything it captures must outlive the graph.
      * @return The newly built render graph.
+     * @throws std::runtime_error If the key is already registered, or the callback's descriptor does not build.
      */
-    Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc);
+    Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphRebuildCallbackVK p_rebuild);
 
     /**
      * @brief Run one renderer frame and, when a graph is given, render it to the swap chain.
@@ -286,7 +290,6 @@ private:
     Vector<Ref<SemaphoreVK>, AllocType> image_available_semaphores;
 
     struct RegisteredRenderGraph {
-        Ref<RendGraphDescVK> descriptor;
         Ref<RenderGraphVK> graph;
         uint32_t reference_count = 0;
     };

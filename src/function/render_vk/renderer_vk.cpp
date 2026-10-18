@@ -285,7 +285,7 @@ void RendererVK::terminate() {
     }
     render_objects.reset();
 
-    // Release the active render graph and any registered render graph descriptors.
+    // Release the active render graph and every registered render graph.
     // These hold Refs to render-object resources (buffers, images, etc.) whose
     // destructors enqueue device-object cleanup via register_delayed_call.
     // We must drop them before draining the delayed-call list, otherwise the
@@ -1717,14 +1717,13 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     }
 }
 
-Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphDescVK p_desc) {
+Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphRebuildCallbackVK p_rebuild) {
     if (render_graphs.contains(p_resource_key)) {
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
     }
 
-    auto desc_ref = make_ref<RendGraphDescVK>(allocator, std::move(p_desc));
     auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data, p_resource_key);
-    graph->build_from_descriptor(*desc_ref);
+    graph->build_from_callback(std::move(p_rebuild));
     for (auto& plugin : registered_plugins) {
         plugin->on_render_graph_registered(p_resource_key, *graph);
     }
@@ -1732,7 +1731,6 @@ Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource
 
     render_graphs.emplace(std::string(p_resource_key),
         RegisteredRenderGraph{
-            .descriptor = std::move(desc_ref),
             .graph = std::move(graph),
             .reference_count = 1,
         });
@@ -1759,15 +1757,13 @@ void RendererVK::unregister_render_graph(std::string_view p_resource_key) {
     }
 
     Ref<RenderGraphVK> released_graph = graph_entry->second.graph;
-    Ref<RendGraphDescVK> released_descriptor = graph_entry->second.descriptor;
     if (active_graph == released_graph) {
         active_graph = MEM_NULL;
     }
     render_graphs.erase(graph_entry);
     register_delay_call(
-        [released_graph, released_descriptor] mutable {
+        [released_graph] mutable {
             released_graph = MEM_NULL;
-            released_descriptor = MEM_NULL;
         },
         frames_in_flight);
 }

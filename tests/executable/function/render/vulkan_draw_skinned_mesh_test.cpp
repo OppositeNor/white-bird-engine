@@ -288,59 +288,75 @@ public:
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
 
-        WBE::RendGraphDescVK graph_desc(render_allocator);
-        // The shader reads position from the geometry binding and the joint ids and weights from the joint-binding
-        // binding, so the draw binds the buffers compiled from both binaries.
-        const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
-            graph_desc,
-            REND_RES_SKINNED_MESH,
-            mesh,
-            submesh,
-            WBE::ShaderMetadataLoader().load(shader_resource),
-            "vertex_main");
-        graph_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-            .add_buffer(REND_RES_SKINNED_MESH_CAMERA_INFO,
-                [initial_data = WBE::to_initial_data(camera_info)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = initial_data,
-                        };
-                })
-            .add_buffer(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS,
-                [initial_data = to_byte_vector(skinning_transforms)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = initial_data,
-                        };
-                });
+        // The buffers start with the state at registration; equal descriptions keep them, and their runtime updates, across
+        // rebuilds.
+        const std::vector<uint8_t> camera_info_data = WBE::to_initial_data(camera_info);
+        const std::vector<uint8_t> skinning_transforms_data = to_byte_vector(skinning_transforms);
+        // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
+        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
+            [this,
+                render_allocator,
+                renderer,
+                base_render_data,
+                mesh,
+                submesh = &submesh,
+                shader_resource,
+                graphics_pipeline,
+                camera_info_data,
+                skinning_transforms_data](const WBE::RendGraphContextVK& /*p_graph_context*/) {
+            WBE::RendGraphDescVK graph_desc(render_allocator);
+            // The shader reads position from the geometry binding and the joint ids and weights from the joint-binding
+            // binding, so the draw binds the buffers compiled from both binaries.
+            const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
+                graph_desc,
+                REND_RES_SKINNED_MESH,
+                mesh,
+                *submesh,
+                WBE::ShaderMetadataLoader().load(shader_resource),
+                "vertex_main");
+            graph_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
+                .add_buffer(REND_RES_SKINNED_MESH_CAMERA_INFO,
+                    [initial_data = camera_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
+                        return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
+                            .domain = WBE::DeviceDomain::HOST_DEVICE,
+                            .initial_data = initial_data,
+                            };
+                    })
+                .add_buffer(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS,
+                    [initial_data = skinning_transforms_data](const WBE::RendGraphContextVK& /*p_context*/) {
+                        return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE,
+                            .domain = WBE::DeviceDomain::HOST_DEVICE,
+                            .initial_data = initial_data,
+                            };
+                    });
 
-        WBE::RendTaskDescVK draw_task_desc(render_allocator);
-        draw_task_desc.task_id = RT_DRAW_SKINNED_MESH;
-        draw_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.05F, 0.05F, 0.05F, 1.0F}}}};
-        draw_task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
-            return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                .set_pipeline(graphics_pipeline)
-                .set_render_extent(p_context.swap_chain_extent)
-                .set_clear_values(clear_values)
-                .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
-                    draw_buffers.index_buffer_id,
-                    draw_buffers.vertex_input,
-                    draw_buffers.indexed_draw_region)
-                .create_unique(base_render_data);
-        };
-        graph_desc.add_task(std::move(draw_task_desc));
+            WBE::RendTaskDescVK draw_task_desc(render_allocator);
+            draw_task_desc.task_id = RT_DRAW_SKINNED_MESH;
+            draw_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+            const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.05F, 0.05F, 0.05F, 1.0F}}}};
+            draw_task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
+                return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                    .set_pipeline(graphics_pipeline)
+                    .set_render_extent(p_context.swap_chain_extent)
+                    .set_clear_values(clear_values)
+                    .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
+                        draw_buffers.index_buffer_id,
+                        draw_buffers.vertex_input,
+                        draw_buffers.indexed_draw_region)
+                    .create_unique(base_render_data);
+            };
+            graph_desc.add_task(std::move(draw_task_desc));
 
-        WBE::RendTaskDescVK imgui_task_desc(render_allocator);
-        imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
-        imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
-            return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
-        };
-        graph_desc.add_task(std::move(imgui_task_desc));
-        WBE::connect_resource_chain(graph_desc, WBE::REND_RES_SWAP_CHAIN, {RT_DRAW_SKINNED_MESH, RT_DRAW_SKINNED_MESH_IMGUI});
-
-        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph", std::move(graph_desc));
+            WBE::RendTaskDescVK imgui_task_desc(render_allocator);
+            imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
+            imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+            imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+            };
+            graph_desc.add_task(std::move(imgui_task_desc));
+            WBE::connect_resource_chain(graph_desc, WBE::REND_RES_SWAP_CHAIN, {RT_DRAW_SKINNED_MESH, RT_DRAW_SKINNED_MESH_IMGUI});
+            return graph_desc;
+        });
         skinning_transforms_buffer =
             graph->acquire_resource(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS)->get().dynamic_cast_ref<WBE::ROBufferVK>();
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());

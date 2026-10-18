@@ -77,6 +77,15 @@ For non-trivial implementation tasks:
   fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
   and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
   the task's `RenderTaskResourceMap`; tasks do not take resource maps.
+- Every graph is registered with `RendererVK::register_render_graph(key, RendGraphRebuildCallbackVK)`; there is no
+  descriptor registration. The callback builds the complete descriptor and runs for the first build and on every
+  rebuild (context change or `rebuild()`), so keep one-time setup (pipeline compiles, application-owned buffers,
+  initial-data snapshots) outside it and only assemble the descriptor inside.
+- Rebuilds diff the new descriptor against the current graph (`RendGraphResourceDiffVK`): a graph-owned resource is kept,
+  with its content, only when its id, kind, per-frame layout, and evaluated description match and, for a view, its image
+  is kept; changed configurations are recreated in place in their containers, while kind or per-frame changes get a new
+  container. Imports are matched by object identity. Keep the description structs' `operator==` complete when adding
+  fields, since the diff relies on them.
 - The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
   descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
 
@@ -85,8 +94,11 @@ For non-trivial implementation tasks:
 - A recipe is a Lua `script` resource whose module exports `build(context)` and returns a `RendGraphRecipeVK` table
   (`imports`, `resources`, `tasks`; see `rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK` runs it and
   `RendGraphRecipeBuilderVK` turns it into a `RendGraphDescVK`; recipes only build descriptors and never touch render objects.
-- `context` holds `RendGraphScriptVK::make_context()` facts (`frames_in_flight`, `swap_chain_format`); applications may add
-  entries before calling `RendGraphScriptVK::run()`.
+- `context` holds `RendGraphScriptVK::make_context()` facts (`frames_in_flight`, `swap_chain_format`, `swap_chain_extent`);
+  applications may add entries before calling `RendGraphScriptVK::run()`. Size swap-chain-dependent resources and
+  dispatches in Lua from `swap_chain_extent`.
+- For a recipe graph, the application's rebuild callback runs the script, builds the descriptor, and adds its C++ tasks.
+  Never pass script keys to the graph.
 - Every resource owned outside the graph must be listed in `imports` and supplied through `RendGraphRecipeImportsVK`; a
   declared-but-missing or supplied-but-undeclared import is an error. Recipes cannot set initial data, so buffers that need
   it are application-owned imports, registered in the render database under their import name.

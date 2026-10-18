@@ -102,10 +102,12 @@
 {% endfor %}
 ---| wbe.RendRecipeTaskVK
 
----Immutable renderer facts passed to a recipe's `build(context)`, plus any entries the application adds.
+---Renderer facts passed to a recipe's `build(context)`, plus any entries the application adds. The recipe re-runs when
+---they change, such as after a swap chain resize.
 ---@class wbe.RecipeContext
 ---@field frames_in_flight integer
 ---@field swap_chain_format wbe.ImageFormatVK
+---@field swap_chain_extent { width: integer, height: integer }
 ---@field [string] any
 
 ---The exports table a render graph recipe script returns.

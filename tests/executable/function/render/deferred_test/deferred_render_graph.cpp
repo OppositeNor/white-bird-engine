@@ -154,52 +154,57 @@ RendImageDescVK make_graph_image_desc(RendResPrimaryUsageVK p_usage, VkFormat p_
 
 void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(
     std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_gbuffer_opaque_task) {
-    RendGraphDescVK pipeline_desc(render_allocator);
-    add_render_graph_resources(pipeline_desc);
-    if (mesh_acceleration_structure != MEM_NULL) {
-        // Build the acceleration structures once, on the graph's first recording.
-        // A recreated task builds them again on its first recording.
-        pipeline_desc.add_task(RendTaskDescVK(render_allocator,
-            RT_BUILD_MESH_ACCELERATION_STRUCTURE,
-            [this, acceleration_structure = mesh_acceleration_structure](const RendGraphContextVK& /*p_context*/) {
-                auto build = make_unique<RTBuildAccelerationStructuresVK>(render_allocator,
-                    base_render_data,
-                    IBindableRenderResourceVK::make_member_resource_id(MESH_ACCELERATION_STRUCTURE_KEY, MeshAccelerationStructureVK::TOP_LEVEL),
-                    [acceleration_structure](VkCommandBuffer p_command_buffer) {
-                        acceleration_structure->record_build(p_command_buffer);
-                    });
-                return make_unique<RTTriggeredVK>(render_allocator, std::move(build), true);
-            }));
-    }
-    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
-        add_spot_light_shadow_tasks(pipeline_desc, light_index, p_use_summed_area_table);
-    }
-    pipeline_desc.add_task(std::move(p_gbuffer_opaque_task));
-    pipeline_desc.add_task(create_gbuffer_task(true, true));
-    const std::array<std::string_view, 3> gbuffer_colors{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
-    pipeline_desc.add_task(dynamic_mesh->make_task(
-        RT_RUN_DYNAMIC_GBUFFER, 0, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
-    pipeline_desc.add_task(dynamic_mesh->make_task(
-        RT_RUN_DYNAMIC_GBUFFER_SECOND, 1, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
-    pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
-    voxel_structure->add_build_render_tasks(pipeline_desc, *dynamic_mesh);
-    pipeline_desc.add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
-    const std::string_view post_processing_last_task_id =
-        post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
-    pipeline_desc.add_task(create_bloom_extract_task_desc())
-        .add_task(create_bloom_blur_task_desc())
-        .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
-        .add_task(create_present_result_image_task_desc())
-        .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
-        .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table));
-    voxel_structure->add_overlay_render_tasks(pipeline_desc);
-    for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
-        pipeline_desc.add_task(create_light_billboard_task_desc(light_index));
-    }
-    pipeline_desc.add_task(create_imgui_task_desc());
-    connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
-    voxel_structure->connect_render_tasks(pipeline_desc);
-    Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id, std::move(pipeline_desc));
+    // The graph calls this for its first build and again whenever it rebuilds: after a swap chain resize, or when
+    // draw_pixel_sort_options() rebuilds it for new post-processing pipelines.
+    Ref<RenderGraphVK> graph = renderer_vk->register_render_graph(p_graph_id,
+        [this, p_use_summed_area_table, gbuffer_opaque_task = std::move(p_gbuffer_opaque_task)](const RendGraphContextVK& /*p_graph_context*/) {
+            RendGraphDescVK pipeline_desc(render_allocator);
+            add_render_graph_resources(pipeline_desc);
+            if (mesh_acceleration_structure != MEM_NULL) {
+                // Build the acceleration structures once, on the graph's first recording.
+                // A recreated task builds them again on its first recording.
+                pipeline_desc.add_task(RendTaskDescVK(render_allocator,
+                    RT_BUILD_MESH_ACCELERATION_STRUCTURE,
+                    [this, acceleration_structure = mesh_acceleration_structure](const RendGraphContextVK& /*p_context*/) {
+                        auto build = make_unique<RTBuildAccelerationStructuresVK>(render_allocator,
+                            base_render_data,
+                            IBindableRenderResourceVK::make_member_resource_id(MESH_ACCELERATION_STRUCTURE_KEY, MeshAccelerationStructureVK::TOP_LEVEL),
+                            [acceleration_structure](VkCommandBuffer p_command_buffer) {
+                                acceleration_structure->record_build(p_command_buffer);
+                            });
+                        return make_unique<RTTriggeredVK>(render_allocator, std::move(build), true);
+                    }));
+            }
+            for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+                add_spot_light_shadow_tasks(pipeline_desc, light_index, p_use_summed_area_table);
+            }
+            pipeline_desc.add_task(RendTaskDescVK(gbuffer_opaque_task));
+            pipeline_desc.add_task(create_gbuffer_task(true, true));
+            const std::array<std::string_view, 3> gbuffer_colors{GBUFFER_ALBEDO_IMAGE_VIEW, GBUFFER_NORMAL_IMAGE_VIEW, GBUFFER_RMA_IMAGE_VIEW};
+            pipeline_desc.add_task(dynamic_mesh->make_task(
+                RT_RUN_DYNAMIC_GBUFFER, 0, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
+            pipeline_desc.add_task(dynamic_mesh->make_task(
+                RT_RUN_DYNAMIC_GBUFFER_SECOND, 1, gbuffer_dynamic_graphics_pipeline, &RendGraphContextVK::swap_chain_extent, gbuffer_colors, GBUFFER_DEPTH_IMAGE_VIEW));
+            pipeline_desc.add_task(create_direct_lighting_task_desc(p_use_summed_area_table));
+            voxel_structure->add_build_render_tasks(pipeline_desc, *dynamic_mesh);
+            pipeline_desc.add_task(create_indirect_lighting_task_desc()).add_task(create_combine_lighting_task_desc());
+            const std::string_view post_processing_last_task_id =
+                post_processing->add_render_tasks(pipeline_desc, RESULT_IMAGE_VIEW, RT_COMBINE_LIGHTING);
+            pipeline_desc.add_task(create_bloom_extract_task_desc())
+                .add_task(create_bloom_blur_task_desc())
+                .add_task(create_bloom_acquire_task_desc(p_use_summed_area_table))
+                .add_task(create_present_result_image_task_desc())
+                .add_task(create_present_frame_sequence_task_desc(p_use_summed_area_table))
+                .add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table));
+            voxel_structure->add_overlay_render_tasks(pipeline_desc);
+            for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
+                pipeline_desc.add_task(create_light_billboard_task_desc(light_index));
+            }
+            pipeline_desc.add_task(create_imgui_task_desc());
+            connect_deferred_render_tasks(pipeline_desc, p_use_summed_area_table, post_processing_last_task_id);
+            voxel_structure->connect_render_tasks(pipeline_desc);
+            return pipeline_desc;
+        });
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
     deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
 }

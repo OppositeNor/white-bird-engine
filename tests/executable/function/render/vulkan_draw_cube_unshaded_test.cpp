@@ -23,6 +23,7 @@
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -59,6 +60,7 @@ public:
     }
 
     virtual void logic_update(double /* p_delta */) override {
+        WBE::on_exec_test_logic(*get_window());
     }
 
     virtual void render_update(double p_delta) override {
@@ -107,12 +109,18 @@ public:
                               .create_ref(base_render_data);
         renderer->get_render_database()->register_compiled_render_resource(
             REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
-        const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
-        WBE::RendGraphRecipeImportsVK imports;
-        imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
-        // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
-        WBE::Ref<WBE::RenderGraphVK> graph = WBE::RendGraphScriptVK::register_render_graph(
-            *renderer, "test_render_graph", "render_graphs.draw_cube_unshaded", imports);
+        // The graph re-runs the recipe whenever it rebuilds, such as after a swap chain resize.
+        WBE::Ref<WBE::RenderGraphVK> graph =
+            renderer->register_render_graph("test_render_graph", [this, renderer](const WBE::RendGraphContextVK& p_context) {
+                const auto* base_render_data = renderer->get_base_render_data();
+                const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
+                WBE::RendGraphRecipeImportsVK imports;
+                imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
+                // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
+                const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(
+                    "render_graphs.draw_cube_unshaded", WBE::RendGraphScriptVK::make_context(*base_render_data, p_context));
+                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+            });
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

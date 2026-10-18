@@ -95,33 +95,38 @@ public:
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_triangle_pipeline", pipeline_resource);
         auto graphics_pipeline = compiled.graphics_pipeline;
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
-        WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
-        const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
-            pipeline_desc,
-            REND_RES_TEST_DRAW_TRIANGLE_MESH,
-            triangle_mesh,
-            triangle_submesh,
-            WBE::ShaderMetadataLoader().load(shader_resource),
-            "vertex_main");
-        WBE::RendTaskDescVK task_desc(render_allocator);
-        task_desc.task_id = RT_RUN_PIPELINE;
-        task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-        task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
-            return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                .set_pipeline(graphics_pipeline)
-                .set_render_extent(p_context.swap_chain_extent)
-                .set_clear_values(clear_values)
-                .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
-                    draw_buffers.index_buffer_id,
-                    draw_buffers.vertex_input,
-                    draw_buffers.indexed_draw_region)
-                .create_unique(base_render_data);
-        };
-        pipeline_desc.tasks.emplace_back(std::move(task_desc));
-        WBE::Ref<WBE::RenderGraphVK> graph =
-            WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
+        // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
+        const WBE::RUSubmesh3D* triangle_submesh_pointer = &triangle_submesh;
+        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
+            [render_allocator, renderer, base_render_data, triangle_mesh, triangle_submesh = triangle_submesh_pointer, graphics_pipeline, shader_resource](
+                const WBE::RendGraphContextVK& /*p_graph_context*/) {
+                WBE::RendGraphDescVK pipeline_desc(render_allocator);
+                pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
+                const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
+                    pipeline_desc,
+                    REND_RES_TEST_DRAW_TRIANGLE_MESH,
+                    triangle_mesh,
+                    *triangle_submesh,
+                    WBE::ShaderMetadataLoader().load(shader_resource),
+                    "vertex_main");
+                WBE::RendTaskDescVK task_desc(render_allocator);
+                task_desc.task_id = RT_RUN_PIPELINE;
+                task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+                const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
+                task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
+                    return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
+                        .set_pipeline(graphics_pipeline)
+                        .set_render_extent(p_context.swap_chain_extent)
+                        .set_clear_values(clear_values)
+                        .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
+                            draw_buffers.index_buffer_id,
+                            draw_buffers.vertex_input,
+                            draw_buffers.indexed_draw_region)
+                        .create_unique(base_render_data);
+                };
+                pipeline_desc.tasks.emplace_back(std::move(task_desc));
+                return pipeline_desc;
+            });
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

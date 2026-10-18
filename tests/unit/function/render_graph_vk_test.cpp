@@ -218,9 +218,16 @@ RendTaskDescVK make_probe_desc(RenderAllocator* p_allocator,
         });
 }
 
+// Build p_graph from a callback that returns a copy of p_descriptor.
+void build_graph(RenderGraphVK& p_graph, const RendGraphDescVK& p_descriptor) {
+    p_graph.build_from_callback([p_descriptor](const RendGraphContextVK& /*p_context*/) {
+        return p_descriptor;
+    });
+}
+
 std::string build_error(RenderGraphVK& p_graph, RendGraphDescVK& p_descriptor) {
     try {
-        p_graph.build_from_descriptor(p_descriptor);
+        build_graph(p_graph, p_descriptor);
     } catch (const std::runtime_error& error) {
         return error.what();
     }
@@ -330,7 +337,7 @@ TEST(WBERenderGraphVKTest, RejectsDuplicateGraphResourceRegistration) {
     descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     RenderGraphVK graph(&render_data);
 
-    EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
+    EXPECT_THROW(build_graph(graph, descriptor), std::runtime_error);
 }
 
 TEST(WBERenderGraphVKTest, MissingReflectedResourceFailsDuringTaskBinding) {
@@ -342,7 +349,7 @@ TEST(WBERenderGraphVKTest, MissingReflectedResourceFailsDuringTaskBinding) {
     });
     RenderGraphVK graph(&render_data);
 
-    EXPECT_THROW(graph.build_from_descriptor(descriptor), std::runtime_error);
+    EXPECT_THROW(build_graph(graph, descriptor), std::runtime_error);
 }
 
 TEST(WBERenderGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
@@ -359,7 +366,7 @@ TEST(WBERenderGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
     RenderGraphVK graph(&render_data);
 
     try {
-        graph.build_from_descriptor(descriptor);
+        build_graph(graph, descriptor);
         FAIL() << "Expected conflicting graph-global resource accesses to fail.";
     } catch (const std::runtime_error& error) {
         const std::string message = error.what();
@@ -381,7 +388,7 @@ TEST(WBERenderGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) 
     RenderGraphVK graph(&render_data);
 
     try {
-        graph.build_from_descriptor(descriptor);
+        build_graph(graph, descriptor);
         FAIL() << "Expected conflicting graph-global resource accesses to fail.";
     } catch (const std::runtime_error& error) {
         const std::string message = error.what();
@@ -406,7 +413,7 @@ TEST(WBERenderGraphVKTest, ResourceListAccessExpandsToIndexedResourcesForConflic
     RenderGraphVK graph(&render_data);
 
     try {
-        graph.build_from_descriptor(descriptor);
+        build_graph(graph, descriptor);
         FAIL() << "Expected conflicting expanded resource-list accesses to fail.";
     } catch (const std::runtime_error& error) {
         const std::string message = error.what();
@@ -453,6 +460,44 @@ TEST(WBERenderGraphVKTest, TaskFactoriesReceiveTheContextOfTheRenderData) {
     EXPECT_EQ(received_extent.height, 360U);
     const RendGraphContextVK expected_context{.swap_chain_extent = {.width = 640, .height = 360}};
     EXPECT_TRUE(graph.get_context() == expected_context);
+}
+
+TEST(WBERenderGraphVKTest, RebuildCallbacksReceiveTheContextOfTheRenderData) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    render_data.swap_chain_extent = {.width = 800, .height = 600};
+    Ref<RenderObjectContainerVK> container = make_test_container(&allocator, &render_data);
+    VkExtent2D received_extent{};
+    uint32_t call_count = 0;
+    RenderGraphVK graph(&render_data);
+    std::string error;
+    try {
+        graph.build_from_callback([&](const RendGraphContextVK& p_context) {
+            received_extent = p_context.swap_chain_extent;
+            ++call_count;
+            RendGraphDescVK descriptor(&allocator);
+            descriptor.add_resource(TEST_LOGICAL_RESOURCE, *container);
+            descriptor.add_task("task", [&allocator](const RendGraphContextVK& /*p_context*/) {
+                return make_unique<RTGraphEdgeProbeVK>(
+                    &allocator, &allocator, QueueFamilyVK::GRAPHICS, std::vector<std::string>{}, std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
+            });
+            return descriptor;
+        });
+    } catch (const std::runtime_error& p_error) {
+        error = p_error.what();
+    }
+    // The descriptor validated; the build stops at command pool creation without a device.
+    EXPECT_NE(error.find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos) << error;
+    EXPECT_EQ(call_count, 1U);
+    EXPECT_EQ(received_extent.width, 800U);
+    EXPECT_EQ(received_extent.height, 600U);
+}
+
+TEST(WBERenderGraphVKTest, RejectsNullRebuildCallbacks) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    BaseRenderDataVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+    EXPECT_THROW(graph.build_from_callback(nullptr), std::runtime_error);
 }
 
 TEST(WBERenderGraphVKTest, RejectsTaskFactoriesThatReturnNull) {

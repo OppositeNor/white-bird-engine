@@ -18,6 +18,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "global/global.hh"
@@ -30,6 +31,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 
@@ -62,12 +64,15 @@ TEST(WBERendGraphScriptVKTest, MakesContextFromTheRenderData) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 3;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
-    DataValue context = RendGraphScriptVK::make_context(render_data);
+    const RendGraphContextVK graph_context{.swap_chain_extent = {.width = 1920, .height = 1080}};
+    DataValue context = RendGraphScriptVK::make_context(render_data, graph_context);
     EXPECT_EQ(context.get_value<uint32_t>("frames_in_flight"), 3U);
     EXPECT_EQ(context.get_value<std::string>("swap_chain_format"), "B8G8R8A8_SRGB");
+    EXPECT_EQ(context.get_entry("swap_chain_extent").get_value<uint32_t>("width"), 1920U);
+    EXPECT_EQ(context.get_entry("swap_chain_extent").get_value<uint32_t>("height"), 1080U);
     // A format ImageFormatVK has no name for is passed as its value.
     render_data.swap_chain_format = VK_FORMAT_R4G4_UNORM_PACK8;
-    context = RendGraphScriptVK::make_context(render_data);
+    context = RendGraphScriptVK::make_context(render_data, graph_context);
     EXPECT_EQ(context.get_value<int64_t>("swap_chain_format"), static_cast<int64_t>(VK_FORMAT_R4G4_UNORM_PACK8));
 }
 
@@ -76,11 +81,42 @@ TEST(WBERendGraphScriptVKTest, RunsBuildAndTheRecipeBuilds) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_UNORM;
-    const DataValue recipe = RendGraphScriptVK::run("test_recipe", TEST_RECIPE_SCRIPT, RendGraphScriptVK::make_context(render_data));
+    const DataValue recipe =
+        RendGraphScriptVK::run("test_recipe", TEST_RECIPE_SCRIPT, RendGraphScriptVK::make_context(render_data, RendGraphContextVK{}));
     RendGraphDescVK graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data);
     ASSERT_EQ(graph.tasks.size(), 2U);
     EXPECT_EQ(graph.get_task("probe_1").next.size(), 1U);
     EXPECT_EQ(graph.samplers.size(), 1U);
+}
+
+TEST(WBERendGraphScriptVKTest, RecipesSizeDispatchesFromTheSwapChainExtent) {
+    constexpr std::string_view TILED_RECIPE = R"(
+return {
+    build = function(context)
+        local extent = context.swap_chain_extent
+        return {
+            tasks = {
+                {
+                    id = "tiled",
+                    type = "run_compute_pipeline",
+                    params = { pipeline = "tiles", group_count_x = (extent.width + 7) // 8, group_count_y = (extent.height + 7) // 8 },
+                },
+            },
+        }
+    end,
+}
+)";
+    RenderAllocator allocator(WBE_KI_B(16));
+    BaseRenderDataVK render_data(&allocator);
+    auto group_counts = [&render_data, TILED_RECIPE](uint32_t p_width, uint32_t p_height) {
+        const RendGraphContextVK graph_context{.swap_chain_extent = {.width = p_width, .height = p_height}};
+        const DataValue recipe = RendGraphScriptVK::run("tiled", TILED_RECIPE, RendGraphScriptVK::make_context(render_data, graph_context));
+        const DataValue& params = recipe.get_entry("tasks").as_list().at(0).get_entry("params");
+        return std::pair{params.get_value<uint32_t>("group_count_x"), params.get_value<uint32_t>("group_count_y")};
+    };
+    // A resize re-runs the recipe with the new extent, which rounds partial tiles up.
+    EXPECT_EQ(group_counts(1920, 1080), std::pair(240U, 135U));
+    EXPECT_EQ(group_counts(1921, 1080), std::pair(241U, 135U));
 }
 
 TEST(WBERendGraphScriptVKTest, RejectsScriptsWithoutBuild) {
@@ -124,7 +160,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
-    DataValue context = RendGraphScriptVK::make_context(render_data);
+    DataValue context = RendGraphScriptVK::make_context(render_data, RendGraphContextVK{});
     context.set_value("source_width", 64);
     context.set_value("source_height", 32);
     context.set_value("orientation", std::string("horizontal"));

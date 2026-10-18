@@ -16,16 +16,11 @@
 #define WBE_FILE_REND_GRAPH_SCRIPT_VK_HH
 
 #include "core/data/data_value.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "resource/resource_unit/resource_unit.hh"
 #include <string_view>
 
 namespace WhiteBirdEngine {
-
-class RendererVK;
 
 /**
  * @class RendGraphScriptVK
@@ -47,11 +42,15 @@ public:
     /**
      * @brief Get the context a recipe's `build(context)` receives.
      *
-     * A map of renderer facts that do not change while a graph lives: `frames_in_flight` (integer) and
-     * `swap_chain_format` (an ImageFormatVK name, or the VkFormat value when ImageFormatVK has no name for it). Sizes that
-     * follow the swap chain are expressed in the recipe with RendExtent2DParamsVK instead.
+     * A map of renderer facts: `frames_in_flight` (integer), `swap_chain_format` (an ImageFormatVK name, or the VkFormat
+     * value when ImageFormatVK has no name for it), and `swap_chain_extent` (`{ width, height }` of p_graph_context).
+     * A graph whose rebuild callback (RendererVK::register_render_graph()) runs the recipe re-runs it with a new
+     * context whenever the graph context changes, so recipes may size resources and dispatches from the extent.
+     *
+     * @param p_render_data The render data of the renderer.
+     * @param p_graph_context The context the graph is being built for.
      */
-    static DataValue make_context(const BaseRenderDataVK& p_render_data);
+    static DataValue make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context);
 
     /**
      * @brief Run a recipe script's `build(context)`.
@@ -72,22 +71,6 @@ public:
      * @throws std::runtime_error If no script resource has the key, or under the conditions of run().
      */
     static DataValue run(std::string_view p_script_key, const DataValue& p_context);
-
-    /**
-     * @brief Run a recipe script, build its graph descriptor, and register it with the renderer.
-     *
-     * Call on the rendering thread.
-     *
-     * @param p_renderer The renderer to register the graph with.
-     * @param p_graph_key The key the graph is registered under.
-     * @param p_script_key The `script` resource key of the recipe.
-     * @param p_imports The resources the recipe imports.
-     * @return The registered graph.
-     * @throws std::runtime_error Under the conditions of run(), RendGraphRecipeBuilderVK::build(), and
-     * RendererVK::register_render_graph().
-     */
-    static Ref<RenderGraphVK> register_render_graph(
-        RendererVK& p_renderer, std::string_view p_graph_key, std::string_view p_script_key, const RendGraphRecipeImportsVK& p_imports);
 };
 
 } // namespace WhiteBirdEngine

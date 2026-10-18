@@ -17,10 +17,8 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/script/sb_lua.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -38,9 +36,13 @@
 
 namespace WhiteBirdEngine {
 
-DataValue RendGraphScriptVK::make_context(const BaseRenderDataVK& p_render_data) {
+DataValue RendGraphScriptVK::make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context) {
     DataValue context = DataValue::make_map();
     context.set_value("frames_in_flight", p_render_data.frames_in_flight);
+    DataValue swap_chain_extent = DataValue::make_map();
+    swap_chain_extent.set_value("width", p_graph_context.swap_chain_extent.width);
+    swap_chain_extent.set_value("height", p_graph_context.swap_chain_extent.height);
+    context.set_entry("swap_chain_extent", swap_chain_extent);
     const auto format = static_cast<ImageFormatVK>(static_cast<std::underlying_type_t<VkFormat>>(p_render_data.swap_chain_format));
     const std::optional<std::string_view> format_name = EnumReflection<ImageFormatVK>::try_enum_to_string(format);
     if (format_name.has_value()) {
@@ -70,13 +72,6 @@ DataValue RendGraphScriptVK::run(std::string_view p_script_key, const DataValue&
         throw std::runtime_error(std::format("Failed to run render graph script '{}': no script resource has this key.", p_script_key));
     }
     return run(p_script_key, std::string_view(script->source.get(), script->size - 1), p_context);
-}
-
-Ref<RenderGraphVK> RendGraphScriptVK::register_render_graph(
-    RendererVK& p_renderer, std::string_view p_graph_key, std::string_view p_script_key, const RendGraphRecipeImportsVK& p_imports) {
-    const BaseRenderDataVK* render_data = p_renderer.get_base_render_data();
-    const DataValue recipe = run(p_script_key, make_context(*render_data));
-    return p_renderer.register_render_graph(p_graph_key, RendGraphRecipeBuilderVK().build(recipe, p_imports, render_data));
 }
 
 } // namespace WhiteBirdEngine
