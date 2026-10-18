@@ -12,25 +12,22 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -48,7 +45,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
-#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -73,7 +69,6 @@ public:
     }
 
     void setup_graphics_pipeline() {
-        auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
@@ -103,27 +98,21 @@ public:
         // The render database holds the pipeline weakly; it must stay alive until the draw task retains it.
         const WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline =
             WBE::compile_render_test_graphics_pipeline(renderer, "draw_cube_unshaded_pipeline", pipeline_resource, color_formats);
-        WBE::RendGraphDescVK pipeline_desc(render_allocator);
-        pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-            .add_buffer(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER,
-                [initial_data = WBE::to_initial_data(camera_info)](const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                        .domain = WBE::DeviceDomain::HOST_DEVICE,
-                        .initial_data = initial_data};
-                });
-        // The task compiles the mesh by its resource key and imports its buffers into the graph itself.
-        const WBE::RTParamsGraphicsDrawMeshVK draw_params{
-            .mesh = "model_cube_static.mesh",
-            .pipeline = "draw_cube_unshaded_pipeline",
-            .parts = {WBE::MeshPartVK::OPAQUE},
-            .clear_values = {WBE::RTParamsClearValueVK{.color = std::vector<float>{0.0F, 0.0F, 0.0F, 0.0F}}},
-        };
-        WBE::RTGraphicsDrawMeshVK::add_to_graph(pipeline_desc, "run_static_mesh", draw_params, base_render_data)
-            .alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        WBE::Ref<WBE::RenderGraphVK> graph =
-            WBE::RendererVK::get_singleton()->register_render_graph("test_render_graph", std::move(pipeline_desc));
-        camera_info_ubo =
-            graph->acquire_resource(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
+        // Recipes cannot set initial data, so the application owns the camera buffer and the recipe imports it.
+        camera_info_ubo = WBE::ROBufferVK::Builder()
+                              .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
+                              .set_size(sizeof(CameraInfoGPU))
+                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+                              .create_ref(base_render_data);
+        renderer->get_render_database()->register_compiled_render_resource(
+            REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
+        const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
+        WBE::RendGraphRecipeImportsVK imports;
+        imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
+        // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
+        WBE::Ref<WBE::RenderGraphVK> graph = WBE::RendGraphScriptVK::register_render_graph(
+            *renderer, "test_render_graph", "render_graphs.draw_cube_unshaded", imports);
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
     }

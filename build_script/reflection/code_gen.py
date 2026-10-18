@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from build_script.reflection.lua_types import LUA_FILTERS
 from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from build_script.utils import hash_file, hash_str_sha256
@@ -52,6 +53,7 @@ class WBECodeGenerator:
             trim_blocks=True,
             lstrip_blocks=True
         )
+        self._env.filters.update(LUA_FILTERS)
         self._generate_infos = generate_infos
 
     def generate(self) -> None:

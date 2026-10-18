@@ -27,6 +27,9 @@ target_link_libraries(wbe_unit_test PRIVATE
 # Shared unit test support headers, such as test_global.hh.
 target_include_directories(wbe_unit_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/unit)
 
+# The Lua editor type stubs generated from reflection (templates/lua_types.lua.jinja).
+target_compile_definitions(wbe_unit_test PRIVATE WBE_LUA_TYPE_STUBS_PATH="${CMAKE_BINARY_DIR}/lua/wbe_types.lua")
+
 file(GLOB_RECURSE WBE_UNIT_TEST_BENCHMARK ${CMAKE_CURRENT_SOURCE_DIR}/benchmark/*.cpp)
 
 add_executable(wbe_benchmark_test

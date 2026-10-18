@@ -80,6 +80,35 @@ For non-trivial implementation tasks:
 - The render graph binds the renderer-owned descriptor heaps before recording each task. Pipeline-run tasks push their reflected
   descriptor-index data; do not reintroduce descriptor-set or pipeline-layout objects.
 
+### Render Graph Recipes
+
+- A recipe is a Lua `script` resource whose module exports `build(context)` and returns a `RendGraphRecipeVK` table
+  (`imports`, `resources`, `tasks`; see `rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK` runs it and
+  `RendGraphRecipeBuilderVK` turns it into a `RendGraphDescVK`; recipes only build descriptors and never touch render objects.
+- `context` holds `RendGraphScriptVK::make_context()` facts (`frames_in_flight`, `swap_chain_format`); applications may add
+  entries before calling `RendGraphScriptVK::run()`.
+- Every resource owned outside the graph must be listed in `imports` and supplied through `RendGraphRecipeImportsVK`; a
+  declared-but-missing or supplied-but-undeclared import is an error. Recipes cannot set initial data, so buffers that need
+  it are application-owned imports, registered in the render database under their import name.
+- Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`. Tasks name a registered task type
+  and pass `params` to it; `aliases` map task-local ids to graph resources. Edges come only from each task's `connect`
+  entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`.
+- Task `pipeline` params are render-database keys; the application compiles those pipelines and keeps them alive.
+- Tasks that need application objects (for example the ImGui overlay) are added in C++ to the built descriptor.
+- `templates/lua_types.lua.jinja` generates editor-only LuaLS type stubs at `build/<target>/lua/wbe_types.lua`, which the
+  repo-root `.luarc.json` loads; annotate `build` with `---@param context wbe.RecipeContext` and
+  `---@return wbe.RendGraphRecipeVK`.
+
+### Lua Scripts
+
+- Lua sources live under `res/assets/scripts/lua/` and are `script` resources declared in
+  `res/assets/scripts/lua/lua_scripts.toml`: recipes in `render_graphs/`, shared helpers in `utils/`.
+- A script's resource id is its module name: its path under `scripts/lua/` without `.lua`, with dots for slashes
+  (`utils/render_graph.lua` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
+  runtime (through `SMRResourceManager`) and in the editor.
+- `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic
+  requires fail. Implement new import sources as an `IScriptModuleResolver`, whose `try_resolve()` must not throw.
+
 ## Layered Architecture
 
 Layers, from upper to lower. Upper layers may depend on lower layers; the reverse is **forbidden**.

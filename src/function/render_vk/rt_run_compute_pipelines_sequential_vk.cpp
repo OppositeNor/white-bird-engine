@@ -26,11 +26,14 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include <array>
 #include <cstddef>
 #include <format>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -133,14 +136,27 @@ Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const BaseRender
     Ref<ROComputePipelineVK> first_pipeline =
         acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", p_params.dispatches.front().pipeline);
     Dispatch dispatch(p_render_data->allocator);
+    // Each dispatch's push constants are typed by its own pipeline.
+    std::vector<std::vector<TaskPushConstantVK>> push_constants;
+    push_constants.reserve(p_params.dispatches.size());
     for (size_t i = 0; i < p_params.dispatches.size(); ++i) {
         const RTParamsComputeDispatchVK& entry = p_params.dispatches[i];
-        dispatch.add_entry(
+        Ref<ROComputePipelineVK> pipeline =
             i == 0 ? first_pipeline
-                   : acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", entry.pipeline),
+                   : acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", entry.pipeline);
+        const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};
+        push_constants.push_back(resolve_task_push_constants_vk(entry.push_constants, layouts, "RTRunComputePipelinesSequentialVK"));
+        dispatch.add_entry(std::move(pipeline),
             VkExtent3D{.width = entry.group_count_x, .height = entry.group_count_y, .depth = entry.group_count_z});
     }
-    return make_unique<RTRunComputePipelinesSequentialVK>(p_render_data->allocator, p_render_data, dispatch, p_params.queue_family);
+    Unique<RTRunComputePipelinesSequentialVK> task =
+        make_unique<RTRunComputePipelinesSequentialVK>(p_render_data->allocator, p_render_data, dispatch, p_params.queue_family);
+    for (size_t i = 0; i < push_constants.size(); ++i) {
+        for (const TaskPushConstantVK& push_constant : push_constants[i]) {
+            task->set_push_constant(i, push_constant.name, push_constant.value);
+        }
+    }
+    return task;
 }
 
 } // namespace WhiteBirdEngine

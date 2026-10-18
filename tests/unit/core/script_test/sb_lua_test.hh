@@ -17,12 +17,15 @@
 
 #include "../reflection_test/reflection_test_data.hh"
 #include "core/data/data_value.hh"
+#include "core/script/i_script_module_resolver.hh"
 #include "core/script/sb_lua.hh"
 #include "core/script/script_sandbox_config.hh"
 #include "glm/ext/vector_float3.hpp"
 #include <array>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -240,7 +243,7 @@ TEST(WBESBLuaTest, SandboxRemovesFileAndSystemAccess) {
 return {
     globals = function()
         return {
-            io = io == nil, os = os == nil, debug = debug == nil, package = package == nil, require = require == nil,
+            io = io == nil, os = os == nil, debug = debug == nil, package = package == nil, require = require ~= nil,
             dofile = dofile == nil, loadfile = loadfile == nil,
             string = string ~= nil, table = table ~= nil, math = math ~= nil, utf8 = utf8 ~= nil,
         }
@@ -303,6 +306,97 @@ TEST(WBESBLuaTest, RejectsArgumentsNestedTooDeeply) {
     const std::array<WBE::DataValue, 1> args = {deep};
     EXPECT_THROW(backend.call("test", "echo", args), std::runtime_error);
     EXPECT_EQ(lua_test_add(backend, 2, 2), 4);
+}
+
+/**
+ * @class SBLuaTestModuleResolver
+ * @brief Resolves modules from an in-memory map of names to sources, and counts the lookups.
+ */
+class SBLuaTestModuleResolver final : public WBE::IScriptModuleResolver {
+public:
+    SBLuaTestModuleResolver() = default;
+    virtual ~SBLuaTestModuleResolver() override = default;
+    SBLuaTestModuleResolver(const SBLuaTestModuleResolver&) = delete;
+    SBLuaTestModuleResolver(SBLuaTestModuleResolver&&) noexcept = delete;
+    SBLuaTestModuleResolver& operator=(const SBLuaTestModuleResolver&) = delete;
+    SBLuaTestModuleResolver& operator=(SBLuaTestModuleResolver&&) noexcept = delete;
+
+    virtual std::optional<std::string_view> try_resolve(std::string_view p_module) const noexcept override {
+        ++lookup_count;
+        const auto found = sources.find(std::string(p_module));
+        if (found == sources.end()) {
+            return std::nullopt;
+        }
+        return found->second;
+    }
+
+    std::map<std::string, std::string> sources;
+    mutable int lookup_count = 0;
+};
+
+TEST(WBESBLuaTest, RequireLoadsResolvedModulesOnce) {
+    SBLuaTestModuleResolver resolver;
+    resolver.sources["utils.math"] = R"(
+local exports = {}
+exports.loads = (exports.loads or 0) + 1
+function exports.double(value)
+    return value * 2
+end
+return exports
+)";
+    WBE::SBLua backend;
+    backend.set_module_resolver(&resolver);
+    backend.load_module("main", R"(
+local math_utils = require("utils.math")
+return {
+    run = function(value)
+        return math_utils.double(value)
+    end,
+    same = function()
+        return require("utils.math") == math_utils
+    end,
+}
+)");
+    EXPECT_EQ(backend.call("main", "run", std::array<WBE::DataValue, 1>{WBE::DataValue::make_integer(21)}).as_integer(), 42);
+    EXPECT_TRUE(backend.call("main", "same", {}).as_boolean());
+    EXPECT_EQ(resolver.lookup_count, 1);
+    // A required module is loaded under its name, like one loaded with load_module().
+    EXPECT_TRUE(backend.has_function("utils.math", "double"));
+}
+
+TEST(WBESBLuaTest, RequireReturnsModulesLoadedWithoutAResolver) {
+    WBE::SBLua backend;
+    backend.load_module("helper", "return { value = function() return 3 end }");
+    backend.load_module("main", "local helper = require('helper') return { run = function() return helper.value() end }");
+    EXPECT_EQ(backend.call("main", "run", {}).as_integer(), 3);
+    EXPECT_THROW(backend.load_module("other", "require('missing') return {}"), std::runtime_error);
+}
+
+TEST(WBESBLuaTest, RequireRejectsMissingCyclicAndInvalidModules) {
+    SBLuaTestModuleResolver resolver;
+    resolver.sources["cycle_a"] = "require('cycle_b') return {}";
+    resolver.sources["cycle_b"] = "require('cycle_a') return {}";
+    resolver.sources["not_a_table"] = "return 1";
+    resolver.sources["failing"] = "error('broken module')";
+    WBE::SBLua backend;
+    backend.set_module_resolver(&resolver);
+    EXPECT_THROW(backend.load_module("main", "require('missing') return {}"), std::runtime_error);
+    try {
+        backend.load_module("main", "require('cycle_a') return {}");
+        FAIL() << "A cyclic require must fail.";
+    } catch (const std::runtime_error& error) {
+        EXPECT_NE(std::string(error.what()).find("cyclic require"), std::string::npos) << error.what();
+    }
+    EXPECT_THROW(backend.load_module("main", "require('not_a_table') return {}"), std::runtime_error);
+    // A failed load is not cached as loading, so requiring it again reports the same failure.
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        try {
+            backend.load_module("main", "require('failing') return {}");
+            FAIL() << "Requiring a failing module must fail.";
+        } catch (const std::runtime_error& error) {
+            EXPECT_NE(std::string(error.what()).find("broken module"), std::string::npos) << error.what();
+        }
+    }
 }
 
 #endif

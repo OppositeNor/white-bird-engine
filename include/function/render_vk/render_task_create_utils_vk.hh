@@ -15,11 +15,17 @@
 #ifndef WBE_FILE_RENDER_TASK_CREATE_UTILS_VK_HH
 #define WBE_FILE_RENDER_TASK_CREATE_UTILS_VK_HH
 
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -44,6 +50,32 @@ Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
  */
 Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
     const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
+
+/**
+ * @brief One custom push-constant value resolved from recipe parameters.
+ */
+struct TaskPushConstantVK {
+    /** Custom WBE_PUSH_CONSTANT identifier. */
+    std::string name;
+    /** The value, typed as the pipelines declare the identifier. */
+    PushConstantValueVK value;
+};
+
+/**
+ * @brief Resolve recipe push constants, a map from custom WBE_PUSH_CONSTANT identifier to number, for a task's create().
+ *
+ * Each value is converted to the scalar type the first of p_layouts that declares the identifier reflects: integers must be
+ * in range for `uint` and `int` fields, and integer-valued floats are accepted for them.
+ *
+ * @param p_push_constants The recipe's `push_constants` value; nil yields no values.
+ * @param p_layouts The reflected layouts of the pipelines the task records (ROPipelineVK::get_descriptor_layout()); null
+ * entries are skipped.
+ * @param p_task_name Task class name used in error messages.
+ * @throws std::runtime_error If p_push_constants is neither nil nor a map, no layout declares an identifier, or a value
+ * does not convert to the declared type.
+ */
+std::vector<TaskPushConstantVK> resolve_task_push_constants_vk(
+    const DataValue& p_push_constants, std::span<const ShaderDescriptorHeapLayoutVK* const> p_layouts, std::string_view p_task_name);
 
 } // namespace WhiteBirdEngine
 

@@ -26,11 +26,14 @@
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_ping_pong_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include <array>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -176,6 +179,24 @@ Unique<IRenderTaskVK> RTPingPongVK::create(
     }
     Ref<ROComputePipelineVK> ping_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", p_params.ping_pipeline);
     Ref<ROComputePipelineVK> pong_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", p_params.pong_pipeline);
+    Ref<ROComputePipelineVK> ping_prefix_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> pong_prefix_pipeline = MEM_NULL;
+    if (p_params.ping_prefix_pipeline.has_value()) {
+        ping_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.ping_prefix_pipeline);
+        pong_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.pong_prefix_pipeline);
+    }
+    // set_push_constant() applies a value to every pipeline of the task that declares its identifier.
+    const auto layout_of = [](const Ref<ROComputePipelineVK>& p_pipeline) {
+        return p_pipeline == MEM_NULL ? nullptr : &p_pipeline->get_descriptor_layout();
+    };
+    const std::array<const ShaderDescriptorHeapLayoutVK*, 4> layouts{
+        layout_of(ping_pipeline),
+        layout_of(pong_pipeline),
+        layout_of(ping_prefix_pipeline),
+        layout_of(pong_prefix_pipeline),
+    };
+    const std::vector<TaskPushConstantVK> push_constants =
+        resolve_task_push_constants_vk(p_params.push_constants, layouts, "RTPingPongVK");
     Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(p_render_data->allocator,
         p_render_data,
         std::move(ping_pipeline),
@@ -184,10 +205,13 @@ Unique<IRenderTaskVK> RTPingPongVK::create(
         p_params.iterations,
         VkExtent3D{.width = p_params.group_count_x, .height = p_params.group_count_y, .depth = p_params.group_count_z},
         p_params.queue_family);
-    if (p_params.ping_prefix_pipeline.has_value()) {
-        task->set_iteration_prefixes(acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.ping_prefix_pipeline),
-            acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.pong_prefix_pipeline),
+    if (ping_prefix_pipeline != MEM_NULL) {
+        task->set_iteration_prefixes(std::move(ping_prefix_pipeline),
+            std::move(pong_prefix_pipeline),
             VkExtent3D{.width = p_params.prefix_group_count_x, .height = p_params.prefix_group_count_y, .depth = p_params.prefix_group_count_z});
+    }
+    for (const TaskPushConstantVK& push_constant : push_constants) {
+        task->set_push_constant(push_constant.name, push_constant.value);
     }
     return task;
 }

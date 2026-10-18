@@ -28,6 +28,7 @@ include = [
     "assets/shaders/bloom/bloom_shader.toml",
     "assets/shaders/sort/sort.toml",
     "assets/shaders/pixel_sort/pixel_sort_shader.toml",
+    "assets/scripts/lua/lua_scripts.toml",
 ]
 resources = [
     { id = "test_text", source_type = "text", source_file = "test_text_files/test_file_utf8.txt" },

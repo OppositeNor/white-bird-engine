@@ -28,9 +28,12 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipeline_indirect_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
+#include <array>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -85,12 +88,19 @@ Unique<IRenderTaskVK> RTRunComputePipelineIndirectVK::create(
     const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
     Ref<ROComputePipelineVK> pipeline =
         acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineIndirectVK", p_params.pipeline);
-    return make_unique<RTRunComputePipelineIndirectVK>(p_render_data->allocator,
+    const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};
+    const std::vector<TaskPushConstantVK> push_constants =
+        resolve_task_push_constants_vk(p_params.push_constants, layouts, "RTRunComputePipelineIndirectVK");
+    Unique<RTRunComputePipelineIndirectVK> task = make_unique<RTRunComputePipelineIndirectVK>(p_render_data->allocator,
         p_render_data,
         std::move(pipeline),
         p_params.indirect_buffer,
         p_params.indirect_offset,
         p_params.queue_family);
+    for (const TaskPushConstantVK& push_constant : push_constants) {
+        task->set_push_constant(push_constant.name, push_constant.value);
+    }
+    return task;
 }
 
 } // namespace WhiteBirdEngine

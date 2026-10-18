@@ -1,0 +1,36 @@
+# Copyright 2025 OppositeNor
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# Lua scripts. A script's resource id is its module name: its path under assets/scripts/lua, without the extension and
+# with dots for slashes, so that `require("utils.render_graph")` finds both the resource and, in the editor, the file.
+include = []
+
+[[resources]]
+id = "utils.math"
+source_type = "script"
+source_file = "assets/scripts/lua/utils/math.lua"
+
+[[resources]]
+id = "utils.render_graph"
+source_type = "script"
+source_file = "assets/scripts/lua/utils/render_graph.lua"
+
+[[resources]]
+id = "render_graphs.draw_cube_unshaded"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/draw_cube_unshaded.lua"
+
+[[resources]]
+id = "render_graphs.pixel_sorting"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/pixel_sorting.lua"

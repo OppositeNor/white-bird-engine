@@ -17,6 +17,7 @@
 
 #include "core/data/data_value.hh"
 #include "core/reflection/serializable_sd.hh"
+#include "core/script/i_script_module_resolver.hh"
 #include <array>
 #include <cstddef>
 #include <span>
@@ -30,9 +31,10 @@ namespace WhiteBirdEngine {
  * @brief One isolated script runtime that loads modules and calls their functions with DataValue arguments.
  *
  * A module is a script whose top-level chunk returns a table, or the language's equivalent, of exported functions. Each
- * module runs in its own global environment, so modules of one backend cannot overwrite each other's globals. Scripts
- * cannot reach files, the operating system, other modules' loaders, or the engine; no native functions are exposed to
- * them. Only DataValue data crosses the boundary in either direction.
+ * module runs in its own global environment, so modules of one backend cannot overwrite each other's globals. A module
+ * can import another module by name through the language's import mechanism, which loads it once per backend through
+ * the IScriptModuleResolver set with set_module_resolver(). Scripts cannot reach files, the operating system, or the
+ * engine. Only DataValue data crosses the boundary in either direction.
  *
  * A backend is confined to the thread that uses it; its methods are not synchronized. Backends are neither copyable nor
  * movable. Script errors, values the DataValue model cannot represent, and exceeded ScriptSandboxConfig limits throw
@@ -58,6 +60,14 @@ public:
      * exports.
      */
     virtual void load_module(std::string_view p_module, std::string_view p_source) = 0;
+
+    /**
+     * @brief Set the resolver that finds the modules scripts import.
+     *
+     * Without a resolver, only modules already loaded with load_module() can be imported.
+     * @param p_resolver The resolver, or nullptr to clear it. Not owned; it must outlive its use by this backend.
+     */
+    virtual void set_module_resolver(const IScriptModuleResolver* p_resolver) = 0;
 
     /**
      * @brief Call an exported function of a loaded module.

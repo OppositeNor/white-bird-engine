@@ -17,6 +17,7 @@
 
 #include "core/data/data_value.hh"
 #include "core/script/i_script_backend.hh"
+#include "core/script/i_script_module_resolver.hh"
 #include "core/script/script_sandbox_config.hh"
 #include <cstddef>
 #include <cstdint>
@@ -36,6 +37,10 @@ namespace WhiteBirdEngine {
  * not loaded; `dofile` and `loadfile` are removed, and `load` only accepts text chunks. A module is a Lua chunk that returns
  * a table of functions; each module runs with its own global table whose missing names fall back to the shared standard
  * libraries. The hash seed is fixed, so table iteration order is reproducible between runs.
+ *
+ * `require(name)` returns the export table of the module loaded under the name, loading it first from the module
+ * resolver when it is not loaded yet. Every importer shares that table. Requiring a module that is still loading, a name
+ * the resolver does not know, or any unloaded module without a resolver raises a Lua error.
  *
  * Conversions to DataValue map nil, booleans, integers, floats, and strings directly. A table whose keys are exactly
  * 1..n becomes a list and a table whose keys are all strings becomes a map; an empty table becomes an empty list.
@@ -68,18 +73,21 @@ public:
     SBLua& operator=(SBLua&&) noexcept = delete;
 
     virtual void load_module(std::string_view p_module, std::string_view p_source) override;
+    virtual void set_module_resolver(const IScriptModuleResolver* p_resolver) override;
     virtual DataValue call(std::string_view p_module, std::string_view p_function, std::span<const DataValue> p_args) override;
     virtual bool has_function(std::string_view p_module, std::string_view p_function) const override;
 
 private:
     static void* allocate(void* p_user_data, void* p_pointer, size_t p_old_size, size_t p_new_size);
     static void count_instructions(lua_State* p_state, lua_Debug* p_debug);
+    static int require_module(lua_State* p_state);
     void reset_instruction_budget();
     void run_sandbox_prelude();
     void push_module_exports(std::string_view p_module) const;
 
     ScriptSandboxConfig config;
     lua_State* state = nullptr;
+    const IScriptModuleResolver* module_resolver = nullptr;
     size_t allocated_bytes = 0;
     uint64_t executed_instructions = 0;
 };

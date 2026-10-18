@@ -16,5 +16,16 @@
             "metadata" : ".metadata",
             "render_tasks" : ".render_tasks"
         }
+    },
+    {
+        "out_dir" : "${build_dir}/lua",
+        "output_name" : "wbe_types.lua",
+        "template" : "lua_types.lua.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "static_serializables" : ".static_serializables",
+            "reflected_enums" : ".reflected_enums",
+            "render_tasks" : ".render_tasks"
+        }
     }
 ]

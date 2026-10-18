@@ -17,12 +17,16 @@
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
+#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "utils/defs.hh"
+#include <array>
+#include <bit>
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -209,6 +213,45 @@ TEST(WBEVulkanEnumMirrorTest, ValuesMatchVulkan) {
     EXPECT_EQ(to_vk_attachment_load_op(EnumReflection<AttachmentLoadOpVK>::string_to_enum("dont_care")), VK_ATTACHMENT_LOAD_OP_DONT_CARE);
     EXPECT_EQ(to_vk_format(EnumReflection<ImageFormatVK>::string_to_enum("b8g8r8a8_srgb")), VK_FORMAT_B8G8R8A8_SRGB);
     EXPECT_EQ(to_vk_format(EnumReflection<ImageFormatVK>::string_to_enum("D32_SFLOAT")), VK_FORMAT_D32_SFLOAT);
+}
+
+TEST(WBERenderTaskPushConstantsVKTest, ResolvesRecipeValuesToTheReflectedTypes) {
+    ShaderDescriptorHeapLayoutVK first;
+    first.default_fields.push_back(ShaderDefaultPushFieldVK{
+        .field_path = "count", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "count", .type = ShaderPushConstantTypeVK::UINT32});
+    first.default_fields.push_back(ShaderDefaultPushFieldVK{
+        .field_path = "time", .value = ShaderDefaultPushValueVK::TIME, .name = "", .type = ShaderPushConstantTypeVK::FLOAT32});
+    ShaderDescriptorHeapLayoutVK second;
+    second.default_fields.push_back(ShaderDefaultPushFieldVK{
+        .field_path = "scale", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "scale", .type = ShaderPushConstantTypeVK::FLOAT32});
+    second.default_fields.push_back(ShaderDefaultPushFieldVK{
+        .field_path = "offset", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "offset", .type = ShaderPushConstantTypeVK::INT32});
+    const std::array<const ShaderDescriptorHeapLayoutVK*, 3> layouts{&first, nullptr, &second};
+
+    const std::vector<TaskPushConstantVK> values =
+        resolve_task_push_constants_vk(parse_task_params(R"({"count": 7, "scale": 2, "offset": -3})"), layouts, "Test");
+    ASSERT_EQ(values.size(), 3U);
+    // Map entries are sorted by key.
+    EXPECT_EQ(values[0].name, "count");
+    EXPECT_EQ(values[0].value.type, ShaderPushConstantTypeVK::UINT32);
+    EXPECT_EQ(values[0].value.bits, 7U);
+    EXPECT_EQ(values[1].name, "offset");
+    EXPECT_EQ(values[1].value.bits, std::bit_cast<uint32_t>(int32_t{-3}));
+    EXPECT_EQ(values[2].value.type, ShaderPushConstantTypeVK::FLOAT32);
+    EXPECT_EQ(values[2].value.bits, std::bit_cast<uint32_t>(2.0F));
+    EXPECT_TRUE(resolve_task_push_constants_vk(DataValue(), layouts, "Test").empty());
+    EXPECT_TRUE(resolve_task_push_constants_vk(DataValue::make_list(), layouts, "Test").empty());
+}
+
+TEST(WBERenderTaskPushConstantsVKTest, RejectsUndeclaredOrUnconvertibleValues) {
+    ShaderDescriptorHeapLayoutVK layout;
+    layout.default_fields.push_back(ShaderDefaultPushFieldVK{
+        .field_path = "count", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "count", .type = ShaderPushConstantTypeVK::UINT32});
+    const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&layout};
+    EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params(R"({"missing": 1})"), layouts, "Test"), std::runtime_error);
+    EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params(R"({"count": -1})"), layouts, "Test"), std::runtime_error);
+    EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params(R"({"count": 1.5})"), layouts, "Test"), std::runtime_error);
+    EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params("[1]"), layouts, "Test"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

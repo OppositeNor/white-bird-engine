@@ -14,6 +14,7 @@
 */
 #include "core/script/sb_lua.hh"
 #include "core/data/data_value.hh"
+#include "core/script/i_script_module_resolver.hh"
 #include "core/script/script_sandbox_config.hh"
 #include "utils/defs.hh"
 extern "C" {
@@ -28,6 +29,7 @@ extern "C" {
 #include <cstdio>
 #include <cstdlib>
 #include <format>
+#include <optional>
 #include <print>
 #include <span>
 #include <stdexcept>
@@ -78,12 +80,26 @@ private:
     int top;
 };
 
-// Opens the sandbox libraries and creates the module table; run under lua_pcall so allocation failures are reported.
+// Opens the sandbox libraries, creates the module table, and installs the `require` function passed as the only
+// argument; run under lua_pcall so allocation failures are reported.
 int initialize_state(lua_State* p_state) {
     luaL_openselectedlibs(p_state, LUA_GLIBK | LUA_STRLIBK | LUA_TABLIBK | LUA_MATHLIBK | LUA_UTF8LIBK, 0);
     lua_newtable(p_state);
     lua_rawsetp(p_state, LUA_REGISTRYINDEX, &MODULES_REGISTRY_KEY);
+    lua_pushvalue(p_state, 1);
+    lua_setglobal(p_state, "require");
     return 0;
+}
+
+// Give the chunk at the stack top its own globals; missing names fall back to the shared standard libraries. Returns false
+// when the chunk has no environment upvalue.
+bool set_module_environment(lua_State* p_state) {
+    lua_newtable(p_state);
+    lua_createtable(p_state, 0, 1);
+    lua_pushglobaltable(p_state);
+    lua_setfield(p_state, -2, "__index");
+    lua_setmetatable(p_state, -2);
+    return lua_setupvalue(p_state, -2, 1) != nullptr;
 }
 
 // Message handler of protected calls: appends a traceback to the error message.
@@ -270,7 +286,8 @@ SBLua::SBLua(const ScriptSandboxConfig& p_config) : config(p_config) {
     }
     lua_atpanic(state, &report_panic);
     lua_pushcfunction(state, &initialize_state);
-    if (lua_pcall(state, 0, 0, 0) != LUA_OK) {
+    lua_pushcfunction(state, &SBLua::require_module);
+    if (lua_pcall(state, 1, 0, 0) != LUA_OK) {
         const std::string message = get_error_message(state);
         lua_close(state);
         state = nullptr;
@@ -300,13 +317,7 @@ void SBLua::load_module(std::string_view p_module, std::string_view p_source) {
     if (luaL_loadbufferx(state, p_source.data(), p_source.size(), chunk_name.c_str(), "t") != LUA_OK) {
         throw std::runtime_error(std::format("Failed to compile script module '{}': {}", p_module, get_error_message(state)));
     }
-    // Give the module its own globals; missing names fall back to the shared standard libraries.
-    lua_newtable(state);
-    lua_createtable(state, 0, 1);
-    lua_pushglobaltable(state);
-    lua_setfield(state, -2, "__index");
-    lua_setmetatable(state, -2);
-    if (lua_setupvalue(state, -2, 1) == nullptr) {
+    if (!set_module_environment(state)) {
         throw std::runtime_error(std::format("Failed to load script module '{}': the chunk has no environment.", p_module));
     }
     if (lua_pcall(state, 0, 1, message_handler) != LUA_OK) {
@@ -321,6 +332,10 @@ void SBLua::load_module(std::string_view p_module, std::string_view p_source) {
     lua_pushlstring(state, p_module.data(), p_module.size());
     lua_pushvalue(state, -3);
     lua_rawset(state, -3);
+}
+
+void SBLua::set_module_resolver(const IScriptModuleResolver* p_resolver) {
+    module_resolver = p_resolver;
 }
 
 DataValue SBLua::call(std::string_view p_module, std::string_view p_function, std::span<const DataValue> p_args) {
@@ -393,6 +408,64 @@ void SBLua::count_instructions(lua_State* p_state, lua_Debug* /*p_debug*/) {
         // Leaves this frame through Lua's error mechanism; the frame holds no objects with destructors.
         luaL_error(p_state, "instruction limit of %llu exceeded", backend->config.instruction_limit);
     }
+}
+
+int SBLua::require_module(lua_State* p_state) {
+    // Errors leave this frame through Lua's error mechanism; the frame holds no objects with destructors.
+    constexpr int NAME_INDEX = 1;
+    constexpr int MODULES_INDEX = 2;
+    size_t name_length = 0;
+    const char* name = luaL_checklstring(p_state, NAME_INDEX, &name_length);
+    lua_settop(p_state, NAME_INDEX);
+    lua_rawgetp(p_state, LUA_REGISTRYINDEX, &MODULES_REGISTRY_KEY);
+    lua_pushvalue(p_state, NAME_INDEX);
+    lua_rawget(p_state, MODULES_INDEX);
+    if (lua_type(p_state, -1) == LUA_TTABLE) {
+        return 1;
+    }
+    // A module that is still loading is marked with false.
+    if (lua_type(p_state, -1) == LUA_TBOOLEAN) {
+        return luaL_error(p_state, "module '%s' is required while it is still loading (cyclic require)", name);
+    }
+    lua_pop(p_state, 1);
+    void* user_data = nullptr;
+    lua_getallocf(p_state, &user_data);
+    WBE_DEBUG_ASSERT(user_data != nullptr);
+    const auto* backend = static_cast<const SBLua*>(user_data);
+    if (backend->module_resolver == nullptr) {
+        return luaL_error(p_state, "module '%s' is not loaded and no module resolver is set", name);
+    }
+    const std::optional<std::string_view> source = backend->module_resolver->try_resolve(std::string_view(name, name_length));
+    if (!source.has_value()) {
+        return luaL_error(p_state, "module '%s' not found", name);
+    }
+    const char* chunk_name = lua_pushfstring(p_state, "=%s", name);
+    if (luaL_loadbufferx(p_state, source->data(), source->size(), chunk_name, "t") != LUA_OK) {
+        return lua_error(p_state);
+    }
+    if (!set_module_environment(p_state)) {
+        return luaL_error(p_state, "module '%s' has no environment", name);
+    }
+    lua_pushvalue(p_state, NAME_INDEX);
+    lua_pushboolean(p_state, 0);
+    lua_rawset(p_state, MODULES_INDEX);
+    const bool loaded = lua_pcall(p_state, 0, 1, 0) == LUA_OK;
+    const bool returned_table = loaded && lua_type(p_state, -1) == LUA_TTABLE;
+    // Store the exports, or clear the loading mark so that a later require reports the failure again.
+    lua_pushvalue(p_state, NAME_INDEX);
+    if (returned_table) {
+        lua_pushvalue(p_state, -2);
+    } else {
+        lua_pushnil(p_state);
+    }
+    lua_rawset(p_state, MODULES_INDEX);
+    if (!loaded) {
+        return lua_error(p_state);
+    }
+    if (!returned_table) {
+        return luaL_error(p_state, "module '%s' must return a table of exports, but returned %s", name, luaL_typename(p_state, -1));
+    }
+    return 1;
 }
 
 void SBLua::reset_instruction_budget() {

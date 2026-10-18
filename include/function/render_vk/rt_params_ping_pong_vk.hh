@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RT_PARAMS_PING_PONG_VK_HH
 #define WBE_FILE_RT_PARAMS_PING_PONG_VK_HH
 
+#include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include <cstdint>
@@ -95,6 +96,11 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsPin
      */
     WBE_META(WBE_REFLECT)
     QueueFamilyVK queue_family = QueueFamilyVK::GRAPHICS;
+    /**
+     * @brief Custom WBE_PUSH_CONSTANT values: a map from identifier to number, typed as the pipeline declares each one.
+     */
+    WBE_META(WBE_REFLECT)
+    DataValue push_constants;
 };
 
 } // namespace WhiteBirdEngine
