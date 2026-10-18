@@ -34,6 +34,7 @@
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -42,6 +43,9 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
+#include "function/render_vk/rt_params_clear_value_vk.hh"
+#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -296,16 +300,20 @@ inline std::optional<MaterialTextureContract> load_mesh_material_contract(RefRes
 inline constexpr size_t RENDER_TEST_MATERIAL_TABLE_INDEX = 0;
 
 /**
- * @brief Compile p_mesh into static-mesh resources, with the material table of p_material_pipeline's contract.
+ * @brief Compile p_mesh into static-mesh resources, with the material table of p_material_pipeline's contract, and register
+ * them in the render database under p_graph_key, the id graphics_draw_mesh tasks name and import them under.
  * @details The table is material table RENDER_TEST_MATERIAL_TABLE_INDEX, which make_mesh_resource_keys() names. A null
  * material pipeline builds no table.
  * @throws std::runtime_error If the mesh already has material tables, so the table would get another index.
  */
 inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
+    std::string_view p_graph_key,
     RefRes<RUMesh3D> p_mesh,
     RefRes<RUGraphicsPipeline> p_material_pipeline,
     const MeshCompilerVK::Config& p_config = {}) {
     Ref<MeshResourcesVK> result = MeshCompilerVK(p_renderer).compile(p_mesh, p_config);
+    // graphics_draw_mesh tasks look the mesh up, and import it, under the key they name.
+    p_renderer->get_render_database()->register_compiled_render_resource(p_graph_key, result);
     const std::optional<MaterialTextureContract> material_contract =
         p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
     if (material_contract.has_value() && result->acquire_material_table(*material_contract) != RENDER_TEST_MATERIAL_TABLE_INDEX) {
@@ -427,42 +435,6 @@ inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipe
 }
 
 /**
- * @brief Convert one compiled mesh draw batch into a pipeline batch drawn with p_pipeline.
- */
-inline RTRunGraphicsPipelineIndirectVK::PipelineBatch to_pipeline_batch(
-    const MeshDrawBatchVK& p_source, Ref<ROGraphicsPipelineVK> p_pipeline) {
-    RTRunGraphicsPipelineIndirectVK::PipelineBatch batch;
-    batch.graphics_pipeline = std::move(p_pipeline);
-    batch.first_draw = p_source.first_draw;
-    batch.draw_count = p_source.draw_count;
-    // The task registers the mesh vertex buffers in MeshResourcesVK order, so the buffer indices carry over.
-    batch.vertex_input = p_source.resolve_vertex_input(batch.graphics_pipeline->get_vertex_input_requirement(), batch.vertex_buffers);
-    return batch;
-}
-
-inline Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> make_mesh_pipeline_batches(
-    RenderAllocator* p_allocator, Ref<MeshResourcesVK> p_resources, Ref<ROGraphicsPipelineVK> p_pipeline, bool p_masked, bool p_double_sided = false) {
-    Vector<RTRunGraphicsPipelineIndirectVK::PipelineBatch, RenderAllocator> result(p_allocator);
-    size_t batch_count = [&p_resources, p_double_sided, p_masked] {
-        if (p_double_sided) {
-            return p_resources->get_opaque_double_sided_draw_batch_count();
-        }
-        return p_masked ? p_resources->get_masked_draw_batch_count() : p_resources->get_opaque_draw_batch_count();
-    }();
-    result.reserve(batch_count);
-    for (size_t i = 0; i < batch_count; ++i) {
-        const MeshDrawBatchVK& source = [i, p_double_sided, p_masked, &p_resources] {
-            if (p_double_sided) {
-                return p_resources->get_opaque_double_sided_draw_batch(i);
-            }
-            return p_masked ? p_resources->get_masked_draw_batch(i) : p_resources->get_opaque_draw_batch(i);
-        }();
-        result.push_back(to_pipeline_batch(source, p_pipeline));
-    }
-    return result;
-}
-
-/**
  * @brief Connect consecutive uses of one resource with resource edges.
  * @param p_graph Graph descriptor that already contains every linked task.
  * @param p_resource_id Graph resource carried by the edges.
@@ -491,6 +463,56 @@ inline RendTaskDescVK& alias_render_targets(RendTaskDescVK& p_task,
     }
     return p_task;
 }
+
+/**
+ * @brief Make a clear value for a color render target.
+ */
+inline RTParamsClearValueVK make_clear_color(float p_red, float p_green, float p_blue, float p_alpha) {
+    return RTParamsClearValueVK{.color = std::vector<float>{p_red, p_green, p_blue, p_alpha}};
+}
+
+/**
+ * @brief Make a clear value for a depth render target.
+ */
+inline RTParamsClearValueVK make_clear_depth(float p_depth) {
+    return RTParamsClearValueVK{.depth = p_depth};
+}
+
+/**
+ * @brief Make a fixed render extent.
+ */
+inline RendExtent2DParamsVK make_fixed_extent_params(VkExtent2D p_extent) {
+    return RendExtent2DParamsVK{.width = p_extent.width, .height = p_extent.height};
+}
+
+/**
+ * @class RenderTestMeshDraw
+ * @brief A graphics_draw_mesh task of a render test, kept as parameters until a rebuild callback adds it to a graph.
+ * Copyable and movable.
+ */
+struct RenderTestMeshDraw {
+    /** The task id. */
+    std::string task_id;
+    /** The task parameters; the mesh must be registered in the render database under params.mesh. */
+    RTParamsGraphicsDrawMeshVK params;
+    /** Graph resources of the color render targets, in pipeline order. */
+    std::vector<std::string> color_attachment_ids;
+    /** Graph resource of the depth render target, when the pipeline uses one. */
+    std::optional<std::string> depth_attachment_id;
+
+    /**
+     * @brief Add the task to a graph descriptor with RTGraphicsDrawMeshVK::add_to_graph() and alias its render targets.
+     * @return The added task descriptor; invalidated when another task is added.
+     * @throws std::runtime_error Under the conditions of RTGraphicsDrawMeshVK::add_to_graph().
+     */
+    RendTaskDescVK& add_to(RendGraphDescVK& p_graph, const BaseRenderDataVK* p_render_data) const {
+        RendTaskDescVK& task = RTGraphicsDrawMeshVK::add_to_graph(p_graph, task_id, params, p_render_data);
+        const std::vector<std::string_view> colors(color_attachment_ids.begin(), color_attachment_ids.end());
+        const std::optional<std::string_view> depth =
+            depth_attachment_id.has_value() ? std::optional<std::string_view>(*depth_attachment_id) : std::nullopt;
+        return alias_render_targets(task, colors, depth);
+    }
+};
 
 inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererVK* p_renderer,
     std::string_view p_key,
@@ -616,52 +638,6 @@ inline SubmeshDrawBuffersVK import_submesh_draw_buffers(RendererVK* p_renderer,
     return result;
 }
 
-inline RendTaskDescVK make_mesh_task_desc(RenderAllocator* p_allocator, // NOLINT
-    const BaseRenderDataVK* p_render_data,
-    std::string_view p_task_id,
-    Ref<MeshResourcesVK> p_resources,
-    Ref<ROGraphicsPipelineVK> p_pipeline,
-    bool p_masked,
-    std::span<const VkClearValue> p_clear_values,
-    RenderTestExtentFactory p_render_extent,
-    std::span<const std::string_view> p_color_attachment_ids,
-    std::optional<std::string_view> p_depth_attachment_id = std::nullopt,
-    VkAttachmentLoadOp p_color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    VkAttachmentLoadOp p_depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    bool p_double_sided = false,
-    std::string_view p_mesh_key = STATIC_MESH_KEY,
-    std::string_view p_transform_id = {}) {
-    auto batches = make_mesh_pipeline_batches(p_allocator, p_resources, p_pipeline, p_masked, p_double_sided);
-    std::string_view indirect_buffer_member = [p_double_sided, p_masked] {
-        if (p_double_sided) {
-            return MeshResourcesVK::OPAQUE_DOUBLE_SIDED_DRAW_BATCHES;
-        }
-        return p_masked ? MeshResourcesVK::MASKED_DRAW_BATCHES : MeshResourcesVK::OPAQUE_DRAW_BATCHES;
-    }();
-    RTRunGraphicsPipelineIndirectVK::Builder task_builder(p_allocator);
-    for (size_t i = 0; i < p_resources->get_vertex_buffer_count(); ++i) {
-        task_builder.add_vertex_buffer(
-            IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::get_vertex_buffer_member(i)));
-    }
-    task_builder.set_index_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INDICES))
-        .set_indirect_buffer(IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, indirect_buffer_member))
-        .set_clear_values(p_clear_values)
-        .set_color_load_op(p_color_load_op)
-        .set_depth_load_op(p_depth_load_op);
-    for (auto& batch : batches) {
-        task_builder.add_pipeline_batch(std::move(batch));
-    }
-    RendTaskDescVK result(p_allocator,
-        p_task_id,
-        [task_builder, p_render_data, render_extent = std::move(p_render_extent)](const RendGraphContextVK& p_context) {
-            RTRunGraphicsPipelineIndirectVK::Builder builder = task_builder;
-            builder.set_render_extent(render_extent(p_context));
-            return builder.create_unique(p_render_data);
-        });
-    alias_render_targets(result, p_color_attachment_ids, p_depth_attachment_id);
-    alias_mesh_resources(result, *p_pipeline, make_mesh_resource_keys(p_mesh_key, p_transform_id));
-    return result;
-}
 } // namespace WhiteBirdEngine
 
 inline glm::vec3 default_test_camera_direction() {

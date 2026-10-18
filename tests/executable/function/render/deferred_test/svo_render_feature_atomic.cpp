@@ -17,10 +17,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/rt_ping_pong_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
 #include "i_svo_render_feature.hh"
 #include <atomic>
 #include <cstdint>
@@ -30,11 +29,8 @@
 
 namespace WhiteBirdEngine {
 
-SVORenderFeatureAtomic::SVORenderFeatureAtomic(RendererVK* p_renderer,
-    Ref<MeshResourcesVK> p_static_mesh_resources,
-    const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-    bool p_rebuild_static_every_frame)
-    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), p_debug_view_mode, "svo", "svo_dynamic", p_rebuild_static_every_frame) {
+SVORenderFeatureAtomic::SVORenderFeatureAtomic(RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame)
+    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), "svo", "svo_dynamic", p_rebuild_static_every_frame) {
 }
 
 std::string_view SVORenderFeatureAtomic::get_name() const {
@@ -45,70 +41,8 @@ uint32_t SVORenderFeatureAtomic::get_reset_group_count() const {
     return 1;
 }
 
-void SVORenderFeatureAtomic::register_implementation_render_graph_data(RendGraphDescVK& /*p_graph*/) const {
-}
-
-void SVORenderFeatureAtomic::add_static_publication_render_tasks(RendGraphDescVK& /*p_graph*/) const {
-    // CAS owners publish static blocks while allocating them.
-}
-
-void SVORenderFeatureAtomic::add_dynamic_publication_render_tasks(RendGraphDescVK& /*p_graph*/) const {
-    // CAS owners publish dynamic blocks while allocating them.
-}
-
-void SVORenderFeatureAtomic::connect_implementation_render_tasks(RendGraphDescVK& p_graph) const {
-    connect_resource_chain(p_graph,
-        SVO_INFO,
-        {RT_RESET_SVO,
-            RT_RUN_BUILD_SVO,
-            RT_RUN_BUILD_SVO_DOUBLE_SIDED,
-            RT_STATIC_SVO_DEFERRED,
-            RT_CLEAR_DYNAMIC_SVO,
-            RT_RUN_BUILD_DYNAMIC_SVO,
-            RT_RUN_BUILD_DYNAMIC_SVO_SECOND,
-            RT_CAPTURE_SVO_PRE_DEFERRED_DEBUG,
-            RT_RUN_BUILD_SVO_DEFERRED,
-            RT_SETUP_SVO_DEBUG_DRAW,
-            RT_RUN_SVO_DEBUG_DRAW});
-    connect_resource_chain(p_graph,
-        SVO_NODE_BUFFER,
-        {RT_RESET_SVO,
-            RT_RUN_BUILD_SVO,
-            RT_RUN_BUILD_SVO_DOUBLE_SIDED,
-            RT_STATIC_SVO_DEFERRED,
-            RT_CLEAR_DYNAMIC_SVO,
-            RT_RUN_BUILD_DYNAMIC_SVO,
-            RT_RUN_BUILD_DYNAMIC_SVO_SECOND,
-            RT_RUN_BUILD_SVO_DEFERRED,
-            RT_RUN_SVO_DEBUG_DRAW,
-            RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW});
-    connect_resource_chain(p_graph,
-        SVO_DYNAMIC_NODES,
-        {RT_CLEAR_DYNAMIC_SVO, RT_RUN_BUILD_DYNAMIC_SVO, RT_RUN_BUILD_DYNAMIC_SVO_SECOND, RT_RUN_BUILD_SVO_DEFERRED, RT_RUN_SVO_DEBUG_DRAW, RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW});
-    connect_resource_chain(p_graph,
-        SVO_DYNAMIC_LEAVES,
-        {RT_CLEAR_DYNAMIC_SVO, RT_RUN_BUILD_DYNAMIC_SVO, RT_RUN_BUILD_DYNAMIC_SVO_SECOND, RT_RUN_BUILD_SVO_DEFERRED, RT_RUN_SVO_DEBUG_DRAW, RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW});
-}
-
-RendTaskDescVK SVORenderFeatureAtomic::make_deferred_construction_render_task_desc(bool p_dynamic) const {
-    RendTaskDescVK task_desc(render_allocator);
-    constexpr VkExtent3D RESET_GROUP_COUNT{.width = 1, .height = 1, .depth = 1};
-    constexpr VkExtent3D PROPAGATION_GROUP_COUNT{.width = SVO_DEFERRED_DISPATCH_GROUP_COUNT, .height = 1, .depth = 1};
-    task_desc.factory = [this, p_dynamic, RESET_GROUP_COUNT, PROPAGATION_GROUP_COUNT](const RendGraphContextVK& /*p_context*/) {
-        Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(render_allocator,
-            base_render_data,
-            p_dynamic ? dynamic_ping_pipeline : svo_deferred_propagation_pong_write_compute_pipeline,
-            p_dynamic ? dynamic_pong_pipeline : svo_deferred_propagation_ping_write_compute_pipeline,
-            false,
-            // A single raster pass can leave contenders at any depth; allow one retry per tree level.
-            static_cast<uint32_t>(SVO_MAX_DEPTH),
-            PROPAGATION_GROUP_COUNT,
-            QueueFamilyVK::COMPUTE_1);
-        task->set_iteration_prefixes(
-            svo_deferred_count_reset_pong_compute_pipeline, svo_deferred_count_reset_ping_compute_pipeline, RESET_GROUP_COUNT);
-        return task;
-    };
-    return task_desc;
+std::string_view SVORenderFeatureAtomic::get_recipe_variant() const {
+    return "atomic";
 }
 
 } // namespace WhiteBirdEngine

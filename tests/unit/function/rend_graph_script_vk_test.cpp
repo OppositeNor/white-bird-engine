@@ -26,13 +26,16 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
+#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <string_view>
+#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -81,8 +84,8 @@ TEST(WBERendGraphScriptVKTest, RunsBuildAndTheRecipeBuilds) {
     BaseRenderDataVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_UNORM;
-    const DataValue recipe =
-        RendGraphScriptVK::run("test_recipe", TEST_RECIPE_SCRIPT, RendGraphScriptVK::make_context(render_data, RendGraphContextVK{}));
+    const DataValue recipe = RendGraphScriptVK::run(
+        "test_recipe", TEST_RECIPE_SCRIPT, RendGraphScriptVK::make_context(render_data, RendGraphContextVK{}));
     RendGraphDescVK graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data);
     ASSERT_EQ(graph.tasks.size(), 2U);
     EXPECT_EQ(graph.get_task("probe_1").next.size(), 1U);
@@ -110,7 +113,8 @@ return {
     BaseRenderDataVK render_data(&allocator);
     auto group_counts = [&render_data, TILED_RECIPE](uint32_t p_width, uint32_t p_height) {
         const RendGraphContextVK graph_context{.swap_chain_extent = {.width = p_width, .height = p_height}};
-        const DataValue recipe = RendGraphScriptVK::run("tiled", TILED_RECIPE, RendGraphScriptVK::make_context(render_data, graph_context));
+        const DataValue recipe =
+            RendGraphScriptVK::run("tiled", TILED_RECIPE, RendGraphScriptVK::make_context(render_data, graph_context));
         const DataValue& params = recipe.get_entry("tasks").as_list().at(0).get_entry("params");
         return std::pair{params.get_value<uint32_t>("group_count_x"), params.get_value<uint32_t>("group_count_y")};
     };
@@ -172,6 +176,175 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     EXPECT_EQ(tasks.back().get_value<std::string>("id"), "draw_imgui");
     EXPECT_TRUE(tasks.back().get_value<bool>("import"));
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 12U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxelAndPixelSortFeatures) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    BaseRenderDataVK render_data(&allocator);
+    render_data.frames_in_flight = 2;
+    render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
+    auto make_extent = [](uint32_t p_width, uint32_t p_height) {
+        DataValue extent = DataValue::make_map();
+        extent.set_value("width", p_width);
+        extent.set_value("height", p_height);
+        return extent;
+    };
+    auto make_imports = [](std::initializer_list<const char*> p_names) {
+        DataValue imports = DataValue::make_list();
+        for (const char* name : p_names) {
+            imports.push_back(DataValue::make_string(name));
+        }
+        return imports;
+    };
+    auto make_octree = [&] {
+        DataValue octree = DataValue::make_map();
+        octree.set_value("module", std::string("render_graphs.features.voxel_octree"));
+        octree.set_entry("imports", make_imports({"octree_info", "octree_static", "octree_dynamic"}));
+        octree.set_value("level_count", 2);
+        DataValue leaf_groups = DataValue::make_map();
+        leaf_groups.set_value("x", 4);
+        leaf_groups.set_value("y", 4);
+        leaf_groups.set_value("z", 2);
+        octree.set_entry("leaf_gather_group_count", leaf_groups);
+        octree.set_value("node_gather_group_count", 8);
+        octree.set_value("leaf_draw_count", 33);
+        return octree;
+    };
+    auto make_svo = [&] {
+        DataValue svo = DataValue::make_map();
+        svo.set_value("module", std::string("render_graphs.features.voxel_svo"));
+        svo.set_value("variant", std::string("pass_published"));
+        svo.set_value("shader_prefix", std::string("svo_2"));
+        svo.set_value("dynamic_shader_prefix", std::string("svo_2_dynamic"));
+        svo.set_entry("imports", make_imports({"svo_info", "svo_nodes"}));
+        svo.set_value("extent", 512);
+        svo.set_value("max_depth", 9);
+        DataValue buffer_sizes = DataValue::make_map();
+        buffer_sizes.set_value("dynamic_nodes", 1024);
+        buffer_sizes.set_value("deferred_list", 516);
+        buffer_sizes.set_value("pre_deferred_debug_info", 60);
+        buffer_sizes.set_value("pre_deferred_debug_list", 512);
+        svo.set_entry("buffer_sizes", buffer_sizes);
+        for (const char* group_count : {
+                 "reset_group_count",
+                 "deferred_dispatch_group_count",
+                 "dynamic_clear_group_count",
+                 "static_publication_group_count",
+                 "dynamic_publication_group_count",
+             }) {
+            svo.set_value(group_count, 4);
+        }
+        DataValue static_build = DataValue::make_map();
+        static_build.set_value("event", std::string("test.voxel_static_build"));
+        static_build.set_value("activate", true);
+        svo.set_entry("static_build", static_build);
+        return svo;
+    };
+    auto run = [&](bool p_summed_area_table, bool p_post_processing, DataValue p_voxel) {
+        DataValue context =
+            RendGraphScriptVK::make_context(render_data, RendGraphContextVK{.swap_chain_extent = {.width = 640, .height = 360}});
+        context.set_value("summed_area_table", p_summed_area_table);
+        context.set_value("spot_light_count", 2);
+        context.set_value("max_spot_light_info_count", 4);
+        context.set_entry("shadow_extent", make_extent(256, 256));
+        context.set_value("shadow_mipmap_level_count", 9);
+        context.set_entry("bloom_extent", make_extent(640, 360));
+        context.set_value("bloom_blur_pass_count", 4);
+        DataValue formats = DataValue::make_map();
+        for (const char* role : {
+                 "gbuffer_albedo",
+                 "gbuffer_normal",
+                 "gbuffer_rma",
+                 "gbuffer_depth",
+                 "shadowmap_depth",
+                 "shadow_moments",
+                 "rsm_flux",
+                 "rsm_normal",
+                 "lighting_output",
+             }) {
+            formats.set_value(role, std::string("r16g16b16a16_sfloat"));
+        }
+        context.set_entry("formats", formats);
+        context.set_value("bloom_acquire_event", std::string("test.bloom"));
+        context.set_value("frame_sequence_event", std::string("test.frames"));
+        context.set_value("has_mesh_acceleration_structure", false);
+        context.set_entry("voxel", p_voxel);
+        DataValue transforms = DataValue::make_list();
+        transforms.push_back(DataValue::make_string("dynamic_mesh_entity_0.transform"));
+        transforms.push_back(DataValue::make_string("dynamic_mesh_entity_1.transform"));
+        context.set_entry("dynamic_mesh_transform_ids", transforms);
+        DataValue toggles = DataValue::make_map();
+        for (const char* group : {"disabled", "enabled", "post_svo_build", "pre_deferred_propagation"}) {
+            DataValue toggle = DataValue::make_map();
+            toggle.set_value("event", std::string("test.voxel_debug_view.") + group);
+            toggle.set_value("enabled", std::string_view(group) == "disabled");
+            toggles.set_entry(group, toggle);
+        }
+        context.set_entry("voxel_debug_view_toggles", toggles);
+        if (p_post_processing) {
+            DataValue post_processing = DataValue::make_map();
+            post_processing.set_value("module", std::string("render_graphs.features.pixel_sort"));
+            post_processing.set_value("direction", std::string("vertical"));
+            post_processing.set_value("scope", std::string("span"));
+            post_processing.set_value("color_format", std::string("r16g16b16a16_sfloat"));
+            post_processing.set_value("queue_family", std::string("compute_1"));
+            post_processing.set_value("contrast_import", std::string("pixel_sort_contrast"));
+            post_processing.set_value("toggle_event", std::string("test.pixel_sort"));
+            post_processing.set_value("enabled", true);
+            context.set_entry("post_processing", post_processing);
+        }
+        return RendGraphScriptVK::run("render_graphs.deferred", context);
+    };
+    const auto count_tasks_with = [](const DataValue::List& p_tasks, std::string_view p_field) {
+        size_t count = 0;
+        for (const DataValue& task : p_tasks) {
+            count += task.contains(p_field) ? 1U : 0U;
+        }
+        return count;
+    };
+    const auto contains_import = [](const DataValue& p_recipe, std::string_view p_name) {
+        const DataValue::List& imports = p_recipe.get_entry("imports").as_list();
+        return std::ranges::any_of(imports, [p_name](const DataValue& p_import) {
+            return p_import.as_string() == p_name;
+        });
+    };
+    // 2 lights x (4 shadow mesh draws + 1 filter), 4 G-buffer mesh draws, indirect lighting and its debug view, the frame
+    // sequence acquisition, ImGui, direct and combine lighting, extract and blur bloom, the bloom acquisition, 2 presents,
+    // and 2 billboards.
+    constexpr size_t BASE_TASK_COUNT = 10 + 4 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 2;
+    // The octree adds its frame-begin barrier, 6 imported C++ tasks, and 2 gathers and 2 overlays, all toggled.
+    const DataValue mipmap = run(false, false, make_octree());
+    const DataValue::List& mipmap_tasks = mipmap.get_entry("tasks").as_list();
+    EXPECT_EQ(mipmap_tasks.size(), BASE_TASK_COUNT + 11);
+    EXPECT_EQ(count_tasks_with(mipmap_tasks, "toggle"), 2U + 4U);
+    EXPECT_EQ(count_tasks_with(mipmap_tasks, "trigger"), 2U);
+    EXPECT_TRUE(contains_import(mipmap, "octree_dynamic"));
+    // The pass-published SVO adds 15 tasks: the 5 static construction tasks are triggered, and the pre-deferred capture and
+    // the 2 overlays toggled. The pixel sort feature adds its 26 toggled tasks and imports the contrast buffer.
+    const DataValue summed_area_table = run(true, true, make_svo());
+    const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 15 + 26);
+    EXPECT_EQ(count_tasks_with(tasks, "toggle"), 2U + 3U + 26U);
+    EXPECT_EQ(count_tasks_with(tasks, "trigger"), 2U + 5U);
+    EXPECT_TRUE(contains_import(summed_area_table, "svo_nodes"));
+    // The SVO declares its 5 scratch buffers with the sizes it is given.
+    const DataValue::List& resources = summed_area_table.get_entry("resources").as_list();
+    const auto find_resource = [&resources](std::string_view p_id) -> const DataValue* {
+        for (const DataValue& resource : resources) {
+            if (resource.get_value<std::string>("id") == p_id) {
+                return &resource;
+            }
+        }
+        return nullptr;
+    };
+    const DataValue* deferred_list = find_resource("svo_deferred_list_ping");
+    ASSERT_NE(deferred_list, nullptr);
+    EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);
+    const DataValue* dynamic_nodes = find_resource("svo_dynamic_nodes");
+    ASSERT_NE(dynamic_nodes, nullptr);
+    EXPECT_EQ(dynamic_nodes->get_entry("buffer").get_value<int64_t>("size"), 1024);
+    EXPECT_EQ(resources.size(), run(true, true, make_octree()).get_entry("resources").as_list().size() + 5);
+    EXPECT_TRUE(contains_import(summed_area_table, "pixel_sort_contrast"));
 }
 
 } // namespace WhiteBirdEngine

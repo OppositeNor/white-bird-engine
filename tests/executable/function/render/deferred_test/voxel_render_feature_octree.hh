@@ -16,8 +16,11 @@
 #define WBE_FILE_VOXEL_RENDER_FEATURE_OCTREE_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
@@ -26,6 +29,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "glm/ext/vector_float3.hpp"
 #include "i_voxel_render_feature.hh"
 #include <array>
 #include <atomic>
@@ -56,15 +60,13 @@ public:
     VoxelRenderFeatureOctree() = delete;
     /**
      * @brief Compiles the octree pipelines and creates the textures and buffers on the rendering thread.
-     * @details The renderer and debug-mode state must outlive this object and its registered graphs. The feature retains
+     * @details The renderer must outlive this object and its registered graphs. The feature retains
      * shared ownership of the static scene. Invalid dependencies throw.
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once,
      * for observing its per-frame cost. Dynamic construction is unaffected either way.
      */
-    VoxelRenderFeatureOctree(RendererVK* p_renderer,
-        Ref<MeshResourcesVK> p_static_mesh_resources,
-        const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-        bool p_rebuild_static_every_frame = false);
+    VoxelRenderFeatureOctree(
+        RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame = false);
     virtual ~VoxelRenderFeatureOctree() override = default;
     VoxelRenderFeatureOctree(const VoxelRenderFeatureOctree&) = delete;
     VoxelRenderFeatureOctree(VoxelRenderFeatureOctree&&) = delete;
@@ -78,20 +80,15 @@ public:
      * root, colored by depth, to the leaf view.
      */
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
+
     /**
-     * @brief Registers the textures, their full and per-level views, and the buffers.
+     * @brief Describe the octree to the render_graphs.features.voxel_octree module, and supply its textures, buffers, and
+     * the clear and construction tasks only C++ can build.
+     * @throws std::runtime_error If the construction tasks declare graph resources other than the mesh imports the recipe's
+     * mesh draws provide.
      */
-    virtual void register_render_graph_data(RendGraphDescVK& p_graph) const override;
-    /**
-     * @brief Adds the static construction, the per-frame dynamic construction, and the debug leaf and node gathers.
-     */
-    virtual void add_build_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const override;
-    /**
-     * @brief Adds the leaf overlay followed by the node overlay.
-     */
-    virtual void add_overlay_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual void connect_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual std::span<const std::string_view> get_overlay_render_task_ids() const override;
+    virtual void configure_recipe(
+        DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
     /**
      * @brief Graph id of the single-level storage view of one mip level of the static texture.
@@ -123,7 +120,6 @@ public:
     static constexpr std::string_view OCTREE_DEBUG_LEAF_MASKS = "octree_debug_leaf_masks";
     static constexpr std::string_view OCTREE_DEBUG_NODE_DRAW_INDIRECT_BUFFER = "octree_debug_node_draw_indirect_buffer";
     static constexpr std::string_view OCTREE_DEBUG_NODE_LIST = "octree_debug_node_list";
-    static constexpr std::array<std::string_view, 2> OVERLAY_RENDER_TASK_IDS{RT_RUN_OCTREE_DEBUG_DRAW, RT_RUN_OCTREE_DEBUG_NODE_DRAW};
 
 private:
     static constexpr std::string_view RT_OCTREE_FRAME_BEGIN = "octree_frame_begin";
@@ -140,7 +136,10 @@ private:
     // Mirrors OCTREE_DEBUG_SUBGRID_EXTENT of octree/octree_debug.slang; the leaf gather runs one 4x4x8 workgroup per 8x8x16
     // subgrid, each invocation testing a 2x2x2 block.
     static constexpr VkExtent3D OCTREE_DEBUG_SUBGRID_GRID_EXTENT{
-        .width = OCTREE_EXTENT / 8, .height = OCTREE_EXTENT / 8, .depth = OCTREE_EXTENT / 16};
+        .width = OCTREE_EXTENT / 8,
+        .height = OCTREE_EXTENT / 8,
+        .depth = OCTREE_EXTENT / 16,
+    };
     static constexpr uint32_t OCTREE_DEBUG_SUBGRID_COUNT =
         OCTREE_DEBUG_SUBGRID_GRID_EXTENT.width * OCTREE_DEBUG_SUBGRID_GRID_EXTENT.height * OCTREE_DEBUG_SUBGRID_GRID_EXTENT.depth;
     // One leaf-view draw command per subgrid, followed by the bounds command.
@@ -177,28 +176,24 @@ private:
     Ref<ROImageVK> create_octree_image() const;
     Ref<ROImageViewVK> create_octree_image_view(const Ref<ROImageVK>& p_image, uint32_t p_base_level, uint32_t p_level_count) const;
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
-    RendTaskDescVK make_static_once(RendTaskDescVK p_task, bool p_finish = false) const;
+    // Make a static construction task record once, through the static build trigger, unless the scene is rebuilt every frame.
+    RendTaskDescVK make_static_build(RendTaskDescVK p_task, const VoxelRecipeInputs& p_inputs) const;
     RendTaskDescVK make_texture_write(RendTaskDescVK p_task, std::string_view p_texture_view_id) const;
     RendTaskDescVK get_clear_render_task_desc(std::string_view p_task_id, bool p_clear_static) const;
-    RendTaskDescVK get_construction_render_task_desc(
-        std::string_view p_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh, size_t p_dynamic_entity_index) const;
-    RendTaskDescVK get_compute_task_desc(
-        std::string_view p_task_id, const Ref<ROComputePipelineVK>& p_pipeline, VkExtent3D p_group_count) const;
-    RendTaskDescVK get_debug_draw_render_task_desc(std::string_view p_task_id,
-        const Ref<ROGraphicsPipelineVK>& p_pipeline,
-        std::string_view p_indirect_buffer_id,
-        uint32_t p_draw_count,
-        VoxelDebugViewMode p_first_mode) const;
+    // Adds a raster construction pass as a graphics_draw_mesh task that also reports its write of the full texture view;
+    // the returned reference is invalidated when another task is added.
+    RendTaskDescVK& add_construction_render_task(RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
+        bool p_double_sided,
+        const DynamicMeshRenderFeature* p_dynamic_mesh,
+        size_t p_dynamic_entity_index) const;
 
     RendererVK* renderer_vk;
     const BaseRenderDataVK* base_render_data;
     RenderAllocator* render_allocator;
     Ref<MeshResourcesVK> static_mesh_resources;
-    const std::atomic<VoxelDebugViewMode>* debug_view_mode;
-    // Skips the run-once wrappers so the static scene is reset and rebuilt every frame.
+    // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
-    // Render-thread completion shared by all graph variants using these textures.
-    Ref<bool> static_build_completed;
 
     Ref<ROGraphicsPipelineVK> build_pipeline;
     Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;

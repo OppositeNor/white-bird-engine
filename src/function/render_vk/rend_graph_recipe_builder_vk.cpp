@@ -20,6 +20,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include <algorithm>
@@ -131,8 +132,8 @@ bool sets_aliases(const DataValue& p_aliases) {
 }
 
 // Copy the task the caller supplies for an imported recipe task into the graph.
-void add_imported_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recipe_task, const RendGraphRecipeImportsVK& p_imports,
-    std::string_view p_location) {
+void add_imported_task(
+    RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recipe_task, const RendGraphRecipeImportsVK& p_imports, std::string_view p_location) {
     if (!p_recipe_task.type.empty()) {
         throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set a type.", p_location));
     }
@@ -143,7 +144,12 @@ void add_imported_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recip
         throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set aliases.", p_location));
     }
     if (p_recipe_task.trigger.has_value()) {
-        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set a trigger.", p_location));
+        throw std::runtime_error(
+            std::format("Failed to build render graph recipe: {} is imported, so it cannot set a trigger.", p_location));
+    }
+    if (p_recipe_task.toggle.has_value()) {
+        throw std::runtime_error(
+            std::format("Failed to build render graph recipe: {} is imported, so it cannot set a toggle.", p_location));
     }
     const RendTaskDescVK* task = p_imports.find_task(p_recipe_task.id);
     if (task == nullptr) {
@@ -152,8 +158,7 @@ void add_imported_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recip
     p_graph.add_task(*task);
 }
 
-void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, const RendGraphRecipeImportsVK& p_imports,
-    const BaseRenderDataVK* p_render_data) {
+void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, const RendGraphRecipeImportsVK& p_imports, const BaseRenderDataVK* p_render_data) {
     std::set<std::string, std::less<>> ids;
     for (size_t i = 0; i < p_recipe.tasks.size(); ++i) {
         const RendRecipeTaskVK& recipe_task = p_recipe.tasks[i];
@@ -169,8 +174,8 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, cons
             continue;
         }
         if (recipe_task.type.empty()) {
-            throw std::runtime_error(std::format(
-                "Failed to build render graph recipe: {} sets no type; set one, or set import for a supplied task.", task_location(i, recipe_task.id)));
+            throw std::runtime_error(std::format("Failed to build render graph recipe: {} sets no type; set one, or set import for a supplied task.",
+                task_location(i, recipe_task.id)));
         }
         RendTaskDescVK& task =
             RenderTaskRegistryVK::add_task(p_graph, recipe_task.id, recipe_task.type, recipe_task.params, p_render_data);
@@ -182,6 +187,15 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, cons
             }
             task.factory = RTTriggeredVK::wrap_factory(
                 std::move(task.factory), recipe_task.trigger->event, p_render_data, recipe_task.trigger->activate);
+        }
+        // The toggle wraps outermost, so it gates a triggered task too.
+        if (recipe_task.toggle.has_value()) {
+            if (recipe_task.toggle->event.empty()) {
+                throw std::runtime_error(std::format(
+                    "Failed to build render graph recipe: {} toggle event is empty.", task_location(i, recipe_task.id)));
+            }
+            task.factory = RTToggleVK::wrap_factory(
+                std::move(task.factory), recipe_task.toggle->event, p_render_data, recipe_task.toggle->enabled);
         }
     }
     for (const std::string& task_id : p_imports.get_task_ids()) {

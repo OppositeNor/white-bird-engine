@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_I_POST_PROCESSING_HH
 #define WBE_FILE_I_POST_PROCESSING_HH
 
-#include "core/memory/unique.hh"
+#include "core/data/data_value.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include <string>
 #include <string_view>
 
@@ -28,9 +28,10 @@ namespace WhiteBirdEngine {
  * @class IPostProcessing
  * @brief Interface of a post-processing effect of the deferred rendering test that modifies a color image in place.
  * @details Effects are disabled on construction. A disabled effect keeps its tasks in every graph it was added to, but
- * they record no commands, so the color image passes through unchanged. Every task is an RTToggleVK subscribed to the
- * effect's toggle event: set_enabled() emits the new state under it, so the tasks of every graph switch together, and
- * tasks created by a rebuild start in the current state. Change the state only between frames. Neither copyable nor movable. All methods and destruction are confined
+ * they record no commands, so the color image passes through unchanged. The effect's tasks are added by a Lua recipe
+ * module (see configure_recipe()) and toggled by the effect's toggle event: set_enabled() emits the new state under it,
+ * so the tasks of every graph switch together, and a rebuild re-runs the recipe with the current state. Change the
+ * state only between frames. Neither copyable nor movable. All methods and destruction are confined
  * to the rendering thread, and the effect must outlive every graph it was added to.
  */
 class IPostProcessing {
@@ -55,15 +56,16 @@ public:
     virtual std::string_view get_name() const = 0;
 
     /**
-     * @brief Adds the effect's resources and tasks to a graph, ordered after a previous user of the color image.
-     * @param p_graph Graph descriptor that already contains p_previous_task_id.
-     * @param p_color_image_view Graph id of the color image the effect modifies in place; it must be sampled and storage.
-     * @param p_previous_task_id Id of the last task that accesses p_color_image_view before the effect.
-     * @return Id of the effect's last task that accesses p_color_image_view; later users of the image must be connected
-     * to it.
+     * @brief Describe the effect to a recipe that includes it, and supply the resources its tasks import.
+     *
+     * Writes `module`, the name of the Lua module whose `add(graph, params, target)` adds the effect's resources and tasks
+     * to a recipe under construction, and every parameter that module reads, including `toggle_event` and `enabled`. The
+     * recipe passes the map to `add()` as `params`.
+     *
+     * @param p_parameters The map to write the module name and parameters into.
+     * @param p_imports The imports of the recipe, to supply the effect's application-owned resources to.
      */
-    virtual std::string_view add_render_tasks(
-        RendGraphDescVK& p_graph, std::string_view p_color_image_view, std::string_view p_previous_task_id) const = 0;
+    virtual void configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const = 0;
 
     /**
      * @brief Whether the effect's tasks record their commands.
@@ -86,15 +88,6 @@ public:
     }
 
 protected:
-    /**
-     * @brief Wrap a task in an RTToggleVK that starts in the current state and follows the toggle event.
-     * @details Binding, queue selection, and access reports always reach p_task.
-     * @param p_task The task to wrap; must not be null.
-     * @return The wrapping task.
-     * @throws std::runtime_error If p_task is null, or no EventManager exists.
-     */
-    Unique<IRenderTaskVK> make_toggle_task(Unique<IRenderTaskVK> p_task) const;
-
     /**
      * @brief Get the allocator of the effect's tasks.
      */

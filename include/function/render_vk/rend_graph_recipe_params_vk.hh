@@ -112,6 +112,26 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
 };
 
 /**
+ * @class RendRecipeToggleVK
+ * @brief Makes a recipe task event-toggled; see RTToggleVK::wrap_factory(). Copyable and movable; strict.
+ *
+ * The task records on every frame while enabled. A rebuild re-runs the recipe, so pass the application's current state
+ * through the context to keep it across rebuilds.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeToggleVK {
+    /**
+     * @brief Event id the task receives RTToggleVK::Command events under.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string event;
+    /**
+     * @brief Whether the task records until a command changes the state.
+     */
+    WBE_META(WBE_REFLECT)
+    bool enabled = false;
+};
+
+/**
  * @class RendRecipeTaskVK
  * @brief A task of a render graph recipe. Copyable and movable; strict.
  *
@@ -130,7 +150,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
     WBE_META(WBE_REFLECT)
     std::string type;
     /**
-     * @brief Whether the caller supplies the task; an import sets no type, params, aliases, or trigger.
+     * @brief Whether the caller supplies the task; an import sets no type, params, aliases, trigger, or toggle.
      */
     WBE_META(WBE_REFLECT)
     bool import = false;
@@ -154,6 +174,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
      */
     WBE_META(WBE_REFLECT)
     std::optional<RendRecipeTriggerVK> trigger;
+    /**
+     * @brief Set to make the task event-toggled. With a trigger too, the toggle gates the triggered task: it records on
+     * the triggered frames that fall while the toggle is enabled.
+     */
+    WBE_META(WBE_REFLECT)
+    std::optional<RendRecipeToggleVK> toggle;
 };
 
 /**

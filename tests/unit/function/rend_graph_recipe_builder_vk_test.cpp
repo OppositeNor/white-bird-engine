@@ -23,18 +23,19 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
 #include "render_task_registry_vk_test_tasks.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
+#include <format>
 #include <gtest/gtest.h>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <format>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -215,8 +216,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, ImportsSuppliedTasksAndConnectsThem) {
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RequiresImportedTasksToMatchSuppliedOnes) {
     RendGraphRecipeImportsVK imports;
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "overlay", "import": true}]})", imports, &render_data)
-                  .find("tasks[0] 'overlay' is imported but not supplied"),
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "overlay", "import": true}]})", imports, &render_data).find("tasks[0] 'overlay' is imported but not supplied"),
         std::string::npos);
     imports.add_task(make_supplied_task(&allocator, "overlay"));
     EXPECT_NE(build_error(builder, R"({"tasks": []})", imports, &render_data).find("supplied task 'overlay' is not imported"),
@@ -240,6 +240,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsImportedTasksThatConfigureThemsel
              {R"("params": {"label": "a"})", "cannot set params"},
              {R"("aliases": {"target": "camera"})", "cannot set aliases"},
              {R"("trigger": {"event": "redraw"})", "cannot set a trigger"},
+             {R"("toggle": {"event": "redraw"})", "cannot set a toggle"},
          }) {
         const std::string recipe = std::format(R"({{"tasks": [{{"id": "overlay", "import": true, {}}}]}})", field);
         EXPECT_NE(build_error(builder, recipe, imports, &render_data).find(message), std::string::npos) << field;
@@ -274,6 +275,47 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsTriggeredTasks) {
     const auto* triggered = dynamic_cast<const RTTriggeredVK*>(task.get());
     ASSERT_NE(triggered, nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("recipe.rebuild"), 1U);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsToggledTasksInTheirInitialState) {
+    const RendGraphRecipeImportsVK imports;
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "tasks": [
+            {"id": "effect", "type": "registry_probe", "params": {"label": "x"}, "toggle": {"event": "recipe.effect", "enabled": true}},
+            {"id": "off", "type": "registry_probe", "params": {"label": "y"}, "toggle": {"event": "recipe.effect"}}
+        ]
+    })"),
+        imports,
+        &render_data);
+    const Unique<IRenderTaskVK> effect = graph.get_task("effect").factory(RendGraphContextVK{});
+    const Unique<IRenderTaskVK> off = graph.get_task("off").factory(RendGraphContextVK{});
+    const auto* effect_toggle = dynamic_cast<const RTToggleVK*>(effect.get());
+    const auto* off_toggle = dynamic_cast<const RTToggleVK*>(off.get());
+    ASSERT_NE(effect_toggle, nullptr);
+    ASSERT_NE(off_toggle, nullptr);
+    EXPECT_TRUE(effect_toggle->is_enabled());
+    EXPECT_FALSE(off_toggle->is_enabled());
+    // Both follow commands under their shared event.
+    EventManager::get_singleton()->emit("recipe.effect", RTToggleVK::Command::enable());
+    EXPECT_TRUE(off_toggle->is_enabled());
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "toggle": {"event": ""}}]})", imports, &render_data)
+                  .find("tasks[0] 'a' toggle event is empty"),
+        std::string::npos);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, TogglesGateTriggeredTasks) {
+    const RendGraphRecipeImportsVK imports;
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "tasks": [{"id": "capture", "type": "registry_probe", "params": {"label": "x"},
+                   "trigger": {"event": "recipe.capture"}, "toggle": {"event": "recipe.capture_allowed", "enabled": true}}]
+    })"),
+        imports,
+        &render_data);
+    const Unique<IRenderTaskVK> task = graph.get_task("capture").factory(RendGraphContextVK{});
+    // The toggle is the outer wrapper; the triggered task inside it still subscribes to its own event.
+    EXPECT_NE(dynamic_cast<const RTToggleVK*>(task.get()), nullptr);
+    EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.capture_allowed"), 1U);
+    EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("recipe.capture"), 1U);
 }
 
 } // namespace WhiteBirdEngine

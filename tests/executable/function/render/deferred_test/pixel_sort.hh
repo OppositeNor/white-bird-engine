@@ -15,12 +15,15 @@
 #ifndef WBE_FILE_PIXEL_SORT_HH
 #define WBE_FILE_PIXEL_SORT_HH
 
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "i_post_processing.hh"
 #include <array>
@@ -95,7 +98,9 @@ struct PixelSortSettings {
  * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
- * pass resources are graph-owned, so every graph the effect is added to allocates its own. Neither copyable nor movable.
+ * Lua module render_graphs.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
+ * graph the effect is added to allocates its own; the effect compiles the pipelines they reference and owns the contrast
+ * buffer every graph imports. Neither copyable nor movable.
  */
 class PixelSort final : public IPostProcessing {
 public:
@@ -131,14 +136,12 @@ public:
         return "pixel sort";
     }
 
-    virtual std::string_view add_render_tasks(
-        RendGraphDescVK& p_graph, std::string_view p_color_image_view, std::string_view p_previous_task_id) const override;
-
-    static constexpr std::string_view RT_COPY_PIXEL_SORT_SOURCE = "copy_pixel_sort_source";
-    static constexpr std::string_view RT_COUNT_PIXEL_SORT_MASK = "count_pixel_sort_mask";
-    static constexpr std::string_view RT_PREFIX_SUM_PIXEL_SORT_COLUMNS = "prefix_sum_pixel_sort_columns";
-    static constexpr std::string_view RT_REGISTER_PIXEL_SORT_KEYS = "register_pixel_sort_keys";
-    static constexpr std::string_view RT_WRITE_SORTED_PIXELS = "write_sorted_pixels";
+    /**
+     * @brief Describe the effect to the render_graphs.features.pixel_sort module, and supply the contrast buffer.
+     *
+     * Writes the current direction, scope, color format, queue family, toggle event, and enabled state.
+     */
+    virtual void configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const override;
 
     /**
      * @brief Get the configuration of the effect.
@@ -152,8 +155,8 @@ public:
      * @brief Change the configuration of the effect.
      *
      * A changed direction or scope changes the effect's pipelines, resources, and dispatches: every graph the effect was
-     * added to must then be rebuilt with RenderGraphVK::rebuild() before it executes again. Otherwise the new metric and
-     * range take effect in a graph once upload_settings() writes them to it.
+     * added to must then be rebuilt with RenderGraphVK::rebuild() before it executes again. The metric, range, and scope
+     * reach the shaders once upload_settings() writes them to the contrast buffer.
      *
      * @param p_settings The new configuration.
      * @return True if every graph the effect was added to must be rebuilt.
@@ -164,62 +167,29 @@ public:
     bool set_settings(const PixelSortSettings& p_settings);
 
     /**
-     * @brief Write the metric, range, and scope of the configuration to the contrast buffer of a graph.
-     * @param p_graph A graph the effect was added to, built with the current direction and scope.
-     * @throws std::runtime_error If p_graph has no pixel sort contrast buffer.
+     * @brief Write the metric, range, and scope of the configuration to the contrast buffer every graph imports.
      */
-    void upload_settings(RenderGraphVK& p_graph) const;
+    void upload_settings();
 
 private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.
     static constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
 
-    // The sizes of the resources and dispatches of the effect for one extent of the color image.
-    struct Layout;
-
-    // The ids of the histogram, histogram prefix sum, overflow prefix sum, overflow addition, and scatter tasks of every radix
-    // sort pass.
-    struct RadixSortTaskIds;
-
     // One pipeline per PixelSortDirection value, indexed by the direction.
     using DirectionPipelines = std::array<Ref<ROComputePipelineVK>, 2>;
 
-    static Layout make_layout(VkExtent2D p_extent, PixelSortDirection p_direction);
+    // Validates that an extent can be sorted in a direction.
+    static void validate_layout(VkExtent2D p_extent, PixelSortDirection p_direction);
     static void validate_settings(const PixelSortSettings& p_settings);
     Ref<ROComputePipelineVK> compile(std::string_view p_shader_id) const;
     DirectionPipelines compile_direction_variants(std::string_view p_shader_name) const;
-    // Add a task dispatching the pipeline of the current direction with the workgroup counts of the layout of the graph's
-    // context.
-    void add_compute_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        const DirectionPipelines& p_pipelines,
-        VkExtent3D Layout::* p_group_count,
-        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
-    void add_graph_resources(RendGraphDescVK& p_graph) const;
-    RadixSortTaskIds add_radix_sort_tasks(RendGraphDescVK& p_graph) const;
-    static void connect_render_tasks(RendGraphDescVK& p_graph,
-        std::string_view p_color_image_view,
-        std::string_view p_previous_task_id,
-        const RadixSortTaskIds& p_task_ids);
-    // Add a task dispatching a pipeline that does not depend on the direction.
-    void add_compute_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        const Ref<ROComputePipelineVK>& p_pipeline,
-        VkExtent3D Layout::* p_group_count,
-        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
-    // Add a task dispatching a pipeline that does not depend on the direction with the radix sort dispatch at p_dispatch_offset
-    // bytes of the radix sort dispatch buffer.
-    void add_indirect_compute_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        const Ref<ROComputePipelineVK>& p_pipeline,
-        VkDeviceSize p_dispatch_offset,
-        std::initializer_list<std::pair<std::string_view, std::string_view>> p_aliases) const;
 
     RendererVK* renderer = nullptr;
     std::function<VkExtent2D(const RendGraphContextVK&)> extent;
     VkFormat color_format = VK_FORMAT_UNDEFINED;
-    // Read by the factories of every graph the effect was added to.
     PixelSortSettings settings;
+    // The contrast uniform buffer every graph imports as REND_RES_PIXEL_SORT_CONTRAST; upload_settings() writes it.
+    Ref<ROBufferVK> contrast_buffer;
     Ref<ROComputePipelineVK> copy_source_pipeline;
     DirectionPipelines count_mask_pipelines;
     Ref<ROComputePipelineVK> prefix_sum_columns_pipeline;

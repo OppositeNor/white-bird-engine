@@ -16,12 +16,12 @@
 #define WBE_FILE_SVO_RENDER_FEATURE_PASS_PUBLISHED_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "i_svo_render_feature.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "i_svo_render_feature.hh"
 #include <atomic>
 #include <cstdint>
 #include <string_view>
@@ -39,13 +39,11 @@ public:
     SVORenderFeaturePassPublished() = delete;
     /**
      * @brief Compiles the pass-published SVO shaders and creates the shared buffers on the rendering thread.
-     * @details The renderer and debug-mode state must outlive this object and its registered graphs. Invalid dependencies throw.
+     * @details The renderer must outlive this object and its registered graphs. Invalid dependencies throw.
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once.
      */
-    SVORenderFeaturePassPublished(RendererVK* p_renderer,
-        Ref<MeshResourcesVK> p_static_mesh_resources,
-        const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-        bool p_rebuild_static_every_frame = false);
+    SVORenderFeaturePassPublished(
+        RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame = false);
     virtual ~SVORenderFeaturePassPublished() override = default;
     SVORenderFeaturePassPublished(const SVORenderFeaturePassPublished&) = delete;
     SVORenderFeaturePassPublished(SVORenderFeaturePassPublished&&) = delete;
@@ -56,14 +54,9 @@ public:
 
 private:
     virtual uint32_t get_reset_group_count() const override;
-    virtual void register_implementation_render_graph_data(RendGraphDescVK& p_graph) const override;
-    virtual void add_static_publication_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual void add_dynamic_publication_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual void connect_implementation_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual RendTaskDescVK make_deferred_construction_render_task_desc(bool p_dynamic) const override;
-    RendTaskDescVK get_state_update_render_task_desc() const;
-    RendTaskDescVK get_dynamic_publication_task_desc() const;
+    virtual std::string_view get_recipe_variant() const override;
 
+    // The publication pipelines, which the render database holds weakly and the recipe names.
     Ref<ROComputePipelineVK> update_states_pipeline;
     Ref<ROComputePipelineVK> dynamic_publication_pipeline;
 };

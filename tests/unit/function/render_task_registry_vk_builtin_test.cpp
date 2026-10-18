@@ -12,8 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
+#include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -100,6 +103,11 @@ constexpr BuiltinTaskCase BUILTIN_TASK_CASES[] = {
                       "color_load_op": "load", "depth_load_op": "DONT_CARE", "draw_vertex_count": 6})",
     },
     {.type = "graphics_draw_mesh", .params = R"({"mesh": "sponza", "pipeline": "p", "parts": ["opaque", "masked"]})"},
+    {
+        .type = "run_graphics_pipeline_indirect",
+        .params = R"({"pipeline": "p", "index_buffer": "indices", "indirect_buffer": "commands", "draw_count": 3,
+                      "color_load_op": "load", "depth_load_op": "load"})",
+    },
 };
 
 } // namespace
@@ -118,6 +126,10 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, RegistersEveryBuiltinTask) {
              "max_downsample",
              "generate_mipmaps",
              "run_graphics_pipeline",
+             "RTRunGraphicsPipelineIndirectVK",
+             "run_graphics_pipeline_indirect",
+             "RTFullMemoryBarrierVK",
+             "full_memory_barrier",
          }) {
         EXPECT_TRUE(RenderTaskRegistryVK::contains(name)) << name;
     }
@@ -151,6 +163,8 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, InvalidParametersFailWhenTheFactoryIsCr
              BuiltinTaskCase{.type = "max_downsample", .params = R"({"pipeline": "p", "mip_views": ["a"], "queue_family": "transfer"})"},
              BuiltinTaskCase{.type = "generate_mipmaps", .params = R"({"source_view": "a", "mip_chain_view": "b", "format": "rgba8"})"},
              BuiltinTaskCase{.type = "run_graphics_pipeline", .params = R"({"pipeline": "p", "color_load_op": "store"})"},
+             BuiltinTaskCase{.type = "run_graphics_pipeline_indirect", .params = R"({"pipeline": "p", "index_buffer": "indices"})"},
+             BuiltinTaskCase{.type = "full_memory_barrier", .params = "{}"},
          }) {
         EXPECT_THROW((void)RenderTaskRegistryVK::create_factory(task_case.type, parse_task_params(task_case.params), &render_data), std::runtime_error)
             << task_case.type << ": " << task_case.params;
@@ -172,6 +186,25 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, CreateValidatesCrossFieldParameters) {
     EXPECT_THROW((void)RenderTaskRegistryVK::create_factory("generate_mipmaps",
                      parse_task_params(R"({"source_view": "a", "mip_chain_view": "b", "format": "R8G8B8A8_UNORM", "base_extent": {"width": 4}})"),
                      &render_data)(context),
+        std::runtime_error);
+}
+
+TEST(WBERenderTaskRegistryVKBuiltinTest, FullMemoryBarrierWritesItsResourceOnTheGraphicsQueue) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    BaseRenderDataVK render_data(&allocator);
+    const RendGraphContextVK context{.swap_chain_extent = {.width = 64, .height = 64}};
+    Unique<IRenderTaskVK> task = RenderTaskRegistryVK::create_factory(
+        "full_memory_barrier", parse_task_params(R"({"resource": "state"})"), &render_data)(context);
+    EXPECT_EQ(task->queue_family(), QueueFamilyVK::GRAPHICS);
+    Vector<ResAccessVK, RenderAllocator> reads(&allocator);
+    Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+    task->append_accesses(reads, writes);
+    EXPECT_TRUE(reads.empty());
+    ASSERT_EQ(writes.size(), 1U);
+    EXPECT_EQ(writes[0].res_id, "state");
+    EXPECT_EQ(writes[0].usage, RendResUsageVK::ALL_COMMANDS);
+    EXPECT_THROW((void)RenderTaskRegistryVK::create_factory(
+                     "full_memory_barrier", parse_task_params(R"({"resource": ""})"), &render_data)(context),
         std::runtime_error);
 }
 
@@ -218,14 +251,30 @@ TEST(WBEVulkanEnumMirrorTest, ValuesMatchVulkan) {
 TEST(WBERenderTaskPushConstantsVKTest, ResolvesRecipeValuesToTheReflectedTypes) {
     ShaderDescriptorHeapLayoutVK first;
     first.default_fields.push_back(ShaderDefaultPushFieldVK{
-        .field_path = "count", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "count", .type = ShaderPushConstantTypeVK::UINT32});
+        .field_path = "count",
+        .value = ShaderDefaultPushValueVK::CUSTOM,
+        .name = "count",
+        .type = ShaderPushConstantTypeVK::UINT32,
+    });
     first.default_fields.push_back(ShaderDefaultPushFieldVK{
-        .field_path = "time", .value = ShaderDefaultPushValueVK::TIME, .name = "", .type = ShaderPushConstantTypeVK::FLOAT32});
+        .field_path = "time",
+        .value = ShaderDefaultPushValueVK::TIME,
+        .name = "",
+        .type = ShaderPushConstantTypeVK::FLOAT32,
+    });
     ShaderDescriptorHeapLayoutVK second;
     second.default_fields.push_back(ShaderDefaultPushFieldVK{
-        .field_path = "scale", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "scale", .type = ShaderPushConstantTypeVK::FLOAT32});
+        .field_path = "scale",
+        .value = ShaderDefaultPushValueVK::CUSTOM,
+        .name = "scale",
+        .type = ShaderPushConstantTypeVK::FLOAT32,
+    });
     second.default_fields.push_back(ShaderDefaultPushFieldVK{
-        .field_path = "offset", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "offset", .type = ShaderPushConstantTypeVK::INT32});
+        .field_path = "offset",
+        .value = ShaderDefaultPushValueVK::CUSTOM,
+        .name = "offset",
+        .type = ShaderPushConstantTypeVK::INT32,
+    });
     const std::array<const ShaderDescriptorHeapLayoutVK*, 3> layouts{&first, nullptr, &second};
 
     const std::vector<TaskPushConstantVK> values =
@@ -246,7 +295,11 @@ TEST(WBERenderTaskPushConstantsVKTest, ResolvesRecipeValuesToTheReflectedTypes) 
 TEST(WBERenderTaskPushConstantsVKTest, RejectsUndeclaredOrUnconvertibleValues) {
     ShaderDescriptorHeapLayoutVK layout;
     layout.default_fields.push_back(ShaderDefaultPushFieldVK{
-        .field_path = "count", .value = ShaderDefaultPushValueVK::CUSTOM, .name = "count", .type = ShaderPushConstantTypeVK::UINT32});
+        .field_path = "count",
+        .value = ShaderDefaultPushValueVK::CUSTOM,
+        .name = "count",
+        .type = ShaderPushConstantTypeVK::UINT32,
+    });
     const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&layout};
     EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params(R"({"missing": 1})"), layouts, "Test"), std::runtime_error);
     EXPECT_THROW((void)resolve_task_push_constants_vk(parse_task_params(R"({"count": -1})"), layouts, "Test"), std::runtime_error);

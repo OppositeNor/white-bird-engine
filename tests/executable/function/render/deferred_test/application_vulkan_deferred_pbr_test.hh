@@ -17,8 +17,8 @@
 
 #include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/engine_core.hh"
-#include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
@@ -33,6 +33,8 @@
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -44,8 +46,6 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
-#include "i_post_processing.hh"
 #include "i_voxel_render_feature.hh"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
@@ -65,11 +65,8 @@
 #include <glm/geometric.hpp>
 #include <glm/gtc/packing.hpp>
 #include <glm/matrix.hpp>
-#include <span>
 #include <string>
 #include <string_view>
-#include <utility>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -117,6 +114,8 @@ private:
     // only by the next tick, so the bound must leave room for it and at least one submitted frame.
     static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
     static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
+    // The `script` resource of the graph recipe, res/assets/scripts/lua/render_graphs/deferred.lua.
+    static constexpr std::string_view DEFERRED_RECIPE_SCRIPT = "render_graphs.deferred";
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
     static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
@@ -175,12 +174,32 @@ private:
     // Event ids of the RTTriggeredVK::Command that drives each graph's on-demand tasks, indexed like
     // deferred_render_graphs. Each graph has its own ids so a request never arms the inactive graph.
     static constexpr std::array<std::string_view, 2> BLOOM_ACQUIRE_EVENT_IDS = {
-        "deferred_pbr_test.mipmap.bloom_acquire", "deferred_pbr_test.summed_area_table.bloom_acquire"};
+        "deferred_pbr_test.mipmap.bloom_acquire",
+        "deferred_pbr_test.summed_area_table.bloom_acquire",
+    };
     // The frame-sequence present and acquisition tasks share an id, so one command enables both on the same frames.
     static constexpr std::array<std::string_view, 2> FRAME_SEQUENCE_EVENT_IDS = {
-        "deferred_pbr_test.mipmap.frame_sequence", "deferred_pbr_test.summed_area_table.frame_sequence"};
+        "deferred_pbr_test.mipmap.frame_sequence",
+        "deferred_pbr_test.summed_area_table.frame_sequence",
+    };
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
+    // Event ids of the RTToggleVK::Command that gates the tasks of each voxel debug view mode group, shared by both graphs;
+    // see is_voxel_debug_view_toggle_enabled(). The recipe receives each as voxel_debug_view_toggles.<name>.
+    static constexpr std::array<std::string_view, 4> VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS = {
+        "deferred_pbr_test.voxel_debug_view.disabled",
+        "deferred_pbr_test.voxel_debug_view.enabled",
+        "deferred_pbr_test.voxel_debug_view.post_svo_build",
+        "deferred_pbr_test.voxel_debug_view.pre_deferred_propagation",
+    };
+    static constexpr std::array<std::string_view, 4> VOXEL_DEBUG_VIEW_TOGGLE_NAMES = {
+        "disabled",
+        "enabled",
+        "post_svo_build",
+        "pre_deferred_propagation",
+    };
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
+    // RTTriggeredVK event of the voxel structure's static construction tasks in both graphs; see finish_voxel_static_build().
+    static constexpr std::string_view VOXEL_STATIC_BUILD_EVENT_ID = "deferred_pbr_test.voxel_static_build";
 
     // Number of spot lights in the scene; T switches which one the light controls move.
     static constexpr uint32_t SPOT_LIGHT_COUNT = 2;
@@ -234,42 +253,28 @@ private:
     ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
     GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     static SpotLightGraphIds make_spot_light_graph_ids(uint32_t p_light_index);
-    RendTaskDescVK create_shadow_task(uint32_t p_light_index, bool p_load_existing, bool p_double_sided = false) const;
-    // Map every slot of a lighting shader's lights[] array to a light's shadow resources. Each pair maps the indexed
-    // task-local base id `<first>[<slot>]` to the light's graph resource `<second>_<light>`; slots past SPOT_LIGHT_COUNT
-    // reuse light zero so that every reflected descriptor binds.
-    static void alias_spot_light_resources(
-        RendTaskDescVK& p_task_desc, std::span<const std::pair<std::string_view, std::string_view>> p_resource_ids);
     // Advance the spot light the light controls move, as the T key does.
     void select_next_controlled_spot_light();
-    RendTaskDescVK create_gbuffer_task(bool p_load_existing, bool p_double_sided = false) const;
     void compile_shadow_moments_summed_area_table_pipelines();
     void compile_lighting_pipelines();
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table, RendTaskDescVK p_gbuffer_opaque_task);
-    void add_spot_light_shadow_tasks(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const;
-    void connect_spot_light_shadow_tasks(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index, bool p_use_summed_area_table) const;
-    void add_render_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
-    void add_graph_owned_resources(RendGraphDescVK& p_pipeline_desc) const;
-    void add_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
-    void add_spot_light_shadow_graph_resources(RendGraphDescVK& p_pipeline_desc, uint32_t p_light_index) const;
-    static void add_gbuffer_graph_resources(RendGraphDescVK& p_pipeline_desc);
-    void add_lighting_graph_resources(RendGraphDescVK& p_pipeline_desc) const;
-    void connect_deferred_render_tasks(
-        RendGraphDescVK& p_pipeline_desc, bool p_use_summed_area_table, std::string_view p_post_processing_last_task_id) const;
-    RendTaskDescVK create_shadow_mipmap_task_desc(uint32_t p_light_index) const;
-    RendTaskDescVK create_shadow_moments_summed_area_table_task_desc(uint32_t p_light_index) const;
-    RendTaskDescVK create_direct_lighting_task_desc(bool p_use_summed_area_table) const;
-    RendTaskDescVK create_indirect_lighting_task_desc() const;
-    RendTaskDescVK create_combine_lighting_task_desc() const;
-    RendTaskDescVK create_bloom_extract_task_desc() const;
-    RendTaskDescVK create_bloom_blur_task_desc() const;
-    RendTaskDescVK create_bloom_acquire_task_desc(bool p_use_summed_area_table);
-    RendTaskDescVK create_present_result_image_task_desc() const;
-    RendTaskDescVK create_present_frame_sequence_task_desc(bool p_use_summed_area_table);
+    void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table);
+    // Run the deferred recipe for a graph context, then add the mesh and voxel parts that stay in C++.
+    RendGraphDescVK make_deferred_render_graph_desc(bool p_use_summed_area_table, const RendGraphContextVK& p_context);
+    DataValue make_deferred_recipe_context(bool p_use_summed_area_table, const RendGraphContextVK& p_context) const;
+    // The application-owned resources the recipe imports, and the tasks built in C++ that it imports.
+    RendGraphRecipeImportsVK make_deferred_recipe_imports(bool p_use_summed_area_table);
+    RendTaskDescVK create_mesh_acceleration_structure_build_task_desc();
+    // Whether a voxel debug view toggle group records in a mode: 0 while the debug view is disabled, 1 while it is
+    // enabled, 2 in the post-SVO-build view, and 3 in the pre-deferred-propagation view.
+    static bool is_voxel_debug_view_toggle_enabled(size_t p_group, VoxelDebugViewMode p_mode);
+    // Emit the toggle events of a changed voxel debug view mode. Runs on the rendering thread, between frames.
+    void apply_voxel_debug_view_mode();
+    // Disable the voxel static construction once a graph has recorded it, so neither the other graph nor a rebuild records
+    // it again. Runs on the rendering thread, between frames.
+    void finish_voxel_static_build();
     RendTaskDescVK create_frame_sequence_acquire_task_desc(bool p_use_summed_area_table);
-    RendTaskDescVK create_light_billboard_task_desc(uint32_t p_light_index) const;
     RendTaskDescVK create_imgui_task_desc();
     CompositionCameraInfo make_composition_camera_info() const;
     // Write a completed bloom acquisition. Runs on a worker thread.
@@ -375,6 +380,12 @@ private:
     std::atomic_bool frame_capture_requested = false;
     std::atomic<bool> summed_area_table_requested = false;
     std::atomic<VoxelDebugViewMode> voxel_debug_view_mode = VoxelDebugViewMode::DISABLED;
+    // The mode the toggled tasks follow; owned by the rendering thread.
+    VoxelDebugViewMode applied_voxel_debug_view_mode = VoxelDebugViewMode::DISABLED;
+    // Whether the voxel static construction has yet to record, and the frame the deferred graphs were registered on; owned
+    // by the rendering thread.
+    bool voxel_static_build_pending = true;
+    uint64_t voxel_static_build_registration_frame = 0;
     bool summed_area_table_active = false;
     // Draws the configuration window into the swap chain after every other pass. Destroyed before the renderer, after
     // the rendering thread has stopped.

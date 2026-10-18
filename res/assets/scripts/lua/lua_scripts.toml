@@ -34,3 +34,23 @@ source_file = "assets/scripts/lua/render_graphs/draw_cube_unshaded.lua"
 id = "render_graphs.pixel_sorting"
 source_type = "script"
 source_file = "assets/scripts/lua/render_graphs/pixel_sorting.lua"
+
+[[resources]]
+id = "render_graphs.deferred"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/deferred.lua"
+
+[[resources]]
+id = "render_graphs.features.pixel_sort"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/features/pixel_sort.lua"
+
+[[resources]]
+id = "render_graphs.features.voxel_svo"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/features/voxel_svo.lua"
+
+[[resources]]
+id = "render_graphs.features.voxel_octree"
+source_type = "script"
+source_file = "assets/scripts/lua/render_graphs/features/voxel_octree.lua"

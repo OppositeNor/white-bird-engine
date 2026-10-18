@@ -104,11 +104,27 @@ For non-trivial implementation tasks:
   it are application-owned imports, registered in the render database under their import name.
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`. Tasks name a registered task type
   and pass `params` to it; `aliases` map task-local ids to graph resources. Edges come only from each task's `connect`
-  entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`.
+  entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`, and an
+  optional `toggle` (`{ event, enabled }`) wraps it with `RTToggleVK`, outside any trigger. Rebuilds re-run the recipe, so
+  pass a toggle's current state through the context.
 - Task `pipeline` params are render-database keys; the application compiles those pipelines and keeps them alive.
+- Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
+  assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each compiled mesh in the render database under
+  the graph id its draws name (`mesh`), which they import it under, so shared meshes are compiled and imported once.
+- A rebuild callback may add to the descriptor `RendGraphRecipeBuilderVK::build()` returns, for parts not yet expressed
+  in Lua (the deferred test adds its acceleration structure and dynamic mesh entities that way); keep everything else in
+  the recipe.
+- A C++ feature that contributes to a recipe describes itself with a `configure_recipe()` that writes the parameters of its
+  Lua feature module (including the `module` name) into the context and supplies its resources and C++ tasks to the
+  `RendGraphRecipeImportsVK`; the recipe calls `require(params.module).add(...)`. Work that runs once, such as a static
+  build, is a `trigger` activated while it is still pending; the application disables the trigger event after the first
+  recorded frame, so later rebuilds create it inactive. Task state that must follow runtime input across rebuilds is a
+  `toggle` whose event the application emits and whose current state it passes through the context.
+- Use `full_memory_barrier` (`RTFullMemoryBarrierVK`) to order a frame's mutation of persistent state after the previous
+  frame's consumers, and `run_graphics_pipeline_indirect` for non-mesh indexed indirect draws.
 - Tasks that need application objects (for example the ImGui overlay) are built in C++ and supplied with
   `RendGraphRecipeImportsVK::add_task()`; the recipe lists each as `{ id = <task id>, import = true }` and wires it with
-  `connect` like any task. Imported tasks set no `type`, `params`, `aliases`, or `trigger`, and supplied and imported
+  `connect` like any task. Imported tasks set no `type`, `params`, `aliases`, `trigger`, or `toggle`, and supplied and imported
   tasks must match, like resource imports.
 - `templates/lua_types.lua.jinja` generates editor-only LuaLS type stubs at `build/<target>/lua/wbe_types.lua`, which the
   repo-root `.luarc.json` loads; annotate `build` with `---@param context wbe.RecipeContext` and
@@ -117,7 +133,9 @@ For non-trivial implementation tasks:
 ### Lua Scripts
 
 - Lua sources live under `res/assets/scripts/lua/` and are `script` resources declared in
-  `res/assets/scripts/lua/lua_scripts.toml`: recipes in `render_graphs/`, shared helpers in `utils/`.
+  `res/assets/scripts/lua/lua_scripts.toml`: recipes in `render_graphs/`, reusable recipe parts (modules whose
+  `add(graph, params, target)` adds resources and tasks to a recipe under construction) in `render_graphs/features/`,
+  and shared helpers in `utils/`.
 - A script's resource id is its module name: its path under `scripts/lua/` without `.lua`, with dots for slashes
   (`utils/render_graph.lua` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
   runtime (through `SMRResourceManager`) and in the editor.

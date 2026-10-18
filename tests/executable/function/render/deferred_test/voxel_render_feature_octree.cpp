@@ -14,32 +14,54 @@
 */
 #include "voxel_render_feature_octree.hh"
 #include "../render_test.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "dynamic_mesh_render_feature.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
+#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "i_voxel_render_feature.hh"
 #include "resource/resource_manager/resource_manager.hh"
-#include "rt_voxel_debug_view_vk.hh"
-#include "rt_voxel_frame_begin_vk.hh"
-#include "rt_voxel_static_stage_vk.hh"
 #include "utils/defs.hh"
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 namespace {
+
+// Render database keys of the construction pipelines, which the graphics_draw_mesh construction tasks name.
+constexpr std::string_view BUILD_PIPELINE = "octree_build_static_mesh_pipeline";
+constexpr std::string_view DYNAMIC_BUILD_PIPELINE = "octree_dynamic_build_static_mesh_pipeline";
 
 /**
  * @brief Clears octree textures to OCTREE_EMPTY in every mip level; neither copyable nor movable.
@@ -132,25 +154,18 @@ private:
 
 } // namespace
 
-VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
-    Ref<MeshResourcesVK> p_static_mesh_resources,
-    const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
-    bool p_rebuild_static_every_frame)
+VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(
+    RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_mesh_resources(std::move(p_static_mesh_resources)), debug_view_mode(p_debug_view_mode),
-      rebuild_static_every_frame(p_rebuild_static_every_frame) {
+      static_mesh_resources(std::move(p_static_mesh_resources)), rebuild_static_every_frame(p_rebuild_static_every_frame) {
     if (renderer_vk == nullptr) {
         throw std::runtime_error("VoxelRenderFeatureOctree: renderer is required.");
     }
     if (static_mesh_resources == MEM_NULL) {
         throw std::runtime_error("VoxelRenderFeatureOctree: static scene is required.");
     }
-    if (debug_view_mode == nullptr) {
-        throw std::runtime_error("VoxelRenderFeatureOctree: debug view state is required.");
-    }
     base_render_data = renderer_vk->get_base_render_data();
     render_allocator = base_render_data->allocator;
-    static_build_completed = make_ref<bool>(render_allocator, false);
     compile_pipelines();
     create_resources();
 }
@@ -211,12 +226,11 @@ void VoxelRenderFeatureOctree::compile_pipelines() {
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
     });
-    constexpr std::string_view BUILD_PIPELINE = "octree_build_static_mesh_pipeline";
     build_pipeline =
         build_compiler.compile(BUILD_PIPELINE, resource_manager->get_resource<RUGraphicsPipeline>(BUILD_PIPELINE)).graphics_pipeline;
-    constexpr std::string_view DYNAMIC_BUILD_PIPELINE = "octree_dynamic_build_static_mesh_pipeline";
     dynamic_build_pipeline =
-        build_compiler.compile(DYNAMIC_BUILD_PIPELINE, resource_manager->get_resource<RUGraphicsPipeline>(DYNAMIC_BUILD_PIPELINE))
+        build_compiler
+            .compile(DYNAMIC_BUILD_PIPELINE, resource_manager->get_resource<RUGraphicsPipeline>(DYNAMIC_BUILD_PIPELINE))
             .graphics_pipeline;
     debug_gather_leaves_pipeline = compile_compute_pipeline("octree_debug_gather_leaves_shader");
     debug_gather_nodes_pipeline = compile_compute_pipeline("octree_debug_gather_nodes_shader");
@@ -298,34 +312,6 @@ void VoxelRenderFeatureOctree::create_resources() {
                           .create_ref(base_render_data);
 }
 
-void VoxelRenderFeatureOctree::register_render_graph_data(RendGraphDescVK& p_graph) const {
-    p_graph.add_resource(OCTREE_INFO, *octree_info)
-        .add_resource(OCTREE_STATIC, *static_view)
-        .add_resource(OCTREE_DYNAMIC, *dynamic_view)
-        .add_resource(OCTREE_DEBUG_DRAW_INDEX_BUFFER, *debug_draw_index_buffer)
-        .add_resource(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, *debug_draw_indirect_buffer)
-        .add_resource(OCTREE_DEBUG_LEAF_MASKS, *debug_leaf_masks)
-        .add_resource(OCTREE_DEBUG_NODE_DRAW_INDIRECT_BUFFER, *debug_node_draw_indirect_buffer)
-        .add_resource(OCTREE_DEBUG_NODE_LIST, *debug_node_list);
-    for (uint32_t level = 0; level < OCTREE_LEVEL_COUNT; ++level) {
-        p_graph.add_resource(get_static_level_resource_id(level), *static_level_views[level])
-            .add_resource(get_dynamic_level_resource_id(level), *dynamic_level_views[level]);
-    }
-}
-
-RendTaskDescVK VoxelRenderFeatureOctree::make_static_once(RendTaskDescVK p_task, bool p_finish) const {
-    if (rebuild_static_every_frame) {
-        // The reset stage empties both textures, so every frame rebuilds from an empty octree.
-        return p_task;
-    }
-    p_task.factory = [this, task_factory = p_task.factory, p_finish](const RendGraphContextVK& p_context) {
-        auto stage = make_unique<RTVoxelStaticStageVK>(
-            render_allocator, task_factory(p_context), static_build_completed, p_finish, "Octree static construction recorded once.");
-        return make_unique<RTTriggeredVK>(render_allocator, std::move(stage), true);
-    };
-    return p_task;
-}
-
 RendTaskDescVK VoxelRenderFeatureOctree::make_texture_write(RendTaskDescVK p_task, std::string_view p_texture_view_id) const {
     p_task.factory = [this, task_factory = p_task.factory, texture_view_id = std::string(p_texture_view_id)](
                          const RendGraphContextVK& p_context) {
@@ -358,159 +344,105 @@ RendTaskDescVK VoxelRenderFeatureOctree::get_clear_render_task_desc(std::string_
     return task_desc;
 }
 
-RendTaskDescVK VoxelRenderFeatureOctree::get_construction_render_task_desc(
-    std::string_view p_task_id, bool p_double_sided, const DynamicMeshRenderFeature* p_dynamic_mesh, size_t p_dynamic_entity_index) const {
-    constexpr std::array<VkClearValue, 0> CLEAR_VALUES{};
-    constexpr std::array<std::string_view, 0> COLOR_ATTACHMENT_IDS{};
-    const VkExtent2D extent{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT};
+RendTaskDescVK& VoxelRenderFeatureOctree::add_construction_render_task(RendGraphDescVK& p_graph,
+    std::string_view p_task_id,
+    bool p_double_sided,
+    const DynamicMeshRenderFeature* p_dynamic_mesh,
+    size_t p_dynamic_entity_index) const {
+    const RendExtent2DParamsVK extent{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT};
     if (p_dynamic_mesh != nullptr) {
-        return make_texture_write(
-            p_dynamic_mesh->make_task(p_task_id, p_dynamic_entity_index, dynamic_build_pipeline, make_fixed_extent_factory(extent)),
-            OCTREE_DYNAMIC);
+        RendTaskDescVK& task = p_dynamic_mesh->add_task(p_graph, p_task_id, p_dynamic_entity_index, DYNAMIC_BUILD_PIPELINE, extent);
+        task = make_texture_write(task, OCTREE_DYNAMIC);
+        return task;
     }
-    return make_texture_write(make_mesh_task_desc(render_allocator,
-        base_render_data,
+    // The construction pass rasterizes without attachments.
+    RendTaskDescVK& task = RTGraphicsDrawMeshVK::add_to_graph(p_graph,
         p_task_id,
-        static_mesh_resources,
-        build_pipeline,
-        false,
-        CLEAR_VALUES,
-        make_fixed_extent_factory(extent),
-        COLOR_ATTACHMENT_IDS,
-        std::nullopt,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        p_double_sided),
-        OCTREE_STATIC);
+        RTParamsGraphicsDrawMeshVK{
+            .mesh = std::string(STATIC_MESH_KEY),
+            .pipeline = std::string(BUILD_PIPELINE),
+            .parts = {p_double_sided ? MeshPartVK::DOUBLE_SIDED : MeshPartVK::OPAQUE},
+            .render_extent = extent,
+        },
+        base_render_data);
+    task = make_texture_write(task, OCTREE_STATIC);
+    return task;
 }
 
-RendTaskDescVK VoxelRenderFeatureOctree::get_compute_task_desc(
-    std::string_view p_task_id, const Ref<ROComputePipelineVK>& p_pipeline, VkExtent3D p_group_count) const {
-    RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = p_task_id;
-    task_desc.factory = [this, p_pipeline, p_group_count](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTRunComputePipelineVK>(
-            render_allocator, base_render_data, p_pipeline, p_group_count, QueueFamilyVK::COMPUTE_1);
-    };
-    return task_desc;
-}
-
-RendTaskDescVK VoxelRenderFeatureOctree::get_debug_draw_render_task_desc(std::string_view p_task_id,
-    const Ref<ROGraphicsPipelineVK>& p_pipeline,
-    std::string_view p_indirect_buffer_id,
-    uint32_t p_draw_count,
-    VoxelDebugViewMode p_first_mode) const {
-    RendTaskDescVK task_desc(render_allocator);
-    task_desc.task_id = p_task_id;
-    const std::array<std::string_view, 1> color_targets{REND_RES_SWAP_CHAIN};
-    alias_render_targets(task_desc, color_targets, GBUFFER_DEPTH_IMAGE_VIEW);
-    RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
-    task_builder.set_index_buffer(OCTREE_DEBUG_DRAW_INDEX_BUFFER)
-        .set_indirect_buffer(p_indirect_buffer_id)
-        .set_pipeline(p_pipeline, p_draw_count)
-        .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
-        .set_depth_load_op(VK_ATTACHMENT_LOAD_OP_LOAD);
-    task_desc.factory = [this, task_builder, p_first_mode](const RendGraphContextVK& p_context) {
-        RTRunGraphicsPipelineIndirectVK::Builder builder = task_builder;
-        builder.set_render_extent(p_context.swap_chain_extent);
-        return make_unique<RTVoxelDebugViewVK>(render_allocator,
-            builder.create_unique(base_render_data),
-            debug_view_mode,
-            p_first_mode,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
-    };
-    return task_desc;
-}
-
-void VoxelRenderFeatureOctree::add_build_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const {
-    RendTaskDescVK begin(render_allocator);
-    begin.task_id = RT_OCTREE_FRAME_BEGIN;
-    begin.factory = [this](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTVoxelFrameBeginVK>(render_allocator, OCTREE_DYNAMIC);
-    };
-    p_graph.add_task(std::move(begin));
-    // Static scene: empty both textures, then occupy the rasterized leaves and their ancestors.
-    p_graph.add_task(make_static_once(get_clear_render_task_desc(RT_RESET_OCTREE, true)))
-        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE, false, nullptr, 0)))
-        .add_task(make_static_once(get_construction_render_task_desc(RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true, nullptr, 0), true));
-    // Dynamic meshes: empty the dynamic texture, then rebuild it like the static scene.
-    p_graph.add_task(get_clear_render_task_desc(RT_CLEAR_DYNAMIC_OCTREE, false))
-        .add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE, false, &p_dynamic_mesh, 0))
-        .add_task(get_construction_render_task_desc(RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, false, &p_dynamic_mesh, 1));
-    // Debug views: the leaf gather serves both views, and the node gather only the node view.
-    RendTaskDescVK gather_leaves = get_compute_task_desc(RT_GATHER_OCTREE_DEBUG_LEAVES, debug_gather_leaves_pipeline, OCTREE_DEBUG_SUBGRID_GRID_EXTENT);
-    gather_leaves.factory = [this, task_factory = gather_leaves.factory](const RendGraphContextVK& p_context) {
-        return make_unique<RTVoxelDebugViewVK>(render_allocator,
-            task_factory(p_context),
-            debug_view_mode,
-            VoxelDebugViewMode::POST_SVO_BUILD,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
-    };
-    p_graph.add_task(std::move(gather_leaves));
-    RendTaskDescVK gather_nodes = get_compute_task_desc(RT_GATHER_OCTREE_DEBUG_NODES,
-        debug_gather_nodes_pipeline,
-        VkExtent3D{
-            .width = OCTREE_DEBUG_GATHER_GROUP_COUNT, .height = OCTREE_DEBUG_GATHER_GROUP_COUNT, .depth = OCTREE_DEBUG_GATHER_GROUP_COUNT});
-    gather_nodes.factory = [this, task_factory = gather_nodes.factory](const RendGraphContextVK& p_context) {
-        return make_unique<RTVoxelDebugViewVK>(render_allocator,
-            task_factory(p_context),
-            debug_view_mode,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION);
-    };
-    p_graph.add_task(std::move(gather_nodes));
-}
-
-void VoxelRenderFeatureOctree::add_overlay_render_tasks(RendGraphDescVK& p_graph) const {
-    p_graph
-        .add_task(get_debug_draw_render_task_desc(
-            RT_RUN_OCTREE_DEBUG_DRAW,
-            debug_draw_pipeline,
-            OCTREE_DEBUG_DRAW_INDIRECT_BUFFER,
-            OCTREE_DEBUG_LEAF_DRAW_COUNT,
-            VoxelDebugViewMode::POST_SVO_BUILD))
-        .add_task(get_debug_draw_render_task_desc(RT_RUN_OCTREE_DEBUG_NODE_DRAW,
-            debug_node_draw_pipeline,
-            OCTREE_DEBUG_NODE_DRAW_INDIRECT_BUFFER,
-            1,
-            VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION));
-}
-
-void VoxelRenderFeatureOctree::connect_render_tasks(RendGraphDescVK& p_graph) const {
-    // The frame-begin barrier orders this frame's mutation after the previous frame's consumers. The debug gathers read the
-    // full views after every pass writing the textures.
-    connect_resource_chain(p_graph,
-        OCTREE_DYNAMIC,
-        {RT_OCTREE_FRAME_BEGIN,
-            RT_RESET_OCTREE,
-            RT_CLEAR_DYNAMIC_OCTREE,
-            RT_RUN_BUILD_DYNAMIC_OCTREE,
-            RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND,
-            RT_GATHER_OCTREE_DEBUG_LEAVES,
-            RT_GATHER_OCTREE_DEBUG_NODES});
-    connect_resource_chain(p_graph,
-        OCTREE_STATIC,
-        {RT_RESET_OCTREE, RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, RT_GATHER_OCTREE_DEBUG_LEAVES, RT_GATHER_OCTREE_DEBUG_NODES});
-    // The raster passes write every mip level through the per-level views.
-    for (uint32_t level = 0; level < OCTREE_LEVEL_COUNT; ++level) {
-        connect_resource_chain(
-            p_graph, get_static_level_resource_id(level), {RT_RESET_OCTREE, RT_RUN_BUILD_OCTREE, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED});
-        connect_resource_chain(p_graph,
-            get_dynamic_level_resource_id(level),
-            {RT_RESET_OCTREE, RT_CLEAR_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND});
+RendTaskDescVK VoxelRenderFeatureOctree::make_static_build(RendTaskDescVK p_task, const VoxelRecipeInputs& p_inputs) const {
+    if (rebuild_static_every_frame) {
+        // The reset stage empties both textures, so every frame rebuilds from an empty octree.
+        return p_task;
     }
-    connect_resource_chain(p_graph, OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, {RT_GATHER_OCTREE_DEBUG_LEAVES, RT_RUN_OCTREE_DEBUG_DRAW});
-    connect_resource_chain(p_graph, OCTREE_DEBUG_LEAF_MASKS, {RT_GATHER_OCTREE_DEBUG_LEAVES, RT_RUN_OCTREE_DEBUG_DRAW});
-    // The leaf gather empties the node view before the node gather fills it.
-    connect_resource_chain(p_graph,
-        OCTREE_DEBUG_NODE_DRAW_INDIRECT_BUFFER,
-        {RT_GATHER_OCTREE_DEBUG_LEAVES, RT_GATHER_OCTREE_DEBUG_NODES, RT_RUN_OCTREE_DEBUG_NODE_DRAW});
-    connect_resource_chain(
-        p_graph, OCTREE_DEBUG_NODE_LIST, {RT_GATHER_OCTREE_DEBUG_LEAVES, RT_GATHER_OCTREE_DEBUG_NODES, RT_RUN_OCTREE_DEBUG_NODE_DRAW});
+    p_task.factory = RTTriggeredVK::wrap_factory(
+        std::move(p_task.factory), std::string(p_inputs.static_build_event), base_render_data, p_inputs.static_build_pending);
+    return p_task;
 }
 
-std::span<const std::string_view> VoxelRenderFeatureOctree::get_overlay_render_task_ids() const {
-    return OVERLAY_RENDER_TASK_IDS;
+void VoxelRenderFeatureOctree::configure_recipe(
+    DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const {
+    if (p_inputs.dynamic_mesh == nullptr) {
+        throw std::runtime_error("VoxelRenderFeatureOctree: the dynamic mesh is required to configure a recipe.");
+    }
+    p_parameters.set_value("module", std::string("render_graphs.features.voxel_octree"));
+    p_parameters.set_value("level_count", OCTREE_LEVEL_COUNT);
+    DataValue leaf_gather_group_count = DataValue::make_map();
+    leaf_gather_group_count.set_value("x", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.width);
+    leaf_gather_group_count.set_value("y", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.height);
+    leaf_gather_group_count.set_value("z", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.depth);
+    p_parameters.set_entry("leaf_gather_group_count", leaf_gather_group_count);
+    p_parameters.set_value("node_gather_group_count", OCTREE_DEBUG_GATHER_GROUP_COUNT);
+    p_parameters.set_value("leaf_draw_count", OCTREE_DEBUG_LEAF_DRAW_COUNT);
+
+    // Textures and buffers.
+    DataValue imports = DataValue::make_list();
+    const auto import = [&p_imports, &imports](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
+        p_imports.add(p_name, p_resource);
+        imports.push_back(DataValue::make_string(p_name));
+    };
+    import(OCTREE_INFO, *octree_info);
+    import(OCTREE_STATIC, *static_view);
+    import(OCTREE_DYNAMIC, *dynamic_view);
+    import(OCTREE_DEBUG_DRAW_INDEX_BUFFER, *debug_draw_index_buffer);
+    import(OCTREE_DEBUG_DRAW_INDIRECT_BUFFER, *debug_draw_indirect_buffer);
+    import(OCTREE_DEBUG_LEAF_MASKS, *debug_leaf_masks);
+    import(OCTREE_DEBUG_NODE_DRAW_INDIRECT_BUFFER, *debug_node_draw_indirect_buffer);
+    import(OCTREE_DEBUG_NODE_LIST, *debug_node_list);
+    for (uint32_t level = 0; level < OCTREE_LEVEL_COUNT; ++level) {
+        import(get_static_level_resource_id(level), *static_level_views[level]);
+        import(get_dynamic_level_resource_id(level), *dynamic_level_views[level]);
+    }
+    p_parameters.set_entry("imports", imports);
+
+    // The clears record vkCmdClearColorImage, and the construction passes report the full texture view they write through
+    // the per-level views; both are C++ tasks the recipe imports. The static ones record once.
+    p_imports.add_task(make_static_build(get_clear_render_task_desc(RT_RESET_OCTREE, true), p_inputs))
+        .add_task(get_clear_render_task_desc(RT_CLEAR_DYNAMIC_OCTREE, false));
+    // The construction draws are prepared on a descriptor of their own, which must hold nothing but the mesh imports the
+    // recipe's own mesh draws provide.
+    RendGraphDescVK construction(render_allocator);
+    add_construction_render_task(construction, RT_RUN_BUILD_OCTREE, false, nullptr, 0);
+    add_construction_render_task(construction, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true, nullptr, 0);
+    add_construction_render_task(construction, RT_RUN_BUILD_DYNAMIC_OCTREE, false, p_inputs.dynamic_mesh, 0);
+    add_construction_render_task(construction, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, false, p_inputs.dynamic_mesh, 1);
+    if (!construction.buffers.empty() || !construction.images.empty() || !construction.image_views.empty() ||
+        !construction.samplers.empty()) {
+        throw std::runtime_error("VoxelRenderFeatureOctree: the construction passes declared graph-owned resources.");
+    }
+    for (const RendResVK& resource : construction.resources) {
+        const std::string_view id = resource.res_id;
+        const auto is_mesh_import = [id](std::string_view p_mesh_key) {
+            return id == p_mesh_key || id.starts_with(std::format("{}.", p_mesh_key));
+        };
+        if (!is_mesh_import(STATIC_MESH_KEY) && !is_mesh_import(DYNAMIC_MESH_KEY)) {
+            throw std::runtime_error(std::format(
+                "VoxelRenderFeatureOctree: the construction passes import '{}', which the recipe does not provide.", id));
+        }
+    }
+    for (RendTaskDescVK& task : construction.tasks) {
+        const bool is_static = task.task_id == RT_RUN_BUILD_OCTREE || task.task_id == RT_RUN_BUILD_OCTREE_DOUBLE_SIDED;
+        p_imports.add_task(is_static ? make_static_build(std::move(task), p_inputs) : std::move(task));
+    }
 }
 
 } // namespace WhiteBirdEngine

@@ -20,14 +20,13 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -42,8 +41,9 @@ class RendererVK;
  * @class DynamicMeshRenderFeature
  * @brief Draws several moving entities of one mesh compiled once by MeshCompilerVK. Neither copyable nor movable.
  *
- * The mesh is imported once under DYNAMIC_MESH_KEY; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` and needs its
- * own draw task per pass. All methods run on the rendering thread. Geometry requires reconstruction to change.
+ * The mesh is registered in the render database under DYNAMIC_MESH_KEY, which its graphics_draw_mesh tasks import it
+ * under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` and needs its own draw task per pass. All methods run
+ * on the rendering thread. Geometry requires reconstruction to change.
  */
 class DynamicMeshRenderFeature {
 public:
@@ -67,9 +67,15 @@ public:
     }
 
     /**
-     * @brief Import the mesh and every entity into p_graph before graph construction.
+     * @brief Import every entity into p_graph before graph construction; the draw tasks import the mesh.
      */
     void register_resources(RendGraphDescVK& p_graph) const;
+
+    /**
+     * @brief Get the graph id of an entity's whole-mesh transform, for graphics_draw_mesh's transform parameter.
+     * @throws std::runtime_error If p_entity_index is out of range.
+     */
+    std::string get_entity_transform_id(size_t p_entity_index) const;
 
     /**
      * @brief Place one entity; every frame slot applies the latest transform.
@@ -78,14 +84,28 @@ public:
     void set_transform(size_t p_entity_index, const glm::mat4& p_transform);
 
     /**
-     * @brief Construct an indirect pass drawing one entity's opaque category with its resources mapped to the pipeline.
-     * Existing attachments are loaded; the caller declares pass-specific shader reads and dependencies.
+     * @brief Make the parameters of a graphics_draw_mesh task drawing one entity's opaque part; existing attachments are
+     * loaded.
+     * @param p_entity_index The entity.
+     * @param p_pipeline_key Render database key of the compiled graphics pipeline.
+     * @param p_extent The render area.
      * @throws std::runtime_error If p_entity_index is out of range.
      */
-    RendTaskDescVK make_task(std::string_view p_task_id,
+    RTParamsGraphicsDrawMeshVK make_draw_params(
+        size_t p_entity_index, std::string_view p_pipeline_key, const RendExtent2DParamsVK& p_extent) const;
+
+    /**
+     * @brief Add a graphics_draw_mesh task drawing one entity (see make_draw_params()) and alias its render targets; the
+     * caller declares pass-specific shader reads and dependencies.
+     * @return The added task descriptor; invalidated when another task is added.
+     * @throws std::runtime_error If p_entity_index is out of range, or under the conditions of
+     * RTGraphicsDrawMeshVK::add_to_graph().
+     */
+    RendTaskDescVK& add_task(RendGraphDescVK& p_graph,
+        std::string_view p_task_id,
         size_t p_entity_index,
-        Ref<ROGraphicsPipelineVK> p_pipeline,
-        std::function<VkExtent2D(const RendGraphContextVK&)> p_extent,
+        std::string_view p_pipeline_key,
+        const RendExtent2DParamsVK& p_extent,
         std::span<const std::string_view> p_colors = {},
         std::optional<std::string_view> p_depth = std::nullopt) const;
 

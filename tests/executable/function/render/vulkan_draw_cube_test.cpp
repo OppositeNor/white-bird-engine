@@ -12,7 +12,6 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_raw.hh"
@@ -25,6 +24,9 @@
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -32,8 +34,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
@@ -54,6 +55,7 @@
 #include <glm/vec3.hpp>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -89,7 +91,7 @@ private:
     void setup_render_context();
     void load_resources();
     void setup_spot_light();
-    void register_draw_cube_render_graph(WBE::RendTaskDescVK p_shadow_task, WBE::RendTaskDescVK p_main_task);
+    void register_draw_cube_render_graph(WBE::RenderTestMeshDraw p_shadow_task, WBE::RenderTestMeshDraw p_main_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::BaseRenderDataVK* base_render_data = nullptr;
@@ -185,7 +187,7 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
         return;
     }
     CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
-    add_render_job([camera_info, camera_info_buffer]() {
+    add_render_job([camera_info, camera_info_buffer] {
         camera_info_buffer->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     });
 }
@@ -199,37 +201,39 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     load_resources();
     setup_spot_light();
 
-    static_mesh_resources = WBE::create_mesh_resources(renderer_vk, cube_mesh, main_pipeline_resource);
+    static_mesh_resources = WBE::create_mesh_resources(renderer_vk, WBE::STATIC_MESH_KEY, cube_mesh, main_pipeline_resource);
     const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
+    // The render database holds the pipelines weakly; the draw tasks look them up by key and keep them alive.
     WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "draw_cube_shadow_pipeline", shadow_pipeline_resource, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
-    const std::array<VkClearValue, 2> shadow_clear_values{VkClearValue{}, VkClearValue{.depthStencil = {.depth = 0.0F, .stencil = 0}}};
-    const std::array<std::string_view, 1> shadow_color_attachments{REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW};
-    WBE::RendTaskDescVK shadow_task = WBE::make_mesh_task_desc(render_allocator,
-        base_render_data,
-        RT_RUN_PIPELINE_SHADOWMAP,
-        static_mesh_resources,
-        shadow_pipeline,
-        false,
-        shadow_clear_values,
-        WBE::make_fixed_extent_factory(shadow_extent),
-        shadow_color_attachments,
-        REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
+    WBE::RenderTestMeshDraw shadow_task{
+        .task_id = std::string(RT_RUN_PIPELINE_SHADOWMAP),
+        .params =
+            WBE::RTParamsGraphicsDrawMeshVK{
+                .mesh = std::string(WBE::STATIC_MESH_KEY),
+                .pipeline = "draw_cube_shadow_pipeline",
+                .parts = {WBE::MeshPartVK::OPAQUE},
+                .render_extent = WBE::make_fixed_extent_params(shadow_extent),
+                .clear_values = {WBE::make_clear_color(0.0F, 0.0F, 0.0F, 0.0F), WBE::make_clear_depth(0.0F)},
+            },
+        .color_attachment_ids = {std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW)},
+        .depth_attachment_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
+    };
 
     const std::array main_formats{base_render_data->swap_chain_format};
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_pipeline =
         WBE::compile_render_test_graphics_pipeline(renderer_vk, "draw_cube_main_pipeline", main_pipeline_resource, main_formats);
-    const std::array<VkClearValue, 1> main_clear_values{};
-    const std::array<std::string_view, 1> main_color_attachments{WBE::REND_RES_SWAP_CHAIN};
-    WBE::RendTaskDescVK main_task = WBE::make_mesh_task_desc(render_allocator,
-        base_render_data,
-        RT_RUN_PIPELINE,
-        static_mesh_resources,
-        main_pipeline,
-        false,
-        main_clear_values,
-        &WBE::RendGraphContextVK::swap_chain_extent,
-        main_color_attachments);
+    WBE::RenderTestMeshDraw main_task{
+        .task_id = std::string(RT_RUN_PIPELINE),
+        .params =
+            WBE::RTParamsGraphicsDrawMeshVK{
+                .mesh = std::string(WBE::STATIC_MESH_KEY),
+                .pipeline = "draw_cube_main_pipeline",
+                .parts = {WBE::MeshPartVK::OPAQUE},
+                .clear_values = {WBE::make_clear_color(0.0F, 0.0F, 0.0F, 0.0F)},
+            },
+        .color_attachment_ids = {std::string(WBE::REND_RES_SWAP_CHAIN)},
+    };
 
     register_draw_cube_render_graph(std::move(shadow_task), std::move(main_task));
 }
@@ -269,7 +273,8 @@ void ApplicationVulkanDrawCubeTest::setup_spot_light() {
     };
 }
 
-void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTaskDescVK p_shadow_task, WBE::RendTaskDescVK p_main_task) {
+void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
+    WBE::RenderTestMeshDraw p_shadow_task, WBE::RenderTestMeshDraw p_main_task) {
     static constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
     static constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
     const VkExtent3D shadow_image_extent{.width = shadow_extent.width, .height = shadow_extent.height, .depth = 1};
@@ -298,41 +303,43 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
             camera_info_data,
             spot_light_count_data](const WBE::RendGraphContextVK& /*p_graph_context*/) {
             WBE::RendGraphDescVK pipeline_desc(render_allocator);
-            pipeline_desc.add_resource(WBE::STATIC_MESH_KEY, *static_mesh_resources);
             pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
                 .add_image(SHADOWMAP_DEPTH_IMAGE,
                     [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
+                        return WBE::RendImageDescVK{
+                            .usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
                             .format = SHADOWMAP_DEPTH_FORMAT,
-                            .extent = shadow_image_extent};
+                            .extent = shadow_image_extent,
+                        };
                     })
                 .add_image(SHADOWMAP_COLOR_IMAGE,
                     [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendImageDescVK{.usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET,
+                        return WBE::RendImageDescVK{
+                            .usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET,
                             .format = SHADOWMAP_COLOR_FORMAT,
-                            .extent = shadow_image_extent};
+                            .extent = shadow_image_extent,
+                        };
                     })
                 .add_image_view(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
                 .add_image_view(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
                 .add_sampler(SHADOW_SAMPLER,
                     [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendSamplerDescVK{.address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        return WBE::RendSamplerDescVK{
+                            .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                             .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                            .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE};
+                            .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        };
                     })
                 .add_buffer(SHADOW_LIGHT_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = spot_light_info_data](
-                        const WBE::RendGraphContextVK& /*p_context*/) {
+                    [make_uniform_buffer, initial_data = spot_light_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
                         return make_uniform_buffer(initial_data);
                     })
                 .add_buffer(SPOT_LIGHT_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = spot_light_info_data](
-                        const WBE::RendGraphContextVK& /*p_context*/) {
+                    [make_uniform_buffer, initial_data = spot_light_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
                         return make_uniform_buffer(initial_data);
                     })
                 .add_buffer(CAMERA_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = camera_info_data](
-                        const WBE::RendGraphContextVK& /*p_context*/) {
+                    [make_uniform_buffer, initial_data = camera_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
                         return make_uniform_buffer(initial_data);
                     })
                 .add_buffer(SPOT_LIGHT_COUNT_BUFFER,
@@ -341,12 +348,9 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(WBE::RendTas
                     });
 
             // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.
-            WBE::RendTaskDescVK main = main_task;
-            WBE::RendTaskDescVK shadow = shadow_task;
-            main.alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            shadow.connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            pipeline_desc.tasks.emplace_back(std::move(shadow));
-            pipeline_desc.tasks.emplace_back(std::move(main));
+            // The draw tasks import the mesh themselves.
+            shadow_task.add_to(pipeline_desc, base_render_data).connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
+            main_task.add_to(pipeline_desc, base_render_data).alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
             return pipeline_desc;
         });
     camera_info_ubo = graph->acquire_resource(CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();

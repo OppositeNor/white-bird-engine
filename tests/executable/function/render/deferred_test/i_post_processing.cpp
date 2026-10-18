@@ -13,15 +13,11 @@
    limitations under the License.
 */
 #include "i_post_processing.hh"
-#include "core/allocator/stl_allocator.hh"
-#include "core/memory/unique.hh"
-#include "function/render/render_defs.hh"
 #include "function/event/event_manager.hh"
-#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render/render_defs.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include <stdexcept>
 #include <string_view>
-#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -39,11 +35,6 @@ IPostProcessing::IPostProcessing(RenderAllocator* p_allocator, std::string_view 
 void IPostProcessing::set_enabled(bool p_enabled) {
     enabled = p_enabled;
     EventManager::get_singleton()->emit(toggle_event_id, RTToggleVK::Command{.enabled = p_enabled});
-}
-
-Unique<IRenderTaskVK> IPostProcessing::make_toggle_task(Unique<IRenderTaskVK> p_task) const {
-    // A task created by a rebuild starts in the current state; later set_enabled() calls reach it through the event.
-    return make_unique<RTToggleVK>(allocator, std::move(p_task), std::string_view(toggle_event_id), enabled);
 }
 
 } // namespace WhiteBirdEngine

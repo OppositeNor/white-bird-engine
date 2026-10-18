@@ -19,15 +19,18 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
 #include <optional>
@@ -47,7 +50,7 @@ namespace WhiteBirdEngine {
  * shared attachment layout. The task reports those accesses, its draw buffers, and every batch's reflected shader resources;
  * map them to graph resources with RendTaskDescVK::alias().
  */
-struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect]) RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     /**
      * @class PipelineBatch
      * @brief One graphics pipeline and its contiguous range of indirect commands.
@@ -188,6 +191,16 @@ struct RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
      * @brief Construct a task from a complete builder configuration.
      */
     RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+
+    /**
+     * @brief Create the task from recipe parameters, as one batch of the pipeline without vertex buffers; used by
+     * RenderTaskRegistryVK.
+     * @throws std::runtime_error If the pipeline is not in the RenderDatabase, or the parameters do not make a valid
+     * builder (see Builder::create_unique()).
+     */
+    WBE_META(WBE_REFLECT)
+    static Unique<IRenderTaskVK> create(
+        const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

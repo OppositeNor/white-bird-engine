@@ -16,24 +16,23 @@
 #define WBE_FILE_I_SVO_RENDER_FEATURE_HH
 
 #include "core/allocator/i_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/vector_float3.hpp"
 #include "i_voxel_render_feature.hh"
 #include <algorithm>
-#include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <glm/vec3.hpp>
-#include <span>
+#include <string>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 
@@ -62,58 +61,12 @@ public:
      * @brief Names the completed-tree view and the pre-deferred-propagation view.
      */
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
+
     /**
-     * @brief Registers all implementation-owned buffers with their stable shader resource names.
+     * @brief Describe the SVO to the render_graphs.features.voxel_svo module, and supply its buffers.
      */
-    virtual void register_render_graph_data(RendGraphDescVK& p_graph) const override;
-    /**
-     * @brief Adds the construction tasks, the dynamic deferred retries, and the debug-draw setup.
-     */
-    virtual void add_build_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const override;
-    /**
-     * @brief Adds the completed-tree overlay followed by the pre-deferred overlay.
-     */
-    virtual void add_overlay_render_tasks(RendGraphDescVK& p_graph) const override;
-    virtual std::span<const std::string_view> get_overlay_render_task_ids() const override;
-    /**
-     * @brief Adds reset, static and dynamic raster draws, publication when required, and pre-deferred capture.
-     */
-    void add_construction_render_tasks(RendGraphDescVK& p_graph, const DynamicMeshRenderFeature& p_dynamic_mesh) const;
-    /**
-     * @brief Connects every SVO task through resource edges on the SVO buffers.
-     * @details Call after all construction, deferred, and debug-draw tasks were added to p_graph.
-     * @param p_graph Graph descriptor containing the SVO tasks.
-     */
-    virtual void connect_render_tasks(RendGraphDescVK& p_graph) const override;
-    /**
-     * @brief Creates the per-frame reset.
-     */
-    RendTaskDescVK get_reset_render_task_desc() const;
-    /**
-     * @brief Creates one raster construction pass over the retained scene.
-     */
-    RendTaskDescVK get_construction_render_task_desc(
-        std::string_view p_task_id,
-        bool p_double_sided = false,
-        const DynamicMeshRenderFeature* p_dynamic_mesh = nullptr,
-        size_t p_dynamic_entity_index = 0) const;
-    /**
-     * @brief Creates bounded deferred retries with the implementation's allocator.
-     * @param p_dynamic Whether the retries continue dynamic construction rather than the static scene.
-     */
-    RendTaskDescVK get_deferred_construction_render_task_desc(bool p_dynamic = true) const;
-    /**
-     * @brief Creates indirect debug-draw setup after construction is complete.
-     */
-    RendTaskDescVK get_debug_draw_setup_render_task_desc() const;
-    /**
-     * @brief Creates the completed-tree overlay drawn over the presented image.
-     */
-    RendTaskDescVK get_debug_draw_render_task_desc() const;
-    /**
-     * @brief Creates the pre-deferred overlay after the completed-tree overlay task.
-     */
-    RendTaskDescVK get_pre_deferred_debug_draw_render_task_desc() const;
+    virtual void configure_recipe(
+        DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
     static constexpr std::string_view RT_RUN_BUILD_SVO_DOUBLE_SIDED = "run_build_svo_double_sided";
     static constexpr std::string_view RT_RESET_SVO = "reset_svo";
@@ -132,22 +85,16 @@ public:
 
     static constexpr std::string_view SVO_INFO = "svo_info";
     static constexpr std::string_view SVO_NODE_BUFFER = "svo_node_buffer";
-    static constexpr std::string_view SVO_DYNAMIC_NODES = "svo_dynamic_nodes";
     static constexpr std::string_view SVO_DYNAMIC_LEAVES = "svo_dynamic_leaves";
     static constexpr std::string_view SVO_LEAF_BUFFER = "svo_leaf_buffer";
-    static constexpr std::string_view SVO_DEFERRED_LIST_PING = "svo_deferred_list_ping";
-    static constexpr std::string_view SVO_DEFERRED_LIST_PONG = "svo_deferred_list_pong";
     static constexpr std::string_view SVO_DEBUG_DRAW_INDEX_BUFFER = "svo_debug_draw_index_buffer";
     static constexpr std::string_view SVO_DEBUG_DRAW_INDIRECT_BUFFER = "svo_debug_draw_indirect_buffer";
-    static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_INFO_BUFFER = "svo_pre_deferred_debug_info_buffer";
-    static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_LIST_BUFFER = "svo_pre_deferred_debug_list_buffer";
     static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER = "svo_pre_deferred_debug_draw_indirect_buffer";
-    static constexpr std::array<std::string_view, 2> OVERLAY_RENDER_TASK_IDS{RT_RUN_SVO_DEBUG_DRAW, RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW};
 
 protected:
     /**
      * @brief Creates the shared pipelines and buffers on the rendering thread.
-     * @details The renderer and debug-mode state must outlive this object and its registered graphs. The feature retains
+     * @details The renderer must outlive this object and its registered graphs. The feature retains
      * shared ownership of the static scene. Invalid dependencies throw.
      * @param p_shader_prefix Resource-key prefix of the static construction shaders.
      * @param p_dynamic_shader_prefix Resource-key prefix of the implementation's own dynamic update shaders: clear, raster
@@ -157,7 +104,6 @@ protected:
      */
     ISVORenderFeature(RendererVK* p_renderer,
         Ref<MeshResourcesVK> p_static_mesh_resources,
-        const std::atomic<VoxelDebugViewMode>* p_debug_view_mode,
         std::string_view p_shader_prefix,
         std::string_view p_dynamic_shader_prefix,
         bool p_rebuild_static_every_frame);
@@ -166,41 +112,15 @@ protected:
      * @brief Workgroup count of the per-frame reset dispatch.
      */
     virtual uint32_t get_reset_group_count() const = 0;
-    /**
-     * @brief Registers resources used only by this implementation.
-     */
-    virtual void register_implementation_render_graph_data(RendGraphDescVK& p_graph) const = 0;
-    /**
-     * @brief Adds the tasks that publish the static raster construction before its deferred retries.
-     */
-    virtual void add_static_publication_render_tasks(RendGraphDescVK& p_graph) const = 0;
-    /**
-     * @brief Adds the tasks that publish the dynamic raster construction before its deferred retries.
-     */
-    virtual void add_dynamic_publication_render_tasks(RendGraphDescVK& p_graph) const = 0;
-    /**
-     * @brief Connects the SVO state resources, whose use depends on the publication strategy.
-     * @details Must order every access of svo_info, the node buffer, the dynamic buffers, and implementation resources.
-     */
-    virtual void connect_implementation_render_tasks(RendGraphDescVK& p_graph) const = 0;
-    /**
-     * @brief Creates the deferred retry task; the caller assigns its task identifier.
-     * @param p_dynamic Whether the retries continue dynamic construction rather than the static scene.
-     */
-    virtual RendTaskDescVK make_deferred_construction_render_task_desc(bool p_dynamic) const = 0;
+    // The `variant` the voxel_svo module builds: "atomic" or "pass_published".
+    virtual std::string_view get_recipe_variant() const = 0;
 
     /**
      * @brief Compiles a compute pipeline from its shader resource key.
      */
     Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_id) const;
-    /**
-     * @brief Runs a static construction stage once unless the static scene is rebuilt every frame.
-     * @param p_finish Whether recording this stage completes the one-time static construction.
-     */
-    RendTaskDescVK make_static_once(RendTaskDescVK p_task, bool p_finish = false) const;
     static constexpr size_t SVO_MAX_DEPTH = 9;
-    static constexpr size_t SVO_VOXEL_COUNT =
-        (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH);
+    static constexpr size_t SVO_VOXEL_COUNT = (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH);
     static constexpr size_t SVO_MAX_NODE_COUNT = SVO_VOXEL_COUNT / 64;
     static constexpr size_t SVO_MAX_DYNAMIC_NODE_COUNT = SVO_MAX_NODE_COUNT;
     static constexpr size_t SVO_MAX_DEFERRED_TASK_COUNT = SVO_VOXEL_COUNT / 8;
@@ -288,7 +208,7 @@ private:
             LEAF = 3,
             ALLOCATING_DYNAMIC = 4,
             NODE_DYNAMIC = 5,
-            LEAF_DYNAMIC = 6
+            LEAF_DYNAMIC = 6,
         };
         enum Subregion {
             XYZ_000,
@@ -299,7 +219,7 @@ private:
             XYZ_101,
             XYZ_110,
             XYZ_111,
-            MAX_SUBREGION
+            MAX_SUBREGION,
         };
         // Mirrors the packed Slang description: state 31:29; leaf occupancy 28:21/block 20:0;
         // nodes use block 20:0 with bits 28:21 unused. Block indices address eight entries.
@@ -339,18 +259,14 @@ private:
     void initialize();
     void compile_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix);
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
-    RendTaskDescVK get_debug_capture_render_task_desc(std::string_view p_task_id, VoxelDebugViewMode p_mode) const;
-    RendTaskDescVK get_dynamic_clear_task_desc() const;
 
     Ref<MeshResourcesVK> static_mesh_resources;
-    const std::atomic<VoxelDebugViewMode>* debug_view_mode;
-    // Skips the run-once wrappers so the static scene is reset and rebuilt every frame.
+    // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
-    // Render-thread completion shared by all graph variants using these buffers.
-    Ref<bool> static_build_completed;
-    Ref<ROBufferVK> dynamic_nodes;
     Ref<ROBufferVK> dynamic_leaves;
     Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;
+    std::string shader_prefix;
+    std::string dynamic_shader_prefix;
     Ref<ROComputePipelineVK> dynamic_clear_pipeline;
     Ref<ROGraphicsPipelineVK> svo_build_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svo_reset_compute_pipeline = MEM_NULL;
@@ -361,12 +277,8 @@ private:
     Ref<ROBufferVK> svo_info;
     Ref<ROBufferVK> svo_nodes;
     Ref<ROBufferVK> svo_leaves;
-    Ref<ROBufferVK> svo_deferred_list_ping;
-    Ref<ROBufferVK> svo_deferred_list_pong;
     Ref<ROBufferVK> svo_debug_draw_index_buffer;
     Ref<ROBufferVK> svo_debug_draw_indirect_buffer;
-    Ref<ROBufferVK> svo_pre_deferred_debug_info_buffer;
-    Ref<ROBufferVK> svo_pre_deferred_debug_list_buffer;
     Ref<ROBufferVK> svo_pre_deferred_debug_draw_indirect_buffer;
 };
 

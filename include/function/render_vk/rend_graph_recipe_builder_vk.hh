@@ -93,7 +93,7 @@ private:
  *
  * The recipe's imports are bound from the caller's table, its resources are declared as graph-owned buffers, images,
  * image views, and samplers, and its tasks are added through RenderTaskRegistryVK::add_task() (so task types'
- * prepare_graph() hooks run), then aliased, connected, and optionally wrapped as triggered tasks. Imported tasks are
+ * prepare_graph() hooks run), then aliased, connected, and optionally wrapped as triggered or toggled tasks. Imported tasks are
  * copied from the caller's table and connected like the others. Graph-level validation
  * (the DAG and resource-conflict rules) happens when the descriptor is built into a RenderGraphVK. Call on the rendering
  * thread, since task types may compile resources while preparing the graph.
@@ -115,7 +115,7 @@ public:
      * @return The descriptor, for a rebuild callback to return (see RendererVK::register_render_graph()).
      * @throws std::runtime_error If the recipe is malformed; a declared import (resource or task) is not supplied or a
      * supplied one is not declared; a resource id is empty, repeated, or sets other than exactly one kind; a task id is
-     * empty or repeated, a task sets no type or an imported task sets a type, params, aliases, or trigger, its aliases are
+     * empty or repeated, a task sets no type or an imported task sets a type, params, aliases, trigger, or toggle, its aliases are
      * not a map of strings, or it connects to an unknown task; or a task cannot be added (see
      * RenderTaskRegistryVK::add_task()). Messages name the recipe location, e.g. `tasks[2] 'gbuffer'`.
      */

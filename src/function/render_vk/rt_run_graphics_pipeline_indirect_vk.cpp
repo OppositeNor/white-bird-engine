@@ -20,12 +20,17 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_clear_value_vk.hh"
+#include "function/render_vk/rt_params_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -35,9 +40,33 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+Unique<IRenderTaskVK> RTRunGraphicsPipelineIndirectVK::create(
+    const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context) {
+    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
+        throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: render data is unavailable.");
+    }
+    Ref<ROGraphicsPipelineVK> pipeline =
+        acquire_task_graphics_pipeline_vk(p_render_data, "RTRunGraphicsPipelineIndirectVK", p_params.pipeline);
+    std::vector<VkClearValue> clear_values;
+    clear_values.reserve(p_params.clear_values.size());
+    for (const RTParamsClearValueVK& clear_value : p_params.clear_values) {
+        clear_values.push_back(clear_value.to_vk());
+    }
+    Builder builder(p_render_data->allocator);
+    builder.set_index_buffer(p_params.index_buffer)
+        .set_indirect_buffer(p_params.indirect_buffer)
+        .set_pipeline(std::move(pipeline), p_params.draw_count)
+        .set_render_extent(p_params.render_extent.resolve(p_context))
+        .set_clear_values(clear_values)
+        .set_color_load_op(to_vk_attachment_load_op(p_params.color_load_op))
+        .set_depth_load_op(to_vk_attachment_load_op(p_params.depth_load_op));
+    return builder.create_unique(p_render_data);
+}
 
 RTRunGraphicsPipelineIndirectVK::Builder::Builder(RenderAllocator* p_allocator)
     : allocator(p_allocator), clear_values(p_allocator), vertex_buffer_ids(p_allocator), indirect_buffer_ids(p_allocator),
@@ -145,7 +174,10 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
       render_targets(p_render_data->allocator,
           first_pipeline(pipeline_batches),
           RenderTargetsVK::Config{
-              .clear_values = p_builder.clear_values, .color_load_op = p_builder.color_load_op, .depth_load_op = p_builder.depth_load_op}),
+              .clear_values = p_builder.clear_values,
+              .color_load_op = p_builder.color_load_op,
+              .depth_load_op = p_builder.depth_load_op,
+          }),
       vertex_buffer_ids(p_builder.vertex_buffer_ids.begin(), p_builder.vertex_buffer_ids.end(), p_render_data->allocator),
       index_buffer_id(p_builder.index_buffer_id),
       indirect_buffer_ids(p_builder.indirect_buffer_ids.begin(), p_builder.indirect_buffer_ids.end(), p_render_data->allocator),
@@ -164,11 +196,13 @@ RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRende
             throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: a batch must bind one vertex buffer per vertex-input binding.");
         }
         if (batch.indirect_buffer_index >= indirect_buffer_ids.size()) {
-            throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: a batch references an indirect buffer that was not configured.");
+            throw std::runtime_error(
+                "RTRunGraphicsPipelineIndirectVK::Builder: a batch references an indirect buffer that was not configured.");
         }
         for (const VertexBufferBindingVK& vertex_buffer : batch.vertex_buffers) {
             if (vertex_buffer.buffer_index >= vertex_buffer_ids.size()) {
-                throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: a batch references a vertex buffer that was not configured.");
+                throw std::runtime_error(
+                    "RTRunGraphicsPipelineIndirectVK::Builder: a batch references a vertex buffer that was not configured.");
             }
         }
         max_vertex_binding_count = std::max(max_vertex_binding_count, batch.vertex_buffers.size());
