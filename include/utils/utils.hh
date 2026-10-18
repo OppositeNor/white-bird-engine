@@ -18,6 +18,8 @@
 #include "core/reflection/reflection_defs.hh"
 #include "utils/defs.hh"
 #include <algorithm>
+#include <charconv>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -25,9 +27,11 @@
 #include <fstream>
 #include <ios>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -271,6 +275,51 @@ inline size_t find_first_pos(std::string_view p_str, std::string_view p_tokens) 
         min_pos = std::min(min_pos, p_str.find(c));
     }
     return min_pos;
+}
+
+/**
+ * @brief Parse a whole string as an integer, without throwing.
+ *
+ * The text must be exactly one integer in base p_base: no surrounding whitespace, no `+`, and a `-` only for signed
+ * types. p_text does not need to be NUL-terminated, so a view into a larger string, such as a substring, works.
+ *
+ * @tparam T The integer type; bool is not accepted.
+ * @param p_text The text to parse.
+ * @param p_base The base, from 2 to 36.
+ * @return The integer, or std::nullopt when p_text is empty, holds anything besides the integer, or the value does not
+ * fit T.
+ */
+template <typename T>
+    requires std::integral<T> && (!std::same_as<T, bool>)
+std::optional<T> try_parse_integer(std::string_view p_text, int p_base = 10) {
+    T value{};
+    const char* text_end = p_text.data() + p_text.size();
+    const auto [end, error] = std::from_chars(p_text.data(), text_end, value, p_base);
+    if (error != std::errc{} || end != text_end) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+/**
+ * @brief Parse a whole string as an integer.
+ *
+ * Accepts what try_parse_integer() accepts.
+ *
+ * @tparam T The integer type; bool is not accepted.
+ * @param p_text The text to parse.
+ * @param p_base The base, from 2 to 36.
+ * @return The integer.
+ * @throws std::runtime_error If p_text is not exactly one integer in base p_base, or the value does not fit T.
+ */
+template <typename T>
+    requires std::integral<T> && (!std::same_as<T, bool>)
+T parse_integer(std::string_view p_text, int p_base = 10) {
+    const std::optional<T> value = try_parse_integer<T>(p_text, p_base);
+    if (!value.has_value()) {
+        throw std::runtime_error(std::format("Failed to parse \"{}\" as an integer in base {}.", p_text, p_base));
+    }
+    return *value;
 }
 
 /**

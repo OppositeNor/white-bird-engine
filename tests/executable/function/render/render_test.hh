@@ -50,10 +50,10 @@
 #include "platform/file_system/path.hh"
 #include "platform/os/os.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -164,13 +164,11 @@ inline bool exec_test_requested(std::string_view p_variable) {
  * @throws std::runtime_error If p_text is not entirely a nonnegative decimal integer.
  */
 inline uint64_t parse_exec_test_frame_count(std::string_view p_text, std::string_view p_error_message) {
-    const char* text_end = p_text.data() + p_text.size();
-    uint64_t value = 0;
-    auto result = std::from_chars(std::string(p_text).c_str(), text_end, value);
-    if (result.ec != std::errc{} || result.ptr != text_end) {
+    const std::optional<uint64_t> value = try_parse_integer<uint64_t>(p_text);
+    if (!value.has_value()) {
         throw std::runtime_error(std::string(p_error_message));
     }
-    return value;
+    return *value;
 }
 
 /**

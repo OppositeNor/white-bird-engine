@@ -13,6 +13,7 @@
    limitations under the License.
 */
 // NOLINTBEGIN
+#include "parse_integer_test.hh" // IWYU pragma: keep
 #include "required_test.hh"      // IWYU pragma: keep
 #include "type_metadata_test.hh" // IWYU pragma: keep
 // NOLINTEND
