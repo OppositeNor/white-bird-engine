@@ -16,64 +16,34 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/unique.hh"
 #include "function/render/render_defs.hh"
+#include "function/event/event_manager.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/rt_toggle_vk.hh"
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-namespace {
-
-// Records the wrapped task only while its post-processing effect is enabled.
-class RTToggleableVK final : public IRenderTaskVK {
-public:
-    RTToggleableVK(Unique<IRenderTaskVK> p_task, const IPostProcessing* p_effect)
-        : task(std::move(p_task)), effect(p_effect) {
-        if (task == MEM_NULL || effect == nullptr) {
-            throw std::runtime_error("Failed to create a toggleable post-processing task: task or effect is null.");
-        }
-    }
-    virtual ~RTToggleableVK() override = default;
-    RTToggleableVK(const RTToggleableVK&) = delete;
-    RTToggleableVK(RTToggleableVK&&) noexcept = delete;
-    RTToggleableVK& operator=(const RTToggleableVK&) = delete;
-    RTToggleableVK& operator=(RTToggleableVK&&) noexcept = delete;
-
-    virtual QueueFamilyVK queue_family() const override {
-        return task->queue_family();
-    }
-
-    virtual void bind_resources(const RendResViewVK& p_resources) override {
-        task->bind_resources(p_resources);
-    }
-
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
-        task->append_accesses(p_reads, p_writes);
-    }
-
-    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
-        if (effect->is_enabled()) {
-            task->record(p_command_buffer, p_delta);
-        }
-    }
-
-private:
-    Unique<IRenderTaskVK> task;
-    const IPostProcessing* effect;
-};
-
-} // namespace
-
-IPostProcessing::IPostProcessing(RenderAllocator* p_allocator)
-    : allocator(p_allocator) {
+IPostProcessing::IPostProcessing(RenderAllocator* p_allocator, std::string_view p_toggle_event_id)
+    : allocator(p_allocator), toggle_event_id(p_toggle_event_id) {
     if (allocator == nullptr) {
         throw std::runtime_error("Failed to create a post-processing effect: allocator is null.");
     }
+    if (toggle_event_id.empty()) {
+        throw std::runtime_error("Failed to create a post-processing effect: the toggle event id is empty.");
+    }
 }
 
-Unique<IRenderTaskVK> IPostProcessing::make_toggleable_task(Unique<IRenderTaskVK> p_task) const {
-    return make_unique<RTToggleableVK>(allocator, std::move(p_task), this);
+void IPostProcessing::set_enabled(bool p_enabled) {
+    enabled = p_enabled;
+    EventManager::get_singleton()->emit(toggle_event_id, RTToggleVK::Command{.enabled = p_enabled});
+}
+
+Unique<IRenderTaskVK> IPostProcessing::make_toggle_task(Unique<IRenderTaskVK> p_task) const {
+    // A task created by a rebuild starts in the current state; later set_enabled() calls reach it through the event.
+    return make_unique<RTToggleVK>(allocator, std::move(p_task), std::string_view(toggle_event_id), enabled);
 }
 
 } // namespace WhiteBirdEngine

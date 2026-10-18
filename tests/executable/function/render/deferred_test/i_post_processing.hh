@@ -19,6 +19,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -27,8 +28,9 @@ namespace WhiteBirdEngine {
  * @class IPostProcessing
  * @brief Interface of a post-processing effect of the deferred rendering test that modifies a color image in place.
  * @details Effects are disabled on construction. A disabled effect keeps its tasks in every graph it was added to, but
- * they record no commands, so the color image passes through unchanged. The enabled state is read when each task is
- * recorded, so it must only change between frames. Neither copyable nor movable. All methods and destruction are confined
+ * they record no commands, so the color image passes through unchanged. Every task is an RTToggleVK subscribed to the
+ * effect's toggle event: set_enabled() emits the new state under it, so the tasks of every graph switch together, and
+ * tasks created by a rebuild start in the current state. Change the state only between frames. Neither copyable nor movable. All methods and destruction are confined
  * to the rendering thread, and the effect must outlive every graph it was added to.
  */
 class IPostProcessing {
@@ -37,8 +39,10 @@ public:
     /**
      * @brief Constructor.
      * @param p_allocator Allocator of the effect's tasks; must outlive the effect.
+     * @param p_toggle_event_id Event id the effect's tasks receive RTToggleVK::Command events under; non-empty.
+     * @throws std::runtime_error If p_allocator is null or p_toggle_event_id is empty.
      */
-    explicit IPostProcessing(RenderAllocator* p_allocator);
+    IPostProcessing(RenderAllocator* p_allocator, std::string_view p_toggle_event_id);
     virtual ~IPostProcessing() = default;
     IPostProcessing(const IPostProcessing&) = delete;
     IPostProcessing(IPostProcessing&&) = delete;
@@ -69,22 +73,27 @@ public:
     }
 
     /**
-     * @brief Enable or disable the effect from the next recorded frame.
+     * @brief Enable or disable the effect from the next recorded frame, by emitting the state under the toggle event.
      * @param p_enabled Whether the effect's tasks record their commands.
      */
-    void set_enabled(bool p_enabled) {
-        enabled = p_enabled;
+    void set_enabled(bool p_enabled);
+
+    /**
+     * @brief Get the event id the effect's tasks receive RTToggleVK::Command events under.
+     */
+    std::string_view get_toggle_event_id() const {
+        return toggle_event_id;
     }
 
 protected:
     /**
-     * @brief Wrap a task so that it records its commands only while the effect is enabled.
+     * @brief Wrap a task in an RTToggleVK that starts in the current state and follows the toggle event.
      * @details Binding, queue selection, and access reports always reach p_task.
      * @param p_task The task to wrap; must not be null.
      * @return The wrapping task.
-     * @throws std::runtime_error If p_task is null.
+     * @throws std::runtime_error If p_task is null, or no EventManager exists.
      */
-    Unique<IRenderTaskVK> make_toggleable_task(Unique<IRenderTaskVK> p_task) const;
+    Unique<IRenderTaskVK> make_toggle_task(Unique<IRenderTaskVK> p_task) const;
 
     /**
      * @brief Get the allocator of the effect's tasks.
@@ -95,6 +104,7 @@ protected:
 
 private:
     RenderAllocator* allocator = nullptr;
+    std::string toggle_event_id;
     bool enabled = false;
 };
 

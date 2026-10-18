@@ -99,6 +99,11 @@ struct PixelSortSettings {
  */
 class PixelSort final : public IPostProcessing {
 public:
+    /**
+     * @brief Event id the effect's tasks receive RTToggleVK::Command events under.
+     */
+    static constexpr std::string_view TOGGLE_EVENT_ID = "pixel_sort.toggle";
+
     PixelSort() = delete;
     /**
      * @brief Compile the effect's compute pipelines.

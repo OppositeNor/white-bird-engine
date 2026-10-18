@@ -187,7 +187,7 @@ PixelSort::Layout PixelSort::make_layout(VkExtent2D p_extent, PixelSortDirection
 
 PixelSort::PixelSort(
     RenderAllocator* p_allocator, RendererVK* p_renderer, RenderTestExtentFactory p_extent, VkFormat p_color_format, const PixelSortSettings& p_settings)
-    : IPostProcessing(p_allocator), renderer(p_renderer), extent(std::move(p_extent)), color_format(p_color_format) {
+    : IPostProcessing(p_allocator, TOGGLE_EVENT_ID), renderer(p_renderer), extent(std::move(p_extent)), color_format(p_color_format) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: renderer is null.");
     }
@@ -466,7 +466,7 @@ void PixelSort::add_compute_task(RendGraphDescVK& p_graph,
     }
     task_desc.factory = [this, pipelines = p_pipelines, p_group_count](const RendGraphContextVK& p_context) {
         const Layout layout = make_layout(extent(p_context), settings.direction);
-        return make_toggleable_task(make_unique<RTRunComputePipelineVK>(get_allocator(),
+        return make_toggle_task(make_unique<RTRunComputePipelineVK>(get_allocator(),
             renderer->get_base_render_data(),
             pipelines[direction_index(settings.direction)],
             layout.*p_group_count,
@@ -494,7 +494,7 @@ void PixelSort::add_indirect_compute_task(RendGraphDescVK& p_graph,
         task_desc.alias(task_resource_id, graph_resource_id);
     }
     task_desc.factory = [this, p_pipeline, p_dispatch_offset](const RendGraphContextVK& /*p_context*/) {
-        return make_toggleable_task(make_unique<RTRunComputePipelineIndirectVK>(get_allocator(),
+        return make_toggle_task(make_unique<RTRunComputePipelineIndirectVK>(get_allocator(),
             renderer->get_base_render_data(),
             p_pipeline,
             REND_RES_PIXEL_SORT_RADIX_SORT_DISPATCH,
