@@ -74,7 +74,6 @@
 
 namespace WBE = WhiteBirdEngine;
 
-inline constexpr std::string_view RT_PRESENT_SORTED_PIXELS = "present_sorted_pixels";
 inline constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
 inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE = "pixel_sorting_post_processing_output_image";
@@ -652,7 +651,7 @@ private:
     }
 
     /**
-     * @brief Run the recipe for the orientation and the graph context, and add the ImGui overlay task to its descriptor.
+     * @brief Run the recipe for the orientation and the graph context, supplying the ImGui overlay task it imports.
      * @param p_vertical Whether the columns, rather than the rows, are sorted.
      * @param p_context The context the graph is being built for.
      * @return The graph descriptor.
@@ -669,21 +668,20 @@ private:
         const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(PIXEL_SORTING_RECIPE_SCRIPT, context);
 
         const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
-        WBE::RendGraphRecipeImportsVK imports;
-        imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain)
-            .add(REND_RES_PIXEL_SORT_SOURCE, *source_view)
-            .add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer)
-            .add(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS, *post_processing_params_buffer);
-        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
-        // The ImGui overlay is owned by the application, so its task is added here rather than by the recipe.
+        // The ImGui overlay is owned by the application, so the recipe imports its task.
         WBE::RendTaskDescVK imgui_task_desc(render_allocator);
         imgui_task_desc.task_id = RT_DRAW_IMGUI;
         imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
         imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
             return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
         };
-        pipeline_desc.add_task(std::move(imgui_task_desc));
-        WBE::connect_resource_chain(pipeline_desc, WBE::REND_RES_SWAP_CHAIN, {RT_PRESENT_SORTED_PIXELS, RT_DRAW_IMGUI});
+        WBE::RendGraphRecipeImportsVK imports;
+        imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain)
+            .add(REND_RES_PIXEL_SORT_SOURCE, *source_view)
+            .add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer)
+            .add(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS, *post_processing_params_buffer)
+            .add_task(std::move(imgui_task_desc));
+        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
         return pipeline_desc;
     }
 

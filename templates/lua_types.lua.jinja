@@ -96,7 +96,15 @@
 {% endif %}
 {% endfor %}
 
+---A task the application supplies through RendGraphRecipeImportsVK::add_task() under the same id; the recipe can only
+---connect it.
+---@class wbe.ImportedTask
+---@field id string
+---@field import true
+---@field connect? wbe.RendRecipeEdgeVK[]
+
 ---@alias wbe.RecipeTask
+---| wbe.ImportedTask
 {% for task in reflected.tasks %}
 ---| wbe.task.{{ task.name }}
 {% endfor %}

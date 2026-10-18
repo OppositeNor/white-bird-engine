@@ -51,6 +51,8 @@ TEST(WBELuaTypeStubsTest, DeclaresReflectedEnumsClassesAndTasks) {
                          "---@field params? wbe.RTParamsGraphicsDrawMeshVK\n"),
         std::string::npos);
     EXPECT_NE(stubs.find("---@field tasks? wbe.RecipeTask[]\n"), std::string::npos);
+    EXPECT_NE(stubs.find("---@alias wbe.RecipeTask\n---| wbe.ImportedTask\n"), std::string::npos);
+    EXPECT_NE(stubs.find("---@class wbe.ImportedTask\n---@field id string\n---@field import true\n"), std::string::npos);
     EXPECT_NE(stubs.find("---@class wbe.RecipeContext\n"), std::string::npos);
     // Test-only reflected types stay out of the editor stubs.
     EXPECT_EQ(stubs.find("TestEnumSigned"), std::string::npos);

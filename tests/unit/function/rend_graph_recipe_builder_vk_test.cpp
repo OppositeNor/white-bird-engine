@@ -33,6 +33,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <format>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -168,6 +170,82 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedTasksWithTheirLocation) 
                   .find("tasks[0] 'a' alias 'input'"),
         std::string::npos);
     EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "missing_task"}]})", imports, &render_data).find("unknown render task type"),
+        std::string::npos);
+}
+
+namespace {
+
+// A supplied task with a caller-side alias, standing in for a task only C++ can build.
+RendTaskDescVK make_supplied_task(RenderAllocator* p_allocator, std::string_view p_task_id) {
+    RendTaskDescVK task(p_allocator, p_task_id, [](const RendGraphContextVK& /*p_context*/) {
+        return Unique<IRenderTaskVK>();
+    });
+    task.alias("target", "camera");
+    return task;
+}
+
+} // namespace
+
+TEST_F(WBERendGraphRecipeBuilderVKTest, ImportsSuppliedTasksAndConnectsThem) {
+    RendGraphRecipeImportsVK imports;
+    imports.add("camera", camera).add_task(make_supplied_task(&allocator, "overlay"));
+    const RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "imports": ["camera"],
+        "tasks": [
+            {"id": "draw", "type": "registry_probe", "params": {"label": "a"}, "connect": [{"to": "overlay", "resource": "camera"}]},
+            {"id": "overlay", "import": true, "connect": [{"to": "after", "resource": "camera"}]},
+            {"id": "after", "type": "registry_probe", "params": {"label": "b"}}
+        ]
+    })"),
+        imports,
+        &render_data);
+
+    ASSERT_EQ(graph.tasks.size(), 3U);
+    RendGraphDescVK mutable_graph = graph;
+    // Edges reach the imported task from recipe tasks and leave it to them.
+    ASSERT_EQ(mutable_graph.get_task("draw").next.size(), 1U);
+    EXPECT_EQ(mutable_graph.get_task("draw").next[0].next_task_id, "overlay");
+    const RendTaskDescVK& overlay = mutable_graph.get_task("overlay");
+    ASSERT_EQ(overlay.next.size(), 1U);
+    EXPECT_EQ(overlay.next[0].next_task_id, "after");
+    // The imported task keeps what the caller gave it.
+    EXPECT_EQ(overlay.resource_map.resolve("target"), "camera");
+    EXPECT_NE(overlay.factory, nullptr);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTest, RequiresImportedTasksToMatchSuppliedOnes) {
+    RendGraphRecipeImportsVK imports;
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "overlay", "import": true}]})", imports, &render_data)
+                  .find("tasks[0] 'overlay' is imported but not supplied"),
+        std::string::npos);
+    imports.add_task(make_supplied_task(&allocator, "overlay"));
+    EXPECT_NE(build_error(builder, R"({"tasks": []})", imports, &render_data).find("supplied task 'overlay' is not imported"),
+        std::string::npos);
+    // An imported id cannot also be a recipe task.
+    EXPECT_NE(build_error(builder,
+                  R"({"tasks": [{"id": "overlay", "import": true}, {"id": "overlay", "type": "registry_probe", "params": {"label": "a"}}]})",
+                  imports,
+                  &render_data)
+                  .find("tasks[1] 'overlay' repeats a task id"),
+        std::string::npos);
+    EXPECT_THROW(imports.add_task(make_supplied_task(&allocator, "overlay")), std::runtime_error);
+    EXPECT_THROW(imports.add_task(make_supplied_task(&allocator, "")), std::runtime_error);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsImportedTasksThatConfigureThemselves) {
+    RendGraphRecipeImportsVK imports;
+    imports.add_task(make_supplied_task(&allocator, "overlay"));
+    for (const auto& [field, message] : {
+             std::pair<std::string_view, std::string_view>{R"("type": "registry_probe")", "cannot set a type"},
+             {R"("params": {"label": "a"})", "cannot set params"},
+             {R"("aliases": {"target": "camera"})", "cannot set aliases"},
+             {R"("trigger": {"event": "redraw"})", "cannot set a trigger"},
+         }) {
+        const std::string recipe = std::format(R"({{"tasks": [{{"id": "overlay", "import": true, {}}}]}})", field);
+        EXPECT_NE(build_error(builder, recipe, imports, &render_data).find(message), std::string::npos) << field;
+    }
+    // A task that is not imported must name a type.
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "draw"}]})", RendGraphRecipeImportsVK{}, &render_data).find("tasks[0] 'draw' sets no type"),
         std::string::npos);
 }
 

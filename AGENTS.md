@@ -106,7 +106,10 @@ For non-trivial implementation tasks:
   and pass `params` to it; `aliases` map task-local ids to graph resources. Edges come only from each task's `connect`
   entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`.
 - Task `pipeline` params are render-database keys; the application compiles those pipelines and keeps them alive.
-- Tasks that need application objects (for example the ImGui overlay) are added in C++ to the built descriptor.
+- Tasks that need application objects (for example the ImGui overlay) are built in C++ and supplied with
+  `RendGraphRecipeImportsVK::add_task()`; the recipe lists each as `{ id = <task id>, import = true }` and wires it with
+  `connect` like any task. Imported tasks set no `type`, `params`, `aliases`, or `trigger`, and supplied and imported
+  tasks must match, like resource imports.
 - `templates/lua_types.lua.jinja` generates editor-only LuaLS type stubs at `build/<target>/lua/wbe_types.lua`, which the
   repo-root `.luarc.json` loads; annotate `build` with `---@param context wbe.RecipeContext` and
   `---@return wbe.RendGraphRecipeVK`.

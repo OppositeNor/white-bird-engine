@@ -114,6 +114,9 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
 /**
  * @class RendRecipeTaskVK
  * @brief A task of a render graph recipe. Copyable and movable; strict.
+ *
+ * A task either has a registered `type` and its `params`, or is an import (`import = true`): a task the caller supplies
+ * through RendGraphRecipeImportsVK::add_task() under the same id, which the recipe can only `connect`.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeTaskVK {
     /**
@@ -122,10 +125,15 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string id;
     /**
-     * @brief A task type name registered in RenderTaskRegistryVK.
+     * @brief A task type name registered in RenderTaskRegistryVK; required unless the task is an import.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT)
     std::string type;
+    /**
+     * @brief Whether the caller supplies the task; an import sets no type, params, aliases, or trigger.
+     */
+    WBE_META(WBE_REFLECT)
+    bool import = false;
     /**
      * @brief The task parameters, deserialized by the registry into the task type's parameter struct.
      */

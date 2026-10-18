@@ -125,7 +125,35 @@ void apply_aliases(RendTaskDescVK& p_task, const DataValue& p_aliases, std::stri
     }
 }
 
-void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, const BaseRenderDataVK* p_render_data) {
+bool sets_aliases(const DataValue& p_aliases) {
+    // An empty Lua table reads as an empty list.
+    return !p_aliases.is_nil() && !(p_aliases.get_kind() == DataValueKind::LIST && p_aliases.as_list().empty());
+}
+
+// Copy the task the caller supplies for an imported recipe task into the graph.
+void add_imported_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recipe_task, const RendGraphRecipeImportsVK& p_imports,
+    std::string_view p_location) {
+    if (!p_recipe_task.type.empty()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set a type.", p_location));
+    }
+    if (!p_recipe_task.params.is_nil()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set params.", p_location));
+    }
+    if (sets_aliases(p_recipe_task.aliases)) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set aliases.", p_location));
+    }
+    if (p_recipe_task.trigger.has_value()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported, so it cannot set a trigger.", p_location));
+    }
+    const RendTaskDescVK* task = p_imports.find_task(p_recipe_task.id);
+    if (task == nullptr) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} is imported but not supplied.", p_location));
+    }
+    p_graph.add_task(*task);
+}
+
+void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, const RendGraphRecipeImportsVK& p_imports,
+    const BaseRenderDataVK* p_render_data) {
     std::set<std::string, std::less<>> ids;
     for (size_t i = 0; i < p_recipe.tasks.size(); ++i) {
         const RendRecipeTaskVK& recipe_task = p_recipe.tasks[i];
@@ -135,6 +163,14 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, cons
         if (!ids.insert(recipe_task.id).second) {
             throw std::runtime_error(
                 std::format("Failed to build render graph recipe: {} repeats a task id.", task_location(i, recipe_task.id)));
+        }
+        if (recipe_task.import) {
+            add_imported_task(p_graph, recipe_task, p_imports, task_location(i, recipe_task.id));
+            continue;
+        }
+        if (recipe_task.type.empty()) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: {} sets no type; set one, or set import for a supplied task.", task_location(i, recipe_task.id)));
         }
         RendTaskDescVK& task =
             RenderTaskRegistryVK::add_task(p_graph, recipe_task.id, recipe_task.type, recipe_task.params, p_render_data);
@@ -146,6 +182,12 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, cons
             }
             task.factory = RTTriggeredVK::wrap_factory(
                 std::move(task.factory), recipe_task.trigger->event, p_render_data, recipe_task.trigger->activate);
+        }
+    }
+    for (const std::string& task_id : p_imports.get_task_ids()) {
+        if (!ids.contains(task_id)) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: the supplied task '{}' is not imported by the recipe.", task_id));
         }
     }
     // Edges may point to later tasks, so they are added once every task exists.
@@ -181,6 +223,32 @@ const IBindableRenderResourceVK* RendGraphRecipeImportsVK::find(std::string_view
     return resource == resources.end() ? nullptr : resource->second;
 }
 
+RendGraphRecipeImportsVK& RendGraphRecipeImportsVK::add_task(RendTaskDescVK p_task) {
+    if (p_task.task_id.empty()) {
+        throw std::runtime_error("Failed to add render graph recipe task import: the task id is empty.");
+    }
+    const std::string task_id = p_task.task_id;
+    if (!tasks.emplace(task_id, std::move(p_task)).second) {
+        throw std::runtime_error(std::format("Failed to add render graph recipe task import: '{}' is already supplied.", task_id));
+    }
+    return *this;
+}
+
+const RendTaskDescVK* RendGraphRecipeImportsVK::find_task(std::string_view p_task_id) const {
+    auto task = tasks.find(p_task_id);
+    return task == tasks.end() ? nullptr : &task->second;
+}
+
+std::vector<std::string> RendGraphRecipeImportsVK::get_task_ids() const {
+    std::vector<std::string> task_ids;
+    task_ids.reserve(tasks.size());
+    for (const auto& [task_id, task] : tasks) {
+        static_cast<void>(task);
+        task_ids.push_back(task_id);
+    }
+    return task_ids;
+}
+
 std::vector<std::string> RendGraphRecipeImportsVK::get_names() const {
     std::vector<std::string> names;
     names.reserve(resources.size());
@@ -201,7 +269,7 @@ RendGraphDescVK RendGraphRecipeBuilderVK::build(
     RendGraphDescVK graph(p_render_data->allocator);
     bind_imports(graph, recipe, p_imports);
     declare_resources(graph, recipe);
-    add_tasks(graph, recipe, p_render_data);
+    add_tasks(graph, recipe, p_imports, p_render_data);
     return graph;
 }
 

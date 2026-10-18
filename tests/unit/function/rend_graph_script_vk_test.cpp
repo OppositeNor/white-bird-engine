@@ -165,8 +165,12 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     context.set_value("source_height", 32);
     context.set_value("orientation", std::string("horizontal"));
     const DataValue recipe = RendGraphScriptVK::run("render_graphs.pixel_sorting", context);
-    // 3 line passes, the dispatch preparation, 5 tasks for each of the 4 radix sort passes, 2 image passes, and present.
-    EXPECT_EQ(recipe.get_entry("tasks").as_list().size(), 27U);
+    // 3 line passes, the dispatch preparation, 5 tasks for each of the 4 radix sort passes, 2 image passes, present, and
+    // the imported ImGui task.
+    const DataValue::List& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 28U);
+    EXPECT_EQ(tasks.back().get_value<std::string>("id"), "draw_imgui");
+    EXPECT_TRUE(tasks.back().get_value<bool>("import"));
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 12U);
 }
 

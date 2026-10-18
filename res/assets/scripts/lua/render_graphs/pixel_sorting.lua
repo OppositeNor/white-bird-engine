@@ -20,7 +20,7 @@
 --   orientation: "vertical" sorts every column, "horizontal" every row.
 -- Imports: `swap_chain`, `pixel_sort_source` (the source image view), and the application-owned uniform buffers
 -- `pixel_sort_contrast` and `pixel_sorting_post_processing_params`.
--- The application adds the ImGui overlay task after `present_sorted_pixels`, ordered by the swap chain.
+-- Imported tasks: `draw_imgui`, the application's ImGui overlay, drawn after `present_sorted_pixels`.
 
 -- Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
 local PIXEL_SORT_TILE_SIZE = 8
@@ -204,6 +204,8 @@ function exports.build(context)
     chain("radix_sort_dispatch", dispatch_chain)
     chain("pixel_sort_destination", { "write_sorted_pixels", "pixel_sorting_post_processing" })
     chain("pixel_sorting_post_processing_output", { "pixel_sorting_post_processing", "present_sorted_pixels" })
+    add_task({ id = "draw_imgui", import = true })
+    chain("swap_chain", { "present_sorted_pixels", "draw_imgui" })
 
     return {
         imports = { "swap_chain", "pixel_sort_source", "pixel_sort_contrast", "pixel_sorting_post_processing_params" },
