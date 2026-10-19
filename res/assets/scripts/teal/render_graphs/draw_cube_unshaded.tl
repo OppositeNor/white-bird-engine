@@ -19,7 +19,7 @@ local type wbe = require("wbe")
 
 local exports = {}
 
-function exports.build(_context: wbe.RecipeContext): wbe.RendGraphRecipeVK
+function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local params: wbe.RTParamsGraphicsDrawMeshVK = {
         mesh = "model_cube_static.mesh",
         pipeline = "draw_cube_unshaded_pipeline",

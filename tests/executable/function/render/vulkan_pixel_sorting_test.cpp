@@ -45,6 +45,7 @@
 #include "imgui.h"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
+#include "pixel_sorting_recipe_context.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -73,6 +74,7 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
+using WhiteBirdEngine::PixelSortOrientation;
 
 inline constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
@@ -170,17 +172,6 @@ inline constexpr std::array<std::string_view, 12> PIXEL_SORT_COMPUTE_SHADERS{
     "radix_sort_histogram_prefix_sum",
     "radix_sort_histogram_overflow_prefix_sum",
     "radix_sort_histogram_add_overflow",
-};
-
-/**
- * @enum PixelSortOrientation
- * @brief The lines of the image the pixel sort sorts.
- */
-enum class PixelSortOrientation : uint8_t {
-    /** Sort every column, from the top. */
-    VERTICAL,
-    /** Sort every row, from the left. */
-    HORIZONTAL,
 };
 
 /**
@@ -389,7 +380,7 @@ public:
 
 private:
     static constexpr std::string_view PIXEL_SORTING_GRAPH_ID = "pixel_sorting_graph";
-    // The `script` resource of the graph recipe, res/assets/scripts/lua/render_graphs/pixel_sorting.lua.
+    // The `script` resource of the graph recipe, res/assets/scripts/teal/render_graphs/pixel_sorting.tl.
     static constexpr std::string_view PIXEL_SORTING_RECIPE_SCRIPT = "render_graphs.pixel_sorting";
 
     /**
@@ -661,10 +652,12 @@ private:
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* base_render_data = renderer->get_base_render_data();
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
-        WBE::DataValue context = WBE::RendGraphScriptVK::make_context(*base_render_data, p_context);
-        context.set_value("source_width", source_extent.width);
-        context.set_value("source_height", source_extent.height);
-        context.set_value("orientation", std::string(p_vertical ? "vertical" : "horizontal"));
+        WBE::PixelSortingRecipeContext recipe_context;
+        static_cast<WBE::RendRecipeContextVK&>(recipe_context) = WBE::RendGraphScriptVK::get_recipe_context(*base_render_data, p_context);
+        recipe_context.source_width = source_extent.width;
+        recipe_context.source_height = source_extent.height;
+        recipe_context.orientation = p_vertical ? WBE::PixelSortOrientation::VERTICAL : WBE::PixelSortOrientation::HORIZONTAL;
+        const WBE::DataValue context = WBE::RendGraphScriptVK::serialize_context(recipe_context);
         const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(PIXEL_SORTING_RECIPE_SCRIPT, context);
 
         const auto swap_chain = renderer->acquire_swap_chain_image_view_container();

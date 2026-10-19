@@ -197,9 +197,17 @@ gen_info = {
     "reflected_enums" : [
         "WBE_REFLECT_ENUM",
     ],
+    # Classes and enums visible to scripts, which the Teal declarations (templates/teal_types.d.tl.jinja) declare. They
+    # cross the C++/script boundary as DataValue, so a script class is also a static serializable and a script enum is also
+    # a reflected enum.
+    "reflect_script" : [
+        "WBE_REFLECT_SCRIPT",
+    ],
 }
 
 gen_info["static_serializables"].extend(gen_info["serializables"])
+gen_info["static_serializables"].extend(gen_info["reflect_script"])
+gen_info["reflected_enums"].extend(gen_info["reflect_script"])
 
 # Setup directories
 root_dir = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))

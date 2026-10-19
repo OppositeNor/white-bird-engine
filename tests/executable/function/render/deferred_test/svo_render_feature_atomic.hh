@@ -51,7 +51,7 @@ public:
 
 private:
     virtual uint32_t get_reset_group_count() const override;
-    virtual std::string_view get_recipe_variant() const override;
+    virtual SVORecipeVariant get_recipe_variant() const override;
 };
 
 } // namespace WhiteBirdEngine

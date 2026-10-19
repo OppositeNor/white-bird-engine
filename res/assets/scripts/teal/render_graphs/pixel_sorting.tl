@@ -15,9 +15,7 @@
 -- Sorts the masked pixels of every column or row of the source image with the GPU radix sort and presents the result.
 -- See ApplicationVulkanPixelSortingTest in tests/executable/function/render/vulkan_pixel_sorting_test.cpp.
 --
--- Context entries supplied by the application, besides the renderer facts:
---   source_width, source_height: the size of the source image, in pixels.
---   orientation: "vertical" sorts every column, "horizontal" every row.
+-- The application supplies a wbe.PixelSortingRecipeContext.
 -- Imports: `swap_chain`, `pixel_sort_source` (the source image view), and the application-owned uniform buffers
 -- `pixel_sort_contrast` and `pixel_sorting_post_processing_params`.
 -- Imported tasks: `draw_imgui`, the application's ImGui overlay, drawn after `present_sorted_pixels`.
@@ -54,27 +52,18 @@ local storage_buffer = graph_utils.storage_buffer
 local storage_image = graph_utils.storage_image
 local image_view = graph_utils.image_view
 
-local enum Orientation
-    "vertical"
-    "horizontal"
-end
-
-local record Context is wbe.RecipeContext
-    source_width: integer
-    source_height: integer
-    orientation: Orientation
-end
-
 local exports = {}
 
-function exports.build(context: Context): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.PixelSortingRecipeContext): wbe.RendGraphRecipeVK
     local width = context.source_width
     local height = context.source_height
-    local orientation = context.orientation
-    if orientation ~= "vertical" and orientation ~= "horizontal" then
-        error("pixel_sorting: unknown orientation '" .. tostring(orientation) .. "'.")
+    local orientation_name = graph_utils.enum_name(context.orientation)
+    if orientation_name ~= "VERTICAL" and orientation_name ~= "HORIZONTAL" then
+        error("pixel_sorting: unknown orientation '" .. orientation_name .. "'.")
     end
-    local vertical = orientation == "vertical"
+    local vertical = orientation_name == "VERTICAL"
+    -- The shader resource keys name the orientation in lower case.
+    local orientation = string.lower(orientation_name)
     local element_count = width * height
     -- The number of sorted lines.
     local line_count = vertical and width or height

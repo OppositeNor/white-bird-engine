@@ -18,24 +18,20 @@
         }
     },
     {
-        "out_dir" : "${build_dir}/lua",
-        "output_name" : "wbe_types.lua",
-        "template" : "lua_types.lua.jinja",
-        "data" : {
-            "metadata" : ".metadata",
-            "static_serializables" : ".static_serializables",
-            "reflected_enums" : ".reflected_enums",
-            "render_tasks" : ".render_tasks"
-        }
-    },
-    {
-        "out_dir" : "${build_dir}/lua",
+        "out_dir" : "${build_dir}/teal",
         "output_name" : "wbe.d.tl",
         "template" : "teal_types.d.tl.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "static_serializables" : ".static_serializables",
-            "reflected_enums" : ".reflected_enums"
+            "reflect_script" : ".reflect_script"
+        }
+    },
+    {
+        "out_dir" : "${root_dir}",
+        "output_name" : "tlconfig.lua",
+        "template" : "tlconfig.lua.jinja",
+        "data" : {
+            "include_dirs" : ["${root_dir}/res/assets/scripts/teal", "${build_dir}/teal"]
         }
     }
 ]

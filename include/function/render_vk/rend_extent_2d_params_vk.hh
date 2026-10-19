@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  * swap_chain_scale, so it follows swap chain resizes; each scaled dimension is rounded down and is at least 1.
  * Deserialization is strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendExtent2DParamsVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendExtent2DParamsVK {
     /**
      * @brief Fixed width in pixels; set together with height.
      */

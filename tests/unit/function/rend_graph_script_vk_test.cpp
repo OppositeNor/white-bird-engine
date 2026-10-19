@@ -134,7 +134,7 @@ protected:
         global = make_test_global();
         ResourceManager* resource_manager = ResourceManager::get_singleton();
         resource_manager->register_chunk(make_ref<ResourceChunkLoadFile>(
-            global_allocator(), "assets/scripts/lua/lua_scripts.json", resource_manager->get_allocator()));
+            global_allocator(), "assets/scripts/teal/lua_scripts.json", resource_manager->get_allocator()));
     }
 
     virtual void TearDown() override {

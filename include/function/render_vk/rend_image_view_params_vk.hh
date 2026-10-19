@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * Unset optional fields are derived from the viewed image. Set mip_level_count or layer_count to 4294967295 (VK_REMAINING_MIP_LEVELS, VK_REMAINING_ARRAY_LAYERS) to view every remaining level or layer. Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendImageViewParamsVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendImageViewParamsVK {
     /**
      * @brief View type; the image's default view type when unset.
      */

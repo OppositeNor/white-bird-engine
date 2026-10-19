@@ -19,7 +19,8 @@
 -- The application imports every pass it builds in C++ as a task (the acceleration structure build, the frame sequence
 -- acquisition, and ImGui), and adds its acceleration structure and dynamic mesh entities to the built descriptor. The
 -- mesh draws import the meshes the application registered in the render database as "static_mesh" and "dynamic_mesh".
--- The context entries it supplies, besides the renderer facts, are declared by Context below.
+-- It supplies a wbe.DeferredRecipeContext, whose voxel and post_processing entries are the RecipeFeatureParams-derived
+-- parameters of the feature modules it selects: a VoxelFeature and a PostProcessingFeature.
 
 local type wbe = require("wbe")
 local type voxel = require("render_graphs.features.voxel")
@@ -37,24 +38,6 @@ local SUMMED_AREA_TABLE_WORKGROUP_SIZE = 64
 -- One workgroup per 8x8 tile of the bloom images.
 local BLOOM_TILE_SIZE = 8
 
--- The image formats of the targets, by role.
-local record Formats
-    gbuffer_albedo: wbe.ImageFormatVK | integer
-    gbuffer_normal: wbe.ImageFormatVK | integer
-    gbuffer_rma: wbe.ImageFormatVK | integer
-    gbuffer_depth: wbe.ImageFormatVK | integer
-    shadowmap_depth: wbe.ImageFormatVK | integer
-    shadow_moments: wbe.ImageFormatVK | integer
-    rsm_flux: wbe.ImageFormatVK | integer
-    rsm_normal: wbe.ImageFormatVK | integer
-    lighting_output: wbe.ImageFormatVK | integer
-end
-
--- A feature the application selects, as { module = <module name>, ... }: the parameters of that module's subgraph().
-local record FeatureParams
-    module: string
-end
-
 local record VoxelFeature
     -- The structure as a subgraph task, whose overlays draw on the target's color and depth.
     subgraph: function(p_id: string, p_params: any, p_target: voxel.Target): wbe.RendRecipeTaskVK
@@ -69,35 +52,6 @@ end
 local record PostProcessingFeature
     -- The effect as a subgraph task, which modifies the target's color view in place.
     subgraph: function(p_id: string, p_params: any, p_target: PostProcessingTarget): wbe.RendRecipeTaskVK
-end
-
-local record Context is wbe.RecipeContext
-    -- Whether shadows are filtered with summed-area tables instead of mipmaps.
-    summed_area_table: boolean
-    -- The lights in the scene.
-    spot_light_count: integer
-    -- The slots of the lighting shaders' lights[].
-    max_spot_light_info_count: integer
-    -- The extent of every light's shadow targets.
-    shadow_extent: wbe.RecipeExtent2D
-    -- The extent of the bloom images.
-    bloom_extent: wbe.RecipeExtent2D
-    shadow_mipmap_level_count: integer
-    bloom_blur_pass_count: integer
-    formats: Formats
-    -- The trigger event ids of this graph.
-    bloom_acquire_event: string
-    frame_sequence_event: string
-    -- Whether the acceleration structure build task is imported.
-    has_mesh_acceleration_structure: boolean
-    -- The voxel structure; its module is a VoxelFeature.
-    voxel: FeatureParams
-    -- The graph ids of the dynamic mesh entities' transforms, one per drawn entity.
-    dynamic_mesh_transform_ids: {string}
-    -- The RTToggleVK toggles of the tasks each voxel debug view mode group records.
-    voxel_debug_view_toggles: voxel.DebugViewToggles
-    -- nil, or the post-processing effect; its module is a PostProcessingFeature.
-    post_processing: FeatureParams
 end
 
 local function image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
@@ -134,7 +88,7 @@ local POST_PROCESSING = "post_processing"
 
 local exports = {}
 
-function exports.build(context: Context): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeVK
     local summed_area_table = context.summed_area_table
     local light_count = context.spot_light_count
     local formats = context.formats
@@ -238,7 +192,7 @@ function exports.build(context: Context): wbe.RendGraphRecipeVK
     import_task("draw_imgui")
 
     -- The voxel structure, a subgraph whose overlays draw over the lit scene.
-    local voxel_params = context.voxel
+    local voxel_params = context.voxel as wbe.RecipeFeatureParams
     local voxel_feature = require(voxel_params.module) as VoxelFeature
     tasks.add(voxel_feature.subgraph(VOXEL, voxel_params, {
         dynamic_mesh_transform_ids = context.dynamic_mesh_transform_ids,
@@ -386,7 +340,7 @@ function exports.build(context: Context): wbe.RendGraphRecipeVK
 
     -- Post-processing, a subgraph, modifies the result image in place after composition.
     local post_processing_last_task = "combine_lighting"
-    local post_processing = context.post_processing
+    local post_processing = context.post_processing as wbe.RecipeFeatureParams
     if post_processing ~= nil then
         local post_processing_feature = require(post_processing.module) as PostProcessingFeature
         tasks.add(post_processing_feature.subgraph(POST_PROCESSING, post_processing,

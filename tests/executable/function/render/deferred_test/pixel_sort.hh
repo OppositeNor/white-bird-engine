@@ -26,6 +26,7 @@
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "i_post_processing.hh"
+#include "pixel_sort_recipe_params.hh"
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -35,17 +36,6 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
-
-/**
- * @enum PixelSortDirection
- * @brief The lines of the image that the pixel sort sorts.
- */
-enum class PixelSortDirection : uint8_t {
-    /** Sort every column, from the top. */
-    VERTICAL,
-    /** Sort every row, from the left. */
-    HORIZONTAL,
-};
 
 /**
  * @enum PixelSortMetric
@@ -59,18 +49,6 @@ enum class PixelSortMetric : uint32_t {
     HUE = 1,
     /** Sort by saturation, grayest first. */
     SATURATION = 2,
-};
-
-/**
- * @enum PixelSortScope
- * @brief The pixels each sort of the pixel sort covers.
- * @details The values must match the WBE_PIXEL_SORT_SCOPE_ macros in pixel_sort_utils.slang.
- */
-enum class PixelSortScope : uint32_t {
-    /** Sort all masked pixels of every line together, compacting them across unmasked gaps. */
-    LINE = 0,
-    /** Sort every span, a maximal run of consecutive masked pixels of a line, independently. */
-    SPAN = 1,
 };
 
 /**

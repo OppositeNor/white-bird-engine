@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  * Set exactly one of color, a floating-point RGBA color, and depth, a depth-stencil value with stencil. Deserialization is
  * strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsClearValueVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsClearValueVK {
     /**
      * @brief Floating-point clear color: exactly four components, red, green, blue, and alpha.
      */

@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  * @class RendRecipeImageViewVK
  * @brief An image view declared by a render graph recipe. Copyable and movable; strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeImageViewVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeImageViewVK {
     /**
      * @brief Graph resource id of the viewed image: a recipe image or an import.
      */
@@ -48,7 +48,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeI
  * @class RendRecipeResourceVK
  * @brief A graph-owned resource declared by a render graph recipe; exactly one kind is set. Copyable and movable; strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeResourceVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeResourceVK {
     /**
      * @brief Graph resource id.
      */
@@ -81,7 +81,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeR
  * @brief A resource dependency edge from a recipe task to a later task; see RendTaskDescVK::connect(). Copyable and
  * movable; strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeEdgeVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeEdgeVK {
     /**
      * @brief Id of the later task.
      */
@@ -98,7 +98,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeE
  * @class RendRecipeTriggerVK
  * @brief Makes a recipe task event-triggered; see RTTriggeredVK::wrap_factory(). Copyable and movable; strict.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeTriggerVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeTriggerVK {
     /**
      * @brief Event id the task receives RTTriggeredVK::Command events under.
      */
@@ -118,7 +118,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
  * The task records on every frame while enabled. A rebuild re-runs the recipe, so pass the application's current state
  * through the context to keep it across rebuilds.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeToggleVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeToggleVK {
     /**
      * @brief Event id the task receives RTToggleVK::Command events under.
      */
@@ -139,7 +139,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
  * through RendGraphRecipeImportsVK::add_task() under the same id, which the recipe can only `connect`, or is a subgraph
  * (`subgraph`): a nested recipe added with RendGraphDescVK::add_subgraph(), which other tasks connect to by this id.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeTaskVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeTaskVK {
     /**
      * @brief Task id, unique in the recipe.
      */
@@ -200,7 +200,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
  *
  * See RendGraphRecipeBuilderVK for how a recipe becomes a RendGraphDescVK.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendGraphRecipeVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendGraphRecipeVK {
     /**
      * @brief Names of the resources the caller must supply; every supplied resource must be listed.
      */

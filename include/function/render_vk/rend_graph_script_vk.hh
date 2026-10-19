@@ -16,8 +16,15 @@
 #define WBE_FILE_REND_GRAPH_SCRIPT_VK_HH
 
 #include "core/data/data_value.hh"
+#include "core/reflection/enum_reflection.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
+#include "generated/enum_reflection.gen.hh"
+#include "generated/serializables_sd.gen.hh"
+#include <concepts>
+#include <cstdint>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -53,10 +60,40 @@ public:
     static DataValue make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context);
 
     /**
+     * @brief Get the renderer facts of make_context(), to fill the base of an application's derived context struct.
+     * @param p_render_data The render data of the renderer.
+     * @param p_graph_context The context the graph is being built for.
+     */
+    static RendRecipeContextVK get_recipe_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context);
+
+    /**
+     * @brief Serialize a recipe context: RendRecipeContextVK, or a reflected struct an application derives from it.
+     *
+     * The fields serialize as their reflected names, except a swap chain format ImageFormatVK has no name for, which is
+     * passed as its VkFormat value, as make_context() does.
+     *
+     * @param p_context The context; TContext must be WBE_SERIALIZABLE_STATIC.
+     */
+    template <typename TContext>
+        requires std::derived_from<TContext, RendRecipeContextVK>
+    static DataValue serialize_context(const TContext& p_context) {
+        DataValue result = DataValue::make_map();
+        if (EnumReflection<ImageFormatVK>::try_enum_to_string(p_context.swap_chain_format).has_value()) {
+            SerializableSD<TContext>::serialize(result, p_context);
+            return result;
+        }
+        TContext named = p_context;
+        named.swap_chain_format = ImageFormatVK::UNDEFINED;
+        SerializableSD<TContext>::serialize(result, named);
+        result.set_value("swap_chain_format", static_cast<int64_t>(p_context.swap_chain_format));
+        return result;
+    }
+
+    /**
      * @brief Run a recipe script's `build(context)`.
      *
      * The script can `require` other `script` resources by key (see SMRResourceManager), such as the helpers under
-     * res/assets/scripts/lua/utils.
+     * res/assets/scripts/teal/utils.
      *
      * @param p_module_name The name the script is loaded under, used in script error messages.
      * @param p_source The Lua source of the module.

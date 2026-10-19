@@ -110,20 +110,18 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
 RendGraphDescVK ApplicationVulkanDeferredPBRTest::make_deferred_render_graph_desc(
     bool p_use_summed_area_table, const RendGraphContextVK& p_context) {
     RendGraphRecipeImportsVK imports = make_deferred_recipe_imports(p_use_summed_area_table);
-    DataValue context = make_deferred_recipe_context(p_use_summed_area_table, p_context);
-    DataValue post_processing_parameters = DataValue::make_map();
-    post_processing->configure_recipe(post_processing_parameters, imports);
-    context.set_entry("post_processing", post_processing_parameters);
-    DataValue voxel_parameters = DataValue::make_map();
-    voxel_structure->configure_recipe(voxel_parameters,
+    DeferredRecipeContext context = make_deferred_recipe_context(p_use_summed_area_table, p_context);
+    context.post_processing = DataValue::make_map();
+    post_processing->configure_recipe(context.post_processing, imports);
+    context.voxel = DataValue::make_map();
+    voxel_structure->configure_recipe(context.voxel,
         imports,
         VoxelRecipeInputs{
             .dynamic_mesh = dynamic_mesh.get(),
             .static_build_event = VOXEL_STATIC_BUILD_EVENT_ID,
             .static_build_pending = voxel_static_build_pending,
         });
-    context.set_entry("voxel", voxel_parameters);
-    const DataValue recipe = RendGraphScriptVK::run(DEFERRED_RECIPE_SCRIPT, context);
+    const DataValue recipe = RendGraphScriptVK::run(DEFERRED_RECIPE_SCRIPT, RendGraphScriptVK::serialize_context(context));
     RendGraphDescVK pipeline_desc = RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
 
     // The recipe's mesh draws import the static and dynamic meshes. The acceleration structure and the dynamic entities stay
@@ -135,55 +133,53 @@ RendGraphDescVK ApplicationVulkanDeferredPBRTest::make_deferred_render_graph_des
     return pipeline_desc;
 }
 
-DataValue ApplicationVulkanDeferredPBRTest::make_deferred_recipe_context(
+DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_context(
     bool p_use_summed_area_table, const RendGraphContextVK& p_context) const {
     const auto make_extent = [](VkExtent2D p_extent) {
-        DataValue extent = DataValue::make_map();
-        extent.set_value("width", p_extent.width);
-        extent.set_value("height", p_extent.height);
-        return extent;
+        return RendRecipeExtent2DVK{.width = p_extent.width, .height = p_extent.height};
     };
     const auto format = [](VkFormat p_format) {
-        return static_cast<int64_t>(p_format);
+        return static_cast<ImageFormatVK>(p_format);
     };
-    DataValue context = RendGraphScriptVK::make_context(*base_render_data, p_context);
-    context.set_value("summed_area_table", p_use_summed_area_table);
-    context.set_value("spot_light_count", SPOT_LIGHT_COUNT);
-    context.set_value("max_spot_light_info_count", MAX_SPOT_LIGHT_INFO_COUNT);
-    context.set_entry("shadow_extent", make_extent(shadow_extent));
-    context.set_value("shadow_mipmap_level_count", shadow_mipmap_level_count);
-    context.set_entry("bloom_extent", make_extent(bloom_extent));
-    context.set_value("bloom_blur_pass_count", BLOOM_BLUR_PASS_COUNT);
-    DataValue formats = DataValue::make_map();
-    formats.set_value("gbuffer_albedo", format(GBUFFER_ALBEDO_FORMAT));
-    formats.set_value("gbuffer_normal", format(GBUFFER_NORMAL_FORMAT));
-    formats.set_value("gbuffer_rma", format(GBUFFER_RMA_FORMAT));
-    formats.set_value("gbuffer_depth", format(GBUFFER_DEPTH_FORMAT));
-    formats.set_value("shadowmap_depth", format(SHADOWMAP_DEPTH_FORMAT));
-    formats.set_value("shadow_moments", format(SHADOW_MOMENTS_FORMAT));
-    formats.set_value("rsm_flux", format(RSM_FLUX_FORMAT));
-    formats.set_value("rsm_normal", format(RSM_NORMAL_FORMAT));
-    formats.set_value("lighting_output", format(LIGHTING_OUTPUT_FORMAT));
-    context.set_entry("formats", formats);
+    DeferredRecipeContext context;
+    static_cast<RendRecipeContextVK&>(context) = RendGraphScriptVK::get_recipe_context(*base_render_data, p_context);
+    context.summed_area_table = p_use_summed_area_table;
+    context.spot_light_count = SPOT_LIGHT_COUNT;
+    context.max_spot_light_info_count = MAX_SPOT_LIGHT_INFO_COUNT;
+    context.shadow_extent = make_extent(shadow_extent);
+    context.shadow_mipmap_level_count = shadow_mipmap_level_count;
+    context.bloom_extent = make_extent(bloom_extent);
+    context.bloom_blur_pass_count = BLOOM_BLUR_PASS_COUNT;
+    context.formats = DeferredRecipeFormats{
+        .gbuffer_albedo = format(GBUFFER_ALBEDO_FORMAT),
+        .gbuffer_normal = format(GBUFFER_NORMAL_FORMAT),
+        .gbuffer_rma = format(GBUFFER_RMA_FORMAT),
+        .gbuffer_depth = format(GBUFFER_DEPTH_FORMAT),
+        .shadowmap_depth = format(SHADOWMAP_DEPTH_FORMAT),
+        .shadow_moments = format(SHADOW_MOMENTS_FORMAT),
+        .rsm_flux = format(RSM_FLUX_FORMAT),
+        .rsm_normal = format(RSM_NORMAL_FORMAT),
+        .lighting_output = format(LIGHTING_OUTPUT_FORMAT),
+    };
     const size_t graph_index = p_use_summed_area_table ? 1U : 0U;
-    context.set_value("bloom_acquire_event", std::string(BLOOM_ACQUIRE_EVENT_IDS[graph_index]));
-    context.set_value("frame_sequence_event", std::string(FRAME_SEQUENCE_EVENT_IDS[graph_index]));
-    context.set_value("has_mesh_acceleration_structure", mesh_acceleration_structure != MEM_NULL);
+    context.bloom_acquire_event = BLOOM_ACQUIRE_EVENT_IDS[graph_index];
+    context.frame_sequence_event = FRAME_SEQUENCE_EVENT_IDS[graph_index];
+    context.has_mesh_acceleration_structure = mesh_acceleration_structure != MEM_NULL;
     // A rebuild creates the toggled tasks in the mode the rendering thread applied last; later changes reach them through
     // the toggle events (see apply_voxel_debug_view_mode()).
-    DataValue voxel_debug_view_toggles = DataValue::make_map();
-    for (size_t group = 0; group < VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS.size(); ++group) {
-        DataValue toggle = DataValue::make_map();
-        toggle.set_value("event", std::string(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[group]));
-        toggle.set_value("enabled", is_voxel_debug_view_toggle_enabled(group, applied_voxel_debug_view_mode));
-        voxel_debug_view_toggles.set_entry(VOXEL_DEBUG_VIEW_TOGGLE_NAMES[group], toggle);
-    }
-    context.set_entry("voxel_debug_view_toggles", voxel_debug_view_toggles);
-    DataValue dynamic_mesh_transform_ids = DataValue::make_list();
+    const auto make_toggle = [this](size_t p_group) {
+        return RendRecipeToggleVK{.event = std::string(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[p_group]),
+            .enabled = is_voxel_debug_view_toggle_enabled(p_group, applied_voxel_debug_view_mode)};
+    };
+    context.voxel_debug_view_toggles = VoxelDebugViewToggles{
+        .disabled = make_toggle(0),
+        .enabled = make_toggle(1),
+        .post_svo_build = make_toggle(2),
+        .pre_deferred_propagation = make_toggle(3),
+    };
     for (size_t entity = 0; entity < dynamic_mesh->get_entity_count(); ++entity) {
-        dynamic_mesh_transform_ids.push_back(DataValue::make_string(dynamic_mesh->get_entity_transform_id(entity)));
+        context.dynamic_mesh_transform_ids.emplace_back(dynamic_mesh->get_entity_transform_id(entity));
     }
-    context.set_entry("dynamic_mesh_transform_ids", dynamic_mesh_transform_ids);
     return context;
 }
 

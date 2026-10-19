@@ -59,7 +59,7 @@ inline constexpr std::string_view REND_RES_MESH_MATERIAL_SAMPLER = "material_sam
  *
  * Reflected; the lowercase aliases are the names used in render graph recipes.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) MeshPartVK : uint8_t {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) MeshPartVK : uint8_t {
     /** Opaque submeshes drawn with face culling. */
     OPAQUE WBE_META(WBE_ALIASES = [opaque]),
     /** Alpha-tested submeshes. */

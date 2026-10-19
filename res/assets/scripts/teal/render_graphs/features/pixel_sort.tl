@@ -50,33 +50,6 @@ local UINT32_MAX = 4294967295
 local DISPATCH_BUFFER = "pixel_sort_radix_sort_dispatch"
 
 local record pixel_sort
-    enum Direction
-        "vertical"
-        "horizontal"
-    end
-
-    enum Scope
-        "line"
-        "span"
-    end
-
-    record Params
-        -- The lines sorted.
-        direction: Direction
-        -- Whether each sort covers the whole line or each masked span.
-        scope: Scope
-        -- The format of the color image.
-        color_format: wbe.ImageFormatVK | integer
-        -- The queue every task runs on.
-        queue_family: wbe.QueueFamilyVK | integer
-        -- The import name of the application's contrast uniform buffer.
-        contrast_import: string
-        -- The event id every task's toggle receives RTToggleVK commands under.
-        toggle_event: string
-        -- Whether the tasks start enabled.
-        enabled: boolean
-    end
-
     record Target
         -- The graph id of the color image view sorted in place, bound to the subgraph's `color` port; it must be sampled
         -- and storage.
@@ -90,13 +63,15 @@ end
 
 -- The effect as a subgraph task with id p_id, which sorts the target's color view in place through its `color` port. The
 -- params' toggle gates all of its tasks.
-function pixel_sort.subgraph(p_id: string, p_params: pixel_sort.Params, p_target: pixel_sort.Target): wbe.RendRecipeTaskVK
-    local vertical = p_params.direction == "vertical"
-    if not vertical and p_params.direction ~= "horizontal" then
-        error("pixel_sort: unknown direction '" .. tostring(p_params.direction) .. "'.")
+function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): wbe.RendRecipeTaskVK
+    local direction = graph_utils.enum_name(p_params.direction)
+    local vertical = direction == "VERTICAL"
+    if not vertical and direction ~= "HORIZONTAL" then
+        error("pixel_sort: unknown direction '" .. direction .. "'.")
     end
-    if p_params.scope ~= "line" and p_params.scope ~= "span" then
-        error("pixel_sort: unknown scope '" .. tostring(p_params.scope) .. "'.")
+    local scope = graph_utils.enum_name(p_params.scope)
+    if scope ~= "LINE" and scope ~= "SPAN" then
+        error("pixel_sort: unknown scope '" .. scope .. "'.")
     end
     local width = p_target.width
     local height = p_target.height
@@ -133,7 +108,7 @@ function pixel_sort.subgraph(p_id: string, p_params: pixel_sort.Params, p_target
     add_resource(graph_utils.storage_image("pixel_sort_source_image", p_params.color_format, width, height))
     add_resource(graph_utils.image_view("pixel_sort_source", "pixel_sort_source_image"))
     add_resource(graph_utils.storage_image(
-        "pixel_sort_mask_image", p_params.scope == "span" and "r16g16b16a16_uint" or "r16_uint", width, height))
+        "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height))
     add_resource(graph_utils.image_view("pixel_sort_mask", "pixel_sort_mask_image"))
     add_resource(graph_utils.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE))
     add_resource(graph_utils.storage_buffer("pixel_sort_keys", key_buffer_size))
@@ -164,7 +139,7 @@ function pixel_sort.subgraph(p_id: string, p_params: pixel_sort.Params, p_target
         }
         tasks.add({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
     end
-    local direction_suffix = "_" .. p_params.direction .. "_shader"
+    local direction_suffix = "_" .. string.lower(direction) .. "_shader"
 
     compute("copy_pixel_sort_source", "copy_pixel_sort_source_shader", tile_group_count_x, tile_group_count_y,
         { pixel_sort_input = "color" })

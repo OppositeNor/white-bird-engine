@@ -17,7 +17,6 @@
 
 #include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
-#include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -46,6 +45,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
+#include "deferred_recipe_context.hh"
 #include "i_voxel_render_feature.hh"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
@@ -114,7 +114,7 @@ private:
     // only by the next tick, so the bound must leave room for it and at least one submitted frame.
     static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
     static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
-    // The `script` resource of the graph recipe, res/assets/scripts/lua/render_graphs/deferred.lua.
+    // The `script` resource of the graph recipe, res/assets/scripts/teal/render_graphs/deferred.tl.
     static constexpr std::string_view DEFERRED_RECIPE_SCRIPT = "render_graphs.deferred";
     static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
     static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
@@ -184,18 +184,12 @@ private:
     };
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
     // Event ids of the RTToggleVK::Command that gates the tasks of each voxel debug view mode group, shared by both graphs;
-    // see is_voxel_debug_view_toggle_enabled(). The recipe receives each as voxel_debug_view_toggles.<name>.
+    // see is_voxel_debug_view_toggle_enabled(). The recipe receives them as VoxelDebugViewToggles.
     static constexpr std::array<std::string_view, 4> VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS = {
         "deferred_pbr_test.voxel_debug_view.disabled",
         "deferred_pbr_test.voxel_debug_view.enabled",
         "deferred_pbr_test.voxel_debug_view.post_svo_build",
         "deferred_pbr_test.voxel_debug_view.pre_deferred_propagation",
-    };
-    static constexpr std::array<std::string_view, 4> VOXEL_DEBUG_VIEW_TOGGLE_NAMES = {
-        "disabled",
-        "enabled",
-        "post_svo_build",
-        "pre_deferred_propagation",
     };
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
     // RTTriggeredVK event of the voxel structure's static construction tasks in both graphs; see finish_voxel_static_build().
@@ -262,7 +256,8 @@ private:
     void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table);
     // Run the deferred recipe for a graph context, then add the mesh and voxel parts that stay in C++.
     RendGraphDescVK make_deferred_render_graph_desc(bool p_use_summed_area_table, const RendGraphContextVK& p_context);
-    DataValue make_deferred_recipe_context(bool p_use_summed_area_table, const RendGraphContextVK& p_context) const;
+    // The recipe context, without the voxel structure and post-processing parameters.
+    DeferredRecipeContext make_deferred_recipe_context(bool p_use_summed_area_table, const RendGraphContextVK& p_context) const;
     // The application-owned resources the recipe imports, and the tasks built in C++ that it imports.
     RendGraphRecipeImportsVK make_deferred_recipe_imports(bool p_use_summed_area_table);
     RendTaskDescVK create_mesh_acceleration_structure_build_task_desc();

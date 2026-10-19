@@ -41,8 +41,8 @@ uint32_t SVORenderFeatureAtomic::get_reset_group_count() const {
     return 1;
 }
 
-std::string_view SVORenderFeatureAtomic::get_recipe_variant() const {
-    return "atomic";
+SVORecipeVariant SVORenderFeatureAtomic::get_recipe_variant() const {
+    return SVORecipeVariant::ATOMIC;
 }
 
 } // namespace WhiteBirdEngine

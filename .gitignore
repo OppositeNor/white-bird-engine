@@ -10,6 +10,8 @@ vgcore*
 *.gen*
 
 compile_commands.json
+# Teal configuration is generated
+tlconfig.lua
 other/
 
 imgui.ini

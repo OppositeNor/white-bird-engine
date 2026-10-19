@@ -42,7 +42,9 @@
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "i_voxel_render_feature.hh"
+#include "octree_recipe_params.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/defs.hh"
 #include <array>
@@ -384,21 +386,21 @@ void VoxelRenderFeatureOctree::configure_recipe(
     if (p_inputs.dynamic_mesh == nullptr) {
         throw std::runtime_error("VoxelRenderFeatureOctree: the dynamic mesh is required to configure a recipe.");
     }
-    p_parameters.set_value("module", std::string("render_graphs.features.voxel_octree"));
-    p_parameters.set_value("level_count", OCTREE_LEVEL_COUNT);
-    DataValue leaf_gather_group_count = DataValue::make_map();
-    leaf_gather_group_count.set_value("x", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.width);
-    leaf_gather_group_count.set_value("y", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.height);
-    leaf_gather_group_count.set_value("z", OCTREE_DEBUG_SUBGRID_GRID_EXTENT.depth);
-    p_parameters.set_entry("leaf_gather_group_count", leaf_gather_group_count);
-    p_parameters.set_value("node_gather_group_count", OCTREE_DEBUG_GATHER_GROUP_COUNT);
-    p_parameters.set_value("leaf_draw_count", OCTREE_DEBUG_LEAF_DRAW_COUNT);
+    OctreeRecipeParams params;
+    params.module = "render_graphs.features.voxel_octree";
+    params.level_count = OCTREE_LEVEL_COUNT;
+    params.leaf_gather_group_count = OctreeGroupCount{
+        .x = OCTREE_DEBUG_SUBGRID_GRID_EXTENT.width,
+        .y = OCTREE_DEBUG_SUBGRID_GRID_EXTENT.height,
+        .z = OCTREE_DEBUG_SUBGRID_GRID_EXTENT.depth,
+    };
+    params.node_gather_group_count = OCTREE_DEBUG_GATHER_GROUP_COUNT;
+    params.leaf_draw_count = OCTREE_DEBUG_LEAF_DRAW_COUNT;
 
     // Textures and buffers.
-    DataValue imports = DataValue::make_list();
-    const auto import = [&p_imports, &imports](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
+    const auto import = [&p_imports, &params](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
         p_imports.add(p_name, p_resource);
-        imports.push_back(DataValue::make_string(p_name));
+        params.imports.emplace_back(p_name);
     };
     import(OCTREE_INFO, *octree_info);
     import(OCTREE_STATIC, *static_view);
@@ -412,7 +414,7 @@ void VoxelRenderFeatureOctree::configure_recipe(
         import(get_static_level_resource_id(level), *static_level_views[level]);
         import(get_dynamic_level_resource_id(level), *dynamic_level_views[level]);
     }
-    p_parameters.set_entry("imports", imports);
+    SerializableSD<OctreeRecipeParams>::serialize(p_parameters, params);
 
     // The clears record vkCmdClearColorImage, and the construction passes report the full texture view they write through
     // the per-level views; both are C++ tasks the recipe imports. The static ones record once.

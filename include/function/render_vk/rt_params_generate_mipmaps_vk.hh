@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsGenerateMipmapsVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsGenerateMipmapsVK {
     /**
      * @brief Graph resource id of the view of the base mip level.
      */

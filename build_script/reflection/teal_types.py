@@ -15,7 +15,16 @@
 import re
 from typing import Any, Callable
 
-from build_script.reflection.lua_types import _strip
+
+def _strip(p_type: str) -> str:
+    """Remove namespaces, cv-qualifiers, and references the declarations do not need."""
+    result = p_type.strip()
+    result = re.sub(r"\bconst\b", "", result)
+    result = result.replace("&", "").strip()
+    for prefix in ("::WhiteBirdEngine::", "WhiteBirdEngine::", "WBE::"):
+        result = result.replace(prefix, "")
+    return result.strip()
+
 
 _STRING_TYPES = {"std::string", "std::string_view", "const char *", "const char*"}
 _BOOLEAN_TYPES = {"bool"}
@@ -48,15 +57,18 @@ def teal_field_name(p_name: str) -> str:
     return p_name
 
 
-def teal_type(p_type: str, p_class_names: list[str], p_enum_names: list[str]) -> str:
+def teal_type(p_type: str, p_scope: dict[str, Any]) -> str:
     """The Teal type of a reflected C++ field type.
 
     Reflected enums accept their names and aliases, or their integer values, as deserialization does.
 
     Args:
         p_type: The C++ type as reflection spells it.
-        p_class_names: Names of the reflected classes the declarations contain.
-        p_enum_names: Names of the reflected enums the declarations contain.
+        p_scope: The names the declarations can refer to: `classes` and `enums`, the script types they declare, and
+            `reflected`, every reflected class and enum, whether visible to scripts or not.
+
+    Raises:
+        ValueError: If the type is a reflected class or enum that is not visible to scripts.
     """
     stripped = _strip(p_type)
     match = _TEMPLATE_PATTERN.match(stripped)
@@ -64,9 +76,9 @@ def teal_type(p_type: str, p_class_names: list[str], p_enum_names: list[str]) ->
         name = match.group("name")
         argument = match.group("argument")
         if name in ("std::vector", "Vector"):
-            return f"{{{teal_type(argument.split(',')[0], p_class_names, p_enum_names)}}}"
+            return f"{{{teal_type(argument.split(',')[0], p_scope)}}}"
         if name == "std::optional":
-            return teal_type(argument, p_class_names, p_enum_names)
+            return teal_type(argument, p_scope)
         if name == "Buffer":
             return "string"
     if stripped in _STRING_TYPES:
@@ -83,15 +95,33 @@ def teal_type(p_type: str, p_class_names: list[str], p_enum_names: list[str]) ->
         return "{number}"
     if stripped == "DataValue":
         return "any"
-    if stripped in p_enum_names:
+    if stripped in p_scope["enums"]:
         return f"{teal_name(stripped)} | integer"
-    if stripped in p_class_names:
+    if stripped in p_scope["classes"]:
         return teal_name(stripped)
+    if stripped in p_scope["reflected"]:
+        raise ValueError(f"The reflected type '{stripped}' reaches scripts but is not WBE_REFLECT_SCRIPT; mark it so it is declared.")
     return "any"
+
+
+def teal_parent(p_parent: str, p_scope: dict[str, Any]) -> str:
+    """The Teal name of the interface a script class derives from, or an empty string for a base that is not reflected,
+    which scripts never see.
+
+    Raises:
+        ValueError: If the base is a reflected class that is not visible to scripts.
+    """
+    stripped = _strip(p_parent)
+    if stripped in p_scope["classes"]:
+        return teal_name(stripped)
+    if stripped in p_scope["reflected"]:
+        raise ValueError(f"The script class base '{stripped}' is not WBE_REFLECT_SCRIPT; mark it so it is declared.")
+    return ""
 
 
 TEAL_FILTERS: dict[str, Callable[..., Any]] = {
     "teal_type": teal_type,
     "teal_name": teal_name,
     "teal_field_name": teal_field_name,
+    "teal_parent": teal_parent,
 }

@@ -30,7 +30,7 @@ namespace WhiteBirdEngine {
  * @enum ImageFormatVK
  * @brief Reflected subset of VkFormat. Add an enumerator to make another format available to recipes.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) ImageFormatVK : std::underlying_type_t<VkFormat> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageFormatVK : std::underlying_type_t<VkFormat> {
     UNDEFINED WBE_META(WBE_ALIASES = [undefined]) = VK_FORMAT_UNDEFINED,
     R8_UNORM WBE_META(WBE_ALIASES = [r8_unorm]) = VK_FORMAT_R8_UNORM,
     R8G8_UNORM WBE_META(WBE_ALIASES = [r8g8_unorm]) = VK_FORMAT_R8G8_UNORM,
@@ -65,7 +65,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) ImageFormatVK : std::underlying_type_t<VkF
  * @enum AttachmentLoadOpVK
  * @brief Reflected mirror of VkAttachmentLoadOp.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) AttachmentLoadOpVK : std::underlying_type_t<VkAttachmentLoadOp> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) AttachmentLoadOpVK : std::underlying_type_t<VkAttachmentLoadOp> {
     LOAD WBE_META(WBE_ALIASES = [load]) = VK_ATTACHMENT_LOAD_OP_LOAD,
     CLEAR WBE_META(WBE_ALIASES = [clear]) = VK_ATTACHMENT_LOAD_OP_CLEAR,
     DONT_CARE WBE_META(WBE_ALIASES = [dont_care]) = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -75,7 +75,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) AttachmentLoadOpVK : std::underlying_type_
  * @enum ImageTypeVK
  * @brief Reflected mirror of VkImageType.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) ImageTypeVK : std::underlying_type_t<VkImageType> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageTypeVK : std::underlying_type_t<VkImageType> {
     TYPE_1D WBE_META(WBE_ALIASES = [1d]) = VK_IMAGE_TYPE_1D,
     TYPE_2D WBE_META(WBE_ALIASES = [2d]) = VK_IMAGE_TYPE_2D,
     TYPE_3D WBE_META(WBE_ALIASES = [3d]) = VK_IMAGE_TYPE_3D,
@@ -85,7 +85,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) ImageTypeVK : std::underlying_type_t<VkIma
  * @enum ImageViewTypeVK
  * @brief Reflected mirror of VkImageViewType.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) ImageViewTypeVK : std::underlying_type_t<VkImageViewType> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageViewTypeVK : std::underlying_type_t<VkImageViewType> {
     TYPE_1D WBE_META(WBE_ALIASES = [1d]) = VK_IMAGE_VIEW_TYPE_1D,
     TYPE_2D WBE_META(WBE_ALIASES = [2d]) = VK_IMAGE_VIEW_TYPE_2D,
     TYPE_3D WBE_META(WBE_ALIASES = [3d]) = VK_IMAGE_VIEW_TYPE_3D,
@@ -99,7 +99,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) ImageViewTypeVK : std::underlying_type_t<V
  * @enum FilterVK
  * @brief Reflected mirror of VkFilter.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) FilterVK : std::underlying_type_t<VkFilter> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) FilterVK : std::underlying_type_t<VkFilter> {
     NEAREST WBE_META(WBE_ALIASES = [nearest]) = VK_FILTER_NEAREST,
     LINEAR WBE_META(WBE_ALIASES = [linear]) = VK_FILTER_LINEAR,
 };
@@ -108,7 +108,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) FilterVK : std::underlying_type_t<VkFilter
  * @enum SamplerMipmapModeVK
  * @brief Reflected mirror of VkSamplerMipmapMode.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) SamplerMipmapModeVK : std::underlying_type_t<VkSamplerMipmapMode> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) SamplerMipmapModeVK : std::underlying_type_t<VkSamplerMipmapMode> {
     NEAREST WBE_META(WBE_ALIASES = [nearest]) = VK_SAMPLER_MIPMAP_MODE_NEAREST,
     LINEAR WBE_META(WBE_ALIASES = [linear]) = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 };
@@ -117,7 +117,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) SamplerMipmapModeVK : std::underlying_type
  * @enum SamplerAddressModeVK
  * @brief Reflected mirror of VkSamplerAddressMode.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) SamplerAddressModeVK : std::underlying_type_t<VkSamplerAddressMode> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) SamplerAddressModeVK : std::underlying_type_t<VkSamplerAddressMode> {
     REPEAT WBE_META(WBE_ALIASES = [repeat]) = VK_SAMPLER_ADDRESS_MODE_REPEAT,
     MIRRORED_REPEAT WBE_META(WBE_ALIASES = [mirrored_repeat]) = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
     CLAMP_TO_EDGE WBE_META(WBE_ALIASES = [clamp_to_edge]) = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -129,7 +129,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) SamplerAddressModeVK : std::underlying_typ
  * @enum CompareOpVK
  * @brief Reflected mirror of VkCompareOp.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) CompareOpVK : std::underlying_type_t<VkCompareOp> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) CompareOpVK : std::underlying_type_t<VkCompareOp> {
     NEVER WBE_META(WBE_ALIASES = [never]) = VK_COMPARE_OP_NEVER,
     LESS WBE_META(WBE_ALIASES = [less]) = VK_COMPARE_OP_LESS,
     EQUAL WBE_META(WBE_ALIASES = [equal]) = VK_COMPARE_OP_EQUAL,
@@ -144,7 +144,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) CompareOpVK : std::underlying_type_t<VkCom
  * @enum BorderColorVK
  * @brief Reflected mirror of VkBorderColor.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) BorderColorVK : std::underlying_type_t<VkBorderColor> {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) BorderColorVK : std::underlying_type_t<VkBorderColor> {
     FLOAT_TRANSPARENT_BLACK WBE_META(WBE_ALIASES = [float_transparent_black]) = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
     INT_TRANSPARENT_BLACK WBE_META(WBE_ALIASES = [int_transparent_black]) = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
     FLOAT_OPAQUE_BLACK WBE_META(WBE_ALIASES = [float_opaque_black]) = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK,
@@ -157,7 +157,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) BorderColorVK : std::underlying_type_t<VkB
  * @enum BufferUsageFlagVK
  * @brief Reflected subset of VkBufferUsageFlagBits; a list of flags combines into VkBufferUsageFlags.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) BufferUsageFlagVK : VkFlags {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) BufferUsageFlagVK : VkFlags {
     TRANSFER_SRC WBE_META(WBE_ALIASES = [transfer_src]) = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     TRANSFER_DST WBE_META(WBE_ALIASES = [transfer_dst]) = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     UNIFORM_TEXEL_BUFFER WBE_META(WBE_ALIASES = [uniform_texel_buffer]) = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT,
@@ -177,7 +177,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) BufferUsageFlagVK : VkFlags {
  * @enum ImageUsageFlagVK
  * @brief Reflected mirror of VkImageUsageFlagBits; a list of flags combines into VkImageUsageFlags.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) ImageUsageFlagVK : VkFlags {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageUsageFlagVK : VkFlags {
     TRANSFER_SRC WBE_META(WBE_ALIASES = [transfer_src]) = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     TRANSFER_DST WBE_META(WBE_ALIASES = [transfer_dst]) = VK_IMAGE_USAGE_TRANSFER_DST_BIT,
     SAMPLED WBE_META(WBE_ALIASES = [sampled]) = VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -192,7 +192,7 @@ enum class WBE_META(WBE_REFLECT_ENUM) ImageUsageFlagVK : VkFlags {
  * @enum ImageAspectFlagVK
  * @brief Reflected subset of VkImageAspectFlagBits; a list of flags combines into VkImageAspectFlags.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) ImageAspectFlagVK : VkFlags {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageAspectFlagVK : VkFlags {
     COLOR WBE_META(WBE_ALIASES = [color]) = VK_IMAGE_ASPECT_COLOR_BIT,
     DEPTH WBE_META(WBE_ALIASES = [depth]) = VK_IMAGE_ASPECT_DEPTH_BIT,
     STENCIL WBE_META(WBE_ALIASES = [stencil]) = VK_IMAGE_ASPECT_STENCIL_BIT,

@@ -94,9 +94,10 @@ For non-trivial implementation tasks:
 - A recipe is a Lua `script` resource whose module exports `build(context)` and returns a `RendGraphRecipeVK` table
   (`imports`, `resources`, `tasks`; see `rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK` runs it and
   `RendGraphRecipeBuilderVK` turns it into a `RendGraphDescVK`; recipes only build descriptors and never touch render objects.
-- `context` holds `RendGraphScriptVK::make_context()` facts (`frames_in_flight`, `swap_chain_format`, `swap_chain_extent`);
-  applications may add entries before calling `RendGraphScriptVK::run()`. Size swap-chain-dependent resources and
-  dispatches in Lua from `swap_chain_extent`.
+- `context` holds `RendGraphScriptVK::make_context()` facts (`RendRecipeContextVK`: `frames_in_flight`,
+  `swap_chain_format`, `swap_chain_extent`). An application that adds entries declares a `WBE_REFLECT_SCRIPT` struct
+  deriving from `RendRecipeContextVK`, fills its base with `get_recipe_context()`, and passes `serialize_context()` to
+  `RendGraphScriptVK::run()`. Size swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
 - For a recipe graph, the application's rebuild callback runs the script, builds the descriptor, and adds its C++ tasks.
   Never pass script keys to the graph.
 - Every resource owned outside the graph must be listed in `imports` and supplied through `RendGraphRecipeImportsVK`; a
@@ -114,8 +115,8 @@ For non-trivial implementation tasks:
 - A rebuild callback may add to the descriptor `RendGraphRecipeBuilderVK::build()` returns, for parts not yet expressed
   in Lua (the deferred test adds its acceleration structure and dynamic mesh entities that way); keep everything else in
   the recipe.
-- A C++ feature that contributes to a recipe describes itself with a `configure_recipe()` that writes the parameters of its
-  Lua feature module (including the `module` name) into the context and supplies its resources and C++ tasks to the
+- A C++ feature that contributes to a recipe describes itself with a `configure_recipe()` that serializes the
+  `WBE_REFLECT_SCRIPT` parameters struct of its Lua feature module (including the `module` name) into the context and supplies its resources and C++ tasks to the
   `RendGraphRecipeImportsVK`; the recipe calls `require(params.module).subgraph(id, params, target)`, which returns the
   feature as a subgraph task. Work that runs once, such as a static
   build, is a `trigger` activated while it is still pending; the application disables the trigger event after the first
@@ -136,27 +137,31 @@ For non-trivial implementation tasks:
   `RendGraphRecipeImportsVK::add_task()`; the recipe lists each as `{ id = <task id>, import = true }` and wires it with
   `connect` like any task. Imported tasks set no `type`, `params`, `aliases`, `trigger`, or `toggle`, and supplied and imported
   tasks must match, like resource imports.
-- Recipes and their feature modules are Teal. `templates/teal_types.d.tl.jinja` generates `build/<target>/lua/wbe.d.tl`,
-  the Teal declarations of the reflected engine types, which the ACP type-checks scripts against; reflection therefore
-  runs before the ACP. Import it as a type only, `local type wbe = require("wbe")`, declare a recipe's context entries
-  with `local record Context is wbe.RecipeContext`, and annotate `build(context: Context): wbe.RendGraphRecipeVK`.
+- Recipes and their feature modules are Teal. `templates/teal_types.d.tl.jinja` generates the Teal declarations of the
+  `WBE_REFLECT_SCRIPT` classes and enums (the `reflect_script` attribute group; such a class is also a static serializable
+  and such an enum a reflected enum) into `build/<target>/teal/wbe.d.tl`; the test executables' types appear only in targets
+  that build the tests, the only ones reflection scans them in. The ACP type-checks scripts against them, so reflection
+  runs before the ACP. Every script class is an
+  interface, a derived one `is` its bases, and a script type naming a reflected type that is not `WBE_REFLECT_SCRIPT`
+  fails generation. Declare data C++ hands a recipe as `WBE_REFLECT_SCRIPT` structs rather than Teal records, import the
+  declarations as types only (`local type wbe = require("wbe")`), and annotate `build(context: <context type>):
+  wbe.RendGraphRecipeVK`. Enums serialize as their canonical names; compare `utils.render_graph.enum_name(value)` with the
+  canonical upper-case name, which also accepts the lowercase aliases.
   Type each task's `params` with its reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`), since
-  `RendRecipeTaskVK.params` is untyped. The repo-root `tlconfig.lua` points the Teal language server at the same paths.
-  `templates/lua_types.lua.jinja` still generates LuaLS stubs (`wbe_types.lua`, loaded by `.luarc.json`) for plain Lua
-  scripts.
+  `RendRecipeTaskVK.params` is untyped. The generated repo-root `tlconfig.lua` points the Teal language server at the
+  same paths for the last built target.
 
-### Lua Scripts
+### Scripts
 
-- Lua sources live under `res/assets/scripts/lua/` and are `script` resources declared in
-  `res/assets/scripts/lua/lua_scripts.toml`: recipes in `render_graphs/`, reusable recipe parts (modules whose
-  `add(graph, params, target)` adds resources and tasks to a recipe under construction) in `render_graphs/features/`,
-  and shared helpers in `utils/`.
-- A script's resource id is its module name: its path under `scripts/lua/` without `.lua`, with dots for slashes
+- Script sources live under `res/assets/scripts/teal/` and are `script` resources declared in
+  `res/assets/scripts/teal/lua_scripts.toml`: recipes in `render_graphs/`, reusable recipe parts (modules whose
+  `subgraph(id, params, target)` returns a subgraph task) in `render_graphs/features/`, and shared helpers in `utils/`.
+- A script's resource id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes
   (`utils/render_graph.tl` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
   runtime (through `SMRResourceManager`) and in the editor.
 - Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `WBEACPCompilerScript` copies Lua sources and type-checks and
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
-  a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/lua/` at compile time, so a
+  a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/teal/` at compile time, so a
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
 - `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic
   requires fail. Implement new import sources as an `IScriptModuleResolver`, whose `try_resolve()` must not throw.

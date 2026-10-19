@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  *
  * The defaults match RendSamplerDescVK. Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendSamplerParamsVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendSamplerParamsVK {
     /**
      * @brief Minification filter.
      */

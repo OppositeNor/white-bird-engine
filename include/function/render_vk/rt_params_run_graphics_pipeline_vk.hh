@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  *
  * Recipes draw without vertex input; indexed mesh draws are configured through RTRunGraphicsPipelineVK::Builder.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRunGraphicsPipelineVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsRunGraphicsPipelineVK {
     /**
      * @brief Resource key of the compiled graphics pipeline in the renderer's RenderDatabase.
      */

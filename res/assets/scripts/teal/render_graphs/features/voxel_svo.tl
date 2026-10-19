@@ -22,52 +22,14 @@ local type wbe = require("wbe")
 local type voxel = require("render_graphs.features.voxel")
 local graph_utils = require("utils.render_graph")
 
-local record voxel_svo
-    enum Variant
-        "atomic"
-        "pass_published"
-    end
-
-    -- The byte sizes of the scratch buffers the module declares.
-    record BufferSizes
-        -- svo_dynamic_nodes.
-        dynamic_nodes: integer
-        -- Each of svo_deferred_list_ping and svo_deferred_list_pong.
-        deferred_list: integer
-        -- svo_pre_deferred_debug_info_buffer.
-        pre_deferred_debug_info: integer
-        -- svo_pre_deferred_debug_list_buffer.
-        pre_deferred_debug_list: integer
-    end
-
-    record Params
-        variant: Variant
-        -- Resource-key prefix of the static construction pipelines.
-        shader_prefix: string
-        -- Resource-key prefix of the dynamic update pipelines.
-        dynamic_shader_prefix: string
-        -- The import names of the application's SVO buffers.
-        imports: {string}
-        buffer_sizes: BufferSizes
-        -- The rasterized resolution of the construction passes.
-        extent: integer
-        -- The tree depth, which is the number of deferred propagation rounds.
-        max_depth: integer
-        reset_group_count: integer
-        deferred_dispatch_group_count: integer
-        dynamic_clear_group_count: integer
-        static_publication_group_count: integer
-        dynamic_publication_group_count: integer
-        -- The trigger of the static construction tasks, which record once; nil to rebuild every frame.
-        static_build: wbe.RendRecipeTriggerVK
-    end
-end
+local voxel_svo = {}
 
 -- The SVO as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
-function voxel_svo.subgraph(p_id: string, p_params: voxel_svo.Params, p_target: voxel.Target): wbe.RendRecipeTaskVK
-    local pass_published = p_params.variant == "pass_published"
-    if not pass_published and p_params.variant ~= "atomic" then
-        error("voxel_svo: unknown variant '" .. tostring(p_params.variant) .. "'.")
+function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): wbe.RendRecipeTaskVK
+    local variant = graph_utils.enum_name(p_params.variant)
+    local pass_published = variant == "PASS_PUBLISHED"
+    if not pass_published and variant ~= "ATOMIC" then
+        error("voxel_svo: unknown variant '" .. variant .. "'.")
     end
     -- Scratch buffers: each frame's dynamic clear (and the static reset) empties the dynamic nodes' range and the
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the

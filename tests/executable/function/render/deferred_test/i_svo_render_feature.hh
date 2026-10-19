@@ -28,6 +28,7 @@
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "glm/ext/vector_float3.hpp"
 #include "i_voxel_render_feature.hh"
+#include "svo_recipe_params.hh"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -112,8 +113,8 @@ protected:
      * @brief Workgroup count of the per-frame reset dispatch.
      */
     virtual uint32_t get_reset_group_count() const = 0;
-    // The `variant` the voxel_svo module builds: "atomic" or "pass_published".
-    virtual std::string_view get_recipe_variant() const = 0;
+    // The construction the voxel_svo module builds.
+    virtual SVORecipeVariant get_recipe_variant() const = 0;
 
     /**
      * @brief Compiles a compute pipeline from its shader resource key.

@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsFullMemoryBarrierVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsFullMemoryBarrierVK {
     /**
      * @brief Graph resource the barrier reports writing, which carries the edge to the task ordered after it.
      */

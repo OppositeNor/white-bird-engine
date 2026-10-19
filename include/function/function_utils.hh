@@ -26,7 +26,7 @@ using EntityID = entt::entity;
  *
  * Reflected; the lowercase aliases are the names used in render graph recipes.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) DeviceDomain {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) DeviceDomain {
     // The host domain
     HOST WBE_META(WBE_ALIASES = [host]),
     // The device domain

@@ -24,8 +24,11 @@
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "i_voxel_render_feature.hh"
+#include "svo_recipe_params.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <array>
 #include <cstddef>
@@ -189,31 +192,28 @@ const char* ISVORenderFeature::get_debug_view_name(VoxelDebugViewMode p_mode) co
 
 void ISVORenderFeature::configure_recipe(
     DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const {
-    p_parameters.set_value("module", std::string("render_graphs.features.voxel_svo"));
-    p_parameters.set_value("variant", std::string(get_recipe_variant()));
-    p_parameters.set_value("shader_prefix", shader_prefix);
-    p_parameters.set_value("dynamic_shader_prefix", dynamic_shader_prefix);
-    p_parameters.set_value("extent", static_cast<int64_t>(SVO_EXTENT));
-    p_parameters.set_value("max_depth", static_cast<int64_t>(SVO_MAX_DEPTH));
-    p_parameters.set_value("reset_group_count", get_reset_group_count());
-    p_parameters.set_value("deferred_dispatch_group_count", SVO_DEFERRED_DISPATCH_GROUP_COUNT);
-    p_parameters.set_value("dynamic_clear_group_count", static_cast<int64_t>((SVO_MAX_NODE_COUNT + 127) / 128));
+    SVORecipeParams params;
+    params.module = "render_graphs.features.voxel_svo";
+    params.variant = get_recipe_variant();
+    params.shader_prefix = shader_prefix;
+    params.dynamic_shader_prefix = dynamic_shader_prefix;
+    params.extent = SVO_EXTENT;
+    params.max_depth = SVO_MAX_DEPTH;
+    params.reset_group_count = get_reset_group_count();
+    params.deferred_dispatch_group_count = SVO_DEFERRED_DISPATCH_GROUP_COUNT;
+    params.dynamic_clear_group_count = (SVO_MAX_NODE_COUNT + 127) / 128;
     // The static publication runs one invocation per node, the dynamic one per static and dynamic node.
-    p_parameters.set_value("static_publication_group_count", static_cast<int64_t>((SVO_MAX_NODE_COUNT + 63) / 64));
-    p_parameters.set_value("dynamic_publication_group_count",
-        static_cast<int64_t>((SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT + 127) / 128));
+    params.static_publication_group_count = (SVO_MAX_NODE_COUNT + 63) / 64;
+    params.dynamic_publication_group_count = (SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT + 127) / 128;
     // Byte sizes of the scratch buffers the module declares, from the capacities svo_info records.
-    DataValue buffer_sizes = DataValue::make_map();
-    buffer_sizes.set_value("dynamic_nodes", static_cast<int64_t>(sizeof(SVONode) * SVO_MAX_DYNAMIC_NODE_COUNT));
-    buffer_sizes.set_value("deferred_list", static_cast<int64_t>(sizeof(uint32_t) * SVO_DEFERRED_LIST_ELEMENT_COUNT));
-    buffer_sizes.set_value("pre_deferred_debug_info", static_cast<int64_t>(sizeof(SVOInfo)));
-    buffer_sizes.set_value("pre_deferred_debug_list", static_cast<int64_t>(sizeof(uint32_t) * SVO_MAX_DEFERRED_TASK_COUNT));
-    p_parameters.set_entry("buffer_sizes", buffer_sizes);
+    params.buffer_sizes = SVOBufferSizes{
+        .dynamic_nodes = sizeof(SVONode) * SVO_MAX_DYNAMIC_NODE_COUNT,
+        .deferred_list = sizeof(uint32_t) * SVO_DEFERRED_LIST_ELEMENT_COUNT,
+        .pre_deferred_debug_info = sizeof(SVOInfo),
+        .pre_deferred_debug_list = sizeof(uint32_t) * SVO_MAX_DEFERRED_TASK_COUNT,
+    };
     if (!rebuild_static_every_frame) {
-        DataValue static_build = DataValue::make_map();
-        static_build.set_value("event", std::string(p_inputs.static_build_event));
-        static_build.set_value("activate", p_inputs.static_build_pending);
-        p_parameters.set_entry("static_build", static_build);
+        params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
     }
     // The buffers holding initial contents or state shared by both graphs; the module declares the per-frame scratch buffers.
     const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 7> buffers{
@@ -227,12 +227,11 @@ void ISVORenderFeature::configure_recipe(
             {SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, &svo_pre_deferred_debug_draw_indirect_buffer},
         },
     };
-    DataValue imports = DataValue::make_list();
     for (const auto& [name, buffer] : buffers) {
         p_imports.add(name, **buffer);
-        imports.push_back(DataValue::make_string(name));
+        params.imports.emplace_back(name);
     }
-    p_parameters.set_entry("imports", imports);
+    SerializableSD<SVORecipeParams>::serialize(p_parameters, params);
 }
 
 } // namespace WhiteBirdEngine

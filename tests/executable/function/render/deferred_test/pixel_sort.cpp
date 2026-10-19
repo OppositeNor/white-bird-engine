@@ -22,12 +22,16 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "i_post_processing.hh"
+#include "pixel_sort_recipe_params.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include <array>
 #include <cstddef>
@@ -181,14 +185,16 @@ void PixelSort::upload_settings() {
 }
 
 void PixelSort::configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const {
-    p_parameters.set_value("module", std::string(PIXEL_SORT_RECIPE_MODULE));
-    p_parameters.set_value("direction", std::string(direction_name(settings.direction)));
-    p_parameters.set_value("scope", std::string(settings.scope == PixelSortScope::SPAN ? "span" : "line"));
-    p_parameters.set_value("color_format", static_cast<int64_t>(color_format));
-    p_parameters.set_value("queue_family", std::string("compute_1"));
-    p_parameters.set_value("contrast_import", std::string(REND_RES_PIXEL_SORT_CONTRAST));
-    p_parameters.set_value("toggle_event", std::string(get_toggle_event_id()));
-    p_parameters.set_value("enabled", is_enabled());
+    PixelSortRecipeParams params;
+    params.module = PIXEL_SORT_RECIPE_MODULE;
+    params.direction = settings.direction;
+    params.scope = settings.scope;
+    params.color_format = static_cast<ImageFormatVK>(color_format);
+    params.queue_family = QueueFamilyVK::COMPUTE_1;
+    params.contrast_import = REND_RES_PIXEL_SORT_CONTRAST;
+    params.toggle_event = get_toggle_event_id();
+    params.enabled = is_enabled();
+    SerializableSD<PixelSortRecipeParams>::serialize(p_parameters, params);
     p_imports.add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer);
 }
 

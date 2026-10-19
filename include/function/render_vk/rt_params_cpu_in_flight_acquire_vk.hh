@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsCPUInFlightAcquireVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsCPUInFlightAcquireVK {
     /**
      * @brief Render-graph resource id of the source image view; it is also the event id of every acquisition.
      */

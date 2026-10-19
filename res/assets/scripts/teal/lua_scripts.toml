@@ -11,58 +11,58 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Lua scripts. A script's resource id is its module name: its path under assets/scripts/lua, without the extension and
+# Scripts. A script's resource id is its module name: its path under assets/scripts/teal, without the extension and
 # with dots for slashes, so that `require("utils.render_graph")` finds both the resource and, in the editor, the file.
 include = []
 
 [[resources]]
 id = "utils.math"
 source_type = "script"
-source_file = "assets/scripts/lua/utils/math.tl"
+source_file = "assets/scripts/teal/utils/math.tl"
 
 [[resources]]
 id = "utils.render_graph"
 source_type = "script"
-source_file = "assets/scripts/lua/utils/render_graph.tl"
+source_file = "assets/scripts/teal/utils/render_graph.tl"
 
 [[resources]]
 id = "render_graphs.draw_cube_unshaded"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/draw_cube_unshaded.tl"
+source_file = "assets/scripts/teal/render_graphs/draw_cube_unshaded.tl"
 
 [[resources]]
 id = "render_graphs.pixel_sorting"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/pixel_sorting.tl"
+source_file = "assets/scripts/teal/render_graphs/pixel_sorting.tl"
 
 [[resources]]
 id = "render_graphs.deferred"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/deferred.tl"
+source_file = "assets/scripts/teal/render_graphs/deferred.tl"
 
 [[resources]]
 id = "render_graphs.features.pixel_sort"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/pixel_sort.tl"
+source_file = "assets/scripts/teal/render_graphs/features/pixel_sort.tl"
 
 [[resources]]
 id = "render_graphs.features.voxel_svo"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/voxel_svo.tl"
+source_file = "assets/scripts/teal/render_graphs/features/voxel_svo.tl"
 
 [[resources]]
 id = "render_graphs.features.voxel_octree"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/voxel_octree.tl"
+source_file = "assets/scripts/teal/render_graphs/features/voxel_octree.tl"
 
 [[resources]]
 id = "tests.teal_math"
 source_type = "script"
-source_file = "assets/scripts/lua/tests/teal_math.tl"
+source_file = "assets/scripts/teal/tests/teal_math.tl"
 scope = "test_only"
 
 [[resources]]
 id = "tests.teal_recipe"
 source_type = "script"
-source_file = "assets/scripts/lua/tests/teal_recipe.tl"
+source_file = "assets/scripts/teal/tests/teal_recipe.tl"
 scope = "test_only"

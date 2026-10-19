@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
  * enough queues; otherwise they share one VkQueue and the graph orders their tasks with pipeline barriers. Reflected; the
  * lowercase aliases are the names used in render graph recipes.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) QueueFamilyVK : uint32_t {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) QueueFamilyVK : uint32_t {
     GRAPHICS WBE_META(WBE_ALIASES = [graphics]) = 0,
     COMPUTE_1 WBE_META(WBE_ALIASES = [compute_1]) = 1,
     COMPUTE_2 WBE_META(WBE_ALIASES = [compute_2]) = 2,

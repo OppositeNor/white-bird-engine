@@ -31,7 +31,7 @@ namespace WhiteBirdEngine {
  *
  * The width and height follow the swap chain unless fixed; see RendExtent2DParamsVK. Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendImageParamsVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendImageParamsVK {
     /**
      * @brief Primary usage; one of the IMAGE_* usages.
      */

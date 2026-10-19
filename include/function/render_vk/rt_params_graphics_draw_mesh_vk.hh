@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsGraphicsDrawMeshVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsGraphicsDrawMeshVK {
     /**
      * @brief Resource key of the RUMesh3D to draw. The compiled mesh is imported into the graph under this key.
      */

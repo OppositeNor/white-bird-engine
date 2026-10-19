@@ -44,7 +44,7 @@ namespace WhiteBirdEngine {
  *
  * Reflected; the lowercase aliases are the names used in render graph recipes.
  */
-enum class WBE_META(WBE_REFLECT_ENUM) RendResPrimaryUsageVK : uint32_t {
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) RendResPrimaryUsageVK : uint32_t {
     /** Image sampled by shaders; its content is written by transfers. Sampled and transfer-destination usage. */
     IMAGE_READ_ONLY WBE_META(WBE_ALIASES = [image_read_only]),
     /** Image read and written by shaders. Storage and sampled usage. */

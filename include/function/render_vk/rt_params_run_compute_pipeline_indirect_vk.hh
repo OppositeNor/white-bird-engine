@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  *
  * Deserialization is strict: an unknown key, such as a misspelt parameter, throws instead of being ignored.
  */
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsRunComputePipelineIndirectVK {
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsRunComputePipelineIndirectVK {
     /**
      * @brief Resource key of the compiled compute pipeline in the renderer's RenderDatabase.
      */

@@ -62,9 +62,9 @@ res_chunks_dir = os.path.join(resource_dir, "res_chunks")
 res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 assets_dir = os.path.join(resource_dir, "assets")
 # Script resources' ids are their module paths under this directory.
-script_modules_dir = os.path.join(assets_dir, "scripts", "lua")
+script_modules_dir = os.path.join(assets_dir, "scripts", "teal")
 # The generated Teal declarations of the reflected engine types (wbe.d.tl).
-script_types_dir = os.path.join(build_dir, "lua")
+script_types_dir = os.path.join(build_dir, "teal")
 assets_output_dir = os.path.join(resource_output_dir, "assets")
 metadata_path = os.path.join(test_env_dir, "metadata.json")
 cache_dir = os.path.join(build_dir, "build_cache")

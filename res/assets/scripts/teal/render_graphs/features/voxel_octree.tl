@@ -22,29 +22,10 @@ local type wbe = require("wbe")
 local type voxel = require("render_graphs.features.voxel")
 local graph_utils = require("utils.render_graph")
 
-local record voxel_octree
-    record GroupCount
-        x: integer
-        y: integer
-        z: integer
-    end
-
-    record Params
-        -- The import names of the application's octree textures and buffers.
-        imports: {string}
-        -- The number of octree levels, which have one storage view each.
-        level_count: integer
-        -- The leaf gather's workgroups.
-        leaf_gather_group_count: GroupCount
-        -- The node gather's workgroups along each axis.
-        node_gather_group_count: integer
-        -- The leaf view's indirect draw records.
-        leaf_draw_count: integer
-    end
-end
+local voxel_octree = {}
 
 -- The octree as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
-function voxel_octree.subgraph(p_id: string, p_params: voxel_octree.Params, p_target: voxel.Target): wbe.RendRecipeTaskVK
+function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p_target: voxel.Target): wbe.RendRecipeTaskVK
     local tasks = graph_utils.task_list()
     local chain = tasks.chain
     local toggles = p_target.debug_view_toggles

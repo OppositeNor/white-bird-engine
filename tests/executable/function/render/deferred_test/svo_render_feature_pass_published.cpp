@@ -49,8 +49,8 @@ uint32_t SVORenderFeaturePassPublished::get_reset_group_count() const {
     return 1;
 }
 
-std::string_view SVORenderFeaturePassPublished::get_recipe_variant() const {
-    return "pass_published";
+SVORecipeVariant SVORenderFeaturePassPublished::get_recipe_variant() const {
+    return SVORecipeVariant::PASS_PUBLISHED;
 }
 
 } // namespace WhiteBirdEngine

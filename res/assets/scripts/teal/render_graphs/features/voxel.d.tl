@@ -18,21 +18,13 @@
 local type wbe = require("wbe")
 
 local record voxel
-    -- The RTToggleVK toggles of the tasks each voxel debug view mode group records.
-    record DebugViewToggles
-        disabled: wbe.RendRecipeToggleVK
-        enabled: wbe.RendRecipeToggleVK
-        post_svo_build: wbe.RendRecipeToggleVK
-        pre_deferred_propagation: wbe.RendRecipeToggleVK
-    end
-
     -- What the including recipe supplies to a voxel structure's subgraph, whose ports `color` and `depth` the overlays draw
     -- through.
     record Target
         -- The transforms of the two dynamic mesh entities.
         dynamic_mesh_transform_ids: {string}
         -- The voxel debug view toggles by mode group.
-        debug_view_toggles: DebugViewToggles
+        debug_view_toggles: wbe.VoxelDebugViewToggles
         -- The color target of the overlays.
         color_target: string
         -- The depth target the overlays test against.

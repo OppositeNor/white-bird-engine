@@ -37,20 +37,15 @@
 namespace WhiteBirdEngine {
 
 DataValue RendGraphScriptVK::make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context) {
-    DataValue context = DataValue::make_map();
-    context.set_value("frames_in_flight", p_render_data.frames_in_flight);
-    DataValue swap_chain_extent = DataValue::make_map();
-    swap_chain_extent.set_value("width", p_graph_context.swap_chain_extent.width);
-    swap_chain_extent.set_value("height", p_graph_context.swap_chain_extent.height);
-    context.set_entry("swap_chain_extent", swap_chain_extent);
-    const auto format = static_cast<ImageFormatVK>(static_cast<std::underlying_type_t<VkFormat>>(p_render_data.swap_chain_format));
-    const std::optional<std::string_view> format_name = EnumReflection<ImageFormatVK>::try_enum_to_string(format);
-    if (format_name.has_value()) {
-        context.set_value("swap_chain_format", *format_name);
-    } else {
-        context.set_value("swap_chain_format", static_cast<int64_t>(p_render_data.swap_chain_format));
-    }
-    return context;
+    return serialize_context(get_recipe_context(p_render_data, p_graph_context));
+}
+
+RendRecipeContextVK RendGraphScriptVK::get_recipe_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context) {
+    return RendRecipeContextVK{
+        .frames_in_flight = p_render_data.frames_in_flight,
+        .swap_chain_format = static_cast<ImageFormatVK>(static_cast<std::underlying_type_t<VkFormat>>(p_render_data.swap_chain_format)),
+        .swap_chain_extent = {.width = p_graph_context.swap_chain_extent.width, .height = p_graph_context.swap_chain_extent.height},
+    };
 }
 
 DataValue RendGraphScriptVK::run(std::string_view p_module_name, std::string_view p_source, const DataValue& p_context) {

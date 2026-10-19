@@ -30,6 +30,15 @@ local record render_graph
     end
 end
 
+-- The canonical name of a reflected enum value the application passes. C++ serializes an enum as its enumerator name, and
+-- the lowercase aliases recipes may also write name the same enumerator, so compare against the canonical upper-case name.
+function render_graph.enum_name(p_value: string | integer): string
+    if p_value is integer then
+        error("enum_name: expected an enumerator name, got the integer " .. tostring(p_value) .. ".", 2)
+    end
+    return string.upper(p_value as string)
+end
+
 -- A graph-owned storage buffer of p_size bytes.
 function render_graph.storage_buffer(p_id: string, p_size: integer): wbe.RendRecipeResourceVK
     return { id = p_id, buffer = { usage = "buffer_storage", size = p_size } }
