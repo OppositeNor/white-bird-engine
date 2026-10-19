@@ -159,14 +159,6 @@ if __name__ == "__main__":
         print(f"WBEBuilder: Building target: {build_setup.args.target}.")
         print("WBEBuilder: Building dependencies...")
         build_setup.build_dependencies.compile()
-        build_setup.setup_acp_compilers()
-        print("WBEBuilder: Running asset conditioning pipeline...")
-        build_setup.acp.process_resources()
-        if build_setup.build_target["generate-tests"]:
-            print("WBEBuilder: Running asset conditioning pipeline with test resources...")
-            build_setup.test_env_acp.process_resources()
-        print("WBEBuilder: Gathering licenses...")
-        _gather_license()
         print("WBEBuilder: Gathering sources...")
         if build_setup.build_target["generate-tests"]:
             headers = build_config.project_headers
@@ -175,9 +167,18 @@ if __name__ == "__main__":
         print("WBEBuilder: Gathering generate.json...")
         gen_infos = _gather_gen_infos()
 
-        # Run reflection script
+        # Run reflection script. It runs before the ACP, which type-checks Teal scripts against the generated declarations.
         print("WBEBuilder: Running reflections...")
         on_build.reflect(metaparser_clang_args, build_setup.metadata_path, build_setup.metadata_cache_dir, headers, gen_infos)
+
+        build_setup.setup_acp_compilers()
+        print("WBEBuilder: Running asset conditioning pipeline...")
+        build_setup.acp.process_resources()
+        if build_setup.build_target["generate-tests"]:
+            print("WBEBuilder: Running asset conditioning pipeline with test resources...")
+            build_setup.test_env_acp.process_resources()
+        print("WBEBuilder: Gathering licenses...")
+        _gather_license()
 
         # Build project with CMake
         print("WBEBuilder: Running cmake...")

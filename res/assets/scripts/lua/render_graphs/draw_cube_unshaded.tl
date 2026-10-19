@@ -15,23 +15,24 @@
 -- Draws the opaque part of the static cube mesh straight into the swap chain.
 -- Imports: `swap_chain` (the swap chain image views) and `camera_info` (the application's camera uniform buffer).
 
+local type wbe = require("wbe")
+
 local exports = {}
 
----@param context wbe.RecipeContext
----@return wbe.RendGraphRecipeVK
-function exports.build(context)
+function exports.build(_context: wbe.RecipeContext): wbe.RendGraphRecipeVK
+    local params: wbe.RTParamsGraphicsDrawMeshVK = {
+        mesh = "model_cube_static.mesh",
+        pipeline = "draw_cube_unshaded_pipeline",
+        parts = { "opaque" },
+        clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
+    }
     return {
         imports = { "swap_chain", "camera_info" },
         tasks = {
             {
                 id = "run_static_mesh",
                 type = "graphics_draw_mesh",
-                params = {
-                    mesh = "model_cube_static.mesh",
-                    pipeline = "draw_cube_unshaded_pipeline",
-                    parts = { "opaque" },
-                    clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
-                },
+                params = params,
                 aliases = { ["render_target_colors[0]"] = "swap_chain" },
             },
         },

@@ -18,43 +18,54 @@
 -- declares the scratch buffers each frame rewrites before reading. See ISVORenderFeature in
 -- tests/executable/function/render/deferred_test/i_svo_render_feature.hh.
 
+local type wbe = require("wbe")
+local type voxel = require("render_graphs.features.voxel")
 local graph_utils = require("utils.render_graph")
 
-local exports = {}
+local record voxel_svo
+    enum Variant
+        "atomic"
+        "pass_published"
+    end
 
----@class wbe.features.VoxelSVOBufferSizes
----@field dynamic_nodes integer svo_dynamic_nodes.
----@field deferred_list integer Each of svo_deferred_list_ping and svo_deferred_list_pong.
----@field pre_deferred_debug_info integer svo_pre_deferred_debug_info_buffer.
----@field pre_deferred_debug_list integer svo_pre_deferred_debug_list_buffer.
+    -- The byte sizes of the scratch buffers the module declares.
+    record BufferSizes
+        -- svo_dynamic_nodes.
+        dynamic_nodes: integer
+        -- Each of svo_deferred_list_ping and svo_deferred_list_pong.
+        deferred_list: integer
+        -- svo_pre_deferred_debug_info_buffer.
+        pre_deferred_debug_info: integer
+        -- svo_pre_deferred_debug_list_buffer.
+        pre_deferred_debug_list: integer
+    end
 
----@class wbe.features.VoxelSVOParams
----@field variant "atomic"|"pass_published"
----@field shader_prefix string Resource-key prefix of the static construction pipelines.
----@field dynamic_shader_prefix string Resource-key prefix of the dynamic update pipelines.
----@field imports string[] The import names of the application's SVO buffers.
----@field buffer_sizes wbe.features.VoxelSVOBufferSizes The byte sizes of the scratch buffers the module declares.
----@field extent integer The rasterized resolution of the construction passes.
----@field max_depth integer The tree depth, which is the number of deferred propagation rounds.
----@field reset_group_count integer
----@field deferred_dispatch_group_count integer
----@field dynamic_clear_group_count integer
----@field static_publication_group_count integer
----@field dynamic_publication_group_count integer
----@field static_build wbe.RendRecipeTriggerVK? The trigger of the static construction tasks, which record once; nil to rebuild every frame.
+    record Params
+        variant: Variant
+        -- Resource-key prefix of the static construction pipelines.
+        shader_prefix: string
+        -- Resource-key prefix of the dynamic update pipelines.
+        dynamic_shader_prefix: string
+        -- The import names of the application's SVO buffers.
+        imports: {string}
+        buffer_sizes: BufferSizes
+        -- The rasterized resolution of the construction passes.
+        extent: integer
+        -- The tree depth, which is the number of deferred propagation rounds.
+        max_depth: integer
+        reset_group_count: integer
+        deferred_dispatch_group_count: integer
+        dynamic_clear_group_count: integer
+        static_publication_group_count: integer
+        dynamic_publication_group_count: integer
+        -- The trigger of the static construction tasks, which record once; nil to rebuild every frame.
+        static_build: wbe.RendRecipeTriggerVK
+    end
+end
 
----@class wbe.features.VoxelTarget
----@field dynamic_mesh_transform_ids string[] The transforms of the two dynamic mesh entities.
----@field debug_view_toggles table<string, wbe.RendRecipeToggleVK> The voxel debug view toggles by mode group.
----@field color_target string The color target of the overlays.
----@field depth_target string The depth target the overlays test against.
-
----Add the SVO's imports and tasks to a recipe under construction.
----@param p_graph { imports: string[], resources: wbe.RendRecipeResourceVK[], tasks: wbe.utils.TaskList }
----@param p_params wbe.features.VoxelSVOParams
----@param p_target wbe.features.VoxelTarget
----@return string[] overlays The overlay tasks, in drawing order; the caller orders them on the color and depth targets.
-function exports.add(p_graph, p_params, p_target)
+-- Add the SVO's imports and tasks to a recipe under construction. Returns the overlay tasks, in drawing order; the caller
+-- orders them on the color and depth targets.
+function voxel_svo.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_svo.Params, p_target: voxel.Target): {string}
     local pass_published = p_params.variant == "pass_published"
     if not pass_published and p_params.variant ~= "atomic" then
         error("voxel_svo: unknown variant '" .. tostring(p_params.variant) .. "'.")
@@ -66,7 +77,7 @@ function exports.add(p_graph, p_params, p_target)
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the
     -- debug draw reads them.
     local resources = p_graph.resources
-    local function add_buffer(p_id, p_size)
+    local function add_buffer(p_id: string, p_size: integer)
         resources[#resources + 1] = graph_utils.storage_buffer(p_id, p_size)
     end
     local sizes = p_params.buffer_sizes
@@ -81,51 +92,39 @@ function exports.add(p_graph, p_params, p_target)
     local dynamic_prefix = p_params.dynamic_shader_prefix
     local toggles = p_target.debug_view_toggles
     local static_build = p_params.static_build
-    local extent = { width = p_params.extent, height = p_params.extent }
+    local extent: wbe.RendExtent2DParamsVK = { width = p_params.extent, height = p_params.extent }
 
-    local function compute(p_id, p_pipeline, p_group_count_x, p_extra)
-        local task = {
-            id = p_id,
-            type = "run_compute_pipeline",
-            params = { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" },
-        }
-        for key, value in pairs(p_extra or {}) do
-            task[key] = value
-        end
-        return tasks.add(task)
+    local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer): wbe.RendRecipeTaskVK
+        local params: wbe.RTParamsRunComputePipelineVK =
+            { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" }
+        return tasks.add({ id = p_id, type = "run_compute_pipeline", params = params })
     end
-    local function construction(p_id, p_mesh, p_pipeline, p_part, p_transform, p_load, p_extra)
-        local load_op = p_load and "load" or "clear"
-        local task = {
-            id = p_id,
-            type = "graphics_draw_mesh",
-            params = {
-                mesh = p_mesh,
-                pipeline = p_pipeline,
-                parts = { p_part },
-                transform = p_transform,
-                render_extent = extent,
-                color_load_op = load_op,
-                depth_load_op = load_op,
-            },
+    local function construction(p_id: string, p_mesh: string, p_pipeline: string, p_part: wbe.MeshPartVK,
+        p_transform: string, p_load: boolean): wbe.RendRecipeTaskVK
+        local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
+        local params: wbe.RTParamsGraphicsDrawMeshVK = {
+            mesh = p_mesh,
+            pipeline = p_pipeline,
+            parts = { p_part },
+            transform = p_transform,
+            render_extent = extent,
+            color_load_op = load_op,
+            depth_load_op = load_op,
         }
-        for key, value in pairs(p_extra or {}) do
-            task[key] = value
-        end
-        return tasks.add(task)
+        return tasks.add({ id = p_id, type = "graphics_draw_mesh", params = params })
     end
     -- Rasterization allocates depth one's children; every propagation round publishes one further level, and an extra
     -- retry consumes leaf occupancy and drains the remaining deferred entries.
-    local function deferred_construction(p_id, p_dynamic, p_extra)
+    local function deferred_construction(p_id: string, p_dynamic: boolean): wbe.RendRecipeTaskVK
         local stage_prefix = p_dynamic and dynamic_prefix or prefix
         local ping = stage_prefix .. "_build_deferred_propagation_pong_write_shader"
         local pong = stage_prefix .. "_build_deferred_propagation_ping_write_shader"
-        local task
+        local task: wbe.RendRecipeTaskVK
         if pass_published then
             local publication = p_dynamic and "svo_2_dynamic_update_states_shader" or "svo_2_update_states_shader"
             local publication_group_count =
                 p_dynamic and p_params.dynamic_publication_group_count or p_params.static_publication_group_count
-            local dispatches = {}
+            local dispatches: {wbe.RTParamsComputeDispatchVK} = {}
             for iteration = 0, p_params.max_depth - 1 do
                 local write_pong = iteration % 2 == 0
                 dispatches[#dispatches + 1] = {
@@ -134,57 +133,52 @@ function exports.add(p_graph, p_params, p_target)
                 dispatches[#dispatches + 1] = { pipeline = write_pong and ping or pong, group_count_x = p_params.deferred_dispatch_group_count }
                 dispatches[#dispatches + 1] = { pipeline = publication, group_count_x = publication_group_count }
             end
-            task = { id = p_id, type = "run_compute_pipelines_sequential", params = { dispatches = dispatches, queue_family = "compute_1" } }
+            local params: wbe.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = "compute_1" }
+            task = { id = p_id, type = "run_compute_pipelines_sequential", params = params }
         else
             -- A single raster pass can leave contenders at any depth; allow one retry per tree level.
-            task = {
-                id = p_id,
-                type = "ping_pong",
-                params = {
-                    ping_pipeline = ping,
-                    pong_pipeline = pong,
-                    iterations = p_params.max_depth,
-                    group_count_x = p_params.deferred_dispatch_group_count,
-                    ping_prefix_pipeline = "svo_deferred_count_reset_pong_shader",
-                    pong_prefix_pipeline = "svo_deferred_count_reset_ping_shader",
-                    queue_family = "compute_1",
-                },
+            local params: wbe.RTParamsPingPongVK = {
+                ping_pipeline = ping,
+                pong_pipeline = pong,
+                iterations = p_params.max_depth,
+                group_count_x = p_params.deferred_dispatch_group_count,
+                ping_prefix_pipeline = "svo_deferred_count_reset_pong_shader",
+                pong_prefix_pipeline = "svo_deferred_count_reset_ping_shader",
+                queue_family = "compute_1",
             }
-        end
-        for key, value in pairs(p_extra or {}) do
-            task[key] = value
+            task = { id = p_id, type = "ping_pong", params = params }
         end
         return tasks.add(task)
     end
-    local function overlay(p_id, p_pipeline, p_indirect_buffer, p_toggle)
+    local function overlay(p_id: string, p_pipeline: string, p_indirect_buffer: string, p_toggle: wbe.RendRecipeToggleVK)
+        local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
+            pipeline = p_pipeline,
+            index_buffer = "svo_debug_draw_index_buffer",
+            indirect_buffer = p_indirect_buffer,
+            color_load_op = "load",
+            depth_load_op = "load",
+        }
         tasks.add({
             id = p_id,
             type = "run_graphics_pipeline_indirect",
-            params = {
-                pipeline = p_pipeline,
-                index_buffer = "svo_debug_draw_index_buffer",
-                indirect_buffer = p_indirect_buffer,
-                color_load_op = "load",
-                depth_load_op = "load",
-            },
+            params = params,
             aliases = { ["render_target_colors[0]"] = p_target.color_target, render_target_depth = p_target.depth_target },
             toggle = p_toggle,
         })
     end
-    -- The static scene is built once into the shared buffers, unless the application rebuilds it every frame.
-    local static_once = static_build ~= nil and { trigger = static_build } or nil
-
     -- The frame-begin barrier orders this frame's SVO mutation after the previous frame's consumers.
-    tasks.add({ id = "svo_frame_begin", type = "full_memory_barrier", params = { resource = "svo_info" } })
-    -- Static scene.
-    compute("reset_svo", prefix .. "_reset_shader", p_params.reset_group_count, static_once)
-    construction("run_build_svo", "static_mesh", prefix .. "_build_static_mesh_pipeline", "opaque", nil, false, static_once)
-    construction("run_build_svo_double_sided", "static_mesh", prefix .. "_build_static_mesh_pipeline", "double_sided", nil, false,
-        static_once)
+    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = "svo_info" }
+    tasks.add({ id = "svo_frame_begin", type = "full_memory_barrier", params = barrier_params })
+    -- Static scene, built once into the shared buffers unless the application rebuilds it every frame (no trigger).
+    compute("reset_svo", prefix .. "_reset_shader", p_params.reset_group_count).trigger = static_build
+    construction("run_build_svo", "static_mesh", prefix .. "_build_static_mesh_pipeline", "opaque", nil, false).trigger =
+        static_build
+    construction("run_build_svo_double_sided", "static_mesh", prefix .. "_build_static_mesh_pipeline", "double_sided", nil,
+        false).trigger = static_build
     if pass_published then
-        compute("update_svo_states", "svo_2_update_states_shader", p_params.static_publication_group_count, static_once)
+        compute("update_svo_states", "svo_2_update_states_shader", p_params.static_publication_group_count).trigger = static_build
     end
-    deferred_construction("static_svo_deferred", false, static_once)
+    deferred_construction("static_svo_deferred", false).trigger = static_build
     -- Dynamic meshes.
     compute("clear_dynamic_svo", dynamic_prefix .. "_clear_shader", p_params.dynamic_clear_group_count)
     for index, id in ipairs({ "dynamic_svo", "dynamic_svo_second" }) do
@@ -194,8 +188,8 @@ function exports.add(p_graph, p_params, p_target)
     if pass_published then
         compute("publish_dynamic_svo", "svo_2_dynamic_update_states_shader", p_params.dynamic_publication_group_count)
     end
-    compute("capture_svo_pre_deferred_debug", "svo_pre_deferred_debug_capture_shader", p_params.deferred_dispatch_group_count,
-        { toggle = toggles.pre_deferred_propagation })
+    compute("capture_svo_pre_deferred_debug", "svo_pre_deferred_debug_capture_shader", p_params.deferred_dispatch_group_count).toggle =
+        toggles.pre_deferred_propagation
     deferred_construction("run_build_svo_deferred", true)
     compute("setup_svo_debug_draw", "svo_debug_draw_setup_shader", 1)
     -- Debug views.
@@ -205,10 +199,10 @@ function exports.add(p_graph, p_params, p_target)
 
     -- Every task using a buffer, in execution order; the publication passes of the pass-published implementation take
     -- their place in the chains of the buffers they publish.
-    local static_publication = pass_published and { "update_svo_states" } or {}
-    local dynamic_publication = pass_published and { "publish_dynamic_svo" } or {}
-    local function sequence(...)
-        local result = {}
+    local static_publication: {string} = pass_published and { "update_svo_states" } or {}
+    local dynamic_publication: {string} = pass_published and { "publish_dynamic_svo" } or {}
+    local function sequence(...: {string}): {string}
+        local result: {string} = {}
         for _, part in ipairs({ ... }) do
             for _, id in ipairs(part) do
                 result[#result + 1] = id
@@ -257,4 +251,4 @@ function exports.add(p_graph, p_params, p_target)
     return { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" }
 end
 
-return exports
+return voxel_svo

@@ -14,24 +14,37 @@
 
 -- Helpers for writing render graph recipes (see wbe.RendGraphRecipeVK).
 
-local exports = {}
+local type wbe = require("wbe")
 
----A graph-owned storage buffer.
----@param p_id string
----@param p_size integer The size in bytes.
----@return wbe.RendRecipeResourceVK
-function exports.storage_buffer(p_id, p_size)
+local record render_graph
+    -- A list of recipe tasks that can connect its tasks into resource chains.
+    record TaskList
+        -- The tasks, in the order they were added.
+        tasks: {wbe.RendRecipeTaskVK}
+        -- Add a task and return it.
+        add: function(p_task: wbe.RendRecipeTaskVK): wbe.RendRecipeTaskVK
+        -- Get an added task; errors when no task has the id.
+        get: function(p_id: string): wbe.RendRecipeTaskVK
+        -- Connect each task to the next on p_resource.
+        chain: function(p_resource: string, p_task_ids: {string})
+    end
+
+    -- A recipe under construction, which feature modules' add() functions add imports, resources, and tasks to.
+    record RecipeBuilder
+        imports: {string}
+        resources: {wbe.RendRecipeResourceVK}
+        tasks: TaskList
+    end
+end
+
+-- A graph-owned storage buffer of p_size bytes.
+function render_graph.storage_buffer(p_id: string, p_size: integer): wbe.RendRecipeResourceVK
     return { id = p_id, buffer = { usage = "buffer_storage", size = p_size } }
 end
 
----A graph-owned 2D image the tasks read and write.
----@param p_id string
----@param p_format wbe.ImageFormatVK
----@param p_width integer
----@param p_height integer
----@param p_additional_usage? wbe.ImageUsageFlagVK[]
----@return wbe.RendRecipeResourceVK
-function exports.storage_image(p_id, p_format, p_width, p_height, p_additional_usage)
+-- A graph-owned 2D image the tasks read and write.
+function render_graph.storage_image(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
+    p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): wbe.RendRecipeResourceVK
     return {
         id = p_id,
         image = {
@@ -43,27 +56,16 @@ function exports.storage_image(p_id, p_format, p_width, p_height, p_additional_u
     }
 end
 
----A default view of a graph-owned image.
----@param p_id string
----@param p_image string The id of the image.
----@return wbe.RendRecipeResourceVK
-function exports.image_view(p_id, p_image)
+-- A default view of the graph-owned image p_image.
+function render_graph.image_view(p_id: string, p_image: string): wbe.RendRecipeResourceVK
     return { id = p_id, image_view = { image = p_image } }
 end
 
----@class wbe.utils.TaskList
----@field tasks wbe.RecipeTask[] The tasks, in the order they were added.
----@field add fun(p_task: wbe.RecipeTask): wbe.RecipeTask Add a task and return it.
----@field get fun(p_id: string): wbe.RecipeTask Get an added task; errors when no task has the id.
----@field chain fun(p_resource: string, p_task_ids: string[]) Connect each task to the next on p_resource.
-
----A list of recipe tasks that can connect its tasks into resource chains.
----@return wbe.utils.TaskList
-function exports.task_list()
-    local tasks = {}
-    local task_by_id = {}
-    local list = { tasks = tasks }
-    function list.add(p_task)
+function render_graph.task_list(): render_graph.TaskList
+    local tasks: {wbe.RendRecipeTaskVK} = {}
+    local task_by_id: {string:wbe.RendRecipeTaskVK} = {}
+    local list: render_graph.TaskList = { tasks = tasks }
+    function list.add(p_task: wbe.RendRecipeTaskVK): wbe.RendRecipeTaskVK
         if task_by_id[p_task.id] ~= nil then
             error("task_list: the task id '" .. tostring(p_task.id) .. "' is added twice.", 2)
         end
@@ -71,7 +73,7 @@ function exports.task_list()
         task_by_id[p_task.id] = p_task
         return p_task
     end
-    function list.get(p_id)
+    function list.get(p_id: string): wbe.RendRecipeTaskVK
         local task = task_by_id[p_id]
         if task == nil then
             error("task_list: no task has the id '" .. tostring(p_id) .. "'.", 2)
@@ -79,7 +81,7 @@ function exports.task_list()
         return task
     end
     -- Order the tasks that use p_resource, in execution order.
-    function list.chain(p_resource, p_task_ids)
+    function list.chain(p_resource: string, p_task_ids: {string})
         for i = 2, #p_task_ids do
             local task = list.get(p_task_ids[i - 1])
             task.connect = task.connect or {}
@@ -89,4 +91,4 @@ function exports.task_list()
     return list
 end
 
-return exports
+return render_graph

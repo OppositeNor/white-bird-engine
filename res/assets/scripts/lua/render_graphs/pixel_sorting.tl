@@ -45,6 +45,7 @@ local RADIX_SORT_DISPATCH_BUFFER_SIZE = 24
 local RADIX_SORT_PASS_COUNT = 4
 local UINT32_SIZE = 4
 
+local type wbe = require("wbe")
 local math_utils = require("utils.math")
 local graph_utils = require("utils.render_graph")
 
@@ -53,11 +54,20 @@ local storage_buffer = graph_utils.storage_buffer
 local storage_image = graph_utils.storage_image
 local image_view = graph_utils.image_view
 
+local enum Orientation
+    "vertical"
+    "horizontal"
+end
+
+local record Context is wbe.RecipeContext
+    source_width: integer
+    source_height: integer
+    orientation: Orientation
+end
+
 local exports = {}
 
----@param context wbe.RecipeContext
----@return wbe.RendGraphRecipeVK
-function exports.build(context)
+function exports.build(context: Context): wbe.RendGraphRecipeVK
     local width = context.source_width
     local height = context.source_height
     local orientation = context.orientation
@@ -81,7 +91,7 @@ function exports.build(context)
     local tile_group_count_x = ceil_div(width, PIXEL_SORT_TILE_SIZE)
     local tile_group_count_y = ceil_div(height, PIXEL_SORT_TILE_SIZE)
 
-    local resources = {
+    local resources: {wbe.RendRecipeResourceVK} = {
         storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE),
         -- The register pass writes and the write pass reads this buffer; the radix sort passes alternate between it and
         -- the swap buffer.
@@ -107,21 +117,16 @@ function exports.build(context)
     local task_list = graph_utils.task_list()
     local add_task = task_list.add
     local chain = task_list.chain
-    local function compute(p_id, p_pipeline, p_group_count_x, p_group_count_y, p_aliases)
-        add_task({
-            id = p_id,
-            type = "run_compute_pipeline",
-            params = { pipeline = p_pipeline, group_count_x = p_group_count_x, group_count_y = p_group_count_y },
-            aliases = p_aliases,
-        })
+    local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
+        p_aliases?: {string:string})
+        local params: wbe.RTParamsRunComputePipelineVK =
+            { pipeline = p_pipeline, group_count_x = p_group_count_x, group_count_y = p_group_count_y }
+        add_task({ id = p_id, type = "run_compute_pipeline", params = params, aliases = p_aliases })
     end
-    local function indirect_compute(p_id, p_pipeline, p_offset, p_aliases)
-        add_task({
-            id = p_id,
-            type = "run_compute_pipeline_indirect",
-            params = { pipeline = p_pipeline, indirect_buffer = "radix_sort_dispatch", indirect_offset = p_offset },
-            aliases = p_aliases,
-        })
+    local function indirect_compute(p_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
+        local params: wbe.RTParamsRunComputePipelineIndirectVK =
+            { pipeline = p_pipeline, indirect_buffer = "radix_sort_dispatch", indirect_offset = p_offset }
+        add_task({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
     end
 
     compute("count_pixel_sort_mask", "count_pixel_sort_mask_" .. orientation .. "_shader", column_group_count, 1)
@@ -132,7 +137,11 @@ function exports.build(context)
     -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
     compute("radix_sort_prepare_dispatch", "radix_sort_prepare_dispatch", 1, 1,
         { input_buffer = "pixel_sort_keys", dispatch_buffer = "radix_sort_dispatch" })
-    local histogram_ids, prefix_sum_ids, overflow_prefix_sum_ids, add_overflow_ids, scatter_ids = {}, {}, {}, {}, {}
+    local histogram_ids: {string} = {}
+    local prefix_sum_ids: {string} = {}
+    local overflow_prefix_sum_ids: {string} = {}
+    local add_overflow_ids: {string} = {}
+    local scatter_ids: {string} = {}
     for pass = 0, RADIX_SORT_PASS_COUNT - 1 do
         local input_keys = pass % 2 == 0 and "pixel_sort_keys" or "pixel_sort_keys_swap"
         local output_keys = pass % 2 == 0 and "pixel_sort_keys_swap" or "pixel_sort_keys"
@@ -159,14 +168,15 @@ function exports.build(context)
     -- After an even number of passes, the sorted keys are back in the key buffer.
     compute("write_sorted_pixels", "write_sorted_pixels_" .. orientation .. "_shader", tile_group_count_x, tile_group_count_y)
     compute("pixel_sorting_post_processing", "pixel_sorting_post_processing_shader", tile_group_count_x, tile_group_count_y)
+    local present_params: wbe.RTParamsRunGraphicsPipelineVK = {
+        pipeline = "present_pixel_sort_pipeline",
+        clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
+        draw_vertex_count = 3,
+    }
     add_task({
         id = "present_sorted_pixels",
         type = "run_graphics_pipeline",
-        params = {
-            pipeline = "present_pixel_sort_pipeline",
-            clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
-            draw_vertex_count = 3,
-        },
+        params = present_params,
         aliases = { ["render_target_colors[0]"] = "swap_chain" },
     })
 
@@ -188,9 +198,9 @@ function exports.build(context)
     })
     chain("pixel_sort_keys_swap",
         { scatter_ids[1], histogram_ids[2], scatter_ids[2], scatter_ids[3], histogram_ids[4], scatter_ids[4] })
-    local histogram_chain = {}
+    local histogram_chain: {string} = {}
     -- The prepare task followed by every task dispatched indirectly, in execution order.
-    local dispatch_chain = { "radix_sort_prepare_dispatch" }
+    local dispatch_chain: {string} = { "radix_sort_prepare_dispatch" }
     for index = 1, RADIX_SORT_PASS_COUNT do
         for _, id in ipairs({ histogram_ids[index], prefix_sum_ids[index], overflow_prefix_sum_ids[index],
             add_overflow_ids[index], scatter_ids[index] }) do

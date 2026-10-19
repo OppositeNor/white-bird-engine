@@ -14,23 +14,19 @@
 
 -- Integer math helpers.
 
-local exports = {}
+local record math_utils
+    -- Divide two non-negative integers, rounding up.
+    ceil_div: function(p_value: integer, p_divisor: integer): integer
+    -- Clamp p_value to [p_min, p_max].
+    clamp: function(p_value: integer, p_min: integer, p_max: integer): integer
+end
 
----Divide two non-negative integers, rounding up.
----@param p_value integer
----@param p_divisor integer
----@return integer
-function exports.ceil_div(p_value, p_divisor)
+function math_utils.ceil_div(p_value: integer, p_divisor: integer): integer
     return (p_value + p_divisor - 1) // p_divisor
 end
 
----Clamp p_value to [p_min, p_max].
----@param p_value number
----@param p_min number
----@param p_max number
----@return number
-function exports.clamp(p_value, p_min, p_max)
+function math_utils.clamp(p_value: integer, p_min: integer, p_max: integer): integer
     return math.min(math.max(p_value, p_min), p_max)
 end
 
-return exports
+return math_utils

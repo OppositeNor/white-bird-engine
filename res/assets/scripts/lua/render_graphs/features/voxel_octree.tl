@@ -18,21 +18,34 @@
 -- they write through the per-level views; see VoxelRenderFeatureOctree in
 -- tests/executable/function/render/deferred_test/voxel_render_feature_octree.hh.
 
-local exports = {}
+local type wbe = require("wbe")
+local type voxel = require("render_graphs.features.voxel")
+local type graph_utils = require("utils.render_graph")
 
----@class wbe.features.VoxelOctreeParams
----@field imports string[] The import names of the application's octree textures and buffers.
----@field level_count integer The number of octree levels, which have one storage view each.
----@field leaf_gather_group_count { x: integer, y: integer, z: integer } The leaf gather's workgroups.
----@field node_gather_group_count integer The node gather's workgroups along each axis.
----@field leaf_draw_count integer The leaf view's indirect draw records.
+local record voxel_octree
+    record GroupCount
+        x: integer
+        y: integer
+        z: integer
+    end
 
----Add the octree's imports and tasks to a recipe under construction.
----@param p_graph { imports: string[], resources: wbe.RendRecipeResourceVK[], tasks: wbe.utils.TaskList }
----@param p_params wbe.features.VoxelOctreeParams
----@param p_target wbe.features.VoxelTarget
----@return string[] overlays The overlay tasks, in drawing order; the caller orders them on the color and depth targets.
-function exports.add(p_graph, p_params, p_target)
+    record Params
+        -- The import names of the application's octree textures and buffers.
+        imports: {string}
+        -- The number of octree levels, which have one storage view each.
+        level_count: integer
+        -- The leaf gather's workgroups.
+        leaf_gather_group_count: GroupCount
+        -- The node gather's workgroups along each axis.
+        node_gather_group_count: integer
+        -- The leaf view's indirect draw records.
+        leaf_draw_count: integer
+    end
+end
+
+-- Add the octree's imports and tasks to a recipe under construction. Returns the overlay tasks, in drawing order; the
+-- caller orders them on the color and depth targets.
+function voxel_octree.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_octree.Params, p_target: voxel.Target): {string}
     for _, import in ipairs(p_params.imports) do
         p_graph.imports[#p_graph.imports + 1] = import
     end
@@ -41,7 +54,8 @@ function exports.add(p_graph, p_params, p_target)
     local toggles = p_target.debug_view_toggles
 
     -- The frame-begin barrier orders this frame's mutation after the previous frame's consumers.
-    tasks.add({ id = "octree_frame_begin", type = "full_memory_barrier", params = { resource = "octree_dynamic" } })
+    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = "octree_dynamic" }
+    tasks.add({ id = "octree_frame_begin", type = "full_memory_barrier", params = barrier_params })
     -- Static scene: empty both textures, then occupy the rasterized leaves and their ancestors. Dynamic meshes: empty the
     -- dynamic texture, then rebuild it like the static scene.
     for _, id in ipairs({ "reset_octree", "run_build_octree", "run_build_octree_double_sided", "clear_dynamic_octree", "dynamic_octree",
@@ -50,43 +64,42 @@ function exports.add(p_graph, p_params, p_target)
     end
     -- Debug views: the leaf gather serves both views, and the node gather only the node view.
     local leaf_groups = p_params.leaf_gather_group_count
-    tasks.add({
-        id = "gather_octree_debug_leaves",
-        type = "run_compute_pipeline",
-        params = {
-            pipeline = "octree_debug_gather_leaves_shader",
-            group_count_x = leaf_groups.x,
-            group_count_y = leaf_groups.y,
-            group_count_z = leaf_groups.z,
-            queue_family = "compute_1",
-        },
-        toggle = toggles.enabled,
-    })
+    local leaf_gather_params: wbe.RTParamsRunComputePipelineVK = {
+        pipeline = "octree_debug_gather_leaves_shader",
+        group_count_x = leaf_groups.x,
+        group_count_y = leaf_groups.y,
+        group_count_z = leaf_groups.z,
+        queue_family = "compute_1",
+    }
+    tasks.add({ id = "gather_octree_debug_leaves", type = "run_compute_pipeline", params = leaf_gather_params, toggle = toggles.enabled })
     local node_groups = p_params.node_gather_group_count
+    local node_gather_params: wbe.RTParamsRunComputePipelineVK = {
+        pipeline = "octree_debug_gather_nodes_shader",
+        group_count_x = node_groups,
+        group_count_y = node_groups,
+        group_count_z = node_groups,
+        queue_family = "compute_1",
+    }
     tasks.add({
         id = "gather_octree_debug_nodes",
         type = "run_compute_pipeline",
-        params = {
-            pipeline = "octree_debug_gather_nodes_shader",
-            group_count_x = node_groups,
-            group_count_y = node_groups,
-            group_count_z = node_groups,
-            queue_family = "compute_1",
-        },
+        params = node_gather_params,
         toggle = toggles.pre_deferred_propagation,
     })
-    local function overlay(p_id, p_pipeline, p_indirect_buffer, p_draw_count, p_toggle)
+    local function overlay(p_id: string, p_pipeline: string, p_indirect_buffer: string, p_draw_count: integer,
+        p_toggle: wbe.RendRecipeToggleVK)
+        local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
+            pipeline = p_pipeline,
+            index_buffer = "octree_debug_draw_index_buffer",
+            indirect_buffer = p_indirect_buffer,
+            draw_count = p_draw_count,
+            color_load_op = "load",
+            depth_load_op = "load",
+        }
         tasks.add({
             id = p_id,
             type = "run_graphics_pipeline_indirect",
-            params = {
-                pipeline = p_pipeline,
-                index_buffer = "octree_debug_draw_index_buffer",
-                indirect_buffer = p_indirect_buffer,
-                draw_count = p_draw_count,
-                color_load_op = "load",
-                depth_load_op = "load",
-            },
+            params = params,
             aliases = { ["render_target_colors[0]"] = p_target.color_target, render_target_depth = p_target.depth_target },
             toggle = p_toggle,
         })
@@ -121,4 +134,4 @@ function exports.add(p_graph, p_params, p_target)
     return { "run_octree_debug_draw", "run_octree_debug_node_draw" }
 end
 
-return exports
+return voxel_octree

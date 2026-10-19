@@ -16,6 +16,7 @@
 -- of every column or row with the GPU radix sort. The application compiles the pipelines and owns the contrast buffer;
 -- see PixelSort in tests/executable/function/render/deferred_test/pixel_sort.hh.
 
+local type wbe = require("wbe")
 local math_utils = require("utils.math")
 local graph_utils = require("utils.render_graph")
 
@@ -48,29 +49,49 @@ local UINT32_MAX = 4294967295
 
 local DISPATCH_BUFFER = "pixel_sort_radix_sort_dispatch"
 
-local exports = {}
+local record pixel_sort
+    enum Direction
+        "vertical"
+        "horizontal"
+    end
 
----@class wbe.features.PixelSortParams
----@field direction "vertical"|"horizontal" The lines sorted.
----@field scope "line"|"span" Whether each sort covers the whole line or each masked span.
----@field color_format wbe.ImageFormatVK The format of the color image.
----@field queue_family wbe.QueueFamilyVK The queue every task runs on.
----@field contrast_import string The import name of the application's contrast uniform buffer.
----@field toggle_event string The event id every task's toggle receives RTToggleVK commands under.
----@field enabled boolean Whether the tasks start enabled.
+    enum Scope
+        "line"
+        "span"
+    end
 
----@class wbe.features.PixelSortTarget
----@field color_view string The graph id of the color image view sorted in place; it must be sampled and storage.
----@field previous_task string The last task that accesses color_view before the effect.
----@field width integer The width of the color image.
----@field height integer The height of the color image.
+    record Params
+        -- The lines sorted.
+        direction: Direction
+        -- Whether each sort covers the whole line or each masked span.
+        scope: Scope
+        -- The format of the color image.
+        color_format: wbe.ImageFormatVK | integer
+        -- The queue every task runs on.
+        queue_family: wbe.QueueFamilyVK | integer
+        -- The import name of the application's contrast uniform buffer.
+        contrast_import: string
+        -- The event id every task's toggle receives RTToggleVK commands under.
+        toggle_event: string
+        -- Whether the tasks start enabled.
+        enabled: boolean
+    end
 
----Add the effect's imports, resources, and tasks to a recipe under construction.
----@param p_graph { imports: string[], resources: wbe.RendRecipeResourceVK[], tasks: wbe.utils.TaskList }
----@param p_params wbe.features.PixelSortParams
----@param p_target wbe.features.PixelSortTarget
----@return string last_task The effect's last task that accesses the color view; connect later users of the image to it.
-function exports.add(p_graph, p_params, p_target)
+    record Target
+        -- The graph id of the color image view sorted in place; it must be sampled and storage.
+        color_view: string
+        -- The last task that accesses color_view before the effect.
+        previous_task: string
+        -- The width of the color image.
+        width: integer
+        -- The height of the color image.
+        height: integer
+    end
+end
+
+-- Add the effect's imports, resources, and tasks to a recipe under construction. Returns the effect's last task that
+-- accesses the color view; connect later users of the image to it.
+function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort.Params, p_target: pixel_sort.Target): string
     local vertical = p_params.direction == "vertical"
     if not vertical and p_params.direction ~= "horizontal" then
         error("pixel_sort: unknown direction '" .. tostring(p_params.direction) .. "'.")
@@ -108,7 +129,7 @@ function exports.add(p_graph, p_params, p_target)
 
     p_graph.imports[#p_graph.imports + 1] = p_params.contrast_import
     local resources = p_graph.resources
-    local function add_resource(p_resource)
+    local function add_resource(p_resource: wbe.RendRecipeResourceVK)
         resources[#resources + 1] = p_resource
     end
     add_resource(graph_utils.storage_image("pixel_sort_source_image", p_params.color_format, width, height))
@@ -126,34 +147,25 @@ function exports.add(p_graph, p_params, p_target)
     add_resource({ id = DISPATCH_BUFFER, buffer = { usage = "buffer_indirect", size = RADIX_SORT_DISPATCH_BUFFER_SIZE } })
 
     local tasks = p_graph.tasks
-    local toggle = { event = p_params.toggle_event, enabled = p_params.enabled }
-    local function compute(p_id, p_pipeline, p_group_count_x, p_group_count_y, p_aliases)
-        tasks.add({
-            id = p_id,
-            type = "run_compute_pipeline",
-            params = {
-                pipeline = p_pipeline,
-                group_count_x = p_group_count_x,
-                group_count_y = p_group_count_y,
-                queue_family = p_params.queue_family,
-            },
-            aliases = p_aliases,
-            toggle = toggle,
-        })
+    local toggle: wbe.RendRecipeToggleVK = { event = p_params.toggle_event, enabled = p_params.enabled }
+    local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
+        p_aliases?: {string:string})
+        local params: wbe.RTParamsRunComputePipelineVK = {
+            pipeline = p_pipeline,
+            group_count_x = p_group_count_x,
+            group_count_y = p_group_count_y,
+            queue_family = p_params.queue_family,
+        }
+        tasks.add({ id = p_id, type = "run_compute_pipeline", params = params, aliases = p_aliases, toggle = toggle })
     end
-    local function indirect_compute(p_id, p_pipeline, p_offset, p_aliases)
-        tasks.add({
-            id = p_id,
-            type = "run_compute_pipeline_indirect",
-            params = {
-                pipeline = p_pipeline,
-                indirect_buffer = DISPATCH_BUFFER,
-                indirect_offset = p_offset,
-                queue_family = p_params.queue_family,
-            },
-            aliases = p_aliases,
-            toggle = toggle,
-        })
+    local function indirect_compute(p_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
+        local params: wbe.RTParamsRunComputePipelineIndirectVK = {
+            pipeline = p_pipeline,
+            indirect_buffer = DISPATCH_BUFFER,
+            indirect_offset = p_offset,
+            queue_family = p_params.queue_family,
+        }
+        tasks.add({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases, toggle = toggle })
     end
     local direction_suffix = "_" .. p_params.direction .. "_shader"
 
@@ -167,7 +179,11 @@ function exports.add(p_graph, p_params, p_target)
     -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
     compute("pixel_sort_radix_sort_prepare_dispatch", "radix_sort_prepare_dispatch", 1, 1,
         { input_buffer = "pixel_sort_keys", dispatch_buffer = DISPATCH_BUFFER })
-    local histogram_ids, prefix_sum_ids, overflow_prefix_sum_ids, add_overflow_ids, scatter_ids = {}, {}, {}, {}, {}
+    local histogram_ids: {string} = {}
+    local prefix_sum_ids: {string} = {}
+    local overflow_prefix_sum_ids: {string} = {}
+    local add_overflow_ids: {string} = {}
+    local scatter_ids: {string} = {}
     for pass = 0, RADIX_SORT_PASS_COUNT - 1 do
         local input_keys = pass % 2 == 0 and "pixel_sort_keys" or "pixel_sort_keys_swap"
         local output_keys = pass % 2 == 0 and "pixel_sort_keys_swap" or "pixel_sort_keys"
@@ -215,9 +231,9 @@ function exports.add(p_graph, p_params, p_target)
     })
     chain("pixel_sort_keys_swap",
         { scatter_ids[1], histogram_ids[2], scatter_ids[2], scatter_ids[3], histogram_ids[4], scatter_ids[4] })
-    local histogram_chain = {}
+    local histogram_chain: {string} = {}
     -- The prepare task followed by every task dispatched indirectly, in execution order.
-    local dispatch_chain = { "pixel_sort_radix_sort_prepare_dispatch" }
+    local dispatch_chain: {string} = { "pixel_sort_radix_sort_prepare_dispatch" }
     for index = 1, RADIX_SORT_PASS_COUNT do
         for _, id in ipairs({ histogram_ids[index], prefix_sum_ids[index], overflow_prefix_sum_ids[index],
             add_overflow_ids[index], scatter_ids[index] }) do
@@ -232,4 +248,4 @@ function exports.add(p_graph, p_params, p_target)
     return "write_sorted_pixels"
 end
 
-return exports
+return pixel_sort

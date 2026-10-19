@@ -18,42 +18,42 @@ include = []
 [[resources]]
 id = "utils.math"
 source_type = "script"
-source_file = "assets/scripts/lua/utils/math.lua"
+source_file = "assets/scripts/lua/utils/math.tl"
 
 [[resources]]
 id = "utils.render_graph"
 source_type = "script"
-source_file = "assets/scripts/lua/utils/render_graph.lua"
+source_file = "assets/scripts/lua/utils/render_graph.tl"
 
 [[resources]]
 id = "render_graphs.draw_cube_unshaded"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/draw_cube_unshaded.lua"
+source_file = "assets/scripts/lua/render_graphs/draw_cube_unshaded.tl"
 
 [[resources]]
 id = "render_graphs.pixel_sorting"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/pixel_sorting.lua"
+source_file = "assets/scripts/lua/render_graphs/pixel_sorting.tl"
 
 [[resources]]
 id = "render_graphs.deferred"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/deferred.lua"
+source_file = "assets/scripts/lua/render_graphs/deferred.tl"
 
 [[resources]]
 id = "render_graphs.features.pixel_sort"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/pixel_sort.lua"
+source_file = "assets/scripts/lua/render_graphs/features/pixel_sort.tl"
 
 [[resources]]
 id = "render_graphs.features.voxel_svo"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/voxel_svo.lua"
+source_file = "assets/scripts/lua/render_graphs/features/voxel_svo.tl"
 
 [[resources]]
 id = "render_graphs.features.voxel_octree"
 source_type = "script"
-source_file = "assets/scripts/lua/render_graphs/features/voxel_octree.lua"
+source_file = "assets/scripts/lua/render_graphs/features/voxel_octree.tl"
 
 [[resources]]
 id = "tests.teal_math"

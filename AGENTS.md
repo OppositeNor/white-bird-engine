@@ -126,9 +126,14 @@ For non-trivial implementation tasks:
   `RendGraphRecipeImportsVK::add_task()`; the recipe lists each as `{ id = <task id>, import = true }` and wires it with
   `connect` like any task. Imported tasks set no `type`, `params`, `aliases`, `trigger`, or `toggle`, and supplied and imported
   tasks must match, like resource imports.
-- `templates/lua_types.lua.jinja` generates editor-only LuaLS type stubs at `build/<target>/lua/wbe_types.lua`, which the
-  repo-root `.luarc.json` loads; annotate `build` with `---@param context wbe.RecipeContext` and
-  `---@return wbe.RendGraphRecipeVK`.
+- Recipes and their feature modules are Teal. `templates/teal_types.d.tl.jinja` generates `build/<target>/lua/wbe.d.tl`,
+  the Teal declarations of the reflected engine types, which the ACP type-checks scripts against; reflection therefore
+  runs before the ACP. Import it as a type only, `local type wbe = require("wbe")`, declare a recipe's context entries
+  with `local record Context is wbe.RecipeContext`, and annotate `build(context: Context): wbe.RendGraphRecipeVK`.
+  Type each task's `params` with its reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`), since
+  `RendRecipeTaskVK.params` is untyped. The repo-root `tlconfig.lua` points the Teal language server at the same paths.
+  `templates/lua_types.lua.jinja` still generates LuaLS stubs (`wbe_types.lua`, loaded by `.luarc.json`) for plain Lua
+  scripts.
 
 ### Lua Scripts
 
@@ -137,7 +142,7 @@ For non-trivial implementation tasks:
   `add(graph, params, target)` adds resources and tasks to a recipe under construction) in `render_graphs/features/`,
   and shared helpers in `utils/`.
 - A script's resource id is its module name: its path under `scripts/lua/` without `.lua`, with dots for slashes
-  (`utils/render_graph.lua` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
+  (`utils/render_graph.tl` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
   runtime (through `SMRResourceManager`) and in the editor.
 - Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `WBEACPCompilerScript` copies Lua sources and type-checks and
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;

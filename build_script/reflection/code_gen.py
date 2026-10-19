@@ -14,6 +14,7 @@
 
 import os
 from build_script.reflection.lua_types import LUA_FILTERS
+from build_script.reflection.teal_types import TEAL_FILTERS
 from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from build_script.utils import hash_file, hash_str_sha256
@@ -54,6 +55,7 @@ class WBECodeGenerator:
             lstrip_blocks=True
         )
         self._env.filters.update(LUA_FILTERS)
+        self._env.filters.update(TEAL_FILTERS)
         self._generate_infos = generate_infos
 
     def generate(self) -> None:

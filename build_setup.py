@@ -63,6 +63,8 @@ res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 assets_dir = os.path.join(resource_dir, "assets")
 # Script resources' ids are their module paths under this directory.
 script_modules_dir = os.path.join(assets_dir, "scripts", "lua")
+# The generated Teal declarations of the reflected engine types (wbe.d.tl).
+script_types_dir = os.path.join(build_dir, "lua")
 assets_output_dir = os.path.join(resource_output_dir, "assets")
 metadata_path = os.path.join(test_env_dir, "metadata.json")
 cache_dir = os.path.join(build_dir, "build_cache")
@@ -118,12 +120,12 @@ def setup_acp_compilers() -> None:
     acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     acp.add_compiler(WBEACPCompilerMesh())
     acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir)]))
+    acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)]))
 
     test_env_acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
     test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
     test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     test_env_acp.add_compiler(WBEACPCompilerMesh())
     test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    test_env_acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir)]))
+    test_env_acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)]))
     acp_compilers_configured = True
