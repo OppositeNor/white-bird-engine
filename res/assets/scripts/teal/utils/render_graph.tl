@@ -39,28 +39,51 @@ function render_graph.enum_name(p_value: string | integer): string
     return string.upper(p_value as string)
 end
 
+-- A graph-owned buffer of p_size bytes with the primary usage p_usage.
+function render_graph.buffer(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): wbe.RendRecipeResourceVK
+    return { id = p_id, buffer = { usage = p_usage, size = p_size } }
+end
+
 -- A graph-owned storage buffer of p_size bytes.
 function render_graph.storage_buffer(p_id: string, p_size: integer): wbe.RendRecipeResourceVK
-    return { id = p_id, buffer = { usage = "buffer_storage", size = p_size } }
+    return render_graph.buffer(p_id, "buffer_storage", p_size)
+end
+
+-- A graph-owned 2D image with the primary usage p_usage. Without p_extent, it keeps the default extent of
+-- wbe.RendImageParamsVK.
+function render_graph.image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
+    p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK | integer},
+    p_mip_levels?: integer): wbe.RendRecipeResourceVK
+    return {
+        id = p_id,
+        image = {
+            usage = p_usage,
+            format = p_format,
+            extent = p_extent,
+            additional_usage = p_additional_usage,
+            mip_levels = p_mip_levels,
+        },
+    }
 end
 
 -- A graph-owned 2D image the tasks read and write.
 function render_graph.storage_image(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
     p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): wbe.RendRecipeResourceVK
-    return {
-        id = p_id,
-        image = {
-            usage = "image_read_write",
-            format = p_format,
-            extent = { width = p_width, height = p_height },
-            additional_usage = p_additional_usage,
-        },
-    }
+    return render_graph.image(p_id, "image_read_write", p_format, { width = p_width, height = p_height }, p_additional_usage)
 end
 
--- A default view of the graph-owned image p_image.
-function render_graph.image_view(p_id: string, p_image: string): wbe.RendRecipeResourceVK
-    return { id = p_id, image_view = { image = p_image } }
+-- A view of the graph-owned image p_image, the default view unless p_view configures it.
+function render_graph.image_view(p_id: string, p_image: string, p_view?: wbe.RendImageViewParamsVK): wbe.RendRecipeResourceVK
+    return { id = p_id, image_view = { image = p_image, view = p_view } }
+end
+
+-- A sampler clamping every coordinate to the edge, otherwise configured by p_params.
+function render_graph.clamp_to_edge_sampler(p_id: string, p_params?: wbe.RendSamplerParamsVK): wbe.RendRecipeResourceVK
+    local params: wbe.RendSamplerParamsVK = p_params or {}
+    params.address_mode_u = "clamp_to_edge"
+    params.address_mode_v = "clamp_to_edge"
+    params.address_mode_w = "clamp_to_edge"
+    return { id = p_id, sampler = params }
 end
 
 -- A task that adds p_recipe, which declares its ports, as a subgraph under p_id; p_ports binds each port to a resource of

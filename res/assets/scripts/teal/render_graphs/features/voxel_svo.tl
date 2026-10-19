@@ -35,8 +35,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the
     -- debug draw reads them.
     local resources: {wbe.RendRecipeResourceVK} = {}
-    local function add_buffer(p_id: string, p_size: integer)
-        resources[#resources + 1] = graph_utils.storage_buffer(p_id, p_size)
+    local function add_buffer(p_buffer_id: string, p_size: integer)
+        resources[#resources + 1] = graph_utils.storage_buffer(p_buffer_id, p_size)
     end
     local sizes = p_params.buffer_sizes
     add_buffer("svo_dynamic_nodes", sizes.dynamic_nodes)
@@ -52,12 +52,12 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local static_build = p_params.static_build
     local extent: wbe.RendExtent2DParamsVK = { width = p_params.extent, height = p_params.extent }
 
-    local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer): wbe.RendRecipeTaskVK
+    local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer): wbe.RendRecipeTaskVK
         local params: wbe.RTParamsRunComputePipelineVK =
             { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" }
-        return tasks.add({ id = p_id, type = "run_compute_pipeline", params = params })
+        return tasks.add({ id = p_task_id, type = "run_compute_pipeline", params = params })
     end
-    local function construction(p_id: string, p_mesh: string, p_pipeline: string, p_part: wbe.MeshPartVK,
+    local function construction(p_task_id: string, p_mesh: string, p_pipeline: string, p_part: wbe.MeshPartVK,
         p_transform: string, p_load: boolean): wbe.RendRecipeTaskVK
         local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
         local params: wbe.RTParamsGraphicsDrawMeshVK = {
@@ -69,11 +69,11 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
             color_load_op = load_op,
             depth_load_op = load_op,
         }
-        return tasks.add({ id = p_id, type = "graphics_draw_mesh", params = params })
+        return tasks.add({ id = p_task_id, type = "graphics_draw_mesh", params = params })
     end
     -- Rasterization allocates depth one's children; every propagation round publishes one further level, and an extra
     -- retry consumes leaf occupancy and drains the remaining deferred entries.
-    local function deferred_construction(p_id: string, p_dynamic: boolean): wbe.RendRecipeTaskVK
+    local function deferred_construction(p_task_id: string, p_dynamic: boolean): wbe.RendRecipeTaskVK
         local stage_prefix = p_dynamic and dynamic_prefix or prefix
         local ping = stage_prefix .. "_build_deferred_propagation_pong_write_shader"
         local pong = stage_prefix .. "_build_deferred_propagation_ping_write_shader"
@@ -92,7 +92,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
                 dispatches[#dispatches + 1] = { pipeline = publication, group_count_x = publication_group_count }
             end
             local params: wbe.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = "compute_1" }
-            task = { id = p_id, type = "run_compute_pipelines_sequential", params = params }
+            task = { id = p_task_id, type = "run_compute_pipelines_sequential", params = params }
         else
             -- A single raster pass can leave contenders at any depth; allow one retry per tree level.
             local params: wbe.RTParamsPingPongVK = {
@@ -104,11 +104,11 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
                 pong_prefix_pipeline = "svo_deferred_count_reset_ping_shader",
                 queue_family = "compute_1",
             }
-            task = { id = p_id, type = "ping_pong", params = params }
+            task = { id = p_task_id, type = "ping_pong", params = params }
         end
         return tasks.add(task)
     end
-    local function overlay(p_id: string, p_pipeline: string, p_indirect_buffer: string, p_toggle: wbe.RendRecipeToggleVK)
+    local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: string, p_toggle: wbe.RendRecipeToggleVK)
         local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = p_pipeline,
             index_buffer = "svo_debug_draw_index_buffer",
@@ -117,7 +117,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
             depth_load_op = "load",
         }
         tasks.add({
-            id = p_id,
+            id = p_task_id,
             type = "run_graphics_pipeline_indirect",
             params = params,
             aliases = { ["render_target_colors[0]"] = "color", render_target_depth = "depth" },

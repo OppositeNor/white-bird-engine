@@ -63,7 +63,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
         params = node_gather_params,
         toggle = toggles.pre_deferred_propagation,
     })
-    local function overlay(p_id: string, p_pipeline: string, p_indirect_buffer: string, p_draw_count: integer,
+    local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: string, p_draw_count: integer,
         p_toggle: wbe.RendRecipeToggleVK)
         local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = p_pipeline,
@@ -74,7 +74,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
             depth_load_op = "load",
         }
         tasks.add({
-            id = p_id,
+            id = p_task_id,
             type = "run_graphics_pipeline_indirect",
             params = params,
             aliases = { ["render_target_colors[0]"] = "color", render_target_depth = "depth" },

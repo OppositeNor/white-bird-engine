@@ -117,10 +117,10 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     add_resource(graph_utils.storage_buffer("pixel_sort_histogram",
         (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * UINT32_SIZE))
     -- The indirect dispatches of the radix sort passes, written from the local sort count of the registered keys.
-    add_resource({ id = DISPATCH_BUFFER, buffer = { usage = "buffer_indirect", size = RADIX_SORT_DISPATCH_BUFFER_SIZE } })
+    add_resource(graph_utils.buffer(DISPATCH_BUFFER, "buffer_indirect", RADIX_SORT_DISPATCH_BUFFER_SIZE))
 
     local tasks = graph_utils.task_list()
-    local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
+    local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
         p_aliases?: {string:string})
         local params: wbe.RTParamsRunComputePipelineVK = {
             pipeline = p_pipeline,
@@ -128,16 +128,16 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
             group_count_y = p_group_count_y,
             queue_family = p_params.queue_family,
         }
-        tasks.add({ id = p_id, type = "run_compute_pipeline", params = params, aliases = p_aliases })
+        tasks.add({ id = p_task_id, type = "run_compute_pipeline", params = params, aliases = p_aliases })
     end
-    local function indirect_compute(p_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
+    local function indirect_compute(p_task_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
         local params: wbe.RTParamsRunComputePipelineIndirectVK = {
             pipeline = p_pipeline,
             indirect_buffer = DISPATCH_BUFFER,
             indirect_offset = p_offset,
             queue_family = p_params.queue_family,
         }
-        tasks.add({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
+        tasks.add({ id = p_task_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
     end
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
 
