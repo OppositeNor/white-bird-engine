@@ -37,6 +37,19 @@ struct RendGraphTaskMetadataVK {
     QueueFamilyVK queue_family = QueueFamilyVK::GRAPHICS;
     /** The position of the task in the graph's execution order, starting at 0. */
     uint64_t topological_order = 0;
+    /** The innermost subgraph the task belongs to; empty when it belongs to none. */
+    RendTaskID subgraph_id;
+};
+
+/**
+ * @class RendGraphSubgraphMetadataVK
+ * @brief One subgraph of a compiled render graph; see RendSubgraphVK.
+ */
+struct RendGraphSubgraphMetadataVK {
+    /** The subgraph identifier, which prefixes its members' ids. */
+    RendTaskID subgraph_id;
+    /** The subgraph that directly contains this one; empty for a subgraph of the graph itself. */
+    RendTaskID parent_subgraph_id;
 };
 
 /**
@@ -79,7 +92,7 @@ struct RendGraphMetadataVK {
      * @param p_allocator Allocator of the task and edge lists; must outlive the metadata.
      */
     explicit RendGraphMetadataVK(RenderAllocator* p_allocator)
-        : tasks(p_allocator), edges(p_allocator) {
+        : tasks(p_allocator), edges(p_allocator), subgraphs(p_allocator) {
     }
     ~RendGraphMetadataVK() = default;
     RendGraphMetadataVK(const RendGraphMetadataVK&) = default;
@@ -91,6 +104,8 @@ struct RendGraphMetadataVK {
     Vector<RendGraphTaskMetadataVK, RenderAllocator> tasks;
     /** Every resource dependency edge of the graph, grouped by the order in which their source tasks were added. */
     Vector<RendGraphEdgeMetadataVK, RenderAllocator> edges;
+    /** Every subgraph of the graph, nested ones included, each after the subgraph that contains it. */
+    Vector<RendGraphSubgraphMetadataVK, RenderAllocator> subgraphs;
 };
 
 } // namespace WhiteBirdEngine

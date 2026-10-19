@@ -846,6 +846,20 @@ TEST(WBERenderGraphVKTest, NestedSubgraphsResolveToTheirInnermostTasks) {
     EXPECT_TRUE(has_edge(metadata, "producer", "post.sort.first", TEST_LOGICAL_RESOURCE));
     EXPECT_TRUE(has_edge(metadata, "post.sort.first", "post.sort.second", TEST_LOGICAL_RESOURCE));
     EXPECT_TRUE(has_edge(metadata, "post.sort.second", "post.finish", TEST_LOGICAL_RESOURCE));
+    // Each task names its innermost subgraph, and each subgraph its parent, parents first.
+    const auto subgraph_of = [&metadata](std::string_view p_task_id) {
+        return std::ranges::find_if(metadata.tasks, [p_task_id](const RendGraphTaskMetadataVK& p_task) {
+            return p_task.task_id == p_task_id;
+        })->subgraph_id;
+    };
+    EXPECT_EQ(subgraph_of("producer"), "");
+    EXPECT_EQ(subgraph_of("post.finish"), "post");
+    EXPECT_EQ(subgraph_of("post.sort.first"), "post.sort");
+    ASSERT_EQ(metadata.subgraphs.size(), 2U);
+    EXPECT_EQ(metadata.subgraphs[0].subgraph_id, "post");
+    EXPECT_EQ(metadata.subgraphs[0].parent_subgraph_id, "");
+    EXPECT_EQ(metadata.subgraphs[1].subgraph_id, "post.sort");
+    EXPECT_EQ(metadata.subgraphs[1].parent_subgraph_id, "post");
 }
 
 TEST(WBERenderGraphVKTest, RejectsSubgraphEdgesOnResourcesNoMemberAccesses) {

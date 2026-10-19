@@ -790,10 +790,34 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
         });
     };
     RendGraphMetadataVK metadata(render_data->allocator);
+    // Nested subgraph ids extend the ids of the subgraphs containing them, so the innermost subgraph containing a task, or
+    // a subgraph, is the one with the longest id among those that contain it.
+    const auto& subgraphs = rebuild_state->subgraphs;
+    const auto innermost = [&subgraphs](const auto& p_contains) -> RendTaskID {
+        const RendSubgraphVK* result = nullptr;
+        for (const RendSubgraphVK& subgraph : subgraphs) {
+            if (p_contains(subgraph) && (result == nullptr || subgraph.subgraph_id.size() > result->subgraph_id.size())) {
+                result = &subgraph;
+            }
+        }
+        return result == nullptr ? RendTaskID() : result->subgraph_id;
+    };
     metadata.tasks.reserve(nodes.size());
     // topological_sort() leaves the nodes in execution order.
     for (const auto& node : nodes) {
-        metadata.tasks.push_back({.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order});
+        const RendTaskID subgraph_id = innermost([&node](const RendSubgraphVK& p_subgraph) {
+            return std::ranges::find(p_subgraph.members, node->task_id) != p_subgraph.members.end();
+        });
+        metadata.tasks.push_back(
+            {.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order, .subgraph_id = subgraph_id});
+    }
+    // A subgraph is added after the subgraphs nested in it, so walking the records backwards lists every parent first.
+    metadata.subgraphs.reserve(subgraphs.size());
+    for (auto subgraph = subgraphs.rbegin(); subgraph != subgraphs.rend(); ++subgraph) {
+        const RendTaskID parent_id = innermost([&subgraph](const RendSubgraphVK& p_candidate) {
+            return subgraph->subgraph_id.starts_with(std::format("{}.", p_candidate.subgraph_id));
+        });
+        metadata.subgraphs.push_back({.subgraph_id = subgraph->subgraph_id, .parent_subgraph_id = parent_id});
     }
     metadata.edges.reserve(resource_edges.size());
     for (const auto& edge : resource_edges) {

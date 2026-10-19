@@ -389,6 +389,7 @@ void TimestampQueryPluginVK::write_report() const {
             task["task_id"] = task_metadata.task_id;
             task["queue"] = queue_family_name(task_metadata.queue_family);
             task["topological_order"] = task_metadata.topological_order;
+            task["subgraph"] = task_metadata.subgraph_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(task_metadata.subgraph_id);
             auto statistics =
                 task_statistics.find(TaskKey(registered.graph_key, task_metadata.queue_family, task_metadata.task_id));
             task["timing"] = statistics == task_statistics.end() ? nlohmann::json(nullptr) : statistics_json(statistics->second);
@@ -408,6 +409,15 @@ void TimestampQueryPluginVK::write_report() const {
             edge["dst_stage"] = string_VkPipelineStageFlags2(edge_metadata.dst_stage);
             edge["dst_access"] = string_VkAccessFlags2(edge_metadata.dst_access);
             graph["edges"].push_back(std::move(edge));
+        }
+        // Each subgraph after the one containing it; its members name it as their subgraph.
+        graph["subgraphs"] = nlohmann::json::array();
+        for (const RendGraphSubgraphMetadataVK& subgraph_metadata : registered.metadata.subgraphs) {
+            nlohmann::json subgraph;
+            subgraph["id"] = subgraph_metadata.subgraph_id;
+            subgraph["parent"] = subgraph_metadata.parent_subgraph_id.empty() ? nlohmann::json(nullptr)
+                                                                               : nlohmann::json(subgraph_metadata.parent_subgraph_id);
+            graph["subgraphs"].push_back(std::move(subgraph));
         }
         report["render_graphs"].push_back(std::move(graph));
     }
