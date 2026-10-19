@@ -19,6 +19,7 @@
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
 local graph_utils = require("utils.render_graph")
+local sort = require("utils.sort")
 
 local ceil_div = math_utils.ceil_div
 
@@ -29,25 +30,17 @@ local PIXEL_SORT_TILE_SIZE = 8
 local PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64
 -- Must match WBE_PIXEL_SORT_COLUMN_OFFSETS_START in pixel_sort_utils.slang.
 local PIXEL_SORT_COLUMN_OFFSETS_START = 4
--- Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT,
--- WBE_RADIX_SORT_DATA_START, WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM, WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START, and
--- WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START in radix_sort_utils.slang.
-local RADIX_SORT_BUCKET_COUNT = 256
-local RADIX_SORT_ELEMENTS_PER_WORKGROUP = 256
-local RADIX_SORT_MAX_WORKGROUP_COUNT = 16384
-local RADIX_SORT_DATA_START = 4
-local RADIX_SORT_SCAN_HISTOGRAM_NUM = 16
-local RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET = 0
--- One VkDispatchIndirectCommand (3 uint32) after the local sort dispatch.
-local RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_OFFSET = 12
-local RADIX_SORT_DISPATCH_BUFFER_SIZE = 24
--- Each pass sorts by one 8-bit digit of the 32-bit keys.
-local RADIX_SORT_PASS_COUNT = 4
 local UINT32_SIZE = 4
 local UINT16_MAX = 65535
 local UINT32_MAX = 4294967295
 
-local DISPATCH_BUFFER = "pixel_sort_radix_sort_dispatch"
+-- The registered keys, sorted in place, and the radix sort's scratch buffers.
+local RADIX_SORT_BUFFERS: sort.RadixSortBuffers = {
+    keys = "pixel_sort_keys",
+    keys_swap = "pixel_sort_keys_swap",
+    histogram = "pixel_sort_histogram",
+    dispatch = "pixel_sort_radix_sort_dispatch",
+}
 
 local record pixel_sort
     record Target
@@ -91,12 +84,6 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     end
 
     local line_count = vertical and width or height
-    -- The radix sort has one local sort per RADIX_SORT_ELEMENTS_PER_WORKGROUP keys, up to RADIX_SORT_MAX_WORKGROUP_COUNT,
-    -- and sizes its buffers for the case where every pixel is inside the mask.
-    local max_local_sort_num =
-        math_utils.clamp(ceil_div(element_count, RADIX_SORT_ELEMENTS_PER_WORKGROUP), 1, RADIX_SORT_MAX_WORKGROUP_COUNT)
-    local max_overflow_num = ceil_div(max_local_sort_num, RADIX_SORT_SCAN_HISTOGRAM_NUM)
-    local key_buffer_size = (RADIX_SORT_DATA_START + element_count) * UINT32_SIZE
     local tile_group_count_x = ceil_div(width, PIXEL_SORT_TILE_SIZE)
     local tile_group_count_y = ceil_div(height, PIXEL_SORT_TILE_SIZE)
     local column_group_count = ceil_div(line_count, PIXEL_SORT_COLUMN_WORKGROUP_SIZE)
@@ -111,13 +98,10 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
         "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height))
     add_resource(graph_utils.image_view("pixel_sort_mask", "pixel_sort_mask_image"))
     add_resource(graph_utils.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE))
-    add_resource(graph_utils.storage_buffer("pixel_sort_keys", key_buffer_size))
-    add_resource(graph_utils.storage_buffer("pixel_sort_keys_swap", key_buffer_size))
-    -- The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.
-    add_resource(graph_utils.storage_buffer("pixel_sort_histogram",
-        (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * UINT32_SIZE))
-    -- The indirect dispatches of the radix sort passes, written from the local sort count of the registered keys.
-    add_resource(graph_utils.buffer(DISPATCH_BUFFER, "buffer_indirect", RADIX_SORT_DISPATCH_BUFFER_SIZE))
+    -- The sort is sized for every pixel inside the mask.
+    for _, resource in ipairs(sort.radix_sort_resources(RADIX_SORT_BUFFERS, element_count)) do
+        add_resource(resource)
+    end
 
     local tasks = graph_utils.task_list()
     local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
@@ -130,15 +114,6 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
         }
         tasks.add({ id = p_task_id, type = "run_compute_pipeline", params = params, aliases = p_aliases })
     end
-    local function indirect_compute(p_task_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
-        local params: wbe.RTParamsRunComputePipelineIndirectVK = {
-            pipeline = p_pipeline,
-            indirect_buffer = DISPATCH_BUFFER,
-            indirect_offset = p_offset,
-            queue_family = p_params.queue_family,
-        }
-        tasks.add({ id = p_task_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
-    end
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
 
     compute("copy_pixel_sort_source", "copy_pixel_sort_source_shader", tile_group_count_x, tile_group_count_y,
@@ -148,37 +123,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     compute("prefix_sum_pixel_sort_columns", "prefix_sum_pixel_sort_columns_shader", 1, 1)
     compute("register_pixel_sort_keys", "register_pixel_sort_keys" .. direction_suffix, column_group_count, 1)
 
-    -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
-    compute("pixel_sort_radix_sort_prepare_dispatch", "radix_sort_prepare_dispatch", 1, 1,
-        { input_buffer = "pixel_sort_keys", dispatch_buffer = DISPATCH_BUFFER })
-    local histogram_ids: {string} = {}
-    local prefix_sum_ids: {string} = {}
-    local overflow_prefix_sum_ids: {string} = {}
-    local add_overflow_ids: {string} = {}
-    local scatter_ids: {string} = {}
-    for pass = 0, RADIX_SORT_PASS_COUNT - 1 do
-        local input_keys = pass % 2 == 0 and "pixel_sort_keys" or "pixel_sort_keys_swap"
-        local output_keys = pass % 2 == 0 and "pixel_sort_keys_swap" or "pixel_sort_keys"
-        local bit_region = string.format("%d_%d", pass * 8, (pass + 1) * 8)
-        local index = pass + 1
-        histogram_ids[index] = "pixel_sort_radix_sort_histogram_" .. bit_region
-        prefix_sum_ids[index] = "pixel_sort_radix_sort_histogram_prefix_sum_" .. bit_region
-        overflow_prefix_sum_ids[index] = "pixel_sort_radix_sort_histogram_overflow_prefix_sum_" .. bit_region
-        add_overflow_ids[index] = "pixel_sort_radix_sort_histogram_add_overflow_" .. bit_region
-        scatter_ids[index] = "pixel_sort_radix_sort_scatter_" .. bit_region
-        indirect_compute(histogram_ids[index], "radix_sort_histogram_workgroup_process_" .. bit_region,
-            RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET, { input_buffer = input_keys, histogram_buffer = "pixel_sort_histogram" })
-        indirect_compute(prefix_sum_ids[index], "radix_sort_histogram_prefix_sum", RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_OFFSET,
-            { histogram_buffer = "pixel_sort_histogram" })
-        -- The overflow histograms are scanned in a single workgroup.
-        compute(overflow_prefix_sum_ids[index], "radix_sort_histogram_overflow_prefix_sum", 1, 1,
-            { histogram_buffer = "pixel_sort_histogram" })
-        indirect_compute(add_overflow_ids[index], "radix_sort_histogram_add_overflow", RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
-            { histogram_buffer = "pixel_sort_histogram" })
-        indirect_compute(scatter_ids[index], "radix_sort_scatter_" .. bit_region, RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
-            { input_buffer = input_keys, histogram_buffer = "pixel_sort_histogram", output_buffer = output_keys })
-    end
-    -- After an even number of passes, the sorted keys are back in the key buffer.
+    tasks.add(sort.radix_sort_task("pixel_sort_radix_sort", RADIX_SORT_BUFFERS, p_params.queue_family))
     compute("write_sorted_pixels", "write_sorted_pixels" .. direction_suffix, tile_group_count_x, tile_group_count_y,
         { pixel_sort_destination = "color" })
 
@@ -188,35 +133,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     chain("pixel_sort_column_offsets",
         { "count_pixel_sort_mask", "prefix_sum_pixel_sort_columns", "register_pixel_sort_keys", "write_sorted_pixels" })
     chain("pixel_sort_mask", { "register_pixel_sort_keys", "write_sorted_pixels" })
-    -- Every task using a key buffer, in execution order. Pass p reads the keys from one buffer and scatters them into the
-    -- other, so each buffer is written by every other scatter.
-    chain("pixel_sort_keys", {
-        "register_pixel_sort_keys",
-        "pixel_sort_radix_sort_prepare_dispatch",
-        histogram_ids[1],
-        scatter_ids[1],
-        scatter_ids[2],
-        histogram_ids[3],
-        scatter_ids[3],
-        scatter_ids[4],
-        "write_sorted_pixels",
-    })
-    chain("pixel_sort_keys_swap",
-        { scatter_ids[1], histogram_ids[2], scatter_ids[2], scatter_ids[3], histogram_ids[4], scatter_ids[4] })
-    local histogram_chain: {string} = {}
-    -- The prepare task followed by every task dispatched indirectly, in execution order.
-    local dispatch_chain: {string} = { "pixel_sort_radix_sort_prepare_dispatch" }
-    for index = 1, RADIX_SORT_PASS_COUNT do
-        for _, id in ipairs({ histogram_ids[index], prefix_sum_ids[index], overflow_prefix_sum_ids[index],
-            add_overflow_ids[index], scatter_ids[index] }) do
-            histogram_chain[#histogram_chain + 1] = id
-        end
-        for _, id in ipairs({ histogram_ids[index], prefix_sum_ids[index], add_overflow_ids[index], scatter_ids[index] }) do
-            dispatch_chain[#dispatch_chain + 1] = id
-        end
-    end
-    chain("pixel_sort_histogram", histogram_chain)
-    chain(DISPATCH_BUFFER, dispatch_chain)
+    chain("pixel_sort_keys", { "register_pixel_sort_keys", "pixel_sort_radix_sort", "write_sorted_pixels" })
     local subgraph = graph_utils.subgraph(p_id,
         { imports = { p_params.contrast_import }, resources = resources, tasks = tasks.tasks, ports = { "color" } },
         { color = p_target.color_view })

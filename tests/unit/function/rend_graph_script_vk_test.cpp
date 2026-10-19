@@ -176,12 +176,16 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     context.set_value("source_height", 32);
     context.set_value("orientation", std::string("horizontal"));
     const DataValue recipe = RendGraphScriptVK::run("render_graphs.pixel_sorting", context);
-    // 3 line passes, the dispatch preparation, 5 tasks for each of the 4 radix sort passes, 2 image passes, present, and
-    // the imported ImGui task.
+    // 3 line passes, the radix sort, 2 image passes, present, and the imported ImGui task.
     const DataValue::List& tasks = recipe.get_entry("tasks").as_list();
-    ASSERT_EQ(tasks.size(), 28U);
+    ASSERT_EQ(tasks.size(), 8U);
     EXPECT_EQ(tasks.back().get_value<std::string>("id"), "draw_imgui");
     EXPECT_TRUE(tasks.back().get_value<bool>("import"));
+    // The radix sort is one task dispatching the preparation and 5 passes for each of its 4 digits.
+    const DataValue& radix_sort = tasks.at(3);
+    EXPECT_EQ(radix_sort.get_value<std::string>("id"), "radix_sort");
+    EXPECT_EQ(radix_sort.get_value<std::string>("type"), "run_compute_pipelines_sequential");
+    EXPECT_EQ(radix_sort.get_entry("params").get_entry("dispatches").as_list().size(), 21U);
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 12U);
 }
 
@@ -342,7 +346,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_TRUE(contains_import(octree_recipe, "octree_dynamic"));
     EXPECT_EQ(octree->get_entry("ports").get_value<std::string>("depth"), "gbuffer_depth");
     // The pass-published SVO subgraph holds 15 tasks: the 5 static construction tasks are triggered, and the pre-deferred
-    // capture and the 2 overlays toggled. The pixel sort subgraph holds 26 tasks, and its one toggle gates them all.
+    // capture and the 2 overlays toggled. The pixel sort subgraph holds 6 tasks, and its one toggle gates them all.
     const DataValue summed_area_table = run(true, true, make_svo());
     const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
     ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 1);
@@ -368,7 +372,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     ASSERT_NE(pixel_sort, nullptr);
     EXPECT_TRUE(pixel_sort->contains("toggle"));
     const DataValue& pixel_sort_recipe = pixel_sort->get_entry("subgraph");
-    EXPECT_EQ(pixel_sort_recipe.get_entry("tasks").as_list().size(), 26U);
+    EXPECT_EQ(pixel_sort_recipe.get_entry("tasks").as_list().size(), 6U);
     EXPECT_EQ(count_tasks_with(pixel_sort_recipe.get_entry("tasks").as_list(), "toggle"), 0U);
     EXPECT_TRUE(contains_import(pixel_sort_recipe, "pixel_sort_contrast"));
     EXPECT_EQ(pixel_sort->get_entry("ports").get_value<std::string>("color"), "result_image");

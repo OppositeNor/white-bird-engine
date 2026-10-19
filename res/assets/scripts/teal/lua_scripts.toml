@@ -26,6 +26,11 @@ source_type = "script"
 source_file = "assets/scripts/teal/utils/render_graph.tl"
 
 [[resources]]
+id = "utils.sort"
+source_type = "script"
+source_file = "assets/scripts/teal/utils/sort.tl"
+
+[[resources]]
 id = "render_graphs.draw_cube_unshaded"
 source_type = "script"
 source_file = "assets/scripts/teal/render_graphs/draw_cube_unshaded.tl"

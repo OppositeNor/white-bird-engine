@@ -86,6 +86,14 @@ function render_graph.clamp_to_edge_sampler(p_id: string, p_params?: wbe.RendSam
     return { id = p_id, sampler = params }
 end
 
+-- A dispatch of a run_compute_pipelines_sequential task that runs p_pipeline with the VkDispatchIndirectCommand at byte
+-- p_offset of the task-local buffer p_indirect_buffer. p_aliases maps the resource ids the pipeline reflects to task-local
+-- resource ids.
+function render_graph.indirect_dispatch(p_pipeline: string, p_indirect_buffer: string, p_offset: integer,
+    p_aliases?: {string:string}): wbe.RTParamsComputeDispatchVK
+    return { pipeline = p_pipeline, indirect_buffer = p_indirect_buffer, indirect_offset = p_offset, aliases = p_aliases }
+end
+
 -- A task that adds p_recipe, which declares its ports, as a subgraph under p_id; p_ports binds each port to a resource of
 -- the enclosing recipe. Its tasks are prefixed `<p_id>.`; other tasks connect to it by p_id, and its trigger or toggle
 -- gates all of its tasks.

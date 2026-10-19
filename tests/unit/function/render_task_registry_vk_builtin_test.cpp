@@ -90,7 +90,9 @@ constexpr BuiltinTaskCase BUILTIN_TASK_CASES[] = {
     {.type = "run_compute_pipeline_indirect", .params = R"({"pipeline": "p", "indirect_buffer": "args", "indirect_offset": 16})"},
     {
         .type = "run_compute_pipelines_sequential",
-        .params = R"({"dispatches": [{"pipeline": "a", "group_count_x": 4}, {"pipeline": "b"}], "queue_family": "COMPUTE_2"})",
+        .params = R"({"dispatches": [{"pipeline": "a", "group_count_x": 4}, {"pipeline": "b"},
+                      {"pipeline": "c", "indirect_buffer": "args", "indirect_offset": 12, "aliases": {"input_buffer": "keys"}}],
+                      "queue_family": "COMPUTE_2"})",
     },
     {
         .type = "ping_pong",
