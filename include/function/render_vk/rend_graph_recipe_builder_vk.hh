@@ -94,7 +94,9 @@ private:
  * The recipe's imports are bound from the caller's table, its resources are declared as graph-owned buffers, images,
  * image views, and samplers, and its tasks are added through RenderTaskRegistryVK::add_task() (so task types'
  * prepare_graph() hooks run), then aliased, connected, and optionally wrapped as triggered or toggled tasks. Imported tasks are
- * copied from the caller's table and connected like the others. Graph-level validation
+ * copied from the caller's table and connected like the others. A task with a nested recipe in `subgraph` is built the same
+ * way and added with RendGraphDescVK::add_subgraph(); a nested recipe may declare imports and import supplied tasks too, and
+ * every supplied import and task must be declared at some level. Graph-level validation
  * (the DAG and resource-conflict rules) happens when the descriptor is built into a RenderGraphVK. Call on the rendering
  * thread, since task types may compile resources while preparing the graph.
  */

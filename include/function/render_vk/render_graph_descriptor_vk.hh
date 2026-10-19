@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -340,6 +341,56 @@ struct RendTaskDescVK {
 };
 
 /**
+ * @class RendSubgraphVK
+ * @brief A subgraph added to a graph descriptor: a named group of flattened tasks that other tasks connect to as one.
+ *
+ * An edge to the subgraph on a resource connects to the members that access the resource and have no edge on it from
+ * another member; an edge from the subgraph leaves from the members that access it and have no edge on it to another member.
+ * The graph resolves both when it is built, from the accesses the tasks report. Copyable and movable.
+ */
+struct RendSubgraphVK {
+    /**
+     * @brief Construct an empty subgraph record.
+     * @param p_allocator Allocator used by the member and dependency lists.
+     * @param p_subgraph_id Identifier of the subgraph within the graph.
+     */
+    RendSubgraphVK(RenderAllocator* p_allocator, std::string_view p_subgraph_id);
+    ~RendSubgraphVK() = default;
+    RendSubgraphVK(const RendSubgraphVK&) = default;
+    RendSubgraphVK(RendSubgraphVK&&) noexcept = default;
+    RendSubgraphVK& operator=(const RendSubgraphVK&) = default;
+    RendSubgraphVK& operator=(RendSubgraphVK&&) noexcept = default;
+
+    /**
+     * @brief Connect the subgraph to a later task or subgraph through a resource dependency; see RendTaskDescVK::connect().
+     * @param p_next_task_id Identifier of the task or subgraph that uses the resource next.
+     * @param p_resource_id Graph resource identifier carried by the edge.
+     * @return This record.
+     */
+    RendSubgraphVK& connect(std::string_view p_next_task_id, std::string_view p_resource_id);
+
+    // The id other tasks connect to; also the prefix of its members' ids.
+    RendTaskID subgraph_id;
+    // The ids of the tasks inside the subgraph, those of nested subgraphs included.
+    Vector<RendTaskID, RenderAllocator> members;
+    // Resource dependencies from the subgraph to later tasks or subgraphs.
+    Vector<RendResEdgeDescVK, RenderAllocator> next;
+};
+
+/**
+ * @class RendSubgraphPortBindingVK
+ * @brief Binds a port of a subgraph to the resource of the enclosing graph it stands for.
+ */
+struct RendSubgraphPortBindingVK {
+    /** The port, a resource identifier inside the subgraph. */
+    std::string_view port;
+    /** The graph resource identifier it is bound to. */
+    std::string_view resource;
+};
+
+struct RendSubgraphDescVK;
+
+/**
  * @class RendGraphDescVK
  * @brief A high-level Vulkan render pipeline descriptor.
  *
@@ -356,7 +407,7 @@ struct RendTaskDescVK {
 struct RendGraphDescVK {
     explicit RendGraphDescVK(RenderAllocator* p_allocator)
         : allocator(p_allocator), tasks(p_allocator), resources(p_allocator), buffers(p_allocator), images(p_allocator),
-          image_views(p_allocator), samplers(p_allocator) {
+          image_views(p_allocator), samplers(p_allocator), subgraphs(p_allocator) {
     }
 
     /**
@@ -460,6 +511,37 @@ struct RendGraphDescVK {
      */
     RendGraphDescVK& add_sampler(std::string_view p_resource_id, RendSamplerFactoryVK p_factory = nullptr);
     /**
+     * @brief Add a subgraph, flattened into this descriptor under p_subgraph_id.
+     *
+     * Every task and nested subgraph of the subgraph gets the id `<p_subgraph_id>.<id>`, and every resource it declares with
+     * add_buffer(), add_image(), add_image_view(), or add_sampler() the id `<p_subgraph_id>.<id>`. Resource identifiers used
+     * inside it, by its tasks' accesses and aliases, its edges, and its views' images, name a port, which resolves to the
+     * resource it is bound to; else a resource it declares; else a resource of the enclosing graph, unchanged. Its imports are
+     * imports of this descriptor; one the descriptor already imports under the same id must be the same resource. Edges
+     * inside the subgraph must stay inside it. Members keep their factories; other tasks may connect to them directly.
+     *
+     * @param p_subgraph_id Identifier other tasks connect to; it must not be the id of a task or subgraph of this descriptor.
+     * @param p_subgraph The subgraph; it is copied.
+     * @param p_ports Binding of every port of p_subgraph.
+     * @return The added subgraph, to connect it to later tasks; invalidated when another subgraph is added.
+     * @throws std::runtime_error If p_subgraph_id is empty or taken, a port is unbound, bound twice, unknown, or names a
+     * resource the subgraph declares or imports, an edge inside it leaves it, or an import conflicts with this descriptor's.
+     */
+    RendSubgraphVK& add_subgraph(
+        std::string_view p_subgraph_id, const RendSubgraphDescVK& p_subgraph, std::span<const RendSubgraphPortBindingVK> p_ports);
+
+    /**
+     * @brief Get a subgraph that was already added, typically to connect it to later tasks.
+     *
+     * The reference is invalidated when another subgraph is added.
+     *
+     * @param p_subgraph_id The subgraph id.
+     * @return The stored subgraph record.
+     * @throws std::runtime_error If no subgraph has the id.
+     */
+    RendSubgraphVK& get_subgraph(std::string_view p_subgraph_id);
+
+    /**
      * @brief Check whether a resource is already imported or declared under an id.
      * @param p_resource_id Graph resource identifier; a composite's members are checked by their full `<key>.<member>` ids.
      */
@@ -476,6 +558,35 @@ struct RendGraphDescVK {
     Vector<RendImageDeclVK, RenderAllocator> images;
     Vector<RendImageViewDeclVK, RenderAllocator> image_views;
     Vector<RendSamplerDeclVK, RenderAllocator> samplers;
+    // Subgraphs added with add_subgraph(); their members are in tasks. The graph resolves the edges to and from them.
+    Vector<RendSubgraphVK, RenderAllocator> subgraphs;
+};
+
+/**
+ * @class RendSubgraphDescVK
+ * @brief A subgraph to add to a graph descriptor with RendGraphDescVK::add_subgraph(): a descriptor of its own, whose
+ * tasks, declared resources, imports, and nested subgraphs it holds, and the ports it is connected through.
+ *
+ * A port is a resource identifier the subgraph's tasks use for a resource of the enclosing graph, bound when the subgraph is
+ * added. Copyable and movable; copies share the task factories' captured state.
+ */
+struct RendSubgraphDescVK {
+    /** @brief Construct an empty subgraph backed by the supplied allocator. */
+    explicit RendSubgraphDescVK(RenderAllocator* p_allocator) : graph(p_allocator), ports(p_allocator) {
+    }
+
+    /**
+     * @brief Declare a port.
+     * @param p_port Resource identifier the subgraph uses for the bound resource.
+     * @return This subgraph.
+     * @throws std::runtime_error If p_port is empty or already declared.
+     */
+    RendSubgraphDescVK& add_port(std::string_view p_port);
+
+    // The tasks, resources, and nested subgraphs of the subgraph.
+    RendGraphDescVK graph;
+    // The ports, each bound to a resource of the enclosing graph when the subgraph is added.
+    Vector<std::string, RenderAllocator> ports;
 };
 
 } // namespace WhiteBirdEngine

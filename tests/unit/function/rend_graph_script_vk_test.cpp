@@ -315,43 +315,63 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
             return p_import.as_string() == p_name;
         });
     };
-    // 2 lights x (4 shadow mesh draws + 1 filter), 4 G-buffer mesh draws, indirect lighting and its debug view, the frame
-    // sequence acquisition, ImGui, direct and combine lighting, extract and blur bloom, the bloom acquisition, 2 presents,
-    // and 2 billboards.
-    constexpr size_t BASE_TASK_COUNT = 10 + 4 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 2;
-    // The octree adds its frame-begin barrier, 6 imported C++ tasks, and 2 gathers and 2 overlays, all toggled.
-    const DataValue mipmap = run(false, false, make_octree());
-    const DataValue::List& mipmap_tasks = mipmap.get_entry("tasks").as_list();
-    EXPECT_EQ(mipmap_tasks.size(), BASE_TASK_COUNT + 11);
-    EXPECT_EQ(count_tasks_with(mipmap_tasks, "toggle"), 2U + 4U);
-    EXPECT_EQ(count_tasks_with(mipmap_tasks, "trigger"), 2U);
-    EXPECT_TRUE(contains_import(mipmap, "octree_dynamic"));
-    // The pass-published SVO adds 15 tasks: the 5 static construction tasks are triggered, and the pre-deferred capture and
-    // the 2 overlays toggled. The pixel sort feature adds its 26 toggled tasks and imports the contrast buffer.
-    const DataValue summed_area_table = run(true, true, make_svo());
-    const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
-    ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 15 + 26);
-    EXPECT_EQ(count_tasks_with(tasks, "toggle"), 2U + 3U + 26U);
-    EXPECT_EQ(count_tasks_with(tasks, "trigger"), 2U + 5U);
-    EXPECT_TRUE(contains_import(summed_area_table, "svo_nodes"));
-    // The SVO declares its 5 scratch buffers with the sizes it is given.
-    const DataValue::List& resources = summed_area_table.get_entry("resources").as_list();
-    const auto find_resource = [&resources](std::string_view p_id) -> const DataValue* {
-        for (const DataValue& resource : resources) {
-            if (resource.get_value<std::string>("id") == p_id) {
-                return &resource;
+    const auto find_by_id = [](const DataValue::List& p_entries, std::string_view p_id) -> const DataValue* {
+        for (const DataValue& entry : p_entries) {
+            if (entry.get_value<std::string>("id") == p_id) {
+                return &entry;
             }
         }
         return nullptr;
     };
-    const DataValue* deferred_list = find_resource("svo_deferred_list_ping");
+    // 2 lights x (4 shadow mesh draws + 1 filter), 4 G-buffer mesh draws, indirect lighting and its debug view, the frame
+    // sequence acquisition, ImGui, direct and combine lighting, extract and blur bloom, the bloom acquisition, 2 presents,
+    // 2 billboards, and the voxel subgraph.
+    constexpr size_t BASE_TASK_COUNT = 10 + 4 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 2 + 1;
+    const DataValue mipmap = run(false, false, make_octree());
+    const DataValue::List& mipmap_tasks = mipmap.get_entry("tasks").as_list();
+    EXPECT_EQ(mipmap_tasks.size(), BASE_TASK_COUNT);
+    EXPECT_EQ(count_tasks_with(mipmap_tasks, "toggle"), 2U);
+    EXPECT_EQ(count_tasks_with(mipmap_tasks, "trigger"), 2U);
+    // The octree subgraph holds its frame-begin barrier, 6 imported C++ tasks, and 2 gathers and 2 overlays, all toggled,
+    // and imports the application's textures and buffers.
+    const DataValue* octree = find_by_id(mipmap_tasks, "voxel");
+    ASSERT_NE(octree, nullptr);
+    const DataValue& octree_recipe = octree->get_entry("subgraph");
+    EXPECT_EQ(octree_recipe.get_entry("tasks").as_list().size(), 11U);
+    EXPECT_EQ(count_tasks_with(octree_recipe.get_entry("tasks").as_list(), "toggle"), 4U);
+    EXPECT_TRUE(contains_import(octree_recipe, "octree_dynamic"));
+    EXPECT_EQ(octree->get_entry("ports").get_value<std::string>("depth"), "gbuffer_depth");
+    // The pass-published SVO subgraph holds 15 tasks: the 5 static construction tasks are triggered, and the pre-deferred
+    // capture and the 2 overlays toggled. The pixel sort subgraph holds 26 tasks, and its one toggle gates them all.
+    const DataValue summed_area_table = run(true, true, make_svo());
+    const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 1);
+    EXPECT_EQ(count_tasks_with(tasks, "toggle"), 2U + 1U);
+    const DataValue* svo = find_by_id(tasks, "voxel");
+    ASSERT_NE(svo, nullptr);
+    const DataValue& svo_recipe = svo->get_entry("subgraph");
+    const DataValue::List& svo_tasks = svo_recipe.get_entry("tasks").as_list();
+    EXPECT_EQ(svo_tasks.size(), 15U);
+    EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
+    EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
+    EXPECT_TRUE(contains_import(svo_recipe, "svo_nodes"));
+    // The SVO declares its 5 scratch buffers with the sizes it is given.
+    const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
+    EXPECT_EQ(svo_resources.size(), 5U);
+    const DataValue* deferred_list = find_by_id(svo_resources, "svo_deferred_list_ping");
     ASSERT_NE(deferred_list, nullptr);
     EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);
-    const DataValue* dynamic_nodes = find_resource("svo_dynamic_nodes");
+    const DataValue* dynamic_nodes = find_by_id(svo_resources, "svo_dynamic_nodes");
     ASSERT_NE(dynamic_nodes, nullptr);
     EXPECT_EQ(dynamic_nodes->get_entry("buffer").get_value<int64_t>("size"), 1024);
-    EXPECT_EQ(resources.size(), run(true, true, make_octree()).get_entry("resources").as_list().size() + 5);
-    EXPECT_TRUE(contains_import(summed_area_table, "pixel_sort_contrast"));
+    const DataValue* pixel_sort = find_by_id(tasks, "post_processing");
+    ASSERT_NE(pixel_sort, nullptr);
+    EXPECT_TRUE(pixel_sort->contains("toggle"));
+    const DataValue& pixel_sort_recipe = pixel_sort->get_entry("subgraph");
+    EXPECT_EQ(pixel_sort_recipe.get_entry("tasks").as_list().size(), 26U);
+    EXPECT_EQ(count_tasks_with(pixel_sort_recipe.get_entry("tasks").as_list(), "toggle"), 0U);
+    EXPECT_TRUE(contains_import(pixel_sort_recipe, "pixel_sort_contrast"));
+    EXPECT_EQ(pixel_sort->get_entry("ports").get_value<std::string>("color"), "result_image");
 }
 
 } // namespace WhiteBirdEngine

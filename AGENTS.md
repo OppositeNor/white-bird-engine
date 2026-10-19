@@ -116,10 +116,20 @@ For non-trivial implementation tasks:
   the recipe.
 - A C++ feature that contributes to a recipe describes itself with a `configure_recipe()` that writes the parameters of its
   Lua feature module (including the `module` name) into the context and supplies its resources and C++ tasks to the
-  `RendGraphRecipeImportsVK`; the recipe calls `require(params.module).add(...)`. Work that runs once, such as a static
+  `RendGraphRecipeImportsVK`; the recipe calls `require(params.module).subgraph(id, params, target)`, which returns the
+  feature as a subgraph task. Work that runs once, such as a static
   build, is a `trigger` activated while it is still pending; the application disables the trigger event after the first
   recorded frame, so later rebuilds create it inactive. Task state that must follow runtime input across rebuilds is a
   `toggle` whose event the application emits and whose current state it passes through the context.
+- A subgraph groups tasks, graph-owned resources, and internal edges under one id (`RendGraphDescVK::add_subgraph()`;
+  in a recipe, a task with a nested recipe in `subgraph` and its `ports` bound in `ports`, built with
+  `utils.render_graph.subgraph()`). It is flattened when it is added: its task and owned resource ids become
+  `<id>.<name>`, and names inside it resolve to a port's bound resource, else its own resource, else the enclosing graph's
+  (task resource maps carry this as an unvalidated scope). Imports stay graph-wide; the same resource imported again merges.
+  Edges to and from the subgraph id resolve when the graph is built, from the tasks' accesses: an incoming edge on R
+  reaches the members that access R with no edge on R from another member, and an outgoing one leaves the members that
+  access R with no edge on R to another member, so order a subgraph's accesses to its ports with internal edges. Members
+  are ordinary tasks that may be connected directly, and a subgraph task's `trigger` or `toggle` wraps every member.
 - Use `full_memory_barrier` (`RTFullMemoryBarrierVK`) to order a frame's mutation of persistent state after the previous
   frame's consumers, and `run_graphics_pipeline_indirect` for non-mesh indexed indirect draws.
 - Tasks that need application objects (for example the ImGui overlay) are built in C++ and supplied with

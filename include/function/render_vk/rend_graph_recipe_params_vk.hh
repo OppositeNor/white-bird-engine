@@ -136,7 +136,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
  * @brief A task of a render graph recipe. Copyable and movable; strict.
  *
  * A task either has a registered `type` and its `params`, or is an import (`import = true`): a task the caller supplies
- * through RendGraphRecipeImportsVK::add_task() under the same id, which the recipe can only `connect`.
+ * through RendGraphRecipeImportsVK::add_task() under the same id, which the recipe can only `connect`, or is a subgraph
+ * (`subgraph`): a nested recipe added with RendGraphDescVK::add_subgraph(), which other tasks connect to by this id.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeTaskVK {
     /**
@@ -180,6 +181,17 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendRecipeT
      */
     WBE_META(WBE_REFLECT)
     std::optional<RendRecipeToggleVK> toggle;
+    /**
+     * @brief A nested RendGraphRecipeVK that makes this task a subgraph, which sets no type, params, aliases, or import. Its
+     * trigger and toggle apply to every task of the subgraph.
+     */
+    WBE_META(WBE_REFLECT)
+    DataValue subgraph;
+    /**
+     * @brief Map from each port of the subgraph to the resource it is bound to; see RendGraphDescVK::add_subgraph().
+     */
+    WBE_META(WBE_REFLECT)
+    DataValue ports;
 };
 
 /**
@@ -204,6 +216,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RendGraphRe
      */
     WBE_META(WBE_REFLECT)
     std::vector<RendRecipeTaskVK> tasks;
+    /**
+     * @brief The ports of a recipe used as a subgraph: resource ids its tasks use for resources of the enclosing graph.
+     * Only a nested recipe sets them.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> ports;
 };
 
 } // namespace WhiteBirdEngine

@@ -250,6 +250,69 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsImportedTasksThatConfigureThemsel
         std::string::npos);
 }
 
+TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsSubgraphTasksWithTheirPortsImportsAndSuppliedTasks) {
+    RendGraphRecipeImportsVK imports;
+    imports.add("camera", camera).add_task(make_supplied_task(&allocator, "overlay"));
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "imports": ["camera"],
+        "tasks": [
+            {"id": "draw", "type": "registry_probe", "params": {"label": "a"}, "connect": [{"to": "post", "resource": "camera"}]},
+            {"id": "post", "ports": {"color": "camera"}, "connect": [{"to": "after", "resource": "camera"}], "subgraph": {
+                "imports": ["camera"],
+                "ports": ["color"],
+                "resources": [{"id": "scratch", "buffer": {"size": 16}}],
+                "tasks": [
+                    {"id": "sort", "type": "registry_probe", "params": {"label": "b"}, "aliases": {"input": "color"},
+                     "connect": [{"to": "overlay", "resource": "scratch"}]},
+                    {"id": "overlay", "import": true}
+                ]
+            }},
+            {"id": "after", "type": "registry_probe", "params": {"label": "c"}, "connect": [{"to": "post.sort", "resource": "camera"}]}
+        ]
+    })"),
+        imports,
+        &render_data);
+
+    ASSERT_EQ(graph.tasks.size(), 4U);
+    const RendTaskDescVK& sort = graph.get_task("post.sort");
+    EXPECT_EQ(sort.resource_map.resolve("input"), "camera");
+    EXPECT_EQ(sort.resource_map.resolve("scratch"), "post.scratch");
+    ASSERT_EQ(sort.next.size(), 1U);
+    EXPECT_EQ(sort.next[0].next_task_id, "post.overlay");
+    EXPECT_EQ(sort.next[0].res_id, "post.scratch");
+    // The supplied task keeps its alias, now in the subgraph's scope.
+    EXPECT_EQ(graph.get_task("post.overlay").resource_map.resolve("target"), "camera");
+    ASSERT_EQ(graph.buffers.size(), 1U);
+    EXPECT_EQ(graph.buffers[0].res_id, "post.scratch");
+    // The subgraph and the graph import the camera once.
+    EXPECT_EQ(graph.resources.size(), 1U);
+    EXPECT_EQ(graph.get_task("draw").next[0].next_task_id, "post");
+    ASSERT_EQ(graph.get_subgraph("post").next.size(), 1U);
+    EXPECT_EQ(graph.get_subgraph("post").next[0].next_task_id, "after");
+    // Recipes may connect to a subgraph's task directly.
+    EXPECT_EQ(graph.get_task("after").next[0].next_task_id, "post.sort");
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedSubgraphsWithTheirLocation) {
+    const RendGraphRecipeImportsVK imports;
+    const auto error = [&](std::string_view p_recipe) {
+        return build_error(builder, p_recipe, imports, &render_data);
+    };
+    EXPECT_NE(error(R"({"ports": ["color"], "tasks": []})").find("only a subgraph's nested recipe declares ports"), std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "post", "type": "registry_probe", "subgraph": {"tasks": []}}]})").find("tasks[0] 'post' is a subgraph"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "ports": {"color": "c"}}]})")
+                  .find("tasks[0] 'a' sets ports but is not a subgraph"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "post", "subgraph": {"tasks": [{"id": "x"}]}}]})").find("tasks[0] 'post' subgraph tasks[0] 'x' sets no type"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "post", "subgraph": {"ports": ["color"], "tasks": []}}]})").find("port 'color' is bound 0 times"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "post", "ports": {"color": 3}, "subgraph": {"ports": ["color"], "tasks": []}}]})")
+                  .find("tasks[0] 'post' port 'color' must map to a graph resource id string"),
+        std::string::npos);
+}
+
 class WBERendGraphRecipeBuilderVKTriggerTest : public WBERendGraphRecipeBuilderVKTest {
 protected:
     virtual void SetUp() override {
@@ -316,6 +379,23 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, TogglesGateTriggeredTasks) {
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(task.get()), nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.capture_allowed"), 1U);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("recipe.capture"), 1U);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, SubgraphGatingWrapsEveryTaskOfTheSubgraph) {
+    const RendGraphRecipeImportsVK imports;
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "tasks": [{"id": "post", "toggle": {"event": "recipe.post", "enabled": true}, "subgraph": {"tasks": [
+            {"id": "first", "type": "registry_probe", "params": {"label": "a"}},
+            {"id": "nested", "subgraph": {"tasks": [{"id": "second", "type": "registry_probe", "params": {"label": "b"}}]}}
+        ]}}]
+    })"),
+        imports,
+        &render_data);
+    const Unique<IRenderTaskVK> first = graph.get_task("post.first").factory(RendGraphContextVK{});
+    const Unique<IRenderTaskVK> second = graph.get_task("post.nested.second").factory(RendGraphContextVK{});
+    EXPECT_NE(dynamic_cast<const RTToggleVK*>(first.get()), nullptr);
+    EXPECT_NE(dynamic_cast<const RTToggleVK*>(second.get()), nullptr);
+    EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.post"), 2U);
 }
 
 } // namespace WhiteBirdEngine

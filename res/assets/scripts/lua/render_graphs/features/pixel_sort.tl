@@ -78,10 +78,9 @@ local record pixel_sort
     end
 
     record Target
-        -- The graph id of the color image view sorted in place; it must be sampled and storage.
+        -- The graph id of the color image view sorted in place, bound to the subgraph's `color` port; it must be sampled
+        -- and storage.
         color_view: string
-        -- The last task that accesses color_view before the effect.
-        previous_task: string
         -- The width of the color image.
         width: integer
         -- The height of the color image.
@@ -89,9 +88,9 @@ local record pixel_sort
     end
 end
 
--- Add the effect's imports, resources, and tasks to a recipe under construction. Returns the effect's last task that
--- accesses the color view; connect later users of the image to it.
-function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort.Params, p_target: pixel_sort.Target): string
+-- The effect as a subgraph task with id p_id, which sorts the target's color view in place through its `color` port. The
+-- params' toggle gates all of its tasks.
+function pixel_sort.subgraph(p_id: string, p_params: pixel_sort.Params, p_target: pixel_sort.Target): wbe.RendRecipeTaskVK
     local vertical = p_params.direction == "vertical"
     if not vertical and p_params.direction ~= "horizontal" then
         error("pixel_sort: unknown direction '" .. tostring(p_params.direction) .. "'.")
@@ -127,8 +126,7 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
     local tile_group_count_y = ceil_div(height, PIXEL_SORT_TILE_SIZE)
     local column_group_count = ceil_div(line_count, PIXEL_SORT_COLUMN_WORKGROUP_SIZE)
 
-    p_graph.imports[#p_graph.imports + 1] = p_params.contrast_import
-    local resources = p_graph.resources
+    local resources: {wbe.RendRecipeResourceVK} = {}
     local function add_resource(p_resource: wbe.RendRecipeResourceVK)
         resources[#resources + 1] = p_resource
     end
@@ -146,8 +144,7 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
     -- The indirect dispatches of the radix sort passes, written from the local sort count of the registered keys.
     add_resource({ id = DISPATCH_BUFFER, buffer = { usage = "buffer_indirect", size = RADIX_SORT_DISPATCH_BUFFER_SIZE } })
 
-    local tasks = p_graph.tasks
-    local toggle: wbe.RendRecipeToggleVK = { event = p_params.toggle_event, enabled = p_params.enabled }
+    local tasks = graph_utils.task_list()
     local function compute(p_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
         p_aliases?: {string:string})
         local params: wbe.RTParamsRunComputePipelineVK = {
@@ -156,7 +153,7 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
             group_count_y = p_group_count_y,
             queue_family = p_params.queue_family,
         }
-        tasks.add({ id = p_id, type = "run_compute_pipeline", params = params, aliases = p_aliases, toggle = toggle })
+        tasks.add({ id = p_id, type = "run_compute_pipeline", params = params, aliases = p_aliases })
     end
     local function indirect_compute(p_id: string, p_pipeline: string, p_offset: integer, p_aliases: {string:string})
         local params: wbe.RTParamsRunComputePipelineIndirectVK = {
@@ -165,12 +162,12 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
             indirect_offset = p_offset,
             queue_family = p_params.queue_family,
         }
-        tasks.add({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases, toggle = toggle })
+        tasks.add({ id = p_id, type = "run_compute_pipeline_indirect", params = params, aliases = p_aliases })
     end
     local direction_suffix = "_" .. p_params.direction .. "_shader"
 
     compute("copy_pixel_sort_source", "copy_pixel_sort_source_shader", tile_group_count_x, tile_group_count_y,
-        { pixel_sort_input = p_target.color_view })
+        { pixel_sort_input = "color" })
     compute("count_pixel_sort_mask", "count_pixel_sort_mask" .. direction_suffix, column_group_count, 1)
     -- The prefix sums run in a single workgroup.
     compute("prefix_sum_pixel_sort_columns", "prefix_sum_pixel_sort_columns_shader", 1, 1)
@@ -208,10 +205,10 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
     end
     -- After an even number of passes, the sorted keys are back in the key buffer.
     compute("write_sorted_pixels", "write_sorted_pixels" .. direction_suffix, tile_group_count_x, tile_group_count_y,
-        { pixel_sort_destination = p_target.color_view })
+        { pixel_sort_destination = "color" })
 
     local chain = tasks.chain
-    chain(p_target.color_view, { p_target.previous_task, "copy_pixel_sort_source", "write_sorted_pixels" })
+    chain("color", { "copy_pixel_sort_source", "write_sorted_pixels" })
     chain("pixel_sort_source", { "copy_pixel_sort_source", "count_pixel_sort_mask", "register_pixel_sort_keys", "write_sorted_pixels" })
     chain("pixel_sort_column_offsets",
         { "count_pixel_sort_mask", "prefix_sum_pixel_sort_columns", "register_pixel_sort_keys", "write_sorted_pixels" })
@@ -245,7 +242,11 @@ function pixel_sort.add(p_graph: graph_utils.RecipeBuilder, p_params: pixel_sort
     end
     chain("pixel_sort_histogram", histogram_chain)
     chain(DISPATCH_BUFFER, dispatch_chain)
-    return "write_sorted_pixels"
+    local subgraph = graph_utils.subgraph(p_id,
+        { imports = { p_params.contrast_import }, resources = resources, tasks = tasks.tasks, ports = { "color" } },
+        { color = p_target.color_view })
+    subgraph.toggle = { event = p_params.toggle_event, enabled = p_params.enabled }
+    return subgraph
 end
 
 return pixel_sort

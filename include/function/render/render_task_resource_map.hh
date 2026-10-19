@@ -18,6 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -31,11 +32,25 @@ namespace WhiteBirdEngine {
  * `render_target_colors[0]`, and ids passed to its constructor. RendTaskDescVK owns one map per task; the render graph
  * resolves every identifier the task binds or reports as an access through it. Unmapped identifiers resolve to themselves.
  *
+ * Bindings of the enclosing scopes, such as the render graph subgraphs that contain the task, map the result further; see
+ * enclose(). They are not the task's own aliases, so they need not be used.
+ *
  * The map is copyable and movable and uses an allocator that must outlive every copy. Resolution records which entries were
  * used so that the graph can reject entries that the task never uses.
  */
 class RenderTaskResourceMap {
 public:
+    /**
+     * @class ScopeBinding
+     * @brief Maps a resource identifier as a scope names it to the identifier the enclosing scope names it by.
+     */
+    struct ScopeBinding {
+        /** The identifier inside the scope. */
+        std::string_view source;
+        /** The identifier outside the scope. */
+        std::string_view target;
+    };
+
     RenderTaskResourceMap() = delete;
     /**
      * @brief Create an empty mapping using an allocator that outlives this configuration.
@@ -57,9 +72,21 @@ public:
     RenderTaskResourceMap& bind(std::string_view p_task_resource_id, std::string_view p_graph_resource_id);
 
     /**
+     * @brief Enclose the task in a scope that renames resource identifiers.
+     *
+     * An identifier resolves through the task's own bindings, then through every scope from the innermost to the outermost.
+     * Enclosing composes p_scope with the scopes the task is already in, so scopes are applied from the inner one out.
+     *
+     * @param p_scope Bindings of the scope; each source appears once. They are copied.
+     * @return *this.
+     * @throws std::runtime_error If an identifier is empty or a source appears twice.
+     */
+    RenderTaskResourceMap& enclose(std::span<const ScopeBinding> p_scope);
+
+    /**
      * @brief Resolve a task-local identifier and record the matching entry as used.
      * @param p_task_resource_id Identifier used by the task.
-     * @return The mapped graph identifier, or p_task_resource_id when it is not mapped.
+     * @return The graph identifier after the task's bindings and its scopes; p_task_resource_id when neither maps it.
      */
     std::string_view resolve(std::string_view p_task_resource_id) const;
 
@@ -76,6 +103,8 @@ private:
         std::string target;
     };
     Vector<Entry, RenderAllocator> entries;
+    // The composition of the enclosing scopes, applied after entries.
+    Vector<Entry, RenderAllocator> scope;
     // Resolution bookkeeping, parallel to entries.
     mutable Vector<uint8_t, RenderAllocator> used;
 };

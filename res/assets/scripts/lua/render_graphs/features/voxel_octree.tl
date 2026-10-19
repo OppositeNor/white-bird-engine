@@ -20,7 +20,7 @@
 
 local type wbe = require("wbe")
 local type voxel = require("render_graphs.features.voxel")
-local type graph_utils = require("utils.render_graph")
+local graph_utils = require("utils.render_graph")
 
 local record voxel_octree
     record GroupCount
@@ -43,13 +43,9 @@ local record voxel_octree
     end
 end
 
--- Add the octree's imports and tasks to a recipe under construction. Returns the overlay tasks, in drawing order; the
--- caller orders them on the color and depth targets.
-function voxel_octree.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_octree.Params, p_target: voxel.Target): {string}
-    for _, import in ipairs(p_params.imports) do
-        p_graph.imports[#p_graph.imports + 1] = import
-    end
-    local tasks = p_graph.tasks
+-- The octree as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
+function voxel_octree.subgraph(p_id: string, p_params: voxel_octree.Params, p_target: voxel.Target): wbe.RendRecipeTaskVK
+    local tasks = graph_utils.task_list()
     local chain = tasks.chain
     local toggles = p_target.debug_view_toggles
 
@@ -100,7 +96,7 @@ function voxel_octree.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_oc
             id = p_id,
             type = "run_graphics_pipeline_indirect",
             params = params,
-            aliases = { ["render_target_colors[0]"] = p_target.color_target, render_target_depth = p_target.depth_target },
+            aliases = { ["render_target_colors[0]"] = "color", render_target_depth = "depth" },
             toggle = p_toggle,
         })
     end
@@ -131,7 +127,11 @@ function voxel_octree.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_oc
     -- The leaf gather empties the node view before the node gather fills it.
     chain("octree_debug_node_draw_indirect_buffer", { "gather_octree_debug_leaves", "gather_octree_debug_nodes", "run_octree_debug_node_draw" })
     chain("octree_debug_node_list", { "gather_octree_debug_leaves", "gather_octree_debug_nodes", "run_octree_debug_node_draw" })
-    return { "run_octree_debug_draw", "run_octree_debug_node_draw" }
+    -- The overlays draw in this order.
+    chain("color", { "run_octree_debug_draw", "run_octree_debug_node_draw" })
+    chain("depth", { "run_octree_debug_draw", "run_octree_debug_node_draw" })
+    return graph_utils.subgraph(p_id, { imports = p_params.imports, tasks = tasks.tasks, ports = { "color", "depth" } },
+        { color = p_target.color_target, depth = p_target.depth_target })
 end
 
 return voxel_octree

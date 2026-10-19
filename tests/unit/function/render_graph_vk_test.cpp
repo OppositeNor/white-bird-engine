@@ -32,6 +32,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -748,6 +749,117 @@ TEST(WBERenderGraphVKTest, ImageViewsMustViewDeclaredImages) {
     non_image.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
     non_image.add_image_view("view", TEST_LOGICAL_RESOURCE);
     EXPECT_NE(build_error(graph, non_image).find("which is not a declared image resource"), std::string::npos);
+}
+
+namespace {
+
+// A subgraph whose `first` writes its `data` port and `second` then rewrites it.
+RendSubgraphDescVK make_rewriting_subgraph(RenderAllocator* p_allocator) {
+    RendSubgraphDescVK subgraph(p_allocator);
+    subgraph.add_port("data");
+    subgraph.graph.add_task(make_probe_desc(p_allocator, "first", QueueFamilyVK::GRAPHICS, {}, {"data"}));
+    subgraph.graph.add_task(make_probe_desc(p_allocator, "second", QueueFamilyVK::GRAPHICS, {"data"}, {"data"}));
+    subgraph.graph.get_task("first").connect("second", "data");
+    return subgraph;
+}
+
+const std::array<RendSubgraphPortBindingVK, 1> LOGICAL_DATA_PORT{{{.port = "data", .resource = TEST_LOGICAL_RESOURCE}}};
+
+bool has_edge(const RendGraphMetadataVK& p_metadata, std::string_view p_from, std::string_view p_to, std::string_view p_resource_id) {
+    return std::ranges::any_of(p_metadata.edges, [&](const RendGraphEdgeMetadataVK& p_edge) {
+        return p_edge.from_task_id == p_from && p_edge.to_task_id == p_to && p_edge.resource_id == p_resource_id;
+    });
+}
+
+} // namespace
+
+TEST(WBERenderGraphVKTest, SubgraphEdgesConnectToTheEntriesAndLeaveFromTheExits) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_task(make_probe_desc(&allocator, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+    descriptor.add_task(make_probe_desc(&allocator, "consumer", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
+    descriptor.add_subgraph("sort", make_rewriting_subgraph(&allocator), LOGICAL_DATA_PORT).connect("consumer", TEST_LOGICAL_RESOURCE);
+    descriptor.get_task("producer").connect("sort", TEST_LOGICAL_RESOURCE);
+    RenderGraphVK graph(&render_data);
+    // The chain through the subgraph orders every conflicting access.
+    ASSERT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+
+    const RendGraphMetadataVK metadata = graph.dump_graph_metadata();
+    ASSERT_EQ(metadata.edges.size(), 3U);
+    EXPECT_TRUE(has_edge(metadata, "producer", "sort.first", TEST_LOGICAL_RESOURCE));
+    EXPECT_TRUE(has_edge(metadata, "sort.first", "sort.second", TEST_LOGICAL_RESOURCE));
+    EXPECT_TRUE(has_edge(metadata, "sort.second", "consumer", TEST_LOGICAL_RESOURCE));
+}
+
+TEST(WBERenderGraphVKTest, UnconnectedSubgraphAccessesStillConflict) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_task(make_probe_desc(&allocator, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+    descriptor.add_subgraph("sort", make_rewriting_subgraph(&allocator), LOGICAL_DATA_PORT);
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_NE(build_error(graph, descriptor).find("without a chain of edges on that resource"), std::string::npos);
+}
+
+TEST(WBERenderGraphVKTest, SubgraphsConnectToSubgraphsAndExposeTheirMembers) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_task(make_probe_desc(&allocator, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
+    descriptor.add_subgraph("upstream", make_rewriting_subgraph(&allocator), LOGICAL_DATA_PORT).connect("downstream", TEST_LOGICAL_RESOURCE);
+    descriptor.add_subgraph("downstream", make_rewriting_subgraph(&allocator), LOGICAL_DATA_PORT);
+    // A member is an ordinary task, which other tasks may connect to directly.
+    descriptor.get_task("downstream.second").connect("reader", TEST_LOGICAL_RESOURCE);
+    RenderGraphVK graph(&render_data);
+    ASSERT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+
+    const RendGraphMetadataVK metadata = graph.dump_graph_metadata();
+    EXPECT_TRUE(has_edge(metadata, "upstream.second", "downstream.first", TEST_LOGICAL_RESOURCE));
+    EXPECT_TRUE(has_edge(metadata, "downstream.second", "reader", TEST_LOGICAL_RESOURCE));
+}
+
+TEST(WBERenderGraphVKTest, NestedSubgraphsResolveToTheirInnermostTasks) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    // `post` runs the nested `sort` on its port, then `finish` reads the result.
+    RendSubgraphDescVK post(&allocator);
+    post.add_port("target");
+    post.graph.add_task(make_probe_desc(&allocator, "finish", QueueFamilyVK::GRAPHICS, {"target"}, {}));
+    const std::array<RendSubgraphPortBindingVK, 1> sort_ports{{{.port = "data", .resource = "target"}}};
+    post.graph.add_subgraph("sort", make_rewriting_subgraph(&allocator), sort_ports).connect("finish", "target");
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_task(make_probe_desc(&allocator, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
+    const std::array<RendSubgraphPortBindingVK, 1> post_ports{{{.port = "target", .resource = TEST_LOGICAL_RESOURCE}}};
+    descriptor.add_subgraph("post", post, post_ports);
+    descriptor.get_task("producer").connect("post", TEST_LOGICAL_RESOURCE);
+    RenderGraphVK graph(&render_data);
+    ASSERT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+
+    const RendGraphMetadataVK metadata = graph.dump_graph_metadata();
+    ASSERT_EQ(metadata.edges.size(), 3U);
+    EXPECT_TRUE(has_edge(metadata, "producer", "post.sort.first", TEST_LOGICAL_RESOURCE));
+    EXPECT_TRUE(has_edge(metadata, "post.sort.first", "post.sort.second", TEST_LOGICAL_RESOURCE));
+    EXPECT_TRUE(has_edge(metadata, "post.sort.second", "post.finish", TEST_LOGICAL_RESOURCE));
+}
+
+TEST(WBERenderGraphVKTest, RejectsSubgraphEdgesOnResourcesNoMemberAccesses) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
+    descriptor.add_resource("other", *make_test_container(&allocator, &render_data));
+    descriptor.add_task(make_probe_desc(&allocator, "consumer", QueueFamilyVK::GRAPHICS, {"other"}, {}));
+    descriptor.add_subgraph("sort", make_rewriting_subgraph(&allocator), LOGICAL_DATA_PORT).connect("consumer", "other");
+    RenderGraphVK graph(&render_data);
+
+    EXPECT_NE(build_error(graph, descriptor).find("subgraph 'sort' is connected on resource 'other', but none of its tasks accesses it"),
+        std::string::npos);
 }
 
 } // namespace WhiteBirdEngine

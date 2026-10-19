@@ -551,7 +551,7 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
 struct RenderGraphVK::RebuildState {
     RebuildState() = delete;
     explicit RebuildState(RenderAllocator* p_allocator)
-        : signatures(p_allocator), owned_containers(p_allocator), task_descs(p_allocator) {
+        : signatures(p_allocator), owned_containers(p_allocator), task_descs(p_allocator), subgraphs(p_allocator) {
     }
     ~RebuildState() = default;
     RebuildState(const RebuildState&) = delete;
@@ -563,6 +563,7 @@ struct RenderGraphVK::RebuildState {
     RendGraphResourceDiffVK::Signatures signatures;
     Map<std::string, Ref<RenderObjectContainerVK>, RenderAllocator> owned_containers;
     Vector<RendTaskDescVK, RenderAllocator> task_descs;
+    Vector<RendSubgraphVK, RenderAllocator> subgraphs;
 };
 
 RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key)
@@ -937,7 +938,8 @@ void RenderGraphVK::apply_descriptor(const RendGraphDescVK& p_desc) {
         apply_owned_resource(sampler_decl.res_id, actions.find(sampler_decl.res_id)->second);
     }
     rebuild_state->task_descs = p_desc.tasks;
-    build_tasks(rebuild_state->task_descs);
+    rebuild_state->subgraphs = p_desc.subgraphs;
+    build_tasks(rebuild_state->task_descs, rebuild_state->subgraphs);
 }
 
 void RenderGraphVK::apply_owned_resource(std::string_view p_resource_id, RendResRebuildActionVK p_action) {
@@ -1015,13 +1017,19 @@ Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_
     return resource->second->container;
 }
 
-void RenderGraphVK::build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks) {
+void RenderGraphVK::build_tasks(
+    const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) {
     free_command_buffers();
     nodes.clear();
     resource_edges.clear();
 
     instantiate_tasks(p_tasks);
-    add_resource_edges(p_tasks);
+    // Subgraph edges resolve against the accesses the tasks have just reported.
+    if (p_subgraphs.empty()) {
+        add_resource_edges(p_tasks);
+    } else {
+        add_resource_edges(resolve_subgraph_edges(p_tasks, p_subgraphs));
+    }
 
     topological_sort();
     validate_resource_conflicts();
@@ -1091,6 +1099,154 @@ Vector<std::string, RenderAllocator> RenderGraphVK::expand_resource_id(std::stri
     }
     for (size_t index = 0; index < resource->second->resource_list->get_resource_count(); ++index) {
         result.push_back(std::format("{}[{}]", p_resource_id, index));
+    }
+    return result;
+}
+
+Vector<RendTaskDescVK, RenderAllocator> RenderGraphVK::resolve_subgraph_edges(
+    const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) const {
+    for (const RendSubgraphVK& subgraph : p_subgraphs) {
+        if (find_node(subgraph.subgraph_id) != MEM_NULL) {
+            throw std::runtime_error(std::format("RenderGraphVK: subgraph '{}' has the id of a task.", subgraph.subgraph_id));
+        }
+    }
+    const auto find_subgraph = [&p_subgraphs](std::string_view p_id) -> const RendSubgraphVK* {
+        for (const RendSubgraphVK& subgraph : p_subgraphs) {
+            if (subgraph.subgraph_id == p_id) {
+                return &subgraph;
+            }
+        }
+        return nullptr;
+    };
+    const auto find_task = [&p_tasks](std::string_view p_id) -> const RendTaskDescVK* {
+        for (const RendTaskDescVK& task : p_tasks) {
+            if (task.task_id == p_id) {
+                return &task;
+            }
+        }
+        return nullptr;
+    };
+    // Whether a task accesses a resource, or an element of the resource list it names.
+    const auto accesses = [this](std::string_view p_task_id, std::string_view p_resource_id) {
+        const Ref<RGNode> node = find_node(p_task_id);
+        WBE_DEBUG_ASSERT(node != MEM_NULL);
+        const std::string element_prefix = std::format("{}[", p_resource_id);
+        const auto matches = [&](const ResAccessVK& p_access) {
+            return p_access.res_id == p_resource_id || p_access.res_id.starts_with(element_prefix);
+        };
+        return std::ranges::any_of(node->reads, matches) || std::ranges::any_of(node->writes, matches);
+    };
+    using TaskIDs = Vector<RendTaskID, RenderAllocator>;
+    // The members at the boundary of a subgraph on a resource: the entries without an edge from another member, or the exits
+    // without an edge to another member.
+    std::function<TaskIDs(const RendSubgraphVK&, std::string_view, bool)> boundary;
+    // The tasks an edge to p_id on the resource reaches.
+    const auto edge_targets = [&](std::string_view p_id, std::string_view p_resource_id) {
+        if (const RendSubgraphVK* subgraph = find_subgraph(p_id)) {
+            return boundary(*subgraph, p_resource_id, true);
+        }
+        TaskIDs result(render_data->allocator);
+        result.emplace_back(p_id);
+        return result;
+    };
+    // The boundaries being resolved; resolving one again means the subgraph edges form a cycle.
+    Vector<std::string, RenderAllocator> resolving(render_data->allocator);
+    boundary = [&](const RendSubgraphVK& p_subgraph, std::string_view p_resource_id, bool p_entries) {
+        const std::string key = std::format("{} {} {}", p_subgraph.subgraph_id, p_resource_id, p_entries ? "entries" : "exits");
+        if (std::ranges::find(resolving, key) != resolving.end()) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: the edges of subgraph '{}' on resource '{}' form a cycle.", p_subgraph.subgraph_id, p_resource_id));
+        }
+        resolving.push_back(key);
+        const auto is_member = [&p_subgraph](std::string_view p_id) {
+            return std::ranges::find(p_subgraph.members, p_id) != p_subgraph.members.end();
+        };
+        TaskIDs linked(render_data->allocator);
+        const auto add_internal_edges = [&](const TaskIDs& p_sources, const Vector<RendResEdgeDescVK, RenderAllocator>& p_edges) {
+            for (const RendResEdgeDescVK& edge : p_edges) {
+                if (edge.res_id != p_resource_id) {
+                    continue;
+                }
+                for (const RendTaskID& target : edge_targets(edge.next_task_id, p_resource_id)) {
+                    if (!is_member(target)) {
+                        continue;
+                    }
+                    if (p_entries) {
+                        linked.push_back(target);
+                    } else {
+                        linked.insert(linked.end(), p_sources.begin(), p_sources.end());
+                    }
+                }
+            }
+        };
+        for (const RendTaskID& member : p_subgraph.members) {
+            const RendTaskDescVK* task = find_task(member);
+            WBE_DEBUG_ASSERT(task != nullptr);
+            TaskIDs source(render_data->allocator);
+            source.push_back(member);
+            add_internal_edges(source, task->next);
+        }
+        const std::string nested_prefix = std::format("{}.", p_subgraph.subgraph_id);
+        for (const RendSubgraphVK& nested : p_subgraphs) {
+            if (nested.subgraph_id.starts_with(nested_prefix)) {
+                bool uses_resource = std::ranges::any_of(nested.next, [p_resource_id](const RendResEdgeDescVK& p_edge) {
+                    return p_edge.res_id == p_resource_id;
+                });
+                if (uses_resource) {
+                    add_internal_edges(boundary(nested, p_resource_id, false), nested.next);
+                }
+            }
+        }
+        TaskIDs result(render_data->allocator);
+        for (const RendTaskID& member : p_subgraph.members) {
+            if (accesses(member, p_resource_id) && std::ranges::find(linked, member) == linked.end()) {
+                result.push_back(member);
+            }
+        }
+        if (result.empty()) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: subgraph '{}' is connected on resource '{}', but none of its tasks accesses it.", p_subgraph.subgraph_id, p_resource_id));
+        }
+        resolving.pop_back();
+        return result;
+    };
+
+    Vector<RendTaskDescVK, RenderAllocator> result = p_tasks;
+    const auto add_edge = [](RendTaskDescVK& p_task, const RendTaskID& p_next_task_id, const std::string& p_resource_id) {
+        const bool exists = std::ranges::any_of(p_task.next, [&](const RendResEdgeDescVK& p_edge) {
+            return p_edge.next_task_id == p_next_task_id && p_edge.res_id == p_resource_id;
+        });
+        if (!exists) {
+            p_task.next.push_back({.next_task_id = p_next_task_id, .res_id = p_resource_id});
+        }
+    };
+    const auto find_result_task = [&result](std::string_view p_id) -> RendTaskDescVK& {
+        const auto task = std::ranges::find_if(result, [p_id](const RendTaskDescVK& p_task) {
+            return p_task.task_id == p_id;
+        });
+        WBE_DEBUG_ASSERT(task != result.end());
+        return *task;
+    };
+    for (RendTaskDescVK& task : result) {
+        task.next.clear();
+    }
+    for (const RendTaskDescVK& task : p_tasks) {
+        RendTaskDescVK& resolved = find_result_task(task.task_id);
+        for (const RendResEdgeDescVK& edge : task.next) {
+            for (const RendTaskID& target : edge_targets(edge.next_task_id, edge.res_id)) {
+                add_edge(resolved, target, edge.res_id);
+            }
+        }
+    }
+    for (const RendSubgraphVK& subgraph : p_subgraphs) {
+        for (const RendResEdgeDescVK& edge : subgraph.next) {
+            const TaskIDs targets = edge_targets(edge.next_task_id, edge.res_id);
+            for (const RendTaskID& source : boundary(subgraph, edge.res_id, false)) {
+                for (const RendTaskID& target : targets) {
+                    add_edge(find_result_task(source), target, edge.res_id);
+                }
+            }
+        }
     }
     return result;
 }

@@ -26,7 +26,8 @@ local record voxel
         pre_deferred_propagation: wbe.RendRecipeToggleVK
     end
 
-    -- What the including recipe supplies to a voxel structure.
+    -- What the including recipe supplies to a voxel structure's subgraph, whose ports `color` and `depth` the overlays draw
+    -- through.
     record Target
         -- The transforms of the two dynamic mesh entities.
         dynamic_mesh_transform_ids: {string}

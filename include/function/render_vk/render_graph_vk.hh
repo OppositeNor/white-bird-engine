@@ -43,6 +43,7 @@ namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
 struct RendTaskDescVK;
+struct RendSubgraphVK;
 enum class RendResRebuildActionVK : uint8_t;
 struct RendBufferDeclVK;
 struct RendImageDeclVK;
@@ -413,10 +414,13 @@ private:
     // Objects the container creates are registered as `<resource_key>.<p_resource_id>`; see RenderGraphVK().
     Ref<RenderObjectContainerVK> create_container(
         std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;
-    void build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
+    void build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs);
     void instantiate_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
+    // The tasks with every edge to or from a subgraph replaced by edges between its members; see RendSubgraphVK.
+    Vector<RendTaskDescVK, RenderAllocator> resolve_subgraph_edges(
+        const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) const;
     void add_resource_edges(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void validate_resource_conflicts() const;
     void validate_queue_completion() const;

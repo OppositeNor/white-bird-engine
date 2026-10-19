@@ -28,13 +28,6 @@ local record render_graph
         -- Connect each task to the next on p_resource.
         chain: function(p_resource: string, p_task_ids: {string})
     end
-
-    -- A recipe under construction, which feature modules' add() functions add imports, resources, and tasks to.
-    record RecipeBuilder
-        imports: {string}
-        resources: {wbe.RendRecipeResourceVK}
-        tasks: TaskList
-    end
 end
 
 -- A graph-owned storage buffer of p_size bytes.
@@ -59,6 +52,13 @@ end
 -- A default view of the graph-owned image p_image.
 function render_graph.image_view(p_id: string, p_image: string): wbe.RendRecipeResourceVK
     return { id = p_id, image_view = { image = p_image } }
+end
+
+-- A task that adds p_recipe, which declares its ports, as a subgraph under p_id; p_ports binds each port to a resource of
+-- the enclosing recipe. Its tasks are prefixed `<p_id>.`; other tasks connect to it by p_id, and its trigger or toggle
+-- gates all of its tasks.
+function render_graph.subgraph(p_id: string, p_recipe: wbe.RendGraphRecipeVK, p_ports: {string:string}): wbe.RendRecipeTaskVK
+    return { id = p_id, subgraph = p_recipe, ports = p_ports }
 end
 
 function render_graph.task_list(): render_graph.TaskList

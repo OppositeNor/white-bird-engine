@@ -16,13 +16,15 @@
 #include "function/render/render_defs.hh"
 #include <cstddef>
 #include <format>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
 
-RenderTaskResourceMap::RenderTaskResourceMap(RenderAllocator* p_allocator) : entries(p_allocator), used(p_allocator) {
+RenderTaskResourceMap::RenderTaskResourceMap(RenderAllocator* p_allocator)
+    : entries(p_allocator), scope(p_allocator), used(p_allocator) {
     if (p_allocator == nullptr) {
         throw std::runtime_error("RenderTaskResourceMap: allocator is null.");
     }
@@ -42,14 +44,59 @@ RenderTaskResourceMap& RenderTaskResourceMap::bind(std::string_view p_task_resou
     return *this;
 }
 
+RenderTaskResourceMap& RenderTaskResourceMap::enclose(std::span<const ScopeBinding> p_scope) {
+    for (size_t i = 0; i < p_scope.size(); ++i) {
+        if (p_scope[i].source.empty() || p_scope[i].target.empty()) {
+            throw std::runtime_error("RenderTaskResourceMap: scope resource identifiers must not be empty.");
+        }
+        for (size_t j = 0; j < i; ++j) {
+            if (p_scope[j].source == p_scope[i].source) {
+                throw std::runtime_error(std::format("RenderTaskResourceMap: scope maps resource '{}' more than once.", p_scope[i].source));
+            }
+        }
+    }
+    const auto find = [p_scope](std::string_view p_id) -> const ScopeBinding* {
+        for (const ScopeBinding& binding : p_scope) {
+            if (binding.source == p_id) {
+                return &binding;
+            }
+        }
+        return nullptr;
+    };
+    // The inner scopes' results now pass through p_scope; identifiers they leave unmapped are named by p_scope directly.
+    const size_t inner_count = scope.size();
+    for (Entry& entry : scope) {
+        if (const ScopeBinding* binding = find(entry.target)) {
+            entry.target = std::string(binding->target);
+        }
+    }
+    for (const ScopeBinding& binding : p_scope) {
+        bool mapped_inside = false;
+        for (size_t i = 0; i < inner_count; ++i) {
+            mapped_inside = mapped_inside || scope[i].source == binding.source;
+        }
+        if (!mapped_inside) {
+            scope.emplace_back(std::string(binding.source), std::string(binding.target));
+        }
+    }
+    return *this;
+}
+
 std::string_view RenderTaskResourceMap::resolve(std::string_view p_task_resource_id) const {
+    std::string_view result = p_task_resource_id;
     for (size_t i = 0; i < entries.size(); ++i) {
         if (entries[i].source == p_task_resource_id) {
             used[i] = 1;
-            return entries[i].target;
+            result = entries[i].target;
+            break;
         }
     }
-    return p_task_resource_id;
+    for (const Entry& entry : scope) {
+        if (entry.source == result) {
+            return entry.target;
+        }
+    }
+    return result;
 }
 
 void RenderTaskResourceMap::validate_all_used(std::string_view p_task_id) const {

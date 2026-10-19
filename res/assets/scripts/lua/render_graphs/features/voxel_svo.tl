@@ -63,20 +63,16 @@ local record voxel_svo
     end
 end
 
--- Add the SVO's imports and tasks to a recipe under construction. Returns the overlay tasks, in drawing order; the caller
--- orders them on the color and depth targets.
-function voxel_svo.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_svo.Params, p_target: voxel.Target): {string}
+-- The SVO as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
+function voxel_svo.subgraph(p_id: string, p_params: voxel_svo.Params, p_target: voxel.Target): wbe.RendRecipeTaskVK
     local pass_published = p_params.variant == "pass_published"
     if not pass_published and p_params.variant ~= "atomic" then
         error("voxel_svo: unknown variant '" .. tostring(p_params.variant) .. "'.")
     end
-    for _, import in ipairs(p_params.imports) do
-        p_graph.imports[#p_graph.imports + 1] = import
-    end
     -- Scratch buffers: each frame's dynamic clear (and the static reset) empties the dynamic nodes' range and the
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the
     -- debug draw reads them.
-    local resources = p_graph.resources
+    local resources: {wbe.RendRecipeResourceVK} = {}
     local function add_buffer(p_id: string, p_size: integer)
         resources[#resources + 1] = graph_utils.storage_buffer(p_id, p_size)
     end
@@ -86,7 +82,7 @@ function voxel_svo.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_svo.P
     add_buffer("svo_deferred_list_pong", sizes.deferred_list)
     add_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
     add_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
-    local tasks = p_graph.tasks
+    local tasks = graph_utils.task_list()
     local chain = tasks.chain
     local prefix = p_params.shader_prefix
     local dynamic_prefix = p_params.dynamic_shader_prefix
@@ -162,7 +158,7 @@ function voxel_svo.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_svo.P
             id = p_id,
             type = "run_graphics_pipeline_indirect",
             params = params,
-            aliases = { ["render_target_colors[0]"] = p_target.color_target, render_target_depth = p_target.depth_target },
+            aliases = { ["render_target_colors[0]"] = "color", render_target_depth = "depth" },
             toggle = p_toggle,
         })
     end
@@ -248,7 +244,12 @@ function voxel_svo.add(p_graph: graph_utils.RecipeBuilder, p_params: voxel_svo.P
         chain(buffer, { "capture_svo_pre_deferred_debug", "run_svo_pre_deferred_debug_draw" })
     end
     chain("svo_debug_draw_indirect_buffer", { "setup_svo_debug_draw", "run_svo_debug_draw" })
-    return { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" }
+    -- The overlays draw in this order.
+    chain("color", { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" })
+    chain("depth", { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" })
+    return graph_utils.subgraph(p_id,
+        { imports = p_params.imports, resources = resources, tasks = tasks.tasks, ports = { "color", "depth" } },
+        { color = p_target.color_target, depth = p_target.depth_target })
 end
 
 return voxel_svo

@@ -50,26 +50,25 @@ local record Formats
     lighting_output: wbe.ImageFormatVK | integer
 end
 
--- A feature the application selects, as { module = <module name>, ... }: the parameters of that module's add().
+-- A feature the application selects, as { module = <module name>, ... }: the parameters of that module's subgraph().
 local record FeatureParams
     module: string
 end
 
 local record VoxelFeature
-    -- Returns the structure's overlays, in drawing order.
-    add: function(p_graph: graph_utils.RecipeBuilder, p_params: any, p_target: voxel.Target): {string}
+    -- The structure as a subgraph task, whose overlays draw on the target's color and depth.
+    subgraph: function(p_id: string, p_params: any, p_target: voxel.Target): wbe.RendRecipeTaskVK
 end
 
 local record PostProcessingTarget
     color_view: string
-    previous_task: string
     width: integer
     height: integer
 end
 
 local record PostProcessingFeature
-    -- Returns the effect's last task that accesses the color view.
-    add: function(p_graph: graph_utils.RecipeBuilder, p_params: any, p_target: PostProcessingTarget): string
+    -- The effect as a subgraph task, which modifies the target's color view in place.
+    subgraph: function(p_id: string, p_params: any, p_target: PostProcessingTarget): wbe.RendRecipeTaskVK
 end
 
 local record Context is wbe.RecipeContext
@@ -128,6 +127,10 @@ end
 local function light_id(p_base: string, p_light: integer): string
     return p_base .. "_" .. p_light
 end
+
+-- The ids of the feature subgraphs.
+local VOXEL = "voxel"
+local POST_PROCESSING = "post_processing"
 
 local exports = {}
 
@@ -234,19 +237,15 @@ function exports.build(context: Context): wbe.RendGraphRecipeVK
     import_task("acquire_frame_sequence")
     import_task("draw_imgui")
 
-    -- The voxel structure, whose overlays draw over the lit scene.
-    local builder: graph_utils.RecipeBuilder = { imports = imports, resources = resources, tasks = tasks }
+    -- The voxel structure, a subgraph whose overlays draw over the lit scene.
     local voxel_params = context.voxel
     local voxel_feature = require(voxel_params.module) as VoxelFeature
-    local overlays = voxel_feature.add(builder, voxel_params, {
+    tasks.add(voxel_feature.subgraph(VOXEL, voxel_params, {
         dynamic_mesh_transform_ids = context.dynamic_mesh_transform_ids,
         debug_view_toggles = context.voxel_debug_view_toggles,
         color_target = "swap_chain",
         depth_target = "gbuffer_depth",
-    })
-    if #overlays == 0 then
-        error("deferred: the voxel structure has no overlays.")
-    end
+    }))
 
     -- Mesh draws. The double-sided and dynamic passes load what the previous pass of their targets wrote.
     local dynamic_transforms = context.dynamic_mesh_transform_ids
@@ -385,13 +384,15 @@ function exports.build(context: Context): wbe.RendGraphRecipeVK
     end
     compute("combine_lighting", "combine_lighting_shader", screen_tiles_x, screen_tiles_y)
 
-    -- Post-processing modifies the result image in place after composition.
+    -- Post-processing, a subgraph, modifies the result image in place after composition.
     local post_processing_last_task = "combine_lighting"
     local post_processing = context.post_processing
     if post_processing ~= nil then
         local post_processing_feature = require(post_processing.module) as PostProcessingFeature
-        post_processing_last_task = post_processing_feature.add(builder, post_processing,
-            { color_view = "result_image", previous_task = "combine_lighting", width = screen.width, height = screen.height })
+        tasks.add(post_processing_feature.subgraph(POST_PROCESSING, post_processing,
+            { color_view = "result_image", width = screen.width, height = screen.height }))
+        chain("result_image", { "combine_lighting", POST_PROCESSING })
+        post_processing_last_task = POST_PROCESSING
     end
 
     -- Bloom, presentation, and on-demand acquisition.
@@ -490,14 +491,10 @@ function exports.build(context: Context): wbe.RendGraphRecipeVK
     chain("gbuffer_rma", { "dynamic_gbuffer_second", "combine_lighting" })
     chain("gbuffer_depth", gbuffer_passes)
     chain("gbuffer_depth", { "dynamic_gbuffer_second", "run_indirect_lighting" })
-    -- Overlays depth-test against the G-buffer depth after lighting has sampled it.
-    chain("gbuffer_depth", { "run_direct_lighting", overlays[1] })
-    local depth_overlays: {string} = { "run_indirect_lighting" }
-    local swap_chain_users: {string} = { "present_result_image" }
-    for _, overlay in ipairs(overlays) do
-        depth_overlays[#depth_overlays + 1] = overlay
-        swap_chain_users[#swap_chain_users + 1] = overlay
-    end
+    -- The voxel overlays depth-test against the G-buffer depth after lighting has sampled it.
+    chain("gbuffer_depth", { "run_direct_lighting", VOXEL })
+    local depth_overlays: {string} = { "run_indirect_lighting", VOXEL }
+    local swap_chain_users: {string} = { "present_result_image", VOXEL }
     for _, billboard in ipairs(billboards) do
         depth_overlays[#depth_overlays + 1] = billboard
         swap_chain_users[#swap_chain_users + 1] = billboard

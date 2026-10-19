@@ -25,10 +25,13 @@
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render_vk/roc_single_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
+#include <array>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vulkan/vulkan_core.h>
 
@@ -263,6 +266,184 @@ TEST(WBERenderGraphDescriptorVKTest, ContainerNotOwnedByRefRefusesToBindItself) 
 
     EXPECT_THROW(descriptor.add_resource("container", container), std::runtime_error);
     EXPECT_TRUE(descriptor.resources.empty());
+}
+
+namespace {
+
+RendTaskDescVK make_empty_task(RenderAllocator* p_allocator, std::string_view p_task_id) {
+    return RendTaskDescVK(p_allocator, p_task_id, [p_allocator](const RendGraphContextVK& /*p_context*/) {
+        static bool destroyed = false;
+        return make_unique<RTDirectDescriptorVK>(p_allocator, &destroyed);
+    });
+}
+
+Ref<ROCSingleVK> make_import_container(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
+    return make_ref<ROCSingleVK>(p_allocator, [p_allocator, p_render_data](uint32_t /*p_slot*/) {
+        return make_ref<TestContainerResourceVK>(p_allocator, p_render_data).dynamic_cast_ref<IRenderObjectVK>();
+    });
+}
+
+// A subgraph with a port, an owned buffer, an image and its view, and two connected tasks using all three.
+RendSubgraphDescVK make_sort_subgraph(RenderAllocator* p_allocator) {
+    RendSubgraphDescVK subgraph(p_allocator);
+    subgraph.add_port("color");
+    subgraph.graph.add_buffer("keys", [](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{};
+    });
+    subgraph.graph.add_image("mask_image", [](const RendGraphContextVK& /*p_context*/) {
+        return RendImageDescVK{};
+    });
+    subgraph.graph.add_image_view("mask", "mask_image");
+    subgraph.graph.add_image_view("color_copy", "color");
+    subgraph.graph.add_task(make_empty_task(p_allocator, "register"));
+    subgraph.graph.add_task(make_empty_task(p_allocator, "write"));
+    subgraph.graph.get_task("register").alias("input", "color").connect("write", "keys").connect("write", "color");
+    return subgraph;
+}
+
+} // namespace
+
+TEST(WBERenderGraphDescriptorVKTest, ResourceMapScopesApplyAfterTheTaskBindingsWithoutBeingValidated) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderTaskResourceMap map(&allocator);
+    map.bind("render_target_colors[0]", "color");
+    const std::array<RenderTaskResourceMap::ScopeBinding, 2> inner{{{.source = "color", .target = "result_image"}, {.source = "keys", .target = "sort.keys"}}};
+    map.enclose(inner);
+    // An enclosing scope sees the inner scope's results: the inner `sort.keys` becomes `deferred.sort.keys`.
+    const std::array<RenderTaskResourceMap::ScopeBinding, 2> outer{
+        {{.source = "sort.keys", .target = "deferred.sort.keys"}, {.source = "result_image", .target = "deferred.result"}}};
+    map.enclose(outer);
+
+    EXPECT_EQ(map.resolve("render_target_colors[0]"), "deferred.result");
+    EXPECT_EQ(map.resolve("keys"), "deferred.sort.keys");
+    EXPECT_EQ(map.resolve("result_image"), "deferred.result");
+    EXPECT_EQ(map.resolve("swap_chain"), "swap_chain");
+    // Only the task's own binding has to be used.
+    EXPECT_NO_THROW(map.validate_all_used("task"));
+    const std::array<RenderTaskResourceMap::ScopeBinding, 2> repeated{{{.source = "a", .target = "b"}, {.source = "a", .target = "c"}}};
+    EXPECT_THROW(map.enclose(repeated), std::runtime_error);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, SubgraphsArePrefixedAndResolveTheirPortsAndResources) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    RendGraphDescVK descriptor(&allocator);
+    const std::array<RendSubgraphPortBindingVK, 1> ports{{{.port = "color", .resource = "result_image"}}};
+    RendSubgraphVK& subgraph = descriptor.add_subgraph("sort", make_sort_subgraph(&allocator), ports);
+    subgraph.connect("present", "result_image");
+
+    ASSERT_EQ(descriptor.tasks.size(), 2U);
+    EXPECT_EQ(descriptor.tasks[0].task_id, "sort.register");
+    EXPECT_EQ(descriptor.tasks[1].task_id, "sort.write");
+    const RendTaskDescVK& registering = descriptor.tasks[0];
+    ASSERT_EQ(registering.next.size(), 2U);
+    EXPECT_EQ(registering.next[0].next_task_id, "sort.write");
+    EXPECT_EQ(registering.next[0].res_id, "sort.keys");
+    EXPECT_EQ(registering.next[1].res_id, "result_image");
+    // Ports, then declared resources, then the enclosing graph's resources.
+    EXPECT_EQ(registering.resource_map.resolve("input"), "result_image");
+    EXPECT_EQ(registering.resource_map.resolve("color"), "result_image");
+    EXPECT_EQ(registering.resource_map.resolve("keys"), "sort.keys");
+    EXPECT_EQ(registering.resource_map.resolve("mask"), "sort.mask");
+    EXPECT_EQ(registering.resource_map.resolve("swap_chain"), "swap_chain");
+    ASSERT_EQ(descriptor.buffers.size(), 1U);
+    EXPECT_EQ(descriptor.buffers[0].res_id, "sort.keys");
+    ASSERT_EQ(descriptor.image_views.size(), 2U);
+    EXPECT_EQ(descriptor.image_views[0].res_id, "sort.mask");
+    EXPECT_EQ(descriptor.image_views[0].image_id, "sort.mask_image");
+    EXPECT_EQ(descriptor.image_views[1].image_id, "result_image");
+    ASSERT_EQ(descriptor.subgraphs.size(), 1U);
+    const RendSubgraphVK& record = descriptor.get_subgraph("sort");
+    ASSERT_EQ(record.members.size(), 2U);
+    EXPECT_EQ(record.members[1], "sort.write");
+    ASSERT_EQ(record.next.size(), 1U);
+    EXPECT_EQ(record.next[0].next_task_id, "present");
+    EXPECT_THROW(descriptor.get_subgraph("missing"), std::runtime_error);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, NestedSubgraphsArePrefixedAgain) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    RendSubgraphDescVK outer(&allocator);
+    outer.add_port("target");
+    outer.graph.add_task(make_empty_task(&allocator, "begin"));
+    const std::array<RendSubgraphPortBindingVK, 1> inner_ports{{{.port = "color", .resource = "target"}}};
+    outer.graph.add_subgraph("sort", make_sort_subgraph(&allocator), inner_ports).connect("begin", "target");
+    RendGraphDescVK descriptor(&allocator);
+    const std::array<RendSubgraphPortBindingVK, 1> outer_ports{{{.port = "target", .resource = "result_image"}}};
+    descriptor.add_subgraph("post", outer, outer_ports);
+
+    ASSERT_EQ(descriptor.subgraphs.size(), 2U);
+    const RendSubgraphVK& inner = descriptor.get_subgraph("post.sort");
+    EXPECT_EQ(inner.members[0], "post.sort.register");
+    ASSERT_EQ(inner.next.size(), 1U);
+    EXPECT_EQ(inner.next[0].next_task_id, "post.begin");
+    EXPECT_EQ(inner.next[0].res_id, "result_image");
+    EXPECT_EQ(descriptor.get_subgraph("post").members.size(), 3U);
+    const RendTaskDescVK& registering = descriptor.get_task("post.sort.register");
+    EXPECT_EQ(registering.resource_map.resolve("input"), "result_image");
+    EXPECT_EQ(registering.resource_map.resolve("keys"), "post.sort.keys");
+    EXPECT_EQ(descriptor.buffers[0].res_id, "post.sort.keys");
+}
+
+TEST(WBERenderGraphDescriptorVKTest, SubgraphImportsMergeIntoTheGraph) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    BaseRenderDataVK render_data(&allocator);
+    Ref<ROCSingleVK> mesh = make_import_container(&allocator, &render_data);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(RendResVK{.res_id = "mesh", .container = mesh});
+    RendSubgraphDescVK subgraph(&allocator);
+    subgraph.graph.add_resource(RendResVK{.res_id = "mesh", .container = mesh});
+    subgraph.graph.add_resource(RendResVK{.res_id = "camera", .container = make_import_container(&allocator, &render_data)});
+    subgraph.graph.add_task(make_empty_task(&allocator, "draw"));
+    descriptor.add_subgraph("first", subgraph, {});
+
+    ASSERT_EQ(descriptor.resources.size(), 2U);
+    EXPECT_EQ(descriptor.resources[1].res_id, "camera");
+    // Each import of a render object wraps it in a container of its own; the same object still merges.
+    const Ref<IRenderObjectVK> camera = descriptor.resources[1].container->get().dynamic_cast_ref<IRenderObjectVK>();
+    RendSubgraphDescVK rewrapping(&allocator);
+    rewrapping.graph.add_resource(RendResVK{.res_id = "camera", .container = make_ref<ROCSingleVK>(&allocator, [camera](uint32_t /*p_slot*/) {
+        return camera;
+    })});
+    descriptor.add_subgraph("rewrapping", rewrapping, {});
+    EXPECT_EQ(descriptor.resources.size(), 2U);
+    // A second subgraph importing another resource under an imported id conflicts.
+    RendSubgraphDescVK conflicting(&allocator);
+    conflicting.graph.add_resource(RendResVK{.res_id = "mesh", .container = make_import_container(&allocator, &render_data)});
+    EXPECT_THROW(descriptor.add_subgraph("second", conflicting, {}), std::runtime_error);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, SubgraphsRejectInvalidPortsIdsAndEdges) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_task(make_empty_task(&allocator, "present"));
+    const RendSubgraphDescVK subgraph = make_sort_subgraph(&allocator);
+    const std::array<RendSubgraphPortBindingVK, 1> ports{{{.port = "color", .resource = "result_image"}}};
+    const std::array<RendSubgraphPortBindingVK, 2> twice{{{.port = "color", .resource = "a"}, {.port = "color", .resource = "b"}}};
+    const std::array<RendSubgraphPortBindingVK, 2> unknown{{{.port = "color", .resource = "a"}, {.port = "depth", .resource = "b"}}};
+    const std::array<RendSubgraphPortBindingVK, 1> empty{{{.port = "color", .resource = ""}}};
+
+    EXPECT_THROW(descriptor.add_subgraph("sort", subgraph, {}), std::runtime_error);
+    EXPECT_THROW(descriptor.add_subgraph("sort", subgraph, twice), std::runtime_error);
+    EXPECT_THROW(descriptor.add_subgraph("sort", subgraph, unknown), std::runtime_error);
+    EXPECT_THROW(descriptor.add_subgraph("sort", subgraph, empty), std::runtime_error);
+    EXPECT_THROW(descriptor.add_subgraph("", subgraph, ports), std::runtime_error);
+    EXPECT_THROW(descriptor.add_subgraph("present", subgraph, ports), std::runtime_error);
+    descriptor.add_subgraph("sort", subgraph, ports);
+    EXPECT_THROW(descriptor.add_subgraph("sort", subgraph, ports), std::runtime_error);
+
+    RendSubgraphDescVK shadowing(&allocator);
+    shadowing.add_port("keys");
+    shadowing.graph.add_buffer("keys", [](const RendGraphContextVK& /*p_context*/) {
+        return RendBufferDescVK{};
+    });
+    const std::array<RendSubgraphPortBindingVK, 1> keys{{{.port = "keys", .resource = "result_image"}}};
+    EXPECT_THROW(descriptor.add_subgraph("shadowing", shadowing, keys), std::runtime_error);
+
+    RendSubgraphDescVK leaving(&allocator);
+    leaving.graph.add_task(make_empty_task(&allocator, "inside"));
+    leaving.graph.get_task("inside").connect("present", "result_image");
+    EXPECT_THROW(descriptor.add_subgraph("leaving", leaving, {}), std::runtime_error);
+    EXPECT_THROW(RendSubgraphDescVK(&allocator).add_port("a").add_port("a"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine
