@@ -48,6 +48,7 @@ build_dir = os.path.join(build_root_dir, build_target["export-directory"])
 binary_dir = os.path.join(build_dir, "bin")
 dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
+teal_dir = os.path.join(dependencies_dir, "tl")
 # Resource dirs
 resource_dir = os.path.join(root_dir, build_config.resource_dir)
 resource_output_dir = os.path.join(binary_dir, "res")
@@ -60,6 +61,8 @@ shaders_incl_dir = os.path.join(resource_dir, "assets/shaders")
 res_chunks_dir = os.path.join(resource_dir, "res_chunks")
 res_chunks_output_dir = os.path.join(resource_output_dir, "res_chunks")
 assets_dir = os.path.join(resource_dir, "assets")
+# Script resources' ids are their module paths under this directory.
+script_modules_dir = os.path.join(assets_dir, "scripts", "lua")
 assets_output_dir = os.path.join(resource_output_dir, "assets")
 metadata_path = os.path.join(test_env_dir, "metadata.json")
 cache_dir = os.path.join(build_dir, "build_cache")
@@ -104,6 +107,7 @@ def setup_acp_compilers() -> None:
     from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
     from build_script.resource.acp.acp_compiler_mesh import WBEACPCompilerMesh
     from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
+    from build_script.resource.acp.acp_compiler_script import WBEACPCompilerScript
     from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
     from build_script.resource.acp.acp_compiler_texture import TextureCompilerPyKTX, WBEACPCompilerTexture
 
@@ -113,11 +117,13 @@ def setup_acp_compilers() -> None:
     acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
     acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     acp.add_compiler(WBEACPCompilerMesh())
-    acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "script", "text", "video"]))
+    acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+    acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir)]))
 
     test_env_acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
     test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
     test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     test_env_acp.add_compiler(WBEACPCompilerMesh())
-    test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "script", "text", "video"]))
+    test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+    test_env_acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir)]))
     acp_compilers_configured = True

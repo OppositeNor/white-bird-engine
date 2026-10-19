@@ -159,6 +159,13 @@ return {
     EXPECT_THROW((void)RendGraphScriptVK::run("missing", "require('utils.missing') return {}", DataValue::make_map()), std::runtime_error);
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, RunsTealScriptsCompiledByTheACP) {
+    // tests.teal_recipe is a Teal module requiring another, which the ACP compiled to Lua.
+    const DataValue recipe = RendGraphScriptVK::run("tests.teal_recipe", DataValue::make_map());
+    EXPECT_EQ(recipe.get_entry("imports").as_list().at(0).as_string(), "6");
+    EXPECT_EQ(recipe.get_value<std::string>("queue_family"), "compute_2");
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     RenderAllocator allocator(WBE_KI_B(16));
     BaseRenderDataVK render_data(&allocator);

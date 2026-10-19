@@ -139,6 +139,10 @@ For non-trivial implementation tasks:
 - A script's resource id is its module name: its path under `scripts/lua/` without `.lua`, with dots for slashes
   (`utils/render_graph.lua` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
   runtime (through `SMRResourceManager`) and in the editor.
+- Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `WBEACPCompilerScript` copies Lua sources and type-checks and
+  compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
+  a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/lua/` at compile time, so a
+  Teal module can require a Lua module only through a `.d.tl` declaration next to it.
 - `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic
   requires fail. Implement new import sources as an `IScriptModuleResolver`, whose `try_resolve()` must not throw.
 
