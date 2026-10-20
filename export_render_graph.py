@@ -184,7 +184,7 @@ def subgraph_title(p_graph: Graph, p_subgraph_id: str, p_line_break: str) -> str
         node for node in p_graph.nodes
         if node.subgraph is not None and (node.subgraph == p_subgraph_id or node.subgraph.startswith(nested_prefix))]
     sampled: list[float] = [node.mean_ms for node in members if node.mean_ms is not None]
-    title: str = f"{p_subgraph_id}{p_line_break}Σ {sum(sampled):.3f} ms over {len(sampled)} tasks"
+    title: str = f"{p_subgraph_id}{p_line_break}sum: {sum(sampled):.3f} ms over {len(sampled)} tasks"
     unsampled: int = len(members) - len(sampled)
     if unsampled > 0:
         title += f" ({unsampled} not sampled)"
