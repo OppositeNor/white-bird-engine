@@ -17,6 +17,17 @@
 
 #include "svo/svo_dynamic_types.slang"
 
+#ifdef WBE_SVO_NORMAL
+/**
+ * @brief Image type of SVO::ndf: writable when WBE_SVO_WRITE is defined, read-only otherwise.
+ */
+#ifdef WBE_SVO_WRITE
+typealias SVONDFImage = RWTexture3D<float3>;
+#else
+typealias SVONDFImage = Texture3D<float3>;
+#endif
+#endif
+
 /**
  * @brief Read-only view of an already constructed SVO that resolves positions to the data_index of their nodes and leaves.
  * @details Every stored node and leaf owns one data element through its data_index; the SVO does not own or read the data,
@@ -50,22 +61,36 @@ struct SVO {
      * @brief Whether traces follow the dynamic children published by the dynamic construction passes.
      */
     bool traverse_dynamic;
+#ifdef WBE_SVO_NORMAL
+    /**
+     * @brief Normal distribution function image; present only when WBE_SVO_NORMAL is defined.
+     */
+    SVONDFImage ndf;
+#endif
 
     /**
      * @brief Create a view over the buffers of a constructed SVO.
+     * @param p_ndf The normal distribution function image; the parameter exists only when WBE_SVO_NORMAL is defined.
      */
     __init(RWStructuredBuffer<SVONode> p_nodes,
         RWStructuredBuffer<SVONode> p_dynamic_nodes,
         StructuredBuffer<SVOLeaf> p_leaves,
         StructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
         SVOInfo p_info,
-        bool p_traverse_dynamic) {
+        bool p_traverse_dynamic
+#ifdef WBE_SVO_NORMAL
+        , SVONDFImage p_ndf
+#endif
+        ) {
         nodes = p_nodes;
         dynamic_nodes = p_dynamic_nodes;
         leaves = p_leaves;
         dynamic_leaves = p_dynamic_leaves;
         info = p_info;
         traverse_dynamic = p_traverse_dynamic;
+#ifdef WBE_SVO_NORMAL
+        ndf = p_ndf;
+#endif
     }
 
     /**

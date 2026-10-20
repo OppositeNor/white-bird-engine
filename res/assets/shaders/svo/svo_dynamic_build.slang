@@ -14,6 +14,14 @@
 */
 #ifndef WBE_FILE_SVO_DYNAMIC_BUILD_SLANG
 #define WBE_FILE_SVO_DYNAMIC_BUILD_SLANG
+// Construction passes write the SVO's normal distribution function.
+#ifndef WBE_SVO_NORMAL
+#define WBE_SVO_NORMAL
+#endif
+#ifndef WBE_SVO_WRITE
+#define WBE_SVO_WRITE
+#endif
+
 #include "svo/svo_utils.slang"
 #include "svo/svo_dynamic_types.slang"
 

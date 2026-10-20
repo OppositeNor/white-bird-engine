@@ -44,6 +44,16 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     add_buffer("svo_deferred_list_pong", sizes.deferred_list)
     add_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
     add_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
+    -- Placeholder for the SVO's normal distribution function, which the construction passes bind as `ndf`.
+    local ndf_image: wbe.RendImageParamsVK = {
+        usage = "image_read_write",
+        format = "r16g16b16a16_sfloat",
+        extent = { width = 3, height = 3 },
+        depth = 3,
+        image_type = "3d",
+    }
+    resources[#resources + 1] = { id = "ndf_image", image = ndf_image }
+    resources[#resources + 1] = graph_utils.image_view("ndf", "ndf_image")
     local tasks = graph_utils.task_list()
     local chain = tasks.chain
     local prefix = p_params.shader_prefix
@@ -179,6 +189,14 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         chain(buffer, sequence({ "clear_dynamic_svo", "dynamic_svo", "dynamic_svo_second" }, dynamic_publication,
             { "run_build_svo_deferred", "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" }))
     end
+    chain("ndf", {
+        "run_build_svo",
+        "run_build_svo_double_sided",
+        "static_svo_deferred",
+        "dynamic_svo",
+        "dynamic_svo_second",
+        "run_build_svo_deferred",
+    })
     chain("svo_leaf_buffer", {
         "run_build_svo",
         "run_build_svo_double_sided",
