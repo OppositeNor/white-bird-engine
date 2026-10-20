@@ -110,6 +110,21 @@ struct SVO {
             return nodes[p_trace_info.node_index].data_index;
         }
     }
+
+    /**
+     * @brief Get the world-space minimum corner of the node or leaf containing a voxel at a depth.
+     * @details Only the top p_depth bits of each axis are read, so a node may be located by any voxel below it, such as
+     * SVONodeTraceInfo::voxel_index. The cell's width is info.width / 2^p_depth.
+     * @param p_voxel_index Flattened voxel coordinate in the grid of extent 2^info.max_depth, packed as by
+     * to_deferred_list_entry().
+     * @param p_depth Depth of the node, at most info.max_depth: one for the root's sectors, info.max_depth for leaves, and
+     * zero for the implicit root.
+     * @return The world-space position of the cell's minimum corner.
+     */
+    float3 voxel_index_to_global(uint p_voxel_index, uint p_depth) {
+        uint3 cell = get_deferred_list_entry_voxel(p_voxel_index, info.max_depth) >> (info.max_depth - p_depth);
+        return info.origin + float3(cell) * (info.width / float(1u << p_depth));
+    }
 };
 
 #endif

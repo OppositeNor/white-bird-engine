@@ -19,6 +19,7 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -96,7 +97,8 @@ protected:
     /**
      * @brief Creates the shared pipelines and buffers on the rendering thread.
      * @details The renderer must outlive this object and its registered graphs. The feature retains
-     * shared ownership of the static scene. Invalid dependencies throw.
+     * shared ownership of the static scene. Invalid dependencies and empty scene bounds throw.
+     * @param p_scene_bounds World-space bounds of the static scene, which the SVO encloses (see VoxelVolume::enclose()).
      * @param p_shader_prefix Resource-key prefix of the static construction shaders.
      * @param p_dynamic_shader_prefix Resource-key prefix of the implementation's own dynamic update shaders: clear, raster
      * construction, and deferred retries.
@@ -105,6 +107,7 @@ protected:
      */
     ISVORenderFeature(RendererVK* p_renderer,
         Ref<MeshResourcesVK> p_static_mesh_resources,
+        const RUAABB3D& p_scene_bounds,
         std::string_view p_shader_prefix,
         std::string_view p_dynamic_shader_prefix,
         bool p_rebuild_static_every_frame);
@@ -179,8 +182,6 @@ private:
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_NODE_COUNT) / 8U);
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_LEAVES_COUNT) / 8U);
-    static constexpr float SVO_WIDTH = 32.0F;
-    static constexpr glm::vec3 SVO_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
 
     struct SVOInfo {
         glm::vec3 origin;
@@ -262,6 +263,8 @@ private:
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
 
     Ref<MeshResourcesVK> static_mesh_resources;
+    // The cube the SVO covers, derived from the scene bounds.
+    VoxelVolume svo_volume;
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
     Ref<ROBufferVK> dynamic_leaves;

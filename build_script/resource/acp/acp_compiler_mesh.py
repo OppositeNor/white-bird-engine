@@ -245,6 +245,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             "center": [(minimum[axis] + maximum[axis]) * 0.5 for axis in range(3)],
             "width": maximum[0] - minimum[0],
             "height": maximum[1] - minimum[1],
+            "depth": maximum[2] - minimum[2],
         }
 
     def _append_indices(self, payload: bytearray, indices: list[Any], vertex_count: int, manifest_path: Path) -> None:

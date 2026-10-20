@@ -438,6 +438,7 @@ RUAABB3D resolve_aabb(const RUSchemaAABB3D& p_scheme) {
         .center = glm::vec3(p_scheme.center[0], p_scheme.center[1], p_scheme.center[2]),
         .width = p_scheme.width,
         .height = p_scheme.height,
+        .depth = p_scheme.depth,
     };
 }
 

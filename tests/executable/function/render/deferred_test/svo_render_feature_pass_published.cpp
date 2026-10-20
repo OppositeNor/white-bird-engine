@@ -34,9 +34,11 @@
 
 namespace WhiteBirdEngine {
 
-SVORenderFeaturePassPublished::SVORenderFeaturePassPublished(
-    RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame)
-    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), "svo_2", "svo_2_dynamic", p_rebuild_static_every_frame) {
+SVORenderFeaturePassPublished::SVORenderFeaturePassPublished(RendererVK* p_renderer,
+    Ref<MeshResourcesVK> p_static_mesh_resources,
+    const RUAABB3D& p_scene_bounds,
+    bool p_rebuild_static_every_frame)
+    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), p_scene_bounds, "svo_2", "svo_2_dynamic", p_rebuild_static_every_frame) {
     update_states_pipeline = compile_compute_pipeline("svo_2_update_states_shader");
     dynamic_publication_pipeline = compile_compute_pipeline("svo_2_dynamic_update_states_shader");
 }

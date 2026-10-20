@@ -61,12 +61,15 @@ public:
     /**
      * @brief Compiles the octree pipelines and creates the textures and buffers on the rendering thread.
      * @details The renderer must outlive this object and its registered graphs. The feature retains
-     * shared ownership of the static scene. Invalid dependencies throw.
+     * shared ownership of the static scene. Invalid dependencies and empty scene bounds throw.
+     * @param p_scene_bounds World-space bounds of the static scene, which the octree encloses (see VoxelVolume::enclose()).
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once,
      * for observing its per-frame cost. Dynamic construction is unaffected either way.
      */
-    VoxelRenderFeatureOctree(
-        RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame = false);
+    VoxelRenderFeatureOctree(RendererVK* p_renderer,
+        Ref<MeshResourcesVK> p_static_mesh_resources,
+        const RUAABB3D& p_scene_bounds,
+        bool p_rebuild_static_every_frame = false);
     virtual ~VoxelRenderFeatureOctree() override = default;
     VoxelRenderFeatureOctree(const VoxelRenderFeatureOctree&) = delete;
     VoxelRenderFeatureOctree(VoxelRenderFeatureOctree&&) = delete;
@@ -152,8 +155,6 @@ private:
     static constexpr uint32_t OCTREE_DEBUG_GATHER_LEVEL = 4;
     static constexpr uint32_t OCTREE_DEBUG_GATHER_GROUP_COUNT = (OCTREE_EXTENT >> OCTREE_DEBUG_GATHER_LEVEL) / 4;
     static_assert(OCTREE_DEBUG_GATHER_GROUP_COUNT > 0);
-    static constexpr float OCTREE_WIDTH = 32.0F;
-    static constexpr glm::vec3 OCTREE_ORIGIN = glm::vec3(-16.0F, -8.0F, -16.0F);
 
     /**
      * @brief Mirrors OctreeInfo of octree/octree_common.slang.
@@ -192,6 +193,8 @@ private:
     const BaseRenderDataVK* base_render_data;
     RenderAllocator* render_allocator;
     Ref<MeshResourcesVK> static_mesh_resources;
+    // The cube the octree covers, derived from the scene bounds.
+    VoxelVolume octree_volume;
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
 

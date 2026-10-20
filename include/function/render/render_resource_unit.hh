@@ -278,6 +278,9 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaAABB3D {
     /** Full Y extent. */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     float height = 0.0F;
+    /** Full Z extent. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    float depth = 0.0F;
 };
 
 /**
@@ -656,6 +659,8 @@ struct RUAABB3D {
     float width = 0.0F;
     /** Full Y extent. */
     float height = 0.0F;
+    /** Full Z extent. */
+    float depth = 0.0F;
 };
 
 /**
@@ -787,6 +792,17 @@ struct RUMesh3D : public ResourceUnit {
     RUSubmeshInstance3D double_sided_opaque_instances;
     /** Referenced skeleton, or null when the mesh is not skinned. */
     RefRes<RUSkeleton> skeleton;
+
+    /**
+     * @brief Compute the axis-aligned bounds of every submesh of every category, with their instance transforms applied.
+     *
+     * Each submesh's bounds are transformed by every instance it draws, so the result is in the mesh's space, before any
+     * entity transform.
+     *
+     * @return The bounds enclosing every drawn submesh instance.
+     * @throws std::runtime_error When the mesh draws no submesh instance.
+     */
+    RUAABB3D compute_aabb() const;
 };
 
 } // namespace WhiteBirdEngine

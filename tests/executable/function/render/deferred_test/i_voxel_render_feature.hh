@@ -16,7 +16,9 @@
 #define WBE_FILE_I_VOXEL_RENDER_FEATURE_HH
 
 #include "core/data/data_value.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "glm/ext/vector_float3.hpp"
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -90,6 +92,27 @@ struct VoxelRecipeInputs {
     std::string_view static_build_event;
     /** Whether the static construction has yet to record; a rebuild after it recorded creates the tasks disabled. */
     bool static_build_pending = true;
+};
+
+/**
+ * @class VoxelVolume
+ * @brief The world-space cube a voxel structure covers.
+ */
+struct VoxelVolume {
+    /** World-space minimum corner of the cube. */
+    glm::vec3 origin{0.0F};
+    /** Edge length of the cube. */
+    float width = 0.0F;
+
+    /**
+     * @brief Get the cube centered on a scene's bounds that a grid of p_extent leaf voxels per axis covers.
+     * @details The width is the bounds' largest extent plus one leaf voxel of margin on each side, which keeps geometry on
+     * the bounds' faces inside the grid.
+     * @param p_bounds World-space bounds of the scene.
+     * @param p_extent Number of leaf voxels along each axis of the grid.
+     * @throws std::runtime_error When the bounds have no positive extent, or p_extent leaves no voxel inside the margin.
+     */
+    static VoxelVolume enclose(const RUAABB3D& p_bounds, uint32_t p_extent);
 };
 
 /**

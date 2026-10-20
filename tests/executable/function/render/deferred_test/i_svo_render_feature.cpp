@@ -44,11 +44,12 @@ namespace WhiteBirdEngine {
 
 ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     Ref<MeshResourcesVK> p_static_mesh_resources,
+    const RUAABB3D& p_scene_bounds,
     std::string_view p_shader_prefix,
     std::string_view p_dynamic_shader_prefix,
     bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_mesh_resources(std::move(p_static_mesh_resources)), rebuild_static_every_frame(p_rebuild_static_every_frame),
+      static_mesh_resources(std::move(p_static_mesh_resources)), svo_volume(VoxelVolume::enclose(p_scene_bounds, SVO_EXTENT)), rebuild_static_every_frame(p_rebuild_static_every_frame),
       shader_prefix(p_shader_prefix), dynamic_shader_prefix(p_dynamic_shader_prefix) {
     if (renderer_vk == nullptr || static_mesh_resources == MEM_NULL) {
         throw std::runtime_error("ISVORenderFeature: renderer and scene are required.");
@@ -148,8 +149,8 @@ void ISVORenderFeature::create_resources() {
 
 void ISVORenderFeature::initialize() {
     const SVOInfo initial_svo_info{
-        .origin = SVO_ORIGIN,
-        .width = SVO_WIDTH,
+        .origin = svo_volume.origin,
+        .width = svo_volume.width,
         .max_depth = SVO_MAX_DEPTH,
         .max_node_count = SVO_MAX_NODE_COUNT,
         .max_leaves_count = SVO_MAX_LEAVES_COUNT,

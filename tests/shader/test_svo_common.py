@@ -52,7 +52,7 @@ INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u
     ("max_deferred_task_count", "<u4"), ("max_dynamic_node_count", "<u4"), ("max_dynamic_leaves_count", "<u4"),
     ("dynamic_node_count", "<u4"), ("dynamic_leaves_count", "<u4")])
 TRACE_DTYPE = np.dtype([("node_index", "<u4"), ("index_type", "<u4"), ("curr_depth", "<u4"), ("remain_depth", "<i4"),
-    ("svo_position", "<f4", 3)])
+    ("svo_position", "<f4", 3), ("voxel_index", "<u4")])
 BUFFER_USAGE = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
 
 
@@ -86,6 +86,11 @@ def voxel_prefix(p_voxel: Voxel, p_depth: int, p_max_depth: int) -> Voxel:
     """Return the top p_depth bits of each coordinate, which identify the depth-p_depth node containing p_voxel."""
     x, y, z = (coordinate >> (p_max_depth - p_depth) for coordinate in p_voxel)
     return (x, y, z)
+
+
+def voxel_index(p_voxel: Voxel, p_max_depth: int) -> int:
+    """Return the flattened voxel coordinate, with x in the lowest p_max_depth bits and z in the highest."""
+    return p_voxel[0] | (p_voxel[1] << p_max_depth) | (p_voxel[2] << (2 * p_max_depth))
 
 
 def shared_prefix_depth(p_first: Voxel, p_second: Voxel, p_max_depth: int) -> int:
@@ -189,7 +194,7 @@ def root_traces(p_voxels: list[Voxel], p_max_depth: int, p_remain_depth: int) ->
     for index, voxel in enumerate(p_voxels):
         center = voxel_center(voxel, p_max_depth)
         traces[index] = (voxel_sector(voxel, 1, p_max_depth), INDEX_STATIC_NODE, 1, p_remain_depth,
-            np.modf(center * 2.0)[0])
+            np.modf(center * 2.0)[0], voxel_index(voxel, p_max_depth))
     return traces
 
 
@@ -292,6 +297,9 @@ def test_get_svo_root_trace_info(svo_common: spy.Module, rng: np.random.Generato
         # The root sector is the stored node at depth one; the position becomes local to that sector.
         assert_trace(trace, int(subregion_reference(position)), INDEX_STATIC_NODE, 1, p_max_depth - 1,
             np.modf(position * 2.0)[0])
+        # The voxel index is the containing leaf-level voxel's flattened coordinate.
+        voxel = np.floor(position * float(1 << p_max_depth)).astype(np.int64)
+        assert trace["voxel_index"] == voxel_index((int(voxel[0]), int(voxel[1]), int(voxel[2])), p_max_depth)
 
 
 @pytest.mark.parametrize("p_max_depth", [2, 4, 7])
@@ -304,6 +312,7 @@ def test_to_trace_info(svo_common: spy.Module, rng: np.random.Generator, p_max_d
         center = voxel_center(voxel, p_max_depth)
         assert_trace(trace, voxel_sector(voxel, 1, p_max_depth), INDEX_STATIC_NODE, 1, p_max_depth - 1,
             np.modf(center * 2.0)[0])
+        assert trace["voxel_index"] == entry
 
 
 def expected_stop_depth(p_tree: StaticSVO, p_voxel: Voxel) -> int:
@@ -425,7 +434,7 @@ def test_traverse_svo_resumes_from_dynamic_node(device: spy.Device, load_kernel:
     nodes, dynamic_nodes, tree_info = dynamic_svo()
     voxel = (1, 2, 3)
     traces = np.zeros(1, dtype=TRACE_DTYPE)
-    traces[0] = (3, INDEX_DYNAMIC_NODE, 2, 4, np.modf(voxel_center(voxel, 3) * 4.0)[0])
+    traces[0] = (3, INDEX_DYNAMIC_NODE, 2, 4, np.modf(voxel_center(voxel, 3) * 4.0)[0], voxel_index(voxel, 3))
     result = run_traverse(device, load_kernel, nodes, dynamic_nodes, tree_info, traces, False, True)
     assert_trace(result[0], 16 + 5, INDEX_DYNAMIC_LEAF, 3, 3, np.modf(voxel_center(voxel, 3) * 8.0)[0])
 

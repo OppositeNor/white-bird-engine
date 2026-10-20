@@ -14,6 +14,7 @@
 */
 #include "function/render/render_resource_unit.hh"
 #include "function/render/vertex_attribute_format_info.hh"
+#include "glm/common.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -50,6 +51,29 @@ void validate_binary_view(const RUBinaryView& p_binary_view, std::string_view p_
     }
     if (p_binary_view.size > 0 && p_binary_view.binary->data == nullptr) {
         throw std::runtime_error(std::format("Failed to access {}: binary data is missing.", p_context));
+    }
+}
+
+// Grow [p_minimum, p_maximum] by every corner of every submesh's bounds under every instance it draws.
+void expand_submesh_instance_bounds(const RUSubmeshInstance3D& p_instances, glm::vec3& p_minimum, glm::vec3& p_maximum) {
+    for (size_t submesh_index = 0; submesh_index < p_instances.submesh_count; ++submesh_index) {
+        const RUSubmesh3D& submesh = p_instances.submeshes.get()[submesh_index];
+        if (submesh.first_instance > p_instances.instance_count ||
+            submesh.instance_count > p_instances.instance_count - submesh.first_instance) {
+            throw std::runtime_error(std::format("Failed to compute mesh bounds: submesh {} draws instances [{}, {}), but the category has {}.",
+                submesh_index, submesh.first_instance, submesh.first_instance + submesh.instance_count, p_instances.instance_count));
+        }
+        const glm::vec3 half_extent = glm::vec3(submesh.aabb.width, submesh.aabb.height, submesh.aabb.depth) * 0.5F;
+        for (size_t instance_index = submesh.first_instance; instance_index < submesh.first_instance + submesh.instance_count;
+            ++instance_index) {
+            const glm::mat4& transform = p_instances.instances.get()[instance_index].global_transform;
+            for (uint32_t corner = 0; corner < 8; ++corner) {
+                const glm::vec3 sign((corner & 4U) != 0 ? 1.0F : -1.0F, (corner & 2U) != 0 ? 1.0F : -1.0F, (corner & 1U) != 0 ? 1.0F : -1.0F);
+                const glm::vec3 position = glm::vec3(transform * glm::vec4(submesh.aabb.center + sign * half_extent, 1.0F));
+                p_minimum = glm::min(p_minimum, position);
+                p_maximum = glm::max(p_maximum, position);
+            }
+        }
     }
 }
 
@@ -299,6 +323,24 @@ size_t RUSubmesh3D::get_vertices_num() const {
         }
     }
     return vertex_count;
+}
+
+RUAABB3D RUMesh3D::compute_aabb() const {
+    glm::vec3 minimum(std::numeric_limits<float>::max());
+    glm::vec3 maximum(std::numeric_limits<float>::lowest());
+    expand_submesh_instance_bounds(opaque_instances, minimum, maximum);
+    expand_submesh_instance_bounds(masked_instances, minimum, maximum);
+    expand_submesh_instance_bounds(double_sided_opaque_instances, minimum, maximum);
+    if (minimum.x > maximum.x) {
+        throw std::runtime_error("Failed to compute mesh bounds: the mesh draws no submesh instance.");
+    }
+    const glm::vec3 extent = maximum - minimum;
+    return RUAABB3D{
+        .center = (minimum + maximum) * 0.5F,
+        .width = extent.x,
+        .height = extent.y,
+        .depth = extent.z,
+    };
 }
 
 RUSkeleton::Joint RUSkeleton::get_joint(size_t p_index) const {

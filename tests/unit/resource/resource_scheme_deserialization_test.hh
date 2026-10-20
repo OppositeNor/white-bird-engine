@@ -244,7 +244,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
                 {
                     "material": {"id": "material_01", "type": "material"},
                     "material_id": "mat_ref_01",
-                    "aabb": {"center": [1.0, 2.0, 3.0], "width": 4.0, "height": 5.0},
+                    "aabb": {"center": [1.0, 2.0, 3.0], "width": 4.0, "height": 5.0, "depth": 6.0},
                     "vertex_bindings": [{
                         "binary": {"binary_id": "test_mesh_01.vertices", "start": 0, "size": 96},
                         "stride": 32,
@@ -268,7 +268,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
         "masked_instances": {
             "submeshes": [
                 {
-                    "aabb": {"center": [0.0, 0.0, 0.0], "width": 0.0, "height": 0.0},
+                    "aabb": {"center": [0.0, 0.0, 0.0], "width": 0.0, "height": 0.0, "depth": 0.0},
                     "vertex_bindings": [{
                         "binary": {"binary_id": "test_mesh_01.vertices", "start": 96, "size": 12},
                         "stride": 12,
@@ -299,6 +299,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshGeneral) {
     ASSERT_EQ(submesh.aabb.center, (std::vector<float>{1.0F, 2.0F, 3.0F}));
     ASSERT_EQ(submesh.aabb.width, 4.0F);
     ASSERT_EQ(submesh.aabb.height, 5.0F);
+    ASSERT_EQ(submesh.aabb.depth, 6.0F);
     ASSERT_EQ(submesh.vertex_bindings.size(), 1U);
     const WBE::RUSchemaVertexView& vertices = submesh.vertex_bindings[0];
     ASSERT_EQ(vertices.binary.binary_id, "test_mesh_01.vertices");
@@ -367,7 +368,7 @@ TEST_F(WBEResourceSchemaDeserializationTest, RUSchemaMeshSkeletonAndJointBinding
         "opaque_instances": {
             "submeshes": [
                 {
-                    "aabb": {"center": [0.0, 0.0, 0.0], "width": 1.0, "height": 1.0},
+                    "aabb": {"center": [0.0, 0.0, 0.0], "width": 1.0, "height": 1.0, "depth": 1.0},
                     "vertex_bindings": [
                         {
                             "binary": {"binary_id": "test_skinned_mesh.geometry", "start": 0, "size": 36},

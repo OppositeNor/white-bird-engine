@@ -71,6 +71,14 @@ struct SVONodeTraceInfo {
      * @brief Voxel position in the current node's local unit cube.
      */
     float3 svo_position;
+    /**
+     * @brief Flattened coordinate of the traced voxel in the SVO's grid of extent 2^max_depth, packed as by
+     * to_deferred_list_entry().
+     * @details A node at depth d covers the voxels whose coordinate, shifted right by max_depth - d on each axis, equals
+     * its cell, so the low max_depth - d bits of each axis are ignored for that node. Traversal does not change it; pass it
+     * to SVO::voxel_index_to_global() with curr_depth to locate the reached node or leaf.
+     */
+    uint voxel_index;
 };
 
 /**
@@ -85,6 +93,7 @@ SVONodeTraceInfo get_svo_root_trace_info(float3 p_svo_position, uint p_max_depth
     result.curr_depth = 1;
     result.remain_depth = int(p_max_depth) - 1;
     result.svo_position = frac(p_svo_position * 2.0);
+    result.voxel_index = to_deferred_list_entry(p_svo_position, p_max_depth);
     return result;
 }
 

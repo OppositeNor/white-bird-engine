@@ -29,8 +29,11 @@
 
 namespace WhiteBirdEngine {
 
-SVORenderFeatureAtomic::SVORenderFeatureAtomic(RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame)
-    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), "svo", "svo_dynamic", p_rebuild_static_every_frame) {
+SVORenderFeatureAtomic::SVORenderFeatureAtomic(RendererVK* p_renderer,
+    Ref<MeshResourcesVK> p_static_mesh_resources,
+    const RUAABB3D& p_scene_bounds,
+    bool p_rebuild_static_every_frame)
+    : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), p_scene_bounds, "svo", "svo_dynamic", p_rebuild_static_every_frame) {
 }
 
 std::string_view SVORenderFeatureAtomic::get_name() const {

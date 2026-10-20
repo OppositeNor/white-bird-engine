@@ -38,9 +38,13 @@ public:
     /**
      * @brief Compiles the atomic-publication SVO shaders and creates the shared buffers on the rendering thread.
      * @details The renderer must outlive this object and its registered graphs. Invalid dependencies throw.
+     * @param p_scene_bounds Bounds of the static scene; the SVO is the cube enclosing them, see VoxelVolume::enclose().
      * @param p_rebuild_static_every_frame When true, the full static-scene construction runs every frame instead of once.
      */
-    SVORenderFeatureAtomic(RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame = false);
+    SVORenderFeatureAtomic(RendererVK* p_renderer,
+        Ref<MeshResourcesVK> p_static_mesh_resources,
+        const RUAABB3D& p_scene_bounds,
+        bool p_rebuild_static_every_frame = false);
     virtual ~SVORenderFeatureAtomic() override = default;
     SVORenderFeatureAtomic(const SVORenderFeatureAtomic&) = delete;
     SVORenderFeatureAtomic(SVORenderFeatureAtomic&&) = delete;

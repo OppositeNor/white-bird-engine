@@ -156,10 +156,13 @@ private:
 
 } // namespace
 
-VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(
-    RendererVK* p_renderer, Ref<MeshResourcesVK> p_static_mesh_resources, bool p_rebuild_static_every_frame)
+VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
+    Ref<MeshResourcesVK> p_static_mesh_resources,
+    const RUAABB3D& p_scene_bounds,
+    bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
-      static_mesh_resources(std::move(p_static_mesh_resources)), rebuild_static_every_frame(p_rebuild_static_every_frame) {
+      static_mesh_resources(std::move(p_static_mesh_resources)), octree_volume(VoxelVolume::enclose(p_scene_bounds, OCTREE_EXTENT)),
+      rebuild_static_every_frame(p_rebuild_static_every_frame) {
     if (renderer_vk == nullptr) {
         throw std::runtime_error("VoxelRenderFeatureOctree: renderer is required.");
     }
@@ -279,8 +282,8 @@ void VoxelRenderFeatureOctree::create_resources() {
         dynamic_level_views[level] = create_octree_image_view(dynamic_image, level, 1);
     }
     const OctreeInfo info{
-        .origin = OCTREE_ORIGIN,
-        .width = OCTREE_WIDTH,
+        .origin = octree_volume.origin,
+        .width = octree_volume.width,
         .max_depth = OCTREE_MAX_DEPTH,
         .max_debug_node_count = OCTREE_MAX_DEBUG_NODE_COUNT,
         .padding = {},

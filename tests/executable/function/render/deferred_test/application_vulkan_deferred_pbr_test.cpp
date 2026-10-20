@@ -442,6 +442,7 @@ void ApplicationVulkanDeferredPBRTest::write_frame_sequence_frame(RTCPUInFlightA
             written_count.fetch_add(1, std::memory_order_release);
             written_count.notify_all();
         }
+
     } written_count_guard{frame_sequence_written_count};
 
     const bool blue_first = p_image.format == VK_FORMAT_B8G8R8A8_SRGB || p_image.format == VK_FORMAT_B8G8R8A8_UNORM;
@@ -480,15 +481,25 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
         voxel_structure_selection = selection;
     }
     const bool rebuild_static_every_frame = exec_test_requested("WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT");
+    // The voxel structure covers the static scene, which the application draws without an entity transform.
+    const RUAABB3D scene_bounds = sponza_mesh->compute_aabb();
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(std::format("Static scene bounds: center ({}, {}, {}), extent ({}, {}, {}).",
+            scene_bounds.center.x,
+            scene_bounds.center.y,
+            scene_bounds.center.z,
+            scene_bounds.width,
+            scene_bounds.height,
+            scene_bounds.depth));
     if (voxel_structure_selection == "1") {
-        voxel_structure =
-            make_unique<SVORenderFeatureAtomic>(render_allocator, renderer_vk, static_mesh_resources, rebuild_static_every_frame);
+        voxel_structure = make_unique<SVORenderFeatureAtomic>(
+            render_allocator, renderer_vk, static_mesh_resources, scene_bounds, rebuild_static_every_frame);
     } else if (voxel_structure_selection == "2") {
         voxel_structure = make_unique<SVORenderFeaturePassPublished>(
-            render_allocator, renderer_vk, static_mesh_resources, rebuild_static_every_frame);
+            render_allocator, renderer_vk, static_mesh_resources, scene_bounds, rebuild_static_every_frame);
     } else if (voxel_structure_selection == "octree") {
-        voxel_structure =
-            make_unique<VoxelRenderFeatureOctree>(render_allocator, renderer_vk, static_mesh_resources, rebuild_static_every_frame);
+        voxel_structure = make_unique<VoxelRenderFeatureOctree>(
+            render_allocator, renderer_vk, static_mesh_resources, scene_bounds, rebuild_static_every_frame);
     } else {
         throw std::runtime_error("WBE_SVO_IMPLEMENTATION must be 1, 2, or octree.");
     }

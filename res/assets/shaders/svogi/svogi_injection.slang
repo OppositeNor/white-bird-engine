@@ -30,8 +30,6 @@ struct DescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
 
-    [WBE_DESCRIPTOR("storage_buffer", "svogi_data_buffer", "read")]
-    uint2 svogi_data;
     [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
@@ -52,6 +50,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+    // TODO
 
     SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
@@ -67,8 +66,10 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         return; // Same convention as the RSM pass: no surface was rasterized here.
     }
     float2 texel_uv = (float2(dispatch_thread_id) + 0.5) / float2(shadow_size);
+    float2 flux = spot_light.rsm_flux.SampleLevel(spot_light.shadowmap_sampler, texel_uv, 0).rg;
     float3 world_position = spot_light.shadow_texel_world_position(texel_uv, shadow_depth);
     SVONodeTraceInfo trace_info;
     uint data_index = svo.trace_data(world_position, trace_info);
     // TODO
+
 }

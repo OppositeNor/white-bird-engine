@@ -465,6 +465,28 @@ uint morton_encode_3d(uint3 p_coordinate) {
         | (morton_spread_bits_3d(p_coordinate.z) << 2);
 }
 
+/**
+ * @brief Flattens a 3D coordinate into a linear index, with x varying fastest and z slowest.
+ * @param p_coordinate The coordinate to flatten; x must be less than p_width and y less than p_height.
+ * @param p_width The grid's extent along x.
+ * @param p_height The grid's extent along y.
+ * @return p_coordinate.x + p_width * (p_coordinate.y + p_height * p_coordinate.z).
+ */
+uint flatten_index_3d(uint3 p_coordinate, uint p_width, uint p_height) {
+    return p_coordinate.x + p_width * (p_coordinate.y + p_height * p_coordinate.z);
+}
+
+/**
+ * @brief Recovers the 3D coordinate of a linear index, inverting flatten_index_3d().
+ * @param p_index The linear index.
+ * @param p_width The grid's extent along x; must be nonzero.
+ * @param p_height The grid's extent along y; must be nonzero.
+ * @return The coordinate whose flattened index is p_index.
+ */
+uint3 unflatten_index_3d(uint p_index, uint p_width, uint p_height) {
+    return uint3(p_index % p_width, (p_index / p_width) % p_height, p_index / (p_width * p_height));
+}
+
 uint morton_delta(uint p_code1, uint p_code2) {
     return firstbithigh(p_code1 ^ p_code2);
 }

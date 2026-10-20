@@ -237,7 +237,7 @@ protected:
     WBE::RUSchemaSubmesh3D make_triangle_submesh_scheme() {
         WBE::RUSchemaSubmesh3D scheme;
         scheme.material_id = "unused_material";
-        scheme.aabb = {.center = {0.0F, 0.0F, 0.0F}, .width = 1.0F, .height = 1.0F};
+        scheme.aabb = {.center = {0.0F, 0.0F, 0.0F}, .width = 1.0F, .height = 1.0F, .depth = 1.0F};
         scheme.vertex_bindings.resize(1);
         scheme.vertex_bindings[0].binary = {.binary_id = "loaded_geometry", .start = 0, .size = sizeof(float) * 15};
         scheme.vertex_bindings[0].stride = sizeof(float) * 5;
@@ -654,6 +654,7 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
     EXPECT_EQ(captured_submesh->aabb.center, glm::vec3(0.0F));
     EXPECT_FLOAT_EQ(captured_submesh->aabb.width, 1.0F);
     EXPECT_FLOAT_EQ(captured_submesh->aabb.height, 1.0F);
+    EXPECT_FLOAT_EQ(captured_submesh->aabb.depth, 1.0F);
     const WBE::RUVertexView& vertex_data = captured_submesh->get_vertex_bindings()[0];
     ASSERT_NE(vertex_data.binary.binary, nullptr);
     EXPECT_EQ(vertex_data.vertex_count, 3U);
@@ -913,7 +914,7 @@ TEST_F(ResourcePopulatorTest, SubmeshAABBLoadsIntoSubmesh) {
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
     auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
     WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
-    scheme.aabb = {.center = {1.5F, -2.0F, 3.25F}, .width = 4.0F, .height = 5.5F};
+    scheme.aabb = {.center = {1.5F, -2.0F, 3.25F}, .width = 4.0F, .height = 5.5F, .depth = 6.5F};
     WBE::ResourceUnitLoaderMesh loader;
 
     loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme));
@@ -924,6 +925,7 @@ TEST_F(ResourcePopulatorTest, SubmeshAABBLoadsIntoSubmesh) {
     EXPECT_EQ(aabb.center, glm::vec3(1.5F, -2.0F, 3.25F));
     EXPECT_FLOAT_EQ(aabb.width, 4.0F);
     EXPECT_FLOAT_EQ(aabb.height, 5.5F);
+    EXPECT_FLOAT_EQ(aabb.depth, 6.5F);
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshAABBRejectsInvalidCenter) {
