@@ -13,6 +13,10 @@
    limitations under the License.
 */
 
+// Injection writes the SVO's normal distribution function.
+#define WBE_SVO_ENABLE_DATA
+#define WBE_SVO_DATA_WRITE
+
 #include "deferred_composition/deferred_composition_utils.slang"
 #include "svo/svo.slang"
 #include "svo/svo_utils.slang"
@@ -29,6 +33,8 @@ struct DescriptorIndices {
     uint2 dynamic_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
+    [WBE_DESCRIPTOR("storage_image", "ndf", "write")]
+    uint2 ndf;
 
     [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
@@ -50,9 +56,10 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
+    RWTexture3D<uint3> ndf = ResourceDescriptorHeap[descriptor_indices.ndf.x];
     // TODO
 
-    SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
+    SVO<uint3> svo = SVO<uint3>(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true, ndf);
 
     uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
     SpotLight spot_light =

@@ -15,17 +15,8 @@
 #ifndef WBE_SVO_BUILD_SLANG
 #define WBE_SVO_BUILD_SLANG
 
-// Construction passes write the SVO's normal distribution function.
-#ifndef WBE_SVO_NORMAL
-#define WBE_SVO_NORMAL
-#endif
-#ifndef WBE_SVO_WRITE
-#define WBE_SVO_WRITE
-#endif
-
 #include "utils/utils.slang"
 #include "svo/svo_utils.slang"
-#include "svo/svo.slang"
 #ifdef WBE_DYNAMIC_BUILD
 #include "svo/svo_dynamic_build.slang"
 #endif
@@ -111,11 +102,6 @@ struct SVODescriptorIndices {
 #endif
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list;
-    /**
-     * @brief Descriptor-heap reference to ndf, the SVO's normal distribution function.
-     */
-    [WBE_DESCRIPTOR("storage_image", "ndf")]
-    uint2 ndf;
     [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 
@@ -235,17 +221,6 @@ void allocate_covered_voxel(float3 p_svo_position) {
     RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
-    StructuredBuffer<SVOLeaf> leaf_view = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWTexture3D<float3> ndf = ResourceDescriptorHeap[descriptor_indices.ndf.x];
-#ifdef WBE_DYNAMIC_BUILD
-    RWStructuredBuffer<SVONode> dynamic_node_view = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
-    StructuredBuffer<SVODynamicLeafBlock> dynamic_leaf_view = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    SVO svo = SVO(tree_nodes, dynamic_node_view, leaf_view, dynamic_leaf_view, svo_info[0], true, ndf);
-#else
-    // Without dynamic storage the static buffers stand in for it; traverse_dynamic keeps them unread.
-    StructuredBuffer<SVODynamicLeafBlock> dynamic_leaf_view = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    SVO svo = SVO(tree_nodes, tree_nodes, leaf_view, dynamic_leaf_view, svo_info[0], false, ndf);
-#endif
     // Trace to the bottom-most node
     SVONodeTraceInfo trace_info = get_svo_root_trace_info(p_svo_position, svo_info[0].max_depth);
     // Try to allocate the node.

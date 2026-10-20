@@ -17,14 +17,14 @@
 
 #include "svo/svo_dynamic_types.slang"
 
-#ifdef WBE_SVO_NORMAL
+#ifdef WBE_SVO_ENABLE_DATA
 /**
- * @brief Image type of SVO::ndf: writable when WBE_SVO_WRITE is defined, read-only otherwise.
+ * @brief Image type of SVO::voxel_data: writable when WBE_SVO_DATA_WRITE is defined, read-only otherwise.
  */
-#ifdef WBE_SVO_WRITE
-typealias SVONDFImage = RWTexture3D<float3>;
+#ifdef WBE_SVO_DATA_WRITE
+typealias SVOVoxelDataImage<T : ITexelElement> = RWTexture3D<T>;
 #else
-typealias SVONDFImage = Texture3D<float3>;
+typealias SVOVoxelDataImage<T : ITexelElement> = Texture3D<T>;
 #endif
 #endif
 
@@ -35,8 +35,10 @@ typealias SVONDFImage = Texture3D<float3>;
  * data first, followed by the dynamic node data and then the dynamic leaf data. The SVO must be fully constructed and
  * published, and its buffers must not change during the calling pass, because node descriptions are read without
  * synchronization. Construction is not performed through this type.
+ * @tparam T Texel type of the voxel_data image. Slang cannot infer it from the constructor's arguments, so callers always
+ * name it, including when WBE_SVO_ENABLE_DATA is undefined and the image is absent.
  */
-struct SVO {
+struct SVO<T : ITexelElement> {
     /**
      * @brief Static SVO node storage.
      */
@@ -61,16 +63,16 @@ struct SVO {
      * @brief Whether traces follow the dynamic children published by the dynamic construction passes.
      */
     bool traverse_dynamic;
-#ifdef WBE_SVO_NORMAL
+#ifdef WBE_SVO_ENABLE_DATA
     /**
-     * @brief Normal distribution function image; present only when WBE_SVO_NORMAL is defined.
+     * @brief Voxel data image; present only when WBE_SVO_ENABLE_DATA is defined.
      */
-    SVONDFImage ndf;
+    SVOVoxelDataImage<T> voxel_data;
 #endif
 
     /**
      * @brief Create a view over the buffers of a constructed SVO.
-     * @param p_ndf The normal distribution function image; the parameter exists only when WBE_SVO_NORMAL is defined.
+     * @param p_voxel_data The voxel data image; the parameter exists only when WBE_SVO_ENABLE_DATA is defined.
      */
     __init(RWStructuredBuffer<SVONode> p_nodes,
         RWStructuredBuffer<SVONode> p_dynamic_nodes,
@@ -78,8 +80,8 @@ struct SVO {
         StructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
         SVOInfo p_info,
         bool p_traverse_dynamic
-#ifdef WBE_SVO_NORMAL
-        , SVONDFImage p_ndf
+#ifdef WBE_SVO_ENABLE_DATA
+        , SVOVoxelDataImage<T> p_voxel_data
 #endif
         ) {
         nodes = p_nodes;
@@ -88,8 +90,8 @@ struct SVO {
         dynamic_leaves = p_dynamic_leaves;
         info = p_info;
         traverse_dynamic = p_traverse_dynamic;
-#ifdef WBE_SVO_NORMAL
-        ndf = p_ndf;
+#ifdef WBE_SVO_ENABLE_DATA
+        voxel_data = p_voxel_data;
 #endif
     }
 

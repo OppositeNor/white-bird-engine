@@ -359,13 +359,9 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
     EXPECT_TRUE(contains_import(svo_recipe, "svo_nodes"));
-    // The SVO declares its 5 scratch buffers with the sizes it is given, and the 3x3x3 ndf placeholder image and its view.
+    // The SVO declares its 5 scratch buffers with the sizes it is given.
     const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
-    EXPECT_EQ(svo_resources.size(), 7U);
-    const DataValue* ndf_image = find_by_id(svo_resources, "ndf_image");
-    ASSERT_NE(ndf_image, nullptr);
-    EXPECT_EQ(ndf_image->get_entry("image").get_value<int64_t>("depth"), 3);
-    EXPECT_NE(find_by_id(svo_resources, "ndf"), nullptr);
+    EXPECT_EQ(svo_resources.size(), 5U);
     const DataValue* deferred_list = find_by_id(svo_resources, "svo_deferred_list_ping");
     ASSERT_NE(deferred_list, nullptr);
     EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);

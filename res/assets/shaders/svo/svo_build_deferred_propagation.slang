@@ -12,17 +12,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-// Construction passes write the SVO's normal distribution function.
-#ifndef WBE_SVO_NORMAL
-#define WBE_SVO_NORMAL
-#endif
-#ifndef WBE_SVO_WRITE
-#define WBE_SVO_WRITE
-#endif
-
 #include "utils/utils.slang"
 #include "svo/svo_utils.slang"
-#include "svo/svo.slang"
 #ifdef WBE_DYNAMIC_BUILD
 #include "svo/svo_dynamic_build.slang"
 #endif
@@ -57,11 +48,6 @@ struct SVODescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong")]
     uint2 deferred_list_write;
 #endif
-    /**
-     * @brief Descriptor-heap reference to ndf, the SVO's normal distribution function.
-     */
-    [WBE_DESCRIPTOR("storage_image", "ndf")]
-    uint2 ndf;
     [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -79,17 +65,6 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
     RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
-    StructuredBuffer<SVOLeaf> leaf_view = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWTexture3D<float3> ndf = ResourceDescriptorHeap[descriptor_indices.ndf.x];
-#ifdef WBE_DYNAMIC_BUILD
-    RWStructuredBuffer<SVONode> dynamic_node_view = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
-    StructuredBuffer<SVODynamicLeafBlock> dynamic_leaf_view = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    SVO svo = SVO(tree_nodes, dynamic_node_view, leaf_view, dynamic_leaf_view, svo_info[0], true, ndf);
-#else
-    // Without dynamic storage the static buffers stand in for it; traverse_dynamic keeps them unread.
-    StructuredBuffer<SVODynamicLeafBlock> dynamic_leaf_view = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    SVO svo = SVO(tree_nodes, tree_nodes, leaf_view, dynamic_leaf_view, svo_info[0], false, ndf);
-#endif
     uint deferred_task_count = deferred_list_read[SVO_DEFERRED_LIST_COUNT_INDEX];
     for (uint task_index = p_dispatch_thread_id.x; task_index < deferred_task_count; task_index += task_stride) {
         uint task = deferred_list_read[SVO_DEFERRED_LIST_ENTRY_OFFSET + task_index];
