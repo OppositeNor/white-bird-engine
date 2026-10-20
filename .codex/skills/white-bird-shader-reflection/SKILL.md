@@ -1,17 +1,17 @@
 ---
 name: white-bird-shader-reflection
-description: Use and extend White Bird Engine's Slang shader-reflection pipeline. Apply when loading reflected shader parameters from RUShader resources, querying metadata, consuming user attributes or layout data, diagnosing reflection contracts, or adding reflected buffer, image, sampler, and ray-tracing acceleration-structure descriptor support.
+description: Use and extend White Bird Engine's Slang shader-reflection pipeline. Apply when loading reflected shader metadata from RUShader resources, querying parameters, consuming user attributes or layout data, writing WBE_DESCRIPTOR / WBE_PUSH_CONSTANT / WBE_VERTEX_INPUT / WBE_TEXTURE contracts, wiring mesh or material shader resources, diagnosing reflection contracts, or adding descriptor-heap type support (buffers, images, samplers, acceleration structures).
 ---
 
 # White Bird Shader Reflection
 
-Use the backend-neutral reflection model for inspection and contracts. Keep Vulkan translation in `function/render_vk` and keep resource acquisition, metadata loading, and querying separate.
+Use the backend-neutral reflection model (`function/render`) for inspection and contracts, and keep Vulkan translation in
+`function/render_vk`. Keep resource acquisition, metadata loading, and querying separate.
 
-For Vulkan work, the current contract is descriptor-heap based. Reflection consumers should expect explicit heap-index push-data fields rather than descriptor-set or bindless-space metadata.
+The Vulkan path is descriptor-heap based: shaders receive heap indices in a single push-data block and access the
+renderer-owned global heaps. There are no descriptor sets, binding numbers, or bindless spaces.
 
 ## Acquire metadata from a shader resource
-
-Given a resource key, acquire the shader resource and load its normalized reflection sidecar:
 
 ```cpp
 auto shader = ResourceManager::get_singleton()->get_resource<RUShader>("shader_resource_key");
@@ -21,51 +21,79 @@ const ShaderMetadataParameter* parameter = ShaderMetadataQuery().find_parameter(
 if (parameter == nullptr) {
     throw std::runtime_error("Required shader parameter 'camera_info' is missing.");
 }
-
-const ShaderMetadataTypeField* view = ShaderMetadataQuery().find_field(parameter->type.fields, "view");
-if (view == nullptr) {
-    throw std::runtime_error("Required shader field 'camera_info.view' is missing.");
-}
 ```
 
-Include `resource/resource_manager.hh`, `function/render/shader_metadata_loader.hh`, and `function/render/shader_metadata_query.hh` as needed. If the caller already owns `RefRes<RUShader>`, pass it directly to `ShaderMetadataLoader::load`.
+Include `resource/resource_manager/resource_manager.hh`, `function/render/shader_metadata_loader.hh`, and
+`function/render/shader_metadata_query.hh`. `RUShader` holds only the SPIR-V words and its `metadata_path`; stage entry names
+live on `RUGraphicsPipeline` / `RURayTracingPipeline`.
 
-Treat pointers and references returned by `ShaderMetadataQuery` as views into `ShaderMetadata`: keep the metadata alive and unmodified. `find_parameter` and `find_field` return `nullptr` for absence but throw for empty or duplicate names. Use `resolve_entry_point` when an entry name may be omitted; omission is valid only when exactly one reflected entry exists for the stage.
+Pointers returned by `ShaderMetadataQuery` view the `ShaderMetadata`: keep it alive and unmodified. `find_parameter` and
+`find_field` return `nullptr` for absence and throw for empty or duplicate names; `find_entry_point` throws when missing or
+duplicated; `resolve_entry_point` allows an omitted name only when the stage has exactly one entry.
 
 ## Choose the consumer
 
-- For name-based inspection, use `ShaderMetadataQuery`.
-- For annotation roles, use `ShaderRoleFieldResolver`; do not hand-roll attribute parsing or role hashing.
-- For vertex inputs, use `VertexInputContractResolver` and `WBE_VERTEX_INPUT`.
-- For material texture indices, use `MaterialTextureContractResolver` and `WBE_TEXTURE`.
-- For Vulkan descriptor-heap push-data layouts, use `collect_shader_descriptor_heap_layout()` and `collect_graphics_pipeline_descriptor_heap_layout()` from `function/render_vk/shader_metadata_vk_utils.*`.
-- For pipeline data binding, name the graph resource in the `WBE_DESCRIPTOR` resource id, or map it with `RendTaskDescVK::alias()`, rather than writing heap indices by hand.
+- Name-based inspection: `ShaderMetadataQuery` (one field level at a time; there is no dotted-path walker).
+- Annotation roles: `ShaderRoleFieldResolver`; do not hand-roll attribute parsing or role hashing.
+- Vertex inputs: `VertexInputContractResolver` with `WBE_VERTEX_INPUT`.
+- Material textures: `MaterialTextureContractResolver` with `WBE_TEXTURE`.
+- Mesh node layout: `MeshNodeContractResolver` (`NodeData` stride and transform offsets from the global `mesh` parameter).
+- Descriptor-heap push-data layout: `collect_shader_descriptor_heap_layout()` /
+  `collect_graphics_pipeline_descriptor_heap_layout()` in `function/render_vk/shader_metadata_vk_utils.hh`.
+- Binding at record time: the task-owned `PipelineDescriptorBindingsVK`; it is driven by pipeline-run tasks, not called
+  by hand.
 
-Do not introduce a closed texture-role enum or branch on roles such as `albedo`, `normal`, or `rma`. Roles are shader-defined strings. An attribute with no explicit string argument uses the annotated field name as its role.
+## Write shader contracts
 
-Do not add new descriptor-set, binding-number, or bindless-space fields to `ShaderMetadata`. The Vulkan path now binds through renderer-owned descriptor heaps. Reflected descriptor fields must be aligned eight-byte `uint2` values in the entry point's single push-data block, with exactly one `WBE_DESCRIPTOR` argument: `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`. Nested structs and fixed-size struct arrays are supported.
+Descriptor fields are aligned `uint2` values in the entry point's single push-data block:
 
-Slang reflects `RaytracingAccelerationStructure` metadata as `kind == "resource"` and `scalar_type == "accelerationStructure"`; query it through `ShaderMetadataQuery` like other global parameters. At runtime, annotate its heap-index field with `WBE_DESCRIPTOR("acceleration_structure")` and bind an `ROAccelerationStructureVK`. The render object lazily owns the buffer-region descriptor returned by `get_descriptor_index()`.
+```slang
+struct PushData {
+    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
+    uint2 camera_info;
+    [WBE_DESCRIPTOR("storage_buffer", "lights", "read")]
+    uint2 lights;
+    [WBE_PUSH_CONSTANT("time")]
+    float time;
+};
+```
+
+- `WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`: `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`,
+  `storage_image`, `sampler`, or `acceleration_structure`; the resource id is required; `ACCESS` (`read`, `write`,
+  `read_write`) is optional and storage resources default to `read_write`, so annotate read-only ones with `read`. The
+  resource id is the graph resource name (or a task-local name mapped with `RendTaskDescVK::alias()`), never a heap index.
+- A resource id ending in `[]` (`shadowmap[]`) resolves per element of the nearest enclosing descriptor struct array
+  (`shadowmap[0]`, `shadowmap[1]`, ...), so each element can be aliased separately. Other ids are shared by all elements.
+- `WBE_PUSH_CONSTANT("time")` (`float`) and `"frame_slot"` (`uint`) are filled by the renderer. Any other name is a custom
+  `uint`, `int`, or `float` set with `set_push_constant(name, PushConstantValueVK::from_uint32(...))` on compute tasks, or
+  through the `push_constants` table of their recipe params. Recording crashes if a custom constant was never set.
+- Declarations needed only for metadata contracts go under `#ifdef WBE_REFLECTION_METADATA`.
+- Do not introduce a closed texture-role enum or branch on concrete roles such as `albedo`, `normal`, or `rma`. An attribute
+  with no explicit role uses the field name.
+
+Mesh draws use `MeshDescriptorIndices` from `utils.slang` (`mesh_submeshes`, `mesh_nodes`, `mesh_instances`, and
+`mesh_transform` under `WBE_MESH_TRANSFORM`), plus `material_params` / `material_sampler`. `RTGraphicsDrawMeshVK` aliases the
+ids the pipeline declares to the drawn mesh's members.
 
 ## Before changing support
 
-Read [references/system-and-extension.md](references/system-and-extension.md) when the task asks what is supported, touches the ACP normalizer or serialized metadata schema, adds an annotation contract, changes field paths, or adds a Vulkan descriptor/type mapping. Trace one real Slang declaration through raw reflection, normalization, deserialization, descriptor-heap layout collection, and its final consumer before editing.
+Read [references/system-and-extension.md](references/system-and-extension.md) when the task asks what is supported, touches
+the ACP shader compiler or serialized metadata schema, adds an annotation contract, changes resource-id resolution, or adds
+a Vulkan descriptor type. Trace one real Slang declaration through raw reflection, normalization, deserialization, layout
+collection, and its final consumer before editing.
 
-Make the smallest layer-correct change. Add tests at every boundary that changes, and never edit generated serialization files or compiled reflection fixtures by hand; regenerate them through the normal build/resource pipeline.
+Preserve the ACP compile profile, `spirv_1_6+spvDescriptorHeapEXT+vk_mem_model`, and do not enable unified descriptor-heap
+stride. Never edit generated serialization files or compiled reflection fixtures; regenerate them through the build.
 
-Render objects and Vulkan backend helpers are rendering-thread-confined. Route cross-thread resource updates or binding changes through `IRenderer::add_job()`.
-
-When changing Slang compilation or reflection fixtures, preserve the descriptor-heap compile profile used by ACP:
-`spirv_1_6+spvDescriptorHeapEXT`. Do not enable unified descriptor-heap stride: the resource heap has separate buffer and image
-regions whose indices use their descriptor type's device-reported stride. Acceleration structures use the buffer region and
-`bufferDescriptorSize`, not the image region or a separate heap.
+Render objects and Vulkan helpers are rendering-thread-confined. Route cross-thread updates through `IRenderer::add_job()`.
 
 ## Validate
 
-Use the repository validation wrapper and a focused filter first:
-
 ```sh
-python validation.py -t debug -- --gtest_filter='WBEShaderMetadataVKTest*'
+python validation.py -t debug -- --gtest_filter='WBEShaderMetadataVKTest*:WBEShaderMetadataVKUtilsTest*'
 ```
 
-Select additional resolver or Vulkan utility tests named in the reference when those consumers change. Descriptor-heap layout changes should also run `WBEShaderMetadataVKUtilsTest*`. The wrapper runs the full unit test binary after the focused test passes. Do not run lint automatically.
+Add `WBEPipelineDescriptorBindingsVKTest*` for binding or push-constant changes, `WBEMaterialTextureContractResolverTest*`
+and `WBEMeshMaterialResourceBuilderVKTest*` for materials, `WBEMeshNodeContractResolverTest*` for mesh nodes, and
+`WBEShaderRoleFieldResolverTest*` for role parsing. The wrapper then runs the full unit suite and the slangpy shader tests.
+Do not run lint.

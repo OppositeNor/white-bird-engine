@@ -1,99 +1,138 @@
-Tick render stages:
+# Vulkan Renderer
 
-- pre-execution tasks: A series of callback functions, each taking a command
-  buffer as a parameter. The callbacks record commands into the command buffer,
-  which is submitted to the queue before any render-graph work executes in the
-  next frame.
+This page describes the Vulkan backend (`function/render_vk`): the frame, device requirements, memory, descriptor heaps,
+vertex input, meshes, and acceleration structures. Render graphs and their Lua/Teal recipes are described in
+[render_graph.md](render_graph.md).
 
-- Run render tasks: The active `RenderGraphVK` (built from a
-  `RendGraphDescVK` via `RenderGraphVK::build_from_descriptor`) is executed
-  in topological order. Each `IRenderTaskVK` records into its own primary
-  command buffer. The graph is a DAG built from resource dependency edges
-  declared with `RendTaskDescVK::connect()`; edges between tasks on the same
-  queue become pipeline barriers, and edges crossing queues use timeline
-  semaphores. Compact `RendResUsageVK` declarations describe accesses but do not
-  create edges; every conflicting access pair on a resource must be ordered by a
-  chain of edges on that resource. After the
-  last graphics submission the graph signals a terminal binary semaphore, which
-  `RendererVK::present()` waits on before `vkQueuePresentKHR`.
+## Frame
 
-## Material Texture Binding
+`RendererVK::tick()` runs on the rendering thread and executes the active graph:
 
-Material texture semantics are shader metadata, not renderer-wide enums. Integer descriptor-index fields in the global
-`MaterialParams` struct declare their texture roles with `WBE_TEXTURE`. An explicit string argument names the role; omitting the
-argument uses the annotated field name. `rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel
-pack.
+1. Recreate the swap chain if the window was resized.
+2. Advance the frame-in-flight slot and call each plugin's `on_frame_begin()`.
+3. Run jobs queued with `IRenderer::add_job()`, then delayed calls registered with `register_delay_call()`.
+4. Check the shader-debug buffer (shader-debug builds).
+5. Submit GPU jobs (see below).
+6. If a graph is active: acquire a swap-chain image, set the swap-chain view container's current slot, and execute the graph.
+   Its tasks are recorded and submitted in topological order, each into its own command buffer.
+7. Capture a frame if `IRenderer::request_frame_capture()` asked for one, present, and wait on the in-flight fence.
 
-The caller resolves this contract from each graphics pipeline's reflected metadata with `MaterialTextureContractResolver` and
-passes it to `MeshCompilerVK::compile()`. The mesh compiler resolves each texture to a global sampled-image descriptor-heap index, initializes missing roles from the configured default material, and writes those indices into
-`MaterialParamsBuffer.materials` at the reflected field offsets. The renderer backend does not interpret texture roles.
+The last graphics submission signals a per-swap-chain-image binary semaphore, which `present()` waits on before
+`vkQueuePresentKHR`.
 
-The contract member names are fixed in `utils/utils.slang`: the reflection-only
-`MaterialTextureContractMetadata.material_sampler` and `MaterialTextureContractMetadata.textures` members describe the resource
-shape, while `MaterialParamsBuffer.materials` is the runtime material table. Application configuration may vary only the
-`material_textures` and `material_params` base variable names and the `default_material` resource key. Materials do not carry a
-separate `material_type`; the selected graphics pipeline defines the shader model.
+### Threading
 
-Texture and vertex annotations use one backend-neutral role resolver. Exact role names are authoritative and hashes are only a
-matching acceleration, so duplicate names and distinct-name hash collisions are rejected consistently. Separate material and
-vertex contract resolvers then apply their domain rules; Vulkan code only translates the validated vertex contract or binds the
-validated texture table.
+Render objects and renderer-backend helpers are confined to the rendering thread and have no internal synchronization. Code
+on another thread submits work through `IRenderer::add_job()` (or `try_add_job()`); do not add locks to render objects.
+
+`register_gpu_job(GPUJobVK)` (`GPUJobVK` is `std::function<void(VkCommandBuffer)>`) queues one-off GPU work. Jobs are
+batched into one graphics command buffer submitted in the same frame before the graph runs, followed by a full memory barrier
+and a timeline-semaphore signal that both compute queues wait on. The returned future resolves after submission and holds a
+completion fence.
+
+`register_delay_call(call, frames)` runs a call after the given number of frames; render objects use it to defer destruction
+until no frame in flight can still use them.
+
+### Plugins
+
+`RenderPluginVK` (`render_plugin_vk.hh`) extends the renderer. Hooks: `try_enable()`, required instance and device
+extensions, `on_before_instance_creation()` / `on_after_instance_created()`, `on_before_device_creation()` /
+`on_after_device_created()`, `update_base_render_data()`, `configure_descriptor_heaps()` / `create_descriptor_arenas()`,
+`on_frame_begin()`, `on_render_graph_registered()`, `on_before_task_recorded()` / `on_after_task_recorded()`, and
+`on_renderer_terminating()`. Device features are requested with the protected `enable_device_feature()` helper, which merges
+an existing `pNext` structure instead of appending a duplicate.
+
+Built-in plugins, enabled through `RendererCapabilities` (`i_renderer.hh`):
+
+- `RayTracingPluginVK` (`ray_tracing`, `ray_query`): acceleration structures, ray-tracing pipelines, and the
+  acceleration-structure descriptor arena.
+- `TimestampQueryPluginVK` (`timestamp_query`): per-task GPU timings, written with the graph structure to
+  `gpu_timestamp_report.json`. `python export_render_graph.py` turns the report into a Mermaid or Graphviz graph.
+- `DescriptorSetPluginVK` (`descriptor_set`): a classic descriptor pool for third-party pipelines such as ImGui.
+
+Other capabilities are `shader_debug` and `conservative_rasterization`.
+
+## Device Requirements
+
+Device extensions: swap chain, `VK_EXT_vertex_input_dynamic_state`, `VK_EXT_descriptor_heap`,
+`VK_KHR_shader_untyped_pointers`, `VK_KHR_maintenance5`, and `VK_KHR_unified_image_layouts`, plus those plugins require.
+Required features include buffer device address, shader demote-to-helper, shader untyped pointers, descriptor heaps,
+vertex-input dynamic state, multi-draw indirect, and a memory type that is both host-visible and device-local for heap
+storage. Timeline semaphores, synchronization2, dynamic rendering, and the Vulkan memory model are enabled. There is no
+fallback for devices that lack them.
 
 ## Device Memory
 
 `ROBufferVK` and `ROImageVK` bind to a `DeviceMemoryVK`, which owns one VMA allocation. Their ordinary `Builder` creates the
-resource, allocates a `Ref<DeviceMemoryVK>` for its requirements, and binds it through `DeviceMemoryVK::get()`. An `AliasBuilder`
-instead takes an existing `Ref<DeviceMemoryVK>` and an offset and creates the resource through `DeviceMemoryVK::create_buffer()` or
-`create_image()`. Those check the resource's memory requirements (from its create info) against the memory type, alignment, and
-remaining size before anything is created, then use VMA's `vmaCreateAliasingBuffer2()` / `vmaCreateAliasingImage2()` to create and
-bind atomically. Every bound resource holds a reference to its memory, so the reference count of the `Ref` tracks its users. Aliasing resources share
-their contents, so their use must be synchronized. Memory for several aliases can be allocated from explicit requirements with
-`DeviceMemoryVK::Builder::set_requirements()`, or taken from an existing resource with `acquire_memory()`.
+resource, allocates a `Ref<DeviceMemoryVK>` for its requirements, and binds it. An `AliasBuilder` instead takes an existing
+`Ref<DeviceMemoryVK>` and an offset (`set_memory()`) and creates the resource through `DeviceMemoryVK::create_buffer()` or
+`create_image()`, which check the memory type, alignment, and remaining size before creating anything, then use
+`vmaCreateAliasingBuffer2()` / `vmaCreateAliasingImage2()`. Memory for several aliases can come from explicit requirements
+(`DeviceMemoryVK::Builder::set_requirements()`) or from an existing resource (`acquire_memory()`). Dedicated allocations cannot
+be aliased.
 
-Every resource retains its memory until its own delayed destruction, and the allocation is freed when the last reference is
-released. Swap-chain and libktx images do not use `DeviceMemoryVK`. The render graph does not alias resources.
+Every bound resource holds a reference to its memory until its own delayed destruction. Aliased resources share contents, so
+their use must be synchronized. Swap-chain and libktx images do not use `DeviceMemoryVK`. The render graph does not alias
+resources.
 
-## Descriptor Heap Binding
+## Descriptor Heaps
 
-The Vulkan backend requires `VK_EXT_descriptor_heap`, shader untyped pointers, maintenance5, buffer device address, and memory that
-is both host-visible and device-local for heap storage. `DescriptorHeapAllocatorVK` owns one resource heap divided into buffer,
-sampled-image, and storage-image arenas plus a separate sampler heap. `ROBufferVK`, `ROImageViewVK`, and `ROSamplerVK` own indices
-allocated lazily by their descriptor getters or transferred through their builders, and defer release for the configured frames
-in flight.
+`DescriptorHeapAllocatorVK` is a generic heap and arena allocator. `RendererVK` creates one resource heap with buffer
+(index 0 reserved for the shader-debug buffer), sampled-image, and storage-image arenas, and a separate sampler heap. Plugins
+add arenas; the ray-tracing plugin adds an acceleration-structure arena to the resource heap whose stride is the
+device-reported acceleration-structure descriptor size. Buffer and image regions use their descriptor type's device-reported
+stride; unified stride is not enabled.
 
-Shaders represent each resource as an aligned `uint2` field in push data marked with `WBE_DESCRIPTOR("TYPE", "resource_id")`,
-where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`. An
-optional third argument states the shader access: `"read"`, `"write"`, or `"read_write"`. Only storage buffers and storage images
-may be written; they default to `"read_write"` and every other type is read. Pipeline-run tasks report these reflected accesses to
-the render graph. The render graph binds both heaps before each task records, and `ROPipelineVK` pushes the reflected index block
-before dispatch or draw. Pipeline binding paths are relative to that push-data block and may traverse nested structs and fixed-size
-struct arrays.
+`ROBufferVK`, `ROImageViewVK`, `ROSamplerVK`, and `ROAccelerationStructureVK` own their descriptor indices, allocated lazily
+by their getters (or transferred through builders), and defer release for the frames in flight.
 
-Vulkan plugins contribute creation requirements through `RenderPluginVK::on_before_instance_creation()` and
-`on_before_device_creation()`. Device-feature requests should use the protected feature helper so plugins merge an existing
-`pNext` structure instead of appending duplicate structure types. `on_device_created()` remains the point for loading commands and
-finishing plugin setup after logical-device creation.
+Shaders receive each resource as an aligned `uint2` field in a single push-data block, marked
+`WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`:
 
-## Vertex Resource Layout
+- `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`.
+- `resource_id` names the graph resource, directly or through the task's `RendTaskDescVK::alias()`. An id ending in `[]`
+  resolves per element of the enclosing descriptor struct array (`shadowmap[0]`, `shadowmap[1]`, ...).
+- `ACCESS` is optional: `read`, `write`, or `read_write`. Only storage buffers and images may be written; they default to
+  `read_write`, so annotate read-only ones with `read`.
 
-Mesh and static-geometry sidecar files are represented by `RUBinary` resources. Submeshes store `vertices` and `indices` views
-into those binaries rather than owning copied geometry arrays. Vertex views are already tightly interleaved; every attribute
-supplies an open string role, a byte offset within the stride, and a reflected scalar/vector type. Index views contain contiguous
-`uint32` indices.
+`WBE_PUSH_CONSTANT` marks four-byte scalars in the same block: `"time"` (`float`) and `"frame_slot"` (`uint`) are filled by
+the renderer, and any other name is a custom value set on compute tasks with `set_push_constant()` or the recipe params'
+`push_constants` table.
 
-Supported attribute types are `float`, `vec2`, `vec3`, `vec4`, `int`, `ivec2`, `ivec3`, `ivec4`, `uint`, `uvec2`, `uvec3`, and
-`uvec4`. The resulting attribute offsets, byte sizes, stride, and vertex count are fixed after loading. Attribute values may be
-changed through `RUSubmesh3D`, but mutation is not thread-safe. Recompile the affected mesh resources, and any acceleration
-structures built from them, after changing geometry.
+The render graph binds both heaps before each task records. Pipeline-run tasks own a `PipelineDescriptorBindingsVK` that binds
+every reflected field to its graph resource at build, checks the resource type, reports the reflected accesses to the graph,
+and pushes the indices and push constants when recording. A missing resource or incompatible type fails graph construction.
 
-Static and dynamic meshes share one resource type, `RUMesh3D` (manifest type `mesh`). It holds three `RUSubmeshInstance3D`
-categories: `opaque_instances`, `masked_instances`, and `double_sided_opaque_instances`. Each category stores its `RUSubmesh3D`
-submeshes and its `RUInstance3D` transforms. A submesh references a material, a vertex view, an index view, and a
-`[first_instance, instance_count)` range into its category's transform array. Instance transforms are exactly 16 column-major
-floats in the serialized resource and are loaded as `glm::mat4`.
+## Materials
 
-Vertex shader fields opt into resource matching with `WBE_VERTEX_INPUT`. An explicit string selects a resource role, while an
-omitted argument uses the annotated field name:
+Material texture semantics are shader metadata, not renderer enums. Integer index fields in the global `MaterialParams`
+struct declare texture roles with `WBE_TEXTURE`: an explicit string names the role, and an omitted one uses the field name.
+`rma` is the canonical role for the roughness, metallic, and ambient-occlusion channel pack. Materials carry no
+`material_type`; the graphics pipeline defines the shader model.
+
+The contract names are fixed in `utils/utils.slang`: the reflection-only `MaterialTextureContractMetadata.material_sampler` and
+`.textures` describe the resource shape, and `MaterialParamsBuffer.materials` is the runtime table. Applications may configure
+only the `material_textures` and `material_params` base variable names (`GraphicsPipelineCompilerVKContext`) and the default
+material key (`MeshCompilerVK::Config::default_material_resource_key`).
+
+`GraphicsPipelineCompilerVK` resolves each pipeline's `MaterialTextureContract` with `MaterialTextureContractResolver`. A
+compiled mesh builds one material table per distinct contract on demand (`MeshResourcesVK::acquire_material_table()`, through
+`MeshMaterialResourceBuilderVK`): each texture becomes its global sampled-image heap index, written at the reflected field
+offset, with missing roles taken from the default material. The renderer never interprets roles.
+
+Texture and vertex annotations share one backend-neutral role resolver: exact names are authoritative, hashes only
+accelerate matching, and duplicate names and distinct-name hash collisions are rejected.
+
+## Vertex Input
+
+Mesh geometry lives in `RUBinary` sidecar files. A submesh (`RUSubmesh3D`) references one or more `RUVertexView` vertex
+bindings and one `RUIndexView`. Every binding holds the same vertex count in the same order, is tightly interleaved with its
+own stride, and lists attributes with an open string role, byte offset, and reflected format (`float`, `vec2`, `vec3`, `vec4`,
+`int`, `ivec2`–`ivec4`, `uint`, `uvec2`–`uvec4`). Each role is declared by at most one binding. Index views contain
+contiguous `uint32` indices. Attribute values may be changed through `RUSubmesh3D`, which is not thread-safe; recompile the
+affected mesh resources and acceleration structures afterwards.
+
+Vertex shader fields opt in with `WBE_VERTEX_INPUT`; an omitted argument uses the field name:
 
 ```slang
 struct VertexInput
@@ -106,257 +145,120 @@ struct VertexInput
 };
 ```
 
-The selected vertex entry point must contain at most one annotation per field, role, and reflected location. Every annotated
-shader role must exist in the resource with the same scalar kind and vector width; unconsumed resource attributes are allowed.
-Locations come from the shader's reflected varying-input bindings rather than fixed engine locations.
+Each annotated role must be provided by exactly one binding with the same format; unconsumed attributes are allowed, and
+locations come from the shader's reflection. A pipeline exposes a mesh-independent `VertexInputRequirement`. Resolving it
+against a submesh's bindings yields a `VertexInputDescriptionVK` containing only the bindings the shader reads, renumbered
+from 0, with `source_bindings` mapping back. The backend supplies it through `VK_EXT_vertex_input_dynamic_state` before each
+draw batch; there is no static vertex-input path. Direct draws use `RTRunGraphicsPipelineVK::Builder::set_indexed_draw()` with
+one vertex-buffer source per binding, or `set_draw_vertex_count()` for vertex-less draws.
 
-The Vulkan backend requires `VK_EXT_vertex_input_dynamic_state` and its `vertexInputDynamicState` feature. It supplies binding
-zero's stride and the matched formats, locations, and offsets immediately before each draw batch. Physical devices without the
-extension and feature are rejected; there is no static vertex-input fallback. Direct indexed graphics tasks receive their
-reflected vertex-input description and vertex-buffer byte offset at construction, while vertex-less draws use an empty dynamic
-state.
+## Meshes
 
-## Mesh Resources
+### Resources
 
-`MeshCompilerVK` compiles every category of one `RUMesh3D` into one `MeshResourcesVK`, whether the mesh never moves or moves
-every frame. Instance-local transforms come from the resource and are immutable. Static meshes are drawn exactly where their
-instance-local transforms put them, with shaders that do not declare a mesh transform. Placed (dynamic) meshes are drawn with
-shader variants compiled with the `WBE_MESH_TRANSFORM` macro: `MeshDescriptorIndices` then also declares
-`REND_RES_MESH_TRANSFORM`, and `load_mesh_node()` places each instance at the mesh transform × its instance-local transform. The
-mesh transform is not part of `MeshResourcesVK`: each such draw aliases `REND_RES_MESH_TRANSFORM` to a one-`GeometryNodeGPU`
-buffer owned by whatever places the mesh, so one compiled mesh can be drawn at several places and moving a whole copy costs one
-matrix regardless of its instance count. The render tests use their local `EntityDrawData`
-(`tests/executable/function/render/entity_draw_data.hh`), which owns one such buffer per frame in flight and imports it as
-`<entity key>.transform`.
+`RUMesh3D` (manifest type `mesh`) holds three `RUSubmeshInstance3D` categories: `opaque_instances`, `masked_instances`, and
+`double_sided_opaque_instances`. Each stores its submeshes and `RUInstance3D` transforms (`global_transform`, 16 column-major
+floats). A submesh references a material, an AABB, its vertex bindings, an index view, and a
+`[first_instance, instance_count)` range. A mesh may reference an `RUSkeleton` (`skeleton_id`); skinned submeshes then declare
+the `joint_binding_ids` (`ivec4`) and `joint_binding_weights` (`vec4`) roles. Skinning itself is done by the application's
+shaders (see `vulkan_draw_skinned_mesh_test.cpp` and `skeleton/skeleton_utils.slang`).
 
-### Compiled Mesh Resources
+### Compilation
 
-`MeshCompilerVK::compile()` compiles opaque, masked, and opaque double-sided geometry into one pipeline-independent
-`MeshResourcesVK`. It owns shared vertex and index buffers, separate opaque, opaque double-sided, and masked indirect command
-buffers with their draw batches, submesh/node/instance tables, material parameters, sampler, and textures. Rendering is performed
-by the generic `RTRunGraphicsPipelineIndirectVK`; callers provide the graphics pipeline of each draw batch.
+`MeshCompilerVK(renderer).compile(mesh, config)` compiles every category of one `RUMesh3D` into one pipeline-independent
+`MeshResourcesVK` and registers it in the `RenderDatabase` under the mesh's resource key; `acquire(key)` returns the
+registered mesh or loads and compiles it. `Config` sets the default material key and extra vertex and index buffer usage.
 
-### Loading Meshes
+1. `MeshBufferCompilerVK` validates storage, strides, and ranges, uploads one vertex buffer per distinct vertex binary, and
+   one index buffer (all drawable submeshes must share one index binary). Uploads are cached in the `RenderDatabase` under the
+   binary's identity plus usage flags, so identical bytes are uploaded once.
+2. The submesh, node, and instance tables (`GeometrySubmeshGPU`, `GeometryNodeGPU`, `GeometryInstanceGPU`) are assembled for
+   all categories, in the order opaque, double-sided, masked, and uploaded as storage buffers.
+3. `MeshDrawBatchPlannerVK` groups submeshes into draw batches independently of any pipeline: draws batch together when their
+   bindings share a layout, binary, `start % stride` residue, and relative offsets, and the vertex span fits `int32_t`. Batches
+   split at `maxDrawIndirectCount`. Each submesh keeps one `VkDrawIndexedIndirectCommand` in a per-category indirect buffer with
+   indirect and storage usage, so a compute task can rewrite it when ordered by edges.
+4. The material sampler is created; material tables are built later per pipeline contract.
 
-Meshes are loaded through the normal chunk pipeline. `ResourceUnitLoaderBinary` loads the shared `RUBinary` payload, and
-`register_renderer_vk_resource_unit_loaders()` registers `ResourceUnitLoaderMesh`, which resolves `mesh` schemas into `RUMesh3D`.
+Vertex and index bytes keep their original binary layouts; side-band tables tell the shader which submesh and transform each
+indirect draw uses.
 
-Each mesh category stores:
+### Graph members
 
-- A list of submeshes.
-- For each submesh: a material, a `RUVertexView`, a `RUIndexView`, and a `[first_instance, instance_count)` slice.
-- One instance array containing `glm::mat4` transforms.
+Importing a mesh with `add_resource(key, *mesh)` registers its members under `<key>.<member>`: `vertices.<i>`, `indices`,
+`opaque_draw_batches`, `opaque_double_sided_draw_batches` and `masked_draw_batches` (for present categories), `submeshes`,
+`nodes`, `instances`, `material_params.<i>` (for each material table built), `material_sampler`, and `textures` (a
+`RenderResourceListVK` whose entries register as `textures[<index>]`).
 
-Each submesh is drawn once per instance in its range, at the mesh transform × that instance's transform.
+Mesh shaders declare the tables in `MeshDescriptorIndices` (`utils/utils.slang`) under shared ids: `mesh_submeshes`,
+`mesh_nodes`, `mesh_instances`, `material_params`, `material_sampler`, and, in shader variants compiled with
+`WBE_MESH_TRANSFORM`, `mesh_transform` (`REND_RES_MESH_*` in C++). `load_mesh_node()` returns the world transform; its layout
+is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
 
-All drawable submeshes in one compiled static mesh must reference the same vertex `RUBinary` resource and the same index
-`RUBinary` resource. Vertex and index binaries may be distinct from each other. The task validates that each vertex view and
-index view stays within its binary bounds before it creates any Vulkan buffers.
+### Drawing
 
-### Vertex Assembly And Upload
+Draw meshes with `RTGraphicsDrawMeshVK` (recipe type `graphics_draw_mesh`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++).
+Its params (`RTParamsGraphicsDrawMeshVK`) name the mesh resource key, the graphics pipeline's render-database key, the
+`parts` to draw (`opaque`, `masked`, `double_sided`), an optional `transform` resource, the render extent, clear values, and
+load ops. When the task is added it acquires the compiled mesh, imports it under its key if not yet imported (so shared
+meshes are compiled and imported once), builds and imports the material table for the pipeline's contract, and aliases the
+`REND_RES_MESH_*` ids the pipeline declares. The caller aliases the render targets. Do not assemble mesh draws from
+`RTRunGraphicsPipelineIndirectVK` by hand; use that task directly only for non-mesh indexed indirect draws.
 
-`MeshCompilerVK` does not flatten mesh data through `RenderDatabase`. Instead, compilation follows this path in
-`src/function/render_vk/mesh_compiler_vk.cpp`:
+Static meshes are drawn where their instance transforms put them, with shaders that do not declare `mesh_transform`. Placed
+(dynamic) meshes use `WBE_MESH_TRANSFORM` variants: `params.transform` names a one-`GeometryNodeGPU` buffer owned by whatever
+places the mesh, so one compiled mesh can be drawn at several places and moving it costs one matrix. The render tests'
+`EntityDrawData` (`tests/executable/function/render/entity_draw_data.hh`) owns one such buffer per frame in flight and imports
+it as `<entity key>.transform`.
 
-1. `MeshBufferCompilerVK` verifies submesh storage, vertex stride, vertex byte ranges, index ranges, and instance ranges. It
-  also enforces that every drawable submesh shares one vertex binary resource and one index binary resource.
-2. `MeshBufferCompilerVK` uploads the vertex binary into an `ROBufferVK` with the effective vertex usage flags, and uploads
-  the index binary into a separate `ROBufferVK` with the effective index usage flags (`build_binary_buffer()` in
-  `mesh_buffer_compiler_vk.cpp`).
-3. Each upload is cached in `RenderDatabase::register_compiled_render_resource()` under the binary resource identity plus Vulkan
-  usage flags, so later tasks and renderer plugins can reuse compatible buffers without re-uploading identical geometry bytes.
-4. `build_static_instance_buffer_data()` assembles three CPU-side tables from each set declaration: `GeometrySubmeshGPU`,
-  `GeometryNodeGPU`, and `GeometryInstanceGPU`. The tables of all categories are concatenated.
-5. `MeshCompilerVK` uploads those tables as storage buffers for submesh metadata, node transforms, and per-instance draw
-  indirection.
-
-The important distinction is that vertex and index bytes stay in their original binary layouts. The task uploads those binaries
-as-is into separate buffers, then uploads side-band metadata buffers that tell the shader which submesh and instance transform to
-use for each indirect draw.
-
-### Feeding The Graphics Pipeline
-
-Mesh shaders declare the metadata tables as reflected storage buffers in `MeshDescriptorIndices` (`utils/utils.slang`),
-annotated as read-only, under shader resource ids shared by every mesh:
-
-- `mesh.submeshes` (`REND_RES_MESH_SUBMESHES`)
-- `mesh.nodes` (`REND_RES_MESH_NODES`)
-- `mesh.instances` (`REND_RES_MESH_INSTANCES`)
-- `mesh.transform` (`REND_RES_MESH_TRANSFORM`), the whole-mesh transform
-
-Shaders read world transforms through `load_mesh_node()`, which applies the mesh transform after the instance-local node. The node
-layout is validated against the reflection-only `ParameterBlock<MeshContractMetadata> mesh`.
-
-Material resources follow the pipeline's reflected material texture contract. `MeshCompilerVK` resolves the configured default
-material, and `MeshMaterialResourceBuilderVK` builds the material-parameter table and sampler from it. The material
-image views are returned as a CPU-side `RenderResourceListVK` through `MeshResourcesVK::acquire_textures()`.
-
-The application imports a compiled static mesh once with `RendGraphDescVK::add_resource(key, *static_mesh)`. Like every import, this
-goes through `IBindableRenderResourceVK::bind()`; the composite registers each member under `<key>.<member>`, using the
-`MeshResourcesVK` member names (`VERTICES`, `NODES`, `MATERIAL_PARAMS`, ...). Graphics tasks bind the vertex, index, and
-indirect-command buffers by those identifiers and
-report the reflected metadata and material accesses themselves. Because the shader ids are shared, each task maps them to the drawn
-mesh's resources with `RendTaskDescVK::alias()`, for example `REND_RES_MESH_NODES` to `sponza.nodes`. This includes the material
-parameter table and sampler. Only ids the pipeline reflects may be aliased, since every alias must be used by the task. A `RenderResourceListVK` does not create GPU resources; graph construction retains the list under its
-aggregate key and registers its entries as `<resource_list_key>[<index>]`. An access or edge on the aggregate expands to all indexed
-entries.
-
-`MeshDrawBatchPlannerVK::build()` groups drawable submeshes for the task's selected pipeline by effective reflected vertex
-layout. Matching layouts can share a batch when their vertex-view offsets have the same remainder modulo stride and their
-relative vertex offsets fit `int32_t`. Groups follow first appearance and retain source order within each group. Each group
-binds its minimum vertex-view byte offset, and is split at the device's `maxDrawIndirectCount` limit. Each submesh retains one
-`VkDrawIndexedIndirectCommand`; each batch submits several commands through one `vkCmdDrawIndexedIndirect` call. Commands store:
-
-- `indexCount` from the submesh's index view.
-- `firstIndex` from the index-view byte offset divided by `sizeof(uint32_t)`.
-- `vertexOffset` from the vertex-view byte offset relative to its batch's binding offset, divided by its stride.
-- `firstInstance` from the precomputed first-instance table.
-- `instanceCount` from the submesh's instance count.
-
-The indirect command buffer has both `VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT` and `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT`. Each
-`RTRunGraphicsPipelineIndirectVK::PipelineBatch` selects a contiguous command range and records one `vkCmdDrawIndexedIndirect`; a
-future compute task can write the same graph resource as a storage buffer when a chain of edges on that resource orders it before
-the graphics task.
-
-Before constructing the task:
-
-1. Load the static meshes, materials, images, shaders, and graphics pipelines through `ResourceManager`, and compile the graphics
-  pipeline for the task's attachment formats with `GraphicsPipelineCompilerVK`.
-2. Compile the static mesh with `MeshCompilerVK::compile()` and import it with `RendGraphDescVK::add_resource(key, *static_mesh)`.
-3. Declare every render target with `RendGraphDescVK::add_image()` and `add_image_view()`; the graph allocates them when it is
-  compiled. Import the renderer's swap-chain image-view container under `REND_RES_SWAP_CHAIN` with `add_resource()` when the graph
-  renders to the swap chain.
-4. Create one `RTRunGraphicsPipelineIndirectVK` per category-plus-pipeline combination, alias its render targets and mesh
-  resources, and order it
-  against other tasks with resource edges declared by `RendTaskDescVK::connect()`.
-
-```cpp
-RendererVK* renderer = RendererVK::get_singleton();
-const BaseRenderDataVK* render_data = renderer->get_base_render_data();
-RenderAllocator* render_allocator = render_data->allocator;
-
-// opaque_mesh and the compiled graphics pipeline come from step 1; the vertex metadata, entry, and material contract come from
-// the pipeline's shader metadata.
-Ref<MeshResourcesVK> static_mesh = MeshCompilerVK(renderer).compile(opaque_mesh,
-    MEM_NULL,
-    opaque_vertex_metadata,
-    opaque_vertex_entry,
-    ShaderMetadata{},
-    {},
-    material_contract,
-    MeshCompilerVK::Config{});
-
-RTRunGraphicsPipelineIndirectVK::Builder task_builder(render_allocator);
-task_builder.set_render_extent(render_data->swap_chain_extent)
-    .set_vertex_buffer("sponza.vertices")
-    .set_index_buffer("sponza.indices")
-    .set_indirect_buffer("sponza.opaque_draw_batches");
-for (size_t i = 0; i < static_mesh->get_opaque_draw_batch_count(); ++i) {
-    const MeshDrawBatchVK& batch = static_mesh->get_opaque_draw_batch(i);
-    task_builder.add_pipeline_batch(graphics_pipeline, batch.first_draw, batch.draw_count, batch.vertex_input, batch.vertex_buffer_offset);
+```lua
+local params: wbe.RTParamsGraphicsDrawMeshVK = {
+    mesh = "model_cube_static.mesh",
+    pipeline = "draw_cube_unshaded_pipeline",
+    parts = { "opaque" },
 }
-RendTaskDescVK task_desc(render_allocator, "run_static_mesh", task_builder.create_unique(render_data));
-task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN).alias(RenderTargetsVK::DEPTH_ID, "scene_depth_view");
-// Map the shader-side mesh ids this pipeline reflects to the static mesh's resources.
-task_desc.alias(REND_RES_MESH_SUBMESHES, "sponza.submeshes")
-    .alias(REND_RES_MESH_NODES, "sponza.nodes")
-    .alias(REND_RES_MESH_INSTANCES, "sponza.instances")
-    .alias(REND_RES_MESH_MATERIAL_PARAMS, "sponza.material_params")
-    .alias(REND_RES_MESH_MATERIAL_SAMPLER, "sponza.material_sampler");
-
-const VkExtent2D extent = render_data->swap_chain_extent;
-RendGraphDescVK graph_desc(render_allocator);
-graph_desc.add_resource("sponza", *static_mesh)
-    .add_resource(REND_RES_SWAP_CHAIN, renderer->acquire_swap_chain_image_view_container())
-    .add_image("scene_depth_image",
-        {.usage = RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
-            .format = VK_FORMAT_D32_SFLOAT,
-            .extent = {.width = extent.width, .height = extent.height, .depth = 1}})
-    .add_image_view("scene_depth_view", "scene_depth_image")
-    .add_task(std::move(task_desc));
-
-renderer->register_render_graph("scene", std::move(graph_desc));
-renderer->activate_render_graph("scene");
+-- task: { id = "run_static_mesh", type = "graphics_draw_mesh", params = params,
+--         aliases = { ["render_target_colors[0]"] = "swap_chain" } }
 ```
 
-The application contributes all graph-visible resources before registration. The renderer does not add or replace descriptor
-resources while building the graph. The task retains its graphics pipelines directly, and the `RendTaskDescVK` move into the graph
-remains one-shot. The reflected camera and light buffers of the pipeline must also be declared on the graph.
+### Pipelines
 
-### Render Targets
+`GraphicsPipelineCompilerVK(context).compile(key, pipeline_resource)` compiles an `RUGraphicsPipeline` for the attachment
+formats in its context and registers it in the `RenderDatabase` under the key, which recipe params reference.
+`ComputePipelineCompilerVK(context).compile(key, shader)` does the same for compute shaders. Compile pipelines once, outside the
+graph's rebuild callback, and keep them alive. Ray-tracing pipelines are built with `ROPipelineRayTracingVK::Builder`.
+
+## Render Targets
 
 Graphics tasks render into the task-local resources `render_target_colors[<index>]` and `render_target_depth`
-(`RenderTargetsVK::color_id()` and `RenderTargetsVK::DEPTH_ID`). The number of color targets and the use of a depth target follow the
-graphics pipeline's attachment formats; every pipeline in one task must share that layout. Map the targets to graph resources on the
-task descriptor:
+(`RenderTargetsVK::color_id()` and `RenderTargetsVK::DEPTH_ID`). The number of color targets and the use of depth follow the
+pipeline's attachment formats; every pipeline in one task shares that layout. Map them to graph resources with `alias()` (or
+recipe `aliases`).
 
-```cpp
-task_desc.alias(RenderTargetsVK::color_id(0), "gbuffer_albedo")
-    .alias(RenderTargetsVK::color_id(1), "gbuffer_normal")
-    .alias(RenderTargetsVK::DEPTH_ID, "gbuffer_depth");
-```
+- Clear values follow target order: all colors, then depth. Empty clears every target to zero.
+- Color and depth load ops control how a follow-up task reuses targets produced earlier; a loaded target is also read.
+- Task ids, aliases, and dependencies belong to the task descriptor, not the task configuration.
 
-- `set_clear_values()` follows target order: all color values first, then depth. Empty clears every target to zero.
-- `set_color_load_op()` and `set_depth_load_op()` control how a follow-up task reuses targets produced by an earlier task; a loaded
-  target is also read.
-- Task ids, resource aliases, and dependencies belong to `RendTaskDescVK`, not the task configuration.
-
-### Mesh Acceleration Structures
+## Acceleration Structures
 
 Ray-tracing acceleration structures are explicit resources; the renderer keeps no published scene geometry.
 
-1. Compile the mesh with `MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE` added to
-  `MeshCompilerVK::Config::vertex_buffer_usage` and `index_buffer_usage`. The compiled `MeshResourcesVK` keeps its
-  source `RUMesh3D`.
-2. Create `MeshAccelerationStructureCompilerVK` from the base render data and `RayTracingPluginVK::get_base_ray_tracing_data()`,
-  then call `compile()` with the mesh. The result holds one BLAS per drawable opaque or opaque double-sided submesh, one
-  TLAS instance per instance at the given mesh transform × instance transform, the instance buffer, scratch
-  buffers, and the build inputs. Moving the mesh afterwards requires compiling the acceleration structure again.
-3. Import it with `add_resource(key, *acceleration_structure)`, which registers the TLAS as `<key>.top_level`, and record its build
-  with `MeshAccelerationStructureVK::record_build()`, for example in an `RTBuildAccelerationStructuresVK` task writing
-  `<key>.top_level` and wrapped in `RTTriggeredVK` to run once. Consumers order after that task with `connect()`.
+1. Compile the mesh with `MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE` added to the `MeshCompilerVK::Config` vertex and
+   index buffer usage.
+2. Create `MeshAccelerationStructureCompilerVK` from the base render data and
+   `RayTracingPluginVK::get_base_ray_tracing_data()`, then `compile(mesh, mesh_transform)`. The result holds one BLAS per
+   drawable opaque or opaque double-sided submesh, one TLAS instance per mesh instance, and the build inputs. Moving the mesh
+   requires compiling again.
+3. Import it with `add_resource(key, *acceleration_structure)`, which registers the TLAS as `<key>.top_level`. Record its build
+   with an `RTBuildAccelerationStructuresVK` task writing `<key>.top_level`, wrapped in `RTTriggeredVK` to run once, and order
+   consumers after it with edges.
 
-### Binding Pipeline Descriptors
+The deferred test supplies the build task to its recipe as an imported task and adds the acceleration-structure import to
+the descriptor the recipe builder returns (`tests/executable/function/render/deferred_test/deferred_render_graph.cpp`).
 
-Pipeline-run tasks bind every reflected `WBE_DESCRIPTOR` field once, when the graph is built: the field's resource id, resolved
-through the task's `RendTaskDescVK::alias()` map, names a graph resource. There is no per-field binding API. The graph resource's
-type must match the field's category: buffers bind as `ROBufferVK`, image fields as `ROImageViewVK`, sampler fields as
-`ROSamplerVK`, and acceleration-structure fields as `ROAccelerationStructureVK`. A missing resource or an incompatible type makes
-graph construction fail.
+## Render Database
 
-Frame-local resources are graph resources held in an `ROCMultislotsVK`, either declared per frame on the graph or imported as a
-container. Update their contents instead of rebinding them:
-
-```cpp
-graph_desc.add_buffer("camera_info", {.usage = RendResPrimaryUsageVK::BUFFER_UNIFORM, .domain = DeviceDomain::HOST_DEVICE, .per_frame = true});
-Ref<RenderGraphVK> graph = renderer->register_render_graph("scene", std::move(graph_desc));
-Ref<ROCMultislotsVK> camera_buffers = graph->acquire_resource("camera_info").dynamic_cast_ref<ROCMultislotsVK>();
-camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
-```
-
-At record time, the task resolves each container from `current_frame_slot` and pushes that resource's descriptor index. Publish
-buffer contents on the rendering thread; callers on other threads must use `IRenderer::add_job()`.
-
-To add a dependency, connect the earlier task to the later one through the resource they share. The graph derives the edge's
-stages and accesses from the usages both tasks report for that resource, so both tasks must access it:
-
-```cpp
-RendTaskDescVK task_desc(render_allocator, "run_shadow", std::move(task));
-task_desc.connect("run_gbuffer", "shadow_moments");
-graph_desc.tasks.emplace_back(std::move(task_desc));
-```
-
-Compute and graphics pipeline-run tasks push their pipeline-owned descriptor-index blocks automatically after the graph binds the
-global heaps. Every task reports all of its accesses through `IRenderTaskVK::append_accesses()`: reflected shader resources, render
-targets, and fixed-function buffers. The accesses are validated against the resource edges; they do not create edges. When a task's
-identifiers differ from the graph's, alias them on the task descriptor; the graph resolves every identifier the task binds or
-reports through that map, and rejects aliases the task never uses:
-
-```cpp
-RendTaskDescVK blur(render_allocator,
-    "blur_bloom_0",
-    make_unique<RTRunComputePipelineVK>(render_allocator, render_data, blur_pipeline, VkExtent3D{.width = 160, .height = 90, .depth = 1}));
-blur.alias("kawase_blur_source", "bloom_ping")
-    .alias("kawase_blur_destination", "bloom_pong")
-    .alias("kawase_blur_sampler", "bloom_sampler");
-```
+`RenderDatabase` (`function/render/render_database.hh`) is a weak registry of compiled render objects keyed by name and type:
+compiled pipelines, meshes, cached binary uploads, and graph-owned resources of keyed graphs (`<graph key>.<resource id>`,
+with `[slot]` for per-frame copies). Registering an object also names it for debugging. It holds entries weakly, so the
+owner must keep each object alive.

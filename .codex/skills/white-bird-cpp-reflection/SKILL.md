@@ -1,18 +1,32 @@
 ---
 name: white-bird-cpp-reflection
-description: Use and extend White Bird Engine's build-time C++ reflection and code-generation system. Apply when annotating C++ types or fields, adding serialization, generated field access, factories, aliases, required fields, labels, type UUIDs, or new reflection consumers. Do not use for Slang shader reflection.
+description: Use and extend White Bird Engine's build-time C++ reflection and code generation. Apply when annotating C++ types, fields, methods, or enums; adding DataValue serialization, strict deserialization, generated field access, factories, aliases, required fields, labels, type UUIDs, reflected enums, render-task registration, WBE_REFLECT_SCRIPT types and their generated Teal declarations, or new generated consumers. Do not use for Slang shader reflection.
 ---
 
 # White Bird C++ Reflection
 
-This system is annotation-driven code generation, not runtime language reflection. The reflection build parses `WBE_META(...)` annotations with Clang and generates target-specific C++ APIs. During normal compilation, `WBE_META(...)` expands to nothing.
+Reflection is annotation-driven code generation, not runtime language reflection. Before CMake runs, `build.py` parses
+`WBE_META(...)` annotations in project `.hh` headers with Clang and renders Jinja templates into target-specific generated
+files. In normal compilation `WBE_META(...)` expands to nothing.
 
-## Choose the type category
+All serialization goes through `DataValue` (`core/data/data_value.hh`), a format-neutral tree of nil, bool, int64, double,
+string, list, and key-sorted map. JSON, TOML, and script backends only convert to and from it.
 
-- Use `WBE_META(WBE_SERIALIZABLE)` when the type needs generated static serialization/access plus virtual JSON serialization and name-based `SerializableFactory` construction. Derive from `Serializable` and add `WBE_DECL_SERIALIZABLE(Type)`.
-- Use `WBE_META(WBE_SERIALIZABLE_STATIC)` when the type needs generated `SerializableSD<Type>` and `SerializableAccess<Type>` but must not derive from `Serializable` or enter the dynamic factory.
-- Existing categories such as `WBE_COMPONENT` and `WBE_CONFIG_OPTION` participate according to `build_config.py`; preserve their established pattern instead of adding a second annotation.
-- Use bare `WBE_META(...)` on a class only when a specific generated consumer, such as `TypeUUID`, needs the class metadata and no serialization category applies.
+## Choose the annotation
+
+| Need | Annotation |
+| --- | --- |
+| Static `SerializableSD<T>` / `SerializableAccess<T>` only | `WBE_META(WBE_SERIALIZABLE_STATIC)` (or `WBE_COMPONENT` for ECS components) |
+| The above plus virtual `serialize(DataValue&)` / `deserialize(const DataValue&)` and name-based `SerializableFactory` construction | `WBE_META(WBE_SERIALIZABLE)`; derive from `Serializable` and add `WBE_DECL_SERIALIZABLE(T)`. `WBE_CONFIG_OPTION` joins this category. |
+| Reject unknown keys | add `WBE_STRICT_DESERIALIZATION` to a static-serializable class |
+| Name-based enum conversion | `WBE_META(WBE_REFLECT_ENUM)` on the enum; `WBE_META(WBE_REFLECT_ENUM_IGNORE)` on enumerators to skip |
+| Visible to Lua/Teal scripts | add `WBE_REFLECT_SCRIPT` (class or enum); it also makes the type static-serializable or a reflected enum |
+| A render-graph task type usable by recipes | `WBE_RENDER_TASK` with `WBE_ALIASES = [ recipe_type_name ]` (see below) |
+| Command-line configuration | `WBE_CLA_CONFIGURATION` |
+| `TypeUUID<T>` only | any `WBE_META(...)` on a class |
+
+Category membership is configured in `gen_info` in `build_config.py`, not in the metaparser. Preserve established patterns
+instead of stacking a second annotation that already applies.
 
 ## Declare a serializable type
 
@@ -35,48 +49,70 @@ struct WBE_META(WBE_SERIALIZABLE, WBE_ALIASES = [ LegacySettings ]) Settings fin
 } // namespace WhiteBirdEngine
 ```
 
-Only fields carrying `WBE_META(WBE_REFLECT)` enter generated serializers and accessors. `WBE_REFLECT_REQUIRED` makes deserialization throw when neither the canonical key nor an alias is present. Keep alias syntax exactly `WBE_ALIASES = [ NameA, NameB ]`.
+Only `WBE_REFLECT` fields enter generated code. `WBE_REFLECT_REQUIRED` makes deserialization throw when neither the canonical
+key nor an alias is present; optional fields keep their current value, except `std::optional<T>`, which is reset. Keep alias
+syntax exactly `WBE_ALIASES = [ NameA, NameB ]`. Enumerators take aliases too: `VALUE WBE_META(WBE_ALIASES = [ value ])`.
 
-Before selecting a field type, verify that `SerializableSD<T>` or the chosen parser supports it. Optional and vector deserialization default-construct their element type.
+Script-facing parameter structs, such as render-task params, combine the categories:
+
+```cpp
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsFooVK {
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string pipeline;
+};
+```
 
 ## Use the generated APIs
 
-After rebuilding, include the specific generated header needed by the caller:
-
-```cpp
-#include "generated/serializable_factory.gen.hh"
-#include "generated/serializables_access.gen.hh"
-#include "generated/serializables_sd.gen.hh"
-```
-
-Static serialization works with JSON or TOML parser data:
+Include the generated header the caller needs (`generated/serializables_sd.gen.hh`, `serializables_access.gen.hh`,
+`serializable_factory.gen.hh`, `enum_reflection.gen.hh`, `type_uuid.gen.hh`):
 
 ```cpp
 Settings settings;
-SerializableSD<Settings>::deserialize(parser.get_data(), settings);
+SerializableSD<Settings>::deserialize(ParserJSON::read(text), settings);
 
-JSONData output;
+DataValue output;
 SerializableSD<Settings>::serialize(output, settings);
+std::string json = ParserJSON::write(output);
 ```
 
-For `WBE_SERIALIZABLE` types, `settings.serialize(output)` and `settings.deserialize(data)` use generated virtual definitions. `SerializableFactory` creates such types by canonical class name or class alias. `SerializableAccess<Settings>` lists reflected fields and performs exact typed name lookup; unknown names and mismatched template types throw.
+`Parser::get_data()` also returns a `DataValue`. `SerializableFactory` builds `WBE_SERIALIZABLE` types by class name or alias
+from a `DataValue`. `SerializableAccess<T>::list_fields()` is static; `get_field<T>()` and `get_pointer_to_member<T>()` are
+const members of an accessor instance, and unknown names or inexact types throw. `EnumReflection<E>` maps enumerators to
+canonical names and aliases; reflected enums serialize as their canonical name and deserialize from a name, alias, or
+in-range declared integer.
+
+## Render tasks
+
+A `WBE_RENDER_TASK` class declares
+`WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const TParams&, const RendGraphContextVK&)`,
+where `TParams` is a strict, script-reflected params struct. The generated `render_task_registry.gen.cpp` implements
+`RenderTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
+`static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. The alias is the `type` name
+recipes use. See `include/function/render_vk/render_task_registry_vk.hh`.
+
+## Script types and Teal declarations
+
+`templates/teal_types.d.tl.jinja` renders every `WBE_REFLECT_SCRIPT` class and enum into `build/<target>/teal/wbe.d.tl`,
+and `tlconfig.lua` at the repo root points the Teal language server at it. Every script class is an `interface` that `is`
+its script bases; a script field or base naming a reflected type that is not `WBE_REFLECT_SCRIPT` fails generation.
+Test-executable types appear only in targets that build tests, because only those scan `tests/`. Reflection runs before the
+ACP, which type-checks Teal against these declarations.
 
 ## Regenerate and validate
 
-Never edit `*.gen.*`. Rebuild through the repository wrapper so the metaparser and generators run:
+Never edit `*.gen.*`, `wbe.d.tl`, or `tlconfig.lua`. Rebuild through `python build.py -t debug`; do not invoke CMake.
 
 ```sh
-python build.py -t debug
+python validation.py -t debug -- --gtest_filter='WBEDeserializer*:WBESerializerTest*:WBESerializableFactoryTest*:WBEEnumReflectionTest*:WBEStrictDeserializationTest*:WBEDataValueTest*'
 ```
 
-For changes to annotations, serialization, accessors, or factories, validate with:
-
-```sh
-python validation.py -t debug -- --gtest_filter='WBEDeserializer*:*WBESerializableFactoryTest*'
-```
-
-The wrapper runs the full unit suite after the focused tests pass. Do not run lint automatically.
+For render-task, params, or Teal changes, add
+`:WBERenderTaskRegistryVK*:WBERendResourceParamsVKTest*:WBETealDeclarationsTest*:WBERendGraphScriptVK*`; for `DataValue` or
+parser changes, add `:ParserJSONTest*:ParserTOMLTest*`. The wrapper runs the full suite afterward. Do not run lint.
 
 ## Advanced work
 
-Read [references/system-and-extension.md](references/system-and-extension.md) before changing parser extraction, annotation categories, supported field/container types, inheritance behavior, templates, `generate.json`, labels, type UUIDs, factories, or other generated consumers. Keep changes layer-correct and update tests at the parser, generated API, and parser-format boundaries that actually change.
+Read [references/system-and-extension.md](references/system-and-extension.md) before changing the metaparser, metadata
+cache, annotation categories, supported field types, inheritance, strict deserialization, enum reflection, Teal generation,
+templates, `generate.json`, labels, type UUIDs, factories, or the render-task registry.

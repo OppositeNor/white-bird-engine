@@ -2,185 +2,164 @@
 
 ## System boundary and flow
 
-White Bird Engine's C++ reflection is a build-time pipeline:
+1. `build.py` collects project `.hh` headers (excluding dependencies, generated output, caches, and build directories).
+   `tests/` is scanned only for targets with `generate-tests`.
+2. `build_script/on_build.py` constructs `WBEMetaparser` and `WBEReflector`. Reflection runs before the ACP.
+3. `build_script/reflection/metaparser.py` runs Clang under `WBE_REFLECTION_PARSER`, where `WBE_META` becomes an `annotate`
+   attribute. It records, per header and only for what that header declares: classes, base specifiers, `WBE_REFLECT`
+   fields, `WBE_REFLECT` methods (name, arguments, return type, static, const), annotated enums with enumerators, values,
+   attributes, and aliases, labels, type spellings, and annotation strings (`metadata_types.py`).
+4. Metadata is ordered by include-dependency depth. `WBEReflector` checks label redefinition, enum qualified-name
+   redefinition, and label hash collisions, then renders every `generate.json` entry.
+5. Generated headers go to `include/per_target/<target>/generated/`, sources to `src/per_target/<target>/generated/`.
 
-1. `build_config.py` discovers project headers and sources while excluding dependencies, generated output, caches, Git metadata, and build directories.
-2. `build_script/on_build.py` constructs `WBEMetaparser` and `WBEReflector`.
-3. `build_script/reflection/metaparser.py` runs Clang with detailed processing records and reads annotation records produced by `WBE_META(...)`.
-4. It records classes/structs, base specifiers, annotated fields, aliases, labels, type spellings, source headers, and annotation strings in the models from `metadata_types.py`.
-5. `WBEReflector` sorts/checks metadata and renders entries from repository `generate.json` files through Jinja templates.
-6. Generated headers live in `include/per_target/<target>/generated/`; generated sources live in `src/per_target/<target>/generated/` and are compiled by the normal build.
+`include/core/reflection/reflection_defs.hh` holds only the `WBE_META` / `WBE_LABEL` macros and optional helpers. Never write
+runtime logic that inspects `WBE_META`.
 
-`include/core/reflection/reflection_defs.hh` defines the crucial boundary: under `WBE_REFLECTION_PARSER`, `WBE_META` becomes a Clang `annotate` attribute; during normal compilation it is empty. Do not write runtime logic that depends on inspecting `WBE_META` itself.
+### Metadata cache
 
-The reflection metadata cache is content-hash validated. The generator writes an output only when its rendered content changes.
+The cache is one JSON per header at `build/<target>/build_cache/source_metadata/<sha256(path)>.json`. A header is reparsed
+when its content hash changes or the parser signature changes; the signature is `METAPARSER_VERSION` plus the Clang
+arguments. Bump `METAPARSER_VERSION` in `metaparser.py` whenever extraction changes. `code_gen.py` writes an output only when
+its rendered content changes.
 
-## Annotation contracts
+## Annotation categories
 
-### Classes and structs
+`gen_info` in `build_config.py` defines the category lists. Derived memberships: `serializables` are also
+`static_serializables`; `reflect_script` classes join `static_serializables` and script enums join `reflected_enums`.
 
-- `WBE_SERIALIZABLE`: generated static serializer/accessor, generated virtual JSON methods, and dynamic factory registration. The type derives from `Serializable` and contains `WBE_DECL_SERIALIZABLE(Type)`.
-- `WBE_SERIALIZABLE_STATIC`: generated static serializer/accessor without virtual methods or dynamic factory registration.
-- `WBE_COMPONENT`: included in the static-serializable category.
-- `WBE_CONFIG_OPTION`: included in the serializable category.
-- `WBE_CLA_CONFIGURATION`: feeds command-line configuration generation.
-- Other annotated classes are still available to consumers that iterate all class metadata, notably `TypeUUID` generation.
+| Annotation | Category | Generates |
+| --- | --- | --- |
+| `WBE_SERIALIZABLE`, `WBE_CONFIG_OPTION` | serializables | SD, Access, virtual `DataValue` methods (`serializable_impl.gen.cpp`), factory registration |
+| `WBE_SERIALIZABLE_STATIC`, `WBE_COMPONENT` | static_serializables | SD and Access |
+| `WBE_STRICT_DESERIALIZATION` | strict_deserializations | strict `deserialize`; effective only with a static-serializable category |
+| `WBE_REFLECT_ENUM` / `WBE_REFLECT_ENUM_IGNORE` | reflected_enums | `EnumReflection<E>` and enum `SerializableSD` |
+| `WBE_REFLECT_SCRIPT` | reflect_script | Teal declaration plus SD/Access or `EnumReflection` |
+| `WBE_RENDER_TASK` | render_tasks | `render_task_registry.gen.cpp` |
+| `WBE_CLA_CONFIGURATION` | cla_configurations | `CLAConfiguration<T>` |
+| `WBE_LABEL(name, CATEGORY)` | static/dynamic labels | `LabelName<hash>`, `LabelManager` |
+| any annotated class | — | `TypeUUID<T>`, `TypeUUIDManager` (enums excluded) |
 
-The category lists are defined in `build_config.py`, not in the metaparser. Before adding a new category, decide which existing generator sets it should join.
-
-### Fields
-
-Only `FIELD_DECL`s containing `WBE_REFLECT` are recorded as reflected fields:
-
-```cpp
-WBE_META(WBE_REFLECT)
-std::string name;
-```
-
-Add `WBE_REFLECT_REQUIRED` when absence must fail deserialization. Optional reflected fields preserve their current/default value when a key is absent, except `std::optional<T>` fields are reset.
+Field and method annotations: `WBE_REFLECT`, `WBE_REFLECT_REQUIRED`, `WBE_ALIASES = [ ... ]`. Methods are recorded for every
+consumer, but only the render-task registry uses them today (it requires `create`).
 
 ### Aliases
 
-Use the exact supported parameter form:
+Field deserialization checks the canonical key before aliases. Class aliases feed the factory, type-name registry, and
+render-task registry; enumerator aliases add extra names. Uniqueness is enforced per consumer: the factory throws at
+runtime, enums and render tasks fail the build with `#error`, and `TypeUUIDManager` silently overwrites, so keep names
+globally unique. The alias parser accepts a narrow comma-separated list of bare identifiers.
 
-```cpp
-WBE_META(WBE_SERIALIZABLE, WBE_ALIASES = [ OldTypeName, OlderTypeName ])
-WBE_META(WBE_REFLECT, WBE_ALIASES = [ old_field_name ])
-```
+## Generated outputs
 
-Field deserialization checks the canonical key before aliases. Class aliases enter the serializable factory and type-name registry where applicable. Factory class names and aliases must be globally unique.
+Every `generate.json` in the repo is used (except under `.cache`, `.git`, `.github`, `__pycache__`, `build`). Entries take
+`out_dir` (empty means the json's own directory), `output_name`, `template`, `data`, and optional `params`. `${name}` resolves
+from the entry's `params`, then built-ins (`build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`,
+`source_dir`), then environment variables; an unresolved name is an error. A `data` string value starting with `.` is
+replaced by the reflection attribute named by its data **key** (the `gen_info` lists plus `metadata`); keys starting with
+`_` are rejected.
 
-The parser accepts a narrow comma-separated bracket list. Do not put quoted strings, expressions, or commas inside an alias token unless parser support is deliberately extended and tested.
+| Output | Template | generate.json |
+| --- | --- | --- |
+| `serializables_sd.gen.hh` | `serializables_sd.hh.jinja` | `include/per_target/` |
+| `enum_reflection.gen.hh` | `enum_reflection.hh.jinja` | `include/per_target/` |
+| `serializables_access.gen.hh` | `serializables_access.hh.jinja` | `include/per_target/` |
+| `serializable_factory.gen.hh` | `serializable_factory.hh.jinja` | `include/per_target/` |
+| `label_manager.gen.hh` | `label_manager.hh.jinja` | `include/per_target/` |
+| `type_uuid.gen.hh` | `type_uuid.hh.jinja` | `include/per_target/` |
+| `cla_configuration.gen.hh` | `cla_configuration.hh.jinja` | `include/per_target/` |
+| `serializable_impl.gen.cpp` | `serializable_impl.cpp.jinja` | `src/generated/` |
+| `render_task_registry.gen.cpp` | `render_task_registry.cpp.jinja` | `src/generated/` |
+| `build/<target>/teal/wbe.d.tl` | `teal_types.d.tl.jinja` | `src/generated/` |
+| `tlconfig.lua` (repo root, gitignored) | `tlconfig.lua.jinja` | `src/generated/` |
+| `executable_test.gen.cmake` | `executable_test.cmake.jinja` | `tests/executable/function/render/` |
 
-### Labels
+### Serialization (`serializables_sd.gen.hh`)
 
-`WBE_LABEL` produces a compile-time hash and, under the reflection parser, an annotated variable declaration. `build_config.py` assigns annotation categories to static and/or dynamic label registries. `WBEReflector.checks()` rejects hash collisions between distinct label names.
+The primary `SerializableSD<T>`, and the `std::optional` and `std::vector` specializations, are hand-written in
+`core/reflection/serializable_sd.hh`. The generated header emits one `SerializableSD<T>` per static-serializable class with
+`serialize`, `deserialize`, and `deserialize_fields`. Serialization visits recorded bases, then fields. Deserialization of a
+base calls `SerializableSD<Base>::deserialize_fields`, so a hand-written base specialization must provide `serialize` and
+`deserialize_fields`. `extended_parents` records every base specifier, reflected or not.
 
-## Generated outputs and runtime APIs
+### Strict deserialization
 
-### `serializables_sd.gen.hh`
+A strict class's `deserialize` first calls `reject_unknown_serializable_keys()` with all field names and aliases of the class
+and its reflected bases, throwing `Unknown field '<key>' for <T>.`. `deserialize_fields` is the lenient path used for bases.
+A strict class accepts its lenient base's fields; a strict base used alone rejects a derived class's keys; a strict member
+type is checked inside a lenient holder. It applies to any `DataValue` source: JSON, TOML, or script.
 
-Generates `SerializableSD<Type>` specializations for every static-serializable category and a recursive `SerializableSD<std::vector<T>>` specialization.
+### Factory, access, UUIDs
 
-- Serialization visits recorded base classes, then reflected fields.
-- Deserialization visits recorded base classes, resolves canonical/alias keys, enforces required fields, and deserializes present values.
-- `std::optional<T>` is emitted only when engaged; absence resets it during deserialization.
+`SerializableFactory` takes `const DataValue&` and builds `Unique<Serializable>`, `Ref<Serializable>` (global allocator), or
+an in-place `Serializable*` in caller-owned storage; the factory singleton must be initialized. `SerializableAccess<T>` lists
+direct reflected fields only (not inherited ones), and the requested type must match Clang's recorded spelling exactly.
+`TypeUUID<T>::UUID` is computed from the canonical class name.
 
-The generic `SerializableSD<T>` delegates to parser-data `set/get`. `SerializableSD<std::optional<T>>` lives in `reflection_defs.hh`.
+### Teal declarations (`wbe.d.tl`)
 
-### `serializable_impl.gen.cpp`
+Everything sits in `local record wbe ... return wbe`, with built-in `Vec2`, `Vec3`, `Vec4`, `Quat`. Script classes are
+`interface`s that `is` their reflected script bases (non-reflected bases are dropped). A script field or base naming any
+`WBE_META`-annotated type that is not `WBE_REFLECT_SCRIPT` raises `ValueError` (`build_script/reflection/teal_types.py`).
+Type mapping: `std::vector`/`Vector` → `{T}`, `std::optional<T>` → `T`, strings and `Buffer` → `string`, integers →
+`integer`, floats → `number`, `glm::mat4` → `{number}`, `DataValue` and unknown types → `any`, script enum fields →
+`Enum | integer`. Field aliases are emitted as extra fields, and keywords are quoted (`["type"]`). Script enums list canonical
+names and aliases, skipping ignored enumerators. The unit test reads the file through `WBE_TEAL_DECLARATIONS_DIR`.
 
-For dynamic `WBE_SERIALIZABLE` categories, defines the virtual JSON `serialize` and `deserialize` methods declared by `WBE_DECL_SERIALIZABLE`. Each definition delegates to `SerializableSD<Type>`.
+## Supported field types
 
-### `serializables_access.gen.hh`
+`DataValue::set/get` (`core/data/data_value.hh`) supports `DataValue`, `std::nullptr_t`, `bool`, all integral and
+floating-point types (unsigned values above `INT64_MAX` throw on set), raw enums, `std::string`, `Buffer` (an overlong string
+throws on read), `glm::vec2/vec3/vec4/quat` as x/y/z/w maps (`vec2` also reads u/v), `glm::mat4` as 16 column-major floats,
+and `std::vector` of supported types. Through `SerializableSD`: `std::optional<T>`, reflected enums, and nested reflected
+classes. Integer/float reads convert when exact; an empty list and an empty map read as each other.
 
-Generates `SerializableAccess<Type>` for static-serializable categories:
+A nested type is serializable only if it belongs to a static-serializable category or has a visible hand-written
+`SerializableSD` specialization. Vectors and optionals default-construct elements during deserialization.
 
-- `list_fields()` returns directly reflected field names;
-- `get_field<T>(object, name)` returns a const or mutable reference;
-- `get_pointer_to_member<T>(name)` returns an exact typed member pointer.
+## Extending
 
-Lookup is name-based and the requested `T` must exactly match Clang's recorded field type. Unknown names and type mismatches throw `std::runtime_error`. The accessor lists the type's direct reflected fields; do not assume it flattens inherited fields.
+### A type or container
 
-### `serializable_factory.gen.hh`
+- Add a hand-written `SerializableSD<NewType>` in a non-generated header visible before generated code uses it, or
+- extend `DataValue::set/get` when the value tree itself must understand the type. Parsers change only when a new
+  `DataValueKind` is added.
 
-Registers dynamic serializable class names and aliases. It can construct:
+Test round trips, missing values, type mismatches, nested usage, and strictness.
 
-- `Unique<Serializable>` using the global allocator;
-- `Ref<Serializable>` using the global allocator;
-- an in-place `Serializable*` in caller-provided storage.
+### Metadata or a language construct
 
-The generated branch requires the concrete type to convert to `Serializable*` and its `SerializableSD` to accept the parser-data type. The factory singleton must be initialized. In-place callers own storage, alignment, and destruction.
+1. Extend `metadata_types.py`.
+2. Populate it in `metaparser.py` from verified Clang cursor shapes, and bump `METAPARSER_VERSION`.
+3. Preserve cache serialization.
+4. Add a representative annotated fixture in `tests/unit/core/reflection_test/reflection_test_data.hh`.
+5. Update only consumers that need it.
 
-### `type_uuid.gen.hh`
+### A category or consumer
 
-Every parsed annotated class receives `TypeUUID<Type>::UUID`, computed from its canonical class name. `TypeUUIDManager` maps canonical names and aliases to IDs and IDs back to canonical names. Unknown values throw.
+Add the category to the right `gen_info` set and template conditions; extend the metaparser only for structured parameters
+or different AST extraction. For a new consumer, add a focused Jinja template and a `generate.json` entry, reuse existing
+metadata, keep generated includes sufficient for every emitted type spelling, and let `code_gen.py` manage writes.
 
-### Other consumers
+## Examples and tests
 
-- `label_manager.gen.hh`: static/dynamic label registration.
-- `cla_configuration.gen.hh`: command-line configuration adapters.
-- `serializable_factory.gen.hh`: dynamic serializable creation.
+- `tests/unit/core/reflection_test/reflection_test_data.hh`: inheritance (multiple, diamond), required fields, aliases,
+  static and strict types, reflected methods, enums.
+- `include/function/render_vk/rt_params_run_compute_pipeline_vk.hh` and `rt_run_compute_pipeline_vk.hh`: params struct and
+  render task.
+- `include/function/render_vk/mesh_resources_vk.hh`: script enum with lowercase aliases.
+- `include/function/render_vk/vulkan_enums_vk.hh`, `rend_*_params_vk.hh`: reflected Vulkan enums and resource params.
+- `tests/executable/function/render/pixel_sorting_recipe_context.hh`: script context deriving from `RendRecipeContextVK`.
+- `include/core/engine_config/engine_config_options.hh`: config option with CLA configuration.
+- Tests: `tests/unit/core/reflection_test/` (aggregated by `reflection_test.cpp`), `tests/unit/core/script_test/`,
+  `tests/unit/core/parser_test/`, `tests/unit/function/teal_declarations_test.cpp`,
+  `render_task_registry_vk_test.cpp`, `render_task_registry_vk_builtin_test.cpp`, `rend_resource_params_vk_test.cpp`,
+  `rend_graph_script_vk_test.cpp`.
 
-Generation entries are declared in `include/per_target/generate.json` and `src/generated/generate.json`. A generation entry supplies `out_dir`, `output_name`, `template`, and `data`. `${...}` expands build parameters; dot-prefixed data paths resolve reflection/config metadata.
-
-## Currently exercised serialization types
-
-The generic parser plus generated recursion currently has coverage for:
-
-- signed and unsigned 32-bit and 64-bit integers;
-- `float`, `double`, `bool`, and `std::string`;
-- `std::optional<std::string>` and the generic optional mechanism;
-- `glm::vec2`, `glm::vec3`, `glm::vec4`, and `glm::quat`;
-- engine `Buffer<N>` values;
-- nested reflected types;
-- `std::vector<int>`, `std::vector<std::string>`, and vectors of reflected types;
-- single, multiple, multilevel, and virtual-diamond inheritance;
-- required fields and aliases.
-
-Support depends on both `SerializableSD<T>` and the selected parser data implementation. JSON and TOML have parallel but separate `set/get` branches. Do not claim a type is generally supported merely because one parser accepts it.
-
-A nested type is not serializable merely because one of its fields uses `WBE_REFLECT`. The nested type must itself belong to a generated serializable category or provide a visible hand-written `SerializableSD<NestedType>` specialization; the same requirement applies to `std::vector<NestedType>` elements.
-
-Vectors and optionals construct temporary elements with `T{}` during deserialization, so element types must be default-constructible. Vector serialization translates each element through `SerializableSD<T>` rather than relying on native parser support for arbitrary `std::vector<T>`.
-
-## Adding a reflected or serializable type
-
-1. Include `core/reflection/reflection_defs.hh`; also include `core/reflection/serializable.hh` for dynamic serializable types.
-2. Select the narrowest existing class category that provides the required generated consumers.
-3. For `WBE_SERIALIZABLE`, derive from `Serializable` and add `WBE_DECL_SERIALIZABLE(Type)` inside the class.
-4. Annotate only fields intended for generated APIs with `WBE_META(WBE_REFLECT)`.
-5. Add required/alias annotations only when the data contract needs them.
-6. Verify every reflected field and base type can be named from generated-header include context and can be serialized by each required parser format.
-7. Build with `python build.py -t debug`; do not invoke CMake directly and do not edit generated files.
-8. Add JSON/TOML tests for data-contract behavior, accessor tests for name/type access, and factory tests only when dynamic construction is required.
-
-Use `tests/unit/core/reflection_test/reflection_test_data.hh` as the canonical declaration examples. Relevant consumers are tested in `accessor_test.hh`, `factory_test.hh`, `serializer_test.hh`, `deserializer_test_json.hh`, and `deserializer_test_toml.hh`.
-
-## Extending supported field or container types
-
-Choose one of two extension levels:
-
-- Add a hand-written `SerializableSD<NewType>` specialization when the type can be translated through the existing parser-data API. Place it in a non-generated header that is visible before generated specializations use it.
-- Extend `ParserJSON` and/or `ParserTOML` `set/get` branches when the parser-data representation itself must understand the type.
-
-For a reusable container, follow the generated `std::vector<T>` pattern only if recursive element conversion and default construction match the desired contract. Avoid teaching templates about a one-off application type.
-
-Test round trips, missing values, malformed/type-mismatched data, nested usage, and both parser formats that the feature claims to support.
-
-## Extending extraction or generation
-
-### New metadata or language construct
-
-`build_script/reflection/metadata_types.py` already models methods, but the current metaparser extracts base classes and annotated fields only. Method reflection therefore requires AST traversal and metadata population before any Jinja template can use it.
-
-When adding metadata:
-
-1. extend the metadata model;
-2. populate it in `metaparser.py` from verified Clang cursor shapes;
-3. preserve cache serialization/deserialization;
-4. add parser tests or a representative annotated fixture;
-5. update only consumers that require the new metadata.
-
-### New annotation category
-
-Annotation strings are stored generically, while category membership is configured in `build_config.py`. Add the category to the appropriate generator set and update template conditions. Extend metaparser logic only when the annotation requires structured parameters or different AST extraction.
-
-### New generated consumer
-
-Add a focused Jinja template and a `generate.json` entry. Reuse the existing metadata rather than reparsing source. Keep generated includes sufficient for every emitted type spelling, use target-specific output paths, and let `code_gen.py` manage changed-file writes.
-
-## Pitfalls and invariants
+## Invariants
 
 - Do not confuse this system with Slang shader reflection.
-- Do not edit generated `*.gen.*` artifacts.
-- Unannotated fields are intentionally invisible.
-- `WBE_META` carries no runtime information in normal compilation.
-- Clang's recorded `field.type.spelling` is emitted into accessor templates; it must compile in generated-header context.
-- Required-field errors occur during deserialization and are `std::runtime_error`.
-- The engine does not catch reflection/parser exceptions outside tests.
-- Inheritance generation invokes `SerializableSD<Base>` for every recorded base; each base must have a compatible specialization.
-- Alias parsing is intentionally narrow.
-- Factory aliases and canonical names must be unique.
-- Label hashes must not collide.
-- Keep all engine and test-support types in `WhiteBirdEngine`; do not introduce helper namespaces.
+- Do not edit generated artifacts. Unannotated fields and methods are invisible.
+- Recorded type spellings are emitted into generated code and must compile there.
+- Reflection and parser errors are `std::runtime_error` (or build failures) and are not caught outside tests.
+- Keep all engine and test-support types in `WhiteBirdEngine`.

@@ -1,60 +1,82 @@
 ---
 name: white-bird-render-graph
-description: Build, extend, and diagnose White Bird Engine's Vulkan render graphs. Apply when declaring graph resources and task dependencies, implementing RenderTaskVK types, scheduling graphics or compute work, binding per-frame resources, or debugging render-graph synchronization and lifecycle behavior.
+description: Build, extend, and diagnose White Bird Engine's Vulkan render graphs and their Lua/Teal recipes. Apply when registering a graph and its rebuild callback, writing or changing a render-graph recipe or feature subgraph module, declaring graph resources, imports, and task edges, adding or registering an IRenderTaskVK type and its RTParams struct, using triggers, toggles, imported C++ tasks, or subgraphs, choosing queues, or debugging render-graph synchronization, rebuild diffing, or lifecycle behavior.
 ---
 
 # White Bird Render Graph
 
-Treat a render graph as a statically built DAG of `IRenderTaskVK` nodes connected by resource dependency edges on named `RendResVK` resources. Use `RendGraphDescVK` and `RendTaskDescVK` for application-owned graph descriptions; use `RenderGraphVK` directly only when lower-level graph construction is required.
+A render graph is a DAG of `IRenderTaskVK` nodes connected by resource dependency edges. Applications never build a graph
+directly: they register a **rebuild callback** that returns a complete `RendGraphDescVK`, and the graph calls it for the first
+build and every rebuild. The descriptor usually comes from a Teal **recipe**; C++ adds only what recipes cannot express.
 
-## Build a graph descriptor
+## Register a graph
 
-1. Declare every resource tasks use. The graph compiler allocates and owns resources declared with `add_buffer()`, `add_image()`, `add_image_view(view_id, image_id, ...)`, and `add_sampler()`: each takes a primary usage (`RendResPrimaryUsageVK`, such as `IMAGE_READ_WRITE`, `IMAGE_RENDER_TARGET`, `IMAGE_DEPTH_TARGET`, or `BUFFER_UNIFORM`) plus format, extent, mip levels, memory domain, per-frame allocation, and initial data as applicable. Import resources owned elsewhere (the swap chain, loaded textures, buffers shared between graphs, compiled static or dynamic meshes, acceleration structures) with `add_resource(id, *bindable)`; composites register members under `<id>.<member>`. Mesh shaders use the shared `REND_RES_MESH_*` ids, so alias them to the drawn mesh's `<id>.<member>` resources.
-2. Add task descriptors with unique lower-snake-case string `task_id` values, each owning its concrete `Unique<IRenderTaskVK>` (construct `RendTaskDescVK(allocator, task_id, task)`, assign `task`, or use `RendGraphDescVK::add_task(task_id, task)`).
-3. Connect tasks with `connect(next_task_id, resource_id)` on the earlier task's descriptor. The graph derives the edge's stages and accesses from the `RendResUsageVK` usages both tasks report for the resource; both tasks must access it. Use `RendGraphDescVK::get_task()` to connect a task that was already added. Declared resource accesses never create edges, and there is no other ordering mechanism.
-4. Map task-local resource identifiers to graph resources with `RendTaskDescVK::alias()`: reflected shader ids that differ from the graph's, and the render targets `render_target_colors[<index>]` / `render_target_depth` of graphics tasks. The graph rejects aliases the task never uses.
-5. Register and activate the graph through `RendererVK`; do not manually drive graph execution from application code.
+```cpp
+Ref<RenderGraphVK> graph = renderer->register_render_graph("my_graph",
+    [this, renderer](const RendGraphContextVK& p_context) {
+        RendGraphRecipeImportsVK imports;
+        imports.add(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
+            .add("camera_info", *camera_info_ubo);
+        const DataValue recipe = RendGraphScriptVK::run("render_graphs.my_graph",
+            RendGraphScriptVK::make_context(*base_render_data, p_context));
+        return RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+    });
+renderer->activate_render_graph("my_graph");
+```
 
-Allocate tasks with the render allocator. `RendTaskDescVK` solely owns its task and is movable but not copyable; building the graph moves the task into it, so a task descriptor builds one graph.
+- The callback runs at registration, when the context changes (swap-chain extent, checked at `execute()`), and on
+  `RenderGraphVK::rebuild()`. Keep pipeline compiles, application-owned buffers, and initial-data snapshots outside it; only
+  assemble the descriptor inside, and make sure its captures outlive the graph.
+- Re-import renderer-owned objects such as the swap-chain container inside the callback; do not capture them once.
+- Rebuilds diff the new descriptor against the current graph. Matching graph-owned resources keep their content; changed ones
+  are recreated in place or replaced. All tasks are recreated from their factories, so state that must survive a rebuild
+  lives outside the task.
 
-## Declare task access precisely
+## Choose where the graph is described
 
-Every task implements `queue_family()`, `append_accesses()`, and `record()`, and reports all of its accesses itself: pipeline-run tasks report their reflected shader resources (access comes from the optional third `WBE_DESCRIPTOR` argument), graphics tasks report their render targets, and fixed-function tasks report their buffers and images. Each `ResAccessVK` uses the exact graph resource ID plus a compact `RendResUsageVK`. Vulkan access and pipeline-stage masks are derived privately by the graph.
+- **Recipe (default).** A Teal `script` resource under `res/assets/scripts/teal/render_graphs/` exporting
+  `build(context)` that returns `imports`, `resources`, and `tasks`. Use registered task types by name with typed `params`.
+- **C++ additions.** Tasks needing application objects (ImGui overlay, acceleration-structure builds, CPU readback sinks)
+  are built as `RendTaskDescVK` and supplied with `RendGraphRecipeImportsVK::add_task()`; the recipe lists them as
+  `{ id = ..., import = true }`. Parts not yet expressible in Lua may be added to the descriptor the builder returns.
+- **Pure C++ graph.** Only for small tests or when a recipe is not available; see `vulkan_draw_triangle_test.cpp`.
 
-Graph construction rejects cycles, self edges, unknown task ids, undeclared resources, empty stages, and graphics-only stages on compute tasks. Every read-write, write-read, or write-write conflict between declared accesses must be ordered by a chain of edges carrying that same resource; edges on other resources do not count. Read-read pairs do not conflict. Consecutive edges on one resource must share a stage at the middle task, and an edge into a task that writes the resource must be a `WRITE` edge.
+Read [references/recipes-and-scripts.md](references/recipes-and-scripts.md) before writing or changing a recipe, a feature
+module, a context struct, a trigger or toggle, an imported task, or a new task type.
 
-Prefer existing task types such as `RTRunComputePipelineVK`, `RTRunGraphicsPipelineVK`, and `RTRunGraphicsPipelineIndirectVK` before adding a new `IRenderTaskVK`. Render-graph command buffers bind the renderer-owned descriptor heaps before task recording, and pipeline-run tasks bind their reflected fields to graph resources at graph build and push their descriptor indices automatically. `RTRunComputePipelineVK`, `RTRunComputePipelinesSequentialVK`, and `RTPingPongVK` default to `QueueFamilyVK::GRAPHICS`; pass `QueueFamilyVK::COMPUTE_1` or `QueueFamilyVK::COMPUTE_2` to run them asynchronously.
+## Core rules
 
-## Use queues and resources safely
+- **Edges are the only ordering.** `connect(next_task_id, resource_id)` on the earlier task (or a recipe `connect` entry)
+  carries one resource; both tasks must access it, and stages and accesses are derived from the `RendResUsageVK` usages
+  both report. Every read-write, write-read, and write-write conflict on a resource must be ordered by a chain of edges on
+  that same resource, or construction fails. Read-read pairs do not conflict.
+- **Tasks report their own accesses** through `append_accesses()`: reflected shader resources (`WBE_DESCRIPTOR` access),
+  render targets, fixed-function buffers. Map task-local ids with `alias()` only; graphics tasks render to
+  `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected.
+- **Resources.** Graph-owned resources are declared with `add_buffer()`, `add_image()`, `add_image_view()`, and
+  `add_sampler()` (factories of the context in C++, tables in recipes). Everything owned elsewhere is an import through
+  `add_resource(id, *bindable)`; composites register `<id>.<member>`. Keep the description structs' `operator==` complete,
+  because diffing relies on it.
+- **Meshes** are drawn with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), which imports the
+  mesh under its render-database key and aliases the `REND_RES_MESH_*` ids. Do not hand-assemble mesh draws.
+- **Queues.** Compute tasks default to `GRAPHICS`; pass `COMPUTE_1` / `COMPUTE_2` (recipe param `queue_family`) to run
+  asynchronously. Same-queue edges become pipeline barriers; cross-queue edges use timeline semaphores. Every task on
+  another queue must reach a graphics task.
+- **Threading.** Render objects and backend helpers are rendering-thread-confined. Submit cross-thread work through
+  `IRenderer::add_job()`; do not add locks.
+- **Descriptors.** The graph binds the renderer-owned descriptor heaps before recording each task; pipeline-run tasks push
+  their reflected descriptor indices. Do not reintroduce descriptor sets or pipeline layouts.
 
-Graphics and compute nodes record from queue-specific command pools and submit to their corresponding queues. Edges between tasks on the same queue become pipeline barriers recorded before the next task: buffer barriers for buffers, whole-image barriers for image views in the unified `GENERAL` layout, and global memory barriers otherwise. Edges crossing queues use one timeline semaphore per producer task. Never place graphics-only pipeline stages on compute tasks.
-
-Images and buffers shared across renderer-selected queue families should retain their default queue-family configuration. Their builders then use concurrent sharing when multiple families exist. An explicit exclusive-sharing override requires queue-family ownership transfers, which render-graph resource barriers do not currently emit.
-
-Presentation remains graphics-specific: swap-chain acquire waits attach to the first graphics node, and terminal signaling, presentation layout transition, and the in-flight fence attach to the last graphics node. Every task on another queue must have an edge path to a graphics task; graph construction fails otherwise.
-
-## Bind runtime resources through the renderer
-
-Render-graph resources are bind-once for the graph lifetime. `RenderGraphVK::build_from_descriptor()` allocates graph-owned resources before instantiating tasks, rejects duplicate ids, and rejects any imported `RendResVK` whose container is null. Graph-owned resources live in an `ROCSingleVK`, or an `ROCMultislotsVK` with one slot per frame in flight when declared per frame; a view of a per-frame image is per-frame. Update graph-owned buffers through `RenderGraphVK::acquire_resource(id)` on the rendering thread. When an imported resource varies by frame, bind one stable container up front and mutate the render objects inside it instead of rebinding the graph resource.
-
-The swap-chain path uses this pattern: the application binds `REND_RES_SWAP_CHAIN` to `RendererVK::acquire_swap_chain_image_view_container()` before graph registration, and each frame the renderer replaces only the current slot's image view before execution. Construct swap-chain `ROCMultislotsVK` containers with `p_flush = false` so slot replacement does not trigger buffer-update generation tracking.
-
-Do not rely on post-build `set_resource()` or transient graph-resource overrides; those late-binding paths are no longer supported. `ROCBindingVK` was removed from the codebase; if a resource must vary, represent that variation inside the bound container itself.
-
-Graph rebuild frees existing command buffers and waits for the device to become idle. Unregistration defers destruction for the configured frames in flight. Tasks are moved out of their descriptors at build, so create new tasks for a new graph instead of rebuilding from a used descriptor.
-
-Render objects and Vulkan backend helpers are confined to the rendering thread. Submit cross-thread updates through `IRenderer::add_job()`; do not add locks to these objects merely to permit direct cross-thread access.
+Read [references/system-and-usage.md](references/system-and-usage.md) before changing edge validation, synchronization,
+queue behavior, descriptor binding, rebuild diffing, subgraph flattening, registration, or presentation, or when choosing
+among the built-in task types.
 
 ## Validate
 
-Use the repository wrapper and select the smallest relevant render test filter first:
-
 ```sh
-python validation.py -t debug -- --gtest_filter='WBERenderGraph*'
+python validation.py -t debug -- --gtest_filter='WBERenderGraph*:WBERendGraph*:WBERenderTaskRegistryVK*:WBERT*'
 ```
 
-The wrapper runs the complete unit suite after the focused tests pass. Do not invoke CMake directly or run lint automatically.
-
-## Advanced work
-
-Read [references/system-and-usage.md](references/system-and-usage.md) before changing edge validation, synchronization, queue behavior, descriptor-heap binding, bind-once resource setup, graph rebuilding, or presentation integration. It also identifies canonical graphics and deferred-compute examples.
+The wrapper builds (including the Teal type check, which fails the build on a type error), runs the focused tests, then the
+full unit suite and shader tests. Visual or synchronization changes also need a rendering executable run; see the
+`white-bird-testing` skill. Do not invoke CMake directly or run lint.
