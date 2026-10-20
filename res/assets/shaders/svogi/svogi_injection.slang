@@ -13,10 +13,6 @@
    limitations under the License.
 */
 
-// Injection writes the SVO's normal distribution function.
-#define WBE_SVO_ENABLE_DATA
-#define WBE_SVO_DATA_WRITE
-
 #include "deferred_composition/deferred_composition_utils.slang"
 #include "svo/svo.slang"
 #include "svo/svo_utils.slang"
@@ -59,7 +55,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     RWTexture3D<uint3> ndf = ResourceDescriptorHeap[descriptor_indices.ndf.x];
     // TODO
 
-    SVO<uint3> svo = SVO<uint3>(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true, ndf);
+    // Injection writes the SVO's normal distribution function.
+    SVOWriteImage<uint3> svo_ndf =
+        SVOWriteImage<uint3>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), ndf);
 
     uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
     SpotLight spot_light =
@@ -76,7 +74,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float2 flux = spot_light.rsm_flux.SampleLevel(spot_light.shadowmap_sampler, texel_uv, 0).rg;
     float3 world_position = spot_light.shadow_texel_world_position(texel_uv, shadow_depth);
     SVONodeTraceInfo trace_info;
-    uint data_index = svo.trace_data(world_position, trace_info);
+    uint data_index = svo_ndf.svo.trace_data(world_position, trace_info);
     // TODO
 
 }

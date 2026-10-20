@@ -40,8 +40,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (index >= position_count) {
         return;
     }
-    // Without WBE_SVO_ENABLE_DATA the SVO holds no voxel data image, so its texel type is unused.
-    SVO<float4> svo = SVO<float4>(nodes, dynamic_nodes, leaves, dynamic_leaves, tree_info[0], TRAVERSE_DYNAMIC != 0);
+    SVO svo = SVO(nodes, dynamic_nodes, leaves, dynamic_leaves, tree_info[0], TRAVERSE_DYNAMIC != 0);
     SVONodeTraceInfo trace_info;
     results[index] = svo.trace_data(positions[index].xyz, trace_info);
     traces[index] = trace_info;

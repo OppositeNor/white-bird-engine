@@ -17,17 +17,6 @@
 
 #include "svo/svo_dynamic_types.slang"
 
-#ifdef WBE_SVO_ENABLE_DATA
-/**
- * @brief Image type of SVO::voxel_data: writable when WBE_SVO_DATA_WRITE is defined, read-only otherwise.
- */
-#ifdef WBE_SVO_DATA_WRITE
-typealias SVOVoxelDataImage<T : ITexelElement> = RWTexture3D<T>;
-#else
-typealias SVOVoxelDataImage<T : ITexelElement> = Texture3D<T>;
-#endif
-#endif
-
 /**
  * @brief Read-only view of an already constructed SVO that resolves positions to the data_index of their nodes and leaves.
  * @details Every stored node and leaf owns one data element through its data_index; the SVO does not own or read the data,
@@ -35,10 +24,8 @@ typealias SVOVoxelDataImage<T : ITexelElement> = Texture3D<T>;
  * data first, followed by the dynamic node data and then the dynamic leaf data. The SVO must be fully constructed and
  * published, and its buffers must not change during the calling pass, because node descriptions are read without
  * synchronization. Construction is not performed through this type.
- * @tparam T Texel type of the voxel_data image. Slang cannot infer it from the constructor's arguments, so callers always
- * name it, including when WBE_SVO_ENABLE_DATA is undefined and the image is absent.
  */
-struct SVO<T : ITexelElement> {
+struct SVO {
     /**
      * @brief Static SVO node storage.
      */
@@ -63,36 +50,22 @@ struct SVO<T : ITexelElement> {
      * @brief Whether traces follow the dynamic children published by the dynamic construction passes.
      */
     bool traverse_dynamic;
-#ifdef WBE_SVO_ENABLE_DATA
-    /**
-     * @brief Voxel data image; present only when WBE_SVO_ENABLE_DATA is defined.
-     */
-    SVOVoxelDataImage<T> voxel_data;
-#endif
 
     /**
      * @brief Create a view over the buffers of a constructed SVO.
-     * @param p_voxel_data The voxel data image; the parameter exists only when WBE_SVO_ENABLE_DATA is defined.
      */
     __init(RWStructuredBuffer<SVONode> p_nodes,
         RWStructuredBuffer<SVONode> p_dynamic_nodes,
         StructuredBuffer<SVOLeaf> p_leaves,
         StructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
         SVOInfo p_info,
-        bool p_traverse_dynamic
-#ifdef WBE_SVO_ENABLE_DATA
-        , SVOVoxelDataImage<T> p_voxel_data
-#endif
-        ) {
+        bool p_traverse_dynamic) {
         nodes = p_nodes;
         dynamic_nodes = p_dynamic_nodes;
         leaves = p_leaves;
         dynamic_leaves = p_dynamic_leaves;
         info = p_info;
         traverse_dynamic = p_traverse_dynamic;
-#ifdef WBE_SVO_ENABLE_DATA
-        voxel_data = p_voxel_data;
-#endif
     }
 
     /**
@@ -151,6 +124,56 @@ struct SVO<T : ITexelElement> {
     float3 voxel_index_to_global(uint p_voxel_index, uint p_depth) {
         uint3 cell = get_deferred_list_entry_voxel(p_voxel_index, info.max_depth) >> (info.max_depth - p_depth);
         return info.origin + float3(cell) * (info.width / float(1u << p_depth));
+    }
+};
+
+/**
+ * @brief An SVO paired with a read-only voxel data image.
+ * @details The image holds the data of the SVO's nodes and leaves; its layout and indexing are defined by the caller. The
+ * same synchronization requirements as SVO apply, and the image must not be written during the calling pass.
+ * @tparam T Texel type of the voxel data image.
+ */
+struct SVOReadImage<T : ITexelElement> {
+    /**
+     * @brief The SVO the voxel data belongs to.
+     */
+    SVO svo;
+    /**
+     * @brief Read-only voxel data image.
+     */
+    Texture3D<T> voxel_data;
+
+    /**
+     * @brief Pair an SVO with its voxel data image.
+     */
+    __init(SVO p_svo, Texture3D<T> p_voxel_data) {
+        svo = p_svo;
+        voxel_data = p_voxel_data;
+    }
+};
+
+/**
+ * @brief An SVO paired with a writable voxel data image.
+ * @details The image holds the data of the SVO's nodes and leaves; its layout and indexing are defined by the caller, who is
+ * also responsible for synchronizing writes to it. The same synchronization requirements as SVO apply to the SVO itself.
+ * @tparam T Texel type of the voxel data image.
+ */
+struct SVOWriteImage<T : ITexelElement> {
+    /**
+     * @brief The SVO the voxel data belongs to.
+     */
+    SVO svo;
+    /**
+     * @brief Writable voxel data image.
+     */
+    RWTexture3D<T> voxel_data;
+
+    /**
+     * @brief Pair an SVO with its voxel data image.
+     */
+    __init(SVO p_svo, RWTexture3D<T> p_voxel_data) {
+        svo = p_svo;
+        voxel_data = p_voxel_data;
     }
 };
 
