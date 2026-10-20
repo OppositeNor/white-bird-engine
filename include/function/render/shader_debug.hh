@@ -54,6 +54,8 @@ enum class WBE_META(WBE_REFLECT_ENUM) ShaderDebugError : uint32_t {
     OCTREE_LEAF_LIST_OVERFLOW = 7,
     /** An octree debug node would exceed the debug node list. */
     OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
+    /** An SVO data index lies past the texels of its voxel data image. */
+    SVO_VOXEL_DATA_INDEX_OVERFLOW = 9,
 };
 
 } // namespace WhiteBirdEngine

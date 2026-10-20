@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_SVO_SLANG
 #define WBE_FILE_SVO_SLANG
 
+#include "utils/utils.slang"
 #include "svo/svo_dynamic_types.slang"
 
 /**
@@ -94,6 +95,22 @@ struct SVO {
     }
 
     /**
+     * @brief Trace like trace_data(), but stop at a node no deeper than p_depth.
+     * @param p_world_position Position in world space; every component must lie in [info.origin, info.origin + info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, in [1, info.max_depth]: one for the root's sectors and
+     * info.max_depth for leaves.
+     * @param p_trace_info Receives the final traversal state: the storage and index of the reached node or leaf, and its
+     * depth.
+     * @return The data_index of the reached node or leaf.
+     */
+    uint trace_data(float3 p_world_position, uint p_depth, out SVONodeTraceInfo p_trace_info) {
+        p_trace_info = get_svo_root_trace_info(get_svo_position(p_world_position), info.max_depth);
+        p_trace_info.remain_depth = int(p_depth) - 1;
+        traverse_svo(nodes, dynamic_nodes, info, traverse_dynamic, p_trace_info);
+        return get_data_index(p_trace_info);
+    }
+
+    /**
      * @brief Get the data index of the node or leaf reached by a trace.
      * @param p_trace_info Traversal state produced by trace_data() or traverse_svo().
      * @return The data_index of the referenced node or leaf.
@@ -150,6 +167,27 @@ struct SVOReadImage<T : ITexelElement> {
         svo = p_svo;
         voxel_data = p_voxel_data;
     }
+
+    /**
+     * @brief Trace the SVO to a depth and read the voxel data of the reached node or leaf.
+     * @details The traced data index is expanded into the image's dimensions row-major, x fastest and z slowest. In
+     * shader-debug builds, a data index past the image's texel count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the read is
+     * not guarded otherwise.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return The stored texel holding the reached node's or leaf's data.
+     */
+    T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
+        SVONodeTraceInfo trace_info;
+        uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
+        uint3 dimensions;
+        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        uint3 texel = unflatten_index_3d_checked(
+            data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
+        return voxel_data.Load(int4(int3(texel), 0));
+    }
 };
 
 /**
@@ -174,6 +212,159 @@ struct SVOWriteImage<T : ITexelElement> {
     __init(SVO p_svo, RWTexture3D<T> p_voxel_data) {
         svo = p_svo;
         voxel_data = p_voxel_data;
+    }
+
+    /**
+     * @brief Trace the SVO to a depth and read the voxel data of the reached node or leaf.
+     * @details The traced data index is expanded into the image's dimensions row-major, x fastest and z slowest. In
+     * shader-debug builds, a data index past the image's texel count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the read is
+     * not guarded otherwise.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return The stored texel holding the reached node's or leaf's data.
+     */
+    T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
+        return voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)];
+    }
+
+    /**
+     * @brief Trace the SVO to a depth and overwrite the voxel data of the reached node or leaf.
+     * @details The texel is located as in trace_data(), with the same shader-debug overflow check. The store is not atomic;
+     * callers must ensure no other invocation accesses the same texel during the calling pass.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
+     * @param p_value Value stored into the reached node's or leaf's texel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void write_data(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
+        voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
+    }
+
+    uint3 trace_texel(float3 p_global_position, uint p_depth, uint p_frame_slot) {
+        SVONodeTraceInfo trace_info;
+        uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
+        uint3 dimensions;
+        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        uint3 texel = unflatten_index_3d_checked(
+            data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
+        return texel;
+    }
+};
+
+/**
+ * @brief Number of texels along each axis of an SVO voxel data brick.
+ */
+static const uint SVO_BRICK_SIZE = 3;
+
+/**
+ * @brief An SVO paired with a read-only image of 3x3x3 voxel data bricks.
+ * @details Each node or leaf owns the brick at its data index, expanded row-major, x fastest and z slowest, into the
+ * image's dimensions divided by SVO_BRICK_SIZE. A brick's texels are sub-voxels of its node or leaf centered at its local
+ * coordinates 0, 0.5, and 1 on each axis: its corners, edge centers, face centers, and center. The same synchronization
+ * requirements as SVO apply, and the image must not be written during the calling pass.
+ * @tparam T Texel type of the brick image; it must support filtered sampling.
+ */
+struct SVOReadBrick<T : ITexelElement> {
+    /**
+     * @brief The SVO the voxel data belongs to.
+     */
+    SVO svo;
+    /**
+     * @brief Read-only brick image.
+     */
+    Texture3D<T> voxel_data;
+    /**
+     * @brief Sampler used to read the bricks; it must filter linearly within a mip level.
+     */
+    SamplerState brick_sampler;
+
+    /**
+     * @brief Pair an SVO with its brick image and the sampler that reads it.
+     */
+    __init(SVO p_svo, Texture3D<T> p_voxel_data, SamplerState p_brick_sampler) {
+        svo = p_svo;
+        voxel_data = p_voxel_data;
+        brick_sampler = p_brick_sampler;
+    }
+
+    /**
+     * @brief Trace the SVO to a depth and interpolate the brick of the reached node or leaf at the traced position.
+     * @details The traced position, local to the reached node or leaf, is interpolated trilinearly between the brick's
+     * sub-voxel centers, so the sample never reads a neighboring brick. In shader-debug builds, a data index past the
+     * image's brick count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the read is not guarded otherwise.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return The interpolated voxel data.
+     */
+    T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
+        SVONodeTraceInfo trace_info;
+        uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
+        uint3 dimensions;
+        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
+                                 ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
+            SVO_BRICK_SIZE;
+        // Sub-voxel centers sit at local 0, 0.5, and 1, the centers of the brick's texels 0, 1, and 2.
+        float3 texel_position = float3(brick_origin) + 0.5 + trace_info.svo_position * float(SVO_BRICK_SIZE - 1);
+        return voxel_data.SampleLevel(brick_sampler, texel_position / float3(dimensions), 0.0);
+    }
+};
+
+/**
+ * @brief An SVO paired with a writable image of 3x3x3 voxel data bricks.
+ * @details The bricks are laid out as in SVOReadBrick. Each sub-voxel spans half its node's or leaf's width around its
+ * center, so every sub-voxel except the center one extends past the node or leaf; only the part inside it receives data,
+ * and the outside part is discarded. Callers are responsible for synchronizing writes to the image. The same
+ * synchronization requirements as SVO apply to the SVO itself.
+ * @tparam T Texel type of the brick image.
+ */
+struct SVOWriteBrick<T : ITexelElement> {
+    /**
+     * @brief The SVO the voxel data belongs to.
+     */
+    SVO svo;
+    /**
+     * @brief Writable brick image.
+     */
+    RWTexture3D<T> voxel_data;
+
+    /**
+     * @brief Pair an SVO with its brick image.
+     */
+    __init(SVO p_svo, RWTexture3D<T> p_voxel_data) {
+        svo = p_svo;
+        voxel_data = p_voxel_data;
+    }
+
+    /**
+     * @brief Trace the SVO to a depth and overwrite the sub-voxel of the reached node or leaf containing a position.
+     * @details The traced position, local to the reached node or leaf, selects the sub-voxel whose in-voxel part contains
+     * it: per axis, [0, 0.25) selects the low sub-voxel, [0.25, 0.75) the middle one, and [0.75, 1) the high one. The
+     * store is not atomic; callers must ensure no other invocation accesses the same texel during the calling pass. In
+     * shader-debug builds, a data index past the image's brick count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the store is
+     * not guarded otherwise.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
+     * @param p_value Value stored into the selected sub-voxel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void write_data(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
+        SVONodeTraceInfo trace_info;
+        uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
+        uint3 dimensions;
+        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
+                                 ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
+            SVO_BRICK_SIZE;
+        // Round to the nearest sub-voxel center at local 0, 0.5, or 1.
+        uint3 sub_voxel = min(uint3(trace_info.svo_position * float(SVO_BRICK_SIZE - 1) + 0.5), uint3(SVO_BRICK_SIZE - 1));
+        voxel_data[brick_origin + sub_voxel] = p_value;
     }
 };
 

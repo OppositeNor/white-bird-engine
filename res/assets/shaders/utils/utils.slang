@@ -43,6 +43,7 @@ enum class ShaderDebugError {
     SVO_SHALLOWER_THAN_EXPECTED = 6,
     OCTREE_LEAF_LIST_OVERFLOW = 7,
     OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
+    SVO_VOXEL_DATA_INDEX_OVERFLOW = 9,
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */
@@ -485,6 +486,22 @@ uint flatten_index_3d(uint3 p_coordinate, uint p_width, uint p_height) {
  */
 uint3 unflatten_index_3d(uint p_index, uint p_width, uint p_height) {
     return uint3(p_index % p_width, (p_index / p_width) % p_height, p_index / (p_width * p_height));
+}
+
+/**
+ * @brief Recovers the 3D coordinate of a linear index like unflatten_index_3d(), checking it against the grid's depth.
+ * @details In shader-debug builds, an index past the grid's cell count reports p_overflow_error; the result is not clamped
+ * otherwise.
+ * @param p_index The linear index.
+ * @param p_extent The grid's extent along each axis; x and y must be nonzero.
+ * @param p_overflow_error Error reported when p_index lies past the grid.
+ * @param p_frame_slot Renderer frame slot receiving the error.
+ * @return The coordinate whose flattened index is p_index.
+ */
+uint3 unflatten_index_3d_checked(uint p_index, uint3 p_extent, ShaderDebugError p_overflow_error, uint p_frame_slot) {
+    uint3 coordinate = unflatten_index_3d(p_index, p_extent.x, p_extent.y);
+    WBE_SHADER_DEBUG_ASSERT(coordinate.z < p_extent.z, p_overflow_error, p_frame_slot);
+    return coordinate;
 }
 
 uint morton_delta(uint p_code1, uint p_code2) {
