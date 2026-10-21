@@ -23,7 +23,7 @@
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
@@ -111,14 +111,14 @@ void record_buffer_readback(VkCommandBuffer p_command_buffer,
 }
 
 BufferReadbackOperation begin_device_buffer_readback(
-    const BaseRenderDataVK* p_render_data, VkBuffer p_source_buffer, size_t p_source_offset, size_t p_size) {
+    const RenderContextVK* p_render_data, VkBuffer p_source_buffer, size_t p_source_offset, size_t p_size) {
     RendererVK* renderer = RendererVK::get_singleton();
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to acquire buffer content: the Vulkan renderer is unavailable.");
     }
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(p_size);
     Ref<ROStagingBufferVK> staging_buffer =
-        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(p_render_data);
+        p_render_data->create_staging_buffer(ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT));
     const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(p_size);
     std::future<Ref<ROFenseVK>> submission_future = renderer->register_gpu_job([source_buffer = p_source_buffer,
                                                                                    source_offset = p_source_offset,
@@ -155,7 +155,7 @@ void release_device_buffer_readback(BufferReadbackOperation& p_operation) {
 // The returned future is ready once the bytes are copied, before the staging release is queued on the rendering thread. A
 // rendering thread waiting on it therefore never waits for room in its own full job buffer.
 template <typename TCompletion>
-auto schedule_device_buffer_readback(const BaseRenderDataVK* p_render_data,
+auto schedule_device_buffer_readback(const RenderContextVK* p_render_data,
     VkBuffer p_source_buffer,
     size_t p_buffer_size,
     VkBufferUsageFlags p_usage,
@@ -185,7 +185,7 @@ auto schedule_device_buffer_readback(const BaseRenderDataVK* p_render_data,
 
 } // namespace
 
-ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
+BufferDescVK& BufferDescVK::set_properties(
     size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
     if (p_element_size == 0 || p_element_count == 0) {
         throw std::runtime_error("Failed to set buffer properties: element size and count must be non-zero.");
@@ -199,11 +199,11 @@ ROBufferVK::Builder& ROBufferVK::Builder::set_properties(
     return *this;
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
+BufferDescVK& BufferDescVK::set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain) {
     return set_properties(p_element_size, 1, p_usage, p_domain);
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain) {
+BufferDescVK& BufferDescVK::initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain) {
     if (p_data.empty()) {
         throw std::runtime_error("Failed to configure initial buffer data: data is empty.");
     }
@@ -216,7 +216,7 @@ ROBufferVK::Builder& ROBufferVK::Builder::initial_data(std::span<const uint8_t> 
     return *this;
 }
 
-ROBufferVK::Builder& ROBufferVK::Builder::initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain) {
+BufferDescVK& BufferDescVK::initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain) {
     if (p_data == nullptr) {
         throw std::runtime_error("Failed to configure initial buffer data: data is null.");
     }
@@ -238,19 +238,35 @@ DebugData make_descriptor_row(
 
 } // namespace
 
+Ref<ROBufferVK> BufferDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_buffer(*this);
+}
+
+Unique<ROBufferVK> BufferDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+}
+
+Ref<ROBufferVK> BufferAliasDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_buffer(*this);
+}
+
+Unique<ROBufferVK> BufferAliasDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
+}
+
 TypeID ROBufferVK::get_type_uuid() const {
     return TypeUUID<ROBufferVK>::UUID;
 }
 
 namespace {
 
-VkDeviceAddressRangeEXT get_buffer_address_range(const BaseRenderDataVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
+VkDeviceAddressRangeEXT get_buffer_address_range(const RenderContextVK* p_render_data, VkBuffer p_buffer, VkDeviceSize p_size) {
     VkBufferDeviceAddressInfo address_info{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = p_buffer};
     return VkDeviceAddressRangeEXT{.address = vkGetBufferDeviceAddress(p_render_data->logic_device, &address_info), .size = p_size};
 }
 
 void write_buffer_descriptor(
-    const BaseRenderDataVK* p_render_data, uint32_t p_index, VkDescriptorType p_type, VkBuffer p_buffer, VkDeviceSize p_size) {
+    const RenderContextVK* p_render_data, uint32_t p_index, VkDescriptorType p_type, VkBuffer p_buffer, VkDeviceSize p_size) {
     VkDeviceAddressRangeEXT address_range = get_buffer_address_range(p_render_data, p_buffer, p_size);
     VkResourceDescriptorInfoEXT descriptor{};
     descriptor.sType = VK_STRUCTURE_TYPE_RESOURCE_DESCRIPTOR_INFO_EXT;
@@ -260,7 +276,7 @@ void write_buffer_descriptor(
     p_render_data->descriptor_heap_allocator->write_resource_descriptor(arena.heap_id, arena.arena_id, p_index, descriptor);
 }
 
-VkBufferUsageFlags get_buffer_usage(const ROBufferVK::Builder& p_builder, DeviceDomain p_domain) {
+VkBufferUsageFlags get_buffer_usage(const BufferDescVK& p_builder, DeviceDomain p_domain) {
     VkBufferUsageFlags usage = WBE_REQUIRED(p_builder.usage);
     if (!p_builder.initial_data_bytes.empty() && p_domain == DeviceDomain::DEVICE) {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -271,14 +287,14 @@ VkBufferUsageFlags get_buffer_usage(const ROBufferVK::Builder& p_builder, Device
     return usage;
 }
 
-std::vector<uint32_t> get_initial_queue_families(const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder) {
+std::vector<uint32_t> get_initial_queue_families(const RenderContextVK* p_render_data, const BufferDescVK& p_builder) {
     if (p_builder.queue_family_indices.empty()) {
         return {p_render_data->queue_family_indices.begin(), p_render_data->queue_family_indices.end()};
     }
     return {p_builder.queue_family_indices.begin(), p_builder.queue_family_indices.end()};
 }
 
-void validate_distinct_descriptor_indices(const ROBufferVK::Builder& p_builder) {
+void validate_distinct_descriptor_indices(const BufferDescVK& p_builder) {
     if (p_builder.uniform_view_index.has_value() && p_builder.storage_view_index.has_value() &&
         p_builder.uniform_view_index == p_builder.storage_view_index) {
         throw std::runtime_error("Failed to create buffer: uniform and storage descriptors cannot adopt the same heap index.");
@@ -286,7 +302,7 @@ void validate_distinct_descriptor_indices(const ROBufferVK::Builder& p_builder) 
 }
 
 void validate_adopted_descriptor_indices(
-    const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder, VkBufferUsageFlags p_usage) {
+    const RenderContextVK* p_render_data, const BufferDescVK& p_builder, VkBufferUsageFlags p_usage) {
     if (p_builder.uniform_view_index.has_value()) {
         if ((p_usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) == 0) {
             throw std::runtime_error("Failed to adopt uniform-buffer descriptor index: buffer does not have uniform-buffer usage.");
@@ -326,8 +342,8 @@ VkBufferCreateInfo make_buffer_create_info(VkDeviceSize p_size, VkBufferUsageFla
     return create_info;
 }
 
-void adopt_buffer_descriptors(const BaseRenderDataVK* p_render_data,
-    const ROBufferVK::Builder& p_builder,
+void adopt_buffer_descriptors(const RenderContextVK* p_render_data,
+    const BufferDescVK& p_builder,
     VkBuffer p_buffer,
     VkDeviceSize p_buffer_size,
     std::optional<uint32_t>& p_uniform_view_index,
@@ -343,16 +359,16 @@ void adopt_buffer_descriptors(const BaseRenderDataVK* p_render_data,
 }
 
 void upload_initial_data(
-    ROBufferVK* p_buffer, const BaseRenderDataVK* p_render_data, const ROBufferVK::Builder& p_builder, DeviceDomain p_domain) {
+    ROBufferVK* p_buffer, const RenderContextVK* p_render_data, const BufferDescVK& p_builder, DeviceDomain p_domain) {
     if (p_builder.initial_data_bytes.empty()) {
         return;
     }
     if (p_domain == DeviceDomain::DEVICE) {
         Ref<ROStagingBufferVK> staging_buffer =
-            ROStagingBufferVK::Builder()
+            p_render_data->create_staging_buffer(ROStagingBufferVK::Builder()
                 .set_size(ROStagingBufferVK::required_buffer_size(p_builder.initial_data_bytes.size()))
                 .set_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                .create_ref(p_render_data);
+                );
         void* staging_data = staging_buffer->allocate(p_builder.initial_data_bytes.size());
         std::memcpy(staging_data, p_builder.initial_data_bytes.data(), p_builder.initial_data_bytes.size());
         p_buffer->update_buffer(staging_buffer, staging_data, p_builder.initial_data_bytes.size());
@@ -363,7 +379,7 @@ void upload_initial_data(
 
 } // namespace
 
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
+ROBufferVK::ROBufferVK(const RenderContextVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
     create_buffer(p_builder, false);
     memory = DeviceMemoryVK::Builder().set_buffer_requirements(buffer).set_domain(exposed_fields.domain).create_ref(render_data);
@@ -374,7 +390,7 @@ ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_b
     finish_creation(p_builder);
 }
 
-ROBufferVK::ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder)
+ROBufferVK::ROBufferVK(const RenderContextVK* p_render_data, const AliasBuilder& p_builder)
     : IRenderObjectVK(p_render_data) {
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing buffer: device memory is null.");

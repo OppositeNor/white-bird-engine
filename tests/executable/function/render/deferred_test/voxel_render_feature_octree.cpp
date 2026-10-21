@@ -160,7 +160,7 @@ VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
     Ref<MeshResourcesVK> p_static_mesh_resources,
     const RUAABB3D& p_scene_bounds,
     bool p_rebuild_static_every_frame)
-    : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
+    : renderer_vk(p_renderer), render_context(nullptr), render_allocator(nullptr),
       static_mesh_resources(std::move(p_static_mesh_resources)), octree_volume(VoxelVolume::enclose(p_scene_bounds, OCTREE_EXTENT)),
       rebuild_static_every_frame(p_rebuild_static_every_frame) {
     if (renderer_vk == nullptr) {
@@ -169,8 +169,8 @@ VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
     if (static_mesh_resources == MEM_NULL) {
         throw std::runtime_error("VoxelRenderFeatureOctree: static scene is required.");
     }
-    base_render_data = renderer_vk->get_base_render_data();
-    render_allocator = base_render_data->allocator;
+    render_context = renderer_vk->get_render_context();
+    render_allocator = render_context->allocator;
     compile_pipelines();
     create_resources();
 }
@@ -202,7 +202,7 @@ std::string VoxelRenderFeatureOctree::get_dynamic_level_resource_id(uint32_t p_l
 Ref<ROComputePipelineVK> VoxelRenderFeatureOctree::compile_compute_pipeline(std::string_view p_resource_id) const {
     ComputePipelineCompilerVK compiler(ComputePipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
     });
     return compiler.compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id)).compute_pipeline;
@@ -211,10 +211,10 @@ Ref<ROComputePipelineVK> VoxelRenderFeatureOctree::compile_compute_pipeline(std:
 Ref<ROGraphicsPipelineVK> VoxelRenderFeatureOctree::compile_debug_draw_pipeline(std::string_view p_resource_id) const {
     GraphicsPipelineCompilerVKContext context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .color_attachment_formats = {render_context->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
         .polygon_mode = VK_POLYGON_MODE_LINE,
     };
@@ -227,7 +227,7 @@ void VoxelRenderFeatureOctree::compile_pipelines() {
     auto* resource_manager = ResourceManager::get_singleton();
     GraphicsPipelineCompilerVK build_compiler(GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
     });
@@ -244,17 +244,16 @@ void VoxelRenderFeatureOctree::compile_pipelines() {
 }
 
 Ref<ROImageVK> VoxelRenderFeatureOctree::create_octree_image() const {
-    return ROImageVK::Builder()
+    return render_context->create_image(ROImageVK::Builder()
         .image_3d(VkExtent3D{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT, .depth = OCTREE_EXTENT})
         .set_format(OCTREE_FORMAT)
         .set_mipmap_level(OCTREE_LEVEL_COUNT)
-        .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-        .create_ref(base_render_data);
+        .set_usage(VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
 }
 
 Ref<ROImageViewVK> VoxelRenderFeatureOctree::create_octree_image_view(
     const Ref<ROImageVK>& p_image, uint32_t p_base_level, uint32_t p_level_count) const {
-    return ROImageViewVK::Builder()
+    return render_context->create_image_view(ROImageViewVK::Builder()
         .set_image(p_image)
         .set_view_type(VK_IMAGE_VIEW_TYPE_3D)
         .set_format(OCTREE_FORMAT)
@@ -264,12 +263,11 @@ Ref<ROImageViewVK> VoxelRenderFeatureOctree::create_octree_image_view(
             .levelCount = p_level_count,
             .baseArrayLayer = 0,
             .layerCount = 1,
-        })
-        .create_ref(base_render_data);
+        }));
 }
 
 Ref<ROBufferVK> VoxelRenderFeatureOctree::create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const {
-    return ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size).create_ref(base_render_data);
+    return render_context->create_buffer(ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size));
 }
 
 void VoxelRenderFeatureOctree::create_resources() {
@@ -299,22 +297,19 @@ void VoxelRenderFeatureOctree::create_resources() {
         .firstInstance = 0,
     };
     // The leaf gather writes every command before each leaf-view draw.
-    debug_draw_indirect_buffer = ROBufferVK::Builder()
+    debug_draw_indirect_buffer = render_context->create_buffer(ROBufferVK::Builder()
                                      .set_properties(sizeof(VkDrawIndexedIndirectCommand),
                                          OCTREE_DEBUG_LEAF_DRAW_COUNT,
-                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
-                                     .create_ref(base_render_data);
-    debug_leaf_masks = ROBufferVK::Builder()
-                           .set_properties(OCTREE_DEBUG_LEAF_MASK_SIZE, OCTREE_DEBUG_SUBGRID_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                           .create_ref(base_render_data);
+                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT));
+    debug_leaf_masks = render_context->create_buffer(ROBufferVK::Builder()
+                           .set_properties(OCTREE_DEBUG_LEAF_MASK_SIZE, OCTREE_DEBUG_SUBGRID_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     debug_node_draw_indirect_buffer = create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         &initial_debug_draw_command,
         sizeof(initial_debug_draw_command));
-    debug_node_list = ROBufferVK::Builder()
+    debug_node_list = render_context->create_buffer(ROBufferVK::Builder()
                           .set_properties(sizeof(uint32_t),
                               size_t{OCTREE_DEBUG_NODE_LIST_HEADER_COUNT} + OCTREE_MAX_DEBUG_NODE_COUNT,
-                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                          .create_ref(base_render_data);
+                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
 }
 
 RendTaskDescVK VoxelRenderFeatureOctree::make_texture_write(RendTaskDescVK p_task, std::string_view p_texture_view_id) const {
@@ -369,7 +364,7 @@ RendTaskDescVK& VoxelRenderFeatureOctree::add_construction_render_task(RendGraph
             .parts = {p_double_sided ? MeshPartVK::DOUBLE_SIDED : MeshPartVK::OPAQUE},
             .render_extent = extent,
         },
-        base_render_data);
+        render_context);
     task = make_texture_write(task, OCTREE_STATIC);
     return task;
 }
@@ -380,7 +375,7 @@ RendTaskDescVK VoxelRenderFeatureOctree::make_static_build(RendTaskDescVK p_task
         return p_task;
     }
     p_task.factory = RTTriggeredVK::wrap_factory(
-        std::move(p_task.factory), std::string(p_inputs.static_build_event), base_render_data, p_inputs.static_build_pending);
+        std::move(p_task.factory), std::string(p_inputs.static_build_event), render_context, p_inputs.static_build_pending);
     return p_task;
 }
 

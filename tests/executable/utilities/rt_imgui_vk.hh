@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "imgui_overlay_vk.hh"
 #include <vulkan/vulkan_core.h>
 
@@ -49,7 +49,7 @@ struct RTImGuiVK final : public IRenderTaskVK {
      * @param p_overlay The overlay to draw; it must outlive every recording of the task.
      * @throws std::runtime_error If p_overlay is null.
      */
-    RTImGuiVK(const BaseRenderDataVK* p_render_data, ImGuiOverlayVK* p_overlay);
+    RTImGuiVK(const RenderContextVK* p_render_data, ImGuiOverlayVK* p_overlay);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -60,7 +60,7 @@ struct RTImGuiVK final : public IRenderTaskVK {
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     ImGuiOverlayVK* overlay = nullptr;
     RenderTargetsVK render_targets;
 };

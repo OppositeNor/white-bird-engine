@@ -44,7 +44,7 @@ Ref<ROShaderVK> PipelineCompilerVK::compile_shader(RefRes<RUShader> p_shader) {
     if (registered_shader != MEM_NULL) {
         return registered_shader;
     }
-    auto shader = ROShaderVK::Builder().set_code(p_shader).create_ref(base_context.render_data);
+    auto shader = base_context.render_data->create_shader(ROShaderVK::Builder().set_code(p_shader));
     base_context.render_database->register_compiled_render_resource(shader_key, shader);
     return shader;
 }

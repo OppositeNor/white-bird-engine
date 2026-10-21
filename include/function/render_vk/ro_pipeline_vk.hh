@@ -16,7 +16,7 @@
 #define WBE_FILE_RO_PIPELINE_VK_HH
 
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <vulkan/vulkan_core.h>
 
@@ -59,7 +59,7 @@ protected:
      * @brief Construct shared runtime state.
      * @param p_render_data Base Vulkan render data.
      */
-    explicit ROPipelineVK(const BaseRenderDataVK* p_render_data);
+    explicit ROPipelineVK(const RenderContextVK* p_render_data);
 
     /**
      * @brief Publish the created Vulkan pipeline handle to the shared owner.

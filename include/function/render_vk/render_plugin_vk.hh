@@ -24,7 +24,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "resource/resource_unit/resource_unit.hh"
 
@@ -129,7 +129,7 @@ public:
      * @param p_logical_device Created logical device.
      */
     virtual void on_after_device_created(
-        BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) = 0;
+        RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) = 0;
 
     /**
      * @brief Refresh plugin-owned physical-device properties stored in the base render data.
@@ -137,18 +137,18 @@ public:
      * @param p_render_data Renderer data to update.
      * @param p_physical_device Selected physical device.
      */
-    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) = 0;
+    virtual void update_render_context(RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device) = 0;
 
     /**
      * @brief Reserve plugin-owned regions in renderer-provided descriptor heap configurations.
      */
     virtual void configure_descriptor_heaps(
-        const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) = 0;
+        const RenderContextVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) = 0;
 
     /**
      * @brief Register plugin-owned arenas after the renderer has created the physical heaps.
      */
-    virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) = 0;
+    virtual void create_descriptor_arenas(RenderContextVK* p_render_data) = 0;
 
     /**
      * @brief Start a renderer frame after the current frame slot has been selected and its in-flight fence has signaled.
@@ -157,7 +157,7 @@ public:
      *
      * @param p_render_data Renderer data whose current frame slot identifies the starting frame.
      */
-    virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) = 0;
+    virtual void on_frame_begin(const RenderContextVK* p_render_data) = 0;
 
     /**
      * @brief Observe a render graph that the renderer has built and registered under a resource key.
@@ -308,7 +308,7 @@ protected:
  */
 void register_builtin_render_plugins_vk(Vector<Ref<RenderPluginVK>, RenderAllocator>& p_registered_plugins,
     RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
+    const RenderContextVK* p_render_data,
     const RendererCapabilities& p_capabilities);
 
 } // namespace WhiteBirdEngine

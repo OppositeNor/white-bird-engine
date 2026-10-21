@@ -23,7 +23,7 @@
 #include "function/render_vk/mesh_gpu_data_vk.hh"
 #include "function/render_vk/mesh_material_resource_builder_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include <cstddef>
 #include <format>
@@ -36,29 +36,28 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-RenderAllocator* get_render_allocator(const BaseRenderDataVK* p_render_data) {
+RenderAllocator* get_render_allocator(const RenderContextVK* p_render_data) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to construct mesh resources: render data or its allocator is null.");
     }
     return p_render_data->allocator;
 }
 
-Ref<ROBufferVK> create_material_params_buffer(const BaseRenderDataVK* p_render_data, std::span<const uint8_t> p_buffer_data) {
+Ref<ROBufferVK> create_material_params_buffer(const RenderContextVK* p_render_data, std::span<const uint8_t> p_buffer_data) {
     const DescriptorArenaLocationVK arena = p_render_data->buffer_descriptor_arena;
     uint32_t uniform_view_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
+    Ref<ROBufferVK> result = p_render_data->create_buffer(ROBufferVK::Builder()
                                  .set_domain(DeviceDomain::HOST_DEVICE)
                                  .set_size(p_buffer_data.size())
                                  .set_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                 .set_uniform_view_index(uniform_view_index)
-                                 .create_ref(p_render_data);
+                                 .set_uniform_view_index(uniform_view_index));
     result->update_buffer(p_buffer_data.data(), p_buffer_data.size());
     return result;
 }
 
 } // namespace
 
-MeshResourcesVK::MeshResourcesVK(const BaseRenderDataVK* p_render_data)
+MeshResourcesVK::MeshResourcesVK(const RenderContextVK* p_render_data)
     : IRenderObjectVK(p_render_data), allocator(get_render_allocator(p_render_data)), vertex_buffers(allocator),
       vertex_binaries(allocator), textures(make_ref<RenderResourceListVK>(allocator, allocator)), opaque_batches(allocator),
       opaque_double_sided_batches(allocator), masked_batches(allocator) {

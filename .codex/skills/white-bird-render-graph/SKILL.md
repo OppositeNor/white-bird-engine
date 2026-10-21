@@ -18,8 +18,8 @@ Ref<RenderGraphVK> graph = renderer->register_render_graph("my_graph",
         imports.add(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add("camera_info", *camera_info_ubo);
         const DataValue recipe = RendGraphScriptVK::run("render_graphs.my_graph",
-            RendGraphScriptVK::make_context(*base_render_data, p_context));
-        return RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+            RendGraphScriptVK::make_context(*render_context, p_context));
+        return RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
     });
 renderer->activate_render_graph("my_graph");
 ```
@@ -35,7 +35,9 @@ renderer->activate_render_graph("my_graph");
 ## Choose where the graph is described
 
 - **Recipe (default).** A Teal `script` resource under `res/assets/scripts/teal/render_graphs/` exporting
-  `build(context)` that returns `imports`, `resources`, and `tasks`. Use registered task types by name with typed `params`.
+  `build(context)`. Create resource handles with `utils.render_graph`, add tasks to `graph_utils.graph()` through colon
+  methods, and return `graph:build()`. It collects referenced resources automatically and emits the C++ recipe schema.
+  Use registered task types by name with typed `params`.
 - **C++ additions.** Tasks needing application objects (ImGui overlay, acceleration-structure builds, CPU readback sinks)
   are built as `RendTaskDescVK` and supplied with `RendGraphRecipeImportsVK::add_task()`; the recipe lists them as
   `{ id = ..., import = true }`. Parts not yet expressible in Lua may be added to the descriptor the builder returns.
@@ -53,6 +55,11 @@ module, a context struct, a trigger or toggle, an imported task, or a new task t
 - **Tasks report their own accesses** through `append_accesses()`: reflected shader resources (`WBE_DESCRIPTOR` access),
   render targets, fixed-function buffers. Map task-local ids with `alias()` only; graphics tasks render to
   `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected.
+- **Recipe handles.** Resource helpers return `graph_utils.Resource`. Use `task:alias(local_name, resource)` for task-local bindings. `graph:add()` returns task objects;
+  pass those objects to `graph:chain(resource, tasks)` or `producer:connect(consumer, resource)`, and use handles in
+  subgraph ports; image views retain their source image. No explicit recipe resource list is authored. `uses` retains
+  same-name/parameter resources without declaring accesses or ordering. `import_resource` names exact supplied imports;
+  `port` names a subgraph port; `reference` names an existing ancestor/composite resource without adding an import.
 - **Resources.** Graph-owned resources are declared with `add_buffer()`, `add_image()`, `add_image_view()`, and
   `add_sampler()` (factories of the context in C++, tables in recipes). Everything owned elsewhere is an import through
   `add_resource(id, *bindable)`; composites register `<id>.<member>`. Keep the description structs' `operator==` complete,

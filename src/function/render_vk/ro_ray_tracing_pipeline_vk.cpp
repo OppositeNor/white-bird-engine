@@ -18,7 +18,7 @@
 #include "function/render_vk/debug_utils_vk.hh"
 #include "function/function_utils.hh"
 #include "function/render_vk/i_ro_ray_tracing_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
@@ -32,7 +32,7 @@
 namespace WhiteBirdEngine {
 
 RORayTracingPipelineVK::RORayTracingPipelineVK(
-    const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder)
+    const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder)
     : IRORayTracingVK(p_render_data, p_ray_tracing_data), shaders(p_render_data->allocator) {
     VkRayTracingPipelineCreateInfoKHR pipeline_create_info{
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,

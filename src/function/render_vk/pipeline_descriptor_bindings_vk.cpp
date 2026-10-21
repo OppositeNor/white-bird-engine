@@ -20,7 +20,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -123,7 +123,7 @@ uint32_t descriptor_index(ShaderDescriptorHeapTypeVK p_type, Ref<IRenderObject> 
 
 } // namespace
 
-PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout)
+PipelineDescriptorBindingsVK::PipelineDescriptorBindingsVK(const RenderContextVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout)
     : render_data(p_render_data), layout(p_layout), push_data(p_render_data != nullptr ? p_render_data->allocator : nullptr),
       containers(p_render_data != nullptr ? p_render_data->allocator : nullptr),
       custom_values_set(p_render_data != nullptr ? p_render_data->allocator : nullptr) {

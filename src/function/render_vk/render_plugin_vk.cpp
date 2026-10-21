@@ -21,13 +21,13 @@
 #include "function/render_vk/timestamp_query_plugin_vk.hh"
 
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 
 namespace WhiteBirdEngine {
 
 void register_builtin_render_plugins_vk(Vector<Ref<RenderPluginVK>, RenderAllocator>& p_registered_plugins,
     RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
+    const RenderContextVK* p_render_data,
     const RendererCapabilities& p_capabilities) {
     p_registered_plugins.clear();
     if (p_capabilities.ray_tracing || p_capabilities.ray_query) {

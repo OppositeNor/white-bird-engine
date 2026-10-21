@@ -22,7 +22,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
@@ -60,7 +60,7 @@ public:
 std::string build_error(const RendGraphRecipeBuilderVK& p_builder,
     std::string_view p_recipe,
     const RendGraphRecipeImportsVK& p_imports,
-    const BaseRenderDataVK* p_render_data) {
+    const RenderContextVK* p_render_data) {
     try {
         (void)p_builder.build(ParserJSON::read(p_recipe), p_imports, p_render_data);
     } catch (const std::runtime_error& p_error) {
@@ -72,7 +72,7 @@ std::string build_error(const RendGraphRecipeBuilderVK& p_builder,
 class WBERendGraphRecipeBuilderVKTest : public ::testing::Test {
 protected:
     RenderAllocator allocator{WBE_KI_B(256)};
-    BaseRenderDataVK render_data{&allocator};
+    RenderContextVK render_data{&allocator};
     RendGraphRecipeBuilderVK builder;
     TestRecipeImportVK camera;
 };

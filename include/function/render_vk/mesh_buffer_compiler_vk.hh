@@ -18,7 +18,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <vector>
@@ -54,7 +54,7 @@ public:
     /**
      * @brief Construct a compiler bound to one renderer's Vulkan state.
      */
-    explicit MeshBufferCompilerVK(const BaseRenderDataVK* p_render_data);
+    explicit MeshBufferCompilerVK(const RenderContextVK* p_render_data);
 
     /**
      * @brief Compile or reuse one vertex buffer per vertex binary and the index buffer shared by every category of one mesh.
@@ -67,7 +67,7 @@ public:
     BuildResult build(RefRes<RUMesh3D> p_mesh, VkBufferUsageFlags p_vertex_usage, VkBufferUsageFlags p_index_usage) const;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
 };
 
 } // namespace WhiteBirdEngine

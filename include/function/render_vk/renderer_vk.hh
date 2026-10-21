@@ -29,7 +29,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -190,12 +190,12 @@ public:
     }
 
     /**
-     * @brief Get the base render data of this renderer.
+     * @brief Get the stable resource creation context owned by this renderer.
      *
-     * @return The base render data of this renderer.
+     * @return The non-owning context pointer. Resource operations run on the rendering thread.
      */
-    const BaseRenderDataVK* get_base_render_data() const {
-        return &base_render_data;
+    const RenderContextVK* get_render_context() const {
+        return &render_context;
     }
 
     /**
@@ -359,7 +359,7 @@ private:
         Vector<VkPresentModeKHR, AllocType> present_modes;
     };
 
-    BaseRenderDataVK base_render_data;
+    RenderContextVK render_context;
     QueueFamilyIndices queue_family_indices;
     Vector<Ref<RenderPluginVK>, AllocType> registered_plugins;
 
@@ -400,7 +400,7 @@ private:
     void register_requested_plugins(const RendererCapabilities& p_capabilities);
 
     void init_vulkan(RendererCapabilities& p_capabilities);
-    void setup_base_render_data();
+    void setup_render_context();
     void init_swap_chain_image_views();
     void recreate_swap_chain();
 

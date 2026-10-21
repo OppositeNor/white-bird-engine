@@ -20,7 +20,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "global/global.hh"
 #include "test_global.hh"
@@ -196,7 +196,7 @@ TEST_F(WBERTToggleVKEventTest, StringLiteralSelectsTheEventConstructor) {
 
 TEST_F(WBERTToggleVKEventTest, WrapFactoryCreatesWrappersInTheGivenStateThatFollowEvents) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     ToggleProbeState state;
     const RendTaskFactoryVK factory = RTToggleVK::wrap_factory(
         [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
@@ -218,7 +218,7 @@ TEST_F(WBERTToggleVKEventTest, WrapFactoryCreatesWrappersInTheGivenStateThatFoll
 
 TEST_F(WBERTToggleVKEventTest, WrapFactoryRejectsInvalidInputs) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     ToggleProbeState state;
     const RendTaskFactoryVK inner = [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
         return make_unique<RTToggleProbeVK>(&allocator, state);

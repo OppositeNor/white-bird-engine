@@ -22,7 +22,7 @@
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -190,7 +190,7 @@ private:
         size_t p_dynamic_entity_index) const;
 
     RendererVK* renderer_vk;
-    const BaseRenderDataVK* base_render_data;
+    const RenderContextVK* render_context;
     RenderAllocator* render_allocator;
     Ref<MeshResourcesVK> static_mesh_resources;
     // The cube the octree covers, derived from the scene bounds.

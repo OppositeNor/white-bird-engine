@@ -21,7 +21,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -32,6 +32,45 @@
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
+class ROShaderVK;
+
+/**
+ * @struct ShaderDescVK
+ * @brief Resource creation description; copyable and movable.
+ * Copying duplicates the owned SPIR-V words; moving transfers them. Source resources need not outlive this description.
+ */
+struct ShaderDescVK {
+    friend ROShaderVK;
+    // The source code of the shader.
+    Required<std::vector<uint32_t>> code;
+    // Size of the code in SPIR-V words.
+    Required<size_t> code_size;
+
+    // Set the shader source code.
+    ShaderDescVK& set_code(std::span<const uint32_t> p_code);
+
+    // Set from a resource ID.
+    ShaderDescVK& set_code(std::string_view p_resource_id);
+
+    // Set from a resource.
+    ShaderDescVK& set_code(RefRes<RUShader> p_resource);
+
+    /**
+     * @brief Create a reference-counted resource on the rendering thread.
+     * @param p_render_context Context that outlives the created resource.
+     */
+    Ref<ROShaderVK> create_ref(const RenderContextVK* p_render_context) const;
+
+    /**
+     * @brief Create a uniquely owned resource on the rendering thread.
+     * @param p_render_context Context that outlives the created resource.
+     */
+    Unique<ROShaderVK> create_unique(const RenderContextVK* p_render_context) const;
+
+private:
+    VkShaderModule create_vk_object(const RenderContextVK* p_render_data) const;
+};
+
 /**
  * @class ShaderVK
  * @brief Shader class for Vulkan.
@@ -39,34 +78,10 @@ namespace WhiteBirdEngine {
  */
 class WBE_META(WBE_RENDER_OBJECT) ROShaderVK final : public IRenderObjectVK {
 public:
-    // Builder for ROShaderVK
-    struct Builder {
-        friend ROShaderVK;
-        // The source code of the shader.
-        Required<std::vector<uint32_t>> code;
-        // Size of the code in SPIR-V words.
-        Required<size_t> code_size;
-
-        // Set the shader source code.
-        Builder& set_code(std::span<const uint32_t> p_code);
-
-        // Set from a resource ID.
-        Builder& set_code(std::string_view p_resource_id);
-
-        // Set from a resource.
-        Builder& set_code(RefRes<RUShader> p_resource);
-
-        Ref<ROShaderVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROShaderVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROShaderVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-    private:
-        VkShaderModule create_vk_object(const BaseRenderDataVK* p_render_data) const;
-    };
+    /**
+     * @brief Compatibility name for the resource creation description.
+     */
+    using Builder = ShaderDescVK;
 
     ROShaderVK() = delete;
     virtual ~ROShaderVK() override;
@@ -82,24 +97,24 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_base_render_data The base render data.
+     * @param p_render_context The base render data.
      * @param p_builder Configuration builder.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder);
+    ROShaderVK(const RenderContextVK* p_render_context, const Builder& p_builder);
     /**
      * @brief Constructor from resource ID.
      *
-     * @param p_base_render_data The base render data.
+     * @param p_render_context The base render data.
      * @param p_resource_id The resource ID.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data, std::string_view p_resource_id);
+    ROShaderVK(const RenderContextVK* p_render_context, std::string_view p_resource_id);
     /**
      * @brief Constructor from a shader resource.
      *
-     * @param p_base_render_data The base render data.
+     * @param p_render_context The base render data.
      * @param p_resource_id The shader's resource.
      */
-    ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource);
+    ROShaderVK(const RenderContextVK* p_render_context, RefRes<RUShader> p_resource);
 
     /**
      * @brief Get the shader module.

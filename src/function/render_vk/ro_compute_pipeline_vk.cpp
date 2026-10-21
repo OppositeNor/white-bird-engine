@@ -15,7 +15,7 @@
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -24,13 +24,23 @@
 
 namespace WhiteBirdEngine {
 
+Ref<ROComputePipelineVK> ComputePipelineDescVK::create_ref(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return p_render_context->create_compute_pipeline(*this);
+}
+
+Unique<ROComputePipelineVK> ComputePipelineDescVK::create_unique(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return make_unique<ROComputePipelineVK>(p_render_context->allocator, p_render_context, *this);
+}
+
 TypeID ROComputePipelineVK::get_type_uuid() const {
     return TypeUUID<ROComputePipelineVK>::UUID;
 }
 
 ROComputePipelineVK::~ROComputePipelineVK() = default;
 
-ROComputePipelineVK::ROComputePipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROComputePipelineVK::ROComputePipelineVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : ROPipelineVK(p_render_data) {
     const auto& shader_stage = WBE_REQUIRED(p_builder.shader_stage);
     VkPipelineShaderStageCreateInfo shader_stage_create_info{};

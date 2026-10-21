@@ -24,7 +24,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
@@ -215,7 +215,7 @@ public:
      * @param p_sequence Ordered dispatch configurations copied into task-owned storage.
      * @throws std::runtime_error When no pass is provided or a pass configuration is invalid.
      */
-    RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence);
+    RTRunGraphicsPipelinesSequentialVK(const RenderContextVK* p_render_data, const Sequence& p_sequence);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -228,7 +228,7 @@ public:
 
 private:
     struct BoundEntry {
-        BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch);
+        BoundEntry(const RenderContextVK* p_render_data, const Dispatch& p_dispatch);
         ~BoundEntry() = default;
         BoundEntry(const BoundEntry&) = delete;
         BoundEntry(BoundEntry&&) noexcept = default;
@@ -244,7 +244,7 @@ private:
         Unique<PipelineDescriptorBindingsVK> descriptor_bindings;
     };
 
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     Vector<BoundEntry, RenderAllocator> entries;
 
     void bind_vertex_buffers(VkCommandBuffer p_command_buffer, BoundEntry& p_bound_entry) const;

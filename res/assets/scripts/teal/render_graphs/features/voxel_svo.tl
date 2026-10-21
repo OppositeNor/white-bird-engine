@@ -25,7 +25,7 @@ local graph_utils = require("utils.render_graph")
 local voxel_svo = {}
 
 -- The SVO as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
-function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): wbe.RendRecipeTaskVK
+function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): graph_utils.Task
     local variant = graph_utils.enum_name(p_params.variant)
     local pass_published = variant == "PASS_PUBLISHED"
     if not pass_published and variant ~= "ATOMIC" then
@@ -34,50 +34,57 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     -- Scratch buffers: each frame's dynamic clear (and the static reset) empties the dynamic nodes' range and the
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the
     -- debug draw reads them.
-    local resources: {wbe.RendRecipeResourceVK} = {}
-    local function add_buffer(p_buffer_id: string, p_size: integer)
-        resources[#resources + 1] = graph_utils.storage_buffer(p_buffer_id, p_size)
+    local buffers: {string:graph_utils.Resource} = {}
+    for _, id in ipairs(p_params.imports) do
+        buffers[id] = graph_utils.import_resource(id)
     end
     local sizes = p_params.buffer_sizes
-    add_buffer("svo_dynamic_nodes", sizes.dynamic_nodes)
-    add_buffer("svo_deferred_list_ping", sizes.deferred_list)
-    add_buffer("svo_deferred_list_pong", sizes.deferred_list)
-    add_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
-    add_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
-    local tasks = graph_utils.task_list()
-    local chain = tasks.chain
+    buffers.svo_dynamic_nodes = graph_utils.storage_buffer("svo_dynamic_nodes", sizes.dynamic_nodes)
+    buffers.svo_deferred_list_ping = graph_utils.storage_buffer("svo_deferred_list_ping", sizes.deferred_list)
+    buffers.svo_deferred_list_pong = graph_utils.storage_buffer("svo_deferred_list_pong", sizes.deferred_list)
+    buffers.svo_pre_deferred_debug_info_buffer =
+        graph_utils.storage_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
+    buffers.svo_pre_deferred_debug_list_buffer =
+        graph_utils.storage_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
+    local color = graph_utils.port("color")
+    local depth = graph_utils.port("depth")
+    local graph = graph_utils.graph()
+    local function chain(p_buffer: graph_utils.Resource, p_tasks: {graph_utils.Task})
+        graph:chain(p_buffer, p_tasks)
+    end
     local prefix = p_params.shader_prefix
     local dynamic_prefix = p_params.dynamic_shader_prefix
     local toggles = p_target.debug_view_toggles
     local static_build = p_params.static_build
     local extent: wbe.RendExtent2DParamsVK = { width = p_params.extent, height = p_params.extent }
 
-    local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer): wbe.RendRecipeTaskVK
+    local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer): graph_utils.Task
         local params: wbe.RTParamsRunComputePipelineVK =
             { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" }
-        return tasks.add({ id = p_task_id, type = "run_compute_pipeline", params = params })
+        return graph:add({ id = p_task_id, type = "run_compute_pipeline", params = params })
     end
     local function construction(p_task_id: string, p_mesh: string, p_pipeline: string, p_part: wbe.MeshPartVK,
-        p_transform: string, p_load: boolean): wbe.RendRecipeTaskVK
+        p_transform: graph_utils.Resource, p_load: boolean): graph_utils.Task
         local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
         local params: wbe.RTParamsGraphicsDrawMeshVK = {
             mesh = p_mesh,
             pipeline = p_pipeline,
             parts = { p_part },
-            transform = p_transform,
+            transform = p_transform and p_transform.id,
             render_extent = extent,
             color_load_op = load_op,
             depth_load_op = load_op,
         }
-        return tasks.add({ id = p_task_id, type = "graphics_draw_mesh", params = params })
+        return graph:add({ id = p_task_id, type = "graphics_draw_mesh", params = params,
+            uses = p_transform and { p_transform } or {} })
     end
     -- Rasterization allocates depth one's children; every propagation round publishes one further level, and an extra
     -- retry consumes leaf occupancy and drains the remaining deferred entries.
-    local function deferred_construction(p_task_id: string, p_dynamic: boolean): wbe.RendRecipeTaskVK
+    local function deferred_construction(p_task_id: string, p_dynamic: boolean): graph_utils.Task
         local stage_prefix = p_dynamic and dynamic_prefix or prefix
         local ping = stage_prefix .. "_build_deferred_propagation_pong_write_shader"
         local pong = stage_prefix .. "_build_deferred_propagation_ping_write_shader"
-        local task: wbe.RendRecipeTaskVK
+        local task: graph_utils.Task
         if pass_published then
             local publication = p_dynamic and "svo_2_dynamic_update_states_shader" or "svo_2_update_states_shader"
             local publication_group_count =
@@ -106,111 +113,120 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
             }
             task = { id = p_task_id, type = "ping_pong", params = params }
         end
-        return tasks.add(task)
+        return graph:add(task)
     end
-    local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: string, p_toggle: wbe.RendRecipeToggleVK)
+    local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: graph_utils.Resource,
+        p_toggle: wbe.RendRecipeToggleVK): graph_utils.Task
         local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = p_pipeline,
-            index_buffer = "svo_debug_draw_index_buffer",
-            indirect_buffer = p_indirect_buffer,
+            index_buffer = buffers.svo_debug_draw_index_buffer.id,
+            indirect_buffer = p_indirect_buffer.id,
             color_load_op = "load",
             depth_load_op = "load",
         }
-        tasks.add({
+        local task = graph:add({
             id = p_task_id,
             type = "run_graphics_pipeline_indirect",
             params = params,
-            aliases = { ["render_target_colors[0]"] = "color", render_target_depth = "depth" },
+            uses = { buffers.svo_debug_draw_index_buffer, p_indirect_buffer },
             toggle = p_toggle,
         })
+        task:alias("render_target_colors[0]", color)
+        task:alias("render_target_depth", depth)
+        return task
     end
     -- The frame-begin barrier orders this frame's SVO mutation after the previous frame's consumers.
-    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = "svo_info" }
-    tasks.add({ id = "svo_frame_begin", type = "full_memory_barrier", params = barrier_params })
+    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = buffers.svo_info.id }
+    local frame_begin = graph:add({ id = "svo_frame_begin", type = "full_memory_barrier", params = barrier_params, uses = { buffers.svo_info } })
     -- Static scene, built once into the shared buffers unless the application rebuilds it every frame (no trigger).
-    compute("reset_svo", prefix .. "_reset_shader", p_params.reset_group_count).trigger = static_build
-    construction("run_build_svo", "static_mesh", prefix .. "_build_static_mesh_pipeline", "opaque", nil, false).trigger =
-        static_build
-    construction("run_build_svo_double_sided", "static_mesh", prefix .. "_build_static_mesh_pipeline", "double_sided", nil,
-        false).trigger = static_build
+    local reset = compute("reset_svo", prefix .. "_reset_shader", p_params.reset_group_count)
+    reset.trigger = static_build
+    local build = construction("run_build_svo", "static_mesh", prefix .. "_build_static_mesh_pipeline", "opaque", nil, false)
+    build.trigger = static_build
+    local build_double_sided = construction("run_build_svo_double_sided", "static_mesh", prefix .. "_build_static_mesh_pipeline", "double_sided", nil,
+        false)
+    build_double_sided.trigger = static_build
+    local static_publication: {graph_utils.Task} = {}
     if pass_published then
-        compute("update_svo_states", "svo_2_update_states_shader", p_params.static_publication_group_count).trigger = static_build
+        local update_states = compute("update_svo_states", "svo_2_update_states_shader", p_params.static_publication_group_count)
+        update_states.trigger = static_build
+        static_publication = { update_states }
     end
-    deferred_construction("static_svo_deferred", false).trigger = static_build
+    local static_deferred = deferred_construction("static_svo_deferred", false)
+    static_deferred.trigger = static_build
     -- Dynamic meshes.
-    compute("clear_dynamic_svo", dynamic_prefix .. "_clear_shader", p_params.dynamic_clear_group_count)
+    local clear_dynamic = compute("clear_dynamic_svo", dynamic_prefix .. "_clear_shader", p_params.dynamic_clear_group_count)
+    local dynamic: {graph_utils.Task} = {}
     for index, id in ipairs({ "dynamic_svo", "dynamic_svo_second" }) do
-        construction(id, "dynamic_mesh", dynamic_prefix .. "_build_static_mesh_pipeline", "opaque",
-            p_target.dynamic_mesh_transform_ids[index], true)
+        dynamic[index] = construction(id, "dynamic_mesh", dynamic_prefix .. "_build_static_mesh_pipeline", "opaque",
+            graph_utils.reference(p_target.dynamic_mesh_transform_ids[index]), true)
     end
+    local dynamic_publication: {graph_utils.Task} = {}
     if pass_published then
-        compute("publish_dynamic_svo", "svo_2_dynamic_update_states_shader", p_params.dynamic_publication_group_count)
+        dynamic_publication = { compute("publish_dynamic_svo", "svo_2_dynamic_update_states_shader", p_params.dynamic_publication_group_count) }
     end
-    compute("capture_svo_pre_deferred_debug", "svo_pre_deferred_debug_capture_shader", p_params.deferred_dispatch_group_count).toggle =
-        toggles.pre_deferred_propagation
-    deferred_construction("run_build_svo_deferred", true)
-    compute("setup_svo_debug_draw", "svo_debug_draw_setup_shader", 1)
+    local capture_pre_deferred_debug = compute("capture_svo_pre_deferred_debug", "svo_pre_deferred_debug_capture_shader", p_params.deferred_dispatch_group_count)
+    capture_pre_deferred_debug.toggle = toggles.pre_deferred_propagation
+    local dynamic_deferred = deferred_construction("run_build_svo_deferred", true)
+    local setup_debug_draw = compute("setup_svo_debug_draw", "svo_debug_draw_setup_shader", 1)
     -- Debug views.
-    overlay("run_svo_debug_draw", "svo_debug_draw_pipeline", "svo_debug_draw_indirect_buffer", toggles.post_svo_build)
-    overlay("run_svo_pre_deferred_debug_draw", "svo_pre_deferred_debug_draw_pipeline", "svo_pre_deferred_debug_draw_indirect_buffer",
+    local debug_draw = overlay("run_svo_debug_draw", "svo_debug_draw_pipeline", buffers.svo_debug_draw_indirect_buffer, toggles.post_svo_build)
+    local pre_deferred_debug_draw = overlay("run_svo_pre_deferred_debug_draw", "svo_pre_deferred_debug_draw_pipeline", buffers.svo_pre_deferred_debug_draw_indirect_buffer,
         toggles.pre_deferred_propagation)
 
     -- Every task using a buffer, in execution order; the publication passes of the pass-published implementation take
     -- their place in the chains of the buffers they publish.
-    local static_publication: {string} = pass_published and { "update_svo_states" } or {}
-    local dynamic_publication: {string} = pass_published and { "publish_dynamic_svo" } or {}
-    local function sequence(...: {string}): {string}
-        local result: {string} = {}
+    local function sequence(...: {graph_utils.Task}): {graph_utils.Task}
+        local result: {graph_utils.Task} = {}
         for _, part in ipairs({ ... }) do
-            for _, id in ipairs(part) do
-                result[#result + 1] = id
+            for _, task in ipairs(part) do
+                result[#result + 1] = task
             end
         end
         return result
     end
-    chain("svo_info", { "svo_frame_begin", "reset_svo" })
-    chain("svo_info", sequence({ "reset_svo", "run_build_svo", "run_build_svo_double_sided" }, static_publication,
-        { "static_svo_deferred", "clear_dynamic_svo", "dynamic_svo", "dynamic_svo_second" }, dynamic_publication,
-        { "capture_svo_pre_deferred_debug", "run_build_svo_deferred", "setup_svo_debug_draw", "run_svo_debug_draw" }))
-    chain("svo_node_buffer", sequence({ "reset_svo", "run_build_svo", "run_build_svo_double_sided" }, static_publication,
-        { "static_svo_deferred", "clear_dynamic_svo", "dynamic_svo", "dynamic_svo_second" }, dynamic_publication,
-        { "run_build_svo_deferred", "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" }))
-    for _, buffer in ipairs({ "svo_dynamic_nodes", "svo_dynamic_leaves" }) do
-        chain(buffer, sequence({ "clear_dynamic_svo", "dynamic_svo", "dynamic_svo_second" }, dynamic_publication,
-            { "run_build_svo_deferred", "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" }))
+    chain(buffers.svo_info, { frame_begin, reset })
+    chain(buffers.svo_info, sequence({ reset, build, build_double_sided }, static_publication,
+        { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
+        { capture_pre_deferred_debug, dynamic_deferred, setup_debug_draw, debug_draw }))
+    chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
+        { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
+        { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
+    for _, buffer in ipairs({ buffers.svo_dynamic_nodes, buffers.svo_dynamic_leaves }) do
+        chain(buffer, sequence({ clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
+            { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
     end
-    chain("svo_leaf_buffer", {
-        "run_build_svo",
-        "run_build_svo_double_sided",
-        "static_svo_deferred",
-        "dynamic_svo",
-        "dynamic_svo_second",
-        "run_build_svo_deferred",
-        "run_svo_debug_draw",
-        "run_svo_pre_deferred_debug_draw",
+    chain(buffers.svo_leaf_buffer, {
+        build,
+        build_double_sided,
+        static_deferred,
+        dynamic[1],
+        dynamic[2],
+        dynamic_deferred,
+        debug_draw,
+        pre_deferred_debug_draw,
     })
-    chain("svo_deferred_list_ping", {
-        "reset_svo",
-        "run_build_svo",
-        "run_build_svo_double_sided",
-        "static_svo_deferred",
-        "clear_dynamic_svo",
-        "dynamic_svo",
-        "dynamic_svo_second",
-        "capture_svo_pre_deferred_debug",
-        "run_build_svo_deferred",
+    chain(buffers.svo_deferred_list_ping, {
+        reset,
+        build,
+        build_double_sided,
+        static_deferred,
+        clear_dynamic,
+        dynamic[1],
+        dynamic[2],
+        capture_pre_deferred_debug,
+        dynamic_deferred,
     })
-    chain("svo_deferred_list_pong", { "reset_svo", "static_svo_deferred", "clear_dynamic_svo", "run_build_svo_deferred" })
-    for _, buffer in ipairs({ "svo_pre_deferred_debug_info_buffer", "svo_pre_deferred_debug_list_buffer",
-        "svo_pre_deferred_debug_draw_indirect_buffer" }) do
-        chain(buffer, { "capture_svo_pre_deferred_debug", "run_svo_pre_deferred_debug_draw" })
+    chain(buffers.svo_deferred_list_pong, { reset, static_deferred, clear_dynamic, dynamic_deferred })
+    for _, buffer in ipairs({ buffers.svo_pre_deferred_debug_info_buffer, buffers.svo_pre_deferred_debug_list_buffer,
+        buffers.svo_pre_deferred_debug_draw_indirect_buffer }) do
+        chain(buffer, { capture_pre_deferred_debug, pre_deferred_debug_draw })
     end
-    chain("svo_debug_draw_indirect_buffer", { "setup_svo_debug_draw", "run_svo_debug_draw" })
+    chain(buffers.svo_debug_draw_indirect_buffer, { setup_debug_draw, debug_draw })
     -- The overlays draw in this order.
-    chain("color", { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" })
-    chain("depth", { "run_svo_debug_draw", "run_svo_pre_deferred_debug_draw" })
-    return graph_utils.subgraph(p_id,
-        { imports = p_params.imports, resources = resources, tasks = tasks.tasks, ports = { "color", "depth" } },
+    chain(color, { debug_draw, pre_deferred_debug_draw })
+    chain(depth, { debug_draw, pre_deferred_debug_draw })
+    return graph_utils.subgraph(p_id, graph:build(p_params.imports, { "color", "depth" }),
         { color = p_target.color_target, depth = p_target.depth_target })
 end
 

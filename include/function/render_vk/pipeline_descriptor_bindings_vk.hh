@@ -20,7 +20,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <bit>
 #include <cstdint>
@@ -86,7 +86,7 @@ public:
      * @param p_render_data Renderer state used for frame-slot resolution and push-data commands.
      * @param p_layout Immutable pipeline descriptor layout.
      */
-    PipelineDescriptorBindingsVK(const BaseRenderDataVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
+    PipelineDescriptorBindingsVK(const RenderContextVK* p_render_data, const ShaderDescriptorHeapLayoutVK& p_layout);
 
     /**
      * @brief Append the reflected shader accesses of every descriptor field.
@@ -134,7 +134,7 @@ public:
     void push(VkCommandBuffer p_command_buffer);
 
 private:
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     ShaderDescriptorHeapLayoutVK layout;
     Vector<uint8_t, RenderAllocator> push_data;
     Vector<Ref<RenderObjectContainerVK>, RenderAllocator> containers;

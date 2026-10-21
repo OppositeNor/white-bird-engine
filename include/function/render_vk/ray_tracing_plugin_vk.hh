@@ -21,7 +21,7 @@
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "utils/interface/i_singleton.hh"
 
 #include <cstddef>
@@ -50,7 +50,7 @@ public:
      *
      * @param p_render_data Renderer data used for Vulkan resource creation.
      */
-    explicit RayTracingPluginVK(const BaseRenderDataVK* p_render_data);
+    explicit RayTracingPluginVK(const RenderContextVK* p_render_data);
 
     /**
      * @brief Get the singleton ray-tracing plugin instance.
@@ -80,13 +80,13 @@ public:
         VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info, VkPhysicalDeviceFeatures* p_device_features) override;
 
     virtual void on_after_device_created(
-        BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
+        RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
 
-    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) override;
+    virtual void update_render_context(RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device) override;
     virtual void configure_descriptor_heaps(
-        const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
-    virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
-    virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) override;
+        const RenderContextVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
+    virtual void create_descriptor_arenas(RenderContextVK* p_render_data) override;
+    virtual void on_frame_begin(const RenderContextVK* p_render_data) override;
     virtual void on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) override;
     virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer,
         const RenderGraphVK& p_graph,

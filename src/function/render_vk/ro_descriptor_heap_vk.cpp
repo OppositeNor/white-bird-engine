@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -46,7 +46,7 @@ VkDeviceSize checked_add(VkDeviceSize p_left, VkDeviceSize p_right) {
 } // namespace
 
 RODescriptorHeapVK::Backing::Backing(
-    const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment)
+    const RenderContextVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment)
     : render_data(p_render_data), usable_size(p_usable_size), reserved_size(p_reserved_size) {
     if (p_render_data == nullptr || p_alignment == 0) {
         throw std::runtime_error("Failed to create descriptor heap: invalid render data or heap alignment.");
@@ -116,7 +116,7 @@ VkBindHeapInfoEXT RODescriptorHeapVK::Backing::get_bind_info() const {
 }
 
 RODescriptorHeapVK::RODescriptorHeapVK(
-    const BaseRenderDataVK* p_render_data, Ref<Backing> p_backing, DescriptorHeapTypeVK p_type, uint32_t p_first_index, uint32_t p_capacity, VkDeviceSize p_stride)
+    const RenderContextVK* p_render_data, Ref<Backing> p_backing, DescriptorHeapTypeVK p_type, uint32_t p_first_index, uint32_t p_capacity, VkDeviceSize p_stride)
     : IRenderObjectVK(p_render_data), backing(std::move(p_backing)), type(p_type), first_index(p_first_index),
       capacity(p_capacity), stride(p_stride) {
     if (backing == MEM_NULL || capacity == 0 || stride == 0) {

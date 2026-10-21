@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/script/sb_lua.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -36,11 +36,11 @@
 
 namespace WhiteBirdEngine {
 
-DataValue RendGraphScriptVK::make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context) {
+DataValue RendGraphScriptVK::make_context(const RenderContextVK& p_render_data, const RendGraphContextVK& p_graph_context) {
     return serialize_context(get_recipe_context(p_render_data, p_graph_context));
 }
 
-RendRecipeContextVK RendGraphScriptVK::get_recipe_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context) {
+RendRecipeContextVK RendGraphScriptVK::get_recipe_context(const RenderContextVK& p_render_data, const RendGraphContextVK& p_graph_context) {
     return RendRecipeContextVK{
         .frames_in_flight = p_render_data.frames_in_flight,
         .swap_chain_format = static_cast<ImageFormatVK>(static_cast<std::underlying_type_t<VkFormat>>(p_render_data.swap_chain_format)),

@@ -29,7 +29,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -94,7 +94,7 @@ private:
     void register_draw_cube_render_graph(WBE::RenderTestMeshDraw p_shadow_task, WBE::RenderTestMeshDraw p_main_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
-    const WBE::BaseRenderDataVK* base_render_data = nullptr;
+    const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
     WBE::RefRes<WBE::RUMesh3D> cube_mesh;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
@@ -193,7 +193,7 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
 }
 
 void ApplicationVulkanDrawCubeTest::render_update(double /* p_delta */) {
-    WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+    WBE::on_exec_test_render(*renderer_vk, render_context->current_frame);
 }
 
 void ApplicationVulkanDrawCubeTest::setup_draw_task() {
@@ -220,7 +220,7 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
         .depth_attachment_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
     };
 
-    const std::array main_formats{base_render_data->swap_chain_format};
+    const std::array main_formats{render_context->swap_chain_format};
     WBE::Ref<WBE::ROGraphicsPipelineVK> main_pipeline =
         WBE::compile_render_test_graphics_pipeline(renderer_vk, "draw_cube_main_pipeline", main_pipeline_resource, main_formats);
     WBE::RenderTestMeshDraw main_task{
@@ -240,9 +240,9 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
 
 void ApplicationVulkanDrawCubeTest::setup_render_context() {
     renderer_vk = WBE::RendererVK::get_singleton();
-    base_render_data = renderer_vk->get_base_render_data();
+    render_context = renderer_vk->get_render_context();
     render_allocator = get_renderer_allocator().get();
-    camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio);
+    camera_component = make_default_test_camera_component(render_context->swap_chain_aspect_ratio);
 }
 
 void ApplicationVulkanDrawCubeTest::load_resources() {
@@ -349,8 +349,8 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
 
             // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.
             // The draw tasks import the mesh themselves.
-            shadow_task.add_to(pipeline_desc, base_render_data).connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            main_task.add_to(pipeline_desc, base_render_data).alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
+            shadow_task.add_to(pipeline_desc, render_context).connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
+            main_task.add_to(pipeline_desc, render_context).alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
             return pipeline_desc;
         });
     camera_info_ubo = graph->acquire_resource(CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();

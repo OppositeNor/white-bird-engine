@@ -14,14 +14,14 @@
 */
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-ROPipelineVK::ROPipelineVK(const BaseRenderDataVK* p_render_data) : IRenderObjectVK(p_render_data) {
+ROPipelineVK::ROPipelineVK(const RenderContextVK* p_render_data) : IRenderObjectVK(p_render_data) {
 }
 
 ROPipelineVK::~ROPipelineVK() {

@@ -21,7 +21,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "render_task_registry_vk_test_tasks.hh"
 #include "utils/defs.hh"
 #include <algorithm>
@@ -62,7 +62,7 @@ TEST(WBERenderTaskRegistryVKTest, RegistersClassNamesAndAliases) {
 
 TEST(WBERenderTaskRegistryVKTest, FactoryCreatesTaskFromParameters) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const RendTaskFactoryVK factory = RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("bloom", 3), &render_data);
     ASSERT_TRUE(static_cast<bool>(factory));
 
@@ -82,7 +82,7 @@ TEST(WBERenderTaskRegistryVKTest, FactoryCreatesTaskFromParameters) {
 
 TEST(WBERenderTaskRegistryVKTest, ClassNameAndAliasesCreateTheSameTaskType) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     for (std::string_view name : {"RTRegistryProbeVK", "registry_probe_alias"}) {
         const Unique<IRenderTaskVK> task =
             RenderTaskRegistryVK::create_factory(name, make_probe_params("named", 1), &render_data)(RendGraphContextVK{});
@@ -92,7 +92,7 @@ TEST(WBERenderTaskRegistryVKTest, ClassNameAndAliasesCreateTheSameTaskType) {
 
 TEST(WBERenderTaskRegistryVKTest, OptionalParametersKeepTheirDefaults) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DataValue params;
     params.set_entry("label", DataValue::make_string("defaults"));
     const Unique<IRenderTaskVK> task =
@@ -102,7 +102,7 @@ TEST(WBERenderTaskRegistryVKTest, OptionalParametersKeepTheirDefaults) {
 
 TEST(WBERenderTaskRegistryVKTest, CreateFactoryRejectsInvalidRequests) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("missing_task", make_probe_params("x", 1), &render_data), std::runtime_error);
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("x", 1), nullptr), std::runtime_error);
     // The required label is missing, so deserialization fails before any factory exists.
@@ -113,7 +113,7 @@ TEST(WBERenderTaskRegistryVKTest, CreateFactoryRejectsInvalidRequests) {
 
 TEST(WBERenderTaskRegistryVKTest, RejectsMisspeltParameters) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DataValue params = make_probe_params("x", 1);
     params.set_entry("cuont", DataValue::make_integer(2));
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data), std::runtime_error);
@@ -126,14 +126,14 @@ TEST(WBERenderTaskRegistryVKTest, RejectsMisspeltParameters) {
 
 TEST(WBERenderTaskRegistryVKTest, CreateFailuresSurfaceWhenTheFactoryRuns) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const RendTaskFactoryVK factory = RenderTaskRegistryVK::create_factory("registry_probe", make_probe_params("x", 0), &render_data);
     EXPECT_THROW(factory(RendGraphContextVK{}), std::runtime_error);
 }
 
 TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DataValue params;
     params.set_entry("pipeline", DataValue::make_string("pipelines/missing"));
     params.set_entry("group_count_x", DataValue::make_integer(8));
@@ -153,7 +153,7 @@ TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) 
 
 TEST(WBERenderTaskRegistryVKTest, AddTaskCallsPrepareGraphAndAddsTheTask) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     RendGraphDescVK graph(&allocator);
     RendTaskDescVK& first =
         RenderTaskRegistryVK::add_task(graph, "first", "registry_preparing_probe", make_probe_params("shared", 1), &render_data);
@@ -170,7 +170,7 @@ TEST(WBERenderTaskRegistryVKTest, AddTaskCallsPrepareGraphAndAddsTheTask) {
 
 TEST(WBERenderTaskRegistryVKTest, AddTaskWithoutPrepareGraphOnlyAddsTheTask) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     RendGraphDescVK graph(&allocator);
     RendTaskDescVK& task = RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("plain", 2), &render_data);
     EXPECT_TRUE(graph.buffers.empty());
@@ -180,7 +180,7 @@ TEST(WBERenderTaskRegistryVKTest, AddTaskWithoutPrepareGraphOnlyAddsTheTask) {
 
 TEST(WBERenderTaskRegistryVKTest, AddTaskRejectsInvalidRequests) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     RendGraphDescVK graph(&allocator);
     RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data);
     EXPECT_THROW(RenderTaskRegistryVK::add_task(graph, "probe", "registry_probe", make_probe_params("x", 1), &render_data),

@@ -15,7 +15,7 @@
 #include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
@@ -55,7 +55,7 @@ VkAccelerationStructureBuildGeometryInfoKHR make_sizing_info(
     return result;
 }
 
-VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const BaseRenderDataVK* p_render_data,
+VkAccelerationStructureBuildSizesInfoKHR get_build_sizes(const RenderContextVK* p_render_data,
     const BaseRayTracingDataVK* p_ray_tracing_data,
     VkAccelerationStructureTypeKHR p_type,
     const VkAccelerationStructureGeometryKHR* p_geometry,
@@ -162,15 +162,14 @@ void append_bottom_level_inputs(std::vector<BottomLevelInput>& p_inputs,
 }
 
 Ref<ROBufferVK> create_scratch_buffer(
-    const BaseRenderDataVK* p_render_data, VkDeviceSize p_size, VkDeviceSize p_alignment, VkDeviceAddress& p_aligned_address) {
+    const RenderContextVK* p_render_data, VkDeviceSize p_size, VkDeviceSize p_alignment, VkDeviceAddress& p_aligned_address) {
     if (p_size > std::numeric_limits<VkDeviceSize>::max() - p_alignment + 1) {
         throw std::runtime_error("Failed to compile static-mesh acceleration structure: invalid scratch-buffer size or alignment.");
     }
-    Ref<ROBufferVK> result = ROBufferVK::Builder()
+    Ref<ROBufferVK> result = p_render_data->create_buffer(ROBufferVK::Builder()
                                  .set_domain(DeviceDomain::DEVICE)
                                  .set_size(p_size + p_alignment - 1)
-                                 .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-                                 .create_ref(p_render_data);
+                                 .set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT));
     p_aligned_address = ((result->get_device_address() + p_alignment - 1) / p_alignment) * p_alignment;
     return result;
 }
@@ -185,7 +184,7 @@ void require_build_input_usage(Ref<ROBufferVK> p_buffer, const char* p_message) 
 } // namespace
 
 MeshAccelerationStructureCompilerVK::MeshAccelerationStructureCompilerVK(
-    const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data)
+    const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data)
     : render_data(p_render_data), ray_tracing_data(p_ray_tracing_data) {
     if (render_data == nullptr || render_data->allocator == nullptr || ray_tracing_data == nullptr ||
         ray_tracing_data->get_acceleration_structure_build_sizes == nullptr ||
@@ -267,11 +266,10 @@ Ref<MeshAccelerationStructureVK> MeshAccelerationStructureCompilerVK::compile(
     }
     const size_t instance_buffer_size = sizeof(VkAccelerationStructureInstanceKHR) * top_level_instances.size();
     result->top_level_instance_buffer =
-        ROBufferVK::Builder()
+        render_data->create_buffer(ROBufferVK::Builder()
             .set_domain(DeviceDomain::HOST)
             .set_size(instance_buffer_size)
-            .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-            .create_ref(render_data);
+            .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT));
     result->top_level_instance_buffer->update_buffer(top_level_instances.data(), instance_buffer_size);
 
     VkAccelerationStructureGeometryKHR& top_level_geometry = result->top_level_geometry;

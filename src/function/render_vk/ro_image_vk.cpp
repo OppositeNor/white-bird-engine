@@ -13,6 +13,7 @@
    limitations under the License.
    */
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/debug_utils_vk.hh"
 #include <string_view>
 #include "core/allocator/i_allocator.hh"
@@ -25,7 +26,7 @@
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_fense_vk.hh"
@@ -238,7 +239,7 @@ void record_image_readback(VkCommandBuffer p_command_buffer,
 }
 
 ImageReadbackOperation begin_image_readback(
-    const ROImageVK::ExposedFields& p_fields, const BaseRenderDataVK* p_render_data, ImageReadbackPlan p_plan) {
+    const ROImageVK::ExposedFields& p_fields, const RenderContextVK* p_render_data, ImageReadbackPlan p_plan) {
     RendererVK* renderer = RendererVK::get_singleton();
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to acquire image content: the Vulkan renderer is unavailable.");
@@ -247,7 +248,7 @@ ImageReadbackOperation begin_image_readback(
     // Allocate a dedicated mapped staging buffer that remains alive through the worker copy.
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(static_cast<size_t>(p_plan.buffer_size));
     Ref<ROStagingBufferVK> staging_buffer =
-        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(p_render_data);
+        p_render_data->create_staging_buffer(ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT));
     const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(static_cast<size_t>(p_plan.buffer_size));
     for (VkBufferImageCopy& copy_region : p_plan.copy_regions) {
         // Translate plan-relative offsets into the staging buffer's suballocation.
@@ -312,7 +313,7 @@ void release_image_readback(ImageReadbackOperation& p_operation) {
 // rendering thread waiting on it therefore never waits for room in its own full job buffer.
 template <typename TCompletion>
 auto schedule_image_readback(
-    const ROImageVK::ExposedFields& p_fields, const BaseRenderDataVK* p_render_data, size_t p_destination_size, TCompletion p_completion) {
+    const ROImageVK::ExposedFields& p_fields, const RenderContextVK* p_render_data, size_t p_destination_size, TCompletion p_completion) {
     Worker* worker = Worker::get_singleton();
     if (worker == nullptr) {
         throw std::runtime_error("Failed to acquire image content: the engine worker is unavailable.");
@@ -342,46 +343,62 @@ auto schedule_image_readback(
 
 } // namespace
 
+Ref<ROImageVK> ImageDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_image(*this);
+}
+
+Unique<ROImageVK> ImageDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+}
+
+Ref<ROImageVK> ImageAliasDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_image(*this);
+}
+
+Unique<ROImageVK> ImageAliasDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
+}
+
 TypeID ROImageVK::get_type_uuid() const {
     return TypeUUID<ROImageVK>::UUID;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_image_type(VkImageType p_image_type) {
+ImageDescVK& ImageDescVK::set_image_type(VkImageType p_image_type) {
     image_type = p_image_type;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_format(VkFormat p_format) {
+ImageDescVK& ImageDescVK::set_format(VkFormat p_format) {
     format = p_format;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_extent(VkExtent3D p_extent) {
+ImageDescVK& ImageDescVK::set_extent(VkExtent3D p_extent) {
     extent = p_extent;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_mipmap_level(uint32_t p_mipmap_level) {
+ImageDescVK& ImageDescVK::set_mipmap_level(uint32_t p_mipmap_level) {
     mipmap_level = p_mipmap_level;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_layers(uint32_t p_layers_count) {
+ImageDescVK& ImageDescVK::set_layers(uint32_t p_layers_count) {
     layers_count = p_layers_count;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_usage(VkImageUsageFlags p_usage) {
+ImageDescVK& ImageDescVK::set_usage(VkImageUsageFlags p_usage) {
     usage = p_usage;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_queue_families(const std::set<uint32_t>& p_queue_families) {
+ImageDescVK& ImageDescVK::set_queue_families(const std::set<uint32_t>& p_queue_families) {
     queue_families = p_queue_families;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage) {
+ImageDescVK& ImageDescVK::set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage) {
     image_type = VK_IMAGE_TYPE_2D;
     format = p_format;
     extent = VkExtent3D{.width = p_extent.width, .height = p_extent.height, .depth = 1};
@@ -389,56 +406,56 @@ ROImageVK::Builder& ROImageVK::Builder::set_properties_2d(VkFormat p_format, VkE
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::image_2d(glm::uvec2 p_size) {
+ImageDescVK& ImageDescVK::image_2d(glm::uvec2 p_size) {
     image_type = VK_IMAGE_TYPE_2D;
     extent = VkExtent3D{.width = p_size.x, .height = p_size.y, .depth = 1};
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::image_2d(VkExtent2D p_extent) {
+ImageDescVK& ImageDescVK::image_2d(VkExtent2D p_extent) {
     image_type = VK_IMAGE_TYPE_2D;
     extent = VkExtent3D{.width = p_extent.width, .height = p_extent.height, .depth = 1};
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::image_3d(glm::uvec3 p_size) {
+ImageDescVK& ImageDescVK::image_3d(glm::uvec3 p_size) {
     image_type = VK_IMAGE_TYPE_3D;
     extent = VkExtent3D{.width = p_size.x, .height = p_size.y, .depth = p_size.z};
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::image_3d(VkExtent3D p_extent) {
+ImageDescVK& ImageDescVK::image_3d(VkExtent3D p_extent) {
     image_type = VK_IMAGE_TYPE_3D;
     extent = p_extent;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::rgb() {
+ImageDescVK& ImageDescVK::rgb() {
     format = VK_FORMAT_R8G8B8_UNORM;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::srgb() {
+ImageDescVK& ImageDescVK::srgb() {
     format = VK_FORMAT_R8G8B8_SRGB;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::rgba() {
+ImageDescVK& ImageDescVK::rgba() {
     format = VK_FORMAT_R8G8B8A8_UNORM;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::srgba() {
+ImageDescVK& ImageDescVK::srgba() {
     format = VK_FORMAT_R8G8B8A8_SRGB;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::rgb_hdr() {
+ImageDescVK& ImageDescVK::rgb_hdr() {
     format = VK_FORMAT_R32G32B32_SFLOAT;
     return *this;
 }
 
-ROImageVK::Builder& ROImageVK::Builder::rgba_hdr() {
+ImageDescVK& ImageDescVK::rgba_hdr() {
     format = VK_FORMAT_R32G32B32A32_SFLOAT;
     return *this;
 }
@@ -470,7 +487,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     }
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const RenderContextVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     create_image(p_builder, MEM_NULL, 0);
     memory = DeviceMemoryVK::Builder().set_image_requirements(exposed_fields.image).set_domain(DeviceDomain::DEVICE).create_ref(render_data);
     VkResult result = vmaBindImageMemory(render_data->vma_allocator, memory->get(), exposed_fields.image);
@@ -480,7 +497,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_bui
     exposed_fields.image_memory = memory->fields().device_memory;
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder) : IRenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const RenderContextVK* p_render_data, const AliasBuilder& p_builder) : IRenderObjectVK(p_render_data) {
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing image: device memory is null.");
     }
@@ -489,7 +506,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& 
     exposed_fields.image_memory = memory->fields().device_memory;
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
+ROImageVK::ROImageVK(const RenderContextVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout)
     : IRenderObjectVK(p_render_data) {
     exposed_fields.image = p_image;
     p_image = VK_NULL_HANDLE;
@@ -500,7 +517,7 @@ ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkI
     ownership = Ownership::SWAP_CHAIN;
 }
 
-ROImageVK::ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture) : IRenderObjectVK(p_render_data) {
+ROImageVK::ROImageVK(const RenderContextVK* p_render_data, ktxVulkanTexture p_texture) : IRenderObjectVK(p_render_data) {
     if (p_texture.image == VK_NULL_HANDLE || p_texture.deviceMemory == VK_NULL_HANDLE) {
         ktxVulkanTexture_Destruct(&p_texture, p_render_data->logic_device, p_render_data->allocation_callbacks);
         throw std::runtime_error("Failed to adopt libktx Vulkan texture: image or device memory is null.");
@@ -578,7 +595,19 @@ void ROImageVK::create_image(const Builder& p_builder, Ref<DeviceMemoryVK> p_ali
     }
     exposed_fields.format = WBE_REQUIRED(p_builder.format);
     exposed_fields.extent = WBE_REQUIRED(p_builder.extent);
-    exposed_fields.view_type = WBE_REQUIRED(p_builder.image_type) == VK_IMAGE_TYPE_3D ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
+    switch (WBE_REQUIRED(p_builder.image_type)) {
+    case VK_IMAGE_TYPE_1D:
+        exposed_fields.view_type = p_builder.layers_count > 1 ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
+        break;
+    case VK_IMAGE_TYPE_2D:
+        exposed_fields.view_type = p_builder.layers_count > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        break;
+    case VK_IMAGE_TYPE_3D:
+        exposed_fields.view_type = VK_IMAGE_VIEW_TYPE_3D;
+        break;
+    default:
+        throw std::runtime_error("Failed to determine default image view type: unsupported image type.");
+    }
     exposed_fields.mipmap_levels = p_builder.mipmap_level;
     exposed_fields.layers_count = p_builder.layers_count;
     exposed_fields.usage = create_info.usage;
@@ -634,6 +663,61 @@ std::future<void> ROImageVK::acquire_image_content(std::span<uint8_t> p_destinat
 size_t ROImageVK::get_content_size() const {
     validate_image_readback(exposed_fields);
     return build_image_readback_plan(exposed_fields).output_size;
+}
+
+Ref<ROImageViewVK> ROImageVK::get_image_view_ref() const {
+    return get_image_view_ref(exposed_fields.view_type,
+        exposed_fields.format,
+        VkImageSubresourceRange{.aspectMask = 0,
+            .baseMipLevel = 0,
+            .levelCount = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount = VK_REMAINING_ARRAY_LAYERS},
+        VkComponentMapping{});
+}
+
+Ref<ROImageViewVK> ROImageVK::get_image_view_ref(VkImageViewType p_view_type,
+    VkFormat p_format,
+    VkImageSubresourceRange p_subresource_range,
+    VkComponentMapping p_components) const {
+    if (p_format == VK_FORMAT_UNDEFINED) {
+        throw std::runtime_error("Failed to create image view: image view format is unavailable.");
+    }
+    if (p_subresource_range.baseMipLevel >= exposed_fields.mipmap_levels ||
+        p_subresource_range.baseArrayLayer >= exposed_fields.layers_count) {
+        throw std::runtime_error("Failed to create image view: subresource range starts outside the image.");
+    }
+    const uint32_t remaining_levels = exposed_fields.mipmap_levels - p_subresource_range.baseMipLevel;
+    const uint32_t remaining_layers = exposed_fields.layers_count - p_subresource_range.baseArrayLayer;
+    if (p_subresource_range.levelCount == VK_REMAINING_MIP_LEVELS) {
+        p_subresource_range.levelCount = remaining_levels;
+    }
+    if (p_subresource_range.layerCount == VK_REMAINING_ARRAY_LAYERS) {
+        p_subresource_range.layerCount = remaining_layers;
+    }
+    if (p_subresource_range.levelCount == 0 || p_subresource_range.levelCount > remaining_levels ||
+        p_subresource_range.layerCount == 0 || p_subresource_range.layerCount > remaining_layers) {
+        throw std::runtime_error("Failed to create image view: subresource range exceeds the image.");
+    }
+    if (p_subresource_range.aspectMask == 0) {
+        const auto format = static_cast<vk::Format>(exposed_fields.format);
+        if (vk::hasDepthComponent(format)) {
+            p_subresource_range.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        }
+        if (vk::hasStencilComponent(format)) {
+            p_subresource_range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+        if (p_subresource_range.aspectMask == 0) {
+            p_subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+    }
+    const ImageViewDescVK description = ImageViewDescVK{}
+                                            .set_image(acquire_this_ref().dynamic_cast_ref<ROImageVK>())
+                                            .set_view_type(p_view_type)
+                                            .set_format(p_format)
+                                            .set_components(p_components)
+                                            .set_subresource_range(p_subresource_range);
+    return render_data->create_image_view(description);
 }
 
 void ROImageVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {

@@ -17,7 +17,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 
 #include <stdexcept>
 #include <string_view>
@@ -28,7 +28,7 @@
 namespace WhiteBirdEngine {
 
 RTBuildAccelerationStructuresVK::RTBuildAccelerationStructuresVK(
-    const BaseRenderDataVK* p_render_data, std::string_view p_acceleration_structure_resource_id, GPUJobVK p_record_job)
+    const RenderContextVK* p_render_data, std::string_view p_acceleration_structure_resource_id, GPUJobVK p_record_job)
     : render_data(p_render_data), acceleration_structure_resource_id(p_acceleration_structure_resource_id),
       record_job(std::move(p_record_job)) {
     if (render_data == nullptr) {

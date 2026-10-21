@@ -18,7 +18,7 @@
 #include "core/core_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/utils.hh"
@@ -31,29 +31,39 @@
 
 namespace WhiteBirdEngine {
 
+Ref<ROShaderVK> ShaderDescVK::create_ref(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return p_render_context->create_shader(*this);
+}
+
+Unique<ROShaderVK> ShaderDescVK::create_unique(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return make_unique<ROShaderVK>(p_render_context->allocator, p_render_context, *this);
+}
+
 TypeID ROShaderVK::get_type_uuid() const {
     return TypeUUID<ROShaderVK>::UUID;
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::span<const uint32_t> p_code) {
+ShaderDescVK& ShaderDescVK::set_code(std::span<const uint32_t> p_code) {
     code = std::vector<uint32_t>(p_code.begin(), p_code.end());
     code_size = p_code.size();
     return *this;
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(std::string_view p_resource_id) {
+ShaderDescVK& ShaderDescVK::set_code(std::string_view p_resource_id) {
     auto resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id);
     return set_code(resource);
 }
 
-ROShaderVK::Builder& ROShaderVK::Builder::set_code(RefRes<RUShader> p_resource) {
+ShaderDescVK& ShaderDescVK::set_code(RefRes<RUShader> p_resource) {
     if (p_resource == nullptr || p_resource->data == nullptr) {
         throw std::runtime_error("Failed to set shader code: shader resource is missing binary data.");
     }
     return set_code(std::span(p_resource->data.get(), p_resource->size));
 }
 
-VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkShaderModule ShaderDescVK::create_vk_object(const RenderContextVK* p_render_data) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     WBE_REQUIRED(code);
@@ -67,20 +77,20 @@ VkShaderModule ROShaderVK::Builder::create_vk_object(const BaseRenderDataVK* p_r
     return result;
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, const Builder& p_builder)
-    : IRenderObjectVK(p_base_render_data) {
+ROShaderVK::ROShaderVK(const RenderContextVK* p_render_context, const Builder& p_builder)
+    : IRenderObjectVK(p_render_context) {
     init(p_builder);
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, std::string_view p_resource_id)
-    : IRenderObjectVK(p_base_render_data) {
+ROShaderVK::ROShaderVK(const RenderContextVK* p_render_context, std::string_view p_resource_id)
+    : IRenderObjectVK(p_render_context) {
     Builder builder;
     builder.set_code(p_resource_id);
     init(builder);
 }
 
-ROShaderVK::ROShaderVK(const BaseRenderDataVK* p_base_render_data, RefRes<RUShader> p_resource)
-    : IRenderObjectVK(p_base_render_data) {
+ROShaderVK::ROShaderVK(const RenderContextVK* p_render_context, RefRes<RUShader> p_resource)
+    : IRenderObjectVK(p_render_context) {
     Builder builder;
     builder.set_code(p_resource);
     init(builder);

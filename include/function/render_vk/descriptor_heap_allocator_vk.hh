@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
 #include <cstdint>
@@ -84,7 +84,7 @@ public:
     /**
      * @brief Construct an empty descriptor-heap allocator.
      */
-    DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data);
+    DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const RenderContextVK* p_render_data);
 
     /**
      * @brief Create a physical descriptor heap and return its identifier.
@@ -170,7 +170,7 @@ private:
     const Arena& get_arena(DescriptorHeapIDVK p_heap_id, DescriptorArenaIDVK p_arena_id) const;
     static bool is_allocated(const Arena& p_arena, uint32_t p_first_index, uint32_t p_count);
 
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     RenderAllocator* allocator = nullptr;
     Vector<Heap, RenderAllocator> heaps;
 };

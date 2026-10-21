@@ -23,7 +23,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
 #include "render_task_registry_vk_test_tasks.hh"
@@ -281,7 +281,7 @@ TEST_F(WBERTTriggeredVKEventTest, StringLiteralSelectsTheEventConstructor) {
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryWrapsEveryCreatedTask) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     TriggerProbeState state;
     int factory_calls = 0;
     VkExtent2D seen_extent{};
@@ -311,7 +311,7 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryWrapsEveryCreatedTask) {
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryCreatesAFreshWrapperOnEveryEvaluation) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     TriggerProbeState state;
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
         [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
@@ -332,7 +332,7 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryCreatesAFreshWrapperOnEveryEvaluati
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryHonoursActivation) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     TriggerProbeState state;
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
         [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
@@ -349,7 +349,7 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryHonoursActivation) {
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryRejectsInvalidInputs) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     TriggerProbeState state;
     const RendTaskFactoryVK inner = [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
         return make_unique<RTTriggerProbeVK>(&allocator, state);
@@ -361,7 +361,7 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryRejectsInvalidInputs) {
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryComposesWithTheTaskRegistry) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DataValue params;
     params.set_entry("label", DataValue::make_string("triggered"));
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
@@ -382,7 +382,7 @@ TEST(WBERTTriggeredVKStandaloneTest, EventModeRequiresEventManager) {
 // Runs without a test global, so no EventManager exists.
 TEST(WBERTTriggeredVKStandaloneTest, WrapFactoryRequiresEventManager) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     TriggerProbeState state;
     ASSERT_EQ(EventManager::get_singleton(), nullptr);
     EXPECT_THROW(RTTriggeredVK::wrap_factory(

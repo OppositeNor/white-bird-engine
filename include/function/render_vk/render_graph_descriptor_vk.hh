@@ -132,7 +132,7 @@ struct RendImageViewDescVK {
     std::optional<VkImageViewType> view_type;
     /** View format. Defaults to the image format. */
     std::optional<VkFormat> format;
-    /** Aspect mask. Defaults to depth for depth formats and color otherwise. */
+    /** Aspect mask. Defaults to the source image's color, depth, and/or stencil aspects. */
     std::optional<VkImageAspectFlags> aspect_mask;
     /** First viewed mip level. */
     uint32_t base_mip_level = 0;

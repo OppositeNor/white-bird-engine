@@ -6,7 +6,7 @@
    (`add_task(RendTaskDescVK)`) owned outside the graph.
 2. `RendGraphScriptVK::run(key_or_source, context)` runs the recipe in a fresh sandboxed `SBLua` and returns its table as a
    `DataValue`. `require` resolves other script resources through `SMRResourceManager`.
-3. `RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data)` returns a `RendGraphDescVK`. It adds tasks through
+3. `RendGraphRecipeBuilderVK().build(recipe, imports, render_context)` returns a `RendGraphDescVK`. It adds tasks through
    `RenderTaskRegistryVK::add_task()` (which runs the type's `prepare_graph`), wraps a `trigger` first and a `toggle`
    outermost, copies imported tasks, and builds subgraphs. A declared-but-missing or supplied-but-undeclared import or task
    is an error.
@@ -15,39 +15,51 @@
 
 Recipes only build descriptors; they never touch render objects.
 
-## Recipe shape
+## Handle-based recipes
+
+Resource constructors return `graph_utils.Resource` handles. Pass image handles to `image_view`, handles in task aliases,
+`graph:chain(handle, tasks)`, and subgraph port maps. `graph:build()` automatically collects declarations from those
+references and image dependencies. Unused handles are omitted; shared handles emit once. A task's `uses` list retains
+resources named directly by typed params or same-name reflected shader bindings, without declaring access or ordering.
+Typed resource-id params use `handle.id`. Mesh/pipeline/task/event keys remain strings.
+
+`import_resource(id)` names an exact C++ supplied import; `port(id)` names a local subgraph port; `reference(id)` names an
+existing enclosing or composite member without declaring a new import. `graph:build(imports)` may preserve a complete
+C++ supplied import list. Feature subgraphs return `graph_utils.Task`; the containing graph lowers them at build time.
+
+`graph:add(description)` returns a task object. Save it and pass task objects to chains or call
+`producer:connect(consumer, resource)`. Strings, forged handles, and handles from other graphs are rejected. Bind resource
+names with `task:alias(local_name, resource)`: the alias is private to that task, duplicate names within one task fail,
+and different tasks may reuse local names. Input alias maps and edge lists are copied per task. `alias` and `connect`
+return the same task for fluent calls. Task IDs remain stable serialized names; task methods and graph references are
+removed by `graph:build()`.
+
+The emitted recipe retains the following plain data schema; handles and graph methods never cross the Lua/C++ boundary.
 
 A recipe module exports `build(context)` returning `RendGraphRecipeVK` (`rend_graph_recipe_params_vk.hh`):
 
 ```lua
 local type wbe = require("wbe")
 local graph_utils = require("utils.render_graph")
-
 local exports = {}
 
-function exports.build(context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+    local target = graph_utils.import_resource("swap_chain")
+    local camera = graph_utils.import_resource("camera_info")
+    local graph = graph_utils.graph()
     local params: wbe.RTParamsGraphicsDrawMeshVK = {
         mesh = "model_cube_static.mesh",
         pipeline = "draw_cube_unshaded_pipeline",
         parts = { "opaque" },
     }
-    return {
-        imports = { "swap_chain", "camera_info" },
-        resources = {
-            graph_utils.storage_image("blur_output", "r16g16b16a16_sfloat",
-                context.swap_chain_extent.width, context.swap_chain_extent.height),
-        },
-        tasks = {
-            {
-                id = "run_static_mesh",
-                type = "graphics_draw_mesh",
-                params = params,
-                aliases = { ["render_target_colors[0]"] = "swap_chain" },
-                connect = { { to = "draw_imgui", resource = "swap_chain" } },
-            },
-            { id = "draw_imgui", import = true },
-        },
-    }
+    local draw = graph:add({
+        id = "run_static_mesh",
+        type = "graphics_draw_mesh",
+        params = params,
+        uses = { camera },
+    })
+    draw:alias("render_target_colors[0]", target)
+    return graph:build()
 end
 
 return exports
@@ -113,8 +125,8 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
    fields `WBE_REFLECT_REQUIRED` and reference pipelines by render-database key.
 2. Mark the task `WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ <name> ])` and declare
-   `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`.
-   Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const BaseRenderDataVK*)` if
+   `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`.
+   Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const RenderContextVK*)` if
    the task must add imports or aliases.
 3. Use `render_task_create_utils_vk.hh` (`acquire_task_compute_pipeline_vk`, `acquire_task_graphics_pipeline_vk`,
    `resolve_task_push_constants_vk`) in `create()`.
@@ -139,9 +151,10 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 - `require` is the only import mechanism; modules load once per backend and cyclic requires fail. New import sources are
   `IScriptModuleResolver`s whose `try_resolve()` must not throw.
 
-`utils.render_graph` provides `enum_name`, `buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
-`clamp_to_edge_sampler`, `indirect_dispatch`, `subgraph`, and `task_list()` (`add`, `get`, `chain(resource, ids)` to connect a
-sequence on one resource). `utils.sort` provides radix-sort resources and tasks; `utils.math` provides `ceil_div` and `clamp`.
+`utils.render_graph` provides `Resource`, `Task`, `Graph`, `graph()`, `enum_name`, `buffer`, `storage_buffer`, `image`,
+`storage_image`, `image_view`, `clamp_to_edge_sampler`, `import_resource`, `port`, `reference`, `indirect_dispatch`, and
+`subgraph`. Graph colon methods are `:add`, `:get`, `:chain(resource, tasks)`, and `:build`. `utils.sort` provides sized
+`radix_sort_buffers` handles and a `radix_sort_task`; `utils.math` provides `ceil_div` and `clamp`.
 
 ## Tests
 

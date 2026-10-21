@@ -18,7 +18,7 @@
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "generated/enum_reflection.gen.hh"
@@ -43,7 +43,7 @@ RTParamsGraphicsDrawMeshVK parse_draw_mesh_params(std::string_view p_json) {
     return result;
 }
 
-std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const BaseRenderDataVK* p_render_data) {
+std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
     try {
         (void)RTGraphicsDrawMeshVK::create(p_render_data, p_params, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
     } catch (const std::runtime_error& p_error) {
@@ -74,7 +74,7 @@ TEST(WBERTGraphicsDrawMeshVKTest, ParametersNamePartsByAlias) {
 
 TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPartsBeforeLookingUpResources) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     RTParamsGraphicsDrawMeshVK params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": "p", "parts": []})");
     EXPECT_NE(create_error(params, &render_data).find("at least one mesh part"), std::string::npos);
     params.parts = {MeshPartVK::OPAQUE, MeshPartVK::MASKED, MeshPartVK::OPAQUE};
@@ -91,7 +91,7 @@ TEST(WBEMeshResourcesVKTest, NamesPartsAndMaterialTables) {
     EXPECT_EQ(MeshResourcesVK::get_material_params_member(2), "material_params.2");
 
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const MeshResourcesVK resources(&render_data);
     for (MeshPartVK part : {MeshPartVK::OPAQUE, MeshPartVK::MASKED, MeshPartVK::DOUBLE_SIDED}) {
         EXPECT_EQ(resources.acquire_draw_commands(part), MEM_NULL);

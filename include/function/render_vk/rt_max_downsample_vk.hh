@@ -23,7 +23,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_max_downsample_vk.hh"
 #include <cstdint>
@@ -77,7 +77,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [max_downsample]) RTMaxDownsample
      * @throws std::runtime_error If the render data or pipeline is missing, the view ids are invalid, or the pipeline does
      * not have the push-data contract described by the class.
      */
-    RTMaxDownsampleVK(const BaseRenderDataVK* p_render_data,
+    RTMaxDownsampleVK(const RenderContextVK* p_render_data,
         Ref<ROComputePipelineVK> p_pipeline,
         std::span<const std::string> p_mip_view_ids,
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
@@ -93,7 +93,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [max_downsample]) RTMaxDownsample
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -113,7 +113,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [max_downsample]) RTMaxDownsample
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> pipeline;
     Vector<std::string, RenderAllocator> mip_view_ids;

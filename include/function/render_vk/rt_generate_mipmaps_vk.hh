@@ -23,7 +23,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_params_generate_mipmaps_vk.hh"
 #include <cstdint>
 #include <string>
@@ -61,7 +61,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [generate_mipmaps]) RTGenerateMip
      * @param p_format Image format used for capability validation.
      * @throws std::runtime_error If the format cannot perform filtered blits.
      */
-    RTGenerateMipmapsVK(const BaseRenderDataVK* p_render_data,
+    RTGenerateMipmapsVK(const RenderContextVK* p_render_data,
         std::string_view p_source_view_id,
         std::string_view p_mip_chain_view_id,
         VkExtent2D p_base_extent,
@@ -79,7 +79,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [generate_mipmaps]) RTGenerateMip
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsGenerateMipmapsVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsGenerateMipmapsVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -92,7 +92,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [generate_mipmaps]) RTGenerateMip
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     std::string source_view_id;
     std::string mip_chain_view_id;
     Ref<RenderObjectContainerVK> source_view_container;

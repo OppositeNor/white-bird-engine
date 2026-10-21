@@ -24,7 +24,7 @@
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/ktx_vulkan_adapter.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
@@ -41,6 +41,200 @@
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
+class ROImageViewVK;
+
+class ROImageVK;
+
+/**
+ * @struct ImageDescVK
+ * @brief Image creation configuration and fluent builder.
+ *
+ * Copyable and movable value configuration; no Vulkan resource is owned by this description.
+ */
+struct ImageDescVK {
+    friend ROImageVK;
+    /**
+     * @brief Format used for the depth attachment of a spot light shadow map.
+     */
+    static constexpr VkFormat SHADOW_MAP_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
+    /**
+     * @brief Format used for the color attachment that accompanies a spot
+     * light shadow map.
+     */
+    static constexpr VkFormat SHADOW_MAP_COLOR_FORMAT = VK_FORMAT_R8_UNORM;
+    /**
+     * @brief Image type.
+     */
+    Required<VkImageType> image_type;
+    /**
+     * @brief Image format.
+     */
+    Required<VkFormat> format;
+    /**
+     * @brief Image extent.
+     */
+    Required<VkExtent3D> extent;
+    /**
+     * @brief Mipmap level.
+     */
+    uint32_t mipmap_level = 1;
+    /**
+     * @brief Number of layers.
+     */
+    uint32_t layers_count = 1;
+    /**
+     * @brief Image usages.
+     */
+    Required<VkImageUsageFlags> usage;
+    /**
+     * @brief The queue families this image will be used in. If not set, it will set to
+     * all queue families used in the graphics renderer.
+     */
+    std::set<uint32_t> queue_families;
+
+    /**
+     * @brief Set the image type.
+     */
+    ImageDescVK& set_image_type(VkImageType p_image_type);
+    /**
+     * @brief Set the format.
+     */
+    ImageDescVK& set_format(VkFormat p_format);
+    /**
+     * @brief Set the image extent.
+     */
+    ImageDescVK& set_extent(VkExtent3D p_extent);
+    /**
+     * @brief Set the mipmap level.
+     */
+    ImageDescVK& set_mipmap_level(uint32_t p_mipmap_level);
+    /**
+     * @brief Set the number of layers of the image.
+     */
+    ImageDescVK& set_layers(uint32_t p_layers_count);
+    /**
+     * @brief Set the image usage.
+     */
+    ImageDescVK& set_usage(VkImageUsageFlags p_usage);
+    /**
+     * @brief Set the queue families.
+     */
+    ImageDescVK& set_queue_families(const std::set<uint32_t>& p_queue_families);
+    /**
+     * @brief Configure the required properties of a two-dimensional image.
+     *
+     * @param p_format Image format.
+     * @param p_extent Image width and height. The depth is set to one.
+     * @param p_usage Image usage flags.
+     * @return *this.
+     */
+    ImageDescVK& set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage);
+    /**
+     * @brief Make a 2D image.
+     */
+    ImageDescVK& image_2d(glm::uvec2 p_size);
+    /**
+     * @brief Make a 2D image.
+     */
+    ImageDescVK& image_2d(VkExtent2D p_extent);
+    /**
+     * @brief Make a 3D image.
+     */
+    ImageDescVK& image_3d(glm::uvec3 p_size);
+    /**
+     * @brief Make a 3D image.
+     */
+    ImageDescVK& image_3d(VkExtent3D p_extent);
+    /**
+     * @brief Make an RGB image with each element 8 bit wide.
+     */
+    ImageDescVK& rgb();
+    /**
+     * @brief Make an SRGB image with each element 8 bit wide.
+     */
+    ImageDescVK& srgb();
+    /**
+     * @brief Make an RGBA image with each element 8 bit wide.
+     */
+    ImageDescVK& rgba();
+    /**
+     * @brief Make an SRGBA image with each element 8 bit wide.
+     */
+    ImageDescVK& srgba();
+    /**
+     * @brief Make an RGB HDR image with each element 32 bit wide.
+     */
+    ImageDescVK& rgb_hdr();
+    /**
+     * @brief Make an RGBA HDR image with each element 32 bit wide.
+     */
+    ImageDescVK& rgba_hdr();
+
+    /**
+     * @brief Create a copyable owning reference on the rendering thread using the renderer context.
+     */
+    Ref<ROImageVK> create_ref(const RenderContextVK* p_render_data) const;
+
+    /**
+     * @brief Create a move-only owner on the rendering thread using the renderer allocator.
+     */
+    Unique<ROImageVK> create_unique(const RenderContextVK* p_render_data) const;
+};
+
+/**
+ * @struct ImageAliasDescVK
+ * @brief Configuration for an image bound to shared existing device memory.
+ *
+ * Copyable and movable; copies share the retained device-memory reference and moves transfer it. This description does not
+ * allocate a Vulkan resource.
+ */
+struct ImageAliasDescVK {
+    /**
+     * @brief Image configuration.
+     */
+    ImageDescVK image;
+    /**
+     * @brief Memory the image is bound to.
+     */
+    Ref<DeviceMemoryVK> memory;
+    /**
+     * @brief Offset of the image inside the memory allocation.
+     */
+    VkDeviceSize offset = 0;
+
+    /**
+     * @brief Set the image configuration.
+     * @param p_image The image configuration.
+     * @return *this.
+     */
+    ImageAliasDescVK& set_image(const ImageDescVK& p_image) {
+        image = p_image;
+        return *this;
+    }
+
+    /**
+     * @brief Set the memory the image aliases.
+     * @param p_memory The memory.
+     * @param p_offset Offset of the image inside the memory allocation.
+     * @return *this.
+     */
+    ImageAliasDescVK& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
+        memory = std::move(p_memory);
+        offset = p_offset;
+        return *this;
+    }
+
+    /**
+     * @brief Create a copyable owning reference on the rendering thread using the renderer context.
+     */
+    Ref<ROImageVK> create_ref(const RenderContextVK* p_render_data) const;
+
+    /**
+     * @brief Create a move-only owner on the rendering thread using the renderer allocator.
+     */
+    Unique<ROImageVK> create_unique(const RenderContextVK* p_render_data) const;
+};
+
 /**
  * @class ROImageVK
  * @brief Image.
@@ -51,127 +245,43 @@ class WBE_META(WBE_RENDER_OBJECT) ROImageVK final : public IRenderObjectVK, publ
     friend class RendererVK;
 
 public:
-    // Builder for ROImageVK
-    struct Builder {
-        friend ROImageVK;
-        // Format used for the depth attachment of a spot light shadow map.
-        static constexpr VkFormat SHADOW_MAP_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
-        // Format used for the color attachment that accompanies a spot
-        // light shadow map.
-        static constexpr VkFormat SHADOW_MAP_COLOR_FORMAT = VK_FORMAT_R8_UNORM;
-        // Image type.
-        Required<VkImageType> image_type;
-        // Image format.
-        Required<VkFormat> format;
-        // Image extent.
-        Required<VkExtent3D> extent;
-        // Mipmap level.
-        uint32_t mipmap_level = 1;
-        // Number of layers.
-        uint32_t layers_count = 1;
-        // Image usages.
-        Required<VkImageUsageFlags> usage;
-        // The queue families this image will be used in. If not set, it will set to
-        // all queue families used in the graphics renderer.
-        std::set<uint32_t> queue_families;
-
-        // Set the image type.
-        Builder& set_image_type(VkImageType p_image_type);
-        // Set the format.
-        Builder& set_format(VkFormat p_format);
-        // Set the image extent.
-        Builder& set_extent(VkExtent3D p_extent);
-        // Set the mipmap level.
-        Builder& set_mipmap_level(uint32_t p_mipmap_level);
-        // Set the number of layers of the image.
-        Builder& set_layers(uint32_t p_layers_count);
-        // Set the image usage.
-        Builder& set_usage(VkImageUsageFlags p_usage);
-        // Set the queue families.
-        Builder& set_queue_families(const std::set<uint32_t>& p_queue_families);
-        /**
-         * @brief Configure the required properties of a two-dimensional image.
-         *
-         * @param p_format Image format.
-         * @param p_extent Image width and height. The depth is set to one.
-         * @param p_usage Image usage flags.
-         * @return *this.
-         */
-        Builder& set_properties_2d(VkFormat p_format, VkExtent2D p_extent, VkImageUsageFlags p_usage);
-        // Make a 2D image.
-        Builder& image_2d(glm::uvec2 p_size);
-        // Make a 2D image.
-        Builder& image_2d(VkExtent2D p_extent);
-        // Make a 3D image.
-        Builder& image_3d(glm::uvec3 p_size);
-        // Make a 3D image.
-        Builder& image_3d(VkExtent3D p_extent);
-        // Make an RGB image with each element 8 bit wide.
-        Builder& rgb();
-        // Make an SRGB image with each element 8 bit wide.
-        Builder& srgb();
-        // Make an RGBA image with each element 8 bit wide.
-        Builder& rgba();
-        // Make an SRGBA image with each element 8 bit wide.
-        Builder& srgba();
-        // Make an RGB HDR image with each element 32 bit wide.
-        Builder& rgb_hdr();
-        // Make an RGBA HDR image with each element 32 bit wide.
-        Builder& rgba_hdr();
-
-        Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
+    /**
+     * @brief Create a shared view matching this image's type, format, aspects, mip levels, and array layers.
+     *
+     * Uses identity component mapping. Each call creates a separate view on the rendering thread and retains this image.
+     * @return An owning reference allocated with the renderer's allocator.
+     * @throws std::runtime_error If this image is not owned by a Ref, its format is unavailable, or view creation fails.
+     */
+    Ref<ROImageViewVK> get_image_view_ref() const;
 
     /**
-     * @class AliasBuilder
-     * @brief Builder for a device-local image bound to existing device memory instead of its own allocation.
+     * @brief Create a shared image view on the rendering thread, retaining this image until the view is destroyed.
      *
-     * The image shares the memory contents with every other resource bound to it; its initial contents are undefined.
+     * Each call creates a separate view.
+     *
+     * @param p_view_type View type.
+     * @param p_format View format.
+     * @param p_subresource_range Viewed subresources. A zero aspect mask inherits the image's aspects;
+     * VK_REMAINING_MIP_LEVELS and VK_REMAINING_ARRAY_LAYERS cover the remaining levels and layers.
+     * @param p_components Component mapping.
+     * @return A copyable owning reference allocated with the renderer's allocator.
+     * @throws std::runtime_error If this image is not owned by a Ref, the format is unavailable,
+     * the subresource range is invalid, or view creation fails.
      */
-    struct AliasBuilder {
-        /** Image configuration. */
-        Builder image;
-        /** Memory the image is bound to. */
-        Ref<DeviceMemoryVK> memory;
-        /** Offset of the image inside the memory allocation. */
-        VkDeviceSize offset = 0;
+    Ref<ROImageViewVK> get_image_view_ref(VkImageViewType p_view_type,
+        VkFormat p_format,
+        VkImageSubresourceRange p_subresource_range,
+        VkComponentMapping p_components) const;
 
-        /**
-         * @brief Set the image configuration.
-         * @param p_image The image configuration.
-         * @return *this.
-         */
-        AliasBuilder& set_image(const Builder& p_image) {
-            image = p_image;
-            return *this;
-        }
+    /**
+     * @brief Compatibility name for ImageDescVK.
+     */
+    using Builder = ImageDescVK;
 
-        /**
-         * @brief Set the memory the image aliases.
-         * @param p_memory The memory.
-         * @param p_offset Offset of the image inside the memory allocation.
-         * @return *this.
-         */
-        AliasBuilder& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
-            memory = std::move(p_memory);
-            offset = p_offset;
-            return *this;
-        }
-
-        Ref<ROImageVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROImageVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROImageVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROImageVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
+    /**
+     * @brief Compatibility name for ImageAliasDescVK.
+     */
+    using AliasBuilder = ImageAliasDescVK;
 
     ROImageVK() = delete;
     virtual ~ROImageVK() override;
@@ -187,38 +297,38 @@ public:
     /**
      * @brief Constructor. Allocates a device-local device memory for the image and binds it.
      *
-     * @param p_render_data The base render data.
+     * @param p_render_data The renderer-owned context.
      * @param p_builder Configuration builder.
      */
-    ROImageVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROImageVK(const RenderContextVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Constructor. Binds the image to existing device memory as an alias.
      *
-     * @param p_render_data The base render data.
+     * @param p_render_data The renderer-owned context.
      * @param p_builder Alias configuration builder.
      * @throws std::runtime_error If the memory is null or cannot hold the image at the offset.
      */
-    ROImageVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder);
+    ROImageVK(const RenderContextVK* p_render_data, const AliasBuilder& p_builder);
 
     /**
      * @brief Constructor for swap chain images. This image will not manually
      * allocate memory, and will not deallocate memory when destroyed.
      *
-     * @param p_render_data The base render data.
+     * @param p_render_data The renderer-owned context.
      * @param p_image The vulkan image instance.
      */
-    ROImageVK(const BaseRenderDataVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
+    ROImageVK(const RenderContextVK* p_render_data, VkImage p_image, VkImageLayout p_initial_image_layout);
 
     /**
      * @brief Adopt a Vulkan image and device-memory allocation created by libktx.
      *
      * The image is destroyed with ktxVulkanTexture_Destruct after the configured frames in flight.
      *
-     * @param p_render_data The base render data.
+     * @param p_render_data The renderer-owned context.
      * @param p_texture The libktx texture allocation whose ownership is transferred to this object.
      */
-    ROImageVK(const BaseRenderDataVK* p_render_data, ktxVulkanTexture p_texture);
+    ROImageVK(const RenderContextVK* p_render_data, ktxVulkanTexture p_texture);
 
     /**
      * @brief Get image instance.

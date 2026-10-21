@@ -25,7 +25,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
 #include <cstddef>
@@ -125,7 +125,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipelines_sequential
      * a direct entry sets an indirect offset, or a resource alias names an id its pipeline does not reflect.
      */
     RTRunComputePipelinesSequentialVK(
-        const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
+        const RenderContextVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     /**
      * @brief Set a custom WBE_PUSH_CONSTANT value for every entry that declares the identifier.
@@ -162,7 +162,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipelines_sequential
      * no compute pipeline is compiled under a dispatch pipeline key. The constructor's own validation also applies.
      */
     WBE_META(WBE_REFLECT)
-    static Unique<IRenderTaskVK> create(const BaseRenderDataVK* p_render_data,
+    static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data,
         const RTParamsRunComputePipelinesSequentialVK& p_params,
         const RendGraphContextVK& p_context);
 
@@ -177,7 +177,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipelines_sequential
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Vector<Entry, RenderAllocator> entries;
     Vector<Unique<PipelineDescriptorBindingsVK>, RenderAllocator> descriptor_bindings;

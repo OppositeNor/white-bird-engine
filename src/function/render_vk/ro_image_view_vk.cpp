@@ -19,7 +19,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -43,7 +43,7 @@ DebugData make_descriptor_row(std::string_view p_descriptor_type, uint32_t p_hea
     return row;
 }
 
-void write_image_descriptor(const BaseRenderDataVK* p_render_data,
+void write_image_descriptor(const RenderContextVK* p_render_data,
     DescriptorArenaLocationVK p_arena,
     uint32_t p_index,
     VkDescriptorType p_type,
@@ -61,52 +61,60 @@ void write_image_descriptor(const BaseRenderDataVK* p_render_data,
 
 } // namespace
 
+Ref<ROImageViewVK> ImageViewDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_image_view(*this);
+}
+
+Unique<ROImageViewVK> ImageViewDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
+}
+
 TypeID ROImageViewVK::get_type_uuid() const {
     return TypeUUID<ROImageViewVK>::UUID;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_image(Ref<ROImageVK> p_image) {
+ImageViewDescVK& ImageViewDescVK::set_image(Ref<ROImageVK> p_image) {
     image = p_image;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_view_type(VkImageViewType p_view_type) {
+ImageViewDescVK& ImageViewDescVK::set_view_type(VkImageViewType p_view_type) {
     view_type = p_view_type;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_format(VkFormat p_format) {
+ImageViewDescVK& ImageViewDescVK::set_format(VkFormat p_format) {
     format = p_format;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(const VkComponentMapping& p_components) {
+ImageViewDescVK& ImageViewDescVK::set_components(const VkComponentMapping& p_components) {
     components = p_components;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_components(
+ImageViewDescVK& ImageViewDescVK::set_components(
     VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a) {
     components = {.r = p_r, .g = p_g, .b = p_b, .a = p_a};
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_subresource_range(const VkImageSubresourceRange& p_subresource_range) {
+ImageViewDescVK& ImageViewDescVK::set_subresource_range(const VkImageSubresourceRange& p_subresource_range) {
     subresource_range = p_subresource_range;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_aspect_mask(VkImageAspectFlags p_aspect_mask) {
+ImageViewDescVK& ImageViewDescVK::set_aspect_mask(VkImageAspectFlags p_aspect_mask) {
     subresource_range.aspectMask = p_aspect_mask;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_mip_level_count(uint32_t p_level_count) {
+ImageViewDescVK& ImageViewDescVK::set_mip_level_count(uint32_t p_level_count) {
     subresource_range.levelCount = p_level_count;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROImageVK::Builder& p_image_config) {
+ImageViewDescVK& ImageViewDescVK::set_from_image_config(const ImageDescVK& p_image_config) {
     switch (WBE_REQUIRED(p_image_config.image_type)) {
     case VK_IMAGE_TYPE_1D:
         view_type = VK_IMAGE_VIEW_TYPE_1D;
@@ -124,17 +132,17 @@ ROImageViewVK::Builder& ROImageViewVK::Builder::set_from_image_config(const ROIm
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_sampled_view_index(uint32_t p_index) {
+ImageViewDescVK& ImageViewDescVK::set_sampled_view_index(uint32_t p_index) {
     sampled_view_index = p_index;
     return *this;
 }
 
-ROImageViewVK::Builder& ROImageViewVK::Builder::set_storage_view_index(uint32_t p_index) {
+ImageViewDescVK& ImageViewDescVK::set_storage_view_index(uint32_t p_index) {
     storage_view_index = p_index;
     return *this;
 }
 
-VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkImageView ImageViewDescVK::create_vk_object(const RenderContextVK* p_render_data) const {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     create_info.image = WBE_REQUIRED(image).get_image();
@@ -150,7 +158,7 @@ VkImageView ROImageViewVK::Builder::create_vk_object(const BaseRenderDataVK* p_r
     return result;
 }
 
-ROImageViewVK::ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROImageViewVK::ROImageViewVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : IRenderObjectVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");

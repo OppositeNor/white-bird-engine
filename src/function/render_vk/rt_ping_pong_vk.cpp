@@ -23,7 +23,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_ping_pong_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -38,7 +38,7 @@
 
 namespace WhiteBirdEngine {
 
-RTPingPongVK::RTPingPongVK(const BaseRenderDataVK* p_render_data,
+RTPingPongVK::RTPingPongVK(const RenderContextVK* p_render_data,
     Ref<ROComputePipelineVK> p_ping_pipeline,
     Ref<ROComputePipelineVK> p_pong_pipeline,
     bool p_initial_state,
@@ -173,7 +173,7 @@ void RTPingPongVK::set_push_constant(std::string_view p_name, PushConstantValueV
 }
 
 Unique<IRenderTaskVK> RTPingPongVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& /*p_context*/) {
     if (p_params.ping_prefix_pipeline.has_value() != p_params.pong_prefix_pipeline.has_value()) {
         throw std::runtime_error("RTPingPongVK: ping_prefix_pipeline and pong_prefix_pipeline must be set together.");
     }

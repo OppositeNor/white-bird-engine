@@ -24,7 +24,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -44,7 +44,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 // The member containers allocate from the render data, so it must be validated before they are constructed.
-RenderAllocator* get_render_data_allocator(const BaseRenderDataVK* p_render_data) {
+RenderAllocator* get_render_data_allocator(const RenderContextVK* p_render_data) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: render data is unavailable.");
     }
@@ -53,7 +53,7 @@ RenderAllocator* get_render_data_allocator(const BaseRenderDataVK* p_render_data
 
 } // namespace
 
-RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id)
+RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id)
     : render_data(p_render_data), image_view_id(p_image_view_id), event_manager(EventManager::get_singleton()),
       pending_acquisitions(get_render_data_allocator(p_render_data)) {
     if (image_view_id.empty()) {
@@ -65,7 +65,7 @@ RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_
 }
 
 Unique<IRenderTaskVK> RTCPUInFlightAcquireVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& /*p_context*/) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: render data is unavailable.");
     }

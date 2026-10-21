@@ -48,14 +48,14 @@ ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     std::string_view p_shader_prefix,
     std::string_view p_dynamic_shader_prefix,
     bool p_rebuild_static_every_frame)
-    : renderer_vk(p_renderer), base_render_data(nullptr), render_allocator(nullptr),
+    : renderer_vk(p_renderer), render_context(nullptr), render_allocator(nullptr),
       static_mesh_resources(std::move(p_static_mesh_resources)), svo_volume(VoxelVolume::enclose(p_scene_bounds, SVO_EXTENT)), rebuild_static_every_frame(p_rebuild_static_every_frame),
       shader_prefix(p_shader_prefix), dynamic_shader_prefix(p_dynamic_shader_prefix) {
     if (renderer_vk == nullptr || static_mesh_resources == MEM_NULL) {
         throw std::runtime_error("ISVORenderFeature: renderer and scene are required.");
     }
-    base_render_data = renderer_vk->get_base_render_data();
-    render_allocator = base_render_data->allocator;
+    render_context = renderer_vk->get_render_context();
+    render_allocator = render_context->allocator;
     compile_pipelines(p_shader_prefix, p_dynamic_shader_prefix);
     create_resources();
 }
@@ -63,7 +63,7 @@ ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
 Ref<ROComputePipelineVK> ISVORenderFeature::compile_compute_pipeline(std::string_view p_resource_id) const {
     ComputePipelineCompilerVK compiler(ComputePipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
     });
     return compiler.compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id)).compute_pipeline;
@@ -73,7 +73,7 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
     auto* resource_manager = ResourceManager::get_singleton();
     GraphicsPipelineCompilerVK svo_compiler(GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
     });
@@ -101,10 +101,10 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
     svo_debug_draw_setup_compute_pipeline = compile_compute_pipeline("svo_debug_draw_setup_shader");
     GraphicsPipelineCompilerVKContext svo_debug_draw_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .color_attachment_formats = {render_context->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
         .polygon_mode = VK_POLYGON_MODE_LINE,
     };
@@ -120,14 +120,13 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
 }
 
 void ISVORenderFeature::create_resources() {
-    svo_info = ROBufferVK::Builder().set_properties(sizeof(SVOInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
+    svo_info = render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVOInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_nodes =
-        ROBufferVK::Builder().set_properties(sizeof(SVONode), SVO_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
-    dynamic_leaves = ROBufferVK::Builder()
-                         .set_properties(sizeof(SVODynamicLeafBlock), SVO_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
-                         .create_ref(base_render_data);
+        render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVONode), SVO_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    dynamic_leaves = render_context->create_buffer(ROBufferVK::Builder()
+                         .set_properties(sizeof(SVODynamicLeafBlock), SVO_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_leaves =
-        ROBufferVK::Builder().set_properties(sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(base_render_data);
+        render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_INDICES));
     const VkDrawIndexedIndirectCommand initial_debug_draw_command{
@@ -176,7 +175,7 @@ void ISVORenderFeature::initialize() {
 }
 
 Ref<ROBufferVK> ISVORenderFeature::create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const {
-    return ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size).create_ref(base_render_data);
+    return render_context->create_buffer(ROBufferVK::Builder().set_usage(p_usage).initial_data(p_data, p_size));
 }
 
 const char* ISVORenderFeature::get_debug_view_name(VoxelDebugViewMode p_mode) const {

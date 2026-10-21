@@ -65,7 +65,7 @@ void validate_parts(const RTParamsGraphicsDrawMeshVK& p_params) {
     }
 }
 
-Ref<MeshResourcesVK> acquire_registered_mesh(const BaseRenderDataVK* p_render_data, std::string_view p_mesh_key) {
+Ref<MeshResourcesVK> acquire_registered_mesh(const RenderContextVK* p_render_data, std::string_view p_mesh_key) {
     Ref<MeshResourcesVK> mesh = p_render_data->render_database->get_compiled_render_resource(p_mesh_key, TypeUUID<MeshResourcesVK>::UUID)
                                     .dynamic_cast_ref<MeshResourcesVK>();
     if (mesh == MEM_NULL) {
@@ -86,7 +86,7 @@ RTGraphicsDrawMeshVK::RTGraphicsDrawMeshVK(Unique<RTRunGraphicsPipelineIndirectV
 }
 
 Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context) {
     validate_parts(p_params);
     Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, TASK_NAME, p_params.pipeline);
     Ref<MeshResourcesVK> mesh = acquire_registered_mesh(p_render_data, p_params.mesh);
@@ -131,7 +131,7 @@ Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(
 }
 
 void RTGraphicsDrawMeshVK::prepare_graph(
-    RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const BaseRenderDataVK* p_render_data) {
+    RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
     validate_parts(p_params);
     Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, TASK_NAME, p_params.pipeline);
     RendererVK* renderer = RendererVK::get_singleton();
@@ -181,7 +181,7 @@ void RTGraphicsDrawMeshVK::prepare_graph(
 }
 
 RendTaskDescVK& RTGraphicsDrawMeshVK::add_to_graph(
-    RendGraphDescVK& p_graph, std::string_view p_task_id, const RTParamsGraphicsDrawMeshVK& p_params, const BaseRenderDataVK* p_render_data) {
+    RendGraphDescVK& p_graph, std::string_view p_task_id, const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
     if (std::ranges::any_of(p_graph.tasks, [p_task_id](const RendTaskDescVK& p_task) {
             return p_task.task_id == p_task_id;
         })) {

@@ -21,7 +21,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -53,7 +53,7 @@ VKAPI_ATTR void VKAPI_CALL capture_push_data(VkCommandBuffer /*p_command_buffer*
 
 TEST(WBEPipelineDescriptorBindingsVKTest, PushesCurrentRendererDefaultValues) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.command_push_data = capture_push_data;
     render_data.time = 12.5;
     render_data.current_frame_slot = 2;
@@ -86,7 +86,7 @@ TEST(WBEPipelineDescriptorBindingsVKTest, PushesCurrentRendererDefaultValues) {
 
 TEST(WBEPipelineDescriptorBindingsVKTest, PushesTaskSuppliedCustomValues) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.command_push_data = capture_push_data;
     ShaderDescriptorHeapLayoutVK layout;
     layout.size = captured_push_data.size();
@@ -146,7 +146,7 @@ ShaderDescriptorHeapLayoutVK make_mapping_layout() {
 
 class TestMappingResourceVK final : public IRenderObjectVK {
 public:
-    explicit TestMappingResourceVK(const BaseRenderDataVK* p_render_data) : IRenderObjectVK(p_render_data) {
+    explicit TestMappingResourceVK(const RenderContextVK* p_render_data) : IRenderObjectVK(p_render_data) {
     }
     virtual ~TestMappingResourceVK() override = default;
     TestMappingResourceVK(const TestMappingResourceVK&) = delete;
@@ -161,7 +161,7 @@ public:
 
 // Add a resource whose two slots are empty, so that pushing its descriptor fails.
 void add_mapping_resource(RenderAllocator* p_allocator,
-    const BaseRenderDataVK* p_render_data,
+    const RenderContextVK* p_render_data,
     Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources,
     std::string_view p_id,
     RendResTID p_type) {
@@ -202,7 +202,7 @@ TEST(WBEPipelineDescriptorBindingsVKTest, ResourceMapRejectsEmptyAndDuplicateSou
 
 TEST(WBEPipelineDescriptorBindingsVKTest, BindsReflectedResourcesThroughTheTaskResourceMap) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     auto layout = make_mapping_layout();
     layout.fields.resize(1);
     PipelineDescriptorBindingsVK bindings(&render_data, layout);
@@ -226,7 +226,7 @@ TEST(WBEPipelineDescriptorBindingsVKTest, BindsReflectedResourcesThroughTheTaskR
 
 TEST(WBEPipelineDescriptorBindingsVKTest, AppendsReflectedAccessesWithTheirReflectedIdentifiers) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     ShaderDescriptorHeapLayoutVK layout;
     layout.size = 40;
     layout.fields = {

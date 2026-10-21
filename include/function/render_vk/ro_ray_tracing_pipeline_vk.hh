@@ -21,7 +21,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_ro_ray_tracing_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
@@ -203,7 +203,7 @@ public:
      * @param p_render_data Base render data.
      * @param p_builder Builder containing the ray tracing pipeline configuration.
      */
-    RORayTracingPipelineVK(const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
+    RORayTracingPipelineVK(const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
 
     virtual TypeID get_type_uuid() const override;
 

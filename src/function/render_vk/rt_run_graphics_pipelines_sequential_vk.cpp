@@ -22,7 +22,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include <algorithm>
 #include <cstddef>
@@ -76,7 +76,7 @@ bool RTRunGraphicsPipelinesSequentialVK::Sequence::is_indirect(size_t p_index) c
     return dispatches[p_index].type == DispatchType::INDIRECT;
 }
 
-RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch)
+RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const RenderContextVK* p_render_data, const Dispatch& p_dispatch)
     : dispatch(p_dispatch), render_targets(p_render_data->allocator,
                                 *p_dispatch.base.pipeline,
                                 RenderTargetsVK::Config{.clear_values = p_dispatch.base.clear_values,
@@ -86,7 +86,7 @@ RTRunGraphicsPipelinesSequentialVK::BoundEntry::BoundEntry(const BaseRenderDataV
         p_render_data->allocator, p_render_data, dispatch.base.pipeline->get_descriptor_layout());
 }
 
-RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const BaseRenderDataVK* p_render_data, const Sequence& p_sequence)
+RTRunGraphicsPipelinesSequentialVK::RTRunGraphicsPipelinesSequentialVK(const RenderContextVK* p_render_data, const Sequence& p_sequence)
     : render_data(p_render_data), entries(p_render_data->allocator) {
     if (p_sequence.dispatches.empty()) {
         throw std::runtime_error("RTRunGraphicsPipelinesSequentialVK: at least one graphics pass is required.");

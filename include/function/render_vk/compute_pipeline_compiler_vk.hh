@@ -21,7 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
  */
 struct ComputePipelineCompilerVKContext {
     RenderAllocator* allocator = nullptr;
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     Ref<RenderDatabase> render_database = MEM_NULL;
 };
 

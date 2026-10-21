@@ -21,7 +21,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -57,7 +57,7 @@ RTToggleVK::RTToggleVK(Unique<IRenderTaskVK> p_task, const char* p_event_id, boo
 }
 
 RendTaskFactoryVK RTToggleVK::wrap_factory(
-    RendTaskFactoryVK p_factory, std::string p_event_id, const BaseRenderDataVK* p_render_data, bool p_enabled) {
+    RendTaskFactoryVK p_factory, std::string p_event_id, const RenderContextVK* p_render_data, bool p_enabled) {
     if (!p_factory) {
         throw std::runtime_error("RTToggleVK: the wrapped task factory is empty.");
     }

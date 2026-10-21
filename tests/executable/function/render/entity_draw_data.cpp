@@ -29,7 +29,7 @@
 
 namespace WhiteBirdEngine {
 
-EntityDrawData::EntityDrawData(const BaseRenderDataVK* p_render_data, Ref<MeshResourcesVK> p_mesh) : mesh(std::move(p_mesh)) {
+EntityDrawData::EntityDrawData(const RenderContextVK* p_render_data, Ref<MeshResourcesVK> p_mesh) : mesh(std::move(p_mesh)) {
     if (p_render_data == nullptr || mesh == MEM_NULL) {
         throw std::runtime_error("Failed to construct entity draw data: render data or mesh is missing.");
     }
@@ -37,7 +37,7 @@ EntityDrawData::EntityDrawData(const BaseRenderDataVK* p_render_data, Ref<MeshRe
         p_render_data->allocator,
         p_render_data->frames_in_flight,
         [p_render_data](uint32_t) -> Ref<IRenderObjectVK> {
-            return ROBufferVK::Builder().set_properties(sizeof(GeometryNodeGPU), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).create_ref(p_render_data);
+            return p_render_data->create_buffer(ROBufferVK::Builder().set_properties(sizeof(GeometryNodeGPU), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
         });
     set_transform(glm::mat4(1.0F));
 }

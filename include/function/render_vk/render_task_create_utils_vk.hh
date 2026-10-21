@@ -18,7 +18,7 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -38,7 +38,7 @@ namespace WhiteBirdEngine {
  * is compiled under p_pipeline_key.
  */
 Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
-    const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
+    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
 
 /**
  * @brief Get a compiled graphics pipeline for a render task's create().
@@ -49,7 +49,7 @@ Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
  * pipeline is compiled under p_pipeline_key.
  */
 Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
-    const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
+    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
 
 /**
  * @brief One custom push-constant value resolved from recipe parameters.

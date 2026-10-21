@@ -18,7 +18,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
@@ -95,7 +95,7 @@ public:
          * @return The shared memory handle.
          * @throws std::runtime_error If the configuration is incomplete or the allocation fails.
          */
-        Ref<DeviceMemoryVK> create_ref(const BaseRenderDataVK* p_render_data, bool p_is_dedicated = false) const;
+        Ref<DeviceMemoryVK> create_ref(const RenderContextVK* p_render_data, bool p_is_dedicated = false) const;
     };
 
     /**
@@ -126,7 +126,7 @@ public:
      * @param p_is_dedicated Request dedicated, non-aliasable memory. Must be true when the source resource requires it.
      * @throws std::runtime_error If the configuration is incomplete or the allocation fails.
      */
-    DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder, bool p_is_dedicated = false);
+    DeviceMemoryVK(const RenderContextVK* p_render_data, const Builder& p_builder, bool p_is_dedicated = false);
     ~DeviceMemoryVK();
     DeviceMemoryVK(const DeviceMemoryVK&) = delete;
     DeviceMemoryVK(DeviceMemoryVK&&) noexcept = delete;
@@ -194,7 +194,7 @@ public:
     }
 
 private:
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     VmaAllocation allocation = VK_NULL_HANDLE;
     bool is_dedicated = false;
     ExposedFields exposed_fields{};

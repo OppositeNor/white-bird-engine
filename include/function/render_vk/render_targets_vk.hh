@@ -20,7 +20,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include <cstdint>
 #include <span>
@@ -121,7 +121,7 @@ public:
      * @param p_command_buffer The command buffer.
      * @param p_render_extent The render area.
      */
-    void begin_rendering(const BaseRenderDataVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const;
+    void begin_rendering(const RenderContextVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const;
 
 private:
     uint32_t color_count = 0;

@@ -13,11 +13,11 @@
    limitations under the License.
 */
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 
 namespace WhiteBirdEngine {
 
-RendGraphContextVK RendGraphContextVK::from_render_data(const BaseRenderDataVK& p_render_data) {
+RendGraphContextVK RendGraphContextVK::from_render_data(const RenderContextVK& p_render_data) {
     return RendGraphContextVK{.swap_chain_extent = p_render_data.swap_chain_extent};
 }
 

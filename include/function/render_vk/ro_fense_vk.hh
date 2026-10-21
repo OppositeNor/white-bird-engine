@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RO_FENSE_VK_HH
 #define WBE_FILE_RO_FENSE_VK_HH
 
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -41,7 +41,7 @@ public:
      * @param p_render_data Renderer data that owns the Vulkan device and delayed-destruction queue.
      * @param p_signaled Whether the fence starts in the signaled state.
      */
-    explicit ROFenseVK(const BaseRenderDataVK* p_render_data, bool p_signaled = false);
+    explicit ROFenseVK(const RenderContextVK* p_render_data, bool p_signaled = false);
 
     /**
      * @brief Wait indefinitely for the submitted GPU job to finish.
@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     VkFence fense = VK_NULL_HANDLE;
 };
 

@@ -16,7 +16,7 @@
 #define WBE_FILE_MESH_ACCELERATION_STRUCTURE_COMPILER_VK_HH
 
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -45,7 +45,7 @@ public:
      * @brief Construct a compiler over renderer and ray-tracing device state; both must outlive the compiler.
      * @throws std::runtime_error If either is null or the ray-tracing device commands are missing.
      */
-    MeshAccelerationStructureCompilerVK(const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data);
+    MeshAccelerationStructureCompilerVK(const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data);
 
     /**
      * @brief Create the acceleration structures of p_static_mesh.
@@ -61,7 +61,7 @@ public:
     Ref<MeshAccelerationStructureVK> compile(Ref<MeshResourcesVK> p_static_mesh, const glm::mat4& p_mesh_transform) const;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     const BaseRayTracingDataVK* ray_tracing_data = nullptr;
 };
 

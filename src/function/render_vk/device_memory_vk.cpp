@@ -16,7 +16,7 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include <format>
 #include <stdexcept>
@@ -69,11 +69,11 @@ DeviceMemoryVK::Builder& DeviceMemoryVK::Builder::set_domain(DeviceDomain p_doma
     return *this;
 }
 
-Ref<DeviceMemoryVK> DeviceMemoryVK::Builder::create_ref(const BaseRenderDataVK* p_render_data, bool p_is_dedicated) const {
+Ref<DeviceMemoryVK> DeviceMemoryVK::Builder::create_ref(const RenderContextVK* p_render_data, bool p_is_dedicated) const {
     return make_ref<DeviceMemoryVK>(p_render_data->allocator, p_render_data, *this, p_is_dedicated);
 }
 
-DeviceMemoryVK::DeviceMemoryVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder, bool p_is_dedicated)
+DeviceMemoryVK::DeviceMemoryVK(const RenderContextVK* p_render_data, const Builder& p_builder, bool p_is_dedicated)
     : render_data(p_render_data), is_dedicated(p_is_dedicated) {
     const int source_count = static_cast<int>(p_builder.buffer != VK_NULL_HANDLE) + static_cast<int>(p_builder.image != VK_NULL_HANDLE) +
                              static_cast<int>(p_builder.requirements.has_value());

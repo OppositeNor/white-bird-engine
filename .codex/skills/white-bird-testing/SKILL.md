@@ -207,7 +207,7 @@ Existing helpers worth reusing before writing your own:
 ### Vulkan / renderer unit tests
 
 Unit tests under `tests/unit/function/*_vk_test.cpp` run without a GPU or `VkDevice`. They exercise builders,
-validation logic, graph compilation, and metadata by constructing `BaseRenderDataVK` over a `RenderAllocator` and
+validation logic, graph compilation, and metadata by constructing `RenderContextVK` over a `RenderAllocator` and
 using fake handles (`reinterpret_cast<VkBuffer>(uintptr_t{1})`) or test doubles derived from the real interfaces
 (e.g. a local `IRenderObjectVK` subclass in an anonymous namespace; see `render_graph_vk_test.cpp`).
 

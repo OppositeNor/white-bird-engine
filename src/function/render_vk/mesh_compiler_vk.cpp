@@ -21,7 +21,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_buffer_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_planner_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "glm/common.hpp"
 #include "glm/matrix.hpp"
@@ -65,18 +65,18 @@ RefRes<RUMaterial> get_default_material(std::string_view p_default_material_key)
     return resource_manager->get_resource<RUMaterial>(std::string(p_default_material_key));
 }
 
-Ref<ROSamplerVK> create_material_sampler(const BaseRenderDataVK* p_render_data) {
+Ref<ROSamplerVK> create_material_sampler(const RenderContextVK* p_render_data) {
     const DescriptorArenaLocationVK arena = p_render_data->sampler_descriptor_arena;
     uint32_t sampler_index = p_render_data->descriptor_heap_allocator->allocate_descriptor(arena.heap_id, arena.arena_id);
-    return ROSamplerVK::Builder().set_sampler_index(sampler_index).create_ref(p_render_data);
+    return p_render_data->create_sampler(ROSamplerVK::Builder().set_sampler_index(sampler_index));
 }
 
-Ref<ROBufferVK> create_host_buffer(const BaseRenderDataVK* p_render_data, const void* p_data, size_t p_size, VkBufferUsageFlags p_usage) {
+Ref<ROBufferVK> create_host_buffer(const RenderContextVK* p_render_data, const void* p_data, size_t p_size, VkBufferUsageFlags p_usage) {
     if (p_size == 0) {
         return MEM_NULL;
     }
     Ref<ROBufferVK> result =
-        ROBufferVK::Builder().set_domain(DeviceDomain::HOST_DEVICE).set_size(p_size).set_usage(p_usage).create_ref(p_render_data);
+        p_render_data->create_buffer(ROBufferVK::Builder().set_domain(DeviceDomain::HOST_DEVICE).set_size(p_size).set_usage(p_usage));
     result->update_buffer(p_data, p_size);
     return result;
 }
@@ -113,11 +113,11 @@ uint32_t get_or_append_material_index(std::vector<RefRes<RUMaterial>>& p_materia
     return static_cast<uint32_t>(p_materials.size() - 1);
 }
 
-Ref<ROBufferVK> create_storage_buffer(const BaseRenderDataVK* p_render_data, const void* p_data, size_t p_size) {
+Ref<ROBufferVK> create_storage_buffer(const RenderContextVK* p_render_data, const void* p_data, size_t p_size) {
     return create_host_buffer(p_render_data, p_data, p_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 }
 
-Ref<ROBufferVK> create_indirect_buffer(const BaseRenderDataVK* p_render_data, std::span<const VkDrawIndexedIndirectCommand> p_commands) {
+Ref<ROBufferVK> create_indirect_buffer(const RenderContextVK* p_render_data, std::span<const VkDrawIndexedIndirectCommand> p_commands) {
     return create_host_buffer(p_render_data,
         p_commands.data(),
         p_commands.size_bytes(),
@@ -125,7 +125,7 @@ Ref<ROBufferVK> create_indirect_buffer(const BaseRenderDataVK* p_render_data, st
 }
 
 MeshBufferCompilerVK::BuildResult compile_geometry_buffers(
-    const BaseRenderDataVK* p_render_data, RefRes<RUMesh3D> p_mesh, const MeshCompilerVK::Config& p_config) {
+    const RenderContextVK* p_render_data, RefRes<RUMesh3D> p_mesh, const MeshCompilerVK::Config& p_config) {
     return MeshBufferCompilerVK(p_render_data)
         .build(p_mesh,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | p_config.vertex_buffer_usage,
@@ -133,7 +133,7 @@ MeshBufferCompilerVK::BuildResult compile_geometry_buffers(
 }
 
 DrawPlan plan_draws(
-    const BaseRenderDataVK* p_render_data, const MeshResourcesVK& p_resources, std::span<const MeshDrawBatchPlannerVK::Draw> p_draws) {
+    const RenderContextVK* p_render_data, const MeshResourcesVK& p_resources, std::span<const MeshDrawBatchPlannerVK::Draw> p_draws) {
     MeshDrawBatchPlannerVK::BuildResult draw_plan =
         MeshDrawBatchPlannerVK().build(p_render_data->allocator, p_draws, p_render_data->max_draw_indirect_count);
     DrawPlan result(p_render_data->allocator);
@@ -190,7 +190,7 @@ struct MaterialBuild {
 // material texture contract.
 MaterialBuild compile_materials(
     RendererVK* p_renderer, const MeshCompilerVK::Config& p_config, std::span<const RefRes<RUMaterial>> p_materials) {
-    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
+    const RenderContextVK* render_data = p_renderer->get_render_context();
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_data->allocator,
         .render_data = render_data,
@@ -354,7 +354,7 @@ Vector<MeshDrawBatchPlannerVK::Draw, RenderAllocator> make_static_draws(
 } // namespace
 
 MeshCompilerVK::MeshCompilerVK(RendererVK* p_renderer) : renderer(p_renderer) {
-    if (renderer == nullptr || renderer->get_base_render_data() == nullptr || renderer->get_base_render_data()->allocator == nullptr) {
+    if (renderer == nullptr || renderer->get_render_context() == nullptr || renderer->get_render_context()->allocator == nullptr) {
         throw std::runtime_error("Failed to construct mesh compiler: renderer state is missing.");
     }
 }
@@ -378,7 +378,7 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh, const Conf
     validate_category(p_mesh->double_sided_opaque_instances);
     validate_category(p_mesh->masked_instances);
 
-    const BaseRenderDataVK* render_data = renderer->get_base_render_data();
+    const RenderContextVK* render_data = renderer->get_render_context();
     Ref<MeshResourcesVK> result = make_ref<MeshResourcesVK>(render_data->allocator, render_data);
     result->mesh = p_mesh;
 

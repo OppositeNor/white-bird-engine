@@ -24,7 +24,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
@@ -46,7 +46,7 @@
 namespace WhiteBirdEngine {
 
 Unique<IRenderTaskVK> RTRunGraphicsPipelineIndirectVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: render data is unavailable.");
     }
@@ -150,7 +150,7 @@ RTRunGraphicsPipelineIndirectVK::Builder& RTRunGraphicsPipelineIndirectVK::Build
     return *this;
 }
 
-Unique<RTRunGraphicsPipelineIndirectVK> RTRunGraphicsPipelineIndirectVK::Builder::create_unique(const BaseRenderDataVK* p_render_data) const {
+Unique<RTRunGraphicsPipelineIndirectVK> RTRunGraphicsPipelineIndirectVK::Builder::create_unique(const RenderContextVK* p_render_data) const {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK::Builder: render data is missing.");
     }
@@ -168,7 +168,7 @@ const ROGraphicsPipelineVK& first_pipeline(const Vector<RTRunGraphicsPipelineInd
 
 } // namespace
 
-RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+RTRunGraphicsPipelineIndirectVK::RTRunGraphicsPipelineIndirectVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data), render_extent(p_builder.render_extent),
       pipeline_batches(p_builder.pipeline_batches.begin(), p_builder.pipeline_batches.end(), p_render_data->allocator),
       render_targets(p_render_data->allocator,

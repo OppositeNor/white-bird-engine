@@ -20,7 +20,7 @@
 #include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "global/global.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -64,7 +64,7 @@ return exports
 
 TEST(WBERendGraphScriptVKTest, MakesContextFromTheRenderData) {
     RenderAllocator allocator(WBE_KI_B(16));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.frames_in_flight = 3;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
     const RendGraphContextVK graph_context{.swap_chain_extent = {.width = 1920, .height = 1080}};
@@ -81,7 +81,7 @@ TEST(WBERendGraphScriptVKTest, MakesContextFromTheRenderData) {
 
 TEST(WBERendGraphScriptVKTest, RunsBuildAndTheRecipeBuilds) {
     RenderAllocator allocator(WBE_KI_B(256));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_UNORM;
     const DataValue recipe = RendGraphScriptVK::run(
@@ -110,7 +110,7 @@ return {
 }
 )";
     RenderAllocator allocator(WBE_KI_B(16));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     auto group_counts = [&render_data, TILED_RECIPE](uint32_t p_width, uint32_t p_height) {
         const RendGraphContextVK graph_context{.swap_chain_extent = {.width = p_width, .height = p_height}};
         const DataValue recipe =
@@ -166,9 +166,249 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTealScriptsCompiledByTheACP) {
     EXPECT_EQ(recipe.get_value<std::string>("queue_family"), "compute_2");
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, CollectsHandleBindingsEdgesAndImageDependencies) {
+    const DataValue recipe = RendGraphScriptVK::run("handle_resources", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local image = graph_utils.storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
+    local view = graph_utils.image_view("output", image)
+    local sampler = graph_utils.clamp_to_edge_sampler("sampler")
+    local scratch = graph_utils.storage_buffer("scratch", 64)
+    local unused = graph_utils.storage_buffer("unused", 32)
+    local graph = graph_utils.graph()
+    local write = graph:add({ id = "write", type = "registry_probe", params = { label = "write" }, uses = { scratch } })
+    local read = graph:add({ id = "read", type = "registry_probe", params = { label = "read" } })
+    read:alias("input", view):alias("sampler", sampler)
+    write:connect(read, view)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& resources = recipe.get_entry("resources").as_list();
+    ASSERT_EQ(resources.size(), 4U);
+    auto find_resource = [&resources](std::string_view p_id) -> const DataValue* {
+        for (const auto& resource : resources) {
+            if (resource.get_value<std::string>("id") == p_id) {
+                return &resource;
+            }
+        }
+        return nullptr;
+    };
+    ASSERT_NE(find_resource("output_image"), nullptr);
+    const DataValue* view = find_resource("output");
+    ASSERT_NE(view, nullptr);
+    EXPECT_EQ(view->get_entry("image_view").get_value<std::string>("image"), "output_image");
+    EXPECT_NE(find_resource("sampler"), nullptr);
+    EXPECT_NE(find_resource("scratch"), nullptr);
+    EXPECT_EQ(find_resource("unused"), nullptr);
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 2U);
+    EXPECT_EQ(tasks[0].get_entry("connect").as_list()[0].get_value<std::string>("resource"), "output");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("input"), "output");
+    EXPECT_FALSE(tasks[0].contains("uses"));
+    EXPECT_FALSE(tasks[1].contains("uses"));
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderContextVK render_context(&allocator);
+    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context);
+    EXPECT_EQ(graph.images.size(), 1U);
+    EXPECT_EQ(graph.image_views.size(), 1U);
+    EXPECT_EQ(graph.samplers.size(), 1U);
+    EXPECT_EQ(graph.buffers.size(), 1U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, LowersImportedHandlesAndCollectsParentPortResources) {
+    const DataValue recipe = RendGraphScriptVK::run("handle_ports", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local target_image = graph_utils.storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
+    local target = graph_utils.image_view("target", target_image)
+    local input = graph_utils.import_resource("input")
+    local member = graph_utils.reference("input.member")
+    local color = graph_utils.port("color")
+    local nested = graph_utils.graph()
+    nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, aliases = { output = color } })
+    local graph = graph_utils.graph()
+    local prepare = graph:add({ id = "prepare", type = "registry_probe", params = { label = "prepare" }, uses = { input, member } })
+    local effect = graph:add(graph_utils.subgraph("effect", nested:build(), { color = target }))
+    graph:chain(target, { prepare, effect })
+    return graph:build({ "input", "application_only" })
+end }
+)", DataValue::make_map());
+    EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 2U);
+    const auto& imports = recipe.get_entry("imports").as_list();
+    ASSERT_EQ(imports.size(), 2U);
+    EXPECT_TRUE(std::ranges::any_of(imports, [](const DataValue& p_import) {
+        return p_import.as_string() == "input";
+    }));
+    const auto& effect = recipe.get_entry("tasks").as_list()[1];
+    EXPECT_EQ(effect.get_entry("ports").get_value<std::string>("color"), "target");
+    const auto& nested = effect.get_entry("subgraph");
+    EXPECT_TRUE(nested.get_entry("resources").as_list().empty());
+    EXPECT_EQ(nested.get_entry("ports").as_list().size(), 1U);
+    EXPECT_EQ(nested.get_entry("ports").as_list()[0].as_string(), "color");
+    EXPECT_EQ(nested.get_entry("tasks").as_list()[0].get_entry("aliases").get_value<std::string>("output"), "color");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsDifferentOwnedHandlesWithTheSameId) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_handles", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local first = graph_utils.storage_buffer("same", 16)
+    local second = graph_utils.storage_buffer("same", 32)
+    local graph = graph_utils.graph()
+    graph:add({ id = "probe", type = "registry_probe", uses = { first, second } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsCyclicHandleDependencies) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("cyclic_handles", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local resource = graph_utils.storage_buffer("cycle", 16)
+    resource.dependencies = { resource }
+    local graph = graph_utils.graph()
+    graph:add({ id = "probe", type = "registry_probe", uses = { resource } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ReusesHandlesWithoutLeakingDeclarationsBetweenGraphs) {
+    const DataValue result = RendGraphScriptVK::run("independent_graphs", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local shared = graph_utils.storage_buffer("shared", 16)
+    local first = graph_utils.graph()
+    first:add({ id = "first", type = "registry_probe", aliases = { input = shared }, uses = { shared, shared } })
+    local second = graph_utils.graph()
+    second:add({ id = "second", type = "registry_probe" })
+    local third = graph_utils.graph()
+    third:add({ id = "third", type = "registry_probe", uses = { shared } })
+    return { first = first:build(), second = second:build(), third = third:build() }
+end }
+)", DataValue::make_map());
+    EXPECT_EQ(result.get_entry("first").get_entry("resources").as_list().size(), 1U);
+    EXPECT_TRUE(result.get_entry("second").get_entry("resources").as_list().empty());
+    EXPECT_EQ(result.get_entry("third").get_entry("resources").as_list().size(), 1U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, TaskAliasesResolveIndependentlyAndConnectionsLowerHandles) {
+    const DataValue recipe = RendGraphScriptVK::run("task_handles", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local first_resource = graph_utils.storage_buffer("first_resource", 16)
+    local second_resource = graph_utils.storage_buffer("second_resource", 32)
+    local graph = graph_utils.graph()
+    local first = graph:add({ id = "first", type = "registry_probe" })
+    local second = graph:add({ id = "second", type = "registry_probe" })
+    assert(first:alias("input", first_resource) == first)
+    assert(second:alias("input", second_resource) == second)
+    assert(first:connect(second, first_resource) == first)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 2U);
+    EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("input"), "first_resource");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("input"), "second_resource");
+    const auto& edge = tasks[0].get_entry("connect").as_list()[0];
+    EXPECT_EQ(edge.get_value<std::string>("to"), "second");
+    EXPECT_EQ(edge.get_value<std::string>("resource"), "first_resource");
+    for (const auto& task : tasks) {
+        EXPECT_FALSE(task.contains("alias"));
+        EXPECT_FALSE(task.contains("graph"));
+        EXPECT_FALSE(task.contains("edges"));
+    }
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, TaskAliasMapsAreOwnedByEachTask) {
+    const DataValue recipe = RendGraphScriptVK::run("independent_aliases", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local shared = graph_utils.storage_buffer("shared", 16)
+    local extra = graph_utils.storage_buffer("extra", 32)
+    local aliases = { input = shared }
+    local graph = graph_utils.graph()
+    local first = graph:add({ id = "first", type = "registry_probe", aliases = aliases })
+    graph:add({ id = "second", type = "registry_probe", aliases = aliases })
+    first:alias("extra", extra)
+    assert(aliases.extra == nil)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    EXPECT_TRUE(tasks[0].get_entry("aliases").contains("extra"));
+    EXPECT_FALSE(tasks[1].get_entry("aliases").contains("extra"));
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsTaskHandlesFromAnotherGraph) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("foreign_tasks", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local resource = graph_utils.storage_buffer("shared", 16)
+    local graph = graph_utils.graph()
+    local other = graph_utils.graph()
+    local first = graph:add({ id = "first", type = "registry_probe" })
+    local foreign = other:add({ id = "second", type = "registry_probe" })
+    first:connect(foreign, resource)
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsForgedTaskHandlesWithMatchingIds) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("forged_tasks", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local resource = graph_utils.storage_buffer("shared", 16)
+    local graph = graph_utils.graph()
+    local first = graph:add({ id = "first", type = "registry_probe" })
+    local second = graph:add({ id = "second", type = "registry_probe" })
+    graph:chain(resource, { first, { id = second.id, graph = graph } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsRenamedTaskHandlesAndUnregisteredEdgeTargets) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("renamed_task", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local graph = graph_utils.graph()
+    local task = graph:add({ id = "original", type = "registry_probe" })
+    task.id = "changed"
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+    EXPECT_THROW((void)RendGraphScriptVK::run("unregistered_edge", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local graph = graph_utils.graph()
+    graph:add({ id = "first", type = "registry_probe", edges = {
+        { to = { id = "missing" }, resource = graph_utils.storage_buffer("shared", 16) },
+    } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsRepeatedTaskLocalAliasNames) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("repeated_alias", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local resource = graph_utils.storage_buffer("shared", 16)
+    local graph = graph_utils.graph()
+    local task = graph:add({ id = "first", type = "registry_probe", aliases = { input = resource } })
+    task:alias("input", resource)
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     RenderAllocator allocator(WBE_KI_B(16));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
     DataValue context = RendGraphScriptVK::make_context(render_data, RendGraphContextVK{});
@@ -191,7 +431,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
 
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxelAndPixelSortFeatures) {
     RenderAllocator allocator(WBE_KI_B(16));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.frames_in_flight = 2;
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
     auto make_extent = [](uint32_t p_width, uint32_t p_height) {
@@ -210,7 +450,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     auto make_octree = [&] {
         DataValue octree = DataValue::make_map();
         octree.set_value("module", std::string("render_graphs.features.voxel_octree"));
-        octree.set_entry("imports", make_imports({"octree_info", "octree_static", "octree_dynamic"}));
+        octree.set_entry("imports", make_imports({"octree_info", "octree_static", "octree_dynamic", "octree_debug_draw_index_buffer",
+            "octree_debug_draw_indirect_buffer", "octree_debug_leaf_masks", "octree_debug_node_draw_indirect_buffer",
+            "octree_debug_node_list", "octree_static_levels[0]", "octree_dynamic_levels[0]", "octree_static_levels[1]",
+            "octree_dynamic_levels[1]"}));
         octree.set_value("level_count", 2);
         DataValue leaf_groups = DataValue::make_map();
         leaf_groups.set_value("x", 4);
@@ -227,7 +470,8 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         svo.set_value("variant", std::string("pass_published"));
         svo.set_value("shader_prefix", std::string("svo_2"));
         svo.set_value("dynamic_shader_prefix", std::string("svo_2_dynamic"));
-        svo.set_entry("imports", make_imports({"svo_info", "svo_nodes"}));
+        svo.set_entry("imports", make_imports({"svo_info", "svo_node_buffer", "svo_dynamic_leaves", "svo_leaf_buffer", "svo_debug_draw_index_buffer",
+            "svo_debug_draw_indirect_buffer", "svo_pre_deferred_debug_draw_indirect_buffer"}));
         svo.set_value("extent", 512);
         svo.set_value("max_depth", 9);
         DataValue buffer_sizes = DataValue::make_map();
@@ -358,7 +602,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(svo_tasks.size(), 15U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
-    EXPECT_TRUE(contains_import(svo_recipe, "svo_nodes"));
+    EXPECT_TRUE(contains_import(svo_recipe, "svo_node_buffer"));
     // The SVO declares its 5 scratch buffers with the sizes it is given.
     const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
     EXPECT_EQ(svo_resources.size(), 5U);

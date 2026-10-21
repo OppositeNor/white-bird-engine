@@ -25,7 +25,7 @@
 #include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -65,14 +65,14 @@ public:
 
     virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
         camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
         camera_info_ubo->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     }
 
     void setup_graphics_pipeline() {
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+        const auto* render_context = renderer->get_render_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
 
         auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
@@ -83,7 +83,7 @@ public:
             throw std::runtime_error("Failed to setup draw cube unshaded test: static mesh resource was not found.");
         }
 
-        aspect_ratio = base_render_data->swap_chain_aspect_ratio;
+        aspect_ratio = render_context->swap_chain_aspect_ratio;
         camera_info = CameraInfoGPU{
             // Look at the origin from (2,2,2)
             .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
@@ -96,30 +96,29 @@ public:
             throw std::runtime_error("Failed to setup draw cube unshaded test: static graphics pipeline resource was not found.");
         }
 
-        const std::array color_formats{base_render_data->swap_chain_format};
+        const std::array color_formats{render_context->swap_chain_format};
         // The render database holds the pipeline weakly; it must stay alive until the draw task retains it.
         const WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline =
             WBE::compile_render_test_graphics_pipeline(renderer, "draw_cube_unshaded_pipeline", pipeline_resource, color_formats);
         // Recipes cannot set initial data, so the application owns the camera buffer and the recipe imports it.
-        camera_info_ubo = WBE::ROBufferVK::Builder()
+        camera_info_ubo = render_context->create_buffer(WBE::ROBufferVK::Builder()
                               .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
                               .set_size(sizeof(CameraInfoGPU))
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                              .create_ref(base_render_data);
+                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
         renderer->get_render_database()->register_compiled_render_resource(
             REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, camera_info_ubo);
         // The graph re-runs the recipe whenever it rebuilds, such as after a swap chain resize.
         WBE::Ref<WBE::RenderGraphVK> graph =
             renderer->register_render_graph("test_render_graph", [this, renderer](const WBE::RendGraphContextVK& p_context) {
-                const auto* base_render_data = renderer->get_base_render_data();
+                const auto* render_context = renderer->get_render_context();
                 const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
                 WBE::RendGraphRecipeImportsVK imports;
                 imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
                 // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
                 const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(
-                    "render_graphs.draw_cube_unshaded", WBE::RendGraphScriptVK::make_context(*base_render_data, p_context));
-                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+                    "render_graphs.draw_cube_unshaded", WBE::RendGraphScriptVK::make_context(*render_context, p_context));
+                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
             });
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");

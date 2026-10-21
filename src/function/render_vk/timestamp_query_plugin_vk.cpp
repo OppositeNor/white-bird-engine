@@ -22,7 +22,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
@@ -88,7 +88,7 @@ double TimestampQueryPluginVK::DurationStatistics::get_standard_deviation() cons
     return std::sqrt(squared_deviation_sum / static_cast<double>(sample_count - 1));
 }
 
-TimestampQueryPluginVK::TimestampQueryPluginVK(const BaseRenderDataVK* p_render_data)
+TimestampQueryPluginVK::TimestampQueryPluginVK(const RenderContextVK* p_render_data)
     : render_data(p_render_data), report_path(FileSystem::get_executable_dir() / DEFAULT_REPORT_FILE_NAME),
       frame_queries(p_render_data->allocator), query_results(p_render_data->allocator), task_statistics(p_render_data->allocator),
       graph_keys(p_render_data->allocator), graph_metadata(p_render_data->allocator) {
@@ -163,19 +163,19 @@ void TimestampQueryPluginVK::on_before_device_creation(
 }
 
 void TimestampQueryPluginVK::on_after_device_created(
-    BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
+    RenderContextVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
     WBE_DEBUG_ASSERT(enabled);
     logical_device = p_logical_device;
 }
 
-void TimestampQueryPluginVK::update_base_render_data(BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/) {
+void TimestampQueryPluginVK::update_render_context(RenderContextVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/) {
 }
 
 void TimestampQueryPluginVK::configure_descriptor_heaps(
-    const BaseRenderDataVK* /*p_render_data*/, std::span<DescriptorHeapConfigurationVK> /*p_configurations*/) {
+    const RenderContextVK* /*p_render_data*/, std::span<DescriptorHeapConfigurationVK> /*p_configurations*/) {
 }
 
-void TimestampQueryPluginVK::create_descriptor_arenas(BaseRenderDataVK* /*p_render_data*/) {
+void TimestampQueryPluginVK::create_descriptor_arenas(RenderContextVK* /*p_render_data*/) {
 }
 
 void TimestampQueryPluginVK::on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) {
@@ -192,7 +192,7 @@ void TimestampQueryPluginVK::on_render_graph_registered(std::string_view p_graph
     graph_metadata.push_back({.graph_key = std::string(p_graph_key), .metadata = std::move(metadata)});
 }
 
-void TimestampQueryPluginVK::on_frame_begin(const BaseRenderDataVK* p_render_data) {
+void TimestampQueryPluginVK::on_frame_begin(const RenderContextVK* p_render_data) {
     WBE_DEBUG_ASSERT(enabled);
     WBE_DEBUG_ASSERT(p_render_data == render_data);
     // Swap-chain recreation may raise the number of frames in flight, so pools are created on demand.

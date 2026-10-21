@@ -17,7 +17,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "utils/defs.hh"
 
 #include <array>
@@ -46,7 +46,7 @@ constexpr std::array<VkDescriptorType, 7> POOL_DESCRIPTOR_TYPES{
 
 } // namespace
 
-DescriptorSetPluginVK::DescriptorSetPluginVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
+DescriptorSetPluginVK::DescriptorSetPluginVK(const RenderContextVK* p_render_data) : render_data(p_render_data) {
     singleton = this;
 }
 
@@ -120,7 +120,7 @@ void DescriptorSetPluginVK::on_before_device_creation(
 }
 
 void DescriptorSetPluginVK::on_after_device_created(
-    BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
+    RenderContextVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
     WBE_DEBUG_ASSERT(enabled);
     WBE_DEBUG_ASSERT(descriptor_pool == VK_NULL_HANDLE);
     logical_device = p_logical_device;
@@ -143,17 +143,17 @@ void DescriptorSetPluginVK::on_after_device_created(
     }
 }
 
-void DescriptorSetPluginVK::update_base_render_data(BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/) {
+void DescriptorSetPluginVK::update_render_context(RenderContextVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/) {
 }
 
 void DescriptorSetPluginVK::configure_descriptor_heaps(
-    const BaseRenderDataVK* /*p_render_data*/, std::span<DescriptorHeapConfigurationVK> /*p_configurations*/) {
+    const RenderContextVK* /*p_render_data*/, std::span<DescriptorHeapConfigurationVK> /*p_configurations*/) {
 }
 
-void DescriptorSetPluginVK::create_descriptor_arenas(BaseRenderDataVK* /*p_render_data*/) {
+void DescriptorSetPluginVK::create_descriptor_arenas(RenderContextVK* /*p_render_data*/) {
 }
 
-void DescriptorSetPluginVK::on_frame_begin(const BaseRenderDataVK* /*p_render_data*/) {
+void DescriptorSetPluginVK::on_frame_begin(const RenderContextVK* /*p_render_data*/) {
 }
 
 void DescriptorSetPluginVK::on_render_graph_registered(std::string_view /*p_graph_key*/, const RenderGraphVK& /*p_graph*/) {

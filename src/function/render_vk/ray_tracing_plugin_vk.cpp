@@ -23,7 +23,7 @@
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_vk_utils_private.hh"
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -53,7 +53,7 @@ constexpr uint32_t ACCELERATION_STRUCTURE_DESCRIPTOR_CAPACITY = 16;
 
 } // namespace
 
-RayTracingPluginVK::RayTracingPluginVK(const BaseRenderDataVK* p_render_data)
+RayTracingPluginVK::RayTracingPluginVK(const RenderContextVK* p_render_data)
     : base_ray_tracing_data(make_unique<BaseRayTracingDataVK>(p_render_data->allocator)) {
     singleton = this;
 }
@@ -229,7 +229,7 @@ void RayTracingPluginVK::on_before_device_creation(
 }
 
 void RayTracingPluginVK::on_after_device_created(
-    BaseRenderDataVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
+    RenderContextVK* /*p_render_data*/, VkPhysicalDevice /*p_physical_device*/, VkDevice p_logical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
     // Resolve the Vulkan acceleration-structure entry points after logical-device creation.
@@ -251,7 +251,7 @@ void RayTracingPluginVK::on_after_device_created(
     }
 }
 
-void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) {
+void RayTracingPluginVK::update_render_context(RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device) {
     WBE_DEBUG_ASSERT(enabled);
 
     // Use the descriptor-heap type-specific size for the acceleration-structure arena.
@@ -281,7 +281,7 @@ void RayTracingPluginVK::update_base_render_data(BaseRenderDataVK* p_render_data
 }
 
 void RayTracingPluginVK::configure_descriptor_heaps(
-    const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) {
+    const RenderContextVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) {
     WBE_DEBUG_ASSERT(enabled);
     auto resource_configuration = std::ranges::find_if(p_configurations, [](const DescriptorHeapConfigurationVK& p_configuration) {
         return p_configuration.type == DescriptorHeapTypeVK::RESOURCE;
@@ -295,7 +295,7 @@ void RayTracingPluginVK::configure_descriptor_heaps(
         p_render_data->descriptor_heap_properties.bufferDescriptorAlignment);
 }
 
-void RayTracingPluginVK::create_descriptor_arenas(BaseRenderDataVK* p_render_data) {
+void RayTracingPluginVK::create_descriptor_arenas(RenderContextVK* p_render_data) {
     WBE_DEBUG_ASSERT(enabled);
     if (p_render_data->descriptor_heap_allocator == nullptr) {
         throw std::runtime_error("Failed to create acceleration-structure arena: descriptor heap allocator is missing.");
@@ -312,7 +312,7 @@ void RayTracingPluginVK::create_descriptor_arenas(BaseRenderDataVK* p_render_dat
     base_ray_tracing_data->acceleration_structure_descriptor_arena = {.heap_id = heap_id, .arena_id = arena_id};
 }
 
-void RayTracingPluginVK::on_frame_begin(const BaseRenderDataVK* /*p_render_data*/) {
+void RayTracingPluginVK::on_frame_begin(const RenderContextVK* /*p_render_data*/) {
 }
 
 void RayTracingPluginVK::on_render_graph_registered(std::string_view /*p_graph_key*/, const RenderGraphVK& /*p_graph*/) {

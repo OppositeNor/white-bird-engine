@@ -243,14 +243,29 @@ struct SVOWriteImage<T : ITexelElement> {
         voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
     }
 
+    /**
+     * @brief Overwrite the voxel data of a static leaf.
+     * @details The texel is located from the leaf's data_index as in trace_data(), with the same shader-debug overflow
+     * check. The store is not atomic; callers must ensure no other invocation accesses the same texel during the calling
+     * pass.
+     * @param p_leaf_index Index into svo.leaves; must be below the static leaf count.
+     * @param p_value Value stored into the leaf's texel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void write_leaf_data(uint p_leaf_index, T p_value, uint p_frame_slot) {
+        voxel_data[get_data_texel(svo.leaves[p_leaf_index].data_index, p_frame_slot)] = p_value;
+    }
+
     uint3 trace_texel(float3 p_global_position, uint p_depth, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
-        uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
+        return get_data_texel(svo.trace_data(p_global_position, p_depth, trace_info), p_frame_slot);
+    }
+
+    uint3 get_data_texel(uint p_data_index, uint p_frame_slot) {
         uint3 dimensions;
         voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        uint3 texel = unflatten_index_3d_checked(
-            data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
-        return texel;
+        return unflatten_index_3d_checked(
+            p_data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
     }
 };
 

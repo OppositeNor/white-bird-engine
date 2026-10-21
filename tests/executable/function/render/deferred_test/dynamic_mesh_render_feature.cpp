@@ -48,7 +48,7 @@ namespace WhiteBirdEngine {
 
 DynamicMeshRenderFeature::DynamicMeshRenderFeature(
     RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, size_t p_entity_count)
-    : render_data(p_renderer->get_base_render_data()) {
+    : render_data(p_renderer->get_render_context()) {
     if (p_entity_count == 0) {
         throw std::runtime_error("Dynamic mesh feature requires at least one entity.");
     }

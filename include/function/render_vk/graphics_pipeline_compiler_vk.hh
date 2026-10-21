@@ -21,7 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
@@ -54,7 +54,7 @@ struct GraphicsPipelineCompilerVKContext {
     /**
      * @brief Vulkan renderer state used by render object builders.
      */
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     /**
      * @brief Registry used to reuse compiled render objects by resource key.
      */

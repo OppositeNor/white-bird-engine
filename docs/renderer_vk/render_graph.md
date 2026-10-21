@@ -12,8 +12,8 @@ Ref<RenderGraphVK> graph = renderer->register_render_graph("scene",
         imports.add(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add("camera_info", *camera_info_ubo);
         const DataValue recipe = RendGraphScriptVK::run("render_graphs.scene",
-            RendGraphScriptVK::make_context(*base_render_data, p_context));
-        return RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+            RendGraphScriptVK::make_context(*render_context, p_context));
+        return RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
     });
 renderer->activate_render_graph("scene");
 ```
@@ -105,30 +105,79 @@ objects.
 
 ```lua
 local type wbe = require("wbe")
-
+local graph_utils = require("utils.render_graph")
 local exports = {}
 
 function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+    local target = graph_utils.import_resource("swap_chain")
+    local camera = graph_utils.import_resource("camera_info")
+    local graph = graph_utils.graph()
     local params: wbe.RTParamsGraphicsDrawMeshVK = {
         mesh = "model_cube_static.mesh",
         pipeline = "draw_cube_unshaded_pipeline",
         parts = { "opaque" },
     }
-    return {
-        imports = { "swap_chain", "camera_info" },
-        tasks = {
-            {
-                id = "run_static_mesh",
-                type = "graphics_draw_mesh",
-                params = params,
-                aliases = { ["render_target_colors[0]"] = "swap_chain" },
-            },
-        },
-    }
+    local draw = graph:add({
+        id = "run_static_mesh",
+        type = "graphics_draw_mesh",
+        params = params,
+        uses = { camera },
+    })
+    draw:alias("render_target_colors[0]", target)
+    return graph:build()
 end
 
 return exports
 ```
+
+### Task objects and aliases
+
+`graph:add(description)` returns a task object owned by that graph. Save the returned objects and use them in
+`graph:chain(resource, { producer, consumer })`, or connect directly with `producer:connect(consumer, resource)`.
+Connections remain explicit and resource-specific. Both methods require actual task handles from the same graph;
+matching string IDs or lookalike tables are insufficient. Subgraph tasks participate in connections the same way.
+
+`task:alias(local_name, resource)` binds a task-local resource name and returns the task for fluent calls. Two tasks can
+use the same local name for different resource handles. Repeating a local alias name within one task is an error.
+Descriptions can still supply an `aliases` map; each task receives its own copy, so later alias calls cannot alter another
+task's bindings. `task:connect()` also returns the task for chaining.
+
+Task IDs remain stable names for C++ and diagnostics. `graph:get(id)` is available for explicit lookup, but dependency
+chains use saved handles. `graph:build()` lowers connections and aliases to the unchanged C++ string-id recipe schema;
+methods and task-to-graph references are never serialized.
+
+### Resource handles
+
+Resource helpers return recipe handles. Reuse those objects in task aliases, edges, and subgraph port bindings:
+
+```lua
+local image = graph_utils.image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo)
+local albedo = graph_utils.image_view("gbuffer_albedo", image)
+-- draw_gbuffer and lighting are the task objects returned by graph:add().
+draw_gbuffer:alias("render_target_colors[0]", albedo)
+lighting:alias("gbuffer_albedo", albedo)
+graph:chain(albedo, { draw_gbuffer, lighting })
+```
+
+`graph:build()` discovers graph-owned resources from task bindings and edges, including the image behind each used view.
+There is no graph-level resource registration or authored `resources` list. Unused handles are omitted, and repeated uses of
+the same handle emit one declaration. Different owned handles with the same id and cyclic handle dependencies fail.
+
+A task's `uses = { handle, ... }` retains resources referenced by typed parameters or implicit same-name shader bindings,
+including read-only samplers and single-task scratch buffers. It only controls resource discovery: accesses are still
+reported by C++ tasks and ordering still comes exclusively from explicit edges. Typed resource-id parameters use
+`handle.id`; pipeline, mesh, task, and event identifiers remain strings.
+
+Use `import_resource(id)` for an exact C++ supplied import, `port(id)` for a subgraph-local port, and `reference(id)` for an
+existing enclosing or composite-member resource. Imports and ports are collected automatically. A feature can pass its
+complete C++ import list to `graph:build(imports)`; this preserves strict supplied-import matching even for resources an
+imported C++ task binds internally. `reference` does not create a resource or declare another import.
+
+`graph_utils.subgraph(id, child_graph:build(), { color = parent_handle })` returns a task whose port bindings retain the
+parent resources. Owned child resources stay scoped to the child. The final build emits the existing string-id recipe
+schema; resource handles and graph methods never cross the Lua/C++ boundary.
+
+The emitted recipe retains the existing C++ schema:
 
 - `imports` lists every resource owned outside the graph. Each must be supplied through `RendGraphRecipeImportsVK`; a
   declared-but-missing or supplied-but-undeclared import is an error. Recipes cannot set initial data, so buffers that need it
@@ -168,7 +217,7 @@ pattern.
 
 Recipes refer to task types by name. A type is registered by annotating its class
 `WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ <name> ])` and declaring a reflected static
-`create(const BaseRenderDataVK*, const <Params>&, const RendGraphContextVK&)`. The params struct is
+`create(const RenderContextVK*, const <Params>&, const RendGraphContextVK&)`. The params struct is
 `WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT`. An optional static `prepare_graph()` lets the type add
 imports and aliases when it is added (`RTGraphicsDrawMeshVK` uses it to import meshes). Reflection generates the
 `RenderTaskRegistryVK` implementation and the Teal declarations of the params.
@@ -198,9 +247,9 @@ wbe.RendGraphRecipeVK`. Since `RendRecipeTaskVK.params` is untyped, type each ta
 serialize as their canonical names; compare `utils.render_graph.enum_name(value)` with the canonical upper-case name, which also
 accepts the lowercase aliases.
 
-`utils.render_graph` provides resource builders (`buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
-`clamp_to_edge_sampler`), `indirect_dispatch`, `subgraph`, `enum_name`, and `task_list()`, whose `chain(resource, ids)`
-connects a sequence of tasks on one resource.
+`utils.render_graph` provides resource handles (`buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
+`clamp_to_edge_sampler`, `import_resource`, `port`, `reference`), plus `indirect_dispatch`, `subgraph`, and `enum_name`.
+`graph()` creates a graph with `:add`, `:get`, `:chain(resource, tasks)`, and `:build` methods.
 
 ## C++-only Graphs
 
@@ -215,7 +264,7 @@ task_desc.factory = [=](const RendGraphContextVK& p_context) {
     return RTRunGraphicsPipelineVK::Builder(render_allocator)
         .set_pipeline(graphics_pipeline)
         .set_render_extent(p_context.swap_chain_extent)
-        .create_unique(base_render_data);
+        .create_unique(render_context);
 };
 graph_desc.get_task("run_shadow").connect("run_pipeline", "shadow_moments");
 graph_desc.add_task(std::move(task_desc));

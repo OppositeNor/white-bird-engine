@@ -24,7 +24,7 @@
 #include "function/render_vk/rt_params_run_compute_pipeline_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include <cstdint>
 #include <string>
@@ -54,7 +54,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline]) RTRunComp
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
      * @param p_queue_family Queue used to submit the compute dispatch: GRAPHICS, COMPUTE_1, or COMPUTE_2.
      */
-    RTRunComputePipelineVK(const BaseRenderDataVK* p_render_data,
+    RTRunComputePipelineVK(const RenderContextVK* p_render_data,
         Ref<ROComputePipelineVK> p_pipeline,
         VkExtent3D p_dispatch_group_count,
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
@@ -69,7 +69,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline]) RTRunComp
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
 
     /**
      * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.
@@ -93,7 +93,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline]) RTRunComp
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> pipeline;
     Unique<PipelineDescriptorBindingsVK> descriptor_bindings;

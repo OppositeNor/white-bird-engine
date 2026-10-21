@@ -15,7 +15,7 @@
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "core/core_utils.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -30,11 +30,21 @@
 
 namespace WhiteBirdEngine {
 
+Ref<ROStagingBufferVK> StagingBufferDescVK::create_ref(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return p_render_context->create_staging_buffer(*this);
+}
+
+Unique<ROStagingBufferVK> StagingBufferDescVK::create_unique(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return make_unique<ROStagingBufferVK>(p_render_context->allocator, p_render_context, *this);
+}
+
 TypeID ROStagingBufferVK::get_type_uuid() const {
     return TypeUUID<ROStagingBufferVK>::UUID;
 }
 
-ROStagingBufferVK::ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROStagingBufferVK::ROStagingBufferVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : IRenderObjectVK(p_render_data) {
     if (p_builder.size < DATA_CHUNK_HEADER_SIZE || p_builder.size > std::numeric_limits<uint32_t>::max()) {
         throw std::runtime_error("Failed to create Vulkan staging buffer: buffer size is outside the supported range.");

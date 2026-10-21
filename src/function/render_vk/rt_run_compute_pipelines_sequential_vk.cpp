@@ -25,7 +25,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
@@ -108,7 +108,7 @@ RTRunComputePipelinesSequentialVK::Dispatch& RTRunComputePipelinesSequentialVK::
 }
 
 RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
-    const BaseRenderDataVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family)
+    const RenderContextVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family)
     : render_data(p_render_data), queue_family_id(p_queue_family), entries(p_render_data->allocator),
       descriptor_bindings(p_render_data->allocator), indirect_buffer_containers(p_render_data->allocator) {
     if (p_dispatch.entries.empty()) {
@@ -210,7 +210,7 @@ void RTRunComputePipelinesSequentialVK::set_push_constant(size_t p_entry_index, 
     descriptor_bindings[p_entry_index]->set_push_constant(p_name, p_value);
 }
 
-Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const BaseRenderDataVK* p_render_data,
+Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderContextVK* p_render_data,
     const RTParamsRunComputePipelinesSequentialVK& p_params,
     const RendGraphContextVK& /*p_context*/) {
     if (p_params.dispatches.empty()) {

@@ -22,7 +22,7 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -142,7 +142,7 @@ protected:
     /**
      * @brief Borrowed renderer data used to create buffers and tasks.
      */
-    const BaseRenderDataVK* base_render_data;
+    const RenderContextVK* render_context;
     /**
      * @brief Borrowed allocator of render objects and tasks.
      */

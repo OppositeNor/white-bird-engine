@@ -26,7 +26,7 @@
 #include "function/render_vk/rt_params_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <cstdint>
 #include <future>
 #include <string>
@@ -93,7 +93,7 @@ public:
      * @param p_image_view_id Render-graph resource id of the source image view; it is also the event id of every acquisition.
      * @throws std::runtime_error If the render data is unavailable, the id is empty, or no EventManager exists.
      */
-    RTCPUInFlightAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_image_view_id);
+    RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id);
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
      * @param p_render_data Base Vulkan render data.
@@ -103,7 +103,7 @@ public:
      * @throws std::runtime_error Under the conditions of the constructor.
      */
     WBE_META(WBE_REFLECT)
-    static Unique<IRenderTaskVK> create(const BaseRenderDataVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& p_context);
+    static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -116,7 +116,7 @@ public:
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     std::string image_view_id;
     EventManager* event_manager = nullptr;
     Ref<RenderObjectContainerVK> image_view_container;

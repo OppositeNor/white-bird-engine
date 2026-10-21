@@ -29,52 +29,31 @@ struct DescriptorIndices {
     uint2 dynamic_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
-    [WBE_DESCRIPTOR("storage_image", "ndf", "write")]
-    uint2 ndf;
-
-    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
-    uint2 light_infos;
-    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-
-    [WBE_PUSH_CONSTANT("light_index")]
-    uint light_index;
+    [WBE_DESCRIPTOR("storage_image", "occupancy", "write")]
+    uint2 occupancy;
+    [WBE_PUSH_CONSTANT("frame_slot")]
+    uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 [shader("compute")]
-[numthreads(8, 8, 1)]
-void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    uint2 dispatch_thread_id = z_order_swizzle_8x8(p_group_id.xy, p_group_thread_id.xy);
+[numthreads(64, 1, 1)]
+void main(uint p_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
-    RWTexture3D<uint3> ndf = ResourceDescriptorHeap[descriptor_indices.ndf.x];
-    // TODO
+    RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
 
     // Injection writes the SVO's normal distribution function.
-    SVOWriteImage<uint3> svo_ndf =
-        SVOWriteImage<uint3>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), ndf);
+    SVOWriteImage<float> svo_occupancy =
+        SVOWriteImage<float>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
 
-    uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
-    SpotLight spot_light =
-        SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[descriptor_indices.light_index], descriptor_indices.light_index);
-    uint2 shadow_size = spot_light.get_shadow_size();
-    if (dispatch_thread_id.x >= shadow_size.x || dispatch_thread_id.y >= shadow_size.y) {
-        return;
-    }
-    float shadow_depth = spot_light.shadow_moments.Load(int3(dispatch_thread_id, 0)).x;
-    if (shadow_depth <= 0.0) {
-        return; // Same convention as the RSM pass: no surface was rasterized here.
-    }
-    float2 texel_uv = (float2(dispatch_thread_id) + 0.5) / float2(shadow_size);
-    float2 flux = spot_light.rsm_flux.SampleLevel(spot_light.shadowmap_sampler, texel_uv, 0).rg;
-    float3 world_position = spot_light.shadow_texel_world_position(texel_uv, shadow_depth);
-    SVONodeTraceInfo trace_info;
-    uint data_index = svo_ndf.svo.trace_data(world_position, trace_info);
-    // TODO
-
+    svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);
+    GroupMemoryBarrierWithGroupSync();
+    SVOLeaf leaf = tree_leaves[p_thread_id];
+    SVONode parent = tree_nodes[leaf.parent_index];
 }

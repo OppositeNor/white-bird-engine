@@ -22,7 +22,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_ro_ray_tracing_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -86,7 +86,7 @@ public:
          * @return Reference-counted acceleration-structure object.
          */
         Ref<ROAccelerationStructureVK> create_ref(
-            const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
+            const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
             return make_ref<ROAccelerationStructureVK>(p_render_data->allocator, p_render_data, p_ray_tracing_data, *this);
         }
 
@@ -98,7 +98,7 @@ public:
          * @return Unique-ownership acceleration-structure object.
          */
         Unique<ROAccelerationStructureVK> create_unique(
-            const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
+            const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data) const {
             return make_unique<ROAccelerationStructureVK>(p_render_data->allocator, p_render_data, p_ray_tracing_data, *this);
         }
     };
@@ -112,7 +112,7 @@ public:
      * @param p_builder Builder containing the acceleration-structure configuration.
      */
     ROAccelerationStructureVK(
-        const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
+        const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder);
     virtual ~ROAccelerationStructureVK() override;
     ROAccelerationStructureVK(const ROAccelerationStructureVK&) = delete;
     ROAccelerationStructureVK(ROAccelerationStructureVK&&) noexcept = delete;

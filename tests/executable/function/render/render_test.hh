@@ -38,7 +38,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
@@ -505,7 +505,7 @@ struct RenderTestMeshDraw {
      * @return The added task descriptor; invalidated when another task is added.
      * @throws std::runtime_error Under the conditions of RTGraphicsDrawMeshVK::add_to_graph().
      */
-    RendTaskDescVK& add_to(RendGraphDescVK& p_graph, const BaseRenderDataVK* p_render_data) const {
+    RendTaskDescVK& add_to(RendGraphDescVK& p_graph, const RenderContextVK* p_render_data) const {
         RendTaskDescVK& task = RTGraphicsDrawMeshVK::add_to_graph(p_graph, task_id, params, p_render_data);
         const std::vector<std::string_view> colors(color_attachment_ids.begin(), color_attachment_ids.end());
         const std::optional<std::string_view> depth =
@@ -519,7 +519,7 @@ inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererV
     RefRes<RUGraphicsPipeline> p_pipeline,
     std::span<const VkFormat> p_color_formats,
     VkFormat p_depth_format = VK_FORMAT_UNDEFINED) {
-    const BaseRenderDataVK* render_data = p_renderer->get_base_render_data();
+    const RenderContextVK* render_data = p_renderer->get_render_context();
     GraphicsPipelineCompilerVKContext context{
         .allocator = render_data->allocator,
         .render_data = render_data,
@@ -608,7 +608,7 @@ inline SubmeshDrawBuffersVK import_submesh_draw_buffers(RendererVK* p_renderer,
         throw std::runtime_error("Failed to import submesh draw buffers: the index range is not uint32 aligned.");
     }
     MeshBufferCompilerVK::BuildResult buffers =
-        MeshBufferCompilerVK(p_renderer->get_base_render_data()).build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        MeshBufferCompilerVK(p_renderer->get_render_context()).build(p_mesh, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     if (buffers.vertex_buffers.empty() || buffers.index_buffer == MEM_NULL) {
         throw std::runtime_error("Failed to import submesh draw buffers: the mesh has no indexed geometry.");
     }

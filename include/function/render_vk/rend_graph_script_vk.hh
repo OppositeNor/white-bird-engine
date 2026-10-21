@@ -19,7 +19,7 @@
 #include "core/reflection/enum_reflection.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
@@ -57,14 +57,14 @@ public:
      * @param p_render_data The render data of the renderer.
      * @param p_graph_context The context the graph is being built for.
      */
-    static DataValue make_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context);
+    static DataValue make_context(const RenderContextVK& p_render_data, const RendGraphContextVK& p_graph_context);
 
     /**
      * @brief Get the renderer facts of make_context(), to fill the base of an application's derived context struct.
      * @param p_render_data The render data of the renderer.
      * @param p_graph_context The context the graph is being built for.
      */
-    static RendRecipeContextVK get_recipe_context(const BaseRenderDataVK& p_render_data, const RendGraphContextVK& p_graph_context);
+    static RendRecipeContextVK get_recipe_context(const RenderContextVK& p_render_data, const RendGraphContextVK& p_graph_context);
 
     /**
      * @brief Serialize a recipe context: RendRecipeContextVK, or a reflected struct an application derives from it.

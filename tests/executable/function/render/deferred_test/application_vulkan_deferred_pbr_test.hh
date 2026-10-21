@@ -36,7 +36,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -292,7 +292,7 @@ private:
     // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table.
     std::array<Ref<RenderGraphVK>, 2> deferred_render_graphs;
     RendererVK* renderer_vk = nullptr;
-    const BaseRenderDataVK* base_render_data = nullptr;
+    const RenderContextVK* render_context = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUMesh3D> sponza_mesh;
     RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;

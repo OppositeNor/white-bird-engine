@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 
 #include <string>
 #include <string_view>
@@ -40,7 +40,7 @@ public:
     RTBuildAccelerationStructuresVK& operator=(RTBuildAccelerationStructuresVK&&) noexcept = delete;
 
     RTBuildAccelerationStructuresVK(
-        const BaseRenderDataVK* p_render_data, std::string_view p_acceleration_structure_resource_id, GPUJobVK p_record_job);
+        const RenderContextVK* p_render_data, std::string_view p_acceleration_structure_resource_id, GPUJobVK p_record_job);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -51,7 +51,7 @@ public:
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     std::string acceleration_structure_resource_id;
     GPUJobVK record_job;
 };

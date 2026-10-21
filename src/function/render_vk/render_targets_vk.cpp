@@ -19,7 +19,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "utils/defs.hh"
@@ -96,7 +96,7 @@ void RenderTargetsVK::bind_resources(const RendResViewVK& p_resources) {
 }
 
 void RenderTargetsVK::begin_rendering(
-    const BaseRenderDataVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const {
+    const RenderContextVK* p_render_data, VkCommandBuffer p_command_buffer, VkExtent2D p_render_extent) const {
     WBE_DEBUG_ASSERT(color_containers.size() == color_count);
     Vector<VkRenderingAttachmentInfo, RenderAllocator> color_attachments(p_render_data->allocator);
     color_attachments.reserve(color_count);

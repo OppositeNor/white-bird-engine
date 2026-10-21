@@ -22,7 +22,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
@@ -139,7 +139,7 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, RegistersEveryBuiltinTask) {
 
 TEST(WBERenderTaskRegistryVKBuiltinTest, ValidParametersReachPipelineLookup) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     for (const BuiltinTaskCase& task_case : BUILTIN_TASK_CASES) {
         // Deserialization succeeds; creating the task fails only because no render database holds the pipelines.
         RendTaskFactoryVK factory;
@@ -157,7 +157,7 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, ValidParametersReachPipelineLookup) {
 
 TEST(WBERenderTaskRegistryVKBuiltinTest, InvalidParametersFailWhenTheFactoryIsCreated) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     for (const BuiltinTaskCase& task_case : {
              BuiltinTaskCase{.type = "run_compute_pipeline_indirect", .params = R"({"pipeline": "p"})"},
              BuiltinTaskCase{.type = "run_compute_pipelines_sequential", .params = R"({"dispatches": [{"group_count_x": 1}]})"},
@@ -175,7 +175,7 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, InvalidParametersFailWhenTheFactoryIsCr
 
 TEST(WBERenderTaskRegistryVKBuiltinTest, CreateValidatesCrossFieldParameters) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const RendGraphContextVK context{.swap_chain_extent = {.width = 64, .height = 64}};
     EXPECT_THROW((void)RenderTaskRegistryVK::create_factory("ping_pong",
                      parse_task_params(R"({"ping_pipeline": "a", "pong_pipeline": "b", "iterations": 1, "ping_prefix_pipeline": "c"})"),
@@ -193,7 +193,7 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, CreateValidatesCrossFieldParameters) {
 
 TEST(WBERenderTaskRegistryVKBuiltinTest, FullMemoryBarrierWritesItsResourceOnTheGraphicsQueue) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const RendGraphContextVK context{.swap_chain_extent = {.width = 64, .height = 64}};
     Unique<IRenderTaskVK> task = RenderTaskRegistryVK::create_factory(
         "full_memory_barrier", parse_task_params(R"({"resource": "state"})"), &render_data)(context);

@@ -18,7 +18,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -62,7 +62,7 @@ DebugData make_descriptor_row(
 
 class TestContextResourceVK final : public IRenderObjectVK {
 public:
-    TestContextResourceVK(const BaseRenderDataVK* p_render_data, uint32_t p_context_id)
+    TestContextResourceVK(const RenderContextVK* p_render_data, uint32_t p_context_id)
         : IRenderObjectVK(p_render_data), context_id(p_context_id) {
     }
     virtual ~TestContextResourceVK() override = default;
@@ -78,7 +78,7 @@ public:
 
 class TestDescriptorResourceVK final : public IRenderObjectVK {
 public:
-    TestDescriptorResourceVK(const BaseRenderDataVK* p_render_data, DebugDataArray p_rows)
+    TestDescriptorResourceVK(const RenderContextVK* p_render_data, DebugDataArray p_rows)
         : IRenderObjectVK(p_render_data), rows(p_render_data->allocator) {
         rows.reserve(p_rows.size());
         for (DebugData& row : p_rows) {
@@ -125,14 +125,14 @@ namespace {
 
 // Factory of one TestContextResourceVK per slot, identified by p_first_id plus the slot index.
 RenderObjectContainerVK::Factory make_context_factory(
-    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, uint32_t p_first_id = 0) {
+    RenderAllocator* p_allocator, const RenderContextVK* p_render_data, uint32_t p_first_id = 0) {
     return [p_allocator, p_render_data, p_first_id](uint32_t p_slot) {
         return make_ref<TestContextResourceVK>(p_allocator, p_render_data, p_first_id + p_slot).template dynamic_cast_ref<IRenderObjectVK>();
     };
 }
 
 // Factory of TestDescriptorResourceVK objects without descriptor rows.
-RenderObjectContainerVK::Factory make_empty_descriptor_factory(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
+RenderObjectContainerVK::Factory make_empty_descriptor_factory(RenderAllocator* p_allocator, const RenderContextVK* p_render_data) {
     return [p_allocator, p_render_data](uint32_t /*p_slot*/) {
         return make_ref<TestDescriptorResourceVK>(p_allocator, p_render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
     };
@@ -142,7 +142,7 @@ RenderObjectContainerVK::Factory make_empty_descriptor_factory(RenderAllocator* 
 
 TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     render_data.frames_in_flight = 3;
 
     ROCMultislotsVK context(&allocator, 3, ROCMultislotsVK::Factory{[&render_data, &allocator](uint32_t p_slot) {
@@ -164,7 +164,7 @@ TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
 
 TEST(WBEROCMultislotsVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     EXPECT_THROW(ROCMultislotsVK(&allocator, 2, ROCMultislotsVK::Factory{}), std::runtime_error);
     EXPECT_THROW(ROCMultislotsVK(&allocator, 2, ROCMultislotsVK::Factory{[](uint32_t /*p_slot*/) {
@@ -177,7 +177,7 @@ TEST(WBEROCMultislotsVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
 
 TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     ROCMultislotsVK context(&allocator, 3, make_context_factory(&allocator, &render_data, 100));
     auto slot_zero_resource =
@@ -202,7 +202,7 @@ TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
 
 TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     ROCMultislotsVK context(&allocator, 2, make_context_factory(&allocator, &render_data, 100), false);
     auto slot_zero_resource =
@@ -227,7 +227,7 @@ TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
 
 TEST(WBEROCMultislotsVKTest, RejectsEmptyPublishedBufferUpdate) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     ROCMultislotsVK context(&allocator, 2, make_context_factory(&allocator, &render_data));
 
     EXPECT_THROW(context.publish_buffer_update(nullptr, 0, 1), std::runtime_error);
@@ -237,7 +237,7 @@ TEST(WBEROCMultislotsVKTest, RejectsEmptyPublishedBufferUpdate) {
 
 TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     auto resource = make_ref<TestContextResourceVK>(&allocator, &render_data, 7).template dynamic_cast_ref<IRenderObjectVK>();
     ROCSingleVK container([resource](uint32_t /*p_slot*/) {
@@ -253,7 +253,7 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
 
 TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescriptors) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     auto resource = make_ref<TestDescriptorResourceVK>(&allocator,
         &render_data,
         DebugDataArray{make_descriptor_row("ROBufferVK", "uniform_buffer", "resource", 13, true),
@@ -278,7 +278,7 @@ TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescriptors) 
 
 TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     ROCMultislotsVK container(&allocator, 3, make_empty_descriptor_factory(&allocator, &render_data));
     container.clear(1);
@@ -303,7 +303,7 @@ TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
 
 TEST(WBEROCMultislotsVKTest, ToStringDoesNotTriggerFlushSynchronization) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     ROCMultislotsVK container(&allocator, 1, make_empty_descriptor_factory(&allocator, &render_data));
     container.set(0,
@@ -323,7 +323,7 @@ TEST(WBEROCMultislotsVKTest, ToStringDoesNotTriggerFlushSynchronization) {
 
 TEST(WBEROCSingleVKTest, EmptyDescriptorResourcesProduceEmptyJsonArray) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     auto resource =
         make_ref<TestDescriptorResourceVK>(&allocator, &render_data, DebugDataArray{}).template dynamic_cast_ref<IRenderObjectVK>();
 
@@ -337,7 +337,7 @@ TEST(WBEROCSingleVKTest, EmptyDescriptorResourcesProduceEmptyJsonArray) {
 
 TEST(WBEROCSingleVKTest, RecreateReplacesTheResourceWithANewOneFromTheFactory) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     uint32_t created_count = 0;
     ROCSingleVK container([&allocator, &render_data, &created_count](uint32_t p_slot) {
         EXPECT_EQ(p_slot, 0U);
@@ -361,7 +361,7 @@ TEST(WBEROCSingleVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
 
 TEST(WBEROCMultislotsVKTest, RecreateReplacesEverySlotIncludingClearedAndReplacedOnes) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     uint32_t generation = 0;
     ROCMultislotsVK container(&allocator, 3, [&allocator, &render_data, &generation](uint32_t p_slot) {
         return make_ref<TestContextResourceVK>(&allocator, &render_data, generation * 10 + p_slot).template dynamic_cast_ref<IRenderObjectVK>();

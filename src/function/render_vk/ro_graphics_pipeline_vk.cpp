@@ -17,7 +17,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -31,11 +31,21 @@
 
 namespace WhiteBirdEngine {
 
+Ref<ROGraphicsPipelineVK> GraphicsPipelineDescVK::create_ref(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return p_render_context->create_graphics_pipeline(*this);
+}
+
+Unique<ROGraphicsPipelineVK> GraphicsPipelineDescVK::create_unique(const RenderContextVK* p_render_context) const {
+    WBE_DEBUG_ASSERT(p_render_context != nullptr);
+    return make_unique<ROGraphicsPipelineVK>(p_render_context->allocator, p_render_context, *this);
+}
+
 TypeID ROGraphicsPipelineVK::get_type_uuid() const {
     return TypeUUID<ROGraphicsPipelineVK>::UUID;
 }
 
-ROGraphicsPipelineVK::ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+ROGraphicsPipelineVK::ROGraphicsPipelineVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : ROPipelineVK(p_render_data) {
     if (p_render_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");

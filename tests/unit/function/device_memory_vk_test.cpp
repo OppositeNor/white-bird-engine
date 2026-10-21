@@ -18,7 +18,7 @@
 #include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/device_memory_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/defs.hh"
@@ -46,7 +46,7 @@ TEST(WBEDeviceMemoryVKTest, BuilderRecordsExplicitRequirementsAndDomain) {
 
 TEST(WBEDeviceMemoryVKTest, RequiresExactlyOneRequirementSource) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     EXPECT_THROW(DeviceMemoryVK(&render_data, DeviceMemoryVK::Builder().set_domain(DeviceDomain::DEVICE)), std::runtime_error);
 
@@ -59,7 +59,7 @@ TEST(WBEDeviceMemoryVKTest, RequiresExactlyOneRequirementSource) {
 
 TEST(WBEDeviceMemoryVKTest, AliasBuildersRequireMemory) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
 
     ROBufferVK::AliasBuilder buffer_builder;
     buffer_builder.set_buffer(ROBufferVK::Builder().set_properties(64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));

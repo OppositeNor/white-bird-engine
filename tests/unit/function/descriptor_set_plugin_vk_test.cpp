@@ -15,7 +15,7 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_set_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
 
 TEST(WBEDescriptorSetPluginVKTest, EnablesOnlyWhenRequested) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DescriptorSetPluginVK plugin(&render_data);
 
     RendererCapabilities capabilities{};
@@ -43,7 +43,7 @@ TEST(WBEDescriptorSetPluginVKTest, EnablesOnlyWhenRequested) {
 
 TEST(WBEDescriptorSetPluginVKTest, RegistersSingleton) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     EXPECT_EQ(DescriptorSetPluginVK::get_singleton(), nullptr);
     {
         DescriptorSetPluginVK plugin(&render_data);
@@ -54,7 +54,7 @@ TEST(WBEDescriptorSetPluginVKTest, RegistersSingleton) {
 
 TEST(WBEDescriptorSetPluginVKTest, ThrowsBeforeVulkanObjectsExist) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     DescriptorSetPluginVK plugin(&render_data);
 
     EXPECT_THROW(static_cast<void>(plugin.get_instance()), std::runtime_error);

@@ -123,12 +123,11 @@ PixelSort::PixelSort(
     static_cast<void>(set_settings(p_settings));
     // Recipes cannot set initial data, so the effect owns the contrast buffer and every graph imports it.
     const PixelSortContrastGPU contrast = make_contrast(settings);
-    contrast_buffer = ROBufferVK::Builder()
+    contrast_buffer = renderer->get_render_context()->create_buffer(ROBufferVK::Builder()
                           .initial_data(&contrast, sizeof(contrast), DeviceDomain::HOST_DEVICE)
                           .set_size(sizeof(contrast))
                           .set_domain(DeviceDomain::HOST_DEVICE)
-                          .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                          .create_ref(renderer->get_base_render_data());
+                          .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
     renderer->get_render_database()->register_compiled_render_resource(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
     copy_source_pipeline = compile("copy_pixel_sort_source_shader");
     count_mask_pipelines = compile_direction_variants("count_pixel_sort_mask");
@@ -173,7 +172,7 @@ void PixelSort::validate_settings(const PixelSortSettings& p_settings) {
 bool PixelSort::set_settings(const PixelSortSettings& p_settings) {
     validate_settings(p_settings);
     // Reject a direction whose lines are too long for the extent of the current renderer state before any graph uses it.
-    validate_layout(extent(RendGraphContextVK::from_render_data(*renderer->get_base_render_data())), p_settings.direction);
+    validate_layout(extent(RendGraphContextVK::from_render_data(*renderer->get_render_context())), p_settings.direction);
     const bool requires_rebuild = p_settings.direction != settings.direction || p_settings.scope != settings.scope;
     settings = p_settings;
     return requires_rebuild;
@@ -206,7 +205,7 @@ Ref<ROComputePipelineVK> PixelSort::compile(std::string_view p_shader_id) const 
     }
     ComputePipelineCompilerVKContext compute_compiler_context{
         .allocator = get_allocator(),
-        .render_data = renderer->get_base_render_data(),
+        .render_data = renderer->get_render_context(),
         .render_database = renderer->get_render_database(),
     };
     return ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;

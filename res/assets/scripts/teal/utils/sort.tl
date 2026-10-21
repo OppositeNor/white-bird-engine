@@ -48,33 +48,42 @@ local HISTOGRAM = "histogram"
 local DISPATCH = "dispatch"
 
 local record sort
-    -- The graph resources of a radix sort.
-    record RadixSortBuffers
-        -- The keys, sorted in place. The sort reads and writes it, so order its producers before and its consumers after
-        -- the sort task on it.
+    -- Names of the graph-owned buffers created for a radix sort.
+    record RadixSortBufferNames
         keys: string
-        -- Scratch buffers the sort alone uses: the keys between passes, the histograms, and the indirect dispatches.
         keys_swap: string
         histogram: string
         dispatch: string
     end
+
+    -- The graph resources of a radix sort.
+    record RadixSortBuffers
+        -- The keys, sorted in place. The sort reads and writes it, so order its producers before and its consumers after
+        -- the sort task on it.
+        keys: graph_utils.Resource
+        -- Scratch buffers the sort alone uses: the keys between passes, the histograms, and the indirect dispatches.
+        keys_swap: graph_utils.Resource
+        histogram: graph_utils.Resource
+        dispatch: graph_utils.Resource
+    end
 end
 
--- Graph-owned storage for p_buffers, sized to sort up to p_max_element_count keys.
-function sort.radix_sort_resources(p_buffers: sort.RadixSortBuffers, p_max_element_count: integer): {wbe.RendRecipeResourceVK}
+-- Graph-owned buffers sized to sort up to p_max_element_count keys. The sort task references these handles, so the graph
+-- discovers their storage when it builds the recipe.
+function sort.radix_sort_buffers(p_names: sort.RadixSortBufferNames, p_max_element_count: integer): sort.RadixSortBuffers
     -- The sort has one local sort per RADIX_SORT_ELEMENTS_PER_WORKGROUP keys, up to RADIX_SORT_MAX_WORKGROUP_COUNT.
     local max_local_sort_num =
         math_utils.clamp(ceil_div(p_max_element_count, RADIX_SORT_ELEMENTS_PER_WORKGROUP), 1, RADIX_SORT_MAX_WORKGROUP_COUNT)
     local max_overflow_num = ceil_div(max_local_sort_num, RADIX_SORT_SCAN_HISTOGRAM_NUM)
     local key_buffer_size = (RADIX_SORT_DATA_START + p_max_element_count) * UINT32_SIZE
     return {
-        graph_utils.storage_buffer(p_buffers.keys, key_buffer_size),
-        graph_utils.storage_buffer(p_buffers.keys_swap, key_buffer_size),
+        keys = graph_utils.storage_buffer(p_names.keys, key_buffer_size),
+        keys_swap = graph_utils.storage_buffer(p_names.keys_swap, key_buffer_size),
         -- The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.
-        graph_utils.storage_buffer(p_buffers.histogram,
+        histogram = graph_utils.storage_buffer(p_names.histogram,
             (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * UINT32_SIZE),
         -- The indirect dispatches of the passes, written from the local sort count of the keys.
-        graph_utils.buffer(p_buffers.dispatch, "buffer_indirect", RADIX_SORT_DISPATCH_BUFFER_SIZE),
+        dispatch = graph_utils.buffer(p_names.dispatch, "buffer_indirect", RADIX_SORT_DISPATCH_BUFFER_SIZE),
     }
 end
 
@@ -82,7 +91,7 @@ end
 -- the previous one in the task's command buffer, and the passes read the element count from the keys, so the count
 -- must be written before the task runs.
 function sort.radix_sort_task(p_id: string, p_buffers: sort.RadixSortBuffers,
-    p_queue_family?: wbe.QueueFamilyVK | integer): wbe.RendRecipeTaskVK
+    p_queue_family?: wbe.QueueFamilyVK | integer): graph_utils.Task
     -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
     local dispatches: {wbe.RTParamsComputeDispatchVK} = {
         { pipeline = "radix_sort_prepare_dispatch", aliases = { input_buffer = KEYS, dispatch_buffer = DISPATCH } },

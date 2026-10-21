@@ -28,7 +28,7 @@
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <cstddef>
 #include <cstdint>
@@ -249,7 +249,7 @@ public:
      * every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with `[<slot>]` appended for
      * each per-frame copy, which also names it.
      */
-    explicit RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key = {});
+    explicit RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key = {});
 
     /**
      * @brief Build the graph from the descriptor a callback produces, and call it again on every rebuild.
@@ -374,7 +374,7 @@ public:
     Ref<RenderObjectContainerVK> acquire_resource(std::string_view p_resource_id) const;
 
 private:
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     // The key the graph is registered under; empty when its resources are not registered.
     std::string resource_key;
 

@@ -153,7 +153,7 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
       window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), render_graphs(p_allocator), base_render_data(p_allocator),
+      image_available_semaphores(p_allocator), render_graphs(p_allocator), render_context(p_allocator),
       registered_plugins(p_allocator), running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
@@ -174,7 +174,7 @@ RendererVK::~RendererVK() {
 void RendererVK::tick(double p_delta) {
     WBE_DEBUG_ASSERT(!(this_ref.is_null()));
 
-    base_render_data.time += p_delta;
+    render_context.time += p_delta;
     execute_graph(active_graph, p_delta);
 }
 
@@ -186,7 +186,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     }
     uint32_t frame_slot = advance_frame_slot();
     for (auto& plugin : registered_plugins) {
-        plugin->on_frame_begin(&base_render_data);
+        plugin->on_frame_begin(&render_context);
     }
 
     // Frame-local resource updates must run after the slot is selected and its fence has completed.
@@ -213,11 +213,11 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
 
     // Update the current frame slot so the graph-bound swap-chain image-view container
     // resolves to the correct image view during task recording.
-    base_render_data.current_swap_chain_index = image_index;
+    render_context.current_swap_chain_index = image_index;
     if (swap_chain_image_view_container == MEM_NULL) {
         throw std::runtime_error("RendererVK: swap-chain image-view container is unavailable.");
     }
-    swap_chain_image_view_container->set(base_render_data.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
+    swap_chain_image_view_container->set(render_context.current_frame_slot, render_objects->swap_chain_image_views[image_index]);
 
     // Tell the graph to wait on the swap-chain image-available binary semaphore
     // at COLOR_ATTACHMENT_OUTPUT.
@@ -225,7 +225,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     std::array<VkSemaphoreSubmitInfo, 1> wait_infos{wait_info};
     std::span<const VkSemaphoreSubmitInfo> extra_signals{};
     p_graph->execute(
-        base_render_data.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
+        render_context.current_frame + 1, p_delta, std::span<const VkSemaphoreSubmitInfo>(wait_infos.data(), wait_infos.size()), extra_signals);
 
     if (!capture_png_path.empty()) {
         capture_swap_chain_image(image_index);
@@ -234,7 +234,7 @@ void RendererVK::execute_graph(Ref<RenderGraphVK> p_graph, double p_delta) {
     present(image_index, p_graph);
     in_flight_fences[frame_slot]->wait();
 
-    ++base_render_data.current_frame;
+    ++render_context.current_frame;
 }
 
 Ref<ROCMultislotsVK> RendererVK::acquire_swap_chain_image_view_container() const {
@@ -249,23 +249,23 @@ void RendererVK::init(RendererCapabilities& p_capabilities) {
     render_objects = make_unique<RenderObjects>(allocator, allocator);
     register_requested_plugins(p_capabilities);
     init_vulkan(p_capabilities);
-    base_render_data.renderer_capabilities = p_capabilities;
-    setup_base_render_data();
-    // Fence creation needs the device and delayed-destruction callback published by setup_base_render_data().
+    render_context.renderer_capabilities = p_capabilities;
+    setup_render_context();
+    // Fence creation needs the device and delayed-destruction callback published by setup_render_context().
     create_async_objects();
     create_descriptor_heap_allocator();
     create_shader_debug_buffer();
     // current_frame is a monotonic counter that drives the per-frame timeline
     // semaphore values. It must be initialized exactly once here, NOT in
-    // setup_base_render_data() (which is also re-invoked on swap chain
+    // setup_render_context() (which is also re-invoked on swap chain
     // recreation) — otherwise the timeline value would regress and
     // re-signal a value already reached, breaking VUID-VkSubmitInfo2-semaphore-03882.
-    base_render_data.current_frame = 1;
+    render_context.current_frame = 1;
     init_swap_chain_image_views();
     refresh_swap_chain_image_view_container();
     image_available_semaphores.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
-        image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &base_render_data, true));
+        image_available_semaphores.emplace_back(make_ref<SemaphoreVK>(allocator, &render_context, true));
     }
     stdout_log(WBE_CHANNEL_DEBUG)->message("Vulkan renderer initialized.");
 }
@@ -278,7 +278,7 @@ void RendererVK::terminate() {
     for (auto& plugin : registered_plugins) {
         plugin->on_renderer_terminating();
     }
-    base_render_data.render_plugins = nullptr;
+    render_context.render_plugins = nullptr;
     registered_plugins.clear();
     if (swap_chain_image_view_container != MEM_NULL) {
         swap_chain_image_view_container->clear();
@@ -301,10 +301,10 @@ void RendererVK::terminate() {
     // The in-flight fences and the GPU-job semaphore are released after the synchronization waits on them; their
     // destruction is delayed, so flush again.
     gpu_job_semaphore = MEM_NULL;
-    base_render_data.in_flight_fence = VK_NULL_HANDLE;
+    render_context.in_flight_fence = VK_NULL_HANDLE;
     in_flight_fences.clear();
     flush_delayed_calls();
-    base_render_data.descriptor_heap_allocator = nullptr;
+    render_context.descriptor_heap_allocator = nullptr;
     descriptor_heap_allocator.reset();
     ktx_vulkan_device_info.reset();
     vkDestroyCommandPool(logical_device, compute_command_pool, get_allocation_callbacks());
@@ -318,7 +318,7 @@ void RendererVK::terminate() {
 }
 
 void RendererVK::register_requested_plugins(const RendererCapabilities& p_capabilities) {
-    register_builtin_render_plugins_vk(registered_plugins, allocator, &base_render_data, p_capabilities);
+    register_builtin_render_plugins_vk(registered_plugins, allocator, &render_context, p_capabilities);
 }
 
 void RendererVK::init_vulkan(RendererCapabilities& p_capabilities) {
@@ -335,55 +335,55 @@ void RendererVK::recreate_swap_chain() {
     vkDeviceWaitIdle(logical_device);
     clean_up_swap_chain();
     create_swap_chain();
-    setup_base_render_data();
+    setup_render_context();
     init_swap_chain_image_views();
     refresh_swap_chain_image_view_container();
 }
 
-void RendererVK::setup_base_render_data() {
-    base_render_data.allocator = allocator;
-    base_render_data.render_database = render_database.get();
-    base_render_data.logic_device = logical_device;
-    base_render_data.physical_device = physical_device;
-    base_render_data.vma_allocator = vma_allocator;
-    base_render_data.swap_chain_format = swap_chain_image_format;
-    base_render_data.swap_chain_extent = swap_chain_extent;
-    base_render_data.swap_chain_aspect_ratio =
+void RendererVK::setup_render_context() {
+    render_context.allocator = allocator;
+    render_context.render_database = render_database.get();
+    render_context.logic_device = logical_device;
+    render_context.physical_device = physical_device;
+    render_context.vma_allocator = vma_allocator;
+    render_context.swap_chain_format = swap_chain_image_format;
+    render_context.swap_chain_extent = swap_chain_extent;
+    render_context.swap_chain_aspect_ratio =
         static_cast<float>(swap_chain_extent.width) / static_cast<float>(swap_chain_extent.height);
-    base_render_data.allocation_callbacks = get_allocation_callbacks();
-    base_render_data.graphics_queue = graphics_queue;
-    base_render_data.compute_queue_1 = compute_queue_1;
-    base_render_data.compute_queue_2 = compute_queue_2;
-    base_render_data.graphics_queue_family_index = queue_family_indices.get_graphics();
-    base_render_data.viewport = viewport;
-    base_render_data.scissor = scissor;
-    base_render_data.graphics_command_pool = graphics_command_pool;
-    base_render_data.compute_command_pool = compute_command_pool;
-    base_render_data.ktx_vulkan_device_info = ktx_vulkan_device_info.get();
-    base_render_data.descriptor_heap_allocator = descriptor_heap_allocator.get();
-    base_render_data.descriptor_heap_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT;
+    render_context.allocation_callbacks = get_allocation_callbacks();
+    render_context.graphics_queue = graphics_queue;
+    render_context.compute_queue_1 = compute_queue_1;
+    render_context.compute_queue_2 = compute_queue_2;
+    render_context.graphics_queue_family_index = queue_family_indices.get_graphics();
+    render_context.viewport = viewport;
+    render_context.scissor = scissor;
+    render_context.graphics_command_pool = graphics_command_pool;
+    render_context.compute_command_pool = compute_command_pool;
+    render_context.ktx_vulkan_device_info = ktx_vulkan_device_info.get();
+    render_context.descriptor_heap_allocator = descriptor_heap_allocator.get();
+    render_context.descriptor_heap_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT;
     VkPhysicalDeviceProperties2 physical_device_properties{};
     physical_device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    physical_device_properties.pNext = &base_render_data.descriptor_heap_properties;
+    physical_device_properties.pNext = &render_context.descriptor_heap_properties;
     vkGetPhysicalDeviceProperties2(physical_device, &physical_device_properties);
-    base_render_data.sampler_descriptor_stride = base_render_data.descriptor_heap_properties.samplerDescriptorSize;
-    base_render_data.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
+    render_context.sampler_descriptor_stride = render_context.descriptor_heap_properties.samplerDescriptorSize;
+    render_context.max_draw_indirect_count = physical_device_properties.properties.limits.maxDrawIndirectCount;
     for (auto& plugin : registered_plugins) {
-        plugin->update_base_render_data(&base_render_data, physical_device);
+        plugin->update_render_context(&render_context, physical_device);
     }
     if (!in_flight_fences.empty()) {
-        base_render_data.in_flight_fence = in_flight_fences[0]->get_fense();
+        render_context.in_flight_fence = in_flight_fences[0]->get_fense();
     } else {
-        base_render_data.in_flight_fence = VK_NULL_HANDLE;
+        render_context.in_flight_fence = VK_NULL_HANDLE;
     }
-    base_render_data.current_swap_chain_index = 0;
-    base_render_data.swap_chain_images_count = swap_chain_images_count;
-    base_render_data.queue_family_indices = queue_family_indices.get_unique_indices();
-    base_render_data.register_delayed_call = [this](std::function<void()>&& p_function, uint32_t p_delayed_frames) {
+    render_context.current_swap_chain_index = 0;
+    render_context.swap_chain_images_count = swap_chain_images_count;
+    render_context.queue_family_indices = queue_family_indices.get_unique_indices();
+    render_context.register_delayed_call = [this](std::function<void()>&& p_function, uint32_t p_delayed_frames) {
         register_delay_call(std::move(p_function), p_delayed_frames);
     };
-    base_render_data.frames_in_flight = frames_in_flight;
-    base_render_data.render_plugins = &registered_plugins;
+    render_context.frames_in_flight = frames_in_flight;
+    render_context.render_plugins = &registered_plugins;
 }
 
 void RendererVK::create_instance() { // NOLINT
@@ -605,7 +605,7 @@ void RendererVK::create_swap_chain_images() {
     render_objects->swap_chain_images.reserve(swap_chain_images_count);
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
-            make_ref<ROImageVK>(allocator, &base_render_data, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
+            make_ref<ROImageVK>(allocator, &render_context, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
         render_database->register_compiled_render_resource(
             std::format("{}.image[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_images.size() - 1), render_objects->swap_chain_images.back());
         ROImageVK::ExposedFields& fields = render_objects->swap_chain_images.back()->exposed_fields;
@@ -660,7 +660,7 @@ void RendererVK::init_swap_chain_image_views() {
             .set_components(VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY)
             .set_subresource_range(subresource_range);
 
-        render_objects->swap_chain_image_views.emplace_back(builder.create_ref(&base_render_data));
+        render_objects->swap_chain_image_views.emplace_back(render_context.create_image_view(builder));
         render_database->register_compiled_render_resource(
             std::format("{}[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_image_views.size() - 1), render_objects->swap_chain_image_views.back());
     }
@@ -730,7 +730,7 @@ void RendererVK::create_descriptor_heap_allocator() {
     constexpr uint32_t SAMPLED_IMAGE_DESCRIPTOR_CAPACITY = 256;
     constexpr uint32_t STORAGE_IMAGE_DESCRIPTOR_CAPACITY = 64;
     constexpr uint32_t SAMPLER_DESCRIPTOR_CAPACITY = 256;
-    const auto& properties = base_render_data.descriptor_heap_properties;
+    const auto& properties = render_context.descriptor_heap_properties;
     if (properties.bufferDescriptorSize == 0 || properties.imageDescriptorSize == 0 ||
         properties.samplerDescriptorSize == 0 || properties.bufferDescriptorAlignment == 0 ||
         properties.imageDescriptorAlignment == 0 || properties.samplerDescriptorAlignment == 0) {
@@ -758,16 +758,16 @@ void RendererVK::create_descriptor_heap_allocator() {
     const VkDeviceSize sampler_offset = configurations[1].reserve_arena_bytes(
         SAMPLER_DESCRIPTOR_CAPACITY, properties.samplerDescriptorSize, properties.samplerDescriptorAlignment);
     for (auto& plugin : registered_plugins) {
-        plugin->configure_descriptor_heaps(&base_render_data, configurations);
+        plugin->configure_descriptor_heaps(&render_context, configurations);
     }
 
-    descriptor_heap_allocator = make_unique<DescriptorHeapAllocatorVK>(allocator, allocator, &base_render_data);
-    base_render_data.descriptor_heap_allocator = descriptor_heap_allocator.get();
-    base_render_data.resource_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[0]);
-    base_render_data.sampler_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[1]);
-    const DescriptorHeapIDVK resource_heap_id = base_render_data.resource_descriptor_heap_id;
-    const DescriptorHeapIDVK sampler_heap_id = base_render_data.sampler_descriptor_heap_id;
-    base_render_data.buffer_descriptor_arena = {
+    descriptor_heap_allocator = make_unique<DescriptorHeapAllocatorVK>(allocator, allocator, &render_context);
+    render_context.descriptor_heap_allocator = descriptor_heap_allocator.get();
+    render_context.resource_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[0]);
+    render_context.sampler_descriptor_heap_id = descriptor_heap_allocator->create_heap(configurations[1]);
+    const DescriptorHeapIDVK resource_heap_id = render_context.resource_descriptor_heap_id;
+    const DescriptorHeapIDVK sampler_heap_id = render_context.sampler_descriptor_heap_id;
+    render_context.buffer_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
             {
@@ -777,7 +777,7 @@ void RendererVK::create_descriptor_heap_allocator() {
                 .descriptor_alignment = properties.bufferDescriptorAlignment,
             }),
     };
-    base_render_data.sampled_image_descriptor_arena = {
+    render_context.sampled_image_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
             {
@@ -787,8 +787,8 @@ void RendererVK::create_descriptor_heap_allocator() {
                 .descriptor_alignment = properties.imageDescriptorAlignment,
             }),
     };
-    base_render_data.sampled_image_descriptor_capacity = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY;
-    base_render_data.storage_image_descriptor_arena = {
+    render_context.sampled_image_descriptor_capacity = SAMPLED_IMAGE_DESCRIPTOR_CAPACITY;
+    render_context.storage_image_descriptor_arena = {
         .heap_id = resource_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(resource_heap_id,
             {
@@ -798,7 +798,7 @@ void RendererVK::create_descriptor_heap_allocator() {
                 .descriptor_alignment = properties.imageDescriptorAlignment,
             }),
     };
-    base_render_data.sampler_descriptor_arena = {
+    render_context.sampler_descriptor_arena = {
         .heap_id = sampler_heap_id,
         .arena_id = descriptor_heap_allocator->allocate_arena(sampler_heap_id,
             {
@@ -809,7 +809,7 @@ void RendererVK::create_descriptor_heap_allocator() {
             }),
     };
     for (auto& plugin : registered_plugins) {
-        plugin->create_descriptor_arenas(&base_render_data);
+        plugin->create_descriptor_arenas(&render_context);
     }
 }
 
@@ -821,10 +821,9 @@ void RendererVK::create_shader_debug_buffer() {
     for (size_t frame_slot = 0; frame_slot < frames_in_flight; ++frame_slot) {
         initial_data[frame_slot * SHADER_DEBUG_FRAME_WORD_COUNT + 1] = SHADER_DEBUG_FRAME_ENTRY_CAPACITY;
     }
-    shader_debug_buffer = ROBufferVK::Builder()
+    shader_debug_buffer = render_context.create_buffer(ROBufferVK::Builder()
                               .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
-                              .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-                              .create_ref(&base_render_data);
+                              .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
     render_database->register_compiled_render_resource("shader_debug", shader_debug_buffer);
     const uint32_t descriptor_index = shader_debug_buffer->get_storage_view_index();
     if (descriptor_index != SHADER_DEBUG_DESCRIPTOR_INDEX) {
@@ -837,7 +836,7 @@ void RendererVK::create_async_objects() {
     in_flight_fences.reserve(frames_in_flight);
     for (size_t i = 0; i < frames_in_flight; ++i) {
         // Start signaled, since there is no previous frame to wait for at the first frame.
-        in_flight_fences.emplace_back(make_ref<ROFenseVK>(allocator, &base_render_data, true));
+        in_flight_fences.emplace_back(make_ref<ROFenseVK>(allocator, &render_context, true));
     }
 }
 
@@ -999,35 +998,35 @@ void RendererVK::create_logical_device() { // NOLINT
     if (result != VK_SUCCESS) {
         throw std::runtime_error(std::format("Failed to create logical device: {}.", string_VkResult(result)));
     }
-    base_render_data.command_set_vertex_input =
+    render_context.command_set_vertex_input =
         reinterpret_cast<PFN_vkCmdSetVertexInputEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdSetVertexInputEXT"));
-    if (base_render_data.command_set_vertex_input == nullptr) {
+    if (render_context.command_set_vertex_input == nullptr) {
         throw std::runtime_error("Failed to load vkCmdSetVertexInputEXT.");
     }
-    // Objects created before setup_base_render_data(), such as the swap-chain images, are named with this device.
-    base_render_data.logic_device = logical_device;
+    // Objects created before setup_render_context(), such as the swap-chain images, are named with this device.
+    render_context.logic_device = logical_device;
     if (debug_utils_enabled) {
         // An instance-level command; set_debug_object_name_vk() does nothing while it stays null.
-        base_render_data.set_debug_utils_object_name =
+        render_context.set_debug_utils_object_name =
             reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetInstanceProcAddr(vk_instance, "vkSetDebugUtilsObjectNameEXT"));
     }
-    base_render_data.write_resource_descriptors =
+    render_context.write_resource_descriptors =
         reinterpret_cast<PFN_vkWriteResourceDescriptorsEXT>(vkGetDeviceProcAddr(logical_device, "vkWriteResourceDescriptorsEXT"));
-    base_render_data.write_sampler_descriptors =
+    render_context.write_sampler_descriptors =
         reinterpret_cast<PFN_vkWriteSamplerDescriptorsEXT>(vkGetDeviceProcAddr(logical_device, "vkWriteSamplerDescriptorsEXT"));
-    base_render_data.command_bind_resource_heap =
+    render_context.command_bind_resource_heap =
         reinterpret_cast<PFN_vkCmdBindResourceHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindResourceHeapEXT"));
-    base_render_data.command_bind_sampler_heap =
+    render_context.command_bind_sampler_heap =
         reinterpret_cast<PFN_vkCmdBindSamplerHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindSamplerHeapEXT"));
-    base_render_data.command_push_data =
+    render_context.command_push_data =
         reinterpret_cast<PFN_vkCmdPushDataEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdPushDataEXT"));
-    if (base_render_data.write_resource_descriptors == nullptr || base_render_data.write_sampler_descriptors == nullptr ||
-        base_render_data.command_bind_resource_heap == nullptr || base_render_data.command_bind_sampler_heap == nullptr ||
-        base_render_data.command_push_data == nullptr) {
+    if (render_context.write_resource_descriptors == nullptr || render_context.write_sampler_descriptors == nullptr ||
+        render_context.command_bind_resource_heap == nullptr || render_context.command_bind_sampler_heap == nullptr ||
+        render_context.command_push_data == nullptr) {
         throw std::runtime_error("Failed to load VK_EXT_descriptor_heap device commands.");
     }
     for (auto& plugin : registered_plugins) {
-        plugin->on_after_device_created(&base_render_data, physical_device, logical_device);
+        plugin->on_after_device_created(&render_context, physical_device, logical_device);
     }
 
     // Get the device queues.
@@ -1420,9 +1419,9 @@ std::optional<uint32_t> RendererVK::acquire_swapchain_next_image(VkSemaphore p_i
 }
 
 uint32_t RendererVK::advance_frame_slot() {
-    const uint32_t frame_slot = (base_render_data.current_frame_slot + 1) % frames_in_flight;
-    base_render_data.in_flight_fence = in_flight_fences[frame_slot]->get_fense();
-    base_render_data.current_frame_slot = frame_slot;
+    const uint32_t frame_slot = (render_context.current_frame_slot + 1) % frames_in_flight;
+    render_context.in_flight_fence = in_flight_fences[frame_slot]->get_fense();
+    render_context.current_frame_slot = frame_slot;
 
     in_flight_fences[frame_slot]->wait();
     return frame_slot;
@@ -1452,7 +1451,7 @@ std::future<Ref<ROFenseVK>> RendererVK::register_gpu_job(GPUJobVK p_job) {
         if (gpu_job.record) {
             continue;
         }
-        Ref<ROFenseVK> completion_fense = make_ref<ROFenseVK>(global_allocator(), &base_render_data);
+        Ref<ROFenseVK> completion_fense = make_ref<ROFenseVK>(global_allocator(), &render_context);
         gpu_job.record = std::move(p_job);
         gpu_job.completion_fense = std::move(completion_fense);
         return gpu_job.submission_promise.get_future();
@@ -1501,7 +1500,7 @@ void RendererVK::run_gpu_jobs() {
     }
     // A timeline semaphore, because every compute queue waits on it and a binary semaphore allows only one waiter.
     if (gpu_job_semaphore == MEM_NULL) {
-        gpu_job_semaphore = make_ref<SemaphoreVK>(allocator, &base_render_data, false);
+        gpu_job_semaphore = make_ref<SemaphoreVK>(allocator, &render_context, false);
     }
     ++gpu_job_semaphore_value;
     submit_gpu_job_command_buffer(completion_fenses, submission_promises, gpu_job_semaphore_value);
@@ -1514,8 +1513,8 @@ void RendererVK::check_shader_debug_buffer() {
         throw std::runtime_error("RendererVK: shader-debug buffer is unavailable.");
     }
 
-    const size_t frame_offset = static_cast<size_t>(base_render_data.current_frame_slot) * SHADER_DEBUG_FRAME_BYTE_SIZE;
-    if (!base_render_data.renderer_capabilities.shader_debug) {
+    const size_t frame_offset = static_cast<size_t>(render_context.current_frame_slot) * SHADER_DEBUG_FRAME_BYTE_SIZE;
+    if (!render_context.renderer_capabilities.shader_debug) {
         constexpr uint32_t EMPTY_SIZE = 0;
         shader_debug_buffer->update_buffer(&EMPTY_SIZE, frame_offset, sizeof(EMPTY_SIZE));
         return;
@@ -1692,7 +1691,7 @@ void RendererVK::capture_swap_chain_image(uint32_t p_image_index) {
     }
     write_image_data_png(Path(capture_png_path.c_str()), pixels, swap_chain_extent.width, swap_chain_extent.height, 4);
     stdout_log()->message(std::format(
-        "Captured frame {} to {}", base_render_data.current_frame, std::string_view(capture_png_path.data(), capture_png_path.size())));
+        "Captured frame {} to {}", render_context.current_frame, std::string_view(capture_png_path.data(), capture_png_path.size())));
 }
 
 void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
@@ -1722,7 +1721,7 @@ Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource
         throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
     }
 
-    auto graph = make_ref<RenderGraphVK>(allocator, &base_render_data, p_resource_key);
+    auto graph = make_ref<RenderGraphVK>(allocator, &render_context, p_resource_key);
     graph->build_from_callback(std::move(p_rebuild));
     for (auto& plugin : registered_plugins) {
         plugin->on_render_graph_registered(p_resource_key, *graph);

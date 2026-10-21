@@ -25,7 +25,7 @@
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/device_memory_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/defs.hh"
@@ -41,6 +41,254 @@
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
+
+class ROBufferVK;
+
+/**
+ * @struct BufferDescVK
+ * @brief Buffer creation configuration and fluent builder.
+ *
+ * Copyable and movable; copies duplicate owned initial bytes and moves transfer them. Descriptor indices are adopted only
+ * when resource creation succeeds; descriptions do not own those indices.
+ */
+struct BufferDescVK {
+    friend ROBufferVK;
+
+    /**
+     * @brief The size of the buffer.
+     */
+    size_t size = WBE_KI_B(4UL);
+    /**
+     * @brief The usage of the buffer.
+     */
+    Required<VkBufferUsageFlags> usage;
+    /**
+     * @brief Queue families this buffer is going to be used across. Either this
+     * size is 1 or is empty will make the buffer created in exclusive
+     * sharing mode, otherwise it will be created in concurrent sharing
+     * mode.
+     */
+    std::set<uint32_t> queue_family_indices;
+    /**
+     * @brief The domain where this buffer's memory will be allocated.
+     */
+    Required<DeviceDomain> domain;
+    /**
+     * @brief Allocated uniform-buffer descriptor index adopted by the created buffer.
+     */
+    std::optional<uint32_t> uniform_view_index;
+    /**
+     * @brief Allocated storage descriptor index adopted by the created resource.
+     */
+    std::optional<uint32_t> storage_view_index;
+    /**
+     * @brief Initial bytes copied into the buffer during creation.
+     */
+    std::vector<uint8_t> initial_data_bytes;
+
+    /**
+     * @brief Configure storage for an array of equally sized elements.
+     *
+     * @param p_element_size Size of one element in bytes.
+     * @param p_element_count Number of elements.
+     * @param p_usage Vulkan usage flags for the buffer.
+     * @param p_domain Memory domain used by the buffer.
+     * @return *this.
+     * @throws std::runtime_error If either dimension is zero or the total size overflows.
+     */
+    BufferDescVK& set_properties(
+        size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+    /**
+     * @brief Configure storage for one element.
+     *
+     * @param p_element_size Element size in bytes.
+     * @param p_usage Vulkan usage flags for the buffer.
+     * @param p_domain Memory domain used by the buffer.
+     * @return *this.
+     * @throws std::runtime_error If the element size is zero.
+     */
+    BufferDescVK& set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+    /**
+     * @brief Configure the buffer and retain initial bytes for upload during creation.
+     *
+     * Device-local uploads automatically add transfer-destination usage and use a staging buffer.
+     *
+     * @param p_data Initial bytes copied into builder-owned storage.
+     * @param p_domain Memory domain used by the buffer.
+     * @return *this.
+     * @throws std::runtime_error If the data span is empty.
+     */
+    BufferDescVK& initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+    /**
+     * @brief Configure the buffer and retain initial bytes from an untyped memory region.
+     * @param p_data Initial byte address.
+     * @param p_size Initial byte count.
+     * @param p_domain Memory domain used by the buffer.
+     * @return *this.
+     */
+    BufferDescVK& initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
+
+    /**
+     * @brief The domain where the memory of this buffer will be allocated.
+     *
+     * @param p_domain The domain.
+     * @return *this.
+     */
+    BufferDescVK& set_domain(DeviceDomain p_domain) {
+        domain = p_domain;
+        return *this;
+    }
+
+    /**
+     * @brief Set the size of the buffer.
+     *
+     * @param p_size The size to be set to.
+     * @return *this.
+     */
+    BufferDescVK& set_size(size_t p_size) {
+        size = p_size;
+        return *this;
+    }
+
+    /**
+     * @brief Set the usage of this buffer.
+     *
+     * @param p_usage The usage of this buffer.
+     * @return *this.
+     */
+    BufferDescVK& set_usage(VkBufferUsageFlags p_usage) {
+        usage = p_usage;
+        return *this;
+    }
+
+    /**
+     * @brief Add usage to this buffer.
+     *
+     * @param p_usage The usage to be added to this buffer.
+     * @return *this.
+     */
+    BufferDescVK& add_usage(VkBufferUsageFlags p_usage) {
+        if (usage.has_value()) {
+            *usage |= p_usage;
+        } else {
+            usage = p_usage;
+        }
+        return *this;
+    }
+
+    /**
+     * @brief Transfer an allocated uniform-buffer descriptor index to the created buffer.
+     *
+     * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+     * release the index after construction succeeds.
+     */
+    BufferDescVK& set_uniform_view_index(uint32_t p_index) {
+        uniform_view_index = p_index;
+        return *this;
+    }
+
+    /**
+     * @brief Transfer an allocated storage-buffer descriptor index to the created buffer.
+     *
+     * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+     * release the index after construction succeeds.
+     */
+    BufferDescVK& set_storage_view_index(uint32_t p_index) {
+        storage_view_index = p_index;
+        return *this;
+    }
+
+    /**
+     * @brief Set the queue families that may use this buffer.
+     *
+     * @param p_queue_family_indices The queue family indices that might use
+     * this buffer.
+     * @return *this.
+     */
+    BufferDescVK& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
+        queue_family_indices = p_queue_family_indices;
+        return *this;
+    }
+
+    /**
+     * @brief Set the queue families that may use this buffer.
+     *
+     * @param p_queue_family_indices The queue family indices that might use
+     * this buffer.
+     * @return *this.
+     */
+    BufferDescVK& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
+        queue_family_indices = std::move(p_queue_family_indices);
+        return *this;
+    }
+
+    /**
+     * @brief Create a copyable owning reference on the rendering thread using the renderer context.
+     */
+    Ref<ROBufferVK> create_ref(const RenderContextVK* p_render_data) const;
+
+    /**
+     * @brief Create a move-only owner on the rendering thread using the renderer allocator.
+     */
+    Unique<ROBufferVK> create_unique(const RenderContextVK* p_render_data) const;
+};
+
+/**
+ * @struct BufferAliasDescVK
+ * @brief Configuration for a buffer bound to shared existing device memory.
+ *
+ * Copyable and movable; copies share the retained device-memory reference and moves transfer it. This description does not
+ * allocate a Vulkan resource.
+ */
+struct BufferAliasDescVK {
+    /**
+     * @brief Buffer configuration. Its domain, when set, must match the memory's domain.
+     */
+    BufferDescVK buffer;
+    /**
+     * @brief Memory the buffer is bound to.
+     */
+    Ref<DeviceMemoryVK> memory;
+    /**
+     * @brief Offset of the buffer inside the memory allocation.
+     */
+    VkDeviceSize offset = 0;
+
+    /**
+     * @brief Set the buffer configuration.
+     * @param p_buffer The buffer configuration.
+     * @return *this.
+     */
+    BufferAliasDescVK& set_buffer(const BufferDescVK& p_buffer) {
+        buffer = p_buffer;
+        return *this;
+    }
+
+    /**
+     * @brief Set the memory the buffer aliases.
+     * @param p_memory The memory.
+     * @param p_offset Offset of the buffer inside the memory allocation.
+     * @return *this.
+     */
+    BufferAliasDescVK& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
+        memory = std::move(p_memory);
+        offset = p_offset;
+        return *this;
+    }
+
+    /**
+     * @brief Create a copyable owning reference on the rendering thread using the renderer context.
+     */
+    Ref<ROBufferVK> create_ref(const RenderContextVK* p_render_data) const;
+
+    /**
+     * @brief Create a move-only owner on the rendering thread using the renderer allocator.
+     */
+    Unique<ROBufferVK> create_unique(const RenderContextVK* p_render_data) const;
+};
 
 /**
  * @class ROBufferVK
@@ -61,221 +309,14 @@ public:
     };
 
     /**
-     * @class Builder
-     * @brief The builder object for ROBufferVK.
-     *
+     * @brief Compatibility name for BufferDescVK.
      */
-    struct Builder {
-        friend ROBufferVK;
-
-        // The size of the buffer.
-        size_t size = WBE_KI_B(4UL);
-        // The usage of the buffer.
-        Required<VkBufferUsageFlags> usage;
-        // Queue families this buffer is going to be used across. Either this
-        // size is 1 or is empty will make the buffer created in exclusive
-        // sharing mode, otherwise it will be created in concurrent sharing
-        // mode.
-        std::set<uint32_t> queue_family_indices;
-        // The domain where this buffer's memory will be allocated.
-        Required<DeviceDomain> domain;
-        std::optional<uint32_t> uniform_view_index;
-        std::optional<uint32_t> storage_view_index;
-        /** Initial bytes copied into the buffer during creation. */
-        std::vector<uint8_t> initial_data_bytes;
-
-        /**
-         * @brief Configure storage for an array of equally sized elements.
-         *
-         * @param p_element_size Size of one element in bytes.
-         * @param p_element_count Number of elements.
-         * @param p_usage Vulkan usage flags for the buffer.
-         * @param p_domain Memory domain used by the buffer.
-         * @return *this.
-         * @throws std::runtime_error If either dimension is zero or the total size overflows.
-         */
-        Builder& set_properties(
-            size_t p_element_size, size_t p_element_count, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
-
-        /**
-         * @brief Configure storage for one element.
-         *
-         * @param p_element_size Element size in bytes.
-         * @param p_usage Vulkan usage flags for the buffer.
-         * @param p_domain Memory domain used by the buffer.
-         * @return *this.
-         * @throws std::runtime_error If the element size is zero.
-         */
-        Builder& set_properties(size_t p_element_size, VkBufferUsageFlags p_usage, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
-
-        /**
-         * @brief Configure the buffer and retain initial bytes for upload during creation.
-         *
-         * Device-local uploads automatically add transfer-destination usage and use a staging buffer.
-         *
-         * @param p_data Initial bytes copied into builder-owned storage.
-         * @param p_domain Memory domain used by the buffer.
-         * @return *this.
-         * @throws std::runtime_error If the data span is empty.
-         */
-        Builder& initial_data(std::span<const uint8_t> p_data, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
-
-        /**
-         * @brief Configure the buffer and retain initial bytes from an untyped memory region.
-         * @param p_data Initial byte address.
-         * @param p_size Initial byte count.
-         * @param p_domain Memory domain used by the buffer.
-         * @return *this.
-         */
-        Builder& initial_data(const void* p_data, size_t p_size, DeviceDomain p_domain = DeviceDomain::HOST_DEVICE);
-
-        /**
-         * @brief The domain where the memory of this buffer will be allocated.
-         *
-         * @param p_domain The domain.
-         * @return *this.
-         */
-        Builder& set_domain(DeviceDomain p_domain) {
-            domain = p_domain;
-            return *this;
-        }
-
-        /**
-         * @brief Set the size of the buffer.
-         *
-         * @param p_size The size to be set to.
-         * @return *this.
-         */
-        Builder& set_size(size_t p_size) {
-            size = p_size;
-            return *this;
-        }
-
-        /**
-         * @brief Set the usage of this buffer.
-         *
-         * @param p_usage The usage of this buffer.
-         * @return *this.
-         */
-        Builder& set_usage(VkBufferUsageFlags p_usage) {
-            usage = p_usage;
-            return *this;
-        }
-
-        /**
-         * @brief Add usage to this buffer.
-         *
-         * @param p_usage The usage to be added to this buffer.
-         * @return *this.
-         */
-        Builder& add_usage(VkBufferUsageFlags p_usage) {
-            if (usage.has_value()) {
-                *usage |= p_usage;
-            } else {
-                usage = p_usage;
-            }
-            return *this;
-        }
-
-        /**
-         * @brief Transfer an allocated uniform-buffer descriptor index to the created buffer.
-         *
-         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
-         * release the index after construction succeeds.
-         */
-        Builder& set_uniform_view_index(uint32_t p_index) {
-            uniform_view_index = p_index;
-            return *this;
-        }
-
-        /**
-         * @brief Transfer an allocated storage-buffer descriptor index to the created buffer.
-         *
-         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
-         * release the index after construction succeeds.
-         */
-        Builder& set_storage_view_index(uint32_t p_index) {
-            storage_view_index = p_index;
-            return *this;
-        }
-
-        /**
-         * @brief Set the queue families that may use this buffer.
-         *
-         * @param p_queue_family_indices The queue family indices that might use
-         * this buffer.
-         * @return *this.
-         */
-        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
-            queue_family_indices = p_queue_family_indices;
-            return *this;
-        }
-
-        /**
-         * @brief Set the queue families that may use this buffer.
-         *
-         * @param p_queue_family_indices The queue family indices that might use
-         * this buffer.
-         * @return *this.
-         */
-        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
-            queue_family_indices = std::move(p_queue_family_indices);
-            return *this;
-        }
-
-        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
+    using Builder = BufferDescVK;
 
     /**
-     * @class AliasBuilder
-     * @brief Builder for a buffer bound to existing device memory instead of its own allocation.
-     *
-     * The buffer takes the domain of the memory and shares the memory contents with every other resource bound to it.
+     * @brief Compatibility name for BufferAliasDescVK.
      */
-    struct AliasBuilder {
-        /** Buffer configuration. Its domain, when set, must match the memory's domain. */
-        Builder buffer;
-        /** Memory the buffer is bound to. */
-        Ref<DeviceMemoryVK> memory;
-        /** Offset of the buffer inside the memory allocation. */
-        VkDeviceSize offset = 0;
-
-        /**
-         * @brief Set the buffer configuration.
-         * @param p_buffer The buffer configuration.
-         * @return *this.
-         */
-        AliasBuilder& set_buffer(const Builder& p_buffer) {
-            buffer = p_buffer;
-            return *this;
-        }
-
-        /**
-         * @brief Set the memory the buffer aliases.
-         * @param p_memory The memory.
-         * @param p_offset Offset of the buffer inside the memory allocation.
-         * @return *this.
-         */
-        AliasBuilder& set_memory(Ref<DeviceMemoryVK> p_memory, VkDeviceSize p_offset = 0) {
-            memory = std::move(p_memory);
-            offset = p_offset;
-            return *this;
-        }
-
-        Ref<ROBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
+    using AliasBuilder = BufferAliasDescVK;
 
     /**
      * @class BufferMemoryBarrierBuilder
@@ -457,7 +498,7 @@ public:
      *
      * @param p_builder The builder instance.
      */
-    ROBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROBufferVK(const RenderContextVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Constructor. Binds the buffer to existing device memory as an alias.
@@ -466,7 +507,7 @@ public:
      * @throws std::runtime_error If the memory is null, its domain differs from the configured one, or it cannot hold the
      * buffer at the offset.
      */
-    ROBufferVK(const BaseRenderDataVK* p_render_data, const AliasBuilder& p_builder);
+    ROBufferVK(const RenderContextVK* p_render_data, const AliasBuilder& p_builder);
     virtual ~ROBufferVK() override;
     ROBufferVK(const ROBufferVK&) = delete;
     ROBufferVK(ROBufferVK&&) noexcept = delete;

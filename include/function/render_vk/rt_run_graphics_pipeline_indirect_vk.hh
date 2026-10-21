@@ -27,7 +27,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_graphics_pipeline_indirect_vk.hh"
@@ -164,7 +164,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect])
         /**
          * @brief Create an allocator-owned render task.
          */
-        Unique<RTRunGraphicsPipelineIndirectVK> create_unique(const BaseRenderDataVK* p_render_data) const;
+        Unique<RTRunGraphicsPipelineIndirectVK> create_unique(const RenderContextVK* p_render_data) const;
 
     private:
         friend RTRunGraphicsPipelineIndirectVK;
@@ -190,7 +190,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect])
     /**
      * @brief Construct a task from a complete builder configuration.
      */
-    RTRunGraphicsPipelineIndirectVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    RTRunGraphicsPipelineIndirectVK(const RenderContextVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Create the task from recipe parameters, as one batch of the pipeline without vertex buffers; used by
@@ -200,7 +200,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect])
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -213,7 +213,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect])
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     VkExtent2D render_extent{};
     Vector<PipelineBatch, RenderAllocator> pipeline_batches;
     RenderTargetsVK render_targets;

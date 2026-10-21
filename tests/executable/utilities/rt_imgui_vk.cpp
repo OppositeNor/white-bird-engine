@@ -16,7 +16,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "imgui_overlay_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -34,7 +34,7 @@ ImGuiOverlayVK* require_overlay(ImGuiOverlayVK* p_overlay) {
 
 } // namespace
 
-RTImGuiVK::RTImGuiVK(const BaseRenderDataVK* p_render_data, ImGuiOverlayVK* p_overlay)
+RTImGuiVK::RTImGuiVK(const RenderContextVK* p_render_data, ImGuiOverlayVK* p_overlay)
     : render_data(p_render_data), overlay(require_overlay(p_overlay)),
       render_targets(p_render_data->allocator, 1, false, RenderTargetsVK::Config{.color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD}) {
 }

@@ -18,7 +18,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -41,36 +41,44 @@ DebugData make_descriptor_row(uint32_t p_heap_index) {
 
 } // namespace
 
+Ref<ROSamplerVK> SamplerDescVK::create_ref(const RenderContextVK* p_render_data) const {
+    return p_render_data->create_sampler(*this);
+}
+
+Unique<ROSamplerVK> SamplerDescVK::create_unique(const RenderContextVK* p_render_data) const {
+    return make_unique<ROSamplerVK>(p_render_data->allocator, p_render_data, *this);
+}
+
 TypeID ROSamplerVK::get_type_uuid() const {
     return TypeUUID<ROSamplerVK>::UUID;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_filter(VkFilter p_min_filter, VkFilter p_mag_filter) {
+SamplerDescVK& SamplerDescVK::set_filter(VkFilter p_min_filter, VkFilter p_mag_filter) {
     min_filter = p_min_filter;
     mag_filter = p_mag_filter;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_mag_filter(VkFilter p_mag_filter) {
+SamplerDescVK& SamplerDescVK::set_mag_filter(VkFilter p_mag_filter) {
     mag_filter = p_mag_filter;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_min_filter(VkFilter p_min_filter) {
+SamplerDescVK& SamplerDescVK::set_min_filter(VkFilter p_min_filter) {
     min_filter = p_min_filter;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_mipmap_mode(VkSamplerMipmapMode p_mipmap_mode) {
+SamplerDescVK& SamplerDescVK::set_mipmap_mode(VkSamplerMipmapMode p_mipmap_mode) {
     mipmap_mode = p_mipmap_mode;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode(VkSamplerAddressMode p_address_mode) {
+SamplerDescVK& SamplerDescVK::set_address_mode(VkSamplerAddressMode p_address_mode) {
     return set_address_mode(p_address_mode, p_address_mode, p_address_mode);
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode(
+SamplerDescVK& SamplerDescVK::set_address_mode(
     VkSamplerAddressMode p_address_mode_u, VkSamplerAddressMode p_address_mode_v, VkSamplerAddressMode p_address_mode_w) {
     address_mode_u = p_address_mode_u;
     address_mode_v = p_address_mode_v;
@@ -78,90 +86,90 @@ ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode(
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode_u(VkSamplerAddressMode p_address_mode_u) {
+SamplerDescVK& SamplerDescVK::set_address_mode_u(VkSamplerAddressMode p_address_mode_u) {
     address_mode_u = p_address_mode_u;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode_v(VkSamplerAddressMode p_address_mode_v) {
+SamplerDescVK& SamplerDescVK::set_address_mode_v(VkSamplerAddressMode p_address_mode_v) {
     address_mode_v = p_address_mode_v;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_address_mode_w(VkSamplerAddressMode p_address_mode_w) {
+SamplerDescVK& SamplerDescVK::set_address_mode_w(VkSamplerAddressMode p_address_mode_w) {
     address_mode_w = p_address_mode_w;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_mip_lod_bias(float p_mip_lod_bias) {
+SamplerDescVK& SamplerDescVK::set_mip_lod_bias(float p_mip_lod_bias) {
     mip_lod_bias = p_mip_lod_bias;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_anisotropy(VkBool32 p_anisotropy_enable, float p_max_anisotropy) {
+SamplerDescVK& SamplerDescVK::set_anisotropy(VkBool32 p_anisotropy_enable, float p_max_anisotropy) {
     anisotropy_enable = p_anisotropy_enable;
     max_anisotropy = p_max_anisotropy;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_anisotropy_enable(VkBool32 p_anisotropy_enable) {
+SamplerDescVK& SamplerDescVK::set_anisotropy_enable(VkBool32 p_anisotropy_enable) {
     anisotropy_enable = p_anisotropy_enable;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_max_anisotropy(float p_max_anisotropy) {
+SamplerDescVK& SamplerDescVK::set_max_anisotropy(float p_max_anisotropy) {
     max_anisotropy = p_max_anisotropy;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_compare(VkBool32 p_compare_enable, VkCompareOp p_compare_op) {
+SamplerDescVK& SamplerDescVK::set_compare(VkBool32 p_compare_enable, VkCompareOp p_compare_op) {
     compare_enable = p_compare_enable;
     compare_op = p_compare_op;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_compare_enable(VkBool32 p_compare_enable) {
+SamplerDescVK& SamplerDescVK::set_compare_enable(VkBool32 p_compare_enable) {
     compare_enable = p_compare_enable;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_compare_op(VkCompareOp p_compare_op) {
+SamplerDescVK& SamplerDescVK::set_compare_op(VkCompareOp p_compare_op) {
     compare_op = p_compare_op;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_lod_range(float p_min_lod, float p_max_lod) {
+SamplerDescVK& SamplerDescVK::set_lod_range(float p_min_lod, float p_max_lod) {
     min_lod = p_min_lod;
     max_lod = p_max_lod;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_min_lod(float p_min_lod) {
+SamplerDescVK& SamplerDescVK::set_min_lod(float p_min_lod) {
     min_lod = p_min_lod;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_max_lod(float p_max_lod) {
+SamplerDescVK& SamplerDescVK::set_max_lod(float p_max_lod) {
     max_lod = p_max_lod;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_border_color(VkBorderColor p_border_color) {
+SamplerDescVK& SamplerDescVK::set_border_color(VkBorderColor p_border_color) {
     border_color = p_border_color;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_unnormalized_coordinates(VkBool32 p_unnormalized_coordinates) {
+SamplerDescVK& SamplerDescVK::set_unnormalized_coordinates(VkBool32 p_unnormalized_coordinates) {
     unnormalized_coordinates = p_unnormalized_coordinates;
     return *this;
 }
 
-ROSamplerVK::Builder& ROSamplerVK::Builder::set_sampler_index(uint32_t p_index) {
+SamplerDescVK& SamplerDescVK::set_sampler_index(uint32_t p_index) {
     sampler_index = p_index;
     return *this;
 }
 
-VkSampler ROSamplerVK::Builder::create_vk_object(const BaseRenderDataVK* p_render_data) const {
+VkSampler SamplerDescVK::create_vk_object(const RenderContextVK* p_render_data) const {
     VkSamplerCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     create_info.magFilter = mag_filter;
@@ -187,7 +195,7 @@ VkSampler ROSamplerVK::Builder::create_vk_object(const BaseRenderDataVK* p_rende
     return result;
 }
 
-ROSamplerVK::ROSamplerVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
+ROSamplerVK::ROSamplerVK(const RenderContextVK* p_render_data, const Builder& p_builder) : IRenderObjectVK(p_render_data) {
     create_info = VkSamplerCreateInfo{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .magFilter = p_builder.mag_filter,
         .minFilter = p_builder.min_filter,

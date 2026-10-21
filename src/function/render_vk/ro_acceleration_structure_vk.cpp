@@ -21,7 +21,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_ro_ray_tracing_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
@@ -53,13 +53,12 @@ TypeID ROAccelerationStructureVK::get_type_uuid() const {
 }
 
 ROAccelerationStructureVK::ROAccelerationStructureVK(
-    const BaseRenderDataVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder)
+    const RenderContextVK* p_render_data, const BaseRayTracingDataVK* p_ray_tracing_data, const Builder& p_builder)
     : IRORayTracingVK(p_render_data, p_ray_tracing_data),
-      storage_buffer(ROBufferVK::Builder()
+      storage_buffer(p_render_data->create_buffer(ROBufferVK::Builder()
               .set_domain(DeviceDomain::DEVICE)
               .set_size(WBE_REQUIRED(p_builder.size))
-              .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
-              .create_ref(p_render_data)) {
+              .set_usage(VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT))) {
     WBE_DEBUG_ASSERT(ray_tracing_data != nullptr);
     WBE_DEBUG_ASSERT(ray_tracing_data->create_acceleration_structure != nullptr);
     WBE_DEBUG_ASSERT(ray_tracing_data->destroy_acceleration_structure != nullptr);

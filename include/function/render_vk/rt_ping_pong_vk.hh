@@ -23,7 +23,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_ping_pong_vk.hh"
 #include <cstdint>
@@ -59,7 +59,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ping_pong]) RTPingPongVK final :
      * @param p_dispatch_group_count Workgroup counts passed to vkCmdDispatch.
      * @param p_queue_family Queue used to submit the compute dispatch: GRAPHICS, COMPUTE_1, or COMPUTE_2.
      */
-    RTPingPongVK(const BaseRenderDataVK* p_render_data,
+    RTPingPongVK(const RenderContextVK* p_render_data,
         Ref<ROComputePipelineVK> p_ping_pipeline,
         Ref<ROComputePipelineVK> p_pong_pipeline,
         bool p_initial_state,
@@ -105,7 +105,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ping_pong]) RTPingPongVK final :
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -118,7 +118,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ping_pong]) RTPingPongVK final :
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> ping_pipeline;
     Ref<ROComputePipelineVK> pong_pipeline;

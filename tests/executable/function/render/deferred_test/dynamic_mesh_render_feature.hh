@@ -22,7 +22,7 @@
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
@@ -110,7 +110,7 @@ public:
         std::optional<std::string_view> p_depth = std::nullopt) const;
 
 private:
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     Ref<MeshResourcesVK> resources;
     std::vector<Unique<EntityDrawData>> entities;
     std::vector<std::string> entity_keys;

@@ -85,7 +85,7 @@ in-range declared integer.
 ## Render tasks
 
 A `WBE_RENDER_TASK` class declares
-`WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const TParams&, const RendGraphContextVK&)`,
+`WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const TParams&, const RendGraphContextVK&)`,
 where `TParams` is a strict, script-reflected params struct. The generated `render_task_registry.gen.cpp` implements
 `RenderTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
 `static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. The alias is the `type` name

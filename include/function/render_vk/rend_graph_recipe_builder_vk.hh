@@ -18,7 +18,7 @@
 #include "core/data/data_value.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <functional>
 #include <map>
 #include <string>
@@ -121,7 +121,7 @@ public:
      * not a map of strings, or it connects to an unknown task; or a task cannot be added (see
      * RenderTaskRegistryVK::add_task()). Messages name the recipe location, e.g. `tasks[2] 'gbuffer'`.
      */
-    RendGraphDescVK build(const DataValue& p_recipe, const RendGraphRecipeImportsVK& p_imports, const BaseRenderDataVK* p_render_data) const;
+    RendGraphDescVK build(const DataValue& p_recipe, const RendGraphRecipeImportsVK& p_imports, const RenderContextVK* p_render_data) const;
 };
 
 } // namespace WhiteBirdEngine

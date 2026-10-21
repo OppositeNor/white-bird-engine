@@ -23,7 +23,7 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -33,6 +33,116 @@
 
 namespace WhiteBirdEngine {
 
+class ROImageViewVK;
+
+/**
+ * @struct ImageViewDescVK
+ * @brief Image-view creation configuration and fluent builder.
+ *
+ * Copyable and movable; copies share the retained image reference and moves transfer it. Descriptor indices are adopted only
+ * when resource creation succeeds; descriptions do not own those indices.
+ */
+struct ImageViewDescVK {
+    friend ROImageViewVK;
+    /**
+     * @brief The image.
+     */
+    Ref<ROImageVK> image;
+    /**
+     * @brief Image view type.
+     */
+    Required<VkImageViewType> view_type;
+    /**
+     * @brief Image format.
+     */
+    Required<VkFormat> format;
+    /**
+     * @brief Component mapping.
+     */
+    VkComponentMapping components = {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .a = VK_COMPONENT_SWIZZLE_IDENTITY};
+    /**
+     * @brief Subresource range.
+     */
+    VkImageSubresourceRange subresource_range{
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
+    /**
+     * @brief Allocated sampled-image descriptor index adopted by the created image view.
+     */
+    std::optional<uint32_t> sampled_view_index;
+    /**
+     * @brief Allocated storage descriptor index adopted by the created resource.
+     */
+    std::optional<uint32_t> storage_view_index;
+
+    /**
+     * @brief Set the source image.
+     */
+    ImageViewDescVK& set_image(Ref<ROImageVK> p_image);
+    /**
+     * @brief Set the image view type.
+     */
+    ImageViewDescVK& set_view_type(VkImageViewType p_view_type);
+    /**
+     * @brief Set the image format.
+     */
+    ImageViewDescVK& set_format(VkFormat p_format);
+    /**
+     * @brief Set component mapping.
+     */
+    ImageViewDescVK& set_components(const VkComponentMapping& p_components);
+    /**
+     * @brief Set component mapping.
+     */
+    ImageViewDescVK& set_components(VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a);
+    /**
+     * @brief Set subresource range.
+     */
+    ImageViewDescVK& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
+    /**
+     * @brief Set aspect mask of the subresource range.
+     */
+    ImageViewDescVK& set_aspect_mask(VkImageAspectFlags p_aspect_mask);
+    /**
+     * @brief Set mip level count.
+     */
+    ImageViewDescVK& set_mip_level_count(uint32_t p_level_count);
+    /**
+     * @brief Set from image configurations. All features are default to match to
+     * the image config.
+     */
+    ImageViewDescVK& set_from_image_config(const ImageDescVK& p_image_config);
+    /**
+     * @brief Transfer an allocated sampled-image descriptor index to the created image view.
+     *
+     * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+     * release the index after construction succeeds.
+     */
+    ImageViewDescVK& set_sampled_view_index(uint32_t p_index);
+    /**
+     * @brief Transfer an allocated storage-image descriptor index to the created image view.
+     *
+     * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
+     * release the index after construction succeeds.
+     */
+    ImageViewDescVK& set_storage_view_index(uint32_t p_index);
+
+    /**
+     * @brief Create a copyable owning reference on the rendering thread using the renderer context.
+     */
+    Ref<ROImageViewVK> create_ref(const RenderContextVK* p_render_data) const;
+
+    /**
+     * @brief Create a move-only owner on the rendering thread using the renderer allocator.
+     */
+    Unique<ROImageViewVK> create_unique(const RenderContextVK* p_render_data) const;
+
+private:
+    VkImageView create_vk_object(const RenderContextVK* p_render_data) const;
+};
+
 /**
  * @class ROImageViewVK
  * @brief Vulkan image view object.
@@ -40,71 +150,10 @@ namespace WhiteBirdEngine {
  */
 class WBE_META(WBE_RENDER_OBJECT) ROImageViewVK final : public IRenderObjectVK, public IBindableRenderResourceVK {
 public:
-    // Builder for ROImageViewVK
-    struct Builder {
-        friend ROImageViewVK;
-        // The image.
-        Ref<ROImageVK> image;
-        // Image view type.
-        Required<VkImageViewType> view_type;
-        // Image format.
-        Required<VkFormat> format;
-        // Component mapping.
-        VkComponentMapping components = {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .a = VK_COMPONENT_SWIZZLE_IDENTITY};
-        // Subresource range.
-        VkImageSubresourceRange subresource_range{
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
-        std::optional<uint32_t> sampled_view_index;
-        std::optional<uint32_t> storage_view_index;
-
-        // Set the source image.
-        Builder& set_image(Ref<ROImageVK> p_image);
-        // Set the image view type.
-        Builder& set_view_type(VkImageViewType p_view_type);
-        // Set the image format.
-        Builder& set_format(VkFormat p_format);
-        // Set component mapping.
-        Builder& set_components(const VkComponentMapping& p_components);
-        // Set component mapping.
-        Builder& set_components(VkComponentSwizzle p_r, VkComponentSwizzle p_g, VkComponentSwizzle p_b, VkComponentSwizzle p_a);
-        // Set subresource range.
-        Builder& set_subresource_range(const VkImageSubresourceRange& p_subresource_range);
-        // Set aspect mask of the subresource range.
-        Builder& set_aspect_mask(VkImageAspectFlags p_aspect_mask);
-        // Set mip level count.
-        Builder& set_mip_level_count(uint32_t p_level_count);
-        // Set from image configurations. All features are default to match to
-        // the image config.
-        Builder& set_from_image_config(const ROImageVK::Builder& p_image_config);
-        /**
-         * @brief Transfer an allocated sampled-image descriptor index to the created image view.
-         *
-         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
-         * release the index after construction succeeds.
-         */
-        Builder& set_sampled_view_index(uint32_t p_index);
-        /**
-         * @brief Transfer an allocated storage-image descriptor index to the created image view.
-         *
-         * The created resource writes the descriptor and becomes responsible for releasing the index. The caller must not
-         * release the index after construction succeeds.
-         */
-        Builder& set_storage_view_index(uint32_t p_index);
-
-        Ref<ROImageViewVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROImageViewVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROImageViewVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-    private:
-        VkImageView create_vk_object(const BaseRenderDataVK* p_render_data) const;
-    };
+    /**
+     * @brief Compatibility name for ImageViewDescVK.
+     */
+    using Builder = ImageViewDescVK;
 
     struct AttachmentBuilder {
         // The image view to use as the attachment.
@@ -298,10 +347,10 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_render_data The base render data.
+     * @param p_render_data The renderer-owned context.
      * @param p_builder Configuration builder.
      */
-    ROImageViewVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROImageViewVK(const RenderContextVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the image view instance.

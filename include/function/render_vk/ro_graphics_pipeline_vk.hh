@@ -22,7 +22,7 @@
 #include "function/render/material_texture_contract.hh"
 #include "function/render/mesh_node_contract.hh"
 #include "function/render/vertex_input_requirement.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
@@ -36,6 +36,8 @@
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
+
+struct GraphicsPipelineDescVK;
 
 /**
  * @class ROGraphicsPipelineVK
@@ -681,81 +683,9 @@ public:
     };
 
     /**
-     * @class Builder
-     * @brief Builder for graphics pipeline render object.
+     * @brief Compatibility name for the resource creation description.
      */
-    struct Builder {
-        friend ROGraphicsPipelineVK;
-        friend GraphicsPipelineCompilerVK;
-
-        // Graphics pipeline configuration payload.
-        Config config{};
-
-        /**
-         * @brief Set the full graphics pipeline config by copy.
-         *
-         * @param p_config The configuration to copy into this builder.
-         * @return *this.
-         */
-        Builder& set_config(const Config& p_config) {
-            config = p_config;
-            return *this;
-        }
-
-        /**
-         * @brief Set the full graphics pipeline config by move.
-         *
-         * @param p_config The configuration to move into this builder.
-         * @return *this.
-         */
-        Builder& set_config(Config&& p_config) {
-            config = std::move(p_config);
-            return *this;
-        }
-
-        /**
-         * @brief Apply default opaque-rendering pipeline configuration.
-         *
-         * This helper configures empty static vertex input, viewport/scissor
-         * from render data, undefined depth/stencil formats, and dynamic vertex
-         * input state. Color formats and blend attachments must be added
-         * explicitly by the caller.
-         *
-         * @param p_render_data Base render data for viewport/scissor defaults.
-         * @param p_shader_config Shader stage configuration.
-         * @return *this.
-         */
-        Builder& default_render_opaque_configuration(const BaseRenderDataVK* p_render_data, const Config::ShaderConfig& p_shader_config) {
-
-            config.shader = p_shader_config;
-            config.vertex_input = {};
-            config.viewport.viewports = {p_render_data->viewport};
-            config.viewport.scissors = {p_render_data->scissor};
-            config.attachment_config.set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
-            config.dynamic_state.add_default_dynamic_states().add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
-            return *this;
-        }
-
-        /**
-         * @brief Create a reference-counted graphics pipeline object.
-         *
-         * @param p_render_data Base render data.
-         * @return Reference-counted graphics pipeline object.
-         */
-        Ref<ROGraphicsPipelineVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        /**
-         * @brief Create a unique-ownership graphics pipeline object.
-         *
-         * @param p_render_data Base render data.
-         * @return Unique-ownership graphics pipeline object.
-         */
-        Unique<ROGraphicsPipelineVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROGraphicsPipelineVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
+    using Builder = GraphicsPipelineDescVK;
 
     ~ROGraphicsPipelineVK();
     ROGraphicsPipelineVK(const ROGraphicsPipelineVK&) = delete;
@@ -772,7 +702,7 @@ public:
      *
      * @param p_builder The builder instance.
      */
-    ROGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROGraphicsPipelineVK(const RenderContextVK* p_render_data, const Builder& p_builder);
 
     /**
      * @brief Get the configurations of the graphics pipeline.
@@ -873,6 +803,85 @@ private:
     static VkPipelineShaderStageCreateInfo get_shader_stage_create_info(
         VkShaderStageFlagBits p_stage_flag, const Config::ShaderConfig::ShaderStage& p_stage);
 };
+
+/**
+ * @struct GraphicsPipelineDescVK
+ * @brief Resource creation description; copyable and movable.
+ * Copying duplicates configuration containers and retains shader references; moving transfers the configuration.
+ */
+struct GraphicsPipelineDescVK {
+    /**
+     * @brief Graphics pipeline configuration type.
+     */
+    using Config = ROGraphicsPipelineVK::Config;
+    friend ROGraphicsPipelineVK;
+    friend GraphicsPipelineCompilerVK;
+
+    // Graphics pipeline configuration payload.
+    Config config{};
+
+    /**
+     * @brief Set the full graphics pipeline config by copy.
+     *
+     * @param p_config The configuration to copy into this builder.
+     * @return *this.
+     */
+    GraphicsPipelineDescVK& set_config(const Config& p_config) {
+        config = p_config;
+        return *this;
+    }
+
+    /**
+     * @brief Set the full graphics pipeline config by move.
+     *
+     * @param p_config The configuration to move into this builder.
+     * @return *this.
+     */
+    GraphicsPipelineDescVK& set_config(Config&& p_config) {
+        config = std::move(p_config);
+        return *this;
+    }
+
+    /**
+     * @brief Apply default opaque-rendering pipeline configuration.
+     *
+     * This helper configures empty static vertex input, viewport/scissor
+     * from render data, undefined depth/stencil formats, and dynamic vertex
+     * input state. Color formats and blend attachments must be added
+     * explicitly by the caller.
+     *
+     * @param p_render_data Base render data for viewport/scissor defaults.
+     * @param p_shader_config Shader stage configuration.
+     * @return *this.
+     */
+    GraphicsPipelineDescVK& default_render_opaque_configuration(const RenderContextVK* p_render_data, const Config::ShaderConfig& p_shader_config) {
+
+        config.shader = p_shader_config;
+        config.vertex_input = {};
+        config.viewport.viewports = {p_render_data->viewport};
+        config.viewport.scissors = {p_render_data->scissor};
+        config.attachment_config.set_depth_format(VK_FORMAT_UNDEFINED).set_stencil_format(VK_FORMAT_UNDEFINED);
+        config.dynamic_state.add_default_dynamic_states().add_dynamic_state(VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);
+        return *this;
+    }
+
+    /**
+     * @brief Create a reference-counted graphics pipeline object.
+     *
+     * @param p_render_context Renderer-owned resource creation context.
+     * @return Reference-counted graphics pipeline object.
+     */
+    Ref<ROGraphicsPipelineVK> create_ref(const RenderContextVK* p_render_context) const;
+
+    /**
+     * @brief Create a unique-ownership graphics pipeline object.
+     *
+     * @param p_render_context Renderer-owned resource creation context.
+     * @return Unique-ownership graphics pipeline object.
+     */
+    Unique<ROGraphicsPipelineVK> create_unique(const RenderContextVK* p_render_context) const;
+};
+
 } // namespace WhiteBirdEngine
 
 #endif

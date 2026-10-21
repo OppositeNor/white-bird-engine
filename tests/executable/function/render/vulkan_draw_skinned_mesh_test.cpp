@@ -27,7 +27,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
@@ -211,7 +211,7 @@ public:
 
     virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
         imgui_overlay->begin_frame(p_delta);
         draw_blend_window();
         imgui_overlay->end_frame();
@@ -233,7 +233,7 @@ public:
     void setup_render_graph() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+        const auto* render_context = renderer->get_render_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
         imgui_overlay = WBE::make_unique<WBE::ImGuiOverlayVK>(WBE::global_allocator(), renderer);
 
@@ -273,16 +273,16 @@ public:
         }
         WBE::GraphicsPipelineCompilerVKContext compiler_context{
             .allocator = render_allocator,
-            .render_data = base_render_data,
+            .render_data = render_context,
             .render_database = renderer->get_render_database(),
             .renderer = renderer,
-            .color_attachment_formats = {base_render_data->swap_chain_format},
+            .color_attachment_formats = {render_context->swap_chain_format},
         };
         auto graphics_pipeline =
             WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_skinned_mesh_pipeline", pipeline_resource).graphics_pipeline;
         CameraInfoGPU camera_info{
             .view = glm::lookAt(glm::vec3(0.0F, 1.0F, 4.5F), glm::vec3(0.0F, 1.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
-            .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), base_render_data->swap_chain_aspect_ratio, 10.0F, 0.1F),
+            .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), render_context->swap_chain_aspect_ratio, 10.0F, 0.1F),
             .world_position = glm::vec4(0.0F, 1.0F, 4.5F, 1.0F),
         };
         // Inverse the y value since Vulkan makes y axis points downwards.
@@ -297,7 +297,7 @@ public:
             [this,
                 render_allocator,
                 renderer,
-                base_render_data,
+                render_context,
                 mesh,
                 submesh = &submesh,
                 shader_resource,
@@ -343,15 +343,15 @@ public:
                         draw_buffers.index_buffer_id,
                         draw_buffers.vertex_input,
                         draw_buffers.indexed_draw_region)
-                    .create_unique(base_render_data);
+                    .create_unique(render_context);
             };
             graph_desc.add_task(std::move(draw_task_desc));
 
             WBE::RendTaskDescVK imgui_task_desc(render_allocator);
             imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
             imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-            imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+            imgui_task_desc.factory = [this, render_allocator, render_context](const WBE::RendGraphContextVK& /*p_context*/) {
+                return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
             };
             graph_desc.add_task(std::move(imgui_task_desc));
             WBE::connect_resource_chain(graph_desc, WBE::REND_RES_SWAP_CHAIN, {RT_DRAW_SKINNED_MESH, RT_DRAW_SKINNED_MESH_IMGUI});

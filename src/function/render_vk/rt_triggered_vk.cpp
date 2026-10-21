@@ -19,7 +19,7 @@
 #include "function/event/event_manager.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include <atomic>
@@ -57,7 +57,7 @@ RTTriggeredVK::RTTriggeredVK(Unique<IRenderTaskVK> p_task, const char* p_event_i
 }
 
 RendTaskFactoryVK RTTriggeredVK::wrap_factory(
-    RendTaskFactoryVK p_factory, std::string p_event_id, const BaseRenderDataVK* p_render_data, bool p_activate) {
+    RendTaskFactoryVK p_factory, std::string p_event_id, const RenderContextVK* p_render_data, bool p_activate) {
     if (!p_factory) {
         throw std::runtime_error("RTTriggeredVK: the wrapped task factory is empty.");
     }

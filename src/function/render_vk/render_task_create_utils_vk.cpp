@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_database.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
@@ -36,7 +36,7 @@ namespace {
 
 template <typename TPipeline>
 Ref<TPipeline> acquire_task_pipeline(
-    const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key, std::string_view p_kind) {
+    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key, std::string_view p_kind) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error(std::format("{}: render data is unavailable.", p_task_name));
     }
@@ -54,12 +54,12 @@ Ref<TPipeline> acquire_task_pipeline(
 } // namespace
 
 Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
-    const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
+    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
     return acquire_task_pipeline<ROComputePipelineVK>(p_render_data, p_task_name, p_pipeline_key, "compute");
 }
 
 Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
-    const BaseRenderDataVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
+    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
     return acquire_task_pipeline<ROGraphicsPipelineVK>(p_render_data, p_task_name, p_pipeline_key, "graphics");
 }
 

@@ -86,7 +86,7 @@ public:
     void record(VkCommandBuffer p_command_buffer);
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     VkFormat color_format = VK_FORMAT_UNDEFINED;
     std::mutex event_mutex;
     Vector<SDL_Event, HeapAllocatorGlobal> pending_events;

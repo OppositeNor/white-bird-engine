@@ -20,7 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -32,6 +32,100 @@
 #include <utility>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
+
+class ROStagingBufferVK;
+
+/**
+ * @struct StagingBufferDescVK
+ * @brief Resource creation description; copyable and movable.
+ * Copying duplicates the queue-family set; moving transfers it. The description owns no Vulkan resources.
+ */
+struct StagingBufferDescVK {
+    friend ROStagingBufferVK;
+
+    // The size of the buffer.
+    size_t size = WBE_KI_B(4UL);
+    // The usage of the buffer.
+    Required<VkBufferUsageFlags> usage;
+    // Queue families this buffer is going to be used across. Either this
+    // size is 1 or is empty will make the buffer created in exclusive
+    // sharing mode, otherwise it will be created in concurrent sharing
+    // mode.
+    std::set<uint32_t> queue_family_indices;
+
+    /**
+     * @brief Set the size of the buffer.
+     *
+     * @param p_size The size to be set to.
+     * @return *this.
+     */
+    StagingBufferDescVK& set_size(size_t p_size) {
+        size = p_size;
+        return *this;
+    }
+
+    /**
+     * @brief Set the usage of this buffer.
+     *
+     * @param p_usage The usage of this buffer.
+     * @return *this.
+     */
+    StagingBufferDescVK& set_usage(VkBufferUsageFlags p_usage) {
+        usage = p_usage;
+        return *this;
+    }
+
+    /**
+     * @brief Add usage to this buffer.
+     *
+     * @param p_usage The usage to be added to this buffer.
+     * @return *this.
+     */
+    StagingBufferDescVK& add_usage(VkBufferUsageFlags p_usage) {
+        if (usage.has_value()) {
+            *usage |= p_usage;
+        } else {
+            usage = p_usage;
+        }
+        return *this;
+    }
+
+    /**
+     * @brief Set the queue families that may use this buffer.
+     *
+     * @param p_queue_family_indices The queue family indices that might use
+     * this buffer.
+     * @return *this.
+     */
+    StagingBufferDescVK& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
+        queue_family_indices = p_queue_family_indices;
+        return *this;
+    }
+
+    /**
+     * @brief Set the queue families that may use this buffer.
+     *
+     * @param p_queue_family_indices The queue family indices that might use
+     * this buffer.
+     * @return *this.
+     */
+    StagingBufferDescVK& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
+        queue_family_indices = std::move(p_queue_family_indices);
+        return *this;
+    }
+
+    /**
+     * @brief Create a reference-counted resource on the rendering thread.
+     * @param p_render_context Context that outlives the created resource.
+     */
+    Ref<ROStagingBufferVK> create_ref(const RenderContextVK* p_render_context) const;
+
+    /**
+     * @brief Create a uniquely owned resource on the rendering thread.
+     * @param p_render_context Context that outlives the created resource.
+     */
+    Unique<ROStagingBufferVK> create_unique(const RenderContextVK* p_render_context) const;
+};
 
 class WBE_META(WBE_RENDER_OBJECT) ROStagingBufferVK final : public IRenderObjectVK {
     friend class ROBufferVK;
@@ -61,94 +155,11 @@ public:
     };
 
     /**
-     * @class Builder
-     * @brief The builder object for ROStagingBufferVK.
-     *
+     * @brief Compatibility name for the resource creation description.
      */
-    struct Builder {
-        friend ROStagingBufferVK;
+    using Builder = StagingBufferDescVK;
 
-        // The size of the buffer.
-        size_t size = WBE_KI_B(4UL);
-        // The usage of the buffer.
-        Required<VkBufferUsageFlags> usage;
-        // Queue families this buffer is going to be used across. Either this
-        // size is 1 or is empty will make the buffer created in exclusive
-        // sharing mode, otherwise it will be created in concurrent sharing
-        // mode.
-        std::set<uint32_t> queue_family_indices;
-
-        /**
-         * @brief Set the size of the buffer.
-         *
-         * @param p_size The size to be set to.
-         * @return *this.
-         */
-        Builder& set_size(size_t p_size) {
-            size = p_size;
-            return *this;
-        }
-
-        /**
-         * @brief Set the usage of this buffer.
-         *
-         * @param p_usage The usage of this buffer.
-         * @return *this.
-         */
-        Builder& set_usage(VkBufferUsageFlags p_usage) {
-            usage = p_usage;
-            return *this;
-        }
-
-        /**
-         * @brief Add usage to this buffer.
-         *
-         * @param p_usage The usage to be added to this buffer.
-         * @return *this.
-         */
-        Builder& add_usage(VkBufferUsageFlags p_usage) {
-            if (usage.has_value()) {
-                *usage |= p_usage;
-            } else {
-                usage = p_usage;
-            }
-            return *this;
-        }
-
-        /**
-         * @brief Set the queue families that may use this buffer.
-         *
-         * @param p_queue_family_indices The queue family indices that might use
-         * this buffer.
-         * @return *this.
-         */
-        Builder& set_queue_family_indices(const std::set<uint32_t>& p_queue_family_indices) {
-            queue_family_indices = p_queue_family_indices;
-            return *this;
-        }
-
-        /**
-         * @brief Set the queue families that may use this buffer.
-         *
-         * @param p_queue_family_indices The queue family indices that might use
-         * this buffer.
-         * @return *this.
-         */
-        Builder& set_queue_family_indices(std::set<uint32_t>&& p_queue_family_indices) {
-            queue_family_indices = std::move(p_queue_family_indices);
-            return *this;
-        }
-
-        Ref<ROStagingBufferVK> create_ref(const BaseRenderDataVK* p_render_data) const {
-            return make_ref<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-
-        Unique<ROStagingBufferVK> create_unique(const BaseRenderDataVK* p_render_data) const {
-            return make_unique<ROStagingBufferVK>(p_render_data->allocator, p_render_data, *this);
-        }
-    };
-
-    ROStagingBufferVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder);
+    ROStagingBufferVK(const RenderContextVK* p_render_data, const Builder& p_builder);
     virtual ~ROStagingBufferVK() override;
     ROStagingBufferVK(const ROStagingBufferVK&) = delete;
     ROStagingBufferVK(ROStagingBufferVK&&) noexcept = delete;

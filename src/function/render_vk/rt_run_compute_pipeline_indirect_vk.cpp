@@ -24,7 +24,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipeline_indirect_vk.hh"
@@ -38,7 +38,7 @@
 
 namespace WhiteBirdEngine {
 
-RTRunComputePipelineIndirectVK::RTRunComputePipelineIndirectVK(const BaseRenderDataVK* p_render_data,
+RTRunComputePipelineIndirectVK::RTRunComputePipelineIndirectVK(const RenderContextVK* p_render_data,
     Ref<ROComputePipelineVK> p_pipeline,
     std::string_view p_indirect_buffer_id,
     VkDeviceSize p_indirect_offset,
@@ -85,7 +85,7 @@ void RTRunComputePipelineIndirectVK::set_push_constant(std::string_view p_name, 
 }
 
 Unique<IRenderTaskVK> RTRunComputePipelineIndirectVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
     Ref<ROComputePipelineVK> pipeline =
         acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineIndirectVK", p_params.pipeline);
     const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};

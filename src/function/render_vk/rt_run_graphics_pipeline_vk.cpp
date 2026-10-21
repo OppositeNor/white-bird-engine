@@ -25,7 +25,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
@@ -104,7 +104,7 @@ RTRunGraphicsPipelineVK::Builder& RTRunGraphicsPipelineVK::Builder::set_draw_ver
     return *this;
 }
 
-Unique<RTRunGraphicsPipelineVK> RTRunGraphicsPipelineVK::Builder::create_unique(const BaseRenderDataVK* p_render_data) const {
+Unique<RTRunGraphicsPipelineVK> RTRunGraphicsPipelineVK::Builder::create_unique(const RenderContextVK* p_render_data) const {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineVK::Builder: render data is missing.");
     }
@@ -122,7 +122,7 @@ const ROGraphicsPipelineVK& require_pipeline(const Ref<ROGraphicsPipelineVK>& p_
 
 } // namespace
 
-RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const BaseRenderDataVK* p_render_data, const Builder& p_builder)
+RTRunGraphicsPipelineVK::RTRunGraphicsPipelineVK(const RenderContextVK* p_render_data, const Builder& p_builder)
     : render_data(p_render_data), render_extent(p_builder.render_extent), graphics_pipeline(p_builder.pipeline),
       render_targets(p_render_data->allocator,
           require_pipeline(p_builder.pipeline),
@@ -223,7 +223,7 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
 }
 
 Unique<IRenderTaskVK> RTRunGraphicsPipelineVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context) {
     Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, "RTRunGraphicsPipelineVK", p_params.pipeline);
     std::vector<VkClearValue> clear_values;
     clear_values.reserve(p_params.clear_values.size());

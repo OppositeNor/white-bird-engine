@@ -29,7 +29,7 @@
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -139,7 +139,7 @@ std::string descriptor_type_name(const DebugData& p_row) {
     return p_row.get_value<std::string>("descriptor_type");
 }
 
-VkQueue queue_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_queue_family) {
+VkQueue queue_for(const RenderContextVK* p_render_data, QueueFamilyVK p_queue_family) {
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return p_render_data->graphics_queue;
@@ -151,7 +151,7 @@ VkQueue queue_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_queue_f
     return VK_NULL_HANDLE;
 }
 
-VkCommandPool pool_for(const BaseRenderDataVK* p_render_data, QueueFamilyVK p_queue_family) {
+VkCommandPool pool_for(const RenderContextVK* p_render_data, QueueFamilyVK p_queue_family) {
     switch (p_queue_family) {
     case QueueFamilyVK::GRAPHICS:
         return p_render_data->graphics_command_pool;
@@ -345,22 +345,7 @@ ROSamplerVK::Builder make_sampler_builder(const RendSamplerDescVK& p_desc) {
     return builder;
 }
 
-bool is_depth_format(VkFormat p_format) {
-    switch (p_format) {
-    case VK_FORMAT_D16_UNORM:
-    case VK_FORMAT_X8_D24_UNORM_PACK32:
-    case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_D16_UNORM_S8_UINT:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    default:
-        return false;
-    }
-}
-
-Ref<ROImageViewVK> make_image_view(const BaseRenderDataVK* p_render_data,
-    Ref<ROImageVK> p_image,
+Ref<ROImageViewVK> make_image_view(Ref<ROImageVK> p_image,
     std::string_view p_view_id,
     std::string_view p_image_id,
     const RendImageViewDescVK& p_desc) {
@@ -379,19 +364,14 @@ Ref<ROImageViewVK> make_image_view(const BaseRenderDataVK* p_render_data,
         throw std::runtime_error(
             std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_id, p_image_id));
     }
-    const VkFormat format = desc.format.value_or(image.format);
-    return ROImageViewVK::Builder()
-        .set_image(p_image)
-        .set_view_type(desc.view_type.value_or(image.view_type))
-        .set_format(format)
-        .set_subresource_range(VkImageSubresourceRange{
-            .aspectMask = desc.aspect_mask.value_or(is_depth_format(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT),
+    return p_image->get_image_view_ref(desc.view_type.value_or(image.view_type),
+        desc.format.value_or(image.format),
+        VkImageSubresourceRange{.aspectMask = desc.aspect_mask.value_or(0),
             .baseMipLevel = desc.base_mip_level,
             .levelCount = mip_level_count,
             .baseArrayLayer = desc.base_array_layer,
-            .layerCount = layer_count,
-        })
-        .create_ref(p_render_data);
+            .layerCount = layer_count},
+        VkComponentMapping{});
 }
 
 // Configuration errors are reported before any container is constructed or recreated, so that a failed graph build
@@ -427,7 +407,7 @@ void validate_image_desc(std::string_view p_resource_id, const RendImageDescVK& 
     static_cast<void>(image_usage_flags(p_desc.usage, p_resource_id));
 }
 
-Ref<IRenderObjectVK> make_buffer(const BaseRenderDataVK* p_render_data, std::string_view p_resource_id, const RendBufferDescVK& p_desc) {
+Ref<IRenderObjectVK> make_buffer(const RenderContextVK* p_render_data, std::string_view p_resource_id, const RendBufferDescVK& p_desc) {
     WBE_DEBUG_ASSERT(p_desc.size != 0 || !p_desc.initial_data.empty());
     const size_t size = p_desc.size == 0 ? p_desc.initial_data.size() : p_desc.size;
     ROBufferVK::Builder builder;
@@ -435,10 +415,10 @@ Ref<IRenderObjectVK> make_buffer(const BaseRenderDataVK* p_render_data, std::str
         builder.initial_data(p_desc.initial_data, p_desc.domain);
     }
     builder.set_size(size).set_domain(p_desc.domain).add_usage(buffer_usage_flags(p_desc.usage, p_resource_id) | p_desc.additional_usage);
-    return builder.create_ref(p_render_data);
+    return p_render_data->create_buffer(builder);
 }
 
-Ref<IRenderObjectVK> make_image(const BaseRenderDataVK* p_render_data, std::string_view p_resource_id, const RendImageDescVK& p_desc) {
+Ref<IRenderObjectVK> make_image(const RenderContextVK* p_render_data, std::string_view p_resource_id, const RendImageDescVK& p_desc) {
     WBE_DEBUG_ASSERT(p_desc.format != VK_FORMAT_UNDEFINED);
     ROImageVK::Builder builder;
     builder.set_image_type(p_desc.image_type)
@@ -447,7 +427,7 @@ Ref<IRenderObjectVK> make_image(const BaseRenderDataVK* p_render_data, std::stri
         .set_mipmap_level(p_desc.mip_levels)
         .set_layers(p_desc.layers)
         .set_usage(image_usage_flags(p_desc.usage, p_resource_id) | p_desc.additional_usage);
-    return builder.create_ref(p_render_data);
+    return p_render_data->create_image(builder);
 }
 
 uint32_t container_slot_count(const RenderObjectContainerVK& p_container) {
@@ -566,7 +546,7 @@ struct RenderGraphVK::RebuildState {
     Vector<RendSubgraphVK, RenderAllocator> subgraphs;
 };
 
-RenderGraphVK::RenderGraphVK(const BaseRenderDataVK* p_render_data, std::string_view p_resource_key)
+RenderGraphVK::RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key)
     : render_data(p_render_data), resource_key(p_resource_key), nodes(p_render_data->allocator), resource_edges(p_render_data->allocator),
       all_resources(p_render_data->allocator),
       rebuild_state(make_unique<RebuildState>(p_render_data->allocator, p_render_data->allocator)),
@@ -1008,10 +988,10 @@ Ref<IRenderObjectVK> RenderGraphVK::create_owned_object(std::string_view p_resou
         WBE_DEBUG_ASSERT(image_resource != all_resources.end() && image_resource->second->container != MEM_NULL);
         Ref<ROImageVK> image = image_resource->second->container->get(p_slot).dynamic_cast_ref<ROImageVK>();
         WBE_DEBUG_ASSERT(image != MEM_NULL);
-        return make_image_view(render_data, image, p_resource_id, resource.image_id, std::get<RendImageViewDescVK>(resource.desc));
+        return make_image_view(image, p_resource_id, resource.image_id, std::get<RendImageViewDescVK>(resource.desc));
     }
     case RendResKindVK::SAMPLER:
-        return make_sampler_builder(std::get<RendSamplerDescVK>(resource.desc)).create_ref(render_data);
+        return render_data->create_sampler(make_sampler_builder(std::get<RendSamplerDescVK>(resource.desc)));
     case RendResKindVK::IMPORT:
         break;
     }

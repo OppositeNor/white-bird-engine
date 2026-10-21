@@ -30,7 +30,7 @@
 #include "function/render/material_texture_contract.hh"
 #include "function/render/mesh_node_contract.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <utility>
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
@@ -122,7 +122,7 @@ public:
      * @brief Construct empty mesh resource storage owned by the render data's allocator.
      * @throws std::runtime_error If p_render_data or its allocator is null.
      */
-    explicit MeshResourcesVK(const BaseRenderDataVK* p_render_data);
+    explicit MeshResourcesVK(const RenderContextVK* p_render_data);
 
     virtual TypeID get_type_uuid() const override;
 

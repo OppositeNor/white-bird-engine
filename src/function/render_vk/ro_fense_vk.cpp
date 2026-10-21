@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_fense_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <format>
@@ -23,7 +23,7 @@
 
 namespace WhiteBirdEngine {
 
-ROFenseVK::ROFenseVK(const BaseRenderDataVK* p_render_data, bool p_signaled) : render_data(p_render_data) {
+ROFenseVK::ROFenseVK(const RenderContextVK* p_render_data, bool p_signaled) : render_data(p_render_data) {
     WBE_DEBUG_ASSERT(p_render_data != nullptr);
     VkFenceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;

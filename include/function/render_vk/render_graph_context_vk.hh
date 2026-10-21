@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RENDER_GRAPH_CONTEXT_VK_HH
 #define WBE_FILE_RENDER_GRAPH_CONTEXT_VK_HH
 
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -36,7 +36,7 @@ struct RendGraphContextVK {
      * @param p_render_data The base render data.
      * @return The context describing p_render_data.
      */
-    static RendGraphContextVK from_render_data(const BaseRenderDataVK& p_render_data);
+    static RendGraphContextVK from_render_data(const RenderContextVK& p_render_data);
 
     /**
      * @brief Compare two contexts.

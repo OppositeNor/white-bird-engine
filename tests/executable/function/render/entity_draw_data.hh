@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include <string_view>
@@ -49,7 +49,7 @@ public:
      * @brief Place p_mesh at the identity transform.
      * @throws std::runtime_error If p_render_data or p_mesh is null.
      */
-    EntityDrawData(const BaseRenderDataVK* p_render_data, Ref<MeshResourcesVK> p_mesh);
+    EntityDrawData(const RenderContextVK* p_render_data, Ref<MeshResourcesVK> p_mesh);
 
     /** @brief Acquire the drawn mesh. */
     Ref<MeshResourcesVK> acquire_mesh() const {

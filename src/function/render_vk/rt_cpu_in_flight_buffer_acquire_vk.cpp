@@ -23,7 +23,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -38,7 +38,7 @@
 
 namespace WhiteBirdEngine {
 
-RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const BaseRenderDataVK* p_render_data, std::string_view p_buffer_id)
+RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const RenderContextVK* p_render_data, std::string_view p_buffer_id)
     : render_data(p_render_data), buffer_id(p_buffer_id), event_manager(EventManager::get_singleton()) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
@@ -52,7 +52,7 @@ RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const BaseRenderDataV
 }
 
 Unique<IRenderTaskVK> RTCPUInFlightBufferAcquireVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsCPUInFlightBufferAcquireVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, const RTParamsCPUInFlightBufferAcquireVK& p_params, const RendGraphContextVK& /*p_context*/) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
     }
@@ -85,7 +85,7 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
 
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(buffer_size);
     Ref<ROStagingBufferVK> staging_buffer =
-        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT).create_ref(render_data);
+        render_data->create_staging_buffer(ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT));
     const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(buffer_size);
     const VkBufferCopy copy_region{
         .srcOffset = 0,

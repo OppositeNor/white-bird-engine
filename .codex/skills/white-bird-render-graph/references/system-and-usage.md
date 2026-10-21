@@ -59,7 +59,7 @@ task_desc.factory = [=](const RendGraphContextVK& p_context) {
     return RTRunGraphicsPipelineVK::Builder(render_allocator)
         .set_pipeline(lighting_pipeline)
         .set_render_extent(p_context.swap_chain_extent)
-        .create_unique(base_render_data);
+        .create_unique(render_context);
 };
 graph_desc.get_task("run_shadow").connect("run_lighting", "shadow_depth");
 graph_desc.add_task(std::move(task_desc));

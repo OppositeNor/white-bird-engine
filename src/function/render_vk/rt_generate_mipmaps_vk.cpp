@@ -23,7 +23,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_params_generate_mipmaps_vk.hh"
@@ -39,7 +39,7 @@
 
 namespace WhiteBirdEngine {
 
-RTGenerateMipmapsVK::RTGenerateMipmapsVK(const BaseRenderDataVK* p_render_data,
+RTGenerateMipmapsVK::RTGenerateMipmapsVK(const RenderContextVK* p_render_data,
     std::string_view p_source_view_id,
     std::string_view p_mip_chain_view_id,
     VkExtent2D p_base_extent,
@@ -177,7 +177,7 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
 }
 
 Unique<IRenderTaskVK> RTGenerateMipmapsVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsGenerateMipmapsVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, const RTParamsGenerateMipmapsVK& p_params, const RendGraphContextVK& p_context) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTGenerateMipmapsVK: render data is unavailable.");
     }

@@ -15,7 +15,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_max_downsample_vk.hh"
 #include "utils/defs.hh"
@@ -34,7 +34,7 @@ TEST(WBERTMaxDownsampleVKTest, RejectsMissingRenderData) {
 
 TEST(WBERTMaxDownsampleVKTest, RejectsFewerThanTwoMipViews) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const std::array<std::string, 1> mip_view_ids{"mip_0"};
 
     EXPECT_THROW(RTMaxDownsampleVK(&render_data, MEM_NULL, mip_view_ids), std::runtime_error);
@@ -42,7 +42,7 @@ TEST(WBERTMaxDownsampleVKTest, RejectsFewerThanTwoMipViews) {
 
 TEST(WBERTMaxDownsampleVKTest, RejectsEmptyMipViewId) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const std::array<std::string, 3> mip_view_ids{"mip_0", "", "mip_2"};
 
     EXPECT_THROW(RTMaxDownsampleVK(&render_data, MEM_NULL, mip_view_ids), std::runtime_error);
@@ -50,7 +50,7 @@ TEST(WBERTMaxDownsampleVKTest, RejectsEmptyMipViewId) {
 
 TEST(WBERTMaxDownsampleVKTest, RejectsRepeatedMipViewId) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const std::array<std::string, 3> mip_view_ids{"mip_0", "mip_1", "mip_0"};
 
     EXPECT_THROW(RTMaxDownsampleVK(&render_data, MEM_NULL, mip_view_ids), std::runtime_error);
@@ -58,7 +58,7 @@ TEST(WBERTMaxDownsampleVKTest, RejectsRepeatedMipViewId) {
 
 TEST(WBERTMaxDownsampleVKTest, RejectsNullPipeline) {
     RenderAllocator allocator(WBE_KI_B(64));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     const std::array<std::string, 2> mip_view_ids{"mip_0", "mip_1"};
 
     EXPECT_THROW(RTMaxDownsampleVK(&render_data, MEM_NULL, mip_view_ids), std::runtime_error);

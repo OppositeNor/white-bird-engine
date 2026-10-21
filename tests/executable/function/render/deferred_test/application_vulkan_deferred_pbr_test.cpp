@@ -34,7 +34,7 @@
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -114,12 +114,12 @@ void update_spot_light_view(ComponentSpotLight& p_spot_light_component) {
 
 // Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
 Ref<ROCMultislotsVK> create_per_frame_buffers(
-    RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
+    RenderAllocator* p_allocator, const RenderContextVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
     return make_ref<ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
         [p_render_data, key = std::string(p_key), p_buffer_size, p_usage](uint32_t p_frame_slot) -> Ref<IRenderObjectVK> {
-            Ref<ROBufferVK> buffer = ROBufferVK::Builder().set_properties(p_buffer_size, p_usage).create_ref(p_render_data);
+            Ref<ROBufferVK> buffer = p_render_data->create_buffer(ROBufferVK::Builder().set_properties(p_buffer_size, p_usage));
             p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
             return buffer;
         });
@@ -339,10 +339,10 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
         std::filesystem::create_directories(output_directory);
         const auto timestamp =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        const Path output_path = output_directory / std::format("deferred_{}_frame_{}.png", timestamp, base_render_data->current_frame);
+        const Path output_path = output_directory / std::format("deferred_{}_frame_{}.png", timestamp, render_context->current_frame);
         renderer_vk->request_frame_capture(output_path.string());
     } else {
-        capturing_frame = WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+        capturing_frame = WBE::on_exec_test_render(*renderer_vk, render_context->current_frame);
     }
     imgui_overlay->begin_frame(p_delta);
     if (!capturing_frame) {
@@ -378,7 +378,7 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
 }
 
 void ApplicationVulkanDeferredPBRTest::start_frame_sequence() {
-    const VkFormat format = base_render_data->swap_chain_format;
+    const VkFormat format = render_context->swap_chain_format;
     if (format != VK_FORMAT_B8G8R8A8_SRGB && format != VK_FORMAT_B8G8R8A8_UNORM && format != VK_FORMAT_R8G8B8A8_SRGB &&
         format != VK_FORMAT_R8G8B8A8_UNORM) {
         throw std::runtime_error("Frame sequence capture supports only RGBA8 and BGRA8 swap-chain formats.");
@@ -397,7 +397,7 @@ void ApplicationVulkanDeferredPBRTest::start_frame_sequence() {
     std::filesystem::create_directories(frame_sequence_directory);
 
     // The next tick records the first frame, so the renderer's current frame numbers it zero.
-    frame_sequence_first_frame = base_render_data->current_frame;
+    frame_sequence_first_frame = render_context->current_frame;
     frame_sequence_frame_count = static_cast<uint32_t>(std::max(frame_sequence_frame_count_input, 1));
     frame_sequence_written_count.store(0, std::memory_order_relaxed);
     frame_sequence_recording = true;
@@ -419,7 +419,7 @@ void ApplicationVulkanDeferredPBRTest::poll_frame_sequence() {
     }
     // The renderer advances current_frame only for frames that execute the graph, so this counts recorded sequence frames.
     const uint32_t recorded_count = static_cast<uint32_t>(
-        std::min<uint64_t>(base_render_data->current_frame - frame_sequence_first_frame, frame_sequence_frame_count));
+        std::min<uint64_t>(render_context->current_frame - frame_sequence_first_frame, frame_sequence_frame_count));
     const uint32_t remaining_frames = frame_sequence_frame_count - recorded_count;
     // Each acquired frame holds a full image until it is written, so wait while too many are pending. The fixed delta
     // keeps the sequence timing unaffected by the wait.
@@ -522,7 +522,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     write_dynamic_camera_descriptors();
     write_dynamic_light_descriptors();
     setup_light_billboard_overlay_resources();
-    voxel_static_build_registration_frame = base_render_data->current_frame;
+    voxel_static_build_registration_frame = render_context->current_frame;
     register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false);
     register_deferred_render_graph(DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true);
     renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
@@ -648,10 +648,10 @@ void ApplicationVulkanDeferredPBRTest::draw_pixel_sort_options() {
 
 void ApplicationVulkanDeferredPBRTest::setup_render_context() {
     renderer_vk = RendererVK::get_singleton();
-    base_render_data = renderer_vk->get_base_render_data();
+    render_context = renderer_vk->get_render_context();
     render_allocator = get_renderer_allocator().get();
     imgui_overlay = make_unique<ImGuiOverlayVK>(global_allocator(), renderer_vk);
-    camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
+    camera_component = make_default_test_camera_component(render_context->swap_chain_aspect_ratio, 100.0F);
 }
 
 void ApplicationVulkanDeferredPBRTest::load_resources() {
@@ -698,12 +698,12 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     static_mesh_resources =
         create_mesh_resources(renderer_vk, STATIC_MESH_KEY, sponza_mesh, gbuffer_opaque_pipeline_resource, static_mesh_config);
     if (build_acceleration_structure) {
-        mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(base_render_data, ray_tracing->get_base_ray_tracing_data())
+        mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(render_context, ray_tracing->get_base_ray_tracing_data())
                                           .compile(static_mesh_resources, glm::mat4(1.0F));
     }
     GraphicsPipelineCompilerVKContext shadow_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
         .color_attachment_formats = {RSM_FLUX_FORMAT, RSM_NORMAL_FORMAT, SHADOW_MOMENTS_FORMAT},
@@ -718,7 +718,7 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
         GraphicsPipelineCompilerVK(shadow_context).compile("deferred_shadow_dynamic", shadow_dynamic_pipeline_resource).graphics_pipeline;
     GraphicsPipelineCompilerVKContext gbuffer_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
         .color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT},
@@ -772,18 +772,17 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 
     for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
         BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_components[i]);
-        light_billboard_ubos[i] = ROBufferVK::Builder()
+        light_billboard_ubos[i] = render_context->create_buffer(ROBufferVK::Builder()
                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                      .initial_data(&light_billboard_info, sizeof(light_billboard_info))
-                                      .create_ref(base_render_data);
+                                      .initial_data(&light_billboard_info, sizeof(light_billboard_info)));
     }
 
     GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .color_attachment_formats = {render_context->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
     };
     GraphicsPipelineCompilerVK compiler(compiler_context);
@@ -793,7 +792,7 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
-    bloom_extent = base_render_data->swap_chain_extent;
+    bloom_extent = render_context->swap_chain_extent;
     // Each acquisition task emits under the id of the image view it reads.
     EventManager* event_manager = EventManager::get_singleton();
     bloom_acquire_registration = event_manager->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(
@@ -839,7 +838,7 @@ ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBR
 void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_pipelines() {
     ComputePipelineCompilerVKContext compute_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
     };
 
@@ -854,13 +853,13 @@ void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_
 
 Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(
     VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
-    return ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size).create_ref(base_render_data);
+    return render_context->create_buffer(ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size));
 }
 
 ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_pipeline_context() const {
     return ComputePipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
     };
 }
@@ -868,21 +867,21 @@ ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_
 GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present_graphics_pipeline_context() const {
     return GraphicsPipelineCompilerVKContext{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .color_attachment_formats = {render_context->swap_chain_format},
     };
 }
 
 void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
     composition_camera_info_ubos = create_per_frame_buffers(
-        render_allocator, base_render_data, "composition_camera_info", sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        render_allocator, render_context, "composition_camera_info", sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(
-        render_allocator, base_render_data, "spot_light_infos", sizeof(SpotLightInfosGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        render_allocator, render_context, "spot_light_infos", sizeof(SpotLightInfosGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     for (size_t light_index = 0; light_index < shadow_light_info_buffers.size(); ++light_index) {
         shadow_light_info_buffers[light_index] = create_per_frame_buffers(
-            render_allocator, base_render_data, std::format("shadow_light_info.{}", light_index), sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+            render_allocator, render_context, std::format("shadow_light_info.{}", light_index), sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
     ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
     auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
@@ -915,7 +914,7 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {
     gbuffer_camera_info_ubos = create_per_frame_buffers(
-        render_allocator, base_render_data, "gbuffer_camera_info", sizeof(CameraInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        render_allocator, render_context, "gbuffer_camera_info", sizeof(CameraInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     CameraInfoGPU gbuffer_camera_info = make_camera_info_gpu(camera_component);
     CompositionCameraInfo composition_camera_info = make_composition_camera_info();
 

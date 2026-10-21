@@ -4,6 +4,27 @@ This page describes the Vulkan backend (`function/render_vk`): the frame, device
 vertex input, meshes, and acceleration structures. Render graphs and their Lua/Teal recipes are described in
 [render_graph.md](render_graph.md).
 
+## Resource creation
+
+`RendererVK::get_render_context()` returns the renderer-owned `RenderContextVK`. The context keeps a stable address across
+swap-chain recreation and exposes synchronous resource creation on the rendering thread:
+
+```cpp
+const RenderContextVK* context = renderer->get_render_context();
+BufferDescVK description;
+description.set_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT).initial_data(bytes);
+Ref<ROBufferVK> buffer = context->create_buffer(description);
+```
+
+The context creates buffers, images, image views, samplers, staging buffers, shaders, and graphics/compute pipelines.
+Buffer and image creation also accept their alias descriptions for binding existing device memory. Include the relevant
+`ro_*.hh` header for the description and returned resource type. Existing names such as `ROBufferVK::Builder` remain aliases
+for the standalone descriptions, and `builder.create_ref(context)` delegates to the same context factory.
+
+Factories return owning `Ref` handles and use the renderer's allocator. The context, allocator, and Vulkan device must
+outlive resources and their deferred destruction. Resource creation from another thread belongs inside an `add_job()`
+callback. Default image views remain available through `image->get_image_view_ref()`.
+
 ## Frame
 
 `RendererVK::tick()` runs on the rendering thread and executes the active graph:
@@ -37,7 +58,7 @@ until no frame in flight can still use them.
 
 `RenderPluginVK` (`render_plugin_vk.hh`) extends the renderer. Hooks: `try_enable()`, required instance and device
 extensions, `on_before_instance_creation()` / `on_after_instance_created()`, `on_before_device_creation()` /
-`on_after_device_created()`, `update_base_render_data()`, `configure_descriptor_heaps()` / `create_descriptor_arenas()`,
+`on_after_device_created()`, `update_render_context()`, `configure_descriptor_heaps()` / `create_descriptor_arenas()`,
 `on_frame_begin()`, `on_render_graph_registered()`, `on_before_task_recorded()` / `on_after_task_recorded()`, and
 `on_renderer_terminating()`. Device features are requested with the protected `enable_device_feature()` helper, which merges
 an existing `pNext` structure instead of appending a duplicate.

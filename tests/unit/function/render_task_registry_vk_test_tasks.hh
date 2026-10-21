@@ -22,7 +22,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -44,7 +44,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsReg
 class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [registry_probe, registry_probe_alias]) RTRegistryProbeVK final : public IRenderTaskVK {
 public:
     RTRegistryProbeVK() = delete;
-    RTRegistryProbeVK(const BaseRenderDataVK* p_render_data, RTParamsRegistryProbeVK p_params, VkExtent2D p_extent)
+    RTRegistryProbeVK(const RenderContextVK* p_render_data, RTParamsRegistryProbeVK p_params, VkExtent2D p_extent)
         : render_data(p_render_data), params(std::move(p_params)), extent(p_extent) {
     }
     virtual ~RTRegistryProbeVK() override = default;
@@ -55,14 +55,14 @@ public:
 
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsRegistryProbeVK& p_params, const RendGraphContextVK& p_context) {
+        const RenderContextVK* p_render_data, const RTParamsRegistryProbeVK& p_params, const RendGraphContextVK& p_context) {
         if (p_params.count == 0) {
             throw std::runtime_error("RTRegistryProbeVK: count must not be zero.");
         }
         return make_unique<RTRegistryProbeVK>(p_render_data->allocator, p_render_data, p_params, p_context.swap_chain_extent);
     }
 
-    const BaseRenderDataVK* get_render_data() const {
+    const RenderContextVK* get_render_data() const {
         return render_data;
     }
 
@@ -85,7 +85,7 @@ public:
     }
 
 private:
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     RTParamsRegistryProbeVK params;
     VkExtent2D extent;
 };
@@ -104,12 +104,12 @@ public:
 
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsRegistryProbeVK& /*p_params*/, const RendGraphContextVK& /*p_context*/) {
+        const RenderContextVK* p_render_data, const RTParamsRegistryProbeVK& /*p_params*/, const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTRegistryPreparingProbeVK>(p_render_data->allocator);
     }
 
     static void prepare_graph(
-        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsRegistryProbeVK& p_params, const BaseRenderDataVK* /*p_render_data*/) {
+        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsRegistryProbeVK& p_params, const RenderContextVK* /*p_render_data*/) {
         const std::string buffer_id = p_params.label + ".prepared";
         if (!p_graph.contains_resource(buffer_id)) {
             p_graph.add_buffer(buffer_id, [](const RendGraphContextVK& /*p_context*/) {

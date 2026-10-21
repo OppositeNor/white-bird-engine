@@ -60,7 +60,7 @@ Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
     std::string_view p_resource_key, Ref<ROShaderVK> p_compute_shader, std::string_view p_compute_entry) {
     ROComputePipelineVK::Builder pipeline_builder;
     pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry);
-    Ref<ROComputePipelineVK> compute_pipeline = pipeline_builder.create_ref(context.render_data);
+    Ref<ROComputePipelineVK> compute_pipeline = context.render_data->create_compute_pipeline(pipeline_builder);
     context.render_database->register_compiled_render_resource(p_resource_key, compute_pipeline);
     return compute_pipeline;
 }

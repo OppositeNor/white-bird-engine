@@ -24,7 +24,7 @@
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_compute_pipeline_indirect_vk.hh"
 #include <string>
@@ -59,7 +59,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline_indirect]) 
      * @throws std::runtime_error If p_pipeline is null, p_indirect_buffer_id is empty, or p_indirect_offset is not a
      * multiple of 4.
      */
-    RTRunComputePipelineIndirectVK(const BaseRenderDataVK* p_render_data,
+    RTRunComputePipelineIndirectVK(const RenderContextVK* p_render_data,
         Ref<ROComputePipelineVK> p_pipeline,
         std::string_view p_indirect_buffer_id,
         VkDeviceSize p_indirect_offset,
@@ -87,7 +87,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline_indirect]) 
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;
@@ -104,7 +104,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline_indirect]) 
     virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override;
 
 private:
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> pipeline;
     Unique<PipelineDescriptorBindingsVK> descriptor_bindings;

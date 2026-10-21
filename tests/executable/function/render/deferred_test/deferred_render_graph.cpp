@@ -122,7 +122,7 @@ RendGraphDescVK ApplicationVulkanDeferredPBRTest::make_deferred_render_graph_des
             .static_build_pending = voxel_static_build_pending,
         });
     const DataValue recipe = RendGraphScriptVK::run(DEFERRED_RECIPE_SCRIPT, RendGraphScriptVK::serialize_context(context));
-    RendGraphDescVK pipeline_desc = RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+    RendGraphDescVK pipeline_desc = RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
 
     // The recipe's mesh draws import the static and dynamic meshes. The acceleration structure and the dynamic entities stay
     // in C++.
@@ -142,7 +142,7 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
         return static_cast<ImageFormatVK>(p_format);
     };
     DeferredRecipeContext context;
-    static_cast<RendRecipeContextVK&>(context) = RendGraphScriptVK::get_recipe_context(*base_render_data, p_context);
+    static_cast<RendRecipeContextVK&>(context) = RendGraphScriptVK::get_recipe_context(*render_context, p_context);
     context.summed_area_table = p_use_summed_area_table;
     context.spot_light_count = SPOT_LIGHT_COUNT;
     context.max_spot_light_info_count = MAX_SPOT_LIGHT_INFO_COUNT;
@@ -208,7 +208,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_mesh_acceleration_struct
         RT_BUILD_MESH_ACCELERATION_STRUCTURE,
         [this, acceleration_structure = mesh_acceleration_structure](const RendGraphContextVK& /*p_context*/) {
             auto build = make_unique<RTBuildAccelerationStructuresVK>(render_allocator,
-                base_render_data,
+                render_context,
                 IBindableRenderResourceVK::make_member_resource_id(MESH_ACCELERATION_STRUCTURE_KEY, MeshAccelerationStructureVK::TOP_LEVEL),
                 [acceleration_structure](VkCommandBuffer p_command_buffer) {
                     acceleration_structure->record_build(p_command_buffer);
@@ -227,10 +227,10 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_frame_sequence_acquire_t
                 throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
             }
             // Completed acquisitions reach write_frame_sequence_frame() through the event registered in setup_bloom_acquisition().
-            return make_unique<RTCPUInFlightAcquireVK>(render_allocator, base_render_data, FRAME_SEQUENCE_IMAGE_VIEW);
+            return make_unique<RTCPUInFlightAcquireVK>(render_allocator, render_context, FRAME_SEQUENCE_IMAGE_VIEW);
         },
         std::string(FRAME_SEQUENCE_EVENT_IDS[p_use_summed_area_table ? 1U : 0U]),
-        base_render_data);
+        render_context);
     return task_desc;
 }
 
@@ -249,7 +249,7 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_imgui_task_desc() {
     task_desc.task_id = RT_DRAW_IMGUI;
     task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN);
     task_desc.factory = [this](const RendGraphContextVK& /*p_context*/) {
-        return make_unique<RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+        return make_unique<RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
     };
     return task_desc;
 }
@@ -293,7 +293,7 @@ void ApplicationVulkanDeferredPBRTest::apply_voxel_debug_view_mode() {
 
 void ApplicationVulkanDeferredPBRTest::finish_voxel_static_build() {
     // The renderer advances current_frame only after a frame executes a graph, which records the pending construction.
-    if (!voxel_static_build_pending || base_render_data->current_frame <= voxel_static_build_registration_frame) {
+    if (!voxel_static_build_pending || render_context->current_frame <= voxel_static_build_registration_frame) {
         return;
     }
     EventManager::get_singleton()->emit(VOXEL_STATIC_BUILD_EVENT_ID, RTTriggeredVK::Command::enable_for(0));

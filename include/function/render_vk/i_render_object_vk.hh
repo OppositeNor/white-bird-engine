@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render_vk/debug_data_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
@@ -46,7 +46,7 @@ public:
      *
      * @param p_render_data The base render data.
      */
-    IRenderObjectVK(const BaseRenderDataVK* p_render_data) : render_data(p_render_data) {
+    IRenderObjectVK(const RenderContextVK* p_render_data) : render_data(p_render_data) {
         if (p_render_data == nullptr) {
             throw std::runtime_error("Render data is nullptr.");
         }
@@ -67,7 +67,7 @@ protected:
     /**
      * @brief The base render data.
      */
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
 };
 
 } // namespace WhiteBirdEngine

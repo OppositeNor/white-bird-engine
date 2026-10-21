@@ -33,7 +33,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
@@ -140,14 +140,14 @@ BillboardInfoGPU make_light_billboard_info(const WBE::ComponentSpotLight& p_spot
 
 // Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
 WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
-    WBE::RenderAllocator* p_allocator, const WBE::BaseRenderDataVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size) {
+    WBE::RenderAllocator* p_allocator, const WBE::RenderContextVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size) {
     return WBE::make_ref<WBE::ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
         WBE::ROCMultislotsVK::Factory{[p_render_data, key = std::string(p_key), p_buffer_size](
                                           uint32_t p_frame_slot) -> WBE::Ref<WBE::IRenderObjectVK> {
             WBE::Ref<WBE::ROBufferVK> buffer =
-                WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).create_ref(p_render_data);
+                p_render_data->create_buffer(WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
             p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
             return buffer;
         }});
@@ -181,7 +181,7 @@ private:
         WBE::RenderTestMeshDraw p_main_masked_task);
 
     WBE::RendererVK* renderer_vk = nullptr;
-    const WBE::BaseRenderDataVK* base_render_data = nullptr;
+    const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
     WBE::RefRes<WBE::RUMesh3D> sponza_mesh;
     WBE::RefRes<WBE::RUGraphicsPipeline> shadow_opaque_pipeline;
@@ -347,7 +347,7 @@ void ApplicationVulkanDrawSponzaTest::logic_update(double p_delta) { // NOLINT
 }
 
 void ApplicationVulkanDrawSponzaTest::render_update(double /* p_delta */) {
-    WBE::on_exec_test_render(*renderer_vk, base_render_data->current_frame);
+    WBE::on_exec_test_render(*renderer_vk, render_context->current_frame);
 }
 
 void ApplicationVulkanDrawSponzaTest::log_view_state() const {
@@ -458,9 +458,9 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
 
 void ApplicationVulkanDrawSponzaTest::setup_render_context() {
     renderer_vk = WBE::RendererVK::get_singleton();
-    base_render_data = renderer_vk->get_base_render_data();
+    render_context = renderer_vk->get_render_context();
     render_allocator = get_renderer_allocator().get();
-    camera_component = make_default_test_camera_component(base_render_data->swap_chain_aspect_ratio, 100.0F);
+    camera_component = make_default_test_camera_component(render_context->swap_chain_aspect_ratio, 100.0F);
     camera_component.view = test_camera_view(camera_position, camera_yaw, camera_pitch);
 }
 
@@ -498,7 +498,7 @@ void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
         renderer_vk, "forward_sponza_shadow_opaque", shadow_opaque_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
     shadow_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "forward_sponza_shadow_masked", shadow_masked_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
-    const std::array main_formats{base_render_data->swap_chain_format};
+    const std::array main_formats{render_context->swap_chain_format};
     main_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
         renderer_vk, "forward_sponza_main_opaque", main_opaque_pipeline, main_formats, MAIN_DEPTH_FORMAT);
     main_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
@@ -527,15 +527,15 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
     }
 
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "camera_info", sizeof(CameraInfoGPU));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, render_context, "camera_info", sizeof(CameraInfoGPU));
     }
 
     WBE::GraphicsPipelineCompilerVKContext compiler_context{
         .allocator = render_allocator,
-        .render_data = base_render_data,
+        .render_data = render_context,
         .render_database = renderer_vk->get_render_database(),
         .renderer = renderer_vk,
-        .color_attachment_formats = {base_render_data->swap_chain_format},
+        .color_attachment_formats = {render_context->swap_chain_format},
     };
     WBE::GraphicsPipelineCompilerVK compiler(compiler_context);
     light_billboard_texture_view = compiler.compile_texture_view("spot_light_billboard", texture_resource);
@@ -546,7 +546,7 @@ void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() 
 void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
     if (spot_light_info_ubos == WBE::MEM_NULL) {
         spot_light_info_ubos =
-            create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_info", sizeof(SpotLightInfoGPU));
+            create_per_frame_uniform_buffers(render_allocator, render_context, "spot_light_info", sizeof(SpotLightInfoGPU));
     }
     SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
@@ -555,15 +555,15 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descriptors() {
     if (camera_info_ubos == WBE::MEM_NULL) {
-        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, base_render_data, "camera_info", sizeof(CameraInfoGPU));
+        camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, render_context, "camera_info", sizeof(CameraInfoGPU));
     }
     if (spot_light_count_ubos == WBE::MEM_NULL) {
         spot_light_count_ubos =
-            create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_count", sizeof(uint32_t));
+            create_per_frame_uniform_buffers(render_allocator, render_context, "spot_light_count", sizeof(uint32_t));
     }
     if (spot_light_info_ubos == WBE::MEM_NULL) {
         spot_light_info_ubos =
-            create_per_frame_uniform_buffers(render_allocator, base_render_data, "spot_light_info", sizeof(SpotLightInfoGPU));
+            create_per_frame_uniform_buffers(render_allocator, render_context, "spot_light_info", sizeof(SpotLightInfoGPU));
     }
     CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
     SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
@@ -656,18 +656,18 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
                     return clamped_linear_sampler;
                 });
 
-            shadow_opaque_task.add_to(pipeline_desc, base_render_data)
+            shadow_opaque_task.add_to(pipeline_desc, render_context)
                 .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW)
                 .connect(RT_RUN_SHADOWMAP_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            shadow_masked_task.add_to(pipeline_desc, base_render_data)
+            shadow_masked_task.add_to(pipeline_desc, render_context)
                 .connect(RT_RUN_MAIN_OPAQUE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
                 .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
             // The main passes sample the shadow depth through their reflected "shadowmap" resource.
-            main_opaque_task.add_to(pipeline_desc, base_render_data)
+            main_opaque_task.add_to(pipeline_desc, render_context)
                 .alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
                 .connect(RT_RUN_MAIN_MASKED, WBE::REND_RES_SWAP_CHAIN)
                 .connect(RT_RUN_MAIN_MASKED, REND_RES_TEST_DRAW_SPONZA_DEPTH_IMAGE_VIEW);
-            main_masked_task.add_to(pipeline_desc, base_render_data)
+            main_masked_task.add_to(pipeline_desc, render_context)
                 .alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW)
                 .connect(RT_RUN_LIGHT_BILLBOARD, WBE::REND_RES_SWAP_CHAIN);
 
@@ -680,7 +680,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
                     .set_render_extent(p_context.swap_chain_extent)
                     .set_color_load_op(VK_ATTACHMENT_LOAD_OP_LOAD)
                     .set_draw_vertex_count(6)
-                    .create_unique(base_render_data);
+                    .create_unique(render_context);
             };
             pipeline_desc.tasks.emplace_back(std::move(light_billboard_task_desc));
             return pipeline_desc;

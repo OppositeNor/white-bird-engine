@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SEMAPHORE_VK_HH
 #define WBE_FILE_SEMAPHORE_VK_HH
 
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <cstdint>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -52,7 +52,7 @@ public:
      * @param p_binary Should the semaphore be a binary semaphore or timeline
      * semaphore. True then it will be binary, false then it will be timeline.
      */
-    SemaphoreVK(const BaseRenderDataVK* p_render_data, bool p_binary = false)
+    SemaphoreVK(const RenderContextVK* p_render_data, bool p_binary = false)
         : render_data(p_render_data), is_binary(p_binary) {
         VkSemaphoreCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -107,7 +107,7 @@ public:
 
 private:
     VkSemaphore semaphore = VK_NULL_HANDLE;
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     bool is_binary;
 };
 } // namespace WhiteBirdEngine

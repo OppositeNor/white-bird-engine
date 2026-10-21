@@ -19,7 +19,7 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "generated/serializables_sd.gen.hh"
@@ -41,7 +41,7 @@ namespace {
 // What every level of a recipe shares: its subgraphs are built into descriptors of their own.
 struct BuildState {
     const RendGraphRecipeImportsVK& imports;
-    const BaseRenderDataVK* render_data;
+    const RenderContextVK* render_data;
     // The supplied imports and tasks some level of the recipe declares.
     std::set<std::string, std::less<>> declared_imports;
     std::set<std::string, std::less<>> imported_tasks;
@@ -143,7 +143,7 @@ void apply_aliases(RendTaskDescVK& p_task, const DataValue& p_aliases, std::stri
 
 // Wrap a factory as the recipe task's trigger and toggle select; the toggle wraps outermost, so it gates a triggered task too.
 RendTaskFactoryVK wrap_gating(
-    RendTaskFactoryVK p_factory, const RendRecipeTaskVK& p_recipe_task, const BaseRenderDataVK* p_render_data, std::string_view p_location) {
+    RendTaskFactoryVK p_factory, const RendRecipeTaskVK& p_recipe_task, const RenderContextVK* p_render_data, std::string_view p_location) {
     if (p_recipe_task.trigger.has_value()) {
         if (p_recipe_task.trigger->event.empty()) {
             throw std::runtime_error(std::format("Failed to build render graph recipe: {} trigger event is empty.", p_location));
@@ -335,7 +335,7 @@ std::vector<std::string> RendGraphRecipeImportsVK::get_names() const {
 }
 
 RendGraphDescVK RendGraphRecipeBuilderVK::build(
-    const DataValue& p_recipe, const RendGraphRecipeImportsVK& p_imports, const BaseRenderDataVK* p_render_data) const {
+    const DataValue& p_recipe, const RendGraphRecipeImportsVK& p_imports, const RenderContextVK* p_render_data) const {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to build render graph recipe: render data is unavailable.");
     }

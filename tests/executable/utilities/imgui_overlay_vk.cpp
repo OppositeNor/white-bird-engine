@@ -19,7 +19,7 @@
 #include "SDL_video.h"
 #include "core/engine_core.hh"
 #include "function/render_vk/descriptor_set_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -134,7 +134,7 @@ void scale_mouse_position(SDL_Window* p_window, int32_t& p_x, int32_t& p_y) {
 } // namespace
 
 ImGuiOverlayVK::ImGuiOverlayVK(RendererVK* p_renderer)
-    : render_data(p_renderer->get_base_render_data()), color_format(render_data->swap_chain_format),
+    : render_data(p_renderer->get_render_context()), color_format(render_data->swap_chain_format),
       pending_events(global_allocator()), frame_events(global_allocator()) {
     auto* descriptor_set_plugin = DescriptorSetPluginVK::get_singleton();
     if (descriptor_set_plugin == nullptr) {

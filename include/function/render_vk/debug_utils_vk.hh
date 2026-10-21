@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_DEBUG_UTILS_VK_HH
 #define WBE_FILE_DEBUG_UTILS_VK_HH
 
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
@@ -35,13 +35,13 @@ namespace WhiteBirdEngine {
  * @param p_handle The object handle, as Vulkan's 64-bit object handle value.
  * @param p_name The name.
  */
-void set_debug_object_name_vk(const BaseRenderDataVK* p_render_data, VkObjectType p_type, uint64_t p_handle, std::string_view p_name);
+void set_debug_object_name_vk(const RenderContextVK* p_render_data, VkObjectType p_type, uint64_t p_handle, std::string_view p_name);
 
 /**
  * @brief Name a Vulkan object; converts the handle to Vulkan's 64-bit object handle value.
  */
 template <typename THandle>
-void set_debug_object_name_vk(const BaseRenderDataVK* p_render_data, VkObjectType p_type, THandle p_handle, std::string_view p_name) {
+void set_debug_object_name_vk(const RenderContextVK* p_render_data, VkObjectType p_type, THandle p_handle, std::string_view p_name) {
     if constexpr (std::is_null_pointer_v<THandle>) {
         set_debug_object_name_vk(p_render_data, p_type, uint64_t{0}, p_name);
     } else if constexpr (std::is_pointer_v<THandle>) {

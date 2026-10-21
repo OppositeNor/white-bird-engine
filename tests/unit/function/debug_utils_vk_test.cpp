@@ -15,7 +15,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/debug_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -58,7 +58,7 @@ protected:
     }
 
     RenderAllocator allocator{WBE_KI_B(16)};
-    BaseRenderDataVK render_data{&allocator};
+    RenderContextVK render_data{&allocator};
 };
 
 } // namespace

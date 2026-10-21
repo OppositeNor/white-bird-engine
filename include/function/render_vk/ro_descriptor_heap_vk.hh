@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/i_render_object_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/vma_vk.hh"
 #include "utils/utils.hh"
 
@@ -65,7 +65,7 @@ public:
         /**
          * @brief Create aligned host-visible and device-local heap storage.
          */
-        Backing(const BaseRenderDataVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment);
+        Backing(const RenderContextVK* p_render_data, VkDeviceSize p_usable_size, VkDeviceSize p_reserved_size, VkDeviceSize p_alignment);
 
         /**
          * @brief Get the physical range used when binding this heap.
@@ -74,7 +74,7 @@ public:
 
     private:
         friend class RODescriptorHeapVK;
-        const BaseRenderDataVK* render_data = nullptr;
+        const RenderContextVK* render_data = nullptr;
         VkBuffer buffer = VK_NULL_HANDLE;
         VmaAllocation allocation = VK_NULL_HANDLE;
         void* mapped_memory = nullptr;
@@ -93,7 +93,7 @@ public:
     /**
      * @brief Construct a logical arena over descriptor-heap backing storage.
      */
-    RODescriptorHeapVK(const BaseRenderDataVK* p_render_data,
+    RODescriptorHeapVK(const RenderContextVK* p_render_data,
         Ref<Backing> p_backing,
         DescriptorHeapTypeVK p_type,
         uint32_t p_first_index,

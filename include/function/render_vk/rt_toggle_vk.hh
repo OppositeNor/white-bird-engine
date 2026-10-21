@@ -21,7 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <atomic>
 #include <string>
 #include <string_view>
@@ -114,7 +114,7 @@ public:
      * EventManager exists.
      */
     static RendTaskFactoryVK wrap_factory(
-        RendTaskFactoryVK p_factory, std::string p_event_id, const BaseRenderDataVK* p_render_data, bool p_enabled = false);
+        RendTaskFactoryVK p_factory, std::string p_event_id, const RenderContextVK* p_render_data, bool p_enabled = false);
 
     /**
      * @brief Set whether the child records, from the next graph recording on.

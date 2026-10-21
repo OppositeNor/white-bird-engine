@@ -17,7 +17,7 @@
 
 #include "core/data/data_value.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <span>
 #include <string_view>
 
@@ -32,7 +32,7 @@ namespace WhiteBirdEngine {
  *
  * @code
  * WBE_META(WBE_REFLECT)
- * static Unique<IRenderTaskVK> create(const BaseRenderDataVK* p_render_data, const TParams& p_params,
+ * static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data, const TParams& p_params,
  *     const RendGraphContextVK& p_context);
  * @endcode
  *
@@ -41,7 +41,7 @@ namespace WhiteBirdEngine {
  *
  * @code
  * static void prepare_graph(RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const TParams& p_params,
- *     const BaseRenderDataVK* p_render_data);
+ *     const RenderContextVK* p_render_data);
  * @endcode
  *
  * which add_task() calls before adding the task, for example to import the resources the task reads. The registry has no
@@ -70,7 +70,7 @@ public:
      * @throws std::runtime_error If the task type is unknown, p_render_data is null, or the parameters cannot be
      * deserialized.
      */
-    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const DataValue& p_params, const BaseRenderDataVK* p_render_data);
+    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data);
 
     /**
      * @brief Add one render task to a graph descriptor.
@@ -91,7 +91,7 @@ public:
         std::string_view p_task_id,
         std::string_view p_task_type,
         const DataValue& p_params,
-        const BaseRenderDataVK* p_render_data);
+        const RenderContextVK* p_render_data);
 
     /**
      * @brief Check whether a task type name is registered.

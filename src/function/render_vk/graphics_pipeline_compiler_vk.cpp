@@ -143,7 +143,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     pipeline_builder.config.rasterization.set_polygon_mode(context.polygon_mode)
         .set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE)
         .set_conservative_rasterization(p_pipeline_resource.conservative_rasterization);
-    Ref<ROGraphicsPipelineVK> graphics_pipeline = pipeline_builder.create_ref(context.render_data);
+    Ref<ROGraphicsPipelineVK> graphics_pipeline = context.render_data->create_graphics_pipeline(pipeline_builder);
     context.render_database->register_compiled_render_resource(p_resource_key, graphics_pipeline);
     return graphics_pipeline;
 }
@@ -157,7 +157,7 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_
     }
     Ref<ROImageVK> image = compile_texture(p_resource_key, p_texture_resource);
     const ROImageVK::ExposedFields& image_fields = image->fields();
-    image_view = ROImageViewVK::Builder()
+    image_view = context.render_data->create_image_view(ROImageViewVK::Builder()
                      .set_image(image)
                      .set_view_type(image_fields.view_type)
                      .set_format(image_fields.format)
@@ -165,8 +165,7 @@ Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_
                          .baseMipLevel = 0,
                          .levelCount = image_fields.mipmap_levels,
                          .baseArrayLayer = 0,
-                         .layerCount = image_fields.layers_count})
-                     .create_ref(context.render_data);
+                         .layerCount = image_fields.layers_count}));
     context.render_database->register_compiled_render_resource(formatted_resource_key, image_view);
     return image_view;
 }

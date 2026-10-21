@@ -23,7 +23,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "platform/file_system/path.hh"
 #include "utils/interface/i_singleton.hh"
 
@@ -75,7 +75,7 @@ public:
      *
      * @param p_render_data Renderer data that outlives the plugin; its current frame slot selects the recorded queries.
      */
-    explicit TimestampQueryPluginVK(const BaseRenderDataVK* p_render_data);
+    explicit TimestampQueryPluginVK(const RenderContextVK* p_render_data);
 
     /**
      * @brief Get the singleton timestamp-query plugin instance.
@@ -122,11 +122,11 @@ public:
     virtual void on_before_device_creation(
         VkPhysicalDevice p_physical_device, VkDeviceCreateInfo* p_create_info, VkPhysicalDeviceFeatures* p_device_features) override;
     virtual void on_after_device_created(
-        BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
-    virtual void update_base_render_data(BaseRenderDataVK* p_render_data, VkPhysicalDevice p_physical_device) override;
+        RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device, VkDevice p_logical_device) override;
+    virtual void update_render_context(RenderContextVK* p_render_data, VkPhysicalDevice p_physical_device) override;
     virtual void configure_descriptor_heaps(
-        const BaseRenderDataVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
-    virtual void create_descriptor_arenas(BaseRenderDataVK* p_render_data) override;
+        const RenderContextVK* p_render_data, std::span<DescriptorHeapConfigurationVK> p_configurations) override;
+    virtual void create_descriptor_arenas(RenderContextVK* p_render_data) override;
 
     /**
      * @brief Snapshot the graph's metadata for the report and attribute its tasks' timestamps to p_graph_key.
@@ -143,7 +143,7 @@ public:
      *
      * @throws std::runtime_error If the query pool cannot be created or its results cannot be read.
      */
-    virtual void on_frame_begin(const BaseRenderDataVK* p_render_data) override;
+    virtual void on_frame_begin(const RenderContextVK* p_render_data) override;
 
     /**
      * @brief Reset the task's query pair and write its start timestamp.
@@ -207,7 +207,7 @@ private:
 
     using TaskKey = std::tuple<std::string, QueueFamilyVK, RendTaskID>;
 
-    const BaseRenderDataVK* render_data = nullptr;
+    const RenderContextVK* render_data = nullptr;
     VkDevice logical_device = VK_NULL_HANDLE;
     bool enabled = false;
     double timestamp_period = 0.0;

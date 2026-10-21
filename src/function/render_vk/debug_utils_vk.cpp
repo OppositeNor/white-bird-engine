@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/debug_utils_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -21,7 +21,7 @@
 
 namespace WhiteBirdEngine {
 
-void set_debug_object_name_vk(const BaseRenderDataVK* p_render_data, VkObjectType p_type, uint64_t p_handle, std::string_view p_name) {
+void set_debug_object_name_vk(const RenderContextVK* p_render_data, VkObjectType p_type, uint64_t p_handle, std::string_view p_name) {
     if (p_render_data == nullptr || p_render_data->set_debug_utils_object_name == nullptr ||
         p_render_data->logic_device == VK_NULL_HANDLE || p_handle == 0 || p_name.empty()) {
         return;

@@ -16,7 +16,7 @@
 
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_descriptor_heap_vk.hh"
 
 #include <algorithm>
@@ -71,7 +71,7 @@ DescriptorHeapAllocatorVK::Heap::Heap(
     : type(p_type), backing(std::move(p_backing)), usable_size(p_usable_size), arenas(p_allocator) {
 }
 
-DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data)
+DescriptorHeapAllocatorVK::DescriptorHeapAllocatorVK(RenderAllocator* p_allocator, const RenderContextVK* p_render_data)
     : render_data(p_render_data), allocator(p_allocator), heaps(p_allocator) {
     if (p_allocator == nullptr || p_render_data == nullptr) {
         throw std::runtime_error("Failed to create descriptor heap allocator: allocator or render data is missing.");

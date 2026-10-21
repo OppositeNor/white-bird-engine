@@ -21,7 +21,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include <string_view>
@@ -70,7 +70,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [graphics_draw_mesh]) RTGraphicsD
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const BaseRenderDataVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context);
 
     /**
      * @brief Prepare a graph descriptor for the task: compile and import the mesh, and alias the pipeline's mesh resources.
@@ -88,7 +88,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [graphics_draw_mesh]) RTGraphicsD
      * REND_RES_MESH_TRANSFORM and p_params.transform is unset.
      */
     static void prepare_graph(
-        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const BaseRenderDataVK* p_render_data);
+        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data);
 
     /**
      * @brief Add the task to a graph descriptor after preparing the descriptor with prepare_graph().
@@ -98,7 +98,7 @@ struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [graphics_draw_mesh]) RTGraphicsD
     static RendTaskDescVK& add_to_graph(RendGraphDescVK& p_graph,
         std::string_view p_task_id,
         const RTParamsGraphicsDrawMeshVK& p_params,
-        const BaseRenderDataVK* p_render_data);
+        const RenderContextVK* p_render_data);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

@@ -33,7 +33,7 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -229,7 +229,7 @@ public:
 
     virtual void render_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
         poll_captures();
         if (recording) {
             record_frame();
@@ -322,7 +322,7 @@ public:
     void setup_render_graph() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+        const auto* render_context = renderer->get_render_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
         imgui_overlay = WBE::make_unique<WBE::ImGuiOverlayVK>(WBE::global_allocator(), renderer);
 
@@ -337,10 +337,10 @@ public:
 
         WBE::GraphicsPipelineCompilerVKContext graphics_compiler_context{
             .allocator = render_allocator,
-            .render_data = base_render_data,
+            .render_data = render_context,
             .render_database = renderer->get_render_database(),
             .renderer = renderer,
-            .color_attachment_formats = {base_render_data->swap_chain_format},
+            .color_attachment_formats = {render_context->swap_chain_format},
         };
         WBE::GraphicsPipelineCompilerVK graphics_compiler(graphics_compiler_context);
         source_view = graphics_compiler.compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
@@ -560,7 +560,7 @@ private:
             PendingCapture capture = std::move(capture_readbacks.front());
             capture_readbacks.pop_front();
             std::vector<uint8_t> result_data = capture.readback.get();
-            const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_base_render_data()->swap_chain_format);
+            const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_render_context()->swap_chain_format);
             // Converting and encoding a full-size image takes long enough to stall a frame, so a worker does it.
             capture_writes.push_back(WBE::Worker::get_singleton()->submit_task(
                 [result_data = std::move(result_data), extent = capture.extent, encode_srgb, path = std::move(capture.path)] {
@@ -650,10 +650,10 @@ private:
     WBE::RendGraphDescVK make_render_graph_desc(bool p_vertical, const WBE::RendGraphContextVK& p_context) {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+        const auto* render_context = renderer->get_render_context();
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         WBE::PixelSortingRecipeContext recipe_context;
-        static_cast<WBE::RendRecipeContextVK&>(recipe_context) = WBE::RendGraphScriptVK::get_recipe_context(*base_render_data, p_context);
+        static_cast<WBE::RendRecipeContextVK&>(recipe_context) = WBE::RendGraphScriptVK::get_recipe_context(*render_context, p_context);
         recipe_context.source_width = source_extent.width;
         recipe_context.source_height = source_extent.height;
         recipe_context.orientation = p_vertical ? WBE::PixelSortOrientation::VERTICAL : WBE::PixelSortOrientation::HORIZONTAL;
@@ -665,8 +665,8 @@ private:
         WBE::RendTaskDescVK imgui_task_desc(render_allocator);
         imgui_task_desc.task_id = RT_DRAW_IMGUI;
         imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-        imgui_task_desc.factory = [this, render_allocator, base_render_data](const WBE::RendGraphContextVK& /*p_context*/) {
-            return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, base_render_data, imgui_overlay.get());
+        imgui_task_desc.factory = [this, render_allocator, render_context](const WBE::RendGraphContextVK& /*p_context*/) {
+            return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
         };
         WBE::RendGraphRecipeImportsVK imports;
         imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain)
@@ -674,7 +674,7 @@ private:
             .add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer)
             .add(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS, *post_processing_params_buffer)
             .add_task(std::move(imgui_task_desc));
-        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, base_render_data);
+        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
         return pipeline_desc;
     }
 
@@ -687,12 +687,11 @@ private:
      */
     static WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(std::string_view p_key, const void* p_data, size_t p_size) {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::Ref<WBE::ROBufferVK> buffer = WBE::ROBufferVK::Builder()
+        WBE::Ref<WBE::ROBufferVK> buffer = renderer->get_render_context()->create_buffer(WBE::ROBufferVK::Builder()
                                                .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
                                                .set_size(p_size)
                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                               .create_ref(renderer->get_base_render_data());
+                                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
         renderer->get_render_database()->register_compiled_render_resource(p_key, buffer);
         return buffer;
     }
@@ -711,7 +710,7 @@ private:
         }
         WBE::ComputePipelineCompilerVKContext compute_compiler_context{
             .allocator = get_renderer_allocator().get(),
-            .render_data = renderer->get_base_render_data(),
+            .render_data = renderer->get_render_context(),
             .render_database = renderer->get_render_database(),
         };
         return WBE::ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;

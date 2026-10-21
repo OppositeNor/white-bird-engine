@@ -68,7 +68,7 @@ private:
 /** @brief Minimal render object that fills the container used to test container binding. */
 class TestContainerResourceVK final : public IRenderObjectVK {
 public:
-    explicit TestContainerResourceVK(const BaseRenderDataVK* p_render_data) : IRenderObjectVK(p_render_data) {
+    explicit TestContainerResourceVK(const RenderContextVK* p_render_data) : IRenderObjectVK(p_render_data) {
     }
     virtual ~TestContainerResourceVK() override = default;
     TestContainerResourceVK(const TestContainerResourceVK&) = delete;
@@ -249,7 +249,7 @@ TEST(WBERenderGraphDescriptorVKTest, ComposesMemberResourceIds) {
 TEST(WBERenderGraphDescriptorVKTest, IncompleteMeshResourcesRefuseToBind) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendGraphDescVK descriptor(&allocator);
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     MeshResourcesVK static_mesh(&render_data);
 
     EXPECT_THROW(descriptor.add_resource("static_mesh", static_mesh), std::runtime_error);
@@ -259,7 +259,7 @@ TEST(WBERenderGraphDescriptorVKTest, IncompleteMeshResourcesRefuseToBind) {
 TEST(WBERenderGraphDescriptorVKTest, ContainerNotOwnedByRefRefusesToBindItself) {
     RenderAllocator allocator(WBE_KI_B(64));
     RendGraphDescVK descriptor(&allocator);
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     ROCMultislotsVK container(&allocator, 1, [&allocator, &render_data](uint32_t /*p_slot*/) {
         return make_ref<TestContainerResourceVK>(&allocator, &render_data).dynamic_cast_ref<IRenderObjectVK>();
     });
@@ -277,7 +277,7 @@ RendTaskDescVK make_empty_task(RenderAllocator* p_allocator, std::string_view p_
     });
 }
 
-Ref<ROCSingleVK> make_import_container(RenderAllocator* p_allocator, const BaseRenderDataVK* p_render_data) {
+Ref<ROCSingleVK> make_import_container(RenderAllocator* p_allocator, const RenderContextVK* p_render_data) {
     return make_ref<ROCSingleVK>(p_allocator, [p_allocator, p_render_data](uint32_t /*p_slot*/) {
         return make_ref<TestContainerResourceVK>(p_allocator, p_render_data).dynamic_cast_ref<IRenderObjectVK>();
     });
@@ -386,7 +386,7 @@ TEST(WBERenderGraphDescriptorVKTest, NestedSubgraphsArePrefixedAgain) {
 
 TEST(WBERenderGraphDescriptorVKTest, SubgraphImportsMergeIntoTheGraph) {
     RenderAllocator allocator(WBE_KI_B(128));
-    BaseRenderDataVK render_data(&allocator);
+    RenderContextVK render_data(&allocator);
     Ref<ROCSingleVK> mesh = make_import_container(&allocator, &render_data);
     RendGraphDescVK descriptor(&allocator);
     descriptor.add_resource(RendResVK{.res_id = "mesh", .container = mesh});

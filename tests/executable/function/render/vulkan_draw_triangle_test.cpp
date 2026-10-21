@@ -27,7 +27,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
@@ -67,13 +67,13 @@ public:
 
     virtual void render_update(double /*p_delta*/) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_base_render_data()->current_frame);
+        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
     }
 
     void setup_graphics_pipeline() {
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* base_render_data = renderer->get_base_render_data();
+        const auto* render_context = renderer->get_render_context();
         auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
         if (triangle_mesh == nullptr || triangle_mesh->opaque_instances.submesh_count != 1 ||
             triangle_mesh->opaque_instances.submeshes == nullptr) {
@@ -87,10 +87,10 @@ public:
         }
         WBE::GraphicsPipelineCompilerVKContext compiler_context{
             .allocator = render_allocator,
-            .render_data = base_render_data,
+            .render_data = render_context,
             .render_database = renderer->get_render_database(),
             .renderer = renderer,
-            .color_attachment_formats = {base_render_data->swap_chain_format},
+            .color_attachment_formats = {render_context->swap_chain_format},
         };
         auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_triangle_pipeline", pipeline_resource);
         auto graphics_pipeline = compiled.graphics_pipeline;
@@ -98,7 +98,7 @@ public:
         // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
         const WBE::RUSubmesh3D* triangle_submesh_pointer = &triangle_submesh;
         WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
-            [render_allocator, renderer, base_render_data, triangle_mesh, triangle_submesh = triangle_submesh_pointer, graphics_pipeline, shader_resource](
+            [render_allocator, renderer, render_context, triangle_mesh, triangle_submesh = triangle_submesh_pointer, graphics_pipeline, shader_resource](
                 const WBE::RendGraphContextVK& /*p_graph_context*/) {
                 WBE::RendGraphDescVK pipeline_desc(render_allocator);
                 pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
@@ -122,7 +122,7 @@ public:
                             draw_buffers.index_buffer_id,
                             draw_buffers.vertex_input,
                             draw_buffers.indexed_draw_region)
-                        .create_unique(base_render_data);
+                        .create_unique(render_context);
                 };
                 pipeline_desc.tasks.emplace_back(std::move(task_desc));
                 return pipeline_desc;

@@ -18,7 +18,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rt_params_full_memory_barrier_vk.hh"
 #include <stdexcept>
 #include <string_view>
@@ -33,7 +33,7 @@ RTFullMemoryBarrierVK::RTFullMemoryBarrierVK(std::string_view p_resource_id) : r
 }
 
 Unique<IRenderTaskVK> RTFullMemoryBarrierVK::create(
-    const BaseRenderDataVK* p_render_data, const RTParamsFullMemoryBarrierVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, const RTParamsFullMemoryBarrierVK& p_params, const RendGraphContextVK& /*p_context*/) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTFullMemoryBarrierVK: render data is unavailable.");
     }
