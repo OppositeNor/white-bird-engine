@@ -417,14 +417,19 @@ local function add_shadow_filtering(p_builder: Builder)
     for light = 0, context.spot_light_count - 1 do
         local tasks = p_builder.light_tasks[light + 1]
         if context.summed_area_table then
-            local params: Graph.RTParamsRunComputePipelinesSequentialVK = {
+            tasks.build_shadow_sat = p_builder.graph:compute_sequential(light_id("build_shadow_sat", light), {
                 queue_family = "compute_1",
                 dispatches = {
-                    { pipeline = p_builder.pipelines.shadow_sat_horizontal, group_count_x = ceil_div(shadow.height, SUMMED_AREA_TABLE_WORKGROUP_SIZE) },
-                    { pipeline = p_builder.pipelines.shadow_sat_vertical, group_count_x = ceil_div(shadow.width, SUMMED_AREA_TABLE_WORKGROUP_SIZE) },
+                    {
+                        pipeline = p_builder.pipelines.shadow_sat_horizontal,
+                        group_count_x = ceil_div(shadow.height, SUMMED_AREA_TABLE_WORKGROUP_SIZE)
+                    },
+                    {
+                        pipeline = p_builder.pipelines.shadow_sat_vertical,
+                        group_count_x = ceil_div(shadow.width, SUMMED_AREA_TABLE_WORKGROUP_SIZE)
+                    },
                 },
-            }
-            tasks.build_shadow_sat = p_builder.graph:compute_sequential(light_id("build_shadow_sat", light), params, {
+            }, {
                 aliases = {
                     shadow_sat_horizontal = resources[light_id("shadow_sat_horizontal", light)],
                     shadow_sat = resources[light_id("shadow_sat", light)],
@@ -526,22 +531,32 @@ local function add_bloom_and_presentation(p_builder: Builder)
         { bloom_sampler = resources.bloom_sampler })
     -- Starting from ping, even iterations blur ping into pong and odd iterations blur pong back into ping, so an even
     -- iteration count leaves the result in ping.
-    local blur_params: Graph.RTParamsPingPongVK = {
+    p_builder.tasks.blur_bloom = graph:ping_pong("blur_bloom", {
         ping_pipeline = p_builder.pipelines.blur_ping,
         pong_pipeline = p_builder.pipelines.blur_pong,
         iterations = context.bloom_blur_pass_count,
         group_count_x = bloom_tiles_x,
         group_count_y = bloom_tiles_y,
         queue_family = "compute_1",
-    }
-    p_builder.tasks.blur_bloom = graph:ping_pong("blur_bloom", blur_params, {
-        aliases = { kawase_blur_ping = resources.bloom_ping, kawase_blur_pong = resources.bloom_pong, kawase_blur_sampler = resources.bloom_sampler },
+    }, {
+        aliases = {
+            kawase_blur_ping = resources.bloom_ping,
+            kawase_blur_pong = resources.bloom_pong,
+            kawase_blur_sampler = resources.bloom_sampler
+        },
     })
     local acquire_params: Graph.RTParamsCPUInFlightAcquireVK = { image_view = resources.bloom_ping }
     p_builder.tasks.acquire_bloom = graph:cpu_acquire_image("acquire_bloom", acquire_params, {
         trigger = { event = context.bloom_acquire_event },
     })
-    local present_params: Graph.RTParamsRunGraphicsPipelineVK = { pipeline = p_builder.pipelines.present, clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } } }
+    local present_params: Graph.RTParamsRunGraphicsPipelineVK = {
+        pipeline = p_builder.pipelines.present,
+        clear_values = {
+            {
+                color = { 0.0, 0.0, 0.0, 1.0 }
+            }
+        }
+    }
     p_builder.tasks.present_result_image = graph:draw("present_result_image", present_params,
         { aliases = { bloom_sampler = resources.bloom_sampler } }):color_target(0, resources.swap_chain)
     p_builder.tasks.present_frame_sequence = graph:draw("present_frame_sequence", present_params, {
