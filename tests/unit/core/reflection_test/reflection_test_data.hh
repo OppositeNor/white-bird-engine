@@ -72,13 +72,13 @@ struct WBE_META(WBE_SERIALIZABLE) TestPartialStruct final : public Serializable 
     uint64_t ui64_test = 0;
 };
 
-struct WBE_META(WBE_SERIALIZABLE, WBE_ALIASES = [ TestSerializableAlias, LegacySerializableAlias ])
+struct WBE_META(WBE_SERIALIZABLE, WBE_SERIALIZATION_ALIASES(TestSerializableAlias, LegacySerializableAlias))
     TestSerializableAliases final : public Serializable {
     WBE_DECL_SERIALIZABLE(TestSerializableAliases)
 
-    WBE_META(WBE_REFLECT, WBE_ALIASES = [ legacy_name, display_name ])
+    WBE_META(WBE_REFLECT, WBE_SERIALIZATION_ALIASES(legacy_name, display_name))
     std::string canonical_name;
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_ALIASES = [required_alias])
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_SERIALIZATION_ALIASES(required_alias))
     int32_t required_value = 0;
 };
 
@@ -413,7 +413,7 @@ struct WBE_META(WBE_SERIALIZABLE) TestNestedRequired final : public Serializable
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) TestStrictBase {
     WBE_META(WBE_REFLECT)
     int32_t base_value = 0;
-    WBE_META(WBE_REFLECT, WBE_ALIASES = [base_alias])
+    WBE_META(WBE_REFLECT, WBE_SERIALIZATION_ALIASES(base_alias))
     std::string base_name;
 };
 
@@ -449,7 +449,7 @@ public:
         return p_left + p_right;
     }
 
-    WBE_META(WBE_REFLECT, WBE_ALIASES = [ make, build ])
+    WBE_META(WBE_REFLECT, WBE_SERIALIZATION_ALIASES(make, build))
     static TestReflectedMethods create(const std::string& p_name, glm::vec3 p_offset) {
         TestReflectedMethods result;
         result.name = p_name;
@@ -510,9 +510,9 @@ private:
  * @brief Reflected enum with a signed narrow underlying type, aliases, and two enumerators sharing a value.
  */
 enum class WBE_META(WBE_REFLECT_ENUM) TestEnumSigned : int8_t {
-    NEGATIVE WBE_META(WBE_ALIASES = [ neg, minus ]) = -3,
+    NEGATIVE WBE_META(WBE_SERIALIZATION_ALIASES(neg, minus)) = -3,
     ZERO = 0,
-    POSITIVE WBE_META(WBE_ALIASES = [pos]) = 100,
+    POSITIVE WBE_META(WBE_SERIALIZATION_ALIASES(pos)) = 100,
     // Shares the value of ZERO, which stays the canonical name.
     SAME_AS_ZERO = 0,
 };
@@ -542,7 +542,7 @@ struct TestEnumHolder {
      */
     enum WBE_META(WBE_REFLECT_ENUM) Nested : uint8_t {
         NESTED_A,
-        NESTED_B WBE_META(WBE_ALIASES = [b]),
+        NESTED_B WBE_META(WBE_SERIALIZATION_ALIASES(b)),
     };
 };
 

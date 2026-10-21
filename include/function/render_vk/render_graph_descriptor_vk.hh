@@ -46,23 +46,23 @@ namespace WhiteBirdEngine {
  */
 enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) RendResPrimaryUsageVK : uint32_t {
     /** Image sampled by shaders; its content is written by transfers. Sampled and transfer-destination usage. */
-    IMAGE_READ_ONLY WBE_META(WBE_ALIASES = [image_read_only]),
+    IMAGE_READ_ONLY WBE_META(WBE_SERIALIZATION_ALIASES(image_read_only)),
     /** Image read and written by shaders. Storage and sampled usage. */
-    IMAGE_READ_WRITE WBE_META(WBE_ALIASES = [image_read_write]),
+    IMAGE_READ_WRITE WBE_META(WBE_SERIALIZATION_ALIASES(image_read_write)),
     /** Color attachment that is later sampled. Color-attachment and sampled usage. */
-    IMAGE_RENDER_TARGET WBE_META(WBE_ALIASES = [image_render_target]),
+    IMAGE_RENDER_TARGET WBE_META(WBE_SERIALIZATION_ALIASES(image_render_target)),
     /** Depth/stencil attachment that is later sampled. Depth-stencil-attachment and sampled usage. */
-    IMAGE_DEPTH_TARGET WBE_META(WBE_ALIASES = [image_depth_target]),
+    IMAGE_DEPTH_TARGET WBE_META(WBE_SERIALIZATION_ALIASES(image_depth_target)),
     /** Uniform buffer. */
-    BUFFER_UNIFORM WBE_META(WBE_ALIASES = [buffer_uniform]),
+    BUFFER_UNIFORM WBE_META(WBE_SERIALIZATION_ALIASES(buffer_uniform)),
     /** Storage buffer read or written by shaders. */
-    BUFFER_STORAGE WBE_META(WBE_ALIASES = [buffer_storage]),
+    BUFFER_STORAGE WBE_META(WBE_SERIALIZATION_ALIASES(buffer_storage)),
     /** Indirect command buffer written by shaders. Indirect and storage usage. */
-    BUFFER_INDIRECT WBE_META(WBE_ALIASES = [buffer_indirect]),
+    BUFFER_INDIRECT WBE_META(WBE_SERIALIZATION_ALIASES(buffer_indirect)),
     /** Vertex buffer. */
-    BUFFER_VERTEX WBE_META(WBE_ALIASES = [buffer_vertex]),
+    BUFFER_VERTEX WBE_META(WBE_SERIALIZATION_ALIASES(buffer_vertex)),
     /** Index buffer. */
-    BUFFER_INDEX WBE_META(WBE_ALIASES = [buffer_index]),
+    BUFFER_INDEX WBE_META(WBE_SERIALIZATION_ALIASES(buffer_index)),
 };
 
 /**

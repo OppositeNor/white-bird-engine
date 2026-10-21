@@ -30,7 +30,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Render-graph resource id of the source image view; it is also the event id of every acquisition.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
     std::string image_view;
 };
 

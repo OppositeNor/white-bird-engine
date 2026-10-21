@@ -38,7 +38,8 @@ namespace WhiteBirdEngine {
  * @brief Render task that binds a compute pipeline and dispatches workgroups.
  * The task reports its reflected shader accesses; map reflected resource ids to graph resources with RendTaskDescVK::alias().
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline]) RTRunComputePipelineVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(compute), WBE_SERIALIZATION_ALIASES(run_compute_pipeline)) RTRunComputePipelineVK final
+    : public IRenderTaskVK {
     RTRunComputePipelineVK() = delete;
     virtual ~RTRunComputePipelineVK() override = default;
     RTRunComputePipelineVK(const RTRunComputePipelineVK&) = delete;

@@ -25,6 +25,14 @@ id = "utils.render_graph"
 source_type = "script"
 source_file = "assets/scripts/teal/utils/render_graph.tl"
 
+# Reflection generates this module into build/<target>/teal (templates/teal_render_graph_tasks.tl.jinja), so its source
+# file is relative to that directory.
+[[resources]]
+id = "utils.render_graph_tasks"
+source_type = "script"
+source_file = "utils/render_graph_tasks.tl"
+path = "assets/scripts/teal/utils/render_graph_tasks.lua"
+
 [[resources]]
 id = "utils.sort"
 source_type = "script"

@@ -36,9 +36,9 @@ namespace WhiteBirdEngine {
  * lowercase aliases are the names used in render graph recipes.
  */
 enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) QueueFamilyVK : uint32_t {
-    GRAPHICS WBE_META(WBE_ALIASES = [graphics]) = 0,
-    COMPUTE_1 WBE_META(WBE_ALIASES = [compute_1]) = 1,
-    COMPUTE_2 WBE_META(WBE_ALIASES = [compute_2]) = 2,
+    GRAPHICS WBE_META(WBE_SERIALIZATION_ALIASES(graphics)) = 0,
+    COMPUTE_1 WBE_META(WBE_SERIALIZATION_ALIASES(compute_1)) = 1,
+    COMPUTE_2 WBE_META(WBE_SERIALIZATION_ALIASES(compute_2)) = 2,
 };
 
 class RendResViewVK;

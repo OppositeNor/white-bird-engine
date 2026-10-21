@@ -43,7 +43,7 @@ namespace WhiteBirdEngine {
  * `subscribe<RTCPUInFlightBufferAcquireVK::AcquiredBuffer>(buffer_id, ...)`. Acquisitions never share memory, so consecutive recordings may be in flight
  * together. Wrap in RTTriggeredVK for on-demand acquisition. Instances are neither copyable nor movable.
  */
-class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [cpu_acquire_buffer]) RTCPUInFlightBufferAcquireVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK, WBE_SERIALIZATION_ALIASES(cpu_acquire_buffer)) RTCPUInFlightBufferAcquireVK final : public IRenderTaskVK {
 public:
     /**
      * @struct AcquiredBuffer

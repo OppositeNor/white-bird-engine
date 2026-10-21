@@ -52,7 +52,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
      * @brief Graph resource id of the whole-mesh transform buffer (one GeometryNodeGPU); required when the pipeline declares
      * REND_RES_MESH_TRANSFORM.
      */
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(graph))
     std::optional<std::string> transform;
     /**
      * @brief Render area; the swap chain extent by default.

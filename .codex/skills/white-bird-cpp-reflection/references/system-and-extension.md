@@ -35,20 +35,23 @@ its rendered content changes.
 | `WBE_STRICT_DESERIALIZATION` | strict_deserializations | strict `deserialize`; effective only with a static-serializable category |
 | `WBE_REFLECT_ENUM` / `WBE_REFLECT_ENUM_IGNORE` | reflected_enums | `EnumReflection<E>` and enum `SerializableSD` |
 | `WBE_REFLECT_SCRIPT` | reflect_script | Teal declaration plus SD/Access or `EnumReflection` |
-| `WBE_RENDER_TASK` | render_tasks | `render_task_registry.gen.cpp` |
+| `WBE_RENDER_TASK`, `WBE_RENDER_TASK(<method>)` | render_tasks | `render_task_registry.gen.cpp`; with a method, its recipe constructor in `build/<target>/teal/utils/render_graph_tasks.tl` |
 | `WBE_CLA_CONFIGURATION` | cla_configurations | `CLAConfiguration<T>` |
 | `WBE_LABEL(name, CATEGORY)` | static/dynamic labels | `LabelName<hash>`, `LabelManager` |
 | any annotated class | — | `TypeUUID<T>`, `TypeUUIDManager` (enums excluded) |
 
-Field and method annotations: `WBE_REFLECT`, `WBE_REFLECT_REQUIRED`, `WBE_ALIASES = [ ... ]`. Methods are recorded for every
-consumer, but only the render-task registry uses them today (it requires `create`).
+Field and method annotations: `WBE_REFLECT`, `WBE_REFLECT_REQUIRED`, `WBE_SERIALIZATION_ALIASES(...)`, and on render-task
+params fields that hold resource ids, `WBE_RECIPE_RESOURCE(graph)` or `WBE_RECIPE_RESOURCE(task_local)`. An attribute is a
+bare name or `NAME(<parameters>)`; reflection records the trimmed parameters by attribute name. Assignment syntax is an
+error. Methods are recorded for every consumer, but only the render-task registry and the recipe constructors use them
+today (both read `create`).
 
 ### Aliases
 
 Field deserialization checks the canonical key before aliases. Class aliases feed the factory, type-name registry, and
 render-task registry; enumerator aliases add extra names. Uniqueness is enforced per consumer: the factory throws at
 runtime, enums and render tasks fail the build with `#error`, and `TypeUUIDManager` silently overwrites, so keep names
-globally unique. The alias parser accepts a narrow comma-separated list of bare identifiers.
+globally unique. The alias parser accepts a comma-separated list of names of letters, digits, and underscores.
 
 ## Generated outputs
 

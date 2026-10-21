@@ -30,9 +30,9 @@ namespace WhiteBirdEngine {
  */
 enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortDirection : uint8_t {
     /** Sort every column, from the top. */
-    VERTICAL WBE_META(WBE_ALIASES = [vertical]),
+    VERTICAL WBE_META(WBE_SERIALIZATION_ALIASES(vertical)),
     /** Sort every row, from the left. */
-    HORIZONTAL WBE_META(WBE_ALIASES = [horizontal]),
+    HORIZONTAL WBE_META(WBE_SERIALIZATION_ALIASES(horizontal)),
 };
 
 /**
@@ -42,9 +42,9 @@ enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortDirection : uint8_t {
  */
 enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortScope : uint32_t {
     /** Sort all masked pixels of every line together, compacting them across unmasked gaps. */
-    LINE WBE_META(WBE_ALIASES = [line]) = 0,
+    LINE WBE_META(WBE_SERIALIZATION_ALIASES(line)) = 0,
     /** Sort every span, a maximal run of consecutive masked pixels of a line, independently. */
-    SPAN WBE_META(WBE_ALIASES = [span]) = 1,
+    SPAN WBE_META(WBE_SERIALIZATION_ALIASES(span)) = 1,
 };
 
 /**

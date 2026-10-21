@@ -27,6 +27,16 @@
         }
     },
     {
+        "out_dir" : "${build_dir}/teal/utils",
+        "output_name" : "render_graph_tasks.tl",
+        "template" : "teal_render_graph_tasks.tl.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "render_tasks" : ".render_tasks",
+            "reflect_script" : ".reflect_script"
+        }
+    },
+    {
         "out_dir" : "${root_dir}",
         "output_name" : "tlconfig.lua",
         "template" : "tlconfig.lua.jinja",

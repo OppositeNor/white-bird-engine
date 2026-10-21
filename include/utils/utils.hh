@@ -39,17 +39,17 @@ namespace WhiteBirdEngine {
 // Types of encoding. Reflected; the lowercase aliases are the names used in resource schemes.
 enum class WBE_META(WBE_REFLECT_ENUM) EncodeType {
     // Unknown encode type.
-    UNKNOWN WBE_META(WBE_ALIASES = [unknown]),
+    UNKNOWN WBE_META(WBE_SERIALIZATION_ALIASES(unknown)),
     // UTF8 (most recommended)
-    UTF8 WBE_META(WBE_ALIASES = [utf8]),
+    UTF8 WBE_META(WBE_SERIALIZATION_ALIASES(utf8)),
     // UTF16 little endian
-    UTF16LE WBE_META(WBE_ALIASES = [utf16le]),
+    UTF16LE WBE_META(WBE_SERIALIZATION_ALIASES(utf16le)),
     // UTF16 big endian
-    UTF16BE WBE_META(WBE_ALIASES = [utf16be]),
+    UTF16BE WBE_META(WBE_SERIALIZATION_ALIASES(utf16be)),
     // UTF32 little endian
-    UTF32LE WBE_META(WBE_ALIASES = [utf32le]),
+    UTF32LE WBE_META(WBE_SERIALIZATION_ALIASES(utf32le)),
     // UTF32 big endian
-    UTF32BE WBE_META(WBE_ALIASES = [utf32be])
+    UTF32BE WBE_META(WBE_SERIALIZATION_ALIASES(utf32be))
 };
 
 // Type of access.
@@ -488,9 +488,9 @@ using ChannelID = HashCode;
 // Color space. Reflected; the lowercase aliases are the names used in resource schemes.
 enum class WBE_META(WBE_REFLECT_ENUM) ColorSpace {
     // RGB space
-    RGB WBE_META(WBE_ALIASES = [rgb]),
+    RGB WBE_META(WBE_SERIALIZATION_ALIASES(rgb)),
     // SRGB space
-    SRGB WBE_META(WBE_ALIASES = [srgb])
+    SRGB WBE_META(WBE_SERIALIZATION_ALIASES(srgb))
 };
 
 /**

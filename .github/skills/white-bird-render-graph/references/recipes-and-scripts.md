@@ -111,15 +111,19 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
 
 1. Write `include/function/render_vk/rt_params_<name>_vk.hh` with
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
-   fields `WBE_REFLECT_REQUIRED` and reference pipelines by render-database key.
-2. Mark the task `WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ <name> ])` and declare
+   fields `WBE_REFLECT_REQUIRED` and reference pipelines by render-database key. Mark fields that hold resource ids
+   `WBE_RECIPE_RESOURCE(graph)`, or `WBE_RECIPE_RESOURCE(task_local)` for ids the task's aliases map, so the recipe
+   constructor also accepts resource handles there.
+2. Mark the task `WBE_META(WBE_RENDER_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))`, or with a bare
+   `WBE_RENDER_TASK` to register it without a recipe constructor, and declare
    `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`.
    Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const BaseRenderDataVK*)` if
    the task must add imports or aliases.
 3. Use `render_task_create_utils_vk.hh` (`acquire_task_compute_pipeline_vk`, `acquire_task_graphics_pipeline_vk`,
    `resolve_task_push_constants_vk`) in `create()`.
 4. Rebuild. `render_task_registry.gen.cpp` registers the class name and aliases; a missing `create` or duplicate name fails
-   the build. The params type appears in `wbe.d.tl` for Teal.
+   the build. The params type appears in `wbe.d.tl` for Teal, and `graph:<method>(id, params, options?)`, which creates
+   the type `<name>`, in the generated `utils.render_graph_tasks`.
 
 Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.hh` (standard), `rt_graphics_draw_mesh_vk.hh`
 (with `prepare_graph`), and `tests/unit/function/render_task_registry_vk_test_tasks.hh` (test probes).

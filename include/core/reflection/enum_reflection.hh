@@ -36,9 +36,9 @@ namespace WhiteBirdEngine {
  *
  * The specializations are generated in generated/enum_reflection.gen.hh; include it to use them. A specialization derives
  * from EnumReflectionBase, which documents the available methods. Enumerators may declare additional accepted names with
- * WBE_META(WBE_ALIASES = [name, ...]) after the enumerator name; an enumerator marked WBE_META(WBE_REFLECT_ENUM_IGNORE),
- * such as a count sentinel, has no reflected name and is not a reflected value. A header that declares a reflected enum must
- * not include the generated header, which includes every such header.
+ * WBE_META(WBE_SERIALIZATION_ALIASES(name, ...)) after the enumerator name; an enumerator marked
+ * WBE_META(WBE_REFLECT_ENUM_IGNORE), such as a count sentinel, has no reflected name and is not a reflected value. A header
+ * that declares a reflected enum must not include the generated header, which includes every such header.
  *
  * @tparam TEnum The reflected enum.
  */

@@ -27,9 +27,9 @@ namespace WhiteBirdEngine {
  */
 enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortOrientation : uint8_t {
     /** Sort every column, from the top. */
-    VERTICAL WBE_META(WBE_ALIASES = [vertical]),
+    VERTICAL WBE_META(WBE_SERIALIZATION_ALIASES(vertical)),
     /** Sort every row, from the left. */
-    HORIZONTAL WBE_META(WBE_ALIASES = [horizontal]),
+    HORIZONTAL WBE_META(WBE_SERIALIZATION_ALIASES(horizontal)),
 };
 
 /**

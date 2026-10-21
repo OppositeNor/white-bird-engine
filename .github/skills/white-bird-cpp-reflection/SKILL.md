@@ -21,7 +21,7 @@ string, list, and key-sorted map. JSON, TOML, and script backends only convert t
 | Reject unknown keys | add `WBE_STRICT_DESERIALIZATION` to a static-serializable class |
 | Name-based enum conversion | `WBE_META(WBE_REFLECT_ENUM)` on the enum; `WBE_META(WBE_REFLECT_ENUM_IGNORE)` on enumerators to skip |
 | Visible to Lua/Teal scripts | add `WBE_REFLECT_SCRIPT` (class or enum); it also makes the type static-serializable or a reflected enum |
-| A render-graph task type usable by recipes | `WBE_RENDER_TASK` with `WBE_ALIASES = [ recipe_type_name ]` (see below) |
+| A render-graph task type usable by recipes | `WBE_RENDER_TASK(<method>)` with `WBE_SERIALIZATION_ALIASES(recipe_type_name)` (see below) |
 | Command-line configuration | `WBE_CLA_CONFIGURATION` |
 | `TypeUUID<T>` only | any `WBE_META(...)` on a class |
 
@@ -36,13 +36,13 @@ instead of stacking a second annotation that already applies.
 
 namespace WhiteBirdEngine {
 
-struct WBE_META(WBE_SERIALIZABLE, WBE_ALIASES = [ LegacySettings ]) Settings final : public Serializable {
+struct WBE_META(WBE_SERIALIZABLE, WBE_SERIALIZATION_ALIASES(LegacySettings)) Settings final : public Serializable {
     WBE_DECL_SERIALIZABLE(Settings)
 
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string name;
 
-    WBE_META(WBE_REFLECT, WBE_ALIASES = [ old_quality ])
+    WBE_META(WBE_REFLECT, WBE_SERIALIZATION_ALIASES(old_quality))
     int32_t quality = 0;
 };
 
@@ -50,8 +50,9 @@ struct WBE_META(WBE_SERIALIZABLE, WBE_ALIASES = [ LegacySettings ]) Settings fin
 ```
 
 Only `WBE_REFLECT` fields enter generated code. `WBE_REFLECT_REQUIRED` makes deserialization throw when neither the canonical
-key nor an alias is present; optional fields keep their current value, except `std::optional<T>`, which is reset. Keep alias
-syntax exactly `WBE_ALIASES = [ NameA, NameB ]`. Enumerators take aliases too: `VALUE WBE_META(WBE_ALIASES = [ value ])`.
+key nor an alias is present; optional fields keep their current value, except `std::optional<T>`, which is reset. Declare
+aliases with `WBE_SERIALIZATION_ALIASES(NameA, NameB)`; an attribute is a bare name or `NAME(<parameters>)`, never an
+assignment. Enumerators take aliases too: `VALUE WBE_META(WBE_SERIALIZATION_ALIASES(value))`.
 
 Script-facing parameter structs, such as render-task params, combine the categories:
 
@@ -88,8 +89,11 @@ A `WBE_RENDER_TASK` class declares
 `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const BaseRenderDataVK*, const TParams&, const RendGraphContextVK&)`,
 where `TParams` is a strict, script-reflected params struct. The generated `render_task_registry.gen.cpp` implements
 `RenderTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
-`static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. The alias is the `type` name
-recipes use. See `include/function/render_vk/render_task_registry_vk.hh`.
+`static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. Each alias is a `type`
+name recipes can use. `WBE_RENDER_TASK(<method>)` also generates the recipe constructor `graph:<method>(id, params,
+options?)`, which uses the first alias; mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)` or
+`WBE_RECIPE_RESOURCE(task_local)` so that it accepts resource handles there. See
+`include/function/render_vk/render_task_registry_vk.hh` and `docs/renderer_vk/render_graph.md`.
 
 ## Script types and Teal declarations
 

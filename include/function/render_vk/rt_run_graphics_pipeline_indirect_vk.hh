@@ -50,7 +50,8 @@ namespace WhiteBirdEngine {
  * shared attachment layout. The task reports those accesses, its draw buffers, and every batch's reflected shader resources;
  * map them to graph resources with RendTaskDescVK::alias().
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline_indirect]) RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(draw_indirect), WBE_SERIALIZATION_ALIASES(run_graphics_pipeline_indirect))
+    RTRunGraphicsPipelineIndirectVK final : public IRenderTaskVK {
     /**
      * @class PipelineBatch
      * @brief One graphics pipeline and its contiguous range of indirect commands.

@@ -66,7 +66,7 @@ struct VertexBufferSourceVK {
  * layout, and reports those accesses, its vertex and index buffers, and its reflected shader resources. Map them to graph
  * resources with RendTaskDescVK::alias().
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_graphics_pipeline]) RTRunGraphicsPipelineVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(draw), WBE_SERIALIZATION_ALIASES(run_graphics_pipeline)) RTRunGraphicsPipelineVK final : public IRenderTaskVK {
     /**
      * @class Builder
      * @brief Configures a graphics draw. Copyable and movable; its allocator must outlive every copy.

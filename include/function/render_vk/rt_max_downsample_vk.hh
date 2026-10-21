@@ -53,7 +53,7 @@ class ROImageViewVK;
  * layout is validated while recording, because the graph may reallocate the views. Instances are neither copyable nor
  * movable.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [max_downsample]) RTMaxDownsampleVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK, WBE_SERIALIZATION_ALIASES(max_downsample)) RTMaxDownsampleVK final : public IRenderTaskVK {
     RTMaxDownsampleVK() = delete;
     virtual ~RTMaxDownsampleVK() override = default;
     RTMaxDownsampleVK(const RTMaxDownsampleVK&) = delete;

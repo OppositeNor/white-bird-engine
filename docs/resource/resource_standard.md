@@ -194,8 +194,11 @@ source_file = "assets/scripts/teal/utils/render_graph.tl"
   enforce this, but `require` resolves modules by id at runtime and by path in the Teal compiler and editor, so keep them in
   sync.
 - `.lua` sources are copied. `.tl` sources are type-checked and compiled to `<name>.lua` with the vendored Teal compiler; a
-  type error fails the build. Teal resolves `require` against the script root and the generated
-  `build/<target>/teal/wbe.d.tl`, so a Teal module can require a Lua module only through a `.d.tl` declaration next to it.
+  type error fails the build. Teal resolves `require` against the script root and the generated modules in
+  `build/<target>/teal/` (`wbe.d.tl` and `utils/render_graph_tasks.tl`), so a Teal module can require a Lua module only
+  through a `.d.tl` declaration next to it.
+- A generated script module is a resource too. Its `source_file` is relative to `build/<target>/teal/`, where ACP looks
+  first, and its entry sets `path` to keep the module's place under `assets/scripts/teal/`.
 - Recipes go in `render_graphs/`, reusable recipe parts in `render_graphs/features/`, and shared helpers in `utils/`.
   Test-only scripts go in `tests/` with `scope = "test_only"`.
 

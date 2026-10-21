@@ -41,7 +41,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION) RTParamsReg
 };
 
 // A GPU-free render task registered through RenderTaskRegistryVK; it records what create() received.
-class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [registry_probe, registry_probe_alias]) RTRegistryProbeVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK, WBE_SERIALIZATION_ALIASES(registry_probe, registry_probe_alias)) RTRegistryProbeVK final
+    : public IRenderTaskVK {
 public:
     RTRegistryProbeVK() = delete;
     RTRegistryProbeVK(const RenderContextVK* p_render_data, RTParamsRegistryProbeVK p_params, VkExtent2D p_extent)
@@ -91,7 +92,7 @@ private:
 };
 
 // A GPU-free render task whose prepare_graph() declares a graph buffer named after its label and aliases it for the task.
-class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [registry_preparing_probe]) RTRegistryPreparingProbeVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK, WBE_SERIALIZATION_ALIASES(registry_preparing_probe)) RTRegistryPreparingProbeVK final : public IRenderTaskVK {
 public:
     static constexpr std::string_view INPUT_ID = "probe_input";
 

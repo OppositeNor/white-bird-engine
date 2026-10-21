@@ -120,12 +120,14 @@ def setup_acp_compilers() -> None:
     acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     acp.add_compiler(WBEACPCompilerMesh())
     acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)]))
+    acp.add_compiler(WBEACPCompilerScript(
+        Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)], Path(script_types_dir)))
 
     test_env_acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
     test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
     test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, Path(model_compiler_cache_dir)))
     test_env_acp.add_compiler(WBEACPCompilerMesh())
     test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    test_env_acp.add_compiler(WBEACPCompilerScript(Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)]))
+    test_env_acp.add_compiler(WBEACPCompilerScript(
+        Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)], Path(script_types_dir)))
     acp_compilers_configured = True

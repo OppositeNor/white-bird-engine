@@ -31,9 +31,9 @@ namespace WhiteBirdEngine {
  */
 enum class WBE_META(WBE_REFLECT_SCRIPT) SVORecipeVariant : uint8_t {
     /** Construction publishes nodes with atomics as it allocates them. */
-    ATOMIC WBE_META(WBE_ALIASES = [atomic]),
+    ATOMIC WBE_META(WBE_SERIALIZATION_ALIASES(atomic)),
     /** Separate passes publish the nodes each construction pass allocates. */
-    PASS_PUBLISHED WBE_META(WBE_ALIASES = [pass_published]),
+    PASS_PUBLISHED WBE_META(WBE_SERIALIZATION_ALIASES(pass_published)),
 };
 
 /**

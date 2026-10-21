@@ -150,6 +150,11 @@ For non-trivial implementation tasks:
   Type each task's `params` with its reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`), since
   `RendRecipeTaskVK.params` is untyped. The generated repo-root `tlconfig.lua` points the Teal language server at the
   same paths for the last built target.
+- The typed graph constructors (`graph:compute()`, `graph:draw_mesh()`, ...) are generated into `utils.render_graph_tasks`
+  (`templates/teal_render_graph_tasks.tl.jinja`) from the task classes annotated `WBE_RENDER_TASK(<method>)`; each creates
+  the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare `WBE_RENDER_TASK` only registers the
+  type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)` or `WBE_RECIPE_RESOURCE(task_local)` so the
+  constructor accepts resource handles there; do not hand-write constructors or handle-bearing params records.
 
 ### Scripts
 
@@ -163,6 +168,9 @@ For non-trivial implementation tasks:
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
   a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/teal/` at compile time, so a
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
+- Modules that reflection generates (`utils.render_graph_tasks`) are written to `build/<target>/teal/`, which `require`
+  also resolves against. Their `lua_scripts.toml` entries give `source_file` relative to that directory, where the ACP
+  looks first, and set `path` under `assets/scripts/teal/`.
 - `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic
   requires fail. Implement new import sources as an `IScriptModuleResolver`, whose `try_resolve()` must not throw.
 
@@ -405,6 +413,9 @@ Document contracts, ownership, threading, and errors; do not restate signatures.
 ## Reflection / Codegen
 
 - All C++ header code are scanned by `build_script/reflection/metaparser.py`.
+- A `WBE_META` attribute is a bare name (`WBE_REFLECT`) or a name with parameters (`WBE_RENDER_TASK(compute)`), which
+  metadata keeps as trimmed text in `attribute_parameters`; there is no assignment syntax. Declare serialization aliases as
+  `WBE_SERIALIZATION_ALIASES(name, ...)`, each a name of letters, digits, and underscores.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.
 - `generate.json` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, and `source_dir`.

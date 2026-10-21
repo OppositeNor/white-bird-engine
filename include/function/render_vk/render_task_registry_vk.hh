@@ -28,7 +28,9 @@ namespace WhiteBirdEngine {
  * @brief Creates render-task factories from a task type name and DataValue parameters.
  *
  * The registry is generated from every class annotated with WBE_META(WBE_RENDER_TASK). A task type is registered under its
- * class name and under each WBE_ALIASES entry; a name used twice fails the build. Every such class must declare
+ * class name and under each WBE_SERIALIZATION_ALIASES entry; a name used twice fails the build. Annotating the class
+ * WBE_RENDER_TASK(<method>) instead also generates the recipe constructor Graph:<method>() of utils.render_graph, which
+ * creates the task type of the first alias. Every such class must declare
  *
  * @code
  * WBE_META(WBE_REFLECT)

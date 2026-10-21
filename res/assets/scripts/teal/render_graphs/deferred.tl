@@ -116,7 +116,7 @@ local record MeshTargets
 end
 
 -- Indirect lighting runs as two toggled tasks, the normal one and the voxel debug view. Expand its first handle to both.
-local function chain(p_builder: Builder, p_resource: graph_utils.Resource, p_tasks: {graph_utils.Task})
+local function chain(p_builder: Builder, p_resources: any, p_tasks: {graph_utils.Task})
     local expanded: {graph_utils.Task} = {}
     for _, task in ipairs(p_tasks) do
         if task == p_builder.tasks.indirect_lighting[1] then
@@ -127,7 +127,11 @@ local function chain(p_builder: Builder, p_resource: graph_utils.Resource, p_tas
             expanded[#expanded + 1] = task
         end
     end
-    p_builder.graph:chain(p_resource, expanded)
+    if (p_resources as graph_utils.Resource).id ~= nil then
+        p_builder.graph:chain(p_resources as graph_utils.Resource, expanded)
+    else
+        p_builder.graph:chain(p_resources as {graph_utils.Resource}, expanded)
+    end
 end
 
 local function compute(p_builder: Builder, p_id: string, p_pipeline: string, p_group_count_x: integer,
@@ -303,7 +307,6 @@ local function add_shadow_filtering(p_builder: Builder)
             }
             tasks.build_shadow_sat = p_builder.graph:compute_sequential(light_id("build_shadow_sat", light), params, {
                 aliases = {
-                    shadow_moments = resources[light_id("shadow_moments", light)],
                     shadow_sat_horizontal = resources[light_id("shadow_sat_horizontal", light)],
                     shadow_sat = resources[light_id("shadow_sat", light)],
                 },
@@ -456,17 +459,14 @@ local function connect_shadow_passes(p_builder: Builder)
         local light_tasks = p_builder.light_tasks[light + 1]
         local dynamic_second = light_tasks.dynamic_shadow_second
         local passes = { light_tasks.run_shadow_opaque, light_tasks.run_shadow_double_sided, light_tasks.dynamic_shadow, dynamic_second }
-        for _, target in ipairs({ "shadowmap_color", "rsm_normal", "shadow_moments", "shadowmap_depth" }) do
-            chain(p_builder, resources[light_id(target, light)], passes)
-        end
-        for _, color in ipairs({ "shadowmap_color", "rsm_normal" }) do
-            chain(p_builder, resources[light_id(color, light)], { dynamic_second, tasks.run_direct_lighting })
-            chain(p_builder, resources[light_id(color, light)], { dynamic_second, tasks.indirect_lighting[1] })
-        end
+        local colors = { resources[light_id("shadowmap_color", light)], resources[light_id("rsm_normal", light)] }
         local moments = resources[light_id("shadow_moments", light)]
+        chain(p_builder, { colors[1], colors[2], moments, resources[light_id("shadowmap_depth", light)] }, passes)
+        chain(p_builder, colors, { dynamic_second, tasks.run_direct_lighting })
+        chain(p_builder, colors, { dynamic_second, tasks.indirect_lighting[1] })
         if p_builder.context.summed_area_table then
             local build = light_tasks.build_shadow_sat
-            chain(p_builder, moments, { dynamic_second, build })
+            build:inputs_from(dynamic_second, { shadow_moments = moments })
             chain(p_builder, moments, { dynamic_second, tasks.run_direct_lighting })
             chain(p_builder, moments, { dynamic_second, tasks.indirect_lighting[1] })
             chain(p_builder, resources[light_id("shadow_sat", light)], { build, tasks.run_direct_lighting })
@@ -483,13 +483,10 @@ local function connect_gbuffer_passes(p_builder: Builder)
     local resources = p_builder.resources
     local tasks = p_builder.tasks
     local gbuffer_passes = { tasks.run_gbuffer, tasks.run_gbuffer_double_sided, tasks.dynamic_gbuffer, tasks.dynamic_gbuffer_second, tasks.run_direct_lighting }
-    for _, color in ipairs({ resources.gbuffer_albedo, resources.gbuffer_normal, resources.gbuffer_rma }) do
-        chain(p_builder, color, gbuffer_passes)
-        chain(p_builder, color, { tasks.dynamic_gbuffer_second, tasks.indirect_lighting[1] })
-    end
+    local gbuffer_resources = { resources.gbuffer_albedo, resources.gbuffer_normal, resources.gbuffer_rma, resources.gbuffer_depth }
+    chain(p_builder, gbuffer_resources, gbuffer_passes)
+    chain(p_builder, gbuffer_resources, { tasks.dynamic_gbuffer_second, tasks.indirect_lighting[1] })
     chain(p_builder, resources.gbuffer_rma, { tasks.dynamic_gbuffer_second, tasks.combine_lighting })
-    chain(p_builder, resources.gbuffer_depth, gbuffer_passes)
-    chain(p_builder, resources.gbuffer_depth, { tasks.dynamic_gbuffer_second, tasks.indirect_lighting[1] })
     -- The voxel overlays depth-test against the G-buffer depth after lighting has sampled it.
     chain(p_builder, resources.gbuffer_depth, { tasks.run_direct_lighting, tasks.voxel })
     local depth_overlays = { tasks.indirect_lighting[1], tasks.voxel }
@@ -506,12 +503,10 @@ local function connect_composition(p_builder: Builder, p_result_writer: graph_ut
     local tasks = p_builder.tasks
     chain(p_builder, resources.direct_lighting, { tasks.run_direct_lighting, tasks.combine_lighting })
     chain(p_builder, resources.indirect_lighting, { tasks.indirect_lighting[1], tasks.combine_lighting })
-    chain(p_builder, resources.result_image, { p_result_writer, tasks.extract_bloom })
-    chain(p_builder, resources.result_image, { p_result_writer, tasks.present_result_image })
+    p_result_writer:connect_all({ tasks.extract_bloom, tasks.present_result_image, tasks.present_frame_sequence }, resources.result_image)
     -- The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
     chain(p_builder, resources.bloom_ping, { tasks.extract_bloom, tasks.blur_bloom, tasks.acquire_bloom, tasks.present_result_image })
     -- The frame sequence presents the same result and bloom into its own image, which it then acquires.
-    chain(p_builder, resources.result_image, { p_result_writer, tasks.present_frame_sequence })
     chain(p_builder, resources.bloom_ping, { tasks.blur_bloom, tasks.present_frame_sequence })
     chain(p_builder, resources.frame_sequence, { tasks.present_frame_sequence, tasks.acquire_frame_sequence })
     local swap_chain_users = { tasks.present_result_image, tasks.voxel }

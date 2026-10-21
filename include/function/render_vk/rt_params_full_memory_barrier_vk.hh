@@ -30,7 +30,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Graph resource the barrier reports writing, which carries the edge to the task ordered after it.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
     std::string resource;
 };
 

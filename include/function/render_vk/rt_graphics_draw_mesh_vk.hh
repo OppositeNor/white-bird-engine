@@ -44,7 +44,7 @@ namespace WhiteBirdEngine {
  *
  * Rendering-thread confined; neither copyable nor movable.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [graphics_draw_mesh]) RTGraphicsDrawMeshVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(draw_mesh), WBE_SERIALIZATION_ALIASES(graphics_draw_mesh)) RTGraphicsDrawMeshVK final : public IRenderTaskVK {
     RTGraphicsDrawMeshVK() = delete;
     virtual ~RTGraphicsDrawMeshVK() override = default;
     RTGraphicsDrawMeshVK(const RTGraphicsDrawMeshVK&) = delete;

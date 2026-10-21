@@ -36,7 +36,8 @@ namespace WhiteBirdEngine {
  * to order a frame's mutation of persistent state after the previous frame's consumers, which the graph does not see as
  * edges. Neither copyable nor movable; confined to the rendering thread.
  */
-class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [full_memory_barrier]) RTFullMemoryBarrierVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK(full_memory_barrier), WBE_SERIALIZATION_ALIASES(full_memory_barrier))
+    RTFullMemoryBarrierVK final : public IRenderTaskVK {
 public:
     RTFullMemoryBarrierVK() = delete;
     /**

@@ -138,7 +138,8 @@ local overlay = graph:import_task("draw_imgui")
 ```
 
 The constructors are `:compute`, `:draw`, `:draw_mesh`, `:draw_indirect`, `:compute_indirect`, `:compute_sequential`,
-`:generate_mipmaps`, `:cpu_acquire_image`, `:full_memory_barrier`, and `:ping_pong`. Each takes `(id, params, options?)`;
+`:generate_mipmaps`, `:cpu_acquire_image`, `:full_memory_barrier`, and `:ping_pong`, generated from the task types that
+name them (see [Task types](#task-types)). Each takes `(id, params, options?)`;
 `options` can supply task-local `aliases`, `uses`, `trigger`, and `toggle`. Their signatures type-check parameters against
 the reflected C++ types or the handle-bearing `graph_utils.*Params` counterparts. Constructors copy parameter data and
 option tables while preserving resource handle identity. `:import_task(id)` registers an externally supplied C++ task.
@@ -147,6 +148,39 @@ option tables while preserving resource handle identity. `:import_task(id)` regi
 `graph:chain(resource, { producer, consumer })`, or connect directly with `producer:connect(consumer, resource)`.
 Connections remain explicit and resource-specific. Both methods require actual task handles from the same graph;
 matching string IDs or lookalike tables are insufficient. Subgraph tasks participate in connections the same way.
+
+Connections and chains accept one resource handle or a non-empty list of handles:
+
+```lua
+gbuffer:connect(lighting, { albedo, normal, depth })
+graph:chain({ color, depth }, { first, second, third })
+```
+
+Each resource expands independently into the existing edges. A chain connects adjacent tasks in order; every adjacent
+pair must access every listed resource. Resource lists preserve their input order.
+
+Use `producer:connect_all(consumers, resources)` for fan-out. It connects the producer to each consumer, leaving the
+consumers unordered relative to one another:
+
+```lua
+composition:connect_all({ extract_bloom, present, present_frame_sequence }, result_image)
+```
+
+`consumer:inputs_from(producer, bindings)` combines task-local aliases and producer-to-consumer edges:
+
+```lua
+lighting:inputs_from(gbuffer, {
+    gbuffer_albedo = albedo,
+    gbuffer_normal = normal,
+    gbuffer_depth = depth,
+})
+```
+
+Bindings are processed in sorted local-name order. Multiple names for the same resource handle create one edge per call;
+distinct handles remain visible to resource validation. Existing alias names cannot be rebound. All endpoints must belong
+to the same graph, and batches validate all arguments before changing aliases or edges. Resource lists and fan-out target
+lists must be dense and non-empty; empty or single-task chains retain their existing no-op behavior. These methods return
+the receiving task for fluent calls. The helpers retain explicit ordering and do not infer accesses from aliases or `uses`.
 
 `task:alias(local_name, resource)` binds a task-local resource name and returns the task for fluent calls. Two tasks can
 use the same local name for different resource handles. Repeating a local alias name within one task is an error.
@@ -194,8 +228,9 @@ graph:generate_mipmaps("shadow_mipmaps", {
 })
 ```
 
-These adapters retain handles and lower only the known resource fields to IDs. A task-local alias cannot redirect an ID
-passed as a parameter handle to a different resource; constructors, alias calls, and builds validate this contract.
+These adapters retain handles and lower only the `WBE_RECIPE_RESOURCE` fields of the params to IDs. A task-local alias
+cannot redirect an ID passed as a parameter handle to a different resource; constructors, alias calls, and builds validate
+this contract.
 Sequential dispatch handles use task-local
 identity aliases under their resource IDs; an existing alias redirecting that ID to a different resource is rejected.
 Existing string dispatch aliases remain local to the containing task.
@@ -254,25 +289,33 @@ pattern.
 ### Task types
 
 Recipes refer to task types by name. A type is registered by annotating its class
-`WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ <name> ])` and declaring a reflected static
+`WBE_META(WBE_RENDER_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))` and declaring a reflected static
 `create(const RenderContextVK*, const <Params>&, const RendGraphContextVK&)`. The params struct is
 `WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT`. An optional static `prepare_graph()` lets the type add
 imports and aliases when it is added (`RTGraphicsDrawMeshVK` uses it to import meshes). Reflection generates the
-`RenderTaskRegistryVK` implementation and the Teal declarations of the params.
+`RenderTaskRegistryVK` implementation, the Teal declarations of the params, and, into `utils.render_graph_tasks`, the
+`graph:<method>(id, params, options?)` constructor, which creates the type `<name>`. A bare `WBE_RENDER_TASK` registers the
+type without a constructor.
 
-| Type | Task | Purpose |
-| --- | --- | --- |
-| `run_compute_pipeline` | `RTRunComputePipelineVK` | One compute dispatch |
-| `run_compute_pipeline_indirect` | `RTRunComputePipelineIndirectVK` | Dispatch with counts read from a buffer |
-| `run_compute_pipelines_sequential` | `RTRunComputePipelinesSequentialVK` | Ordered compute passes in one command buffer |
-| `ping_pong` | `RTPingPongVK` | Alternates two compute pipelines for N iterations |
-| `max_downsample` | `RTMaxDownsampleVK` | Mip chain by 2x2 maximum |
-| `run_graphics_pipeline` | `RTRunGraphicsPipelineVK` | One graphics pipeline draw |
-| `run_graphics_pipeline_indirect` | `RTRunGraphicsPipelineIndirectVK` | Non-mesh indexed indirect draws |
-| `graphics_draw_mesh` | `RTGraphicsDrawMeshVK` | Draws parts of a compiled mesh |
-| `generate_mipmaps` | `RTGenerateMipmapsVK` | Color mip chain with filtered blits |
-| `full_memory_barrier` | `RTFullMemoryBarrierVK` | Orders a frame's mutation of persistent state after the previous frame's consumers |
-| `cpu_acquire_image` / `cpu_acquire_buffer` | `RTCPUInFlightAcquireVK` / `RTCPUInFlightBufferAcquireVK` | Asynchronous CPU readback, delivered through `EventManager` |
+Annotate a params field that holds resource ids `WBE_RECIPE_RESOURCE(graph)` for graph resource ids, or
+`WBE_RECIPE_RESOURCE(task_local)` for ids the task's aliases map. The field holds a `std::string`, optional or in a vector,
+or a `DataValue` map of ids. The constructor of params with such fields, directly or in nested params, takes an authoring
+interface named after the C++ params that also accepts resource handles there; `utils.render_graph` re-exports the ones
+recipes name as `graph_utils.*Params` records.
+
+| Type | Constructor | Task | Purpose |
+| --- | --- | --- | --- |
+| `run_compute_pipeline` | `:compute` | `RTRunComputePipelineVK` | One compute dispatch |
+| `run_compute_pipeline_indirect` | `:compute_indirect` | `RTRunComputePipelineIndirectVK` | Dispatch with counts read from a buffer |
+| `run_compute_pipelines_sequential` | `:compute_sequential` | `RTRunComputePipelinesSequentialVK` | Ordered compute passes in one command buffer |
+| `ping_pong` | `:ping_pong` | `RTPingPongVK` | Alternates two compute pipelines for N iterations |
+| `max_downsample` | — | `RTMaxDownsampleVK` | Mip chain by 2x2 maximum |
+| `run_graphics_pipeline` | `:draw` | `RTRunGraphicsPipelineVK` | One graphics pipeline draw |
+| `run_graphics_pipeline_indirect` | `:draw_indirect` | `RTRunGraphicsPipelineIndirectVK` | Non-mesh indexed indirect draws |
+| `graphics_draw_mesh` | `:draw_mesh` | `RTGraphicsDrawMeshVK` | Draws parts of a compiled mesh |
+| `generate_mipmaps` | `:generate_mipmaps` | `RTGenerateMipmapsVK` | Color mip chain with filtered blits |
+| `full_memory_barrier` | `:full_memory_barrier` | `RTFullMemoryBarrierVK` | Orders a frame's mutation of persistent state after the previous frame's consumers |
+| `cpu_acquire_image` / `cpu_acquire_buffer` | `:cpu_acquire_image` / — | `RTCPUInFlightAcquireVK` / `RTCPUInFlightBufferAcquireVK` | Asynchronous CPU readback, delivered through `EventManager` |
 
 Compute types take a `queue_family` param and a `push_constants` table.
 

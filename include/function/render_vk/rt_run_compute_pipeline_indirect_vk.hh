@@ -39,7 +39,8 @@ namespace WhiteBirdEngine {
  * @details The task reports its reflected shader accesses and an indirect read of the indirect buffer; map reflected
  * resource ids to graph resources with RendTaskDescVK::alias(). Neither copyable nor movable.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipeline_indirect]) RTRunComputePipelineIndirectVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(compute_indirect), WBE_SERIALIZATION_ALIASES(run_compute_pipeline_indirect))
+    RTRunComputePipelineIndirectVK final : public IRenderTaskVK {
     RTRunComputePipelineIndirectVK() = delete;
     virtual ~RTRunComputePipelineIndirectVK() override = default;
     RTRunComputePipelineIndirectVK(const RTRunComputePipelineIndirectVK&) = delete;

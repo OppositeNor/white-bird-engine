@@ -59,4 +59,23 @@ TEST(WBETealDeclarationsTest, DeclaresTheScriptTypesOfTheTestExecutablesInTestTa
     EXPECT_NE(declarations.find("        variant: SVORecipeVariant | integer\n"), std::string::npos);
 }
 
+TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks) {
+    const std::string constructors = read_declarations("utils/render_graph_tasks.tl");
+    // WBE_RENDER_TASK(<method>) names a constructor, which creates the task type of the class's first serialization alias.
+    EXPECT_NE(constructors.find("        compute: function(self: Self, p_id: string, p_params: wbe.RTParamsRunComputePipelineVK,\n"),
+        std::string::npos);
+    EXPECT_NE(constructors.find("p_make_task(p_id, \"run_compute_pipeline\", p_params, p_options, compute_fields)"), std::string::npos);
+    // Params with WBE_RECIPE_RESOURCE fields, directly or in nested params, take an authoring interface instead.
+    EXPECT_NE(constructors.find("p_params: RTParamsGraphicsDrawMeshVK<Resource>,\n"), std::string::npos);
+    EXPECT_NE(constructors.find("    interface RTParamsGraphicsDrawMeshVK<Resource>\n"), std::string::npos);
+    EXPECT_NE(constructors.find("        transform: Resource | string\n"), std::string::npos);
+    EXPECT_NE(constructors.find("        parts: {wbe.MeshPartVK | integer}\n"), std::string::npos);
+    EXPECT_NE(constructors.find("        dispatches: {RTParamsComputeDispatchVK<Resource>}\n"), std::string::npos);
+    EXPECT_NE(constructors.find("        aliases: {string:Resource | string}\n"), std::string::npos);
+    EXPECT_NE(constructors.find("{ name = \"indirect_buffer\", kind = \"resource\", scope = \"task_local\" }"), std::string::npos);
+    // A bare WBE_RENDER_TASK registers its task type without a constructor.
+    EXPECT_EQ(constructors.find("max_downsample"), std::string::npos);
+    EXPECT_EQ(constructors.find("registry_probe"), std::string::npos);
+}
+
 } // namespace WhiteBirdEngine

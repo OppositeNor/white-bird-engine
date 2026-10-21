@@ -35,12 +35,12 @@ namespace WhiteBirdEngine {
  * Reflected; the aliases are the type names written in WBE_DESCRIPTOR.
  */
 enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorHeapTypeVK : uint8_t {
-    UNIFORM_BUFFER WBE_META(WBE_ALIASES = [uniform_buffer]),
-    STORAGE_BUFFER WBE_META(WBE_ALIASES = [storage_buffer]),
-    SAMPLED_IMAGE WBE_META(WBE_ALIASES = [sampled_image]),
-    STORAGE_IMAGE WBE_META(WBE_ALIASES = [storage_image]),
-    SAMPLER WBE_META(WBE_ALIASES = [sampler]),
-    ACCELERATION_STRUCTURE WBE_META(WBE_ALIASES = [acceleration_structure]),
+    UNIFORM_BUFFER WBE_META(WBE_SERIALIZATION_ALIASES(uniform_buffer)),
+    STORAGE_BUFFER WBE_META(WBE_SERIALIZATION_ALIASES(storage_buffer)),
+    SAMPLED_IMAGE WBE_META(WBE_SERIALIZATION_ALIASES(sampled_image)),
+    STORAGE_IMAGE WBE_META(WBE_SERIALIZATION_ALIASES(storage_image)),
+    SAMPLER WBE_META(WBE_SERIALIZATION_ALIASES(sampler)),
+    ACCELERATION_STRUCTURE WBE_META(WBE_SERIALIZATION_ALIASES(acceleration_structure)),
 };
 
 /**
@@ -51,11 +51,11 @@ enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorHeapTypeVK : uint8_t {
  */
 enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorAccessVK : uint8_t {
     /** The shader only reads the resource. */
-    READ WBE_META(WBE_ALIASES = [read]),
+    READ WBE_META(WBE_SERIALIZATION_ALIASES(read)),
     /** The shader only writes the resource. */
-    WRITE WBE_META(WBE_ALIASES = [write]),
+    WRITE WBE_META(WBE_SERIALIZATION_ALIASES(write)),
     /** The shader reads and writes the resource. */
-    READ_WRITE WBE_META(WBE_ALIASES = [read_write]),
+    READ_WRITE WBE_META(WBE_SERIALIZATION_ALIASES(read_write)),
 };
 
 /**

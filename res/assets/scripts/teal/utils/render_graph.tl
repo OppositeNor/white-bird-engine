@@ -16,6 +16,7 @@
 -- Resource and task handles describe a graph; Graph:build() emits the plain recipe tables C++ consumes.
 
 local type wbe = require("wbe")
+local render_graph_tasks = require("utils.render_graph_tasks")
 
 local record render_graph
     image_view: function(p_id: string, p_image: Resource, p_view?: wbe.RendImageViewParamsVK): Resource
@@ -28,68 +29,24 @@ local record render_graph
         view: function(self: Resource, p_id?: string, p_view?: wbe.RendImageViewParamsVK): Resource
     end
 
-    -- Resource-bearing task parameters mirror the reflected C++ descriptions, replacing resource IDs with handles.
+    -- Resource-bearing task parameters mirror the reflected C++ descriptions, accepting handles in place of the resource
+    -- IDs of their WBE_RECIPE_RESOURCE fields (see utils.render_graph_tasks).
     -- String IDs remain accepted for existing recipes and task-local names in sequential dispatches.
-    record DrawMeshParams
-        mesh: string
-        pipeline: string
-        parts: {wbe.MeshPartVK | integer}
-        transform: Resource | string
-        render_extent: wbe.RendExtent2DParamsVK
-        clear_values: {wbe.RTParamsClearValueVK}
-        color_load_op: wbe.AttachmentLoadOpVK | integer
-        depth_load_op: wbe.AttachmentLoadOpVK | integer
+    record DrawMeshParams is render_graph_tasks.RTParamsGraphicsDrawMeshVK<Resource>
     end
-
-    record DrawIndirectParams
-        pipeline: string
-        index_buffer: Resource | string
-        indirect_buffer: Resource | string
-        draw_count: integer
-        render_extent: wbe.RendExtent2DParamsVK
-        clear_values: {wbe.RTParamsClearValueVK}
-        color_load_op: wbe.AttachmentLoadOpVK | integer
-        depth_load_op: wbe.AttachmentLoadOpVK | integer
+    record DrawIndirectParams is render_graph_tasks.RTParamsRunGraphicsPipelineIndirectVK<Resource>
     end
-
-    record ComputeIndirectParams
-        pipeline: string
-        indirect_buffer: Resource | string
-        indirect_offset: integer
-        queue_family: wbe.QueueFamilyVK | integer
-        push_constants: any
+    record ComputeIndirectParams is render_graph_tasks.RTParamsRunComputePipelineIndirectVK<Resource>
     end
-
-    record ComputeDispatchParams
-        pipeline: string
-        indirect_buffer: Resource | string
-        indirect_offset: integer
-        aliases: {string:Resource | string}
-        group_count_x: integer
-        group_count_y: integer
-        group_count_z: integer
-        push_constants: any
+    record ComputeDispatchParams is render_graph_tasks.RTParamsComputeDispatchVK<Resource>
     end
-
-    record ComputeSequentialParams
-        dispatches: {ComputeDispatchParams}
-        queue_family: wbe.QueueFamilyVK | integer
+    record ComputeSequentialParams is render_graph_tasks.RTParamsRunComputePipelinesSequentialVK<Resource>
     end
-
-    record GenerateMipmapsParams
-        source_view: Resource | string
-        mip_chain_view: Resource | string
-        base_extent: wbe.RendExtent2DParamsVK
-        mipmap_level_count: integer
-        format: wbe.ImageFormatVK | integer
+    record GenerateMipmapsParams is render_graph_tasks.RTParamsGenerateMipmapsVK<Resource>
     end
-
-    record CPUAcquireImageParams
-        image_view: Resource | string
+    record CPUAcquireImageParams is render_graph_tasks.RTParamsCPUInFlightAcquireVK<Resource>
     end
-
-    record FullMemoryBarrierParams
-        resource: Resource | string
+    record FullMemoryBarrierParams is render_graph_tasks.RTParamsFullMemoryBarrierVK<Resource>
     end
 
     record TaskOptions
@@ -115,6 +72,10 @@ local record render_graph
         graph: Graph
         alias: function(self: Task, p_local_name: string, p_resource: Resource): Task
         connect: function(self: Task, p_next_task: Task, p_resource: Resource): Task
+        connect: function(self: Task, p_next_task: Task, p_resources: {Resource}): Task
+        connect_all: function(self: Task, p_next_tasks: {Task}, p_resource: Resource): Task
+        connect_all: function(self: Task, p_next_tasks: {Task}, p_resources: {Resource}): Task
+        inputs_from: function(self: Task, p_producer: Task, p_bindings: {string:Resource}): Task
         color_target: function(self: Task, p_index: integer, p_resource: Resource): Task
         depth_target: function(self: Task, p_resource: Resource): Task
         trigger: wbe.RendRecipeTriggerVK
@@ -126,30 +87,15 @@ local record render_graph
         uses: {Resource}
     end
 
-    record Graph
+    -- The typed task constructors, such as compute and draw_mesh, come from the render tasks annotated
+    -- WBE_RENDER_TASK(<method>) (see utils.render_graph_tasks), which must not shadow the members declared here.
+    record Graph is render_graph_tasks.Graph<Resource, Task, TaskOptions, Graph>
         tasks: {Task}
         add: function(self: Graph, p_task: Task): Task
         get: function(self: Graph, p_id: string): Task
-        compute: function(self: Graph, p_id: string, p_params: wbe.RTParamsRunComputePipelineVK,
-            p_options?: TaskOptions): Task
-        draw: function(self: Graph, p_id: string, p_params: wbe.RTParamsRunGraphicsPipelineVK,
-            p_options?: TaskOptions): Task
-        draw_mesh: function(self: Graph, p_id: string, p_params: DrawMeshParams, p_options?: TaskOptions): Task
-        draw_indirect: function(self: Graph, p_id: string, p_params: DrawIndirectParams, p_options?: TaskOptions): Task
-        compute_indirect: function(self: Graph, p_id: string, p_params: ComputeIndirectParams,
-            p_options?: TaskOptions): Task
-        compute_sequential: function(self: Graph, p_id: string, p_params: ComputeSequentialParams,
-            p_options?: TaskOptions): Task
-        generate_mipmaps: function(self: Graph, p_id: string, p_params: GenerateMipmapsParams,
-            p_options?: TaskOptions): Task
-        cpu_acquire_image: function(self: Graph, p_id: string, p_params: CPUAcquireImageParams,
-            p_options?: TaskOptions): Task
-        full_memory_barrier: function(self: Graph, p_id: string, p_params: FullMemoryBarrierParams,
-            p_options?: TaskOptions): Task
-        ping_pong: function(self: Graph, p_id: string, p_params: wbe.RTParamsPingPongVK,
-            p_options?: TaskOptions): Task
         import_task: function(self: Graph, p_id: string): Task
         chain: function(self: Graph, p_resource: Resource, p_tasks: {Task})
+        chain: function(self: Graph, p_resources: {Resource}, p_tasks: {Task})
         build: function(self: Graph, p_imports?: {string}, p_ports?: {string}): wbe.RendGraphRecipeVK
     end
 end
@@ -160,6 +106,74 @@ local function validate_id(p_id: string)
     end
 end
 
+local function sorted_keys<T>(p_map: {string:T}): {string}
+    local keys: {string} = {}
+    for key in pairs(p_map) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys)
+    return keys
+end
+
+local function validate_resource(p_resource: render_graph.Resource)
+    if type(p_resource) ~= "table" then
+        error("render_graph: expected a resource handle.", 3)
+    end
+    validate_id(p_resource.id)
+    if type(p_resource.kind) ~= "string" or type(p_resource.dependencies) ~= "table" then
+        error("render_graph: expected a resource handle.", 3)
+    end
+end
+
+local function validate_list<T>(p_values: {T}, p_name: string, p_allow_empty: boolean)
+    if type(p_values) ~= "table" then
+        error("render_graph: expected a dense " .. p_name .. " list.", 3)
+    end
+    local count = 0
+    for key in pairs(p_values as {any:any}) do
+        if type(key) ~= "number" then
+            error("render_graph: expected a dense " .. p_name .. " list.", 3)
+        end
+        local index = key as number
+        if index < 1 or index % 1 ~= 0 then
+            error("render_graph: expected a dense " .. p_name .. " list.", 3)
+        end
+        count = count + 1
+    end
+    for i = 1, count do
+        if p_values[i] == nil then
+            error("render_graph: expected a dense " .. p_name .. " list.", 3)
+        end
+    end
+    if count == 0 and not p_allow_empty then
+        error("render_graph: the " .. p_name .. " list must not be empty.", 3)
+    end
+end
+
+-- Teal cannot discriminate a record/array union; the public methods expose typed overloads instead.
+local function connection_resources(p_resources: any): {render_graph.Resource}
+    if type(p_resources) ~= "table" then
+        error("render_graph: expected a resource handle or a non-empty resource list.", 3)
+    end
+    if (p_resources as render_graph.Resource).id ~= nil then
+        local resource = p_resources as render_graph.Resource
+        validate_resource(resource)
+        return { resource }
+    end
+    local resources = p_resources as {render_graph.Resource}
+    validate_list(resources, "resource", false)
+    for _, resource in ipairs(resources) do
+        validate_resource(resource)
+    end
+    return resources
+end
+
+local function append_edge(p_producer: render_graph.Task, p_consumer: render_graph.Task,
+    p_resource: render_graph.Resource)
+    p_producer.edges = p_producer.edges or {}
+    p_producer.edges[#p_producer.edges + 1] = { to = p_consumer, resource = p_resource }
+end
+
 local function attach_task(p_task: render_graph.Task,
     p_validate_task?: function(p_task: render_graph.Task, p_local_name?: string,
         p_resource?: render_graph.Resource)): render_graph.Task
@@ -168,7 +182,7 @@ local function attach_task(p_task: render_graph.Task,
             error("render_graph: add the task to a graph before assigning an alias.", 2)
         end
         validate_id(p_local_name)
-        validate_id(p_resource.id)
+        validate_resource(p_resource)
         p_validate_task(self, p_local_name, p_resource)
         self.aliases = self.aliases or {}
         if self.aliases[p_local_name] ~= nil then
@@ -178,14 +192,69 @@ local function attach_task(p_task: render_graph.Task,
         return self
     end
 
-    function p_task:connect(p_next_task: render_graph.Task, p_resource: render_graph.Resource): render_graph.Task
+    local function connect(self: render_graph.Task, p_next_task: render_graph.Task,
+        p_resources: any): render_graph.Task
         if p_validate_task == nil then
             error("render_graph: add the task to a graph before connecting it.", 2)
         end
         p_validate_task(self)
-        self.graph:chain(p_resource, { self, p_next_task })
+        p_validate_task(p_next_task)
+        self.graph:chain(connection_resources(p_resources), { self, p_next_task })
         return self
     end
+    p_task.connect = connect
+
+    local function connect_all(self: render_graph.Task, p_next_tasks: {render_graph.Task},
+        p_resources: any): render_graph.Task
+        if p_validate_task == nil then
+            error("render_graph: add the task to a graph before connecting it.", 2)
+        end
+        p_validate_task(self)
+        validate_list(p_next_tasks, "target task", false)
+        for _, task in ipairs(p_next_tasks) do
+            p_validate_task(task)
+        end
+        local resources = connection_resources(p_resources)
+        for _, resource in ipairs(resources) do
+            for _, task in ipairs(p_next_tasks) do
+                append_edge(self, task, resource)
+            end
+        end
+        return self
+    end
+    p_task.connect_all = connect_all
+
+    function p_task:inputs_from(p_producer: render_graph.Task,
+        p_bindings: {string:render_graph.Resource}): render_graph.Task
+        if p_validate_task == nil then
+            error("render_graph: add the task to a graph before assigning inputs.", 2)
+        end
+        p_validate_task(self)
+        p_validate_task(p_producer)
+        if type(p_bindings) ~= "table" or next(p_bindings) == nil then
+            error("render_graph: input bindings must be a non-empty map of task-local names to resources.", 2)
+        end
+        for local_name, resource in pairs(p_bindings) do
+            validate_id(local_name)
+            validate_resource(resource)
+            p_validate_task(self, local_name, resource)
+            if self.aliases ~= nil and self.aliases[local_name] ~= nil then
+                error("render_graph: task-local resource '" .. local_name .. "' is mapped more than once.", 2)
+            end
+        end
+        self.aliases = self.aliases or {}
+        local connected: {render_graph.Resource:boolean} = {}
+        for _, local_name in ipairs(sorted_keys(p_bindings)) do
+            local resource = p_bindings[local_name]
+            self.aliases[local_name] = resource
+            if not connected[resource] then
+                append_edge(p_producer, self, resource)
+                connected[resource] = true
+            end
+        end
+        return self
+    end
+
     function p_task:color_target(p_index: integer, p_resource: render_graph.Resource): render_graph.Task
         if type(p_index) ~= "number" or p_index < 0 or p_index % 1 ~= 0 then
             error("render_graph: color attachment indices must be non-negative integers.", 2)
@@ -197,15 +266,6 @@ local function attach_task(p_task: render_graph.Task,
         return self:alias("render_target_depth", p_resource)
     end
     return p_task
-end
-
-local function sorted_keys<T>(p_map: {string:T}): {string}
-    local keys: {string} = {}
-    for key in pairs(p_map) do
-        keys[#keys + 1] = key
-    end
-    table.sort(keys)
-    return keys
 end
 
 local function attach_resource(p_resource: render_graph.Resource): render_graph.Resource
@@ -453,123 +513,69 @@ function render_graph.graph(): render_graph.Graph
         return graph:add(task)
     end
 
-    function graph:compute(p_id: string, p_params: wbe.RTParamsRunComputePipelineVK,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        return make_task(p_id, "run_compute_pipeline", p_params, p_options)
-    end
-
-    function graph:draw(p_id: string, p_params: wbe.RTParamsRunGraphicsPipelineVK,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        return make_task(p_id, "run_graphics_pipeline", p_params, p_options)
-    end
-
-    function graph:draw_mesh(p_id: string, p_params: render_graph.DrawMeshParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
+    -- The typed constructors lower the resource handles of their params to IDs and retain the handles. A task-local
+    -- handle also binds its graph ID as an identity alias, which cannot shadow an unrelated same-name shader binding.
+    -- Every handle stays reachable, so collection still rejects distinct owned descriptions of the same graph ID.
+    local function make_typed_task(p_id: string, p_type: string, p_params: any, p_options: render_graph.TaskOptions,
+        p_fields: {render_graph_tasks.ResourceField}): render_graph.Task
         local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.transform = resource_id(p_params.transform, uses)
-        return make_task(p_id, "graphics_draw_mesh", params, p_options, uses)
-    end
-
-    function graph:draw_indirect(p_id: string, p_params: render_graph.DrawIndirectParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.index_buffer = resource_id(p_params.index_buffer, uses)
-        params.indirect_buffer = resource_id(p_params.indirect_buffer, uses)
-        return make_task(p_id, "run_graphics_pipeline_indirect", params, p_options, uses)
-    end
-
-    function graph:compute_indirect(p_id: string, p_params: render_graph.ComputeIndirectParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.indirect_buffer = resource_id(p_params.indirect_buffer, uses)
-        return make_task(p_id, "run_compute_pipeline_indirect", params, p_options, uses)
-    end
-
-    function graph:generate_mipmaps(p_id: string, p_params: render_graph.GenerateMipmapsParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.source_view = resource_id(p_params.source_view, uses)
-        params.mip_chain_view = resource_id(p_params.mip_chain_view, uses)
-        return make_task(p_id, "generate_mipmaps", params, p_options, uses)
-    end
-
-    function graph:cpu_acquire_image(p_id: string, p_params: render_graph.CPUAcquireImageParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.image_view = resource_id(p_params.image_view, uses)
-        return make_task(p_id, "cpu_acquire_image", params, p_options, uses)
-    end
-
-    function graph:full_memory_barrier(p_id: string, p_params: render_graph.FullMemoryBarrierParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local params = copy_fields(p_params)
-        params.resource = resource_id(p_params.resource, uses)
-        return make_task(p_id, "full_memory_barrier", params, p_options, uses)
-    end
-
-    function graph:ping_pong(p_id: string, p_params: wbe.RTParamsPingPongVK,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        return make_task(p_id, "ping_pong", p_params, p_options)
-    end
-
-    function graph:import_task(p_id: string): render_graph.Task
-        return self:add({ id = p_id, import = true })
-    end
-
-    function graph:compute_sequential(p_id: string, p_params: render_graph.ComputeSequentialParams,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        local options: render_graph.TaskOptions = p_options or {}
-        local aliases: {string:render_graph.Resource} = {}
-        local uses: {render_graph.Resource} = {}
-        for key, resource in pairs(options.aliases or {}) do
-            aliases[key] = resource
-        end
-        -- A handle binds its graph ID as an identity alias. This cannot shadow an unrelated same-name shader binding.
-        -- Keep every handle reachable so collection still rejects distinct owned descriptions of the same graph ID.
-        local function local_id(p_value: render_graph.Resource | string): string
+        local task_local_uses: {render_graph.Resource} = {}
+        local function lower(p_value: any, p_field: render_graph_tasks.ResourceField): any
             if p_value == nil then
                 return nil
-            end
-            if p_value is string then
-                return p_value
-            end
-            local id = resource_id(p_value, uses)
-            local previous = aliases[id]
-            if previous ~= nil and previous.id ~= id then
-                error("render_graph: sequential resource '" .. id .. "' conflicts with an explicit task-local alias.", 3)
-            end
-            if previous == nil then
-                aliases[id] = p_value
-            end
-            return id
-        end
-        local dispatches: {wbe.RTParamsComputeDispatchVK} = {}
-        for _, dispatch in ipairs(p_params.dispatches) do
-            local wire_dispatch = copy_fields(dispatch)
-            wire_dispatch.indirect_buffer = local_id(dispatch.indirect_buffer)
-            if dispatch.aliases ~= nil then
-                local dispatch_aliases: {string:string} = {}
-                for _, key in ipairs(sorted_keys(dispatch.aliases)) do
-                    dispatch_aliases[key] = local_id(dispatch.aliases[key])
+            elseif p_field.kind == "resource" then
+                local resource = p_value as render_graph.Resource | string
+                if not (resource is string) and p_field.scope == "task_local" then
+                    task_local_uses[#task_local_uses + 1] = resource
                 end
-                wire_dispatch.aliases = dispatch_aliases
+                return resource_id(resource, uses)
+            elseif p_field.kind == "list" then
+                local result: {any} = {}
+                for _, value in ipairs(p_value as {any}) do
+                    result[#result + 1] = lower(value, p_field.element)
+                end
+                return result
+            elseif p_field.kind == "map" then
+                local values = p_value as {string:any}
+                local result: {string:any} = {}
+                for _, key in ipairs(sorted_keys(values)) do
+                    result[key] = lower(values[key], p_field.element)
+                end
+                return result
             end
-            dispatches[#dispatches + 1] = wire_dispatch as wbe.RTParamsComputeDispatchVK
+            local values = p_value as {string:any}
+            local result = copy_fields(values)
+            for _, field in ipairs(p_field.fields) do
+                result[field.name] = lower(values[field.name], field)
+            end
+            return result
         end
-        local params = copy_fields(p_params)
-        params.dispatches = dispatches
-        return make_task(p_id, "run_compute_pipelines_sequential", params, {
+        local params = lower(p_params, { kind = "record", fields = p_fields })
+
+        local options: render_graph.TaskOptions = p_options or {}
+        local aliases: {string:render_graph.Resource} = {}
+        for local_name, resource in pairs(options.aliases or {}) do
+            aliases[local_name] = resource
+        end
+        for _, resource in ipairs(task_local_uses) do
+            local previous = aliases[resource.id]
+            if previous ~= nil and previous.id ~= resource.id then
+                error("render_graph: task-local resource '" .. resource.id ..
+                    "' conflicts with an explicit task-local alias.", 3)
+            end
+            aliases[resource.id] = previous or resource
+        end
+        return make_task(p_id, p_type, params, {
             aliases = next(aliases) ~= nil and aliases or options.aliases,
             uses = options.uses,
             trigger = options.trigger,
             toggle = options.toggle,
         }, uses)
+    end
+    render_graph_tasks.install(graph, make_typed_task)
+
+    function graph:import_task(p_id: string): render_graph.Task
+        return self:add({ id = p_id, import = true })
     end
 
     function graph:get(p_id: string): render_graph.Task
@@ -581,16 +587,19 @@ function render_graph.graph(): render_graph.Graph
         return task
     end
 
-    function graph:chain(p_resource: render_graph.Resource, p_tasks: {render_graph.Task})
+    local function chain(self: render_graph.Graph, p_resources: any, p_tasks: {render_graph.Task})
+        local resources = connection_resources(p_resources)
+        validate_list(p_tasks, "task", true)
         for _, task in ipairs(p_tasks) do
             validate_task(task)
         end
-        for i = 2, #p_tasks do
-            local task = p_tasks[i - 1]
-            task.edges = task.edges or {}
-            task.edges[#task.edges + 1] = { to = p_tasks[i], resource = p_resource }
+        for _, resource in ipairs(resources) do
+            for i = 2, #p_tasks do
+                append_edge(p_tasks[i - 1], p_tasks[i], resource)
+            end
         end
     end
+    graph.chain = chain
 
     function graph:build(p_imports?: {string}, p_ports?: {string}): wbe.RendGraphRecipeVK
         local resources: {wbe.RendRecipeResourceVK} = {}

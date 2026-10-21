@@ -45,7 +45,8 @@ namespace WhiteBirdEngine {
  * wrap in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
  * Instances are neither copyable nor movable.
  */
-class WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [cpu_acquire_image]) RTCPUInFlightAcquireVK final : public IRenderTaskVK {
+class WBE_META(WBE_RENDER_TASK(cpu_acquire_image), WBE_SERIALIZATION_ALIASES(cpu_acquire_image)) RTCPUInFlightAcquireVK final
+    : public IRenderTaskVK {
 public:
     /**
      * @struct AcquiredImage

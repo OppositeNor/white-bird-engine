@@ -28,11 +28,11 @@ using EntityID = entt::entity;
  */
 enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) DeviceDomain {
     // The host domain
-    HOST WBE_META(WBE_ALIASES = [host]),
+    HOST WBE_META(WBE_SERIALIZATION_ALIASES(host)),
     // The device domain
-    DEVICE WBE_META(WBE_ALIASES = [device]),
+    DEVICE WBE_META(WBE_SERIALIZATION_ALIASES(device)),
     // Both the host and device domain
-    HOST_DEVICE WBE_META(WBE_ALIASES = [host_device]),
+    HOST_DEVICE WBE_META(WBE_SERIALIZATION_ALIASES(host_device)),
 };
 
 } // namespace WhiteBirdEngine

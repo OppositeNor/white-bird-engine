@@ -42,7 +42,8 @@ namespace WhiteBirdEngine {
  * through a mip-chain view of the same image, and reports both accesses to the
  * render graph. Instances are neither copyable nor movable.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [generate_mipmaps]) RTGenerateMipmapsVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(generate_mipmaps), WBE_SERIALIZATION_ALIASES(generate_mipmaps)) RTGenerateMipmapsVK final
+    : public IRenderTaskVK {
     RTGenerateMipmapsVK() = delete;
     virtual ~RTGenerateMipmapsVK() override = default;
     RTGenerateMipmapsVK(const RTGenerateMipmapsVK&) = delete;

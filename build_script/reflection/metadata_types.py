@@ -18,10 +18,12 @@ class WBEFieldMetadata(BaseModel):
     """Field metadata.
 
     Attributes: 
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
         field_name: The name of the field.
         field_type: The type of the field.
     """
     attribute : list[str] = Field(default_factory=list)
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
     name : str = ""
     type : str = ""
@@ -31,7 +33,8 @@ class WBEMethodMetadata(BaseModel):
 
     Attributes: 
         attribute: The WBE_META attributes of the method.
-        aliases: The aliases declared with WBE_ALIASES.
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
+        aliases: The aliases declared with WBE_SERIALIZATION_ALIASES.
         method_name: The name of the method.
         name: The names of the arguments, in declaration order; an unnamed argument has an empty name.
         type: The types of the arguments, in declaration order, as clang spells them.
@@ -40,6 +43,7 @@ class WBEMethodMetadata(BaseModel):
         is_const: Whether the method is const-qualified.
     """
     attribute : list[str] = Field(default_factory=list)
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
     method_name : str = ""
     name : list[str] = Field(default_factory=list)
@@ -52,6 +56,7 @@ class WBEClassMetadata(BaseModel):
     """Class metadata.
 
     Attributes: 
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
         is_struct: Is it declared as struct.
         class_name: The name of the class.
         fields: The fields of the class.
@@ -62,6 +67,7 @@ class WBEClassMetadata(BaseModel):
     name : str = ""
     extended_parents : list[Any] = Field(default_factory=list[Any])
     attribute : list[str] = Field(default_factory=list[str])
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
     fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
     methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
@@ -73,11 +79,13 @@ class WBEEnumValueMetadata(BaseModel):
         name: The name of the enumerator.
         value: The value of the enumerator.
         attribute: The WBE_META attributes of the enumerator.
-        aliases: The aliases declared with WBE_ALIASES on the enumerator.
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
+        aliases: The aliases declared with WBE_SERIALIZATION_ALIASES on the enumerator.
     """
     name : str = ""
     value : int = 0
     attribute : list[str] = Field(default_factory=list[str])
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
 
 class WBEEnumMetadata(BaseModel):
@@ -88,6 +96,8 @@ class WBEEnumMetadata(BaseModel):
         qualified_name: The fully qualified type name of the enum, usable from any scope.
         in_header: The header that declares the enum.
         attribute: The WBE_META attributes of the enum.
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
+        aliases: The aliases declared with WBE_SERIALIZATION_ALIASES on the enum.
         underlying_type: The underlying integer type, as clang spells it.
         is_scoped: Whether the enum is an enum class.
         values: The enumerators in declaration order.
@@ -96,6 +106,8 @@ class WBEEnumMetadata(BaseModel):
     qualified_name : str = ""
     in_header : str = ""
     attribute : list[str] = Field(default_factory=list[str])
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
+    aliases : list[str] = Field(default_factory=list[str])
     underlying_type : str = ""
     is_scoped : bool = False
     values : list[WBEEnumValueMetadata] = Field(default_factory=list[WBEEnumValueMetadata])
@@ -105,9 +117,11 @@ class WBELabelMetadata(BaseModel):
 
     Attributes: 
         attribute: The attribute of the label.
+        attribute_parameters: Raw parameter expressions indexed by their attribute name.
         label_name: The name of the label.
     """
     attribute : list[str] = Field(default_factory=list[str])
+    attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
     name : str = ""
 

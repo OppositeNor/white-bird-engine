@@ -50,7 +50,9 @@ function exports.build(): wbe.RendGraphRecipeVK
     graph:full_memory_barrier("barrier", { resource = buffer })
     graph:ping_pong("ping_pong", { ping_pipeline = "ping_pipeline", pong_pipeline = "pong_pipeline", iterations = 2 })
     local overlay = graph:import_task("overlay")
-    graph:chain(color, { prepare, draw, overlay })
+    graph:chain({ color, buffer }, { prepare, draw, overlay })
+    prepare:connect_all({ draw, overlay }, color)
+    draw:inputs_from(prepare, { typed_input = buffer })
     return graph:build()
 end
 

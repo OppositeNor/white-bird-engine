@@ -40,7 +40,7 @@ namespace WhiteBirdEngine {
  * accesses of every pipeline; map reflected resource ids to graph resources with RendTaskDescVK::alias(). Consecutive
  * dispatches are separated by a barrier that makes storage writes visible to sampled and storage reads.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [ping_pong]) RTPingPongVK final : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(ping_pong), WBE_SERIALIZATION_ALIASES(ping_pong)) RTPingPongVK final : public IRenderTaskVK {
     RTPingPongVK() = delete;
     virtual ~RTPingPongVK() override = default;
     RTPingPongVK(const RTPingPongVK&) = delete;

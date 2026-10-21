@@ -49,9 +49,6 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local color = graph_utils.port("color")
     local depth = graph_utils.port("depth")
     local graph = graph_utils.graph()
-    local function chain(p_buffer: graph_utils.Resource, p_tasks: {graph_utils.Task})
-        graph:chain(p_buffer, p_tasks)
-    end
     local prefix = p_params.shader_prefix
     local dynamic_prefix = p_params.dynamic_shader_prefix
     local toggles = p_target.debug_view_toggles
@@ -180,18 +177,17 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         end
         return result
     end
-    chain(buffers.svo_info, { frame_begin, reset })
-    chain(buffers.svo_info, sequence({ reset, build, build_double_sided }, static_publication,
+    graph:chain(buffers.svo_info, { frame_begin, reset })
+    graph:chain(buffers.svo_info, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
         { capture_pre_deferred_debug, dynamic_deferred, setup_debug_draw, debug_draw }))
-    chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
+    graph:chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
         { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
-    for _, buffer in ipairs({ buffers.svo_dynamic_nodes, buffers.svo_dynamic_leaves }) do
-        chain(buffer, sequence({ clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
+    graph:chain({ buffers.svo_dynamic_nodes, buffers.svo_dynamic_leaves },
+        sequence({ clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
             { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
-    end
-    chain(buffers.svo_leaf_buffer, {
+    graph:chain(buffers.svo_leaf_buffer, {
         build,
         build_double_sided,
         static_deferred,
@@ -201,7 +197,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         debug_draw,
         pre_deferred_debug_draw,
     })
-    chain(buffers.svo_deferred_list_ping, {
+    graph:chain(buffers.svo_deferred_list_ping, {
         reset,
         build,
         build_double_sided,
@@ -212,15 +208,12 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         capture_pre_deferred_debug,
         dynamic_deferred,
     })
-    chain(buffers.svo_deferred_list_pong, { reset, static_deferred, clear_dynamic, dynamic_deferred })
-    for _, buffer in ipairs({ buffers.svo_pre_deferred_debug_info_buffer, buffers.svo_pre_deferred_debug_list_buffer,
-        buffers.svo_pre_deferred_debug_draw_indirect_buffer }) do
-        chain(buffer, { capture_pre_deferred_debug, pre_deferred_debug_draw })
-    end
-    chain(buffers.svo_debug_draw_indirect_buffer, { setup_debug_draw, debug_draw })
+    graph:chain(buffers.svo_deferred_list_pong, { reset, static_deferred, clear_dynamic, dynamic_deferred })
+    graph:chain({ buffers.svo_pre_deferred_debug_info_buffer, buffers.svo_pre_deferred_debug_list_buffer,
+        buffers.svo_pre_deferred_debug_draw_indirect_buffer }, { capture_pre_deferred_debug, pre_deferred_debug_draw })
+    graph:chain(buffers.svo_debug_draw_indirect_buffer, { setup_debug_draw, debug_draw })
     -- The overlays draw in this order.
-    chain(color, { debug_draw, pre_deferred_debug_draw })
-    chain(depth, { debug_draw, pre_deferred_debug_draw })
+    graph:chain({ color, depth }, { debug_draw, pre_deferred_debug_draw })
     return graph_utils.subgraph(p_id, graph:build(p_params.imports, { "color", "depth" }),
         { color = p_target.color_target, depth = p_target.depth_target })
 end

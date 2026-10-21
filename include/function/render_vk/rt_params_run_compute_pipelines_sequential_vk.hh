@@ -40,7 +40,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
      * @brief Task-local resource id of the buffer holding the dispatch's VkDispatchIndirectCommand; empty for a direct
      * dispatch, which uses the group counts.
      */
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(task_local))
     std::string indirect_buffer;
     /**
      * @brief Byte offset of the command in the indirect buffer; a multiple of 4, and 0 for a direct dispatch.
@@ -52,7 +52,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
      * task's own aliases then map to a graph resource. Lets dispatches of one task bind one shader resource to different
      * resources.
      */
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(task_local))
     DataValue aliases;
     /**
      * @brief Dispatch workgroup count along x passed to vkCmdDispatch.

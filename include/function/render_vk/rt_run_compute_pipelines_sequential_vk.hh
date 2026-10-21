@@ -45,8 +45,8 @@ namespace WhiteBirdEngine {
  * passes may bind one shader resource to different resources. Consecutive passes are separated by a global compute
  * memory barrier, which also covers the indirect command read when the next pass is indirect.
  */
-struct WBE_META(WBE_RENDER_TASK, WBE_ALIASES = [run_compute_pipelines_sequential]) RTRunComputePipelinesSequentialVK final
-    : public IRenderTaskVK {
+struct WBE_META(WBE_RENDER_TASK(compute_sequential), WBE_SERIALIZATION_ALIASES(run_compute_pipelines_sequential))
+    RTRunComputePipelinesSequentialVK final : public IRenderTaskVK {
     /**
      * @class Entry
      * @brief One retained compute pipeline plus its workgroup counts or indirect command, and its resource aliases.

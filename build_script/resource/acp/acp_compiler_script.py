@@ -53,21 +53,35 @@ class WBEACPCompilerScript(WBEACPCompilerFile):
     Lua sources (.lua) are copied. Teal sources (.tl) are type-checked and compiled to Lua with the Teal compiler,
     which runs in an embedded Lua 5.5; a Teal script is emitted as <name>.lua next to where its source would be copied.
     Modules a Teal script requires resolve against the module directories, where each module is searched for as a
-    declaration (.d.tl), a Teal source (.tl), or a Lua source (.lua) under its module path.
+    declaration (.d.tl), a Teal source (.tl), or a Lua source (.lua) under its module path. A script whose source file
+    is in the generated module directory, such as the utils/render_graph_tasks.tl that reflection generates, is
+    compiled from there.
     """
 
-    def __init__(self, teal_dir: Path, module_dirs: list[Path]) -> None:
+    def __init__(self, teal_dir: Path, module_dirs: list[Path], generated_modules_dir: Path | None = None) -> None:
         """
         Args:
             teal_dir: The directory containing the Teal compiler (tl.lua).
             module_dirs: The directories module names resolve against, in search order.
+            generated_modules_dir: The directory reflection generates script modules into, where script source files
+                are looked up before the resource directory.
         """
         super().__init__(["script"])
         self._teal_dir = teal_dir
+        self._generated_modules_dir = generated_modules_dir
         self._search_path = ";".join((module_dir / "?.lua").as_posix() for module_dir in module_dirs)
         self._lua: Any = None
         self._teal: Any = None
         self._teal_compile: Any = None
+
+    @override
+    def _resolve_resource_file_path(self, resource_path: str, manifest_path: Path, res_dir: Path) -> tuple[Path, Path]:
+        relative_path = self._normalize_resource_path(resource_path, manifest_path)
+        if self._generated_modules_dir is not None:
+            generated_path = self._generated_modules_dir / relative_path
+            if generated_path.is_file():
+                return generated_path.resolve(), relative_path
+        return super()._resolve_resource_file_path(resource_path, manifest_path, res_dir)
 
     @override
     def _get_default_output_file(self, relative_file: Path) -> Path:
