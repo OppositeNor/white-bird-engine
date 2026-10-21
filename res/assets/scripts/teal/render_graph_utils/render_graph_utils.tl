@@ -12,93 +12,12 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Handle-based helpers for writing render graph recipes (see wbe.RendGraphRecipeVK).
--- Resource and task handles describe a graph; Graph:build() emits the plain recipe tables C++ consumes.
+-- Implements the generated render_graph_utils.render_graph API for authoring render-graph recipes.
+-- Handles describe a graph; Graph:build() emits the plain recipe tables C++ consumes.
 
 local type wbe = require("wbe")
-local render_graph_tasks = require("utils.render_graph_tasks")
-
-local record render_graph
-    image_view: function(p_id: string, p_image: Resource, p_view?: wbe.RendImageViewParamsVK): Resource
-    -- A graph-owned description, an external import, or a subgraph port. Image views retain their source handle.
-    record Resource
-        id: string
-        kind: string
-        description: wbe.RendRecipeResourceVK
-        dependencies: {Resource}
-        view: function(self: Resource, p_id?: string, p_view?: wbe.RendImageViewParamsVK): Resource
-    end
-
-    -- Resource-bearing task parameters mirror the reflected C++ descriptions, accepting handles in place of the resource
-    -- IDs of their WBE_RECIPE_RESOURCE fields (see utils.render_graph_tasks).
-    -- String IDs remain accepted for existing recipes and task-local names in sequential dispatches.
-    record DrawMeshParams is render_graph_tasks.RTParamsGraphicsDrawMeshVK<Resource>
-    end
-    record DrawIndirectParams is render_graph_tasks.RTParamsRunGraphicsPipelineIndirectVK<Resource>
-    end
-    record ComputeIndirectParams is render_graph_tasks.RTParamsRunComputePipelineIndirectVK<Resource>
-    end
-    record ComputeDispatchParams is render_graph_tasks.RTParamsComputeDispatchVK<Resource>
-    end
-    record ComputeSequentialParams is render_graph_tasks.RTParamsRunComputePipelinesSequentialVK<Resource>
-    end
-    record GenerateMipmapsParams is render_graph_tasks.RTParamsGenerateMipmapsVK<Resource>
-    end
-    record CPUAcquireImageParams is render_graph_tasks.RTParamsCPUInFlightAcquireVK<Resource>
-    end
-    record FullMemoryBarrierParams is render_graph_tasks.RTParamsFullMemoryBarrierVK<Resource>
-    end
-
-    record TaskOptions
-        aliases: {string:Resource}
-        uses: {Resource}
-        trigger: wbe.RendRecipeTriggerVK
-        toggle: wbe.RendRecipeToggleVK
-    end
-
-    record Edge
-        to: Task
-        resource: Resource
-    end
-
-    -- Resource handles bind task-local names without changing the explicit ordering of connect edges.
-    record Task
-        id: string
-        ["type"]: string
-        import: boolean
-        params: any
-        aliases: {string:Resource}
-        edges: {Edge}
-        graph: Graph
-        alias: function(self: Task, p_local_name: string, p_resource: Resource): Task
-        connect: function(self: Task, p_next_task: Task, p_resource: Resource): Task
-        connect: function(self: Task, p_next_task: Task, p_resources: {Resource}): Task
-        connect_all: function(self: Task, p_next_tasks: {Task}, p_resource: Resource): Task
-        connect_all: function(self: Task, p_next_tasks: {Task}, p_resources: {Resource}): Task
-        inputs_from: function(self: Task, p_producer: Task, p_bindings: {string:Resource}): Task
-        color_target: function(self: Task, p_index: integer, p_resource: Resource): Task
-        depth_target: function(self: Task, p_resource: Resource): Task
-        trigger: wbe.RendRecipeTriggerVK
-        toggle: wbe.RendRecipeToggleVK
-        subgraph: wbe.RendGraphRecipeVK
-        ports: {string:Resource}
-        -- Retain resources named directly by typed task parameters or reflected same-name shader bindings.
-        -- This collects resources and does not declare an access or add an ordering edge.
-        uses: {Resource}
-    end
-
-    -- The typed task constructors, such as compute and draw_mesh, come from the render tasks annotated
-    -- WBE_RENDER_TASK(<method>) (see utils.render_graph_tasks), which must not shadow the members declared here.
-    record Graph is render_graph_tasks.Graph<Resource, Task, TaskOptions, Graph>
-        tasks: {Task}
-        add: function(self: Graph, p_task: Task): Task
-        get: function(self: Graph, p_id: string): Task
-        import_task: function(self: Graph, p_id: string): Task
-        chain: function(self: Graph, p_resource: Resource, p_tasks: {Task})
-        chain: function(self: Graph, p_resources: {Resource}, p_tasks: {Task})
-        build: function(self: Graph, p_imports?: {string}, p_ports?: {string}): wbe.RendGraphRecipeVK
-    end
-end
+local render_graph = require("render_graph_utils.render_graph")
+local render_graph_tasks = require("render_graph_utils.render_graph_tasks")
 
 local function validate_id(p_id: string)
     if type(p_id) ~= "string" or p_id == "" then
@@ -122,6 +41,13 @@ local function validate_resource(p_resource: render_graph.Resource)
     validate_id(p_resource.id)
     if type(p_resource.kind) ~= "string" or type(p_resource.dependencies) ~= "table" then
         error("render_graph: expected a resource handle.", 3)
+    end
+end
+
+local function validate_graph_resource(p_resource: render_graph.Resource)
+    validate_resource(p_resource)
+    if p_resource.kind == "database" then
+        error("render_graph: database resources cannot be used as graph bindings or dependencies.", 3)
     end
 end
 
@@ -150,21 +76,28 @@ local function validate_list<T>(p_values: {T}, p_name: string, p_allow_empty: bo
     end
 end
 
+local function validate_graph_resource_list(p_resources: {render_graph.Resource})
+    validate_list(p_resources, "resource", false)
+    for _, resource in ipairs(p_resources) do
+        validate_graph_resource(resource)
+    end
+end
+
 -- Teal cannot discriminate a record/array union; the public methods expose typed overloads instead.
 local function connection_resources(p_resources: any): {render_graph.Resource}
     if type(p_resources) ~= "table" then
-        error("render_graph: expected a resource handle or a non-empty resource list.", 3)
+        error("render_graph: expected a resource handle, a resource bundle, or a non-empty resource list.", 3)
     end
     if (p_resources as render_graph.Resource).id ~= nil then
         local resource = p_resources as render_graph.Resource
-        validate_resource(resource)
+        validate_graph_resource(resource)
         return { resource }
     end
     local resources = p_resources as {render_graph.Resource}
-    validate_list(resources, "resource", false)
-    for _, resource in ipairs(resources) do
-        validate_resource(resource)
+    if (p_resources as render_graph.ResourceBundle).resources ~= nil then
+        resources = (p_resources as render_graph.ResourceBundle).resources
     end
+    validate_graph_resource_list(resources)
     return resources
 end
 
@@ -182,7 +115,7 @@ local function attach_task(p_task: render_graph.Task,
             error("render_graph: add the task to a graph before assigning an alias.", 2)
         end
         validate_id(p_local_name)
-        validate_resource(p_resource)
+        validate_graph_resource(p_resource)
         p_validate_task(self, p_local_name, p_resource)
         self.aliases = self.aliases or {}
         if self.aliases[p_local_name] ~= nil then
@@ -236,7 +169,7 @@ local function attach_task(p_task: render_graph.Task,
         end
         for local_name, resource in pairs(p_bindings) do
             validate_id(local_name)
-            validate_resource(resource)
+            validate_graph_resource(resource)
             p_validate_task(self, local_name, resource)
             if self.aliases ~= nil and self.aliases[local_name] ~= nil then
                 error("render_graph: task-local resource '" .. local_name .. "' is mapped more than once.", 2)
@@ -292,6 +225,11 @@ local function owned_resource(p_description: wbe.RendRecipeResourceVK, p_kind: s
     p_dependencies?: {render_graph.Resource}): render_graph.Resource
     validate_id(p_description.id)
     return attach_resource({ id = p_description.id, kind = p_kind, description = p_description, dependencies = p_dependencies or {} })
+end
+
+local function database_resource(p_key: string, p_type: string): render_graph.Resource
+    validate_id(p_key)
+    return attach_resource({ id = p_key, kind = "database", resource_type = p_type, dependencies = {} })
 end
 
 -- The canonical name of a reflected enum value the application passes. C++ serializes an enum as its enumerator name,
@@ -368,9 +306,10 @@ function render_graph.reference(p_id: string): render_graph.Resource
     return attach_resource({ id = p_id, kind = "reference", dependencies = {} })
 end
 
--- A dispatch uses task-local string aliases: these names are resolved inside the containing task's handle bindings.
-function render_graph.indirect_dispatch(p_pipeline: string, p_indirect_buffer: string, p_offset: integer,
-    p_aliases?: {string:string}): wbe.RTParamsComputeDispatchVK
+-- A dispatch accepts graph handles or task-local strings, resolved inside the containing task's handle bindings.
+function render_graph.indirect_dispatch(p_pipeline: render_graph.Resource,
+    p_indirect_buffer: render_graph.Resource | string, p_offset: integer,
+    p_aliases?: {string:render_graph.Resource | string}): render_graph.RTParamsComputeDispatchVK
     return { pipeline = p_pipeline, indirect_buffer = p_indirect_buffer, indirect_offset = p_offset, aliases = p_aliases }
 end
 
@@ -406,9 +345,18 @@ local function resource_id(p_value: render_graph.Resource | string, p_uses: {ren
     if p_value is string then
         return p_value
     end
-    validate_id(p_value.id)
+    validate_graph_resource(p_value)
     p_uses[#p_uses + 1] = p_value
     return p_value.id
+end
+
+local function database_key(p_value: any, p_expected_type: string): string
+    local resource = p_value as render_graph.Resource
+    validate_resource(resource)
+    if resource.kind ~= "database" or resource.resource_type ~= p_expected_type then
+        error("render_graph: expected a database resource of type '" .. p_expected_type .. "'.", 3)
+    end
+    return resource.id
 end
 
 function render_graph.graph(): render_graph.Graph
@@ -418,6 +366,80 @@ function render_graph.graph(): render_graph.Graph
     local parameter_ids: {render_graph.Task:{string:boolean}} = {}
     local registered_count = 0
     local graph: render_graph.Graph = { tasks = tasks }
+
+    function graph:resource_bundle(p_resources: {render_graph.Resource}): render_graph.ResourceBundle
+        validate_graph_resource_list(p_resources)
+        local resources: {render_graph.Resource} = {}
+        for _, resource in ipairs(p_resources) do
+            resources[#resources + 1] = resource
+        end
+        return { resources = resources }
+    end
+
+    -- Declare application-owned database entries as resources. Their task factories resolve the live objects in C++.
+    function graph:add_mesh(p_key: string): render_graph.Resource
+        return database_resource(p_key, "WhiteBirdEngine::MeshResourcesVK")
+    end
+
+    function graph:add_compute_pipeline(p_key: string): render_graph.Resource
+        return database_resource(p_key, "WhiteBirdEngine::ROComputePipelineVK")
+    end
+
+    function graph:add_graphics_pipeline(p_key: string): render_graph.Resource
+        return database_resource(p_key, "WhiteBirdEngine::ROGraphicsPipelineVK")
+    end
+
+    -- Graph handles describe resources lazily and may be shared with other graph descriptions.
+    function graph:add_buffer(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): render_graph.Resource
+        return render_graph.buffer(p_id, p_usage, p_size)
+    end
+
+    function graph:add_storage_buffer(p_id: string, p_size: integer): render_graph.Resource
+        return render_graph.storage_buffer(p_id, p_size)
+    end
+
+    function graph:add_image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
+        p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK | integer},
+        p_mip_levels?: integer): render_graph.Resource
+        return render_graph.image(p_id, p_usage, p_format, p_extent, p_additional_usage, p_mip_levels)
+    end
+
+    function graph:add_storage_image(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
+        p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): render_graph.Resource
+        return render_graph.storage_image(p_id, p_format, p_width, p_height, p_additional_usage)
+    end
+
+    function graph:add_image_view(p_id: string, p_image: render_graph.Resource,
+        p_view?: wbe.RendImageViewParamsVK): render_graph.Resource
+        return render_graph.image_view(p_id, p_image, p_view)
+    end
+
+    function graph:add_clamp_to_edge_sampler(p_id: string, p_params?: wbe.RendSamplerParamsVK): render_graph.Resource
+        return render_graph.clamp_to_edge_sampler(p_id, p_params)
+    end
+
+    function graph:import_resource(p_id: string): render_graph.Resource
+        return render_graph.import_resource(p_id)
+    end
+
+    function graph:port(p_id: string): render_graph.Resource
+        return render_graph.port(p_id)
+    end
+
+    function graph:reference(p_id: string): render_graph.Resource
+        return render_graph.reference(p_id)
+    end
+
+    function graph:indirect_dispatch(p_pipeline: render_graph.Resource,
+        p_indirect_buffer: render_graph.Resource | string, p_offset: integer,
+        p_aliases?: {string:render_graph.Resource | string}): render_graph.RTParamsComputeDispatchVK
+        return render_graph.indirect_dispatch(p_pipeline, p_indirect_buffer, p_offset, p_aliases)
+    end
+
+    function graph:as_subgraph(p_id: string, p_ports: {string:render_graph.Resource},
+        p_imports?: {string}): render_graph.Task
+        return render_graph.subgraph(p_id, self:build(p_imports, sorted_keys(p_ports)), p_ports)
+    end
 
     local function validate_parameter_alias(p_task: render_graph.Task, p_local_name: string,
         p_resource: render_graph.Resource)
@@ -513,8 +535,8 @@ function render_graph.graph(): render_graph.Graph
         return graph:add(task)
     end
 
-    -- The typed constructors lower the resource handles of their params to IDs and retain the handles. A task-local
-    -- handle also binds its graph ID as an identity alias, which cannot shadow an unrelated same-name shader binding.
+    -- The typed constructors lower database keys to strings and graph resource handles to IDs, retaining only the latter.
+    -- A task-local handle also binds its graph ID as an identity alias, which cannot shadow an unrelated shader binding.
     -- Every handle stays reachable, so collection still rejects distinct owned descriptions of the same graph ID.
     local function make_typed_task(p_id: string, p_type: string, p_params: any, p_options: render_graph.TaskOptions,
         p_fields: {render_graph_tasks.ResourceField}): render_graph.Task
@@ -524,6 +546,9 @@ function render_graph.graph(): render_graph.Graph
             if p_value == nil then
                 return nil
             elseif p_field.kind == "resource" then
+                if p_field.scope == "database" then
+                    return database_key(p_value, p_field.expected_type)
+                end
                 local resource = p_value as render_graph.Resource | string
                 if not (resource is string) and p_field.scope == "task_local" then
                     task_local_uses[#task_local_uses + 1] = resource
@@ -587,7 +612,7 @@ function render_graph.graph(): render_graph.Graph
         return task
     end
 
-    local function chain(self: render_graph.Graph, p_resources: any, p_tasks: {render_graph.Task})
+    local function chain(_: render_graph.Graph, p_resources: any, p_tasks: {render_graph.Task})
         local resources = connection_resources(p_resources)
         validate_list(p_tasks, "task", true)
         for _, task in ipairs(p_tasks) do
@@ -654,7 +679,7 @@ function render_graph.graph(): render_graph.Graph
         end
 
         local function collect(p_resource: render_graph.Resource)
-            validate_id(p_resource.id)
+            validate_graph_resource(p_resource)
             if visiting[p_resource] then
                 error("render_graph: resource dependency cycle at '" .. p_resource.id .. "'.", 3)
             end
@@ -736,6 +761,10 @@ function render_graph.graph(): render_graph.Graph
         return { imports = imports, resources = resources, tasks = wire_tasks, ports = ports }
     end
     return graph
+end
+
+function render_graph.new(): render_graph.Graph
+    return render_graph.graph()
 end
 
 return render_graph

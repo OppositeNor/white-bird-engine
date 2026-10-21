@@ -34,7 +34,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Resource key of the compiled compute pipeline in the renderer's RenderDatabase.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::string pipeline;
     /**
      * @brief Task-local resource id of the buffer holding the dispatch's VkDispatchIndirectCommand; empty for a direct

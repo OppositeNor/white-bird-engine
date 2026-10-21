@@ -34,12 +34,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Resource key of the compute pipeline selected by a false state.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::string ping_pipeline;
     /**
      * @brief Resource key of the compute pipeline selected by a true state.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::string pong_pipeline;
     /**
      * @brief Selection used by the first iteration; false selects ping and true selects pong.
@@ -69,12 +69,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Resource key of the compute pipeline recorded before every ping dispatch; set together with pong_prefix_pipeline.
      */
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::optional<std::string> ping_prefix_pipeline;
     /**
      * @brief Resource key of the compute pipeline recorded before every pong dispatch; set together with ping_prefix_pipeline.
      */
-    WBE_META(WBE_REFLECT)
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::optional<std::string> pong_prefix_pipeline;
     /**
      * @brief Prefix workgroup count along x passed to vkCmdDispatch.

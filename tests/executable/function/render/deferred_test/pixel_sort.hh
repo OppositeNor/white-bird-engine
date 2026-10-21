@@ -76,7 +76,7 @@ struct PixelSortSettings {
  * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
- * Lua module render_graphs.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
+ * Lua module render_graph_utils.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
  * graph the effect is added to allocates its own; the effect compiles the pipelines they reference and owns the contrast
  * buffer every graph imports. Neither copyable nor movable.
  */
@@ -115,7 +115,7 @@ public:
     }
 
     /**
-     * @brief Describe the effect to the render_graphs.features.pixel_sort module, and supply the contrast buffer.
+     * @brief Describe the effect to the render_graph_utils.features.pixel_sort module, and supply the contrast buffer.
      *
      * Writes the current direction, scope, color format, queue family, toggle event, and enabled state.
      */

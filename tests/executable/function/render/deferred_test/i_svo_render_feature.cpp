@@ -193,7 +193,7 @@ const char* ISVORenderFeature::get_debug_view_name(VoxelDebugViewMode p_mode) co
 void ISVORenderFeature::configure_recipe(
     DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const {
     SVORecipeParams params;
-    params.module = "render_graphs.features.voxel_svo";
+    params.module = "render_graph_utils.features.voxel_svo";
     params.variant = get_recipe_variant();
     params.shader_prefix = shader_prefix;
     params.dynamic_shader_prefix = dynamic_shader_prefix;

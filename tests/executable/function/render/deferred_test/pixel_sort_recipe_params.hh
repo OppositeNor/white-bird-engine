@@ -49,7 +49,7 @@ enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortScope : uint32_t {
 
 /**
  * @class PixelSortRecipeParams
- * @brief The parameters of the render_graphs.features.pixel_sort recipe module; see PixelSort::configure_recipe().
+ * @brief The parameters of the render_graph_utils.features.pixel_sort recipe module; see PixelSort::configure_recipe().
  * @details Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) PixelSortRecipeParams : public RecipeFeatureParams {

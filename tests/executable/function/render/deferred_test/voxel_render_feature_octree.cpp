@@ -385,7 +385,7 @@ void VoxelRenderFeatureOctree::configure_recipe(
         throw std::runtime_error("VoxelRenderFeatureOctree: the dynamic mesh is required to configure a recipe.");
     }
     OctreeRecipeParams params;
-    params.module = "render_graphs.features.voxel_octree";
+    params.module = "render_graph_utils.features.voxel_octree";
     params.level_count = OCTREE_LEVEL_COUNT;
     params.leaf_gather_group_count = OctreeGroupCount{
         .x = OCTREE_DEBUG_SUBGRID_GRID_EXTENT.width,

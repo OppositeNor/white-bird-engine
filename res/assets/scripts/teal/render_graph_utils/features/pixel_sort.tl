@@ -18,8 +18,8 @@
 
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
-local graph_utils = require("utils.render_graph")
-local sort = require("utils.sort")
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
 
 local ceil_div = math_utils.ceil_div
 
@@ -46,7 +46,7 @@ local record pixel_sort
     record Target
         -- The color image view sorted in place, bound to the subgraph's `color` port; it must be sampled
         -- and storage.
-        color_view: graph_utils.Resource
+        color_view: Graph.Resource
         -- The width of the color image.
         width: integer
         -- The height of the color image.
@@ -56,13 +56,13 @@ end
 
 -- The effect as a subgraph task with id p_id, which sorts the target's color view in place through its `color` port. The
 -- params' toggle gates all of its tasks.
-function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): graph_utils.Task
-    local direction = graph_utils.enum_name(p_params.direction)
+function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): Graph.Task
+    local direction = Graph.enum_name(p_params.direction)
     local vertical = direction == "VERTICAL"
     if not vertical and direction ~= "HORIZONTAL" then
         error("pixel_sort: unknown direction '" .. direction .. "'.")
     end
-    local scope = graph_utils.enum_name(p_params.scope)
+    local scope = Graph.enum_name(p_params.scope)
     if scope ~= "LINE" and scope ~= "SPAN" then
         error("pixel_sort: unknown scope '" .. scope .. "'.")
     end
@@ -88,41 +88,46 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     local tile_group_count_y = ceil_div(height, PIXEL_SORT_TILE_SIZE)
     local column_group_count = ceil_div(line_count, PIXEL_SORT_COLUMN_WORKGROUP_SIZE)
 
-    local color = graph_utils.port("color")
-    local contrast = graph_utils.import_resource(p_params.contrast_import)
-    local source = graph_utils.storage_image("pixel_sort_source_image", p_params.color_format, width, height)
+    local graph = Graph.new()
+    local color = graph:port("color")
+    local contrast = graph:import_resource(p_params.contrast_import)
+    local source = graph:add_storage_image("pixel_sort_source_image", p_params.color_format, width, height)
         :view("pixel_sort_source")
-    local mask = graph_utils.storage_image(
+    local mask = graph:add_storage_image(
         "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height):view("pixel_sort_mask")
-    local column_offsets = graph_utils.storage_buffer(
+    local column_offsets = graph:add_storage_buffer(
         "pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE)
     -- The sort is sized for every pixel inside the mask.
-    local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
+    local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count, graph)
 
-    local graph = graph_utils.graph()
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
+    local copy_source_pipeline = graph:add_compute_pipeline("copy_pixel_sort_source_shader")
+    local count_mask_pipeline = graph:add_compute_pipeline("count_pixel_sort_mask" .. direction_suffix)
+    local prefix_sum_pipeline = graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = graph:add_compute_pipeline("register_pixel_sort_keys" .. direction_suffix)
+    local write_pixels_pipeline = graph:add_compute_pipeline("write_sorted_pixels" .. direction_suffix)
 
     local copy_source = graph:compute("copy_pixel_sort_source", {
-        pipeline = "copy_pixel_sort_source_shader",
+        pipeline = copy_source_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
         queue_family = p_params.queue_family,
     }, { uses = { source } }):alias("pixel_sort_input", color)
     local count_mask = graph:compute("count_pixel_sort_mask", {
-        pipeline = "count_pixel_sort_mask" .. direction_suffix,
+        pipeline = count_mask_pipeline,
         group_count_x = column_group_count,
         group_count_y = 1,
         queue_family = p_params.queue_family,
     }, { uses = { source, contrast, column_offsets } })
     -- The prefix sums run in a single workgroup.
     local prefix_sum = graph:compute("prefix_sum_pixel_sort_columns", {
-        pipeline = "prefix_sum_pixel_sort_columns_shader",
+        pipeline = prefix_sum_pipeline,
         group_count_x = 1,
         group_count_y = 1,
         queue_family = p_params.queue_family,
     }, { uses = { column_offsets } })
     local register_keys = graph:compute("register_pixel_sort_keys", {
-        pipeline = "register_pixel_sort_keys" .. direction_suffix,
+        pipeline = register_keys_pipeline,
         group_count_x = column_group_count,
         group_count_y = 1,
         queue_family = p_params.queue_family,
@@ -130,7 +135,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
 
     local radix_sort = sort.add_radix_sort_task(graph, "pixel_sort_radix_sort", sort_buffers, p_params.queue_family)
     local write_pixels = graph:compute("write_sorted_pixels", {
-        pipeline = "write_sorted_pixels" .. direction_suffix,
+        pipeline = write_pixels_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
         queue_family = p_params.queue_family,
@@ -141,7 +146,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     graph:chain(column_offsets, { count_mask, prefix_sum, register_keys, write_pixels })
     graph:chain(mask, { register_keys, write_pixels })
     graph:chain(sort_buffers.keys, { register_keys, radix_sort, write_pixels })
-    local subgraph = graph_utils.subgraph(p_id, graph:build(), { color = p_target.color_view })
+    local subgraph = graph:as_subgraph(p_id, { color = p_target.color_view })
     subgraph.toggle = { event = p_params.toggle_event, enabled = p_params.enabled }
     return subgraph
 end

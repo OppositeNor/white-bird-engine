@@ -166,16 +166,43 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTealScriptsCompiledByTheACP) {
     EXPECT_EQ(recipe.get_value<std::string>("queue_family"), "compute_2");
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, SharedGraphDeclarationsLoadBeforeTheRuntimeAndTaskInstaller) {
+    const DataValue recipe = RendGraphScriptVK::run("shared_graph_api", R"(
+local common = require("render_graph_utils.render_graph")
+local constructors = require("render_graph_utils.render_graph_tasks")
+assert(type(constructors.install) == "function")
+assert(common.new == nil)
+local graph_utils = require("render_graph_utils.render_graph_utils")
+assert(graph_utils == common)
+assert(require("render_graph_utils.render_graph") == common)
+assert(require("render_graph_utils.render_graph_tasks") == constructors)
+return { build = function()
+    local graph = graph_utils.new()
+    local pipeline = graph:add_compute_pipeline("pipeline")
+    local compute = graph:compute("compute", { pipeline = pipeline })
+    assert(graph:get("compute") == compute)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 1U);
+    EXPECT_EQ(tasks[0].get_value<std::string>("type"), "run_compute_pipeline");
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("pipeline"), "pipeline");
+    EXPECT_TRUE(recipe.get_entry("resources").as_list().empty());
+    EXPECT_TRUE(recipe.get_entry("imports").as_list().empty());
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, CollectsHandleBindingsEdgesAndImageDependencies) {
     const DataValue recipe = RendGraphScriptVK::run("handle_resources", R"(
-local graph_utils = require("utils.render_graph")
+local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local image = graph_utils.storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
-    local view = graph_utils.image_view("output", image)
-    local sampler = graph_utils.clamp_to_edge_sampler("sampler")
-    local scratch = graph_utils.storage_buffer("scratch", 64)
-    local unused = graph_utils.storage_buffer("unused", 32)
-    local graph = graph_utils.graph()
+    local graph = Graph.new()
+    local image = graph:add_storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
+    local view = graph:add_image_view("output", image)
+    local sampler = graph:add_clamp_to_edge_sampler("sampler")
+    local scratch = graph:add_buffer("scratch", "buffer_storage", 64)
+    local unused = graph:add_storage_buffer("unused", 32)
+    assert(Graph.enum_name("image_read_write") == "IMAGE_READ_WRITE")
     local write = graph:add({ id = "write", type = "registry_probe", params = { label = "write" }, uses = { scratch } })
     local read = graph:add({ id = "read", type = "registry_probe", params = { label = "read" } })
     read:alias("input", view):alias("sampler", sampler)
@@ -217,18 +244,18 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, LowersImportedHandlesAndCollectsParentPortResources) {
     const DataValue recipe = RendGraphScriptVK::run("handle_ports", R"(
-local graph_utils = require("utils.render_graph")
+local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local target_image = graph_utils.storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
-    local target = graph_utils.image_view("target", target_image)
-    local input = graph_utils.import_resource("input")
-    local member = graph_utils.reference("input.member")
-    local color = graph_utils.port("color")
-    local nested = graph_utils.graph()
+    local graph = Graph.new()
+    local target_image = graph:add_storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
+    local target = graph:add_image_view("target", target_image)
+    local input = graph:import_resource("input")
+    local member = graph:reference("input.member")
+    local nested = Graph.new()
+    local color = nested:port("color")
     nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, aliases = { output = color } })
-    local graph = graph_utils.graph()
     local prepare = graph:add({ id = "prepare", type = "registry_probe", params = { label = "prepare" }, uses = { input, member } })
-    local effect = graph:add(graph_utils.subgraph("effect", nested:build(), { color = target }))
+    local effect = graph:add(nested:as_subgraph("effect", { unused = target, color = target }, { "nested_only" }))
     graph:chain(target, { prepare, effect })
     return graph:build({ "input", "application_only" })
 end }
@@ -239,18 +266,25 @@ end }
     EXPECT_TRUE(std::ranges::any_of(imports, [](const DataValue& p_import) {
         return p_import.as_string() == "input";
     }));
+    EXPECT_TRUE(std::ranges::any_of(imports, [](const DataValue& p_import) {
+        return p_import.as_string() == "application_only";
+    }));
     const auto& effect = recipe.get_entry("tasks").as_list()[1];
     EXPECT_EQ(effect.get_entry("ports").get_value<std::string>("color"), "target");
+    EXPECT_EQ(effect.get_entry("ports").get_value<std::string>("unused"), "target");
     const auto& nested = effect.get_entry("subgraph");
     EXPECT_TRUE(nested.get_entry("resources").as_list().empty());
-    EXPECT_EQ(nested.get_entry("ports").as_list().size(), 1U);
+    ASSERT_EQ(nested.get_entry("imports").as_list().size(), 1U);
+    EXPECT_EQ(nested.get_entry("imports").as_list()[0].as_string(), "nested_only");
+    ASSERT_EQ(nested.get_entry("ports").as_list().size(), 2U);
     EXPECT_EQ(nested.get_entry("ports").as_list()[0].as_string(), "color");
+    EXPECT_EQ(nested.get_entry("ports").as_list()[1].as_string(), "unused");
     EXPECT_EQ(nested.get_entry("tasks").as_list()[0].get_entry("aliases").get_value<std::string>("output"), "color");
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsDifferentOwnedHandlesWithTheSameId) {
     EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_handles", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local first = graph_utils.storage_buffer("same", 16)
     local second = graph_utils.storage_buffer("same", 32)
@@ -263,7 +297,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsCyclicHandleDependencies) {
     EXPECT_THROW((void)RendGraphScriptVK::run("cyclic_handles", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local resource = graph_utils.storage_buffer("cycle", 16)
     resource.dependencies = { resource }
@@ -276,14 +310,14 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ReusesHandlesWithoutLeakingDeclarationsBetweenGraphs) {
     const DataValue result = RendGraphScriptVK::run("independent_graphs", R"(
-local graph_utils = require("utils.render_graph")
+local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local shared = graph_utils.storage_buffer("shared", 16)
-    local first = graph_utils.graph()
+    local first = Graph.new()
+    local shared = first:add_storage_buffer("shared", 16)
     first:add({ id = "first", type = "registry_probe", aliases = { input = shared }, uses = { shared, shared } })
-    local second = graph_utils.graph()
+    local second = Graph.new()
     second:add({ id = "second", type = "registry_probe" })
-    local third = graph_utils.graph()
+    local third = Graph.new()
     third:add({ id = "third", type = "registry_probe", uses = { shared } })
     return { first = first:build(), second = second:build(), third = third:build() }
 end }
@@ -295,7 +329,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, TaskAliasesResolveIndependentlyAndConnectionsLowerHandles) {
     const DataValue recipe = RendGraphScriptVK::run("task_handles", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local first_resource = graph_utils.storage_buffer("first_resource", 16)
     local second_resource = graph_utils.storage_buffer("second_resource", 32)
@@ -324,7 +358,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, TaskAliasMapsAreOwnedByEachTask) {
     const DataValue recipe = RendGraphScriptVK::run("independent_aliases", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local shared = graph_utils.storage_buffer("shared", 16)
     local extra = graph_utils.storage_buffer("extra", 32)
@@ -344,16 +378,20 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, BatchedConnectionsLowerEachResourceAndPreserveSingleResourceCalls) {
     const DataValue recipe = RendGraphScriptVK::run("batched_connections", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
     local depth = graph_utils.storage_buffer("depth", 32)
     local graph = graph_utils.graph()
-    local first = graph:compute("first", { pipeline = "first" })
-    local second = graph:compute("second", { pipeline = "second" })
-    local third = graph:compute("third", { pipeline = "third" })
-    local last = graph:compute("last", { pipeline = "last" })
-    local sink = graph:compute("sink", { pipeline = "sink" })
+    local first = graph:compute("first", { pipeline = compute_pipeline("first") })
+    local second = graph:compute("second", { pipeline = compute_pipeline("second") })
+    local third = graph:compute("third", { pipeline = compute_pipeline("third") })
+    local last = graph:compute("last", { pipeline = compute_pipeline("last") })
+    local sink = graph:compute("sink", { pipeline = compute_pipeline("sink") })
     graph:chain({ color, depth }, { first, second, third })
     assert(third:connect(last, { color, depth }) == third)
     graph:chain(color, {})
@@ -380,14 +418,18 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ConnectionFanOutLeavesConsumersUnordered) {
     const DataValue recipe = RendGraphScriptVK::run("connection_fan_out", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
     local depth = graph_utils.storage_buffer("depth", 32)
     local graph = graph_utils.graph()
-    local producer = graph:compute("producer", { pipeline = "producer" })
-    local first = graph:compute("first", { pipeline = "first" })
-    local second = graph:compute("second", { pipeline = "second" })
+    local producer = graph:compute("producer", { pipeline = compute_pipeline("producer") })
+    local first = graph:compute("first", { pipeline = compute_pipeline("first") })
+    local second = graph:compute("second", { pipeline = compute_pipeline("second") })
     assert(producer:connect_all({ first, second }, { color, depth }) == producer)
     return graph:build()
 end }
@@ -407,17 +449,224 @@ end }
     EXPECT_FALSE(tasks[2].contains("connect"));
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesSnapshotMembersAndPreserveConnectionOrderAndDuplicates) {
+    const DataValue recipe = RendGraphScriptVK::run("resource_bundle_connections", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local color = graph:add_storage_buffer("color", 16)
+    local depth = graph:add_storage_buffer("depth", 32)
+    local source = { depth, color, depth }
+    local bundle = graph:resource_bundle(source)
+    assert(bundle.id == nil)
+    assert(bundle.resources ~= source)
+    assert(bundle.resources[1] == depth and bundle.resources[2] == color and bundle.resources[3] == depth)
+    source[1], source[2], source[3] = color, nil, nil
+    local first = graph:import_task("first")
+    local second = graph:import_task("second")
+    local third = graph:import_task("third")
+    local fourth = graph:import_task("fourth")
+    local fifth = graph:import_task("fifth")
+    local sixth = graph:import_task("sixth")
+    graph:chain(bundle, { first, second, third })
+    assert(third:connect(fourth, bundle) == third)
+    assert(fourth:connect_all({ fifth, sixth }, bundle) == fourth)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 6U);
+    for (size_t i = 0; i < 3; ++i) {
+        const auto& edges = tasks[i].get_entry("connect").as_list();
+        ASSERT_EQ(edges.size(), 3U);
+        for (const auto& edge : edges) {
+            EXPECT_EQ(edge.get_value<std::string>("to"), tasks[i + 1].get_value<std::string>("id"));
+        }
+        EXPECT_EQ(edges[0].get_value<std::string>("resource"), "depth");
+        EXPECT_EQ(edges[1].get_value<std::string>("resource"), "color");
+        EXPECT_EQ(edges[2].get_value<std::string>("resource"), "depth");
+    }
+    const auto& fan_out = tasks[3].get_entry("connect").as_list();
+    ASSERT_EQ(fan_out.size(), 6U);
+    for (size_t i = 0; i < fan_out.size(); ++i) {
+        EXPECT_EQ(fan_out[i].get_value<std::string>("to"), i % 2 == 0 ? "fifth" : "sixth");
+        EXPECT_EQ(fan_out[i].get_value<std::string>("resource"), i / 2 == 1 ? "color" : "depth");
+    }
+    EXPECT_FALSE(tasks[4].contains("connect"));
+    EXPECT_FALSE(tasks[5].contains("connect"));
+    EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 2U);
+    for (const auto& task : tasks) {
+        EXPECT_FALSE(task.contains("resources"));
+        EXPECT_FALSE(task.contains("resource_bundle"));
+    }
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesCollectOnlyUsedMembersAndRetainImageViewDependenciesAcrossGraphs) {
+    const DataValue recipe = RendGraphScriptVK::run("resource_bundle_collection", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local image = graph:add_storage_image("image", "r16g16b16a16_sfloat", 16, 8)
+    local view = image:view()
+    local scratch = graph:add_storage_buffer("scratch", 64)
+    local unused = graph:add_storage_buffer("unused", 32)
+    local bundle = graph:resource_bundle({ view, scratch })
+    graph:resource_bundle({ unused })
+    assert(#graph:build().resources == 0)
+    local producer = graph:import_task("producer")
+    local consumer = graph:import_task("consumer")
+    graph:chain(bundle, { producer, consumer })
+    local other = Graph.new()
+    local other_producer = other:import_task("other_producer")
+    local other_consumer = other:import_task("other_consumer")
+    other_producer:connect(other_consumer, bundle)
+    local other_recipe = other:build()
+    assert(#other_recipe.resources == 3)
+    assert(other_recipe.tasks[1].connect[1].resource == "image.view")
+    assert(other_recipe.tasks[1].connect[2].resource == "scratch")
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& resources = recipe.get_entry("resources").as_list();
+    ASSERT_EQ(resources.size(), 3U);
+    EXPECT_EQ(resources[0].get_value<std::string>("id"), "image");
+    EXPECT_EQ(resources[1].get_value<std::string>("id"), "image.view");
+    EXPECT_EQ(resources[1].get_entry("image_view").get_value<std::string>("image"), "image");
+    EXPECT_EQ(resources[2].get_value<std::string>("id"), "scratch");
+    EXPECT_TRUE(recipe.get_entry("imports").as_list().empty());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    EXPECT_EQ(tasks[0].get_entry("connect").as_list()[0].get_value<std::string>("resource"), "image.view");
+    EXPECT_EQ(tasks[0].get_entry("connect").as_list()[1].get_value<std::string>("resource"), "scratch");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConstructionRejectsInvalidAndNestedMembersWithoutCollectingResources) {
+    const DataValue recipe = RendGraphScriptVK::run("resource_bundle_validation", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local resource = graph:add_storage_buffer("resource", 16)
+    local other = graph:add_storage_buffer("other", 32)
+    local mesh = graph:add_mesh("mesh")
+    local compute = graph:add_compute_pipeline("compute")
+    local graphics = graph:add_graphics_pipeline("graphics")
+    local bundle = graph:resource_bundle({ resource })
+    local invalid_lists = {
+        {},
+        { [1] = resource, [3] = other },
+        { resource, extra = other },
+        { resource, "invalid" },
+        { resource, {} },
+        { resource, { id = "malformed", kind = "buffer" } },
+        { resource, mesh },
+        { resource, compute },
+        { resource, graphics },
+        { resource, bundle },
+        "invalid",
+    }
+    for _, resources in ipairs(invalid_lists) do
+        assert(not pcall(function() graph:resource_bundle(resources) end))
+        assert(#graph:build().resources == 0)
+    end
+    assert(not pcall(function() graph:resource_bundle(nil) end))
+    return graph:build()
+end }
+)", DataValue::make_map());
+    EXPECT_TRUE(recipe.get_entry("resources").as_list().empty());
+    EXPECT_TRUE(recipe.get_entry("tasks").as_list().empty());
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConnectionFailuresLeaveExistingEdgesUnchanged) {
+    const DataValue recipe = RendGraphScriptVK::run("resource_bundle_connection_validation", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local resource = graph:add_storage_buffer("resource", 16)
+    local other = graph:add_storage_buffer("other", 32)
+    local database = graph:add_mesh("mesh")
+    local producer = graph:import_task("producer")
+    local consumer = graph:import_task("consumer")
+    local third = graph:import_task("third")
+    local foreign = Graph.new():import_task("foreign")
+    local bundle = graph:resource_bundle({ resource, other })
+    producer:connect(consumer, resource)
+    local original_edge = producer.edges[1]
+    local function assert_unchanged()
+        assert(#producer.edges == 1 and producer.edges[1] == original_edge)
+        assert(consumer.edges == nil and third.edges == nil)
+    end
+    local function reject(p_call)
+        assert(not pcall(p_call))
+        assert_unchanged()
+    end
+    reject(function() graph:chain(bundle, { producer, consumer, foreign }) end)
+    reject(function() producer:connect(foreign, bundle) end)
+    reject(function() producer:connect_all({ consumer, foreign }, bundle) end)
+    local invalid_members = {
+        {},
+        { [1] = resource, [3] = other },
+        { resource, extra = other },
+        { resource, "invalid" },
+        { resource, database },
+        { resource, graph:resource_bundle({ other }) },
+        "invalid",
+    }
+    for _, members in ipairs(invalid_members) do
+        bundle.resources = members
+        reject(function() graph:chain(bundle, { producer, consumer, third }) end)
+        reject(function() producer:connect(consumer, bundle) end)
+        reject(function() producer:connect_all({ consumer, third }, bundle) end)
+    end
+    bundle.resources = nil
+    reject(function() graph:chain(bundle, { producer, consumer }) end)
+    reject(function() producer:connect(consumer, bundle) end)
+    reject(function() producer:connect_all({ consumer, third }, bundle) end)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 3U);
+    ASSERT_EQ(tasks[0].get_entry("connect").as_list().size(), 1U);
+    EXPECT_EQ(tasks[0].get_entry("connect").as_list()[0].get_value<std::string>("to"), "consumer");
+    EXPECT_EQ(tasks[0].get_entry("connect").as_list()[0].get_value<std::string>("resource"), "resource");
+    EXPECT_FALSE(tasks[1].contains("connect"));
+    EXPECT_FALSE(tasks[2].contains("connect"));
+    ASSERT_EQ(recipe.get_entry("resources").as_list().size(), 1U);
+    EXPECT_EQ(recipe.get_entry("resources").as_list()[0].get_value<std::string>("id"), "resource");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesPreserveConflictingOwnedHandlesForBuildValidation) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_bundle_handles", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local first = graph:add_storage_buffer("same", 16)
+    local second = graph:add_storage_buffer("same", 32)
+    local bundle = graph:resource_bundle({ first, second })
+    local producer = graph:import_task("producer")
+    local consumer = graph:import_task("consumer")
+    producer:connect(consumer, bundle)
+    assert(#producer.edges == 2)
+    assert(producer.edges[1].resource == first and producer.edges[2].resource == second)
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, InputsFromBindsTaskLocalNamesAndConnectsEachHandleOnce) {
     const DataValue recipe = RendGraphScriptVK::run("input_connections", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
     local normal = graph_utils.storage_buffer("normal", 32)
     local other = graph_utils.storage_buffer("other", 64)
     local graph = graph_utils.graph()
-    local producer = graph:compute("producer", { pipeline = "producer" })
-    local first = graph:compute("first", { pipeline = "first" })
-    local second = graph:compute("second", { pipeline = "second" })
+    local producer = graph:compute("producer", { pipeline = compute_pipeline("producer") })
+    local first = graph:compute("first", { pipeline = compute_pipeline("first") })
+    local second = graph:compute("second", { pipeline = compute_pipeline("second") })
     assert(first:inputs_from(producer, { normal = normal, albedo = color, albedo_again = color }) == first)
     second:inputs_from(producer, { albedo = other })
     return graph:build()
@@ -446,14 +695,18 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ConnectionBatchesValidateBeforeChangingTheGraph) {
     const DataValue recipe = RendGraphScriptVK::run("connection_batch_validation", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local resource = graph_utils.storage_buffer("resource", 16)
     local other = graph_utils.storage_buffer("other", 32)
     local graph = graph_utils.graph()
-    local producer = graph:compute("producer", { pipeline = "producer" })
-    local consumer = graph:compute_indirect("consumer", { pipeline = "consumer", indirect_buffer = resource })
-    local foreign = graph_utils.graph():compute("foreign", { pipeline = "foreign" })
+    local producer = graph:compute("producer", { pipeline = compute_pipeline("producer") })
+    local consumer = graph:compute_indirect("consumer", { pipeline = compute_pipeline("consumer"), indirect_buffer = resource })
+    local foreign = graph_utils.graph():compute("foreign", { pipeline = compute_pipeline("foreign") })
     consumer:alias("z_existing", other)
     local invalid_calls = {
         function() producer:connect_all({ consumer, foreign }, resource) end,
@@ -491,13 +744,17 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, InputConnectionsPreserveConflictingOwnedHandlesForValidation) {
     EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_input_handles", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local first = graph_utils.storage_buffer("same", 16)
     local second = graph_utils.storage_buffer("same", 32)
     local graph = graph_utils.graph()
-    local producer = graph:compute("producer", { pipeline = "producer" })
-    graph:compute("consumer", { pipeline = "consumer" }):inputs_from(producer, { first = first, second = second })
+    local producer = graph:compute("producer", { pipeline = compute_pipeline("producer") })
+    graph:compute("consumer", { pipeline = compute_pipeline("consumer") }):inputs_from(producer, { first = first, second = second })
     return graph:build()
 end }
 )", DataValue::make_map()), std::runtime_error);
@@ -505,7 +762,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsTaskHandlesFromAnotherGraph) {
     EXPECT_THROW((void)RendGraphScriptVK::run("foreign_tasks", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local resource = graph_utils.storage_buffer("shared", 16)
     local graph = graph_utils.graph()
@@ -520,7 +777,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsForgedTaskHandlesWithMatchingIds) {
     EXPECT_THROW((void)RendGraphScriptVK::run("forged_tasks", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local resource = graph_utils.storage_buffer("shared", 16)
     local graph = graph_utils.graph()
@@ -534,7 +791,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsRenamedTaskHandlesAndUnregisteredEdgeTargets) {
     EXPECT_THROW((void)RendGraphScriptVK::run("renamed_task", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
     local task = graph:add({ id = "original", type = "registry_probe" })
@@ -543,7 +800,7 @@ return { build = function()
 end }
 )", DataValue::make_map()), std::runtime_error);
     EXPECT_THROW((void)RendGraphScriptVK::run("unregistered_edge", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
     graph:add({ id = "first", type = "registry_probe", edges = {
@@ -556,7 +813,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsRepeatedTaskLocalAliasNames) {
     EXPECT_THROW((void)RendGraphScriptVK::run("repeated_alias", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local resource = graph_utils.storage_buffer("shared", 16)
     local graph = graph_utils.graph()
@@ -612,7 +869,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParameter
         EXPECT_FALSE(task.contains("color_target"));
         EXPECT_FALSE(task.contains("depth_target"));
     }
-    // Pipeline, mesh, and event strings never become resource imports. Parameter handles emit one declaration each.
+    // Pipeline and mesh keys and event strings never become resource imports. Parameter handles emit one declaration each.
     ASSERT_EQ(recipe.get_entry("imports").as_list().size(), 1U);
     EXPECT_EQ(recipe.get_entry("imports").as_list()[0].as_string(), "input");
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 4U);
@@ -620,16 +877,221 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParameter
     EXPECT_FALSE(tasks[5].contains("connect"));
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesLowerWithoutGraphResourcesAndSnapshotTheirValues) {
+    const DataValue recipe = RendGraphScriptVK::run("database_keys", R"(
+local graph_utils = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = graph_utils.graph()
+    local mesh = graph:add_mesh("static_mesh")
+    local graphics = graph:add_graphics_pipeline("shared_name")
+    local compute = graph:add_compute_pipeline("shared_name")
+    graph:add_mesh("unused_mesh")
+    assert(#graph.tasks == 0)
+    local draw = graph:draw_mesh("mesh", { mesh = mesh, pipeline = graphics, parts = { "opaque" } })
+    graph:compute("compute", { pipeline = compute })
+    graph:compute_sequential("sequence", { dispatches = { { pipeline = compute } } })
+    graph:ping_pong("ping_pong", { ping_pipeline = compute, pong_pipeline = compute, iterations = 2,
+        ping_prefix_pipeline = compute, pong_prefix_pipeline = compute })
+    graph:ping_pong("without_prefix", { ping_pipeline = compute, pong_pipeline = compute, iterations = 1 })
+    mesh.id = "changed_mesh"
+    graphics.id = "changed_graphics"
+    compute.id = "changed_compute"
+    -- A database key does not reserve a task-local graph alias with the same name.
+    draw:alias("static_mesh", graph_utils.storage_buffer("buffer", 16))
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 5U);
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("mesh"), "static_mesh");
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("pipeline"), "shared_name");
+    EXPECT_EQ(tasks[1].get_entry("params").get_value<std::string>("pipeline"), "shared_name");
+    const auto& dispatch = tasks[2].get_entry("params").get_entry("dispatches").as_list()[0];
+    EXPECT_EQ(dispatch.get_value<std::string>("pipeline"), "shared_name");
+    for (const char* field : {"ping_pipeline", "pong_pipeline", "ping_prefix_pipeline", "pong_prefix_pipeline"}) {
+        EXPECT_EQ(tasks[3].get_entry("params").get_value<std::string>(field), "shared_name");
+    }
+    EXPECT_FALSE(tasks[4].get_entry("params").contains("ping_prefix_pipeline"));
+    EXPECT_FALSE(tasks[4].get_entry("params").contains("pong_prefix_pipeline"));
+    for (const auto& task : tasks) {
+        EXPECT_FALSE(task.contains("connect"));
+        EXPECT_FALSE(task.contains("uses"));
+    }
+    EXPECT_FALSE(tasks[1].contains("aliases"));
+    EXPECT_FALSE(tasks[2].contains("aliases"));
+    EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("static_mesh"), "buffer");
+    EXPECT_TRUE(recipe.get_entry("imports").as_list().empty());
+    ASSERT_EQ(recipe.get_entry("resources").as_list().size(), 1U);
+    EXPECT_EQ(recipe.get_entry("resources").as_list()[0].get_value<std::string>("id"), "buffer");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectWrongTypesBeforeAddingTasks) {
+    const DataValue recipe = RendGraphScriptVK::run("invalid_database_keys", R"(
+local graph_utils = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = graph_utils.graph()
+    local graphics = graph:add_graphics_pipeline("graphics")
+    local compute = graph:add_compute_pipeline("compute")
+    local mesh = graph:add_mesh("mesh")
+    local invalid_calls = {
+        function() graph:add_mesh("") end,
+        function() graph:add_compute_pipeline("") end,
+        function() graph:add_graphics_pipeline("") end,
+        function() graph:compute("invalid", { pipeline = "compute" }) end,
+        function() graph:compute("invalid", { pipeline = graphics }) end,
+        function() graph:draw("invalid", { pipeline = compute }) end,
+        function() graph:draw_mesh("invalid", { mesh = graphics, pipeline = graphics, parts = { "opaque" } }) end,
+        function() graph:draw_mesh("invalid", { mesh = mesh, pipeline = mesh, parts = { "opaque" } }) end,
+        function() graph:compute("invalid", { pipeline = graph_utils.import_resource("compute") }) end,
+        function() graph:compute("invalid", { pipeline = { id = "", kind = "database", dependencies = {},
+            resource_type = compute.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = 42, kind = "database", dependencies = {},
+            resource_type = compute.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", dependencies = {},
+            resource_type = compute.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database",
+            resource_type = compute.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "import", dependencies = {},
+            resource_type = compute.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database", dependencies = {},
+            resource_type = graphics.resource_type } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database", dependencies = {} } }) end,
+        function() graph:compute_sequential("invalid", { dispatches = { { pipeline = graphics } } }) end,
+        function() graph:ping_pong("invalid", { ping_pipeline = compute, pong_pipeline = compute, iterations = 1,
+            ping_prefix_pipeline = graphics, pong_prefix_pipeline = compute }) end,
+    }
+    for _, call in ipairs(invalid_calls) do
+        assert(not pcall(call))
+        assert(#graph.tasks == 0)
+    end
+    graph:compute("valid", { pipeline = compute })
+    return graph:build()
+end }
+)", DataValue::make_map());
+    ASSERT_EQ(recipe.get_entry("tasks").as_list().size(), 1U);
+    EXPECT_EQ(recipe.get_entry("tasks").as_list()[0].get_value<std::string>("id"), "valid");
+    EXPECT_TRUE(recipe.get_entry("imports").as_list().empty());
+    EXPECT_TRUE(recipe.get_entry("resources").as_list().empty());
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectGraphBindingsBeforeChangingTasks) {
+    const DataValue recipe = RendGraphScriptVK::run("database_graph_bindings", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = Graph.new()
+    local compute = graph:add_compute_pipeline("compute")
+    local graphics = graph:add_graphics_pipeline("graphics")
+    local buffer = graph:add_storage_buffer("buffer", 16)
+    local producer = graph:compute("producer", { pipeline = compute })
+    local consumer = graph:draw("consumer", { pipeline = graphics })
+    consumer:alias("valid", buffer)
+    producer:connect(consumer, buffer)
+    local aliases = consumer.aliases
+    local edges = producer.edges
+    for _, resource in ipairs({ graph:add_mesh("mesh"), compute, graphics }) do
+        local invalid_calls = {
+            function() graph:full_memory_barrier("invalid", { resource = resource }) end,
+            function() graph:compute_sequential("invalid", { dispatches = {
+                { pipeline = compute, indirect_buffer = resource } } }) end,
+            function() graph:compute_sequential("invalid", { dispatches = {
+                { pipeline = compute, aliases = { invalid = resource } } } }) end,
+            function() consumer:alias("invalid", resource) end,
+            function() producer:connect(consumer, resource) end,
+            function() producer:connect(consumer, { buffer, resource }) end,
+            function() producer:connect_all({ consumer }, { buffer, resource }) end,
+            function() consumer:inputs_from(producer, { first = buffer, invalid = resource }) end,
+            function() graph:chain({ buffer, resource }, { producer, consumer }) end,
+            function() consumer:color_target(0, resource) end,
+            function() consumer:depth_target(resource) end,
+            function() resource:view() end,
+            function() graph:add_image_view("invalid", resource) end,
+        }
+        for _, call in ipairs(invalid_calls) do
+            assert(not pcall(call))
+            assert(#graph.tasks == 2)
+            assert(consumer.aliases == aliases and aliases.valid == buffer)
+            local alias_count = 0
+            for _ in pairs(aliases) do
+                alias_count = alias_count + 1
+            end
+            assert(alias_count == 1)
+            assert(producer.edges == edges and #edges == 1)
+        end
+    end
+    return graph:build()
+end }
+)", DataValue::make_map());
+    ASSERT_EQ(recipe.get_entry("tasks").as_list().size(), 2U);
+    const auto& producer = recipe.get_entry("tasks").as_list()[0];
+    ASSERT_EQ(producer.get_entry("connect").as_list().size(), 1U);
+    EXPECT_EQ(producer.get_entry("connect").as_list()[0].get_value<std::string>("resource"), "buffer");
+    const auto& aliases = recipe.get_entry("tasks").as_list()[1].get_entry("aliases").as_map();
+    EXPECT_EQ(aliases.size(), 1U);
+    EXPECT_TRUE(recipe.get_entry("imports").as_list().empty());
+    EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 1U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, BuildRejectsDatabaseResourcesInRawGraphBindings) {
+    EXPECT_NO_THROW((void)RendGraphScriptVK::run("raw_database_graph_bindings", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local invalid_bindings = {
+        function(graph, producer, consumer, buffer, resource)
+            graph:add({ id = "invalid", type = "registry_probe", aliases = { input = resource } })
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            graph:add({ id = "invalid", type = "registry_probe", uses = { resource } })
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            graph:add({ id = "invalid", subgraph = { tasks = {} }, ports = { input = resource } })
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            graph:add({ id = "invalid", type = "registry_probe", edges = { { to = consumer, resource = resource } } })
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            consumer.aliases = { input = resource }
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            producer.edges = { { to = consumer, resource = resource } }
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            buffer.dependencies = { resource }
+            consumer:alias("input", buffer)
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { aliases = { input = resource } })
+        end,
+        function(graph, producer, consumer, buffer, resource)
+            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { uses = { resource } })
+        end,
+    }
+    for _, resource_kind in ipairs({ "mesh", "compute", "graphics" }) do
+        for _, bind in ipairs(invalid_bindings) do
+            local graph = Graph.new()
+            local resource = resource_kind == "mesh" and graph:add_mesh("resource") or
+                resource_kind == "compute" and graph:add_compute_pipeline("resource") or graph:add_graphics_pipeline("resource")
+            local buffer = graph:add_storage_buffer("buffer", 16)
+            local producer = graph:add({ id = "producer", type = "registry_probe" })
+            local consumer = graph:add({ id = "consumer", type = "registry_probe" })
+            bind(graph, producer, consumer, buffer, resource)
+            assert(not pcall(function() graph:build() end))
+        end
+    end
+    return {}
+end }
+)", DataValue::make_map()));
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, ImageMethodsCacheDefaultViewsAndPreserveExplicitRanges) {
     const DataValue recipe = RendGraphScriptVK::run("image_methods", R"(
-local graph_utils = require("utils.render_graph")
+local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local image = graph_utils.image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
+    local graph = Graph.new()
+    local image = graph:add_image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
     local view = image:view()
     assert(image:view() == view)
     local range = image:view("image_range", { base_mip_level = 1, mip_level_count = 3 })
-    local graph = graph_utils.graph()
-    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, view)
+    graph:draw("draw", { pipeline = graph:add_graphics_pipeline("pipeline") }):color_target(0, view)
     graph:cpu_acquire_image("readback", { image_view = range })
     return graph:build()
 end }
@@ -664,12 +1126,16 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsDoNotMutateCallerParametersOrSharedOptions) {
     const DataValue recipe = RendGraphScriptVK::run("typed_parameter_copies", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local buffer = graph_utils.storage_buffer("commands", 64)
     local other = graph_utils.storage_buffer("other", 64)
     local options = { aliases = { input = buffer } }
-    local params = { pipeline = "pipeline", indirect_buffer = buffer }
+    local params = { pipeline = compute_pipeline("pipeline"), indirect_buffer = buffer }
     local graph = graph_utils.graph()
     graph:compute_indirect("first", params, options)
     assert(params.indirect_buffer == buffer)
@@ -677,7 +1143,7 @@ return { build = function()
     params.indirect_buffer = other
     options.aliases.input = other
     graph:compute_indirect("second", params, options)
-    local dispatch = { pipeline = "nested", indirect_buffer = buffer, aliases = { shader_buffer = buffer } }
+    local dispatch = { pipeline = compute_pipeline("nested"), indirect_buffer = buffer, aliases = { shader_buffer = buffer } }
     graph:compute_sequential("sequence", { dispatches = { dispatch } })
     assert(dispatch.indirect_buffer == buffer)
     assert(dispatch.aliases.shader_buffer == buffer)
@@ -699,16 +1165,20 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, AttachmentMethodsKeepAliasesTaskScopedAndRejectDuplicateTargets) {
     const DataValue recipe = RendGraphScriptVK::run("attachment_methods", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function graphics_pipeline(p_key)
+    return helper_graph:add_graphics_pipeline(p_key)
+end
 return { build = function()
     local first = graph_utils.import_resource("first")
     local second = graph_utils.import_resource("second")
     local depth = graph_utils.import_resource("depth")
     local graph = graph_utils.graph()
-    local draw = graph:draw("first", { pipeline = "pipeline" })
+    local draw = graph:draw("first", { pipeline = graphics_pipeline("pipeline") })
     assert(draw:color_target(0, first) == draw)
     assert(draw:depth_target(depth) == draw)
-    graph:draw("second", { pipeline = "pipeline" }):color_target(0, second)
+    graph:draw("second", { pipeline = graphics_pipeline("pipeline") }):color_target(0, second)
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -717,19 +1187,27 @@ end }
     EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("render_target_colors[0]"), "second");
     EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("render_target_depth"), "depth");
     EXPECT_THROW((void)RendGraphScriptVK::run("duplicate_attachment", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function graphics_pipeline(p_key)
+    return helper_graph:add_graphics_pipeline(p_key)
+end
 return { build = function()
     local target = graph_utils.import_resource("target")
     local graph = graph_utils.graph()
-    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, target):color_target(0, target)
+    graph:draw("draw", { pipeline = graphics_pipeline("pipeline") }):color_target(0, target):color_target(0, target)
     return graph:build()
 end }
 )", DataValue::make_map()), std::runtime_error);
     EXPECT_THROW((void)RendGraphScriptVK::run("invalid_attachment_index", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function graphics_pipeline(p_key)
+    return helper_graph:add_graphics_pipeline(p_key)
+end
 return { build = function()
     local graph = graph_utils.graph()
-    graph:draw("draw", { pipeline = "pipeline" }):color_target(-1, graph_utils.import_resource("target"))
+    graph:draw("draw", { pipeline = graphics_pipeline("pipeline") }):color_target(-1, graph_utils.import_resource("target"))
     return graph:build()
 end }
 )", DataValue::make_map()), std::runtime_error);
@@ -737,14 +1215,18 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, SequentialHandleBindingsPreserveSameNameResourcesAndRejectConflictingAliases) {
     const DataValue recipe = RendGraphScriptVK::run("sequential_identity_bindings", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local commands = graph_utils.storage_buffer("commands", 64)
     local same_name = graph_utils.storage_buffer("__render_graph_resource_1", 64)
     local graph = graph_utils.graph()
     graph:compute_sequential("sequence", { dispatches = {
-        { pipeline = "first", indirect_buffer = commands },
-        { pipeline = "second", aliases = { input = "__render_graph_resource_1" } },
+        { pipeline = compute_pipeline("first"), indirect_buffer = commands },
+        { pipeline = compute_pipeline("second"), aliases = { input = "__render_graph_resource_1" } },
     } }, { uses = { same_name } })
     return graph:build()
 end }
@@ -755,13 +1237,17 @@ end }
     const auto& dispatches = task.get_entry("params").get_entry("dispatches").as_list();
     EXPECT_EQ(dispatches[1].get_entry("aliases").get_value<std::string>("input"), "__render_graph_resource_1");
     EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_sequential_alias", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function()
     local commands = graph_utils.storage_buffer("commands", 64)
     local other = graph_utils.storage_buffer("other", 64)
     local graph = graph_utils.graph()
     graph:compute_sequential("sequence", { dispatches = {
-        { pipeline = "pipeline", indirect_buffer = commands },
+        { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands },
     } }, { aliases = { commands = other } })
     return graph:build()
 end }
@@ -770,7 +1256,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RejectsViewsOfOwnedNonImageResourcesAndConflictingDefaultViewIds) {
     EXPECT_THROW((void)RendGraphScriptVK::run("buffer_view", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
     local buffer = graph_utils.storage_buffer("buffer", 16)
@@ -779,11 +1265,15 @@ return { build = function()
 end }
 )", DataValue::make_map()), std::runtime_error);
     EXPECT_THROW((void)RendGraphScriptVK::run("default_view_collision", R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function graphics_pipeline(p_key)
+    return helper_graph:add_graphics_pipeline(p_key)
+end
 return { build = function()
     local image = graph_utils.storage_image("image", "r16g16b16a16_sfloat", 16, 8)
     local graph = graph_utils.graph()
-    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, image:view())
+    graph:draw("draw", { pipeline = graphics_pipeline("pipeline") }):color_target(0, image:view())
     graph:full_memory_barrier("barrier", { resource = graph_utils.storage_buffer("image.view", 16) })
     return graph:build()
 end }
@@ -792,16 +1282,20 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, TypedResourceParametersRejectAliasesThatRedirectTheirHandles) {
     constexpr std::string_view REDIRECT_RECIPE = R"(
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
 return { build = function(context)
     local commands = graph_utils.storage_buffer("commands", 64)
     local other = graph_utils.storage_buffer("other", 64)
     local graph = graph_utils.graph()
     if context.mode == "options" then
-        graph:compute_indirect("dispatch", { pipeline = "pipeline", indirect_buffer = commands },
+        graph:compute_indirect("dispatch", { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands },
             { aliases = { commands = other } })
     else
-        local dispatch = graph:compute_indirect("dispatch", { pipeline = "pipeline", indirect_buffer = commands })
+        local dispatch = graph:compute_indirect("dispatch", { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands })
         if context.mode == "method" then
             dispatch:alias("commands", other)
         elseif context.mode == "mutation" then
@@ -869,7 +1363,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     };
     auto make_octree = [&] {
         DataValue octree = DataValue::make_map();
-        octree.set_value("module", std::string("render_graphs.features.voxel_octree"));
+        octree.set_value("module", std::string("render_graph_utils.features.voxel_octree"));
         octree.set_entry("imports", make_imports({"octree_info", "octree_static", "octree_dynamic", "octree_debug_draw_index_buffer",
             "octree_debug_draw_indirect_buffer", "octree_debug_leaf_masks", "octree_debug_node_draw_indirect_buffer",
             "octree_debug_node_list", "octree_static_levels[0]", "octree_dynamic_levels[0]", "octree_static_levels[1]",
@@ -886,7 +1380,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     };
     auto make_svo = [&] {
         DataValue svo = DataValue::make_map();
-        svo.set_value("module", std::string("render_graphs.features.voxel_svo"));
+        svo.set_value("module", std::string("render_graph_utils.features.voxel_svo"));
         svo.set_value("variant", std::string("pass_published"));
         svo.set_value("shader_prefix", std::string("svo_2"));
         svo.set_value("dynamic_shader_prefix", std::string("svo_2_dynamic"));
@@ -958,7 +1452,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         context.set_entry("voxel_debug_view_toggles", toggles);
         if (p_post_processing) {
             DataValue post_processing = DataValue::make_map();
-            post_processing.set_value("module", std::string("render_graphs.features.pixel_sort"));
+            post_processing.set_value("module", std::string("render_graph_utils.features.pixel_sort"));
             post_processing.set_value("direction", std::string("vertical"));
             post_processing.set_value("scope", std::string("span"));
             post_processing.set_value("color_format", std::string("r16g16b16a16_sfloat"));

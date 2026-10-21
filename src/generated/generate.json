@@ -27,7 +27,17 @@
         }
     },
     {
-        "out_dir" : "${build_dir}/teal/utils",
+        "out_dir" : "${build_dir}/teal/render_graph_utils",
+        "output_name" : "render_graph.tl",
+        "template" : "teal_render_graph.tl.jinja",
+        "data" : {
+            "metadata" : ".metadata",
+            "render_tasks" : ".render_tasks",
+            "reflect_script" : ".reflect_script"
+        }
+    },
+    {
+        "out_dir" : "${build_dir}/teal/render_graph_utils",
         "output_name" : "render_graph_tasks.tl",
         "template" : "teal_render_graph_tasks.tl.jinja",
         "data" : {

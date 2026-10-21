@@ -31,13 +31,10 @@ local UINT32_SIZE = 4
 
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
-local graph_utils = require("utils.render_graph")
-local sort = require("utils.sort")
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
 
 local ceil_div = math_utils.ceil_div
-local storage_buffer = graph_utils.storage_buffer
-local storage_image = graph_utils.storage_image
-local clamp_to_edge_sampler = graph_utils.clamp_to_edge_sampler
 
 -- The sizes and dispatch counts derived from the source image.
 local record Layout
@@ -65,7 +62,7 @@ local RADIX_SORT_BUFFER_NAMES: sort.RadixSortBufferNames = {
 local function make_layout(p_context: wbe.PixelSortingRecipeContext): Layout
     local width = p_context.source_width
     local height = p_context.source_height
-    local orientation_name = graph_utils.enum_name(p_context.orientation)
+    local orientation_name = Graph.enum_name(p_context.orientation)
     if orientation_name ~= "VERTICAL" and orientation_name ~= "HORIZONTAL" then
         error("pixel_sorting: unknown orientation '" .. orientation_name .. "'.")
     end
@@ -85,61 +82,64 @@ local function make_layout(p_context: wbe.PixelSortingRecipeContext): Layout
 end
 
 local record Resources
-    column_offsets: graph_utils.Resource
-    destination: graph_utils.Resource
-    post_processing_output: graph_utils.Resource
-    mask: graph_utils.Resource
-    sampler: graph_utils.Resource
+    column_offsets: Graph.Resource
+    destination: Graph.Resource
+    post_processing_output: Graph.Resource
+    mask: Graph.Resource
+    sampler: Graph.Resource
     sort_buffers: sort.RadixSortBuffers
-    swap_chain: graph_utils.Resource
-    source: graph_utils.Resource
-    contrast: graph_utils.Resource
-    post_processing_params: graph_utils.Resource
+    swap_chain: Graph.Resource
+    source: Graph.Resource
+    contrast: Graph.Resource
+    post_processing_params: Graph.Resource
 end
 
-local function make_resources(p_layout: Layout): Resources
+local function make_resources(p_graph: Graph.Graph, p_layout: Layout): Resources
     local width = p_layout.width
     local height = p_layout.height
     return {
-        column_offsets = storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
-        destination = storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
+        column_offsets = p_graph:add_storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
+        destination = p_graph:add_storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
             :view("pixel_sort_destination"),
         -- The screenshot reads the result back through a transfer.
-        post_processing_output = storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat",
+        post_processing_output = p_graph:add_storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat",
             width, height, { "transfer_src" }):view("pixel_sorting_post_processing_output"),
         -- Stores each masked pixel's rank within its line, with 0xFFFF marking unmasked pixels.
-        mask = storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
-        sampler = clamp_to_edge_sampler("pixel_sort_sampler"),
+        mask = p_graph:add_storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
+        sampler = p_graph:add_clamp_to_edge_sampler("pixel_sort_sampler"),
         -- The register pass writes and the write pass reads the keys; size the sort for every masked pixel.
-        sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, p_layout.element_count),
-        swap_chain = graph_utils.import_resource("swap_chain"),
-        source = graph_utils.import_resource("pixel_sort_source"),
-        contrast = graph_utils.import_resource("pixel_sort_contrast"),
-        post_processing_params = graph_utils.import_resource("pixel_sorting_post_processing_params"),
+        sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, p_layout.element_count, p_graph),
+        swap_chain = p_graph:import_resource("swap_chain"),
+        source = p_graph:import_resource("pixel_sort_source"),
+        contrast = p_graph:import_resource("pixel_sort_contrast"),
+        post_processing_params = p_graph:import_resource("pixel_sorting_post_processing_params"),
     }
 end
 
 local record KeyRegistrationTasks
-    count_mask: graph_utils.Task
-    prefix_sum: graph_utils.Task
-    register_keys: graph_utils.Task
+    count_mask: Graph.Task
+    prefix_sum: Graph.Task
+    register_keys: Graph.Task
 end
 
 -- Count the masked pixels of every line, sum them into the column offsets, and register their sort keys.
-local function add_key_registration(p_graph: graph_utils.Graph, p_layout: Layout,
+local function add_key_registration(p_graph: Graph.Graph, p_layout: Layout,
     p_resources: Resources): KeyRegistrationTasks
     local orientation = p_layout.orientation
+    local count_mask_pipeline = p_graph:add_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
+    local prefix_sum_pipeline = p_graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = p_graph:add_compute_pipeline("register_pixel_sort_keys_" .. orientation .. "_shader")
     local count_mask = p_graph:compute("count_pixel_sort_mask", {
-        pipeline = "count_pixel_sort_mask_" .. orientation .. "_shader",
+        pipeline = count_mask_pipeline,
         group_count_x = p_layout.column_group_count,
         group_count_y = 1,
     }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets } })
     -- The prefix sum runs in a single workgroup.
     local prefix_sum = p_graph:compute("prefix_sum_pixel_sort_columns", {
-        pipeline = "prefix_sum_pixel_sort_columns_shader", group_count_x = 1, group_count_y = 1,
+        pipeline = prefix_sum_pipeline, group_count_x = 1, group_count_y = 1,
     }, { uses = { p_resources.column_offsets } })
     local register_keys = p_graph:compute("register_pixel_sort_keys", {
-        pipeline = "register_pixel_sort_keys_" .. orientation .. "_shader",
+        pipeline = register_keys_pipeline,
         group_count_x = p_layout.column_group_count,
         group_count_y = 1,
     }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets,
@@ -148,30 +148,33 @@ local function add_key_registration(p_graph: graph_utils.Graph, p_layout: Layout
 end
 
 local record OutputTasks
-    write_pixels: graph_utils.Task
-    post_processing: graph_utils.Task
-    present: graph_utils.Task
-    draw_imgui: graph_utils.Task
+    write_pixels: Graph.Task
+    post_processing: Graph.Task
+    present: Graph.Task
+    draw_imgui: Graph.Task
 end
 
 -- Write the sorted pixels, post-process them, and present the result under the application's ImGui overlay.
-local function add_output(p_graph: graph_utils.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
+local function add_output(p_graph: Graph.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
     local tile_group_count_x = p_layout.tile_group_count_x
     local tile_group_count_y = p_layout.tile_group_count_y
+    local write_pixels_pipeline = p_graph:add_compute_pipeline("write_sorted_pixels_" .. p_layout.orientation .. "_shader")
+    local post_processing_pipeline = p_graph:add_compute_pipeline("pixel_sorting_post_processing_shader")
+    local present_pipeline = p_graph:add_graphics_pipeline("present_pixel_sort_pipeline")
     local write_pixels = p_graph:compute("write_sorted_pixels", {
-        pipeline = "write_sorted_pixels_" .. p_layout.orientation .. "_shader",
+        pipeline = write_pixels_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
     }, { uses = { p_resources.source, p_resources.sort_buffers.keys, p_resources.mask, p_resources.contrast,
         p_resources.column_offsets, p_resources.destination } })
     local post_processing = p_graph:compute("pixel_sorting_post_processing", {
-        pipeline = "pixel_sorting_post_processing_shader",
+        pipeline = post_processing_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
     }, { uses = { p_resources.destination, p_resources.sampler, p_resources.post_processing_params,
         p_resources.post_processing_output } })
     local present = p_graph:draw("present_sorted_pixels", {
-        pipeline = "present_pixel_sort_pipeline",
+        pipeline = present_pipeline,
         clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
         draw_vertex_count = 3,
     }, {
@@ -184,8 +187,8 @@ end
 
 -- Order the line bookkeeping and the keys before the write, and the output images through post-processing and
 -- presentation.
-local function connect_tasks(p_graph: graph_utils.Graph, p_resources: Resources, p_registration: KeyRegistrationTasks,
-    p_radix_sort: graph_utils.Task, p_output: OutputTasks)
+local function connect_tasks(p_graph: Graph.Graph, p_resources: Resources, p_registration: KeyRegistrationTasks,
+    p_radix_sort: Graph.Task, p_output: OutputTasks)
     p_graph:chain(p_resources.column_offsets,
         { p_registration.count_mask, p_registration.prefix_sum, p_registration.register_keys, p_output.write_pixels })
     p_graph:chain(p_resources.mask, { p_registration.register_keys, p_output.write_pixels })
@@ -199,8 +202,8 @@ local exports = {}
 
 function exports.build(context: wbe.PixelSortingRecipeContext): wbe.RendGraphRecipeVK
     local layout = make_layout(context)
-    local resources = make_resources(layout)
-    local graph = graph_utils.graph()
+    local graph = Graph.new()
+    local resources = make_resources(graph, layout)
     local registration = add_key_registration(graph, layout, resources)
     local radix_sort = sort.add_radix_sort_task(graph, "radix_sort", resources.sort_buffers)
     local output = add_output(graph, layout, resources)

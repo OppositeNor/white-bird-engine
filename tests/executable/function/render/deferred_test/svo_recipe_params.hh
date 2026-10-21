@@ -65,7 +65,7 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVOBufferSizes {
 
 /**
  * @class SVORecipeParams
- * @brief The parameters of the render_graphs.features.voxel_svo recipe module; see ISVORenderFeature::configure_recipe().
+ * @brief The parameters of the render_graph_utils.features.voxel_svo recipe module; see ISVORenderFeature::configure_recipe().
  * @details Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) SVORecipeParams : public RecipeFeatureParams {

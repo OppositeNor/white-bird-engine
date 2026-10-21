@@ -47,7 +47,7 @@ struct WBE_META(WBE_REFLECT_SCRIPT) OctreeGroupCount {
 
 /**
  * @class OctreeRecipeParams
- * @brief The parameters of the render_graphs.features.voxel_octree recipe module; see
+ * @brief The parameters of the render_graph_utils.features.voxel_octree recipe module; see
  * VoxelRenderFeatureOctree::configure_recipe(). Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) OctreeRecipeParams : public RecipeFeatureParams {

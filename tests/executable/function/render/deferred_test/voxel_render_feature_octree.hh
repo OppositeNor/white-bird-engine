@@ -85,7 +85,7 @@ public:
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
 
     /**
-     * @brief Describe the octree to the render_graphs.features.voxel_octree module, and supply its textures, buffers, and
+     * @brief Describe the octree to the render_graph_utils.features.voxel_octree module, and supply its textures, buffers, and
      * the clear and construction tasks only C++ can build.
      * @throws std::runtime_error If the construction tasks declare graph resources other than the mesh imports the recipe's
      * mesh draws provide.

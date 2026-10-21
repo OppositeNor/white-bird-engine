@@ -21,7 +21,7 @@ A recipe module exports `build(context)` returning `RendGraphRecipeVK` (`rend_gr
 
 ```lua
 local type wbe = require("wbe")
-local graph_utils = require("utils.render_graph")
+local graph_utils = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
@@ -98,7 +98,7 @@ recipe. Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_render_
 
 ## Feature subgraph modules
 
-A reusable recipe part lives in `render_graphs/features/` and exports `subgraph(id, params, target)` returning a subgraph
+A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(id, params, target)` returning a subgraph
 task built with `graph_utils.subgraph(id, recipe_with_ports, { port = resource })`. Its C++ side provides
 `configure_recipe(DataValue&, RendGraphRecipeImportsVK&)`, which serializes its `WBE_REFLECT_SCRIPT` params struct (derived
 from `RecipeFeatureParams`, including the `module` name) into the context and supplies its resources and C++ tasks. The recipe
@@ -123,7 +123,7 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
    `resolve_task_push_constants_vk`) in `create()`.
 4. Rebuild. `render_task_registry.gen.cpp` registers the class name and aliases; a missing `create` or duplicate name fails
    the build. The params type appears in `wbe.d.tl` for Teal, and `graph:<method>(id, params, options?)`, which creates
-   the type `<name>`, in the generated `utils.render_graph_tasks`.
+   the type `<name>`, in the generated `render_graph_utils.render_graph_tasks`.
 
 Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.hh` (standard), `rt_graphics_draw_mesh_vk.hh`
 (with `prepare_graph`), and `tests/unit/function/render_task_registry_vk_test_tasks.hh` (test probes).
@@ -131,8 +131,9 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 ## Scripts and Teal
 
 - Sources live under `res/assets/scripts/teal/` and are `script` resources declared in `lua_scripts.toml`: recipes in
-  `render_graphs/` (`deferred.tl`, `draw_cube_unshaded.tl`, `pixel_sorting.tl`), features in `render_graphs/features/`,
-  helpers in `utils/` (`render_graph.tl`, `math.tl`, `sort.tl`). Test-only scripts (`tests/teal_math.tl`,
+  `render_graphs/` (`deferred.tl`, `draw_cube_unshaded.tl`, `pixel_sorting.tl`), features in `render_graph_utils/features/`,
+  graph helpers in `render_graph_utils/` (`render_graph_utils.tl`, `sort.tl`), and general helpers in `utils/` (`math.tl`).
+  Test-only scripts (`tests/teal_math.tl`,
   `tests/teal_recipe.tl`) use `scope = "test_only"`.
 - A script's resource id is its module name: path under `scripts/teal/` without extension, dots for slashes. Keep them in
   sync so `require` resolves the same module at runtime and in the editor.
@@ -143,9 +144,9 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 - `require` is the only import mechanism; modules load once per backend and cyclic requires fail. New import sources are
   `IScriptModuleResolver`s whose `try_resolve()` must not throw.
 
-`utils.render_graph` provides `enum_name`, `buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
+`render_graph_utils.render_graph_utils` provides `enum_name`, `buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
 `clamp_to_edge_sampler`, `indirect_dispatch`, `subgraph`, and `task_list()` (`add`, `get`, `chain(resource, ids)` to connect a
-sequence on one resource). `utils.sort` provides radix-sort resources and tasks; `utils.math` provides `ceil_div` and `clamp`.
+sequence on one resource). `render_graph_utils.sort` provides radix-sort resources and tasks; `utils.math` provides `ceil_div` and `clamp`.
 
 ## Tests
 

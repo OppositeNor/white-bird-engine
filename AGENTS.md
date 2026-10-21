@@ -124,7 +124,7 @@ For non-trivial implementation tasks:
   `toggle` whose event the application emits and whose current state it passes through the context.
 - A subgraph groups tasks, graph-owned resources, and internal edges under one id (`RendGraphDescVK::add_subgraph()`;
   in a recipe, a task with a nested recipe in `subgraph` and its `ports` bound in `ports`, built with
-  `utils.render_graph.subgraph()`). It is flattened when it is added: its task and owned resource ids become
+  `render_graph_utils.render_graph_utils.subgraph()`). It is flattened when it is added: its task and owned resource ids become
   `<id>.<name>`, and names inside it resolve to a port's bound resource, else its own resource, else the enclosing graph's
   (task resource maps carry this as an unvalidated scope). Imports stay graph-wide; the same resource imported again merges.
   Edges to and from the subgraph id resolve when the graph is built, from the tasks' accesses: an incoming edge on R
@@ -145,12 +145,12 @@ For non-trivial implementation tasks:
   interface, a derived one `is` its bases, and a script type naming a reflected type that is not `WBE_REFLECT_SCRIPT`
   fails generation. Declare data C++ hands a recipe as `WBE_REFLECT_SCRIPT` structs rather than Teal records, import the
   declarations as types only (`local type wbe = require("wbe")`), and annotate `build(context: <context type>):
-  wbe.RendGraphRecipeVK`. Enums serialize as their canonical names; compare `utils.render_graph.enum_name(value)` with the
+  wbe.RendGraphRecipeVK`. Enums serialize as their canonical names; compare `render_graph_utils.render_graph_utils.enum_name(value)` with the
   canonical upper-case name, which also accepts the lowercase aliases.
   Type each task's `params` with its reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`), since
   `RendRecipeTaskVK.params` is untyped. The generated repo-root `tlconfig.lua` points the Teal language server at the
   same paths for the last built target.
-- The typed graph constructors (`graph:compute()`, `graph:draw_mesh()`, ...) are generated into `utils.render_graph_tasks`
+- The typed graph constructors (`graph:compute()`, `graph:draw_mesh()`, ...) are generated into `render_graph_utils.render_graph_tasks`
   (`templates/teal_render_graph_tasks.tl.jinja`) from the task classes annotated `WBE_RENDER_TASK(<method>)`; each creates
   the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare `WBE_RENDER_TASK` only registers the
   type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)` or `WBE_RECIPE_RESOURCE(task_local)` so the
@@ -160,15 +160,17 @@ For non-trivial implementation tasks:
 
 - Script sources live under `res/assets/scripts/teal/` and are `script` resources declared in
   `res/assets/scripts/teal/lua_scripts.toml`: recipes in `render_graphs/`, reusable recipe parts (modules whose
-  `subgraph(id, params, target)` returns a subgraph task) in `render_graphs/features/`, and shared helpers in `utils/`.
+  `subgraph(id, params, target)` returns a subgraph task) in `render_graph_utils/features/`, graph helpers in
+  `render_graph_utils/`, and general script helpers in `utils/`.
 - A script's resource id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes
-  (`utils/render_graph.tl` is `utils.render_graph`). Keep the two in sync, so that `require` resolves the same module at
-  runtime (through `SMRResourceManager`) and in the editor.
+  (`render_graph_utils/render_graph_utils.tl` is `render_graph_utils.render_graph_utils`). Keep the two in sync, so that
+  `require` resolves the same module at runtime (through `SMRResourceManager`) and in the editor.
 - Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `WBEACPCompilerScript` copies Lua sources and type-checks and
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
   a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/teal/` at compile time, so a
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
-- Modules that reflection generates (`utils.render_graph_tasks`) are written to `build/<target>/teal/`, which `require`
+- Modules that reflection generates (`render_graph_utils.render_graph` and `render_graph_utils.render_graph_tasks`) are
+  written to `build/<target>/teal/`, which `require`
   also resolves against. Their `lua_scripts.toml` entries give `source_file` relative to that directory, where the ACP
   looks first, and set `path` under `assets/scripts/teal/`.
 - `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic

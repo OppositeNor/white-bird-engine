@@ -34,14 +34,14 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsGraphicsDrawMeshVK {
     /**
-     * @brief Resource key of the RUMesh3D to draw. The compiled mesh is imported into the graph under this key.
+     * @brief Resource key of the compiled mesh to draw. The compiled mesh is imported into the graph under this key.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, MeshResourcesVK))
     std::string mesh;
     /**
      * @brief Resource key of the compiled graphics pipeline in the renderer's RenderDatabase.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROGraphicsPipelineVK))
     std::string pipeline;
     /**
      * @brief Parts of the mesh the task draws, in draw order; at least one, each at most once.

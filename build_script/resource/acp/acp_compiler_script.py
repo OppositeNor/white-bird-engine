@@ -54,7 +54,7 @@ class WBEACPCompilerScript(WBEACPCompilerFile):
     which runs in an embedded Lua 5.5; a Teal script is emitted as <name>.lua next to where its source would be copied.
     Modules a Teal script requires resolve against the module directories, where each module is searched for as a
     declaration (.d.tl), a Teal source (.tl), or a Lua source (.lua) under its module path. A script whose source file
-    is in the generated module directory, such as the utils/render_graph_tasks.tl that reflection generates, is
+    is in the generated module directory, such as the render_graph_utils/render_graph_tasks.tl that reflection generates, is
     compiled from there.
     """
 

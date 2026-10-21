@@ -16,17 +16,19 @@
 -- Imports: `swap_chain` (the swap chain image views) and `camera_info` (the application's camera uniform buffer).
 
 local type wbe = require("wbe")
-local graph_utils = require("utils.render_graph")
+local Graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
-    local swap_chain = graph_utils.import_resource("swap_chain")
-    local camera_info = graph_utils.import_resource("camera_info")
-    local graph = graph_utils.graph()
+    local graph = Graph.new()
+    local swap_chain = graph:import_resource("swap_chain")
+    local camera_info = graph:import_resource("camera_info")
+    local static_mesh = graph:add_mesh("model_cube_static.mesh")
+    local pipeline = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline")
     graph:draw_mesh("run_static_mesh", {
-        mesh = "model_cube_static.mesh",
-        pipeline = "draw_cube_unshaded_pipeline",
+        mesh = static_mesh,
+        pipeline = pipeline,
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
     }, { uses = { camera_info } }):color_target(0, swap_chain)

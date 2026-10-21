@@ -65,7 +65,7 @@ public:
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
 
     /**
-     * @brief Describe the SVO to the render_graphs.features.voxel_svo module, and supply its buffers.
+     * @brief Describe the SVO to the render_graph_utils.features.voxel_svo module, and supply its buffers.
      */
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;

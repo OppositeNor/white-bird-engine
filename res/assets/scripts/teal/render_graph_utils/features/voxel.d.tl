@@ -12,11 +12,11 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Types shared by the voxel structure feature modules (render_graphs.features.voxel_svo and voxel_octree), and the
--- recipes that include them. Declarations only: import them with `local type voxel = require("render_graphs.features.voxel")`.
+-- Types shared by the voxel structure feature modules (render_graph_utils.features.voxel_svo and voxel_octree), and the
+-- recipes that include them. Declarations only: import them with `local type voxel = require("render_graph_utils.features.voxel")`.
 
 local type wbe = require("wbe")
-local type graph_utils = require("utils.render_graph")
+local type Graph = require("render_graph_utils.render_graph")
 
 local record voxel
     -- What the including recipe supplies to a voxel structure's subgraph, whose ports `color` and `depth` the overlays draw
@@ -27,9 +27,9 @@ local record voxel
         -- The voxel debug view toggles by mode group.
         debug_view_toggles: wbe.VoxelDebugViewToggles
         -- The color target of the overlays.
-        color_target: graph_utils.Resource
+        color_target: Graph.Resource
         -- The depth target the overlays test against.
-        depth_target: graph_utils.Resource
+        depth_target: Graph.Resource
     end
 end
 

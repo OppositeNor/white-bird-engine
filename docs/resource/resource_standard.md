@@ -185,9 +185,9 @@ Scripts live under `res/assets/scripts/teal/` and are declared in `res/assets/sc
 
 ```toml
 [[resources]]
-id = "utils.render_graph"
+id = "render_graph_utils.render_graph_utils"
 source_type = "script"
-source_file = "assets/scripts/teal/utils/render_graph.tl"
+source_file = "assets/scripts/teal/render_graph_utils/render_graph_utils.tl"
 ```
 
 - A script's id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes. ACP does not
@@ -195,11 +195,13 @@ source_file = "assets/scripts/teal/utils/render_graph.tl"
   sync.
 - `.lua` sources are copied. `.tl` sources are type-checked and compiled to `<name>.lua` with the vendored Teal compiler; a
   type error fails the build. Teal resolves `require` against the script root and the generated modules in
-  `build/<target>/teal/` (`wbe.d.tl` and `utils/render_graph_tasks.tl`), so a Teal module can require a Lua module only
-  through a `.d.tl` declaration next to it.
+  `build/<target>/teal/` (`wbe.d.tl`, `render_graph_utils/render_graph.tl`, and
+  `render_graph_utils/render_graph_tasks.tl`), so a Teal module can require a Lua module only through a `.d.tl` declaration
+  next to it.
 - A generated script module is a resource too. Its `source_file` is relative to `build/<target>/teal/`, where ACP looks
   first, and its entry sets `path` to keep the module's place under `assets/scripts/teal/`.
-- Recipes go in `render_graphs/`, reusable recipe parts in `render_graphs/features/`, and shared helpers in `utils/`.
+- Recipes go in `render_graphs/`; reusable graph parts and helpers go in `render_graph_utils/`, with features in
+  `render_graph_utils/features/`. General script helpers remain in `utils/`.
   Test-only scripts go in `tests/` with `scope = "test_only"`.
 
 At runtime `require` is the only import mechanism: `SMRResourceManager` resolves module ids to script resources, each module

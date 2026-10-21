@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Jinja filters that describe reflected C++ types as Teal declarations, nested in the `wbe` declaration record, and the
-render-task constructors of utils.render_graph, which refer to those declarations."""
+"""Jinja filters that describe reflected C++ types as Teal declarations in `wbe`, and concrete render-task authoring
+interfaces and constructors in the shared `render_graph` module."""
 import re
 from typing import Any, Callable
 from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEMetadata
@@ -124,9 +124,13 @@ def teal_parent(p_parent: str, p_scope: dict[str, Any]) -> str:
 
 _RECIPE_RESOURCE = "WBE_RECIPE_RESOURCE"
 _RECIPE_RESOURCE_SCOPES = ("graph", "task_local")
-# The members utils.render_graph declares on Graph itself. Teal lets them silently override a generated constructor of the
+_RENDER_OBJECT = "WBE_RENDER_OBJECT"
+# The shared render_graph module's Graph members. Teal lets them silently override a generated constructor of the
 # same name, so generation rejects one.
-_GRAPH_MEMBERS = {"tasks", "add", "get", "import_task", "chain", "build"}
+_GRAPH_MEMBERS = {"tasks", "add", "get", "import_task", "chain", "build",
+                  "add_mesh", "add_compute_pipeline", "add_graphics_pipeline", "add_buffer", "add_storage_buffer",
+                  "add_image", "add_storage_image", "add_image_view", "add_clamp_to_edge_sampler", "import_resource",
+                  "port", "reference", "indirect_dispatch", "as_subgraph"}
 
 
 def _template_argument(p_type: str) -> tuple[str, str]:
@@ -165,7 +169,7 @@ class _RenderTaskDescriber:
             "method": p_method,
             # Recipes name a task type by the first serialization alias of its class.
             "type": p_task.aliases[0] if p_task.aliases else p_task.name,
-            "params_type": f"{self._interface(params)}<Resource>" if fields else "wbe." + teal_name(params),
+            "params_type": self._interface(params) if fields else "wbe." + teal_name(params),
             "fields": fields,
         }
 
@@ -178,16 +182,23 @@ class _RenderTaskDescriber:
                 fields.extend(self._fields(parent_class))
         return fields + p_class.fields
 
-    def _resource_scope(self, p_field: WBEFieldMetadata) -> str | None:
-        """The scope of the resource ids a field holds, or None for a field that is not WBE_RECIPE_RESOURCE."""
+    def _resource_scope(self, p_field: WBEFieldMetadata) -> tuple[str, str] | None:
+        """The scope and optional render-object type of a resource field, or None for an ordinary field."""
         if _RECIPE_RESOURCE not in p_field.attribute:
             return None
         parameters = p_field.attribute_parameters.get(_RECIPE_RESOURCE, [])
-        if len(parameters) != 1 or parameters[0] not in _RECIPE_RESOURCE_SCOPES:
-            raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE}(graph) or {_RECIPE_RESOURCE}(task_local).")
-        return parameters[0]
+        if len(parameters) == 1 and parameters[0] in _RECIPE_RESOURCE_SCOPES:
+            return parameters[0], ""
+        if len(parameters) == 2 and parameters[0] == "database":
+            target = _strip(parameters[1])
+            render_object = next((cpp_class for cpp_class in self._classes.values()
+                                  if _strip(cpp_class.name) == target), None)
+            if render_object is None or _RENDER_OBJECT not in render_object.attribute:
+                raise ValueError(f"The database resource field '{p_field.name}' names '{parameters[1]}', which is not a reflected WBE_RENDER_OBJECT class.")
+            return "database", target
+        raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE}(graph), {_RECIPE_RESOURCE}(task_local), or {_RECIPE_RESOURCE}(database, RenderObjectType).")
 
-    def _value(self, p_type: str, p_scope: str | None, p_field: str) -> tuple[dict[str, Any] | None, str]:
+    def _value(self, p_type: str, p_scope: tuple[str, str] | None, p_field: str) -> tuple[dict[str, Any] | None, str]:
         """Describe the resource ids a field value holds, with its authoring Teal type; None and its declared type for a
         value without resource ids."""
         stripped = _strip(p_type)
@@ -200,14 +211,19 @@ class _RenderTaskDescriber:
                 return None, teal_type(p_type, self._scope, "wbe.")
             return {"kind": "list", "element": element}, f"{{{element_type}}}"
         if p_scope is not None:
-            resource = {"kind": "resource", "scope": p_scope}
+            scope, target = p_scope
+            resource = {"kind": "resource", "scope": scope}
+            resource_type = "Resource | string"
+            if scope == "database":
+                resource["expected_type"] = "WhiteBirdEngine::" + target
+                resource_type = "Resource"
             if stripped == "std::string":
-                return resource, "Resource | string"
+                return resource, resource_type
             if stripped == "DataValue":
-                return {"kind": "map", "element": resource}, "{string:Resource | string}"
+                return {"kind": "map", "element": resource}, f"{{string:{resource_type}}}"
             raise ValueError(f"The {_RECIPE_RESOURCE} field '{p_field}' must hold std::string ids or a DataValue map of them, not '{p_type}'.")
         if stripped in self._classes and self._resource_fields_of(stripped):
-            return {"kind": "record", "fields": self._resource_fields_of(stripped)}, f"{self._interface(stripped)}<Resource>"
+            return {"kind": "record", "fields": self._resource_fields_of(stripped)}, self._interface(stripped)
         return None, teal_type(p_type, self._scope, "wbe.")
 
     def _resource_fields_of(self, p_class: str) -> list[dict[str, Any]]:
@@ -239,11 +255,13 @@ class _RenderTaskDescriber:
 
 
 def teal_render_tasks(p_metadata: WBEMetadata, p_render_tasks: list[str], p_reflect_script: list[str]) -> dict[str, Any]:
-    """Describe the Graph constructors of utils.render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
+    """Describe the Graph constructors of render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
 
     A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated
     WBE_RECIPE_RESOURCE(graph) hold graph resource ids, and those annotated WBE_RECIPE_RESOURCE(task_local) hold ids the
-    task's aliases map: a std::string, optional or in a vector, or a DataValue map of them. Params that hold such fields,
+    task's aliases map. WBE_RECIPE_RESOURCE(database, T) requires a resource handle for a reflected render object T,
+    whose canonical type is recorded for runtime validation.
+    These are std::string fields, optional or in a vector, or a DataValue map of them. Params that hold such fields,
     directly or in nested params, get an authoring interface, which also accepts resource handles in their place.
 
     Args:
@@ -270,7 +288,7 @@ def teal_render_tasks(p_metadata: WBEMetadata, p_render_tasks: list[str], p_refl
             raise ValueError(f"The render task {task.name} must name its constructor with one identifier, as in WBE_RENDER_TASK(compute).")
         method = parameters[0]
         if method in _GRAPH_MEMBERS:
-            raise ValueError(f"The constructor '{method}' of {task.name} shadows a member of the Graph of utils.render_graph.")
+            raise ValueError(f"The constructor '{method}' of {task.name} shadows a member of the Graph of render_graph.")
         if method in constructors:
             raise ValueError(f"The constructor '{method}' is declared by more than one render task.")
         constructors[method] = describer.constructor(task, method)

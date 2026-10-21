@@ -17,6 +17,7 @@ from typing import Any
 import unittest
 
 from jinja2 import Environment, FileSystemLoader
+import lupa.lua55
 
 from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEMetadata, WBEMethodMetadata
 from build_script.reflection.teal_types import TEAL_FILTERS, teal_render_tasks
@@ -73,7 +74,7 @@ class TealRenderTasksTest(unittest.TestCase):
         api = _describe([params, dispatch, _task("RTSequentialVK", "compute_sequential", params.name)])
         task_local = {"kind": "resource", "scope": "task_local"}
         graph = {"kind": "resource", "scope": "graph"}
-        self.assertEqual(api["constructors"][0]["params_type"], "RTParamsSequentialVK<Resource>")
+        self.assertEqual(api["constructors"][0]["params_type"], "RTParamsSequentialVK")
         self.assertEqual(api["constructors"][0]["fields"], [
             {"name": "dispatches", "kind": "list", "element": {"kind": "record", "fields": [
                 {"name": "indirect_buffer", **task_local},
@@ -85,7 +86,7 @@ class TealRenderTasksTest(unittest.TestCase):
         interfaces = {interface["name"]: interface["fields"] for interface in api["interfaces"]}
         self.assertEqual(list(interfaces), ["RTParamsDispatchVK", "RTParamsSequentialVK"])
         self.assertEqual(interfaces["RTParamsSequentialVK"], [
-            {"name": "dispatches", "type": "{RTParamsDispatchVK<Resource>}"},
+            {"name": "dispatches", "type": "{RTParamsDispatchVK}"},
             {"name": "views", "type": "{Resource | string}"},
             {"name": "transform", "type": "Resource | string"},
             {"name": "counts", "type": "{integer}"},
@@ -102,8 +103,11 @@ class TealRenderTasksTest(unittest.TestCase):
         for method in ['"compute"', "end", "two words", ""]:
             with self.subTest(method=method), self.assertRaisesRegex(ValueError, "one identifier"):
                 _describe([params, _task("RTComputeVK", method, params.name)])
-        with self.assertRaisesRegex(ValueError, "shadows"):
-            _describe([params, _task("RTComputeVK", "chain", params.name)])
+        for method in ["chain", "add_mesh", "add_compute_pipeline", "add_graphics_pipeline", "add_buffer", "add_storage_buffer",
+                       "add_image", "add_storage_image", "add_image_view", "add_clamp_to_edge_sampler", "import_resource",
+                       "port", "reference", "indirect_dispatch", "as_subgraph"]:
+            with self.subTest(method=method), self.assertRaisesRegex(ValueError, "shadows"):
+                _describe([params, _task("RTComputeVK", method, params.name)])
         with self.assertRaisesRegex(ValueError, "more than one"):
             _describe([params, _task("RTFirstVK", "compute", params.name), _task("RTSecondVK", "compute", params.name)])
 
@@ -134,50 +138,68 @@ class TealRenderTasksTest(unittest.TestCase):
         environment.filters.update(TEAL_FILTERS)
         module = environment.get_template("teal_render_graph_tasks.tl.jinja").render(
             metadata=metadata, render_tasks=["WBE_RENDER_TASK"], reflect_script=["WBE_REFLECT_SCRIPT"], _prefix="Test.")
+        common = environment.get_template("teal_render_graph.tl.jinja").render(
+            metadata=metadata, render_tasks=["WBE_RENDER_TASK"], reflect_script=["WBE_REFLECT_SCRIPT"], _prefix="Test.")
         with TemporaryDirectory() as temporary:
             generated = Path(temporary) / "generated"
-            (generated / "utils").mkdir(parents=True)
-            (generated / "utils" / "render_graph_tasks.tl").write_text(module)
-            (generated / "wbe.d.tl").write_text("local record wbe\nend\nreturn wbe\n")
-            consumer = Path(temporary) / "consumer.tl"
-            consumer.write_text('''local render_graph_tasks = require("utils.render_graph_tasks")
-local record module
-    record Resource
-        id: string
-    end
-    record Task
-        id: string
-    end
-    record Options
-        uses: {Resource}
-    end
-    record CopyParams is render_graph_tasks.RTParamsCopyVK<Resource>
-    end
-    record Graph is render_graph_tasks.Graph<Resource, Task, Options, Graph>
-        tasks: {Task}
-    end
+            (generated / "render_graph_utils").mkdir(parents=True)
+            (generated / "render_graph_utils" / "render_graph_tasks.tl").write_text(module)
+            (generated / "render_graph_utils/render_graph.tl").write_text(common)
+            core_types = ["RendRecipeResourceVK", "RendImageViewParamsVK", "RendRecipeTriggerVK", "RendRecipeToggleVK",
+                          "RendGraphRecipeVK", "RendResPrimaryUsageVK", "ImageFormatVK", "RendExtent2DParamsVK",
+                          "ImageUsageFlagVK", "RendSamplerParamsVK", "RTParamsComputeDispatchVK"]
+            (generated / "wbe.d.tl").write_text("local record wbe\n" + "".join(
+                f"    interface {name}\n    end\n" for name in core_types) + "end\nreturn wbe\n")
+            implementation = generated / "render_graph_utils/render_graph_utils.tl"
+            implementation.write_text('''local Graph = require("render_graph_utils.render_graph")
+local render_graph_tasks = require("render_graph_utils.render_graph_tasks")
+function Graph.new(): Graph.Graph
+    local graph: Graph.Graph = { tasks = {} }
+    render_graph_tasks.install(graph, function(p_id: string, _type: string, p_params: any, _options: Graph.TaskOptions,
+        _fields: {render_graph_tasks.ResourceField}): Graph.Task
+        local task: Graph.Task = { id = p_id, params = p_params, graph = graph }
+        graph.tasks[#graph.tasks + 1] = task
+        return task
+    end)
+    return graph
 end
-local graph: module.Graph = { tasks = {} }
-render_graph_tasks.install(graph, function(p_id: string, _type: string, _params: any, _options: module.Options,
-    _fields: {render_graph_tasks.ResourceField}): module.Task
-    return { id = p_id }
-end)
-local params: module.CopyParams = { pipeline = "pipeline", buffer = { id = "buffer" } }
-local task: module.Task = graph:copy("copy", params)
+return Graph
+''')
+            consumer = Path(temporary) / "consumer.tl"
+            consumer.write_text('''local Graph = require("render_graph_utils.render_graph_utils")
+local type Shared = require("render_graph_utils.render_graph")
+local graph = Graph.new()
+local params: Graph.RTParamsCopyVK = { pipeline = "pipeline", buffer = { id = "buffer" } }
+local task: Shared.Task = graph:copy("copy", params)
 graph:copy("other", { pipeline = "pipeline", buffer = "buffer" })
-return module
+assert(#graph.tasks == 2)
+assert(task.graph == graph)
+local captured = task.params as Graph.RTParamsCopyVK
+assert(captured.pipeline == "pipeline")
+return graph
 ''')
             compiler = WBEACPCompilerScript(_ROOT / "dependencies" / "tl", [generated], generated)
+            self.assertNotIn("<Resource>", common)
+            self.assertNotIn("install<", module)
+            self.assertNotIn('require("render_graph_utils.', common)
+            (generated / "render_graph_utils/render_graph.lua").write_text(
+                compiler._compile_teal(generated / "render_graph_utils/render_graph.tl"))
             self.assertIn('p_make_task(p_id, "wire_copy", p_params, p_options, copy_fields)',
-                          compiler._compile_teal(generated / "utils" / "render_graph_tasks.tl"))
-            compiler._compile_teal(consumer)
+                          compiler._compile_teal(generated / "render_graph_utils" / "render_graph_tasks.tl"))
+            (generated / "render_graph_utils/render_graph_tasks.lua").write_text(
+                compiler._compile_teal(generated / "render_graph_utils/render_graph_tasks.tl"))
+            (generated / "render_graph_utils/render_graph_utils.lua").write_text(compiler._compile_teal(implementation))
+            consumer_lua = compiler._compile_teal(consumer)
+            runtime = lupa.lua55.LuaRuntime(unpack_returned_tuples=True)
+            runtime.execute("package.path = ...", (generated / "?.lua").as_posix())
+            runtime.execute(consumer_lua)
             output = Path(temporary) / "output"
-            resources = compiler.compile({"id": "utils.render_graph_tasks", "source_type": "script",
-                                          "source_file": "utils/render_graph_tasks.tl",
-                                          "path": "assets/scripts/teal/utils/render_graph_tasks.lua"},
+            resources = compiler.compile({"id": "render_graph_utils.render_graph_tasks", "source_type": "script",
+                                          "source_file": "render_graph_utils/render_graph_tasks.tl",
+                                          "path": "assets/scripts/teal/render_graph_utils/render_graph_tasks.lua"},
                                          Path("lua_scripts.toml"), Path(temporary) / "res", output)
-            self.assertEqual(resources[0]["path"], "assets/scripts/teal/utils/render_graph_tasks.lua")
-            self.assertTrue((output / "assets/scripts/teal/utils/render_graph_tasks.lua").is_file())
+            self.assertEqual(resources[0]["path"], "assets/scripts/teal/render_graph_utils/render_graph_tasks.lua")
+            self.assertTrue((output / "assets/scripts/teal/render_graph_utils/render_graph_tasks.lua").is_file())
 
 
 if __name__ == "__main__":

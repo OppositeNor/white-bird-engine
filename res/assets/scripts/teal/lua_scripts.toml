@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Scripts. A script's resource id is its module name: its path under assets/scripts/teal, without the extension and
-# with dots for slashes, so that `require("utils.render_graph")` finds both the resource and, in the editor, the file.
+# with dots for slashes, so that `require("render_graph_utils.render_graph_utils")` finds both the resource and, in the editor, the file.
 include = []
 
 [[resources]]
@@ -21,22 +21,29 @@ source_type = "script"
 source_file = "assets/scripts/teal/utils/math.tl"
 
 [[resources]]
-id = "utils.render_graph"
+id = "render_graph_utils.render_graph_utils"
 source_type = "script"
-source_file = "assets/scripts/teal/utils/render_graph.tl"
+source_file = "assets/scripts/teal/render_graph_utils/render_graph_utils.tl"
+
+# Shared declarations generated from the graph API and reflected render-task parameters.
+[[resources]]
+id = "render_graph_utils.render_graph"
+source_type = "script"
+source_file = "render_graph_utils/render_graph.tl"
+path = "assets/scripts/teal/render_graph_utils/render_graph.lua"
 
 # Reflection generates this module into build/<target>/teal (templates/teal_render_graph_tasks.tl.jinja), so its source
 # file is relative to that directory.
 [[resources]]
-id = "utils.render_graph_tasks"
+id = "render_graph_utils.render_graph_tasks"
 source_type = "script"
-source_file = "utils/render_graph_tasks.tl"
-path = "assets/scripts/teal/utils/render_graph_tasks.lua"
+source_file = "render_graph_utils/render_graph_tasks.tl"
+path = "assets/scripts/teal/render_graph_utils/render_graph_tasks.lua"
 
 [[resources]]
-id = "utils.sort"
+id = "render_graph_utils.sort"
 source_type = "script"
-source_file = "assets/scripts/teal/utils/sort.tl"
+source_file = "assets/scripts/teal/render_graph_utils/sort.tl"
 
 [[resources]]
 id = "render_graphs.draw_cube_unshaded"
@@ -54,19 +61,19 @@ source_type = "script"
 source_file = "assets/scripts/teal/render_graphs/deferred.tl"
 
 [[resources]]
-id = "render_graphs.features.pixel_sort"
+id = "render_graph_utils.features.pixel_sort"
 source_type = "script"
-source_file = "assets/scripts/teal/render_graphs/features/pixel_sort.tl"
+source_file = "assets/scripts/teal/render_graph_utils/features/pixel_sort.tl"
 
 [[resources]]
-id = "render_graphs.features.voxel_svo"
+id = "render_graph_utils.features.voxel_svo"
 source_type = "script"
-source_file = "assets/scripts/teal/render_graphs/features/voxel_svo.tl"
+source_file = "assets/scripts/teal/render_graph_utils/features/voxel_svo.tl"
 
 [[resources]]
-id = "render_graphs.features.voxel_octree"
+id = "render_graph_utils.features.voxel_octree"
 source_type = "script"
-source_file = "assets/scripts/teal/render_graphs/features/voxel_octree.tl"
+source_file = "assets/scripts/teal/render_graph_utils/features/voxel_octree.tl"
 
 [[resources]]
 id = "tests.teal_math"

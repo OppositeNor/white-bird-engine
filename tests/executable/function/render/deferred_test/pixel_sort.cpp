@@ -48,7 +48,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 // The Lua module that adds the effect's resources and tasks to a recipe.
-constexpr std::string_view PIXEL_SORT_RECIPE_MODULE = "render_graphs.features.pixel_sort";
+constexpr std::string_view PIXEL_SORT_RECIPE_MODULE = "render_graph_utils.features.pixel_sort";
 // The import name, and render database key, of the contrast buffer.
 constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 

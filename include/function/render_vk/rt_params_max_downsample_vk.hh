@@ -32,7 +32,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Resource key of the compiled max-downsample compute pipeline in the renderer's RenderDatabase.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
     std::string pipeline;
     /**
      * @brief Graph resource ids of the mip-level image views, from the full-resolution level down; at least two.
