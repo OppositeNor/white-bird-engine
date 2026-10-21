@@ -406,6 +406,265 @@ end }
 )", DataValue::make_map()), std::runtime_error);
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParametersAndKeepPlainRecipeTables) {
+    const DataValue recipe = RendGraphScriptVK::run("tests.teal_graph_api", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 11U);
+    EXPECT_EQ(tasks[0].get_value<std::string>("type"), "run_compute_pipeline");
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("pipeline"), "prepare_pipeline");
+    EXPECT_TRUE(tasks[0].get_entry("trigger").get_value<bool>("activate"));
+    EXPECT_TRUE(tasks[0].get_entry("toggle").get_value<bool>("enabled"));
+    EXPECT_EQ(tasks[1].get_value<std::string>("type"), "run_graphics_pipeline");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("render_target_colors[0]"), "color_image.view");
+    EXPECT_EQ(tasks[2].get_value<std::string>("type"), "graphics_draw_mesh");
+    EXPECT_EQ(tasks[2].get_entry("params").get_value<std::string>("transform"), "commands");
+    EXPECT_EQ(tasks[2].get_entry("params").get_value<std::string>("mesh"), "mesh_key");
+    EXPECT_EQ(tasks[3].get_value<std::string>("type"), "run_graphics_pipeline_indirect");
+    EXPECT_EQ(tasks[3].get_entry("params").get_value<std::string>("index_buffer"), "commands");
+    EXPECT_EQ(tasks[3].get_entry("params").get_value<std::string>("indirect_buffer"), "commands");
+    EXPECT_EQ(tasks[4].get_value<std::string>("type"), "run_compute_pipeline_indirect");
+    EXPECT_EQ(tasks[4].get_entry("params").get_value<std::string>("indirect_buffer"), "commands");
+    EXPECT_EQ(tasks[5].get_value<std::string>("type"), "run_compute_pipelines_sequential");
+    const auto& dispatches = tasks[5].get_entry("params").get_entry("dispatches").as_list();
+    ASSERT_EQ(dispatches.size(), 3U);
+    const DataValue& sequence_aliases = tasks[5].get_entry("aliases");
+    const std::string indirect_local = dispatches[1].get_value<std::string>("indirect_buffer");
+    EXPECT_EQ(sequence_aliases.get_value<std::string>(indirect_local), "commands");
+    const std::string shader_local = dispatches[1].get_entry("aliases").get_value<std::string>("shader_buffer");
+    EXPECT_EQ(sequence_aliases.get_value<std::string>(shader_local), "commands");
+    EXPECT_EQ(dispatches[2].get_value<std::string>("indirect_buffer"), "commands_local");
+    EXPECT_EQ(dispatches[2].get_entry("aliases").get_value<std::string>("shader_buffer"), "commands_local");
+    EXPECT_EQ(tasks[6].get_value<std::string>("type"), "generate_mipmaps");
+    EXPECT_EQ(tasks[6].get_entry("params").get_value<std::string>("source_view"), "color_image.view");
+    EXPECT_EQ(tasks[6].get_entry("params").get_value<std::string>("mip_chain_view"), "color_mips");
+    EXPECT_EQ(tasks[7].get_value<std::string>("type"), "cpu_acquire_image");
+    EXPECT_EQ(tasks[7].get_entry("params").get_value<std::string>("image_view"), "color_image.view");
+    EXPECT_EQ(tasks[8].get_value<std::string>("type"), "full_memory_barrier");
+    EXPECT_EQ(tasks[8].get_entry("params").get_value<std::string>("resource"), "commands");
+    EXPECT_EQ(tasks[9].get_value<std::string>("type"), "ping_pong");
+    EXPECT_TRUE(tasks[10].get_value<bool>("import"));
+    EXPECT_FALSE(tasks[10].contains("params"));
+    EXPECT_FALSE(tasks[10].contains("type"));
+    for (const auto& task : tasks) {
+        EXPECT_FALSE(task.contains("uses"));
+        EXPECT_FALSE(task.contains("graph"));
+        EXPECT_FALSE(task.contains("color_target"));
+        EXPECT_FALSE(task.contains("depth_target"));
+    }
+    // Pipeline, mesh, and event strings never become resource imports. Parameter handles emit one declaration each.
+    ASSERT_EQ(recipe.get_entry("imports").as_list().size(), 1U);
+    EXPECT_EQ(recipe.get_entry("imports").as_list()[0].as_string(), "input");
+    EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 4U);
+    EXPECT_FALSE(tasks[2].contains("connect"));
+    EXPECT_FALSE(tasks[5].contains("connect"));
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, ImageMethodsCacheDefaultViewsAndPreserveExplicitRanges) {
+    const DataValue recipe = RendGraphScriptVK::run("image_methods", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local image = graph_utils.image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
+    local view = image:view()
+    assert(image:view() == view)
+    local range = image:view("image_range", { base_mip_level = 1, mip_level_count = 3 })
+    local graph = graph_utils.graph()
+    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, view)
+    graph:cpu_acquire_image("readback", { image_view = range })
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& resources = recipe.get_entry("resources").as_list();
+    ASSERT_EQ(resources.size(), 3U);
+    const auto default_view = std::ranges::find_if(resources, [](const DataValue& p_resource) {
+        return p_resource.get_value<std::string>("id") == "image.view";
+    });
+    ASSERT_NE(default_view, resources.end());
+    EXPECT_EQ(default_view->get_entry("image_view").get_value<std::string>("image"), "image");
+    const auto range = std::ranges::find_if(resources, [](const DataValue& p_resource) {
+        return p_resource.get_value<std::string>("id") == "image_range";
+    });
+    ASSERT_NE(range, resources.end());
+    const DataValue& description = range->get_entry("image_view").get_entry("view");
+    EXPECT_EQ(description.get_value<int64_t>("base_mip_level"), 1);
+    EXPECT_EQ(description.get_value<int64_t>("mip_level_count"), 3);
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderContextVK render_context(&allocator);
+    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context);
+    ASSERT_EQ(graph.image_views.size(), 2U);
+    // The no-argument method preserves the graph's existing default range of one mip and one layer.
+    const auto default_description = std::ranges::find_if(graph.image_views, [](const auto& p_view) {
+        return p_view.res_id == "image.view";
+    });
+    ASSERT_NE(default_description, graph.image_views.end());
+    const RendImageViewDescVK configuration = default_description->factory(RendGraphContextVK{});
+    EXPECT_EQ(configuration.mip_level_count, 1U);
+    EXPECT_EQ(configuration.layer_count, 1U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsDoNotMutateCallerParametersOrSharedOptions) {
+    const DataValue recipe = RendGraphScriptVK::run("typed_parameter_copies", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local buffer = graph_utils.storage_buffer("commands", 64)
+    local other = graph_utils.storage_buffer("other", 64)
+    local options = { aliases = { input = buffer } }
+    local params = { pipeline = "pipeline", indirect_buffer = buffer }
+    local graph = graph_utils.graph()
+    graph:compute_indirect("first", params, options)
+    assert(params.indirect_buffer == buffer)
+    assert(options.aliases.input == buffer)
+    params.indirect_buffer = other
+    options.aliases.input = other
+    graph:compute_indirect("second", params, options)
+    local dispatch = { pipeline = "nested", indirect_buffer = buffer, aliases = { shader_buffer = buffer } }
+    graph:compute_sequential("sequence", { dispatches = { dispatch } })
+    assert(dispatch.indirect_buffer == buffer)
+    assert(dispatch.aliases.shader_buffer == buffer)
+    dispatch.indirect_buffer = other
+    dispatch.aliases.shader_buffer = other
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("indirect_buffer"), "commands");
+    EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("input"), "commands");
+    EXPECT_EQ(tasks[1].get_entry("params").get_value<std::string>("indirect_buffer"), "other");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("input"), "other");
+    const auto& dispatch = tasks[2].get_entry("params").get_entry("dispatches").as_list()[0];
+    const auto& aliases = tasks[2].get_entry("aliases");
+    EXPECT_EQ(aliases.get_value<std::string>(dispatch.get_value<std::string>("indirect_buffer")), "commands");
+    EXPECT_EQ(aliases.get_value<std::string>(dispatch.get_entry("aliases").get_value<std::string>("shader_buffer")), "commands");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, AttachmentMethodsKeepAliasesTaskScopedAndRejectDuplicateTargets) {
+    const DataValue recipe = RendGraphScriptVK::run("attachment_methods", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local first = graph_utils.import_resource("first")
+    local second = graph_utils.import_resource("second")
+    local depth = graph_utils.import_resource("depth")
+    local graph = graph_utils.graph()
+    local draw = graph:draw("first", { pipeline = "pipeline" })
+    assert(draw:color_target(0, first) == draw)
+    assert(draw:depth_target(depth) == draw)
+    graph:draw("second", { pipeline = "pipeline" }):color_target(0, second)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("render_target_colors[0]"), "first");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("render_target_colors[0]"), "second");
+    EXPECT_EQ(tasks[0].get_entry("aliases").get_value<std::string>("render_target_depth"), "depth");
+    EXPECT_THROW((void)RendGraphScriptVK::run("duplicate_attachment", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local target = graph_utils.import_resource("target")
+    local graph = graph_utils.graph()
+    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, target):color_target(0, target)
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+    EXPECT_THROW((void)RendGraphScriptVK::run("invalid_attachment_index", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local graph = graph_utils.graph()
+    graph:draw("draw", { pipeline = "pipeline" }):color_target(-1, graph_utils.import_resource("target"))
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, SequentialHandleBindingsPreserveSameNameResourcesAndRejectConflictingAliases) {
+    const DataValue recipe = RendGraphScriptVK::run("sequential_identity_bindings", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local commands = graph_utils.storage_buffer("commands", 64)
+    local same_name = graph_utils.storage_buffer("__render_graph_resource_1", 64)
+    local graph = graph_utils.graph()
+    graph:compute_sequential("sequence", { dispatches = {
+        { pipeline = "first", indirect_buffer = commands },
+        { pipeline = "second", aliases = { input = "__render_graph_resource_1" } },
+    } }, { uses = { same_name } })
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& task = recipe.get_entry("tasks").as_list()[0];
+    EXPECT_EQ(task.get_entry("aliases").get_value<std::string>("commands"), "commands");
+    EXPECT_FALSE(task.get_entry("aliases").contains("__render_graph_resource_1"));
+    const auto& dispatches = task.get_entry("params").get_entry("dispatches").as_list();
+    EXPECT_EQ(dispatches[1].get_entry("aliases").get_value<std::string>("input"), "__render_graph_resource_1");
+    EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_sequential_alias", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local commands = graph_utils.storage_buffer("commands", 64)
+    local other = graph_utils.storage_buffer("other", 64)
+    local graph = graph_utils.graph()
+    graph:compute_sequential("sequence", { dispatches = {
+        { pipeline = "pipeline", indirect_buffer = commands },
+    } }, { aliases = { commands = other } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RejectsViewsOfOwnedNonImageResourcesAndConflictingDefaultViewIds) {
+    EXPECT_THROW((void)RendGraphScriptVK::run("buffer_view", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local graph = graph_utils.graph()
+    local buffer = graph_utils.storage_buffer("buffer", 16)
+    graph:cpu_acquire_image("readback", { image_view = buffer:view() })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+    EXPECT_THROW((void)RendGraphScriptVK::run("default_view_collision", R"(
+local graph_utils = require("utils.render_graph")
+return { build = function()
+    local image = graph_utils.storage_image("image", "r16g16b16a16_sfloat", 16, 8)
+    local graph = graph_utils.graph()
+    graph:draw("draw", { pipeline = "pipeline" }):color_target(0, image:view())
+    graph:full_memory_barrier("barrier", { resource = graph_utils.storage_buffer("image.view", 16) })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, TypedResourceParametersRejectAliasesThatRedirectTheirHandles) {
+    constexpr std::string_view REDIRECT_RECIPE = R"(
+local graph_utils = require("utils.render_graph")
+return { build = function(context)
+    local commands = graph_utils.storage_buffer("commands", 64)
+    local other = graph_utils.storage_buffer("other", 64)
+    local graph = graph_utils.graph()
+    if context.mode == "options" then
+        graph:compute_indirect("dispatch", { pipeline = "pipeline", indirect_buffer = commands },
+            { aliases = { commands = other } })
+    else
+        local dispatch = graph:compute_indirect("dispatch", { pipeline = "pipeline", indirect_buffer = commands })
+        if context.mode == "method" then
+            dispatch:alias("commands", other)
+        elseif context.mode == "mutation" then
+            dispatch.aliases = { commands = other }
+        else
+            dispatch:alias("commands", commands)
+        end
+    end
+    return graph:build()
+end }
+)";
+    for (const char* mode : {"options", "method", "mutation"}) {
+        SCOPED_TRACE(mode);
+        DataValue context = DataValue::make_map();
+        context.set_value("mode", std::string(mode));
+        EXPECT_THROW((void)RendGraphScriptVK::run("redirect_handle", REDIRECT_RECIPE, context), std::runtime_error);
+    }
+    const DataValue recipe = RendGraphScriptVK::run("identity_handle", REDIRECT_RECIPE, DataValue::make_map());
+    const auto& dispatch = recipe.get_entry("tasks").as_list()[0];
+    EXPECT_EQ(dispatch.get_entry("params").get_value<std::string>("indirect_buffer"), "commands");
+    EXPECT_EQ(dispatch.get_entry("aliases").get_value<std::string>("commands"), "commands");
+    EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 1U);
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     RenderAllocator allocator(WBE_KI_B(16));
     RenderContextVK render_data(&allocator);

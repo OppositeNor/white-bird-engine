@@ -37,7 +37,6 @@ local sort = require("utils.sort")
 local ceil_div = math_utils.ceil_div
 local storage_buffer = graph_utils.storage_buffer
 local storage_image = graph_utils.storage_image
-local image_view = graph_utils.image_view
 local clamp_to_edge_sampler = graph_utils.clamp_to_edge_sampler
 
 -- The sizes and dispatch counts derived from the source image.
@@ -103,13 +102,13 @@ local function make_resources(p_layout: Layout): Resources
     local height = p_layout.height
     return {
         column_offsets = storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
-        destination = image_view("pixel_sort_destination",
-            storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)),
+        destination = storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
+            :view("pixel_sort_destination"),
         -- The screenshot reads the result back through a transfer.
-        post_processing_output = image_view("pixel_sorting_post_processing_output",
-            storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat", width, height, { "transfer_src" })),
+        post_processing_output = storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat",
+            width, height, { "transfer_src" }):view("pixel_sorting_post_processing_output"),
         -- Stores each masked pixel's rank within its line, with 0xFFFF marking unmasked pixels.
-        mask = image_view("pixel_sort_mask", storage_image("pixel_sort_mask_image", "r16_uint", width, height)),
+        mask = storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
         sampler = clamp_to_edge_sampler("pixel_sort_sampler"),
         -- The register pass writes and the write pass reads the keys; size the sort for every masked pixel.
         sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, p_layout.element_count),
@@ -118,13 +117,6 @@ local function make_resources(p_layout: Layout): Resources
         contrast = graph_utils.import_resource("pixel_sort_contrast"),
         post_processing_params = graph_utils.import_resource("pixel_sorting_post_processing_params"),
     }
-end
-
-local function compute(p_graph: graph_utils.Graph, p_id: string, p_pipeline: string, p_group_count_x: integer,
-    p_group_count_y: integer, p_uses: {graph_utils.Resource}): graph_utils.Task
-    local params: wbe.RTParamsRunComputePipelineVK =
-        { pipeline = p_pipeline, group_count_x = p_group_count_x, group_count_y = p_group_count_y }
-    return p_graph:add({ id = p_id, type = "run_compute_pipeline", params = params, uses = p_uses })
 end
 
 local record KeyRegistrationTasks
@@ -137,15 +129,21 @@ end
 local function add_key_registration(p_graph: graph_utils.Graph, p_layout: Layout,
     p_resources: Resources): KeyRegistrationTasks
     local orientation = p_layout.orientation
-    local count_mask = compute(p_graph, "count_pixel_sort_mask", "count_pixel_sort_mask_" .. orientation .. "_shader",
-        p_layout.column_group_count, 1,
-        { p_resources.source, p_resources.contrast, p_resources.column_offsets })
+    local count_mask = p_graph:compute("count_pixel_sort_mask", {
+        pipeline = "count_pixel_sort_mask_" .. orientation .. "_shader",
+        group_count_x = p_layout.column_group_count,
+        group_count_y = 1,
+    }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets } })
     -- The prefix sum runs in a single workgroup.
-    local prefix_sum = compute(p_graph, "prefix_sum_pixel_sort_columns", "prefix_sum_pixel_sort_columns_shader", 1, 1,
-        { p_resources.column_offsets })
-    local register_keys = compute(p_graph, "register_pixel_sort_keys", "register_pixel_sort_keys_" .. orientation .. "_shader",
-        p_layout.column_group_count, 1,
-        { p_resources.source, p_resources.contrast, p_resources.column_offsets, p_resources.sort_buffers.keys, p_resources.mask })
+    local prefix_sum = p_graph:compute("prefix_sum_pixel_sort_columns", {
+        pipeline = "prefix_sum_pixel_sort_columns_shader", group_count_x = 1, group_count_y = 1,
+    }, { uses = { p_resources.column_offsets } })
+    local register_keys = p_graph:compute("register_pixel_sort_keys", {
+        pipeline = "register_pixel_sort_keys_" .. orientation .. "_shader",
+        group_count_x = p_layout.column_group_count,
+        group_count_y = 1,
+    }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets,
+        p_resources.sort_buffers.keys, p_resources.mask } })
     return { count_mask = count_mask, prefix_sum = prefix_sum, register_keys = register_keys }
 end
 
@@ -160,26 +158,27 @@ end
 local function add_output(p_graph: graph_utils.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
     local tile_group_count_x = p_layout.tile_group_count_x
     local tile_group_count_y = p_layout.tile_group_count_y
-    local write_pixels = compute(p_graph, "write_sorted_pixels", "write_sorted_pixels_" .. p_layout.orientation .. "_shader",
-        tile_group_count_x, tile_group_count_y,
-        { p_resources.source, p_resources.sort_buffers.keys, p_resources.mask, p_resources.contrast,
-            p_resources.column_offsets, p_resources.destination })
-    local post_processing = compute(p_graph, "pixel_sorting_post_processing", "pixel_sorting_post_processing_shader",
-        tile_group_count_x, tile_group_count_y,
-        { p_resources.destination, p_resources.sampler, p_resources.post_processing_params, p_resources.post_processing_output })
-    local present_params: wbe.RTParamsRunGraphicsPipelineVK = {
+    local write_pixels = p_graph:compute("write_sorted_pixels", {
+        pipeline = "write_sorted_pixels_" .. p_layout.orientation .. "_shader",
+        group_count_x = tile_group_count_x,
+        group_count_y = tile_group_count_y,
+    }, { uses = { p_resources.source, p_resources.sort_buffers.keys, p_resources.mask, p_resources.contrast,
+        p_resources.column_offsets, p_resources.destination } })
+    local post_processing = p_graph:compute("pixel_sorting_post_processing", {
+        pipeline = "pixel_sorting_post_processing_shader",
+        group_count_x = tile_group_count_x,
+        group_count_y = tile_group_count_y,
+    }, { uses = { p_resources.destination, p_resources.sampler, p_resources.post_processing_params,
+        p_resources.post_processing_output } })
+    local present = p_graph:draw("present_sorted_pixels", {
         pipeline = "present_pixel_sort_pipeline",
         clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
         draw_vertex_count = 3,
-    }
-    local present = p_graph:add({
-        id = "present_sorted_pixels",
-        type = "run_graphics_pipeline",
-        params = present_params,
+    }, {
         uses = { p_resources.post_processing_output, p_resources.sampler },
     })
-    present:alias("render_target_colors[0]", p_resources.swap_chain)
-    local draw_imgui = p_graph:add({ id = "draw_imgui", import = true })
+    present:color_target(0, p_resources.swap_chain)
+    local draw_imgui = p_graph:import_task("draw_imgui")
     return { write_pixels = write_pixels, post_processing = post_processing, present = present, draw_imgui = draw_imgui }
 end
 
@@ -203,7 +202,7 @@ function exports.build(context: wbe.PixelSortingRecipeContext): wbe.RendGraphRec
     local resources = make_resources(layout)
     local graph = graph_utils.graph()
     local registration = add_key_registration(graph, layout, resources)
-    local radix_sort = graph:add(sort.radix_sort_task("radix_sort", resources.sort_buffers))
+    local radix_sort = sort.add_radix_sort_task(graph, "radix_sort", resources.sort_buffers)
     local output = add_output(graph, layout, resources)
     connect_tasks(graph, resources, registration, radix_sort, output)
     return graph:build()

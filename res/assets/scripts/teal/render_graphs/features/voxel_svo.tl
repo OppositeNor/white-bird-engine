@@ -61,22 +61,21 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer): graph_utils.Task
         local params: wbe.RTParamsRunComputePipelineVK =
             { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" }
-        return graph:add({ id = p_task_id, type = "run_compute_pipeline", params = params })
+        return graph:compute(p_task_id, params)
     end
     local function construction(p_task_id: string, p_mesh: string, p_pipeline: string, p_part: wbe.MeshPartVK,
         p_transform: graph_utils.Resource, p_load: boolean): graph_utils.Task
         local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
-        local params: wbe.RTParamsGraphicsDrawMeshVK = {
+        local params: graph_utils.DrawMeshParams = {
             mesh = p_mesh,
             pipeline = p_pipeline,
             parts = { p_part },
-            transform = p_transform and p_transform.id,
+            transform = p_transform,
             render_extent = extent,
             color_load_op = load_op,
             depth_load_op = load_op,
         }
-        return graph:add({ id = p_task_id, type = "graphics_draw_mesh", params = params,
-            uses = p_transform and { p_transform } or {} })
+        return graph:draw_mesh(p_task_id, params)
     end
     -- Rasterization allocates depth one's children; every propagation round publishes one further level, and an extra
     -- retry consumes leaf occupancy and drains the remaining deferred entries.
@@ -89,7 +88,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
             local publication = p_dynamic and "svo_2_dynamic_update_states_shader" or "svo_2_update_states_shader"
             local publication_group_count =
                 p_dynamic and p_params.dynamic_publication_group_count or p_params.static_publication_group_count
-            local dispatches: {wbe.RTParamsComputeDispatchVK} = {}
+            local dispatches: {graph_utils.ComputeDispatchParams} = {}
             for iteration = 0, p_params.max_depth - 1 do
                 local write_pong = iteration % 2 == 0
                 dispatches[#dispatches + 1] = {
@@ -98,8 +97,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
                 dispatches[#dispatches + 1] = { pipeline = write_pong and ping or pong, group_count_x = p_params.deferred_dispatch_group_count }
                 dispatches[#dispatches + 1] = { pipeline = publication, group_count_x = publication_group_count }
             end
-            local params: wbe.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = "compute_1" }
-            task = { id = p_task_id, type = "run_compute_pipelines_sequential", params = params }
+            local params: graph_utils.ComputeSequentialParams = { dispatches = dispatches, queue_family = "compute_1" }
+            task = graph:compute_sequential(p_task_id, params)
         else
             -- A single raster pass can leave contenders at any depth; allow one retry per tree level.
             local params: wbe.RTParamsPingPongVK = {
@@ -111,33 +110,29 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
                 pong_prefix_pipeline = "svo_deferred_count_reset_ping_shader",
                 queue_family = "compute_1",
             }
-            task = { id = p_task_id, type = "ping_pong", params = params }
+            task = graph:ping_pong(p_task_id, params)
         end
-        return graph:add(task)
+        return task
     end
     local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: graph_utils.Resource,
         p_toggle: wbe.RendRecipeToggleVK): graph_utils.Task
-        local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
+        local params: graph_utils.DrawIndirectParams = {
             pipeline = p_pipeline,
-            index_buffer = buffers.svo_debug_draw_index_buffer.id,
-            indirect_buffer = p_indirect_buffer.id,
+            index_buffer = buffers.svo_debug_draw_index_buffer,
+            indirect_buffer = p_indirect_buffer,
             color_load_op = "load",
             depth_load_op = "load",
         }
-        local task = graph:add({
-            id = p_task_id,
-            type = "run_graphics_pipeline_indirect",
-            params = params,
-            uses = { buffers.svo_debug_draw_index_buffer, p_indirect_buffer },
+        local task = graph:draw_indirect(p_task_id, params, {
             toggle = p_toggle,
         })
-        task:alias("render_target_colors[0]", color)
-        task:alias("render_target_depth", depth)
+        task:color_target(0, color)
+        task:depth_target(depth)
         return task
     end
     -- The frame-begin barrier orders this frame's SVO mutation after the previous frame's consumers.
-    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = buffers.svo_info.id }
-    local frame_begin = graph:add({ id = "svo_frame_begin", type = "full_memory_barrier", params = barrier_params, uses = { buffers.svo_info } })
+    local barrier_params: graph_utils.FullMemoryBarrierParams = { resource = buffers.svo_info }
+    local frame_begin = graph:full_memory_barrier("svo_frame_begin", barrier_params)
     -- Static scene, built once into the shared buffers unless the application rebuilds it every frame (no trigger).
     local reset = compute("reset_svo", prefix .. "_reset_shader", p_params.reset_group_count)
     reset.trigger = static_build

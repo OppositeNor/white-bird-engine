@@ -112,18 +112,12 @@ function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local target = graph_utils.import_resource("swap_chain")
     local camera = graph_utils.import_resource("camera_info")
     local graph = graph_utils.graph()
-    local params: wbe.RTParamsGraphicsDrawMeshVK = {
+    local draw = graph:draw_mesh("run_static_mesh", {
         mesh = "model_cube_static.mesh",
         pipeline = "draw_cube_unshaded_pipeline",
         parts = { "opaque" },
-    }
-    local draw = graph:add({
-        id = "run_static_mesh",
-        type = "graphics_draw_mesh",
-        params = params,
-        uses = { camera },
-    })
-    draw:alias("render_target_colors[0]", target)
+    }, { uses = { camera } })
+    draw:color_target(0, target)
     return graph:build()
 end
 
@@ -132,7 +126,24 @@ return exports
 
 ### Task objects and aliases
 
-`graph:add(description)` returns a task object owned by that graph. Save the returned objects and use them in
+Typed graph methods create and return task objects owned by that graph. For example:
+
+```lua
+local lighting = graph:compute("lighting", {
+    pipeline = "lighting_shader",
+    group_count_x = groups_x,
+    group_count_y = groups_y,
+}, { aliases = { albedo = albedo } })
+local overlay = graph:import_task("draw_imgui")
+```
+
+The constructors are `:compute`, `:draw`, `:draw_mesh`, `:draw_indirect`, `:compute_indirect`, `:compute_sequential`,
+`:generate_mipmaps`, `:cpu_acquire_image`, `:full_memory_barrier`, and `:ping_pong`. Each takes `(id, params, options?)`;
+`options` can supply task-local `aliases`, `uses`, `trigger`, and `toggle`. Their signatures type-check parameters against
+the reflected C++ types or the handle-bearing `graph_utils.*Params` counterparts. Constructors copy parameter data and
+option tables while preserving resource handle identity. `:import_task(id)` registers an externally supplied C++ task.
+
+`graph:add(description)` remains available for custom task types and feature subgraphs. Save the returned objects and use them in
 `graph:chain(resource, { producer, consumer })`, or connect directly with `producer:connect(consumer, resource)`.
 Connections remain explicit and resource-specific. Both methods require actual task handles from the same graph;
 matching string IDs or lookalike tables are insufficient. Subgraph tasks participate in connections the same way.
@@ -141,6 +152,10 @@ matching string IDs or lookalike tables are insufficient. Subgraph tasks partici
 use the same local name for different resource handles. Repeating a local alias name within one task is an error.
 Descriptions can still supply an `aliases` map; each task receives its own copy, so later alias calls cannot alter another
 task's bindings. `task:connect()` also returns the task for chaining.
+
+`task:color_target(index, resource)` and `task:depth_target(resource)` bind render attachments through those same
+task-local aliases. Color indices start at zero and must be non-negative integers. They return the task and reject
+duplicate bindings, including a target already bound through `:alias()`.
 
 Task IDs remain stable names for C++ and diagnostics. `graph:get(id)` is available for explicit lookup, but dependency
 chains use saved handles. `graph:build()` lowers connections and aliases to the unchanged C++ string-id recipe schema;
@@ -152,9 +167,9 @@ Resource helpers return recipe handles. Reuse those objects in task aliases, edg
 
 ```lua
 local image = graph_utils.image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo)
-local albedo = graph_utils.image_view("gbuffer_albedo", image)
--- draw_gbuffer and lighting are the task objects returned by graph:add().
-draw_gbuffer:alias("render_target_colors[0]", albedo)
+local albedo = image:view("gbuffer_albedo")
+-- draw_gbuffer and lighting are task objects.
+draw_gbuffer:color_target(0, albedo)
 lighting:alias("gbuffer_albedo", albedo)
 graph:chain(albedo, { draw_gbuffer, lighting })
 ```
@@ -163,10 +178,33 @@ graph:chain(albedo, { draw_gbuffer, lighting })
 There is no graph-level resource registration or authored `resources` list. Unused handles are omitted, and repeated uses of
 the same handle emit one declaration. Different owned handles with the same id and cyclic handle dependencies fail.
 
-A task's `uses = { handle, ... }` retains resources referenced by typed parameters or implicit same-name shader bindings,
-including read-only samplers and single-task scratch buffers. It only controls resource discovery: accesses are still
-reported by C++ tasks and ordering still comes exclusively from explicit edges. Typed resource-id parameters use
-`handle.id`; pipeline, mesh, task, and event identifiers remain strings.
+`image:view()` returns a cached default view with the stable id `<image.id>.view`; repeated calls on the same image return
+the same handle. Its type and format follow the image, and its range preserves the graph default of one mip and one layer.
+Use `image:view(id, description?)` for explicit names or specialized mip/aspect/layer ranges. A customized view requires an
+explicit id. The existing `graph_utils.image_view(id, image, description?)` helper remains available. Views retain their
+source image. Imports, references, and ports can also describe views of external images; C++ validates their actual kind.
+
+Resource-bearing parameters of typed constructors accept handles directly:
+
+```lua
+graph:generate_mipmaps("shadow_mipmaps", {
+    source_view = moments,
+    mip_chain_view = sampled_moments,
+    format = formats.shadow_moments,
+})
+```
+
+These adapters retain handles and lower only the known resource fields to IDs. A task-local alias cannot redirect an ID
+passed as a parameter handle to a different resource; constructors, alias calls, and builds validate this contract.
+Sequential dispatch handles use task-local
+identity aliases under their resource IDs; an existing alias redirecting that ID to a different resource is rejected.
+Existing string dispatch aliases remain local to the containing task.
+Pipeline, mesh, and event keys remain strings. Existing string resource parameters are supported, but callers must retain
+those resources through another binding, edge, or `uses` entry.
+
+A task's `uses = { handle, ... }` retains resources accessed by implicit same-name shader bindings, including read-only
+samplers and single-task scratch buffers, or by a custom task's string parameters. This only controls resource discovery:
+accesses are still reported by C++ tasks and ordering comes exclusively from explicit edges.
 
 Use `import_resource(id)` for an exact C++ supplied import, `port(id)` for a subgraph-local port, and `reference(id)` for an
 existing enclosing or composite-member resource. Imports and ports are collected automatically. A feature can pass its
@@ -243,13 +281,16 @@ Compute types take a `queue_family` param and a `push_constants` table.
 Recipes and their modules are Teal sources under `res/assets/scripts/teal/` (see
 [resource_standard.md](../resource/resource_standard.md#script-resources)). They import the generated declarations of the
 `WBE_REFLECT_SCRIPT` types as types only (`local type wbe = require("wbe")`) and annotate `build(context: <context type>):
-wbe.RendGraphRecipeVK`. Since `RendRecipeTaskVK.params` is untyped, type each task's params with its reflected struct. Enums
+wbe.RendGraphRecipeVK`. Typed graph methods check their parameter tables directly. When using raw `graph:add()` for a
+custom task, annotate its params with the reflected struct because `RendRecipeTaskVK.params` is untyped. Enums
 serialize as their canonical names; compare `utils.render_graph.enum_name(value)` with the canonical upper-case name, which also
 accepts the lowercase aliases.
 
 `utils.render_graph` provides resource handles (`buffer`, `storage_buffer`, `image`, `storage_image`, `image_view`,
 `clamp_to_edge_sampler`, `import_resource`, `port`, `reference`), plus `indirect_dispatch`, `subgraph`, and `enum_name`.
-`graph()` creates a graph with `:add`, `:get`, `:chain(resource, tasks)`, and `:build` methods.
+`graph()` creates a graph with the typed task constructors, `:import_task`, `:add`, `:get`, `:chain(resource, tasks)`,
+and `:build` methods. `utils.sort.add_radix_sort_task(graph, id, buffers, queue_family?)` registers a typed sequential
+compute task; `utils.sort.radix_sort_task` remains available for callers that need an unregistered task description.
 
 ## C++-only Graphs
 

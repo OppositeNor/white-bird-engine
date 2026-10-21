@@ -24,19 +24,12 @@ function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local swap_chain = graph_utils.import_resource("swap_chain")
     local camera_info = graph_utils.import_resource("camera_info")
     local graph = graph_utils.graph()
-    local params: wbe.RTParamsGraphicsDrawMeshVK = {
+    graph:draw_mesh("run_static_mesh", {
         mesh = "model_cube_static.mesh",
         pipeline = "draw_cube_unshaded_pipeline",
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
-    }
-    graph:add({
-        id = "run_static_mesh",
-        type = "graphics_draw_mesh",
-        params = params,
-        aliases = { ["render_target_colors[0]"] = swap_chain },
-        uses = { camera_info },
-    })
+    }, { uses = { camera_info } }):color_target(0, swap_chain)
     return graph:build()
 end
 

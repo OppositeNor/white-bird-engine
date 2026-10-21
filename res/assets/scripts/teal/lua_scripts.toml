@@ -71,3 +71,9 @@ id = "tests.teal_recipe"
 source_type = "script"
 source_file = "assets/scripts/teal/tests/teal_recipe.tl"
 scope = "test_only"
+
+[[resources]]
+id = "tests.teal_graph_api"
+source_type = "script"
+source_file = "assets/scripts/teal/tests/teal_graph_api.tl"
+scope = "test_only"

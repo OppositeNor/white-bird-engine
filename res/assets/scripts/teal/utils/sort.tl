@@ -87,17 +87,14 @@ function sort.radix_sort_buffers(p_names: sort.RadixSortBufferNames, p_max_eleme
     }
 end
 
--- A task with id p_id that sorts p_buffers.keys in place on p_queue_family (graphics by default). Every pass follows
--- the previous one in the task's command buffer, and the passes read the element count from the keys, so the count
--- must be written before the task runs.
-function sort.radix_sort_task(p_id: string, p_buffers: sort.RadixSortBuffers,
-    p_queue_family?: wbe.QueueFamilyVK | integer): graph_utils.Task
+local function radix_sort_params(p_queue_family?: wbe.QueueFamilyVK | integer): graph_utils.ComputeSequentialParams
     -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
-    local dispatches: {wbe.RTParamsComputeDispatchVK} = {
+    local dispatches: {graph_utils.ComputeDispatchParams} = {
         { pipeline = "radix_sort_prepare_dispatch", aliases = { input_buffer = KEYS, dispatch_buffer = DISPATCH } },
     }
     local function indirect(p_pipeline: string, p_offset: integer, p_aliases: {string:string})
-        dispatches[#dispatches + 1] = graph_utils.indirect_dispatch(p_pipeline, DISPATCH, p_offset, p_aliases)
+        dispatches[#dispatches + 1] =
+            { pipeline = p_pipeline, indirect_buffer = DISPATCH, indirect_offset = p_offset, aliases = p_aliases }
     end
     for pass = 0, RADIX_SORT_PASS_COUNT - 1 do
         -- Pass p reads the keys from one buffer and scatters them into the other, so after an even number of passes
@@ -115,18 +112,35 @@ function sort.radix_sort_task(p_id: string, p_buffers: sort.RadixSortBuffers,
         indirect("radix_sort_scatter_" .. bit_region, RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
             { input_buffer = input_keys, histogram_buffer = HISTOGRAM, output_buffer = output_keys })
     end
-    local params: wbe.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = p_queue_family }
+    return { dispatches = dispatches, queue_family = p_queue_family }
+end
+
+local function radix_sort_aliases(p_buffers: sort.RadixSortBuffers): {string:graph_utils.Resource}
+    return {
+        [KEYS] = p_buffers.keys,
+        [KEYS_SWAP] = p_buffers.keys_swap,
+        [HISTOGRAM] = p_buffers.histogram,
+        [DISPATCH] = p_buffers.dispatch,
+    }
+end
+
+-- A task with id p_id that sorts p_buffers.keys in place on p_queue_family (graphics by default). Every pass follows
+-- the previous one in the task's command buffer, and the passes read the element count from the keys, so the count
+-- must be written before the task runs. Add the returned description with graph:add(), or use add_radix_sort_task().
+function sort.radix_sort_task(p_id: string, p_buffers: sort.RadixSortBuffers,
+    p_queue_family?: wbe.QueueFamilyVK | integer): graph_utils.Task
     return {
         id = p_id,
         type = "run_compute_pipelines_sequential",
-        params = params,
-        aliases = {
-            [KEYS] = p_buffers.keys,
-            [KEYS_SWAP] = p_buffers.keys_swap,
-            [HISTOGRAM] = p_buffers.histogram,
-            [DISPATCH] = p_buffers.dispatch,
-        },
+        params = radix_sort_params(p_queue_family),
+        aliases = radix_sort_aliases(p_buffers),
     }
+end
+
+-- Adds the sort to p_graph and returns its registered task object.
+function sort.add_radix_sort_task(p_graph: graph_utils.Graph, p_id: string, p_buffers: sort.RadixSortBuffers,
+    p_queue_family?: wbe.QueueFamilyVK | integer): graph_utils.Task
+    return p_graph:compute_sequential(p_id, radix_sort_params(p_queue_family), { aliases = radix_sort_aliases(p_buffers) })
 end
 
 return sort

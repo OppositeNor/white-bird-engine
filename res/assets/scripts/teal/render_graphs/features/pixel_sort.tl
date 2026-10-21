@@ -90,46 +90,51 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
 
     local color = graph_utils.port("color")
     local contrast = graph_utils.import_resource(p_params.contrast_import)
-    local source = graph_utils.image_view("pixel_sort_source",
-        graph_utils.storage_image("pixel_sort_source_image", p_params.color_format, width, height))
-    local mask = graph_utils.image_view("pixel_sort_mask", graph_utils.storage_image(
-        "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height))
+    local source = graph_utils.storage_image("pixel_sort_source_image", p_params.color_format, width, height)
+        :view("pixel_sort_source")
+    local mask = graph_utils.storage_image(
+        "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height):view("pixel_sort_mask")
     local column_offsets = graph_utils.storage_buffer(
         "pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE)
     -- The sort is sized for every pixel inside the mask.
     local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
 
     local graph = graph_utils.graph()
-    local function compute(p_task_id: string, p_pipeline: string, p_group_count_x: integer, p_group_count_y: integer,
-        p_uses: {graph_utils.Resource}, p_aliases?: {string:graph_utils.Resource}): graph_utils.Task
-        local params: wbe.RTParamsRunComputePipelineVK = {
-            pipeline = p_pipeline,
-            group_count_x = p_group_count_x,
-            group_count_y = p_group_count_y,
-            queue_family = p_params.queue_family,
-        }
-        local task = graph:add({ id = p_task_id, type = "run_compute_pipeline", params = params, uses = p_uses })
-        for name, resource in pairs(p_aliases or {}) do
-            task:alias(name, resource)
-        end
-        return task
-    end
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
 
-    local copy_source = compute("copy_pixel_sort_source", "copy_pixel_sort_source_shader", tile_group_count_x, tile_group_count_y,
-        { source }, { pixel_sort_input = color })
-    local count_mask = compute("count_pixel_sort_mask", "count_pixel_sort_mask" .. direction_suffix, column_group_count, 1,
-        { source, contrast, column_offsets })
+    local copy_source = graph:compute("copy_pixel_sort_source", {
+        pipeline = "copy_pixel_sort_source_shader",
+        group_count_x = tile_group_count_x,
+        group_count_y = tile_group_count_y,
+        queue_family = p_params.queue_family,
+    }, { uses = { source } }):alias("pixel_sort_input", color)
+    local count_mask = graph:compute("count_pixel_sort_mask", {
+        pipeline = "count_pixel_sort_mask" .. direction_suffix,
+        group_count_x = column_group_count,
+        group_count_y = 1,
+        queue_family = p_params.queue_family,
+    }, { uses = { source, contrast, column_offsets } })
     -- The prefix sums run in a single workgroup.
-    local prefix_sum = compute("prefix_sum_pixel_sort_columns", "prefix_sum_pixel_sort_columns_shader", 1, 1, { column_offsets })
-    local register_keys = compute("register_pixel_sort_keys", "register_pixel_sort_keys" .. direction_suffix,
-        column_group_count, 1,
-        { source, contrast, column_offsets, sort_buffers.keys, mask })
+    local prefix_sum = graph:compute("prefix_sum_pixel_sort_columns", {
+        pipeline = "prefix_sum_pixel_sort_columns_shader",
+        group_count_x = 1,
+        group_count_y = 1,
+        queue_family = p_params.queue_family,
+    }, { uses = { column_offsets } })
+    local register_keys = graph:compute("register_pixel_sort_keys", {
+        pipeline = "register_pixel_sort_keys" .. direction_suffix,
+        group_count_x = column_group_count,
+        group_count_y = 1,
+        queue_family = p_params.queue_family,
+    }, { uses = { source, contrast, column_offsets, sort_buffers.keys, mask } })
 
-    local radix_sort = graph:add(sort.radix_sort_task("pixel_sort_radix_sort", sort_buffers, p_params.queue_family))
-    local write_pixels = compute("write_sorted_pixels", "write_sorted_pixels" .. direction_suffix,
-        tile_group_count_x, tile_group_count_y,
-        { source, sort_buffers.keys, mask, contrast, column_offsets }, { pixel_sort_destination = color })
+    local radix_sort = sort.add_radix_sort_task(graph, "pixel_sort_radix_sort", sort_buffers, p_params.queue_family)
+    local write_pixels = graph:compute("write_sorted_pixels", {
+        pipeline = "write_sorted_pixels" .. direction_suffix,
+        group_count_x = tile_group_count_x,
+        group_count_y = tile_group_count_y,
+        queue_family = p_params.queue_family,
+    }, { uses = { source, sort_buffers.keys, mask, contrast, column_offsets } }):alias("pixel_sort_destination", color)
 
     graph:chain(color, { copy_source, write_pixels })
     graph:chain(source, { copy_source, count_mask, register_keys, write_pixels })

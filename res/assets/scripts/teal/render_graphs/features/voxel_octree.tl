@@ -39,16 +39,16 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     local toggles = p_target.debug_view_toggles
 
     -- The frame-begin barrier orders this frame's mutation after the previous frame's consumers.
-    local barrier_params: wbe.RTParamsFullMemoryBarrierVK = { resource = resources.octree_dynamic.id }
-    local frame_begin = graph:add({ id = "octree_frame_begin", type = "full_memory_barrier", params = barrier_params, uses = { resources.octree_dynamic } })
+    local barrier_params: graph_utils.FullMemoryBarrierParams = { resource = resources.octree_dynamic }
+    local frame_begin = graph:full_memory_barrier("octree_frame_begin", barrier_params)
     -- Static scene: empty both textures, then occupy the rasterized leaves and their ancestors. Dynamic meshes: empty the
     -- dynamic texture, then rebuild it like the static scene.
-    local reset = graph:add({ id = "reset_octree", import = true })
-    local build = graph:add({ id = "run_build_octree", import = true })
-    local build_double_sided = graph:add({ id = "run_build_octree_double_sided", import = true })
-    local clear_dynamic = graph:add({ id = "clear_dynamic_octree", import = true })
-    local dynamic = graph:add({ id = "dynamic_octree", import = true })
-    local dynamic_second = graph:add({ id = "dynamic_octree_second", import = true })
+    local reset = graph:import_task("reset_octree")
+    local build = graph:import_task("run_build_octree")
+    local build_double_sided = graph:import_task("run_build_octree_double_sided")
+    local clear_dynamic = graph:import_task("clear_dynamic_octree")
+    local dynamic = graph:import_task("dynamic_octree")
+    local dynamic_second = graph:import_task("dynamic_octree_second")
     -- Debug views: the leaf gather serves both views, and the node gather only the node view.
     local leaf_groups = p_params.leaf_gather_group_count
     local leaf_gather_params: wbe.RTParamsRunComputePipelineVK = {
@@ -58,7 +58,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
         group_count_z = leaf_groups.z,
         queue_family = "compute_1",
     }
-    local gather_debug_leaves = graph:add({ id = "gather_octree_debug_leaves", type = "run_compute_pipeline", params = leaf_gather_params, toggle = toggles.enabled })
+    local gather_debug_leaves = graph:compute("gather_octree_debug_leaves", leaf_gather_params, { toggle = toggles.enabled })
     local node_groups = p_params.node_gather_group_count
     local node_gather_params: wbe.RTParamsRunComputePipelineVK = {
         pipeline = "octree_debug_gather_nodes_shader",
@@ -67,31 +67,24 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
         group_count_z = node_groups,
         queue_family = "compute_1",
     }
-    local gather_debug_nodes = graph:add({
-        id = "gather_octree_debug_nodes",
-        type = "run_compute_pipeline",
-        params = node_gather_params,
+    local gather_debug_nodes = graph:compute("gather_octree_debug_nodes", node_gather_params, {
         toggle = toggles.pre_deferred_propagation,
     })
     local function overlay(p_task_id: string, p_pipeline: string, p_indirect_buffer: graph_utils.Resource, p_draw_count: integer,
         p_toggle: wbe.RendRecipeToggleVK): graph_utils.Task
-        local params: wbe.RTParamsRunGraphicsPipelineIndirectVK = {
+        local params: graph_utils.DrawIndirectParams = {
             pipeline = p_pipeline,
-            index_buffer = resources.octree_debug_draw_index_buffer.id,
-            indirect_buffer = p_indirect_buffer.id,
+            index_buffer = resources.octree_debug_draw_index_buffer,
+            indirect_buffer = p_indirect_buffer,
             draw_count = p_draw_count,
             color_load_op = "load",
             depth_load_op = "load",
         }
-        local task = graph:add({
-            id = p_task_id,
-            type = "run_graphics_pipeline_indirect",
-            params = params,
-            uses = { resources.octree_debug_draw_index_buffer, p_indirect_buffer },
+        local task = graph:draw_indirect(p_task_id, params, {
             toggle = p_toggle,
         })
-        task:alias("render_target_colors[0]", color)
-        task:alias("render_target_depth", depth)
+        task:color_target(0, color)
+        task:depth_target(depth)
         return task
     end
     local debug_draw = overlay("run_octree_debug_draw", "octree_debug_draw_pipeline", resources.octree_debug_draw_indirect_buffer, p_params.leaf_draw_count,
