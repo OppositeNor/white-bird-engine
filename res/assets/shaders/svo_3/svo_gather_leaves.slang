@@ -17,6 +17,7 @@
 
 #include "utils/utils.slang"
 #include "svo_2/svo_utils.slang"
+#include "sort/radix_sort_utils.slang"
 
 /**
  * @brief The input data from the vertex buffer
@@ -91,20 +92,10 @@ struct SVODescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
     uint2 svo_info;
     /**
-     * @brief Descriptor-heap reference to svo_node_buffer.
+     * @brief Descriptor-heap reference to svo_deferred_list, which receives the Morton code of every rasterized leaf.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
-    uint2 tree_nodes;
-    /**
-     * @brief Descriptor-heap reference to svo_pending_children.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pending_children")]
-    uint2 pending_children;
-    /**
-     * @brief Descriptor-heap reference to svo_leaf_buffer.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer")]
-    uint2 tree_leaves;
+    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list")]
+    uint2 deferred_list;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
@@ -220,13 +211,15 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
 }
 
 /**
- * @brief Allocates the cell at the triangle's plane depth under each rasterized pixel.
- * @details Pixels outside the original triangle's cell bounds come from the enlarged triangle's overshooting corners and
- * are discarded. The plane depth is clamped to the triangle's depth bounds, which it overshoots near the triangle's edges.
+ * @brief Registers the cell at the triangle's plane depth under each rasterized pixel in the deferred list.
+ * @details The deferred list has the layout of a radix sort key buffer (see radix_sort_utils.slang): the count of the
+ * registered leaves, then their Morton codes. A cell covered by several triangles is registered once for each. Pixels
+ * outside the original triangle's cell bounds come from the enlarged triangle's overshooting corners and are discarded.
+ * The plane depth is clamped to the triangle's depth bounds, which it overshoots near the triangle's edges.
  */
 [shader("fragment")]
 void fragment_main(GSOutput p_input) {
-    RWStructuredBuffer<uint> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
+    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     // Helper invocations cannot publish storage writes and receive undefined atomic results.
     // Keep them out of allocation retry loops; this shader does not need derivatives.
@@ -250,12 +243,10 @@ void fragment_main(GSOutput p_input) {
     // Get the voxel index according to the center, and get the morton code.
     uint voxel_morton_code = morton_encode_3d(uint3(center));
     uint leaf_index;
-    InterlockedAdd(
-        svo_info_buffer[0].leaves_count,
-        1,
-        leaf_index
-    );
-    tree_leaves[leaf_index] = voxel_morton_code;
+    InterlockedAdd(deferred_list[WBE_RADIX_SORT_ELEMENT_COUNT_INDEX], 1, leaf_index);
+    WBE_SHADER_DEBUG_ASSERT(leaf_index < svo_info_buffer[0].max_deferred_task_count,
+        ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+    deferred_list[WBE_RADIX_SORT_DATA_START + leaf_index] = voxel_morton_code;
 }
 
 #endif

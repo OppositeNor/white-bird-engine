@@ -150,6 +150,25 @@ function sort.radix_sort_task(p_id: string, p_buffers: sort.RadixSortBuffers,
     }
 end
 
+-- The dispatches that sort p_buffers.keys in place, bound to the buffers' handles, for a run_compute_pipelines_sequential
+-- task that may dispatch other passes before and after them. Like the sort task, they read the element count from the
+-- keys, so the count must be written before they run.
+function sort.radix_sort_dispatches(p_graph: Graph.Graph, p_buffers: sort.RadixSortBuffers): {Graph.RTParamsComputeDispatchVK}
+    local bindings = radix_sort_aliases(p_buffers)
+    local dispatches = radix_sort_params(p_graph).dispatches
+    for _, dispatch in ipairs(dispatches) do
+        if dispatch.indirect_buffer ~= nil then
+            dispatch.indirect_buffer = bindings[dispatch.indirect_buffer as string]
+        end
+        local aliases: {string:Graph.Resource | string} = {}
+        for name, local_name in pairs(dispatch.aliases) do
+            aliases[name] = bindings[local_name as string]
+        end
+        dispatch.aliases = aliases
+    end
+    return dispatches
+end
+
 -- Adds the sort to p_graph and returns its registered task object.
 function sort.add_radix_sort_task(p_graph: Graph.Graph, p_id: string, p_buffers: sort.RadixSortBuffers,
     p_queue_family?: wbe.QueueFamilyVK | integer): Graph.Task

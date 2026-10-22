@@ -1343,6 +1343,50 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 12U);
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequentialTask) {
+    const DataValue recipe = RendGraphScriptVK::run("tests.teal_svo_3", DataValue::make_map());
+    // The deferred-list reset, the gathering, and one task clamping the leaf count and dispatching the deduplication.
+    const DataValue::List& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 3U);
+    EXPECT_EQ(tasks[1].get_value<std::string>("type"), "graphics_draw_mesh");
+    EXPECT_EQ(tasks[1].get_entry("aliases").get_value<std::string>("svo_deferred_list"), "svo_3_deferred_list");
+    bool gather_connects_deduplication = false;
+    for (const DataValue& connection : tasks[1].get_entry("connect").as_list()) {
+        gather_connects_deduplication = gather_connects_deduplication ||
+            (connection.get_value<std::string>("to") == "svo_3_deduplicate_leaves" &&
+                connection.get_value<std::string>("resource") == "svo_3_deferred_list");
+    }
+    EXPECT_TRUE(gather_connects_deduplication);
+    const DataValue& deduplicate = tasks[2];
+    EXPECT_EQ(deduplicate.get_value<std::string>("id"), "svo_3_deduplicate_leaves");
+    EXPECT_EQ(deduplicate.get_value<std::string>("type"), "run_compute_pipelines_sequential");
+    // The clamping, the deduplication's preparation, the radix sort's preparation and 5 passes for each of its 4 digits,
+    // the marking, the scan's preparation and 4 passes, and the scatter.
+    const DataValue::List& dispatches = deduplicate.get_entry("params").get_entry("dispatches").as_list();
+    ASSERT_EQ(dispatches.size(), 30U);
+    const DataValue& aliases = deduplicate.get_entry("aliases");
+    const auto bound = [&](const DataValue& p_dispatch, std::string_view p_name) {
+        return aliases.get_value<std::string>(p_dispatch.get_entry("aliases").get_value<std::string>(p_name));
+    };
+    EXPECT_EQ(dispatches[0].get_value<std::string>("pipeline"), "svo_3_prepare_leaves_shader");
+    EXPECT_EQ(dispatches[1].get_value<std::string>("pipeline"), "dedup_large_prepare_dispatch");
+    EXPECT_EQ(dispatches[2].get_value<std::string>("pipeline"), "radix_sort_prepare_dispatch");
+    EXPECT_EQ(bound(dispatches[2], "input_buffer"), "svo_3_deferred_list");
+    const DataValue& mark = dispatches[23];
+    EXPECT_EQ(mark.get_value<std::string>("pipeline"), "dedup_large_mark");
+    EXPECT_EQ(aliases.get_value<std::string>(mark.get_value<std::string>("indirect_buffer")),
+        "svo_3_deferred_list_dedup_dispatch");
+    EXPECT_EQ(bound(mark, "marks"), "svo_3_deferred_list_marks");
+    // The scan's blocks pass scans the marks in place, and its sections pass runs the fixed 256 workgroups.
+    EXPECT_EQ(dispatches[25].get_value<std::string>("pipeline"), "large_prefix_scan_blocks");
+    EXPECT_EQ(bound(dispatches[25], "data_buffer"), "svo_3_deferred_list_marks");
+    EXPECT_EQ(aliases.get_value<std::string>(dispatches[25].get_value<std::string>("indirect_buffer")),
+        "svo_3_deferred_list_mark_dispatch");
+    EXPECT_EQ(dispatches[26].get_value<uint32_t>("group_count_x"), 256U);
+    EXPECT_EQ(dispatches[29].get_value<std::string>("pipeline"), "dedup_large_scatter");
+    EXPECT_EQ(bound(dispatches[29], "unique_keys"), "svo_3_unique_leaves");
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxelAndPixelSortFeatures) {
     RenderAllocator allocator(WBE_KI_B(16));
     RenderContextVK render_data(&allocator);

@@ -74,8 +74,9 @@ void workgroup_inclusive_prefix_sum_64_256(__ref groupshared uint p_data[256], u
  * @param p_element_count The number of elements in the range.
  * @param p_thread_id The local invocation index in [0, N).
  * @param p_scratch Scratch array of one element per invocation; its contents are overwritten.
+ * @return The sum of every element in the range, the same in every invocation.
  */
-void workgroup_general_prefix_sum<let N : uint>(RWStructuredBuffer<uint> p_buffer, uint p_start, uint p_element_count,
+uint workgroup_general_prefix_sum<let N : uint>(RWStructuredBuffer<uint> p_buffer, uint p_start, uint p_element_count,
         uint p_thread_id, __ref groupshared uint p_scratch[N]) {
     // The sum of every element in the earlier chunks.
     uint carry = 0;
@@ -111,5 +112,6 @@ void workgroup_general_prefix_sum<let N : uint>(RWStructuredBuffer<uint> p_buffe
         // Every invocation has read p_scratch before the next chunk overwrites it.
         GroupMemoryBarrierWithGroupSync();
     }
+    return carry;
 }
 #endif

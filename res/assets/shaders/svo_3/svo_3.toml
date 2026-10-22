@@ -30,3 +30,11 @@ depth_test = false
 depth_write = false
 cull_backfaces = false
 conservative_rasterization = false
+
+[[resources]]
+id = "svo_3_prepare_leaves_shader"
+source_type = "shader"
+src = "assets/shaders/svo_3/svo_3_prepare_leaves.slang"
+dst = "assets/shaders/svo_3/svo_3_prepare_leaves.spv"
+metadata = "assets/shaders/svo_3/svo_3_prepare_leaves.json"
+
