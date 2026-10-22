@@ -22,7 +22,6 @@
 #include "svo/svo_common.slang"
 
 StructuredBuffer<SVONode> nodes;
-StructuredBuffer<SVONode> dynamic_nodes;
 RWStructuredBuffer<SVOInfo> tree_info;
 RWStructuredBuffer<SVONodeTraceInfo> traces;
 
@@ -40,7 +39,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #if TRAVERSE_STATIC
     traverse_static_svo(nodes, trace_info);
 #else
-    traverse_svo(nodes, dynamic_nodes, tree_info[0], TRAVERSE_DYNAMIC != 0, trace_info);
+    traverse_svo(nodes, TRAVERSE_DYNAMIC != 0, trace_info);
 #endif
     traces[index] = trace_info;
 }

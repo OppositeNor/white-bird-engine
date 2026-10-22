@@ -40,7 +40,6 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         buffers[id] = graph:import_resource(id)
     end
     local sizes = p_params.buffer_sizes
-    buffers.svo_dynamic_nodes = graph:add_storage_buffer("svo_dynamic_nodes", sizes.dynamic_nodes)
     buffers.svo_deferred_list_ping = graph:add_storage_buffer("svo_deferred_list_ping", sizes.deferred_list)
     buffers.svo_deferred_list_pong = graph:add_storage_buffer("svo_deferred_list_pong", sizes.deferred_list)
     buffers.svo_pre_deferred_debug_info_buffer =
@@ -205,7 +204,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
         { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
-    graph:chain({ buffers.svo_dynamic_nodes, buffers.svo_dynamic_leaves },
+    graph:chain(buffers.svo_dynamic_leaves,
         sequence({ clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
             { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
     graph:chain(buffers.svo_leaf_buffer, {

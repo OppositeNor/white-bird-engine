@@ -22,21 +22,18 @@
  * @brief Read-only view of an already constructed SVO that resolves positions to the data_index of their nodes and leaves.
  * @details Every stored node and leaf owns one data element through its data_index; the SVO does not own or read the data,
  * so callers index their own data buffer with the traced index. The construction passes assign the static node and leaf
- * data first, followed by the dynamic node data and then the dynamic leaf data. Nodes and leaves are addressed by indices
- * that span both storages: node indices below info.max_node_count are static and the dynamic ones follow at an offset of
- * info.max_node_count, while leaf indices cover the static leaves followed by the dynamic leaves. The SVO must be fully
+ * data first, followed by the dynamic node data and then the dynamic leaf data. The node buffer holds the static nodes
+ * followed by the dynamic nodes, so node indices below info.node_count are static and the dynamic ones follow them, while
+ * leaf indices span both storages, covering the static leaves followed by the dynamic leaves. The SVO must be fully
  * constructed and published, and its buffers must not change during the calling pass, because node descriptions are read
  * without synchronization. Construction is not performed through this type.
  */
 struct SVO {
     /**
-     * @brief Static SVO node storage.
+     * @brief SVO node storage: the static nodes followed by the dynamic nodes, which traces reach only when
+     * traverse_dynamic is true.
      */
     StructuredBuffer<SVONode> nodes;
-    /**
-     * @brief Dynamic SVO node storage; traces read it only when traverse_dynamic is true.
-     */
-    StructuredBuffer<SVONode> dynamic_nodes;
     /**
      * @brief Static SVO leaf storage.
      */
@@ -58,13 +55,11 @@ struct SVO {
      * @brief Create a view over the buffers of a constructed SVO.
      */
     __init(StructuredBuffer<SVONode> p_nodes,
-        StructuredBuffer<SVONode> p_dynamic_nodes,
         StructuredBuffer<SVOLeaf> p_leaves,
         StructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
         SVOInfo p_info,
         bool p_traverse_dynamic) {
         nodes = p_nodes;
-        dynamic_nodes = p_dynamic_nodes;
         leaves = p_leaves;
         dynamic_leaves = p_dynamic_leaves;
         info = p_info;
@@ -92,7 +87,7 @@ struct SVO {
      */
     uint trace_data(float3 p_world_position, out SVONodeTraceInfo p_trace_info) {
         p_trace_info = get_svo_root_trace_info(get_svo_position(p_world_position), info.max_depth);
-        traverse_svo(nodes, dynamic_nodes, info, traverse_dynamic, p_trace_info);
+        traverse_svo(nodes, traverse_dynamic, p_trace_info);
         return get_data_index(p_trace_info);
     }
 
@@ -108,7 +103,7 @@ struct SVO {
     uint trace_data(float3 p_world_position, uint p_depth, out SVONodeTraceInfo p_trace_info) {
         p_trace_info = get_svo_root_trace_info(get_svo_position(p_world_position), info.max_depth);
         p_trace_info.remain_depth = int(p_depth) - 1;
-        traverse_svo(nodes, dynamic_nodes, info, traverse_dynamic, p_trace_info);
+        traverse_svo(nodes, traverse_dynamic, p_trace_info);
         return get_data_index(p_trace_info);
     }
 
@@ -119,8 +114,6 @@ struct SVO {
      */
     uint get_data_index(SVONodeTraceInfo p_trace_info) {
         switch (p_trace_info.index_type) {
-        case SVONodeTraceInfo::IndexType::DYNAMIC_NODE:
-            return dynamic_nodes[p_trace_info.node_index].data_index;
         case SVONodeTraceInfo::IndexType::STATIC_LEAF:
             return leaves[p_trace_info.node_index].data_index;
         case SVONodeTraceInfo::IndexType::DYNAMIC_LEAF:
@@ -140,7 +133,7 @@ struct SVO {
 
     /**
      * @brief Count the stored nodes in static and dynamic storage, excluding the implicit root.
-     * @details Dynamic node indices start at info.max_node_count, so this is not an upper bound of the node indices.
+     * @return The upper bound of the node indices taken by get_node().
      */
     uint get_total_nodes() {
         return info.node_count + info.dynamic_node_count;
@@ -148,13 +141,10 @@ struct SVO {
 
     /**
      * @brief Read a node from static or dynamic storage.
-     * @param p_index Node index; static below info.max_node_count, dynamic from it on.
+     * @param p_index Node index below get_total_nodes(); static below info.node_count, dynamic from it on.
      */
     SVONode get_node(uint p_index) {
-        if (p_index < info.max_node_count) {
-            return nodes[p_index];
-        }
-        return dynamic_nodes[p_index - info.max_node_count];
+        return nodes[p_index];
     }
 
     /**
@@ -179,7 +169,7 @@ struct SVO {
      */
     bool is_leaf_occupied(uint p_index, uint p_frame_slot) {
         SVOLeaf leaf = get_leaf(p_index);
-        WBE_SHADER_DEBUG_ASSERT(leaf.parent_index >= 0 && uint(leaf.parent_index) < info.max_node_count + info.dynamic_node_count,
+        WBE_SHADER_DEBUG_ASSERT(leaf.parent_index >= 0 && uint(leaf.parent_index) < get_total_nodes(),
             ShaderDebugError::SVO_NODE_INDEX_OVERFLOW,
             p_frame_slot);
         SVONode parent = get_node(uint(leaf.parent_index));
@@ -206,7 +196,7 @@ struct SVO {
         int parent_index = get_leaf(p_index).parent_index;
         uint traversed_depth = 0;
         for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
-            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < info.max_node_count + info.dynamic_node_count,
+            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
             SVONode parent = get_node(uint(parent_index));
             WBE_SHADER_DEBUG_ASSERT(child_index >= get_svo_children_index(parent) &&

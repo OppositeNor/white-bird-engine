@@ -24,11 +24,6 @@ struct SVODebugDrawDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
     /**
-     * @brief Descriptor-heap reference to svo_dynamic_nodes.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_nodes", "read")]
-    uint2 dynamic_nodes;
-    /**
      * @brief Descriptor-heap reference to svo_dynamic_leaves.
      */
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
@@ -65,11 +60,10 @@ SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint 
     StructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     SVOInfo svo_info = svo_info_buffer[0];
-    SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
+    SVO svo = SVO(tree_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
     bool is_bounds = p_instance_id == svo.get_total_leaves();

@@ -1433,7 +1433,6 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         svo.set_value("extent", 512);
         svo.set_value("max_depth", 9);
         DataValue buffer_sizes = DataValue::make_map();
-        buffer_sizes.set_value("dynamic_nodes", 1024);
         buffer_sizes.set_value("deferred_list", 516);
         buffer_sizes.set_value("pre_deferred_debug_info", 60);
         buffer_sizes.set_value("pre_deferred_debug_list", 512);
@@ -1561,15 +1560,15 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
     EXPECT_TRUE(contains_import(svo_recipe, "svo_node_buffer"));
-    // The SVO declares its 5 scratch buffers with the sizes it is given.
+    // The SVO declares its 4 scratch buffers with the sizes it is given.
     const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
-    EXPECT_EQ(svo_resources.size(), 5U);
+    EXPECT_EQ(svo_resources.size(), 4U);
     const DataValue* deferred_list = find_by_id(svo_resources, "svo_deferred_list_ping");
     ASSERT_NE(deferred_list, nullptr);
     EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);
-    const DataValue* dynamic_nodes = find_by_id(svo_resources, "svo_dynamic_nodes");
-    ASSERT_NE(dynamic_nodes, nullptr);
-    EXPECT_EQ(dynamic_nodes->get_entry("buffer").get_value<int64_t>("size"), 1024);
+    const DataValue* pre_deferred_debug_list = find_by_id(svo_resources, "svo_pre_deferred_debug_list_buffer");
+    ASSERT_NE(pre_deferred_debug_list, nullptr);
+    EXPECT_EQ(pre_deferred_debug_list->get_entry("buffer").get_value<int64_t>("size"), 512);
     const DataValue* pixel_sort = find_by_id(tasks, "post_processing");
     ASSERT_NE(pixel_sort, nullptr);
     EXPECT_TRUE(pixel_sort->contains("toggle"));

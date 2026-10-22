@@ -39,10 +39,9 @@ OCCUPANCY_BIT_OFFSET = 21
 BLOCK_INDEX_BIT_COUNT = 21
 
 # SVONodeTraceInfo::IndexType values.
-INDEX_STATIC_NODE = 0
-INDEX_DYNAMIC_NODE = 1
-INDEX_STATIC_LEAF = 2
-INDEX_DYNAMIC_LEAF = 3
+INDEX_NODE = 0
+INDEX_STATIC_LEAF = 1
+INDEX_DYNAMIC_LEAF = 2
 
 NODE_DTYPE = np.dtype([("children_data", "<u4"), ("data_index", "<u4"), ("parent_index", "<i4"),
     ("original_children_data", "<u4")])
@@ -194,18 +193,17 @@ def root_traces(p_voxels: list[Voxel], p_max_depth: int, p_remain_depth: int) ->
     traces = np.zeros(len(p_voxels), dtype=TRACE_DTYPE)
     for index, voxel in enumerate(p_voxels):
         center = voxel_center(voxel, p_max_depth)
-        traces[index] = (voxel_sector(voxel, 1, p_max_depth), INDEX_STATIC_NODE, 1, p_remain_depth,
+        traces[index] = (voxel_sector(voxel, 1, p_max_depth), INDEX_NODE, 1, p_remain_depth,
             np.modf(center * 2.0)[0], voxel_index(voxel, p_max_depth))
     return traces
 
 
-def run_traverse(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_dynamic_nodes: np.ndarray,
-        p_tree_info: np.ndarray, p_traces: np.ndarray, p_static: bool, p_dynamic: bool) -> np.ndarray:
+def run_traverse(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_tree_info: np.ndarray,
+        p_traces: np.ndarray, p_static: bool, p_dynamic: bool) -> np.ndarray:
     kernel = p_load_kernel("svo_traverse.slang", {"TRAVERSE_STATIC": int(p_static), "TRAVERSE_DYNAMIC": int(p_dynamic)})
     trace_buffer = make_buffer(p_device, p_traces)
     kernel.dispatch(thread_count=[len(p_traces), 1, 1], vars={"nodes": make_buffer(p_device, p_nodes),
-        "dynamic_nodes": make_buffer(p_device, p_dynamic_nodes), "tree_info": make_buffer(p_device, p_tree_info),
-        "traces": trace_buffer})
+        "tree_info": make_buffer(p_device, p_tree_info), "traces": trace_buffer})
     return read_buffer(trace_buffer, TRACE_DTYPE)
 
 
@@ -297,7 +295,7 @@ def test_get_svo_root_trace_info(svo_common: spy.Module, rng: np.random.Generato
     for position in rng.uniform(0.0, 1.0, (16, 3)).astype(np.float32):
         trace = svo_common.get_svo_root_trace_info(spy.float3(*position), p_max_depth)
         # The root sector is the stored node at depth one; the position becomes local to that sector.
-        assert_trace(trace, int(subregion_reference(position)), INDEX_STATIC_NODE, 1, p_max_depth - 1,
+        assert_trace(trace, int(subregion_reference(position)), INDEX_NODE, 1, p_max_depth - 1,
             np.modf(position * 2.0)[0])
         # The voxel index is the containing leaf-level voxel's flattened coordinate.
         voxel = np.floor(position * float(1 << p_max_depth)).astype(np.int64)
@@ -312,7 +310,7 @@ def test_to_trace_info(svo_common: spy.Module, rng: np.random.Generator, p_max_d
         trace = svo_common.to_trace_info(entry, p_max_depth)
         # The traversal targets the voxel's center from its root sector.
         center = voxel_center(voxel, p_max_depth)
-        assert_trace(trace, voxel_sector(voxel, 1, p_max_depth), INDEX_STATIC_NODE, 1, p_max_depth - 1,
+        assert_trace(trace, voxel_sector(voxel, 1, p_max_depth), INDEX_NODE, 1, p_max_depth - 1,
             np.modf(center * 2.0)[0])
         assert trace["voxel_index"] == entry
 
@@ -343,7 +341,7 @@ def test_traverse_svo_static(device: spy.Device, load_kernel: KernelLoader, rng:
     tree = build_static_svo(random_voxels(rng, 24, p_max_depth), p_max_depth)
     queries = static_query_voxels(rng, tree, 64)
     nodes = tree.node_array()
-    result = run_traverse(device, load_kernel, nodes, nodes, make_tree_info(p_max_depth, len(nodes)),
+    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth, len(nodes)),
         root_traces(queries, p_max_depth, p_remain_depth), False, False)
     for voxel, trace in zip(queries, result):
         if voxel in tree.leaf_of_voxel:
@@ -351,12 +349,12 @@ def test_traverse_svo_static(device: spy.Device, load_kernel: KernelLoader, rng:
             stop = (tree.leaf_of_voxel[voxel], INDEX_STATIC_LEAF)
         else:
             stop_depth = expected_stop_depth(tree, voxel)
-            stop = (tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))], INDEX_STATIC_NODE)
+            stop = (tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))], INDEX_NODE)
         steps = stop_depth - 1
         if p_remain_depth >= 0 and p_remain_depth < steps:
             steps = p_remain_depth
             stop_depth = 1 + steps
-            stop = (tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))], INDEX_STATIC_NODE)
+            stop = (tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))], INDEX_NODE)
         center = voxel_center(voxel, p_max_depth)
         assert_trace(trace, stop[0], stop[1], stop_depth, p_remain_depth - steps if p_remain_depth >= 0 else -1,
             np.modf(center * float(1 << stop_depth))[0])
@@ -369,7 +367,7 @@ def test_traverse_static_svo(device: spy.Device, load_kernel: KernelLoader, rng:
     tree = build_static_svo(random_voxels(rng, 24, p_max_depth), p_max_depth)
     queries = static_query_voxels(rng, tree, 64)
     nodes = tree.node_array()
-    result = run_traverse(device, load_kernel, nodes, nodes, make_tree_info(p_max_depth, len(nodes)),
+    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth, len(nodes)),
         root_traces(queries, p_max_depth, p_remain_depth), True, False)
     for voxel, trace in zip(queries, result):
         # Static traversal stops at the first node that is not NODE, so leaf blocks are never entered.
@@ -383,61 +381,66 @@ def test_traverse_static_svo(device: spy.Device, load_kernel: KernelLoader, rng:
             remain = p_remain_depth - steps if p_remain_depth >= 0 else -1
         node_index = tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))]
         center = voxel_center(voxel, p_max_depth)
-        assert_trace(trace, node_index, INDEX_STATIC_NODE, stop_depth, remain, np.modf(center * float(1 << stop_depth))[0])
+        assert_trace(trace, node_index, INDEX_NODE, stop_depth, remain, np.modf(center * float(1 << stop_depth))[0])
 
 
-def dynamic_svo() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+# Number of static nodes in dynamic_svo(); its dynamic node block follows them.
+DYNAMIC_SVO_NODE_COUNT = 16
+
+
+def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
     """
-    Return static nodes, dynamic nodes, and tree info for a depth-three tree whose root sector 0 has dynamic children.
+    Return the nodes and tree info of a depth-three tree whose root sector 0 has dynamic children.
 
-    Root sector 0 is NODE_DYNAMIC with the first dynamic node block; dynamic node 3 owns dynamic leaf block 2 with only
-    sector 5 occupied, and every other dynamic node is EMPTY. Root sector 7 is a static node whose children are EMPTY.
+    The node buffer holds 16 static nodes followed by one block of 8 dynamic nodes. Root sector 0 is NODE_DYNAMIC with
+    that block; dynamic node 3 owns dynamic leaf block 2 with only sector 5 occupied, and every other dynamic node is
+    EMPTY. Root sector 7 is a static node whose children are EMPTY.
     """
-    max_node_count = 16
-    nodes = np.zeros(max_node_count, dtype=NODE_DTYPE)
+    nodes = np.zeros(DYNAMIC_SVO_NODE_COUNT + 8, dtype=NODE_DTYPE)
     nodes["children_data"] = pack_children_data(STATE_EMPTY)
-    # NODE_DYNAMIC stores the block index offset by max_node_count.
-    nodes[0]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, max_node_count // 8)
+    nodes[0]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, DYNAMIC_SVO_NODE_COUNT // 8)
     nodes[7]["children_data"] = pack_children_data(STATE_NODE, 1)
-    dynamic_nodes = np.zeros(8, dtype=NODE_DTYPE)
-    dynamic_nodes["children_data"] = pack_children_data(STATE_EMPTY)
-    dynamic_nodes[3]["children_data"] = pack_children_data(STATE_LEAF_DYNAMIC, 2, 1 << 5)
-    return nodes, dynamic_nodes, make_tree_info(3, max_node_count)
+    nodes[DYNAMIC_SVO_NODE_COUNT + 3]["children_data"] = pack_children_data(STATE_LEAF_DYNAMIC, 2, 1 << 5)
+    tree_info = make_tree_info(3, DYNAMIC_SVO_NODE_COUNT)
+    tree_info["node_count"] = DYNAMIC_SVO_NODE_COUNT
+    tree_info["max_dynamic_node_count"] = 8
+    tree_info["dynamic_node_count"] = 8
+    return nodes, tree_info
 
 
 # (voxel, expected with dynamic traversal, expected without), each expectation being (index, index type, depth).
 DYNAMIC_TRAVERSAL_CASES = [
     # Root sector 0, dynamic node 3 (sector bits 011), occupied leaf sector 5 (101).
-    ((1, 2, 3), (16 + 5, INDEX_DYNAMIC_LEAF, 3), (0, INDEX_STATIC_NODE, 1)),
+    ((1, 2, 3), (16 + 5, INDEX_DYNAMIC_LEAF, 3), (0, INDEX_NODE, 1)),
     # Same dynamic node, unoccupied leaf sector 4 (100).
-    ((1, 2, 2), (3, INDEX_DYNAMIC_NODE, 2), (0, INDEX_STATIC_NODE, 1)),
+    ((1, 2, 2), (DYNAMIC_SVO_NODE_COUNT + 3, INDEX_NODE, 2), (0, INDEX_NODE, 1)),
     # Root sector 0, EMPTY dynamic node 6 (110).
-    ((3, 3, 0), (6, INDEX_DYNAMIC_NODE, 2), (0, INDEX_STATIC_NODE, 1)),
+    ((3, 3, 0), (DYNAMIC_SVO_NODE_COUNT + 6, INDEX_NODE, 2), (0, INDEX_NODE, 1)),
     # Root sector 7, static EMPTY child 8 + 2 (010).
-    ((4, 6, 4), (8 + 2, INDEX_STATIC_NODE, 2), (8 + 2, INDEX_STATIC_NODE, 2)),
+    ((4, 6, 4), (8 + 2, INDEX_NODE, 2), (8 + 2, INDEX_NODE, 2)),
     # EMPTY root sector 4.
-    ((5, 1, 1), (4, INDEX_STATIC_NODE, 1), (4, INDEX_STATIC_NODE, 1)),
+    ((5, 1, 1), (4, INDEX_NODE, 1), (4, INDEX_NODE, 1)),
 ]
 
 
 @pytest.mark.parametrize("p_traverse_dynamic", [True, False])
 def test_traverse_svo_dynamic(device: spy.Device, load_kernel: KernelLoader, p_traverse_dynamic: bool) -> None:
-    nodes, dynamic_nodes, tree_info = dynamic_svo()
+    nodes, tree_info = dynamic_svo()
     voxels = [case[0] for case in DYNAMIC_TRAVERSAL_CASES]
-    result = run_traverse(device, load_kernel, nodes, dynamic_nodes, tree_info, root_traces(voxels, 3, -1), False,
-        p_traverse_dynamic)
+    result = run_traverse(device, load_kernel, nodes, tree_info, root_traces(voxels, 3, -1), False, p_traverse_dynamic)
     for (voxel, with_dynamic, without_dynamic), trace in zip(DYNAMIC_TRAVERSAL_CASES, result):
         index, index_type, depth = with_dynamic if p_traverse_dynamic else without_dynamic
         assert_trace(trace, index, index_type, depth, -1, np.modf(voxel_center(voxel, 3) * float(1 << depth))[0])
 
 
 def test_traverse_svo_resumes_from_dynamic_node(device: spy.Device, load_kernel: KernelLoader) -> None:
-    # A traversal saved at a dynamic node continues in dynamic storage.
-    nodes, dynamic_nodes, tree_info = dynamic_svo()
+    # A traversal saved at a dynamic node continues below it.
+    nodes, tree_info = dynamic_svo()
     voxel = (1, 2, 3)
     traces = np.zeros(1, dtype=TRACE_DTYPE)
-    traces[0] = (3, INDEX_DYNAMIC_NODE, 2, 4, np.modf(voxel_center(voxel, 3) * 4.0)[0], voxel_index(voxel, 3))
-    result = run_traverse(device, load_kernel, nodes, dynamic_nodes, tree_info, traces, False, True)
+    traces[0] = (DYNAMIC_SVO_NODE_COUNT + 3, INDEX_NODE, 2, 4, np.modf(voxel_center(voxel, 3) * 4.0)[0],
+        voxel_index(voxel, 3))
+    result = run_traverse(device, load_kernel, nodes, tree_info, traces, False, True)
     assert_trace(result[0], 16 + 5, INDEX_DYNAMIC_LEAF, 3, 3, np.modf(voxel_center(voxel, 3) * 8.0)[0])
 
 
@@ -473,8 +476,7 @@ def run_leaf_queries(p_device: spy.Device, p_load_kernel: KernelLoader, p_tree: 
     totals = make_buffer(p_device, np.zeros((1, 2), dtype=np.uint32))
     dynamic_leaves = p_dynamic_leaves if len(p_dynamic_leaves) != 0 else np.zeros(1, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
     p_load_kernel("svo_leaf_queries.slang", {}).dispatch(thread_count=[leaf_count, 1, 1], vars={
-        "nodes": make_buffer(p_device, nodes), "dynamic_nodes": make_buffer(p_device, np.zeros(8, dtype=NODE_DTYPE)),
-        "leaves": make_buffer(p_device, p_tree.leaf_array()), "dynamic_leaves": make_buffer(p_device, dynamic_leaves),
+        "nodes": make_buffer(p_device, nodes), "leaves": make_buffer(p_device, p_tree.leaf_array()), "dynamic_leaves": make_buffer(p_device, dynamic_leaves),
         "tree_info": make_buffer(p_device, tree_info), "occupied": occupied, "grid_positions": grid_positions,
         "totals": totals})
     return (read_buffer(occupied, np.uint32), read_buffer(grid_positions, np.uint32).reshape(-1, 4)[:, :3],
@@ -509,7 +511,7 @@ def test_svo_leaf_queries_hide_superseded_static_leaves(device: spy.Device, load
     dynamic_leaves = np.zeros(1, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
     dynamic_leaves[0]["leaves"]["parent_index"] = parent
     occupied, grid_positions, totals = run_leaf_queries(device, load_kernel, tree, dynamic_leaves, 8)
-    # Dynamic node slots count toward the total even though dynamic node indices are offset by max_node_count.
+    # Dynamic node slots count toward the total.
     np.testing.assert_array_equal(totals, [len(tree.leaves) + 8, len(tree.nodes) + 8])
     superseded_block = static_leaf // 8 * 8
     np.testing.assert_array_equal(occupied[superseded_block:superseded_block + 8], 0)

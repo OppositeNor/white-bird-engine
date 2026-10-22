@@ -25,28 +25,22 @@
  * observe ALLOCATING_DYNAMIC or lose the CAS return false so the caller can defer them.
  * @return True when the voxel's leaf occupancy is recorded; false with p_trace at the contended node otherwise.
  */
-bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_static_nodes,
+bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_nodes,
     RWStructuredBuffer<SVOLeaf> p_static_leaves,
-    RWStructuredBuffer<SVONode> p_dynamic_nodes,
     RWStructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
     RWStructuredBuffer<SVOInfo> p_info,
     inout SVONodeTraceInfo p_trace,
     uint p_frame_slot) {
-    uint static_capacity = p_info[0].max_node_count;
+    // Dynamic nodes follow the static nodes, whose count is fixed while dynamic construction runs.
+    uint dynamic_begin = p_info[0].node_count;
     while (p_trace.remain_depth < 0 || p_trace.remain_depth > 0) {
         uint node_index = p_trace.node_index;
-        bool is_static = node_index < static_capacity;
-        uint local_index = is_static ? node_index : node_index - static_capacity;
         // Counters grow concurrently within this pass, so only the fixed capacities are stable bounds.
-        WBE_SHADER_DEBUG_ASSERT(is_static || local_index < p_info[0].max_dynamic_node_count,
+        WBE_SHADER_DEBUG_ASSERT(node_index < dynamic_begin + p_info[0].max_dynamic_node_count,
             ShaderDebugError::SVO_NODE_INDEX_OVERFLOW,
             p_frame_slot);
         uint description;
-        if (is_static) {
-            InterlockedAdd(p_static_nodes[local_index].children_data, 0, description);
-        } else {
-            InterlockedAdd(p_dynamic_nodes[local_index].children_data, 0, description);
-        }
+        InterlockedAdd(p_nodes[node_index].children_data, 0, description);
         uint state = description >> SVO_CHILDREN_STATE_SHIFT;
         uint sector = get_svo_node_subregion(p_trace.svo_position);
         if (state == uint(SVONode::ChildrenState::NODE) || state == uint(SVONode::ChildrenState::NODE_DYNAMIC)) {
@@ -62,13 +56,7 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_static_node
         }
         if (state == uint(SVONode::ChildrenState::LEAF_DYNAMIC)) {
             uint ignored;
-            if (is_static) {
-                InterlockedOr(
-                    p_static_nodes[local_index].children_data, 1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + sector), ignored);
-            } else {
-                InterlockedOr(
-                    p_dynamic_nodes[local_index].children_data, 1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + sector), ignored);
-            }
+            InterlockedOr(p_nodes[node_index].children_data, 1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + sector), ignored);
             return true;
         }
         if (state == uint(SVONode::ChildrenState::ALLOCATING_DYNAMIC)) {
@@ -79,19 +67,11 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_static_node
             p_frame_slot);
         uint original;
         uint allocating = uint(SVONode::ChildrenState::ALLOCATING_DYNAMIC) << SVO_CHILDREN_STATE_SHIFT;
-        if (is_static) {
-            InterlockedCompareExchange(p_static_nodes[local_index].children_data, description, allocating, original);
-        } else {
-            InterlockedCompareExchange(p_dynamic_nodes[local_index].children_data, description, allocating, original);
-        }
+        InterlockedCompareExchange(p_nodes[node_index].children_data, description, allocating, original);
         if (original != description) {
             return false;
         }
-        if (is_static) {
-            p_static_nodes[local_index].original_children_data = original;
-        } else {
-            p_dynamic_nodes[local_index].original_children_data = original;
-        }
+        p_nodes[node_index].original_children_data = original;
         bool is_leaf = p_trace.curr_depth == p_info[0].max_depth - 1;
         uint children;
         uint published;
@@ -115,28 +95,25 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_static_node
             uint occupancy = (original & SVO_CHILDREN_OCCUPANCY_MASK) | (1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + sector));
             published = (uint(SVONode::ChildrenState::LEAF_DYNAMIC) << SVO_CHILDREN_STATE_SHIFT) | occupancy | block;
         } else {
-            InterlockedAdd(p_info[0].dynamic_node_count, 8, children);
+            uint dynamic_index;
+            InterlockedAdd(p_info[0].dynamic_node_count, 8, dynamic_index);
             WBE_SHADER_DEBUG_ASSERT(
-                children < p_info[0].max_dynamic_node_count, ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+                dynamic_index < p_info[0].max_dynamic_node_count, ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+            children = dynamic_begin + dynamic_index;
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVONode child;
                 child.children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
-                child.data_index = p_info[0].data_count + children + i;
+                child.data_index = p_info[0].data_count + dynamic_index + i;
                 child.parent_index = int(node_index);
                 child.original_children_data = child.children_data;
-                p_dynamic_nodes[children + i] = child;
+                p_nodes[children + i] = child;
             }
-            children += static_capacity;
             published = (uint(SVONode::ChildrenState::NODE_DYNAMIC) << SVO_CHILDREN_STATE_SHIFT) | (children / 8);
         }
         // Release the initialized block before publishing it.
         DeviceMemoryBarrier();
         uint ignored;
-        if (is_static) {
-            InterlockedExchange(p_static_nodes[local_index].children_data, published, ignored);
-        } else {
-            InterlockedExchange(p_dynamic_nodes[local_index].children_data, published, ignored);
-        }
+        InterlockedExchange(p_nodes[node_index].children_data, published, ignored);
         if (is_leaf) {
             return true;
         }

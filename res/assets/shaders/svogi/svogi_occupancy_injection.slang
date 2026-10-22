@@ -24,8 +24,6 @@ struct DescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_nodes", "read")]
-    uint2 dynamic_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
     uint2 dynamic_leaves;
     [WBE_DESCRIPTOR("storage_image", "occupancy", "write")]
@@ -42,7 +40,6 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 void main(uint p_group_id : SV_GroupThreadID, uint p_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
@@ -50,7 +47,7 @@ void main(uint p_group_id : SV_GroupThreadID, uint p_thread_id : SV_DispatchThre
 
     // Injection writes the SVO's normal distribution function.
     SVOWriteImage<float> svo_occupancy =
-        SVOWriteImage<float>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
+        SVOWriteImage<float>(SVO(tree_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
 
     if (svo_occupancy.svo.is_leaf_occupied(p_thread_id, frame_slot)) {
         svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);

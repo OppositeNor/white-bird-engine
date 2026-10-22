@@ -121,8 +121,9 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
 
 void ISVORenderFeature::create_resources() {
     svo_info = render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVOInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    svo_nodes =
-        render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVONode), SVO_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    // The node buffer holds the static nodes followed by the dynamic nodes.
+    svo_nodes = render_context->create_buffer(ROBufferVK::Builder().set_properties(
+        sizeof(SVONode), SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     dynamic_leaves = render_context->create_buffer(ROBufferVK::Builder()
                          .set_properties(sizeof(SVODynamicLeafBlock), SVO_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_leaves =
@@ -207,7 +208,6 @@ void ISVORenderFeature::configure_recipe(
     params.dynamic_publication_group_count = (SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT + 127) / 128;
     // Byte sizes of the scratch buffers the module declares, from the capacities svo_info records.
     params.buffer_sizes = SVOBufferSizes{
-        .dynamic_nodes = sizeof(SVONode) * SVO_MAX_DYNAMIC_NODE_COUNT,
         .deferred_list = sizeof(uint32_t) * SVO_DEFERRED_LIST_ELEMENT_COUNT,
         .pre_deferred_debug_info = sizeof(SVOInfo),
         .pre_deferred_debug_list = sizeof(uint32_t) * SVO_MAX_DEFERRED_TASK_COUNT,

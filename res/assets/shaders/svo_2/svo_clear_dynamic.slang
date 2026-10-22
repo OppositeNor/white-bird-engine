@@ -30,11 +30,6 @@ struct DynamicDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
     /**
-     * @brief Descriptor-heap reference to svo_dynamic_nodes.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_nodes", "read")]
-    uint2 dynamic_nodes;
-    /**
      * @brief Descriptor-heap reference to svo_dynamic_leaves.
      */
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]

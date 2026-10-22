@@ -30,11 +30,6 @@ struct DynamicDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
     /**
-     * @brief Descriptor-heap reference to svo_dynamic_nodes.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_nodes")]
-    uint2 dynamic_nodes;
-    /**
      * @brief Descriptor-heap reference to svo_dynamic_leaves.
      */
     [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
@@ -51,23 +46,16 @@ ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 void main(uint3 p_id : SV_DispatchThreadID) {
     StructuredBuffer<SVOInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
     RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
-    RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     uint index = p_id.x;
-    bool is_static = index < info[0].max_node_count;
-    uint local = is_static ? index : index - info[0].max_node_count;
-    if (is_static ? local >= info[0].node_count : local >= info[0].dynamic_node_count) {
+    // The node buffer holds the static nodes followed by the dynamic nodes.
+    if (index >= info[0].node_count + info[0].dynamic_node_count) {
         return;
     }
-    uint description = is_static ? nodes[local].children_data : dynamic_nodes[local].children_data;
+    uint description = nodes[index].children_data;
     if ((description >> SVO_CHILDREN_STATE_SHIFT) != uint(SVONode::ChildrenState::ALLOCATING_DYNAMIC)) {
         return;
     }
     uint state = (description & SVO_CHILDREN_OCCUPANCY_MASK) != 0 ? uint(SVONode::ChildrenState::LEAF_DYNAMIC)
                                                   : uint(SVONode::ChildrenState::NODE_DYNAMIC);
-    description = (description & SVO_CHILDREN_PAYLOAD_MASK) | (state << SVO_CHILDREN_STATE_SHIFT);
-    if (is_static) {
-        nodes[local].children_data = description;
-    } else {
-        dynamic_nodes[local].children_data = description;
-    }
+    nodes[index].children_data = (description & SVO_CHILDREN_PAYLOAD_MASK) | (state << SVO_CHILDREN_STATE_SHIFT);
 }
