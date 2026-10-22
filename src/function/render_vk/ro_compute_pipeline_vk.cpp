@@ -65,7 +65,7 @@ ROComputePipelineVK::ROComputePipelineVK(const RenderContextVK* p_render_data, c
     exposed_fields.compute_shader = shader_stage.shader;
 }
 
-void ROComputePipelineVK::set_debug_name(std::string_view p_name) {
+void ROComputePipelineVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, get_pipeline(), p_name);
 }
 

@@ -210,7 +210,7 @@ public:
     /**
      * @brief Name the pipeline, and register its shader binding table buffer as `<p_name>.shader_binding_table`.
      */
-    virtual void set_debug_name(std::string_view p_name) override;
+    virtual void apply_debug_name(std::string_view p_name) override;
 
 private:
     size_t calculate_sbt_buffer_size(VkPipeline p_ray_pipeline,

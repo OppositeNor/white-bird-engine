@@ -36,11 +36,12 @@ public:
 
     virtual TypeID get_type_uuid() const override;
 
-    virtual void set_debug_name(std::string_view p_name) override {
-        debug_name = p_name;
-    }
+    std::string applied_debug_name;
 
-    std::string debug_name;
+protected:
+    virtual void apply_debug_name(std::string_view p_name) override {
+        applied_debug_name = p_name;
+    }
 };
 
 TypeID RenderDatabaseTestRenderObject::get_type_uuid() const {
@@ -65,7 +66,8 @@ TEST_F(WBERenderDatabaseTest, RegistersCompiledRenderResourceUsingConcreteObject
 TEST_F(WBERenderDatabaseTest, NamesRegisteredObjectsAfterTheirResourceKey) {
     Ref<RenderDatabaseTestRenderObject> object = make_ref<RenderDatabaseTestRenderObject>(&render_allocator);
     render_database.register_compiled_render_resource("sponza#vk_usage_130", object);
-    EXPECT_EQ(object->debug_name, "sponza#vk_usage_130");
+    EXPECT_EQ(object->applied_debug_name, "sponza#vk_usage_130");
+    EXPECT_EQ(object->get_debug_name(), "sponza#vk_usage_130");
 }
 
 } // namespace WhiteBirdEngine

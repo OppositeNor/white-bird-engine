@@ -264,7 +264,7 @@ void ROSamplerVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id)
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
-void ROSamplerVK::set_debug_name(std::string_view p_name) {
+void ROSamplerVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_SAMPLER, sampler, p_name);
 }
 

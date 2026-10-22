@@ -128,7 +128,7 @@ void ROAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view 
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
-void ROAccelerationStructureVK::set_debug_name(std::string_view p_name) {
+void ROAccelerationStructureVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, acceleration_structure, p_name);
     if (storage_buffer != MEM_NULL && render_data->render_database != nullptr) {
         render_data->render_database->register_compiled_render_resource(std::format("{}.storage", p_name), storage_buffer);

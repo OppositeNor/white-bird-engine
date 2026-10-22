@@ -124,7 +124,7 @@ public:
     /**
      * @brief Name the acceleration structure, and register its storage buffer as `<p_name>.storage`.
      */
-    virtual void set_debug_name(std::string_view p_name) override;
+    virtual void apply_debug_name(std::string_view p_name) override;
 
     /**
      * @brief Get the owned Vulkan acceleration-structure handle.

@@ -113,7 +113,7 @@ void RORayTracingPipelineVK::create_sbt() {
             .create_ref(render_data);
 }
 
-void RORayTracingPipelineVK::set_debug_name(std::string_view p_name) {
+void RORayTracingPipelineVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, pipeline, p_name);
     if (shader_binding_table_buffer != MEM_NULL && render_data->render_database != nullptr) {
         render_data->render_database->register_compiled_render_resource(

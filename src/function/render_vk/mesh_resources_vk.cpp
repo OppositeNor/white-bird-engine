@@ -203,9 +203,9 @@ size_t MeshResourcesVK::acquire_material_table(const MaterialTextureContract& p_
         .contract = p_contract,
         .buffer = create_material_params_buffer(render_data, material_resources.material_params_data),
     });
-    if (!debug_name.empty() && render_data->render_database != nullptr) {
+    if (!get_debug_name().empty() && render_data->render_database != nullptr) {
         render_data->render_database->register_compiled_render_resource(
-            make_member_resource_id(debug_name, get_material_params_member(material_tables.size() - 1)), material_tables.back().buffer);
+            make_member_resource_id(get_debug_name(), get_material_params_member(material_tables.size() - 1)), material_tables.back().buffer);
     }
     return material_tables.size() - 1;
 }
@@ -217,8 +217,7 @@ Ref<ROBufferVK> MeshResourcesVK::acquire_material_params(size_t p_index) const {
     return material_tables[p_index].buffer;
 }
 
-void MeshResourcesVK::set_debug_name(std::string_view p_name) {
-    debug_name = p_name;
+void MeshResourcesVK::apply_debug_name(std::string_view p_name) {
     if (render_data->render_database == nullptr) {
         return;
     }

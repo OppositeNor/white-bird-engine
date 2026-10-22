@@ -62,6 +62,8 @@ protected:
 
     /**
      * @brief Import one render object under p_resource_id, wrapped in a single-slot container.
+     *
+     * An object without a debug name is named p_resource_id. Call on the rendering thread.
      * @throws std::runtime_error If p_resource is null or p_resource_id is empty.
      */
     static void bind_render_object(RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRenderObjectVK> p_resource);

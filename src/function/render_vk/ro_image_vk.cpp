@@ -724,7 +724,7 @@ void ROImageVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) c
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
-void ROImageVK::set_debug_name(std::string_view p_name) {
+void ROImageVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_IMAGE, get_image(), p_name);
 }
 

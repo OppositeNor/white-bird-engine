@@ -274,7 +274,7 @@ void ROImageViewVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_i
     bind_render_object(p_graph, p_resource_id, acquire_this_ref());
 }
 
-void ROImageViewVK::set_debug_name(std::string_view p_name) {
+void ROImageViewVK::apply_debug_name(std::string_view p_name) {
     // Names only the view; the viewed image is named by whoever registers or allocates it.
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_IMAGE_VIEW, image_view, p_name);
 }

@@ -17,6 +17,7 @@
 
 #include "utils/utils.hh"
 
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -45,14 +46,39 @@ public:
      * @brief Name the backend objects the render object owns, for debuggers and validation messages.
      *
      * RenderDatabase calls this with the key an object is registered under, so registered objects are named after their
-     * database key. Backends without object naming, and render objects that own no backend objects, ignore the call.
-     * Composites register their parts as `<p_name>.<part>`, which names them too. Call on the rendering thread.
+     * database key; importing an unnamed object into a render graph names it after its import id. Backends without object
+     * naming, and render objects that own no backend objects, ignore the name but still record it. Composites register
+     * their parts as `<p_name>.<part>`, which names them too. Call on the rendering thread.
      *
      * @param p_name The name, normally the resource key the object is registered under.
      */
-    virtual void set_debug_name(std::string_view p_name) {
+    void set_debug_name(std::string_view p_name) {
+        debug_name = p_name;
+        apply_debug_name(debug_name);
+    }
+
+    /**
+     * @brief Get the name last given through set_debug_name().
+     * @return The name, or an empty string if the object has not been named.
+     */
+    const std::string& get_debug_name() const {
+        return debug_name;
+    }
+
+protected:
+    /**
+     * @brief Apply a name given through set_debug_name() to the backend objects the render object owns.
+     *
+     * The default implementation ignores the name.
+     *
+     * @param p_name The name.
+     */
+    virtual void apply_debug_name(std::string_view p_name) {
         static_cast<void>(p_name);
     }
+
+private:
+    std::string debug_name;
 };
 
 } // namespace WhiteBirdEngine

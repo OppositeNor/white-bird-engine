@@ -113,7 +113,7 @@ void ROShaderVK::init(const Builder& p_builder) {
     shader_module = p_builder.create_vk_object(render_data);
 }
 
-void ROShaderVK::set_debug_name(std::string_view p_name) {
+void ROShaderVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_SHADER_MODULE, shader_module, p_name);
 }
 

@@ -276,7 +276,7 @@ void ROGraphicsPipelineVK::setup_pipeline_rendering_create_info(const Config& p_
     p_pipeline_create_infos.pipeline_rendering = create_info;
 }
 
-void ROGraphicsPipelineVK::set_debug_name(std::string_view p_name) {
+void ROGraphicsPipelineVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_PIPELINE, get_pipeline(), p_name);
 }
 
