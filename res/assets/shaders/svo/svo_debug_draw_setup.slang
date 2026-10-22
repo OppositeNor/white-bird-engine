@@ -42,7 +42,7 @@ void main() {
     StructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
     DrawIndexedIndirectCommand command;
-    command.index_count = 36;
+    command.index_count = 24;
     command.instance_count = svo_info[0].leaves_count + svo_info[0].dynamic_leaves_count + 1;
     command.first_index = 0;
     command.vertex_offset = 0;

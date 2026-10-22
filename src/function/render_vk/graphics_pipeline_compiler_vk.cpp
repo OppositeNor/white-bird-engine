@@ -138,6 +138,7 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     for (size_t attachment_index = 0; attachment_index < context.color_attachment_formats.size(); ++attachment_index) {
         pipeline_builder.config.color_blend.add_default_color_attachment();
     }
+    pipeline_builder.config.input_assembly.set_primitive_topology(context.primitive_topology);
     pipeline_builder.config.depth_test.set_depth_test(p_pipeline_resource.depth_test ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.depth_test.set_depth_write(p_pipeline_resource.depth_write ? VK_TRUE : VK_FALSE);
     pipeline_builder.config.rasterization.set_polygon_mode(context.polygon_mode)

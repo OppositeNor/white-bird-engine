@@ -80,6 +80,10 @@ struct GraphicsPipelineCompilerVKContext {
      */
     VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
     /**
+     * @brief Primitive topology the compiled pipeline assembles its vertices into.
+     */
+    VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    /**
      * @brief Name of the global shader variable holding the material texture table; see MaterialTextureContractResolver.
      */
     std::string material_textures_variable_name = "material_textures";

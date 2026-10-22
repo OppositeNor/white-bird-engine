@@ -28,12 +28,10 @@
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_params_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include <cstdint>
-#include <optional>
 #include <span>
 #include <string>
 #include <string_view>

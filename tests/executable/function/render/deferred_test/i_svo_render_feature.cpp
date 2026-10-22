@@ -106,7 +106,7 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
         .renderer = renderer_vk,
         .color_attachment_formats = {render_context->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-        .polygon_mode = VK_POLYGON_MODE_LINE,
+        .primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
     };
     svo_debug_draw_graphics_pipeline =
         GraphicsPipelineCompilerVK(svo_debug_draw_context)

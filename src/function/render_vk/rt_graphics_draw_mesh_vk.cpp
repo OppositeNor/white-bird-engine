@@ -27,7 +27,6 @@
 #include "generated/enum_reflection.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <format>
 #include <stdexcept>

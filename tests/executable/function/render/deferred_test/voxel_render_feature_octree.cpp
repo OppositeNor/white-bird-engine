@@ -216,7 +216,7 @@ Ref<ROGraphicsPipelineVK> VoxelRenderFeatureOctree::compile_debug_draw_pipeline(
         .renderer = renderer_vk,
         .color_attachment_formats = {render_context->swap_chain_format},
         .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-        .polygon_mode = VK_POLYGON_MODE_LINE,
+        .primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
     };
     return GraphicsPipelineCompilerVK(context)
         .compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_id))

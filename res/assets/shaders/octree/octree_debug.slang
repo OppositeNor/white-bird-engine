@@ -36,7 +36,7 @@ struct DrawIndexedIndirectCommand {
 /**
  * @brief Index count of the cube drawn per debug instance.
  */
-static const uint OCTREE_DEBUG_CUBE_INDEX_COUNT = 36;
+static const uint OCTREE_DEBUG_CUBE_INDEX_COUNT = 24;
 /**
  * @brief Leaves along each axis of one leaf-view subgrid; one workgroup gathers each subgrid.
  */

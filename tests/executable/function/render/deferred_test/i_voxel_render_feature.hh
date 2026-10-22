@@ -39,46 +39,38 @@ enum class VoxelDebugViewMode : uint32_t {
 };
 
 /**
- * @brief Triangle-list indices of the unit cube whose corner i has the coordinates ((i >> 2) & 1, (i >> 1) & 1, i & 1).
- * @details The voxel debug draws instance this cube per leaf or node and generate its corners in the vertex shader.
+ * @brief Line-list indices of the twelve edges of the unit cube whose corner i has the coordinates ((i >> 2) & 1, (i >> 1) & 1, i & 1).
+ * @details The voxel debug draws instance this cube per leaf or node and generate its corners in the vertex shader. Each edge
+ * joins corner i to the corner that differs in one coordinate bit.
  */
-inline constexpr std::array<uint32_t, 36> VOXEL_DEBUG_CUBE_INDICES{
-    0,
-    2,
-    3,
-    0,
-    3,
-    1,
-    4,
-    5,
-    7,
-    4,
-    7,
-    6,
+inline constexpr std::array<uint32_t, 24> VOXEL_DEBUG_CUBE_INDICES{
+    // Edges along z.
     0,
     1,
-    5,
-    0,
-    5,
-    4,
     2,
-    6,
-    7,
-    2,
-    7,
     3,
-    0,
     4,
+    5,
     6,
+    7,
+    // Edges along y.
     0,
-    6,
     2,
     1,
     3,
-    7,
-    1,
-    7,
+    4,
+    6,
     5,
+    7,
+    // Edges along x.
+    0,
+    4,
+    1,
+    5,
+    2,
+    6,
+    3,
+    7,
 };
 
 /**

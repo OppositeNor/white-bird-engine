@@ -178,7 +178,7 @@ private:
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t SVO_EXTENT = size_t{1} << SVO_MAX_DEPTH;
     static constexpr size_t SVO_MAX_LEAVES_COUNT = SVO_VOXEL_COUNT / 8;
-    static constexpr size_t SVO_MAX_DYNAMIC_LEAVES_COUNT = SVO_MAX_LEAVES_COUNT;
+    static constexpr size_t SVO_MAX_DYNAMIC_LEAVES_COUNT = SVO_MAX_LEAVES_COUNT / 1024;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_NODE_COUNT) / 8U);
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_LEAVES_COUNT) / 8U);

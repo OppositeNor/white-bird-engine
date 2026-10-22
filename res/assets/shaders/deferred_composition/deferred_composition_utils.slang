@@ -18,7 +18,7 @@
 #include "light/spot_light_utils.slang"
 #include "utils.slang"
 
-static const uint WBE_RSM_SAMPLE_COUNT = 8;
+static const uint WBE_RSM_SAMPLE_COUNT = 4;
 static const float WBE_RSM_SAMPLE_RADIUS_UV = 0.5;
 static const float WBE_RSM_MIN_DISTANCE_SQUARED = 0.05;
 
