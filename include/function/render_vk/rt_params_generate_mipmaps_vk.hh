@@ -47,10 +47,18 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     RendExtent2DParamsVK base_extent;
     /**
-     * @brief Number of mip levels including the base level; the full chain of base_extent by default.
+     * @brief Number of mip levels including the base level; the full chain of base_extent at downsample_rate by default.
      */
     WBE_META(WBE_REFLECT)
     std::optional<uint32_t> mipmap_level_count;
+    /**
+     * @brief Factor by which each mip level shrinks every dimension of the previous one; at least 2.
+     *
+     * A rate of 2 halves each dimension, combining 2x2 texels (2x2x2 for 3D images) into one; a rate of 3 combines 3x3
+     * (3x3x3) texels.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t downsample_rate = 2;
     /**
      * @brief Format of the image, which must support filtered blits.
      */

@@ -40,7 +40,9 @@ namespace WhiteBirdEngine {
  * transfer-source, transfer-destination, and linear blit operations. The task
  * reads mip level zero through a source view and writes the remaining levels
  * through a mip-chain view of the same image, and reports both accesses to the
- * render graph. Instances are neither copyable nor movable.
+ * render graph. Each level divides every dimension of the previous one by the
+ * downsample rate, rounding down to at least 1; the depth of a 3D image is
+ * taken from the image itself. Instances are neither copyable nor movable.
  */
 struct WBE_META(WBE_RENDER_TASK(generate_mipmaps), WBE_SERIALIZATION_ALIASES(generate_mipmaps)) RTGenerateMipmapsVK final
     : public IRenderTaskVK {
@@ -60,14 +62,17 @@ struct WBE_META(WBE_RENDER_TASK(generate_mipmaps), WBE_SERIALIZATION_ALIASES(gen
      * @param p_base_extent Extent of mip level zero.
      * @param p_mipmap_level_count Total number of mip levels, including level zero.
      * @param p_format Image format used for capability validation.
-     * @throws std::runtime_error If the format cannot perform filtered blits.
+     * @param p_downsample_rate Factor by which each level shrinks every dimension of the previous one.
+     * @throws std::runtime_error If the format cannot perform filtered blits, the downsample rate is below 2, or the mip
+     * level count exceeds the levels the base extent supports at that rate.
      */
     RTGenerateMipmapsVK(const RenderContextVK* p_render_data,
         std::string_view p_source_view_id,
         std::string_view p_mip_chain_view_id,
         VkExtent2D p_base_extent,
         uint32_t p_mipmap_level_count,
-        VkFormat p_format);
+        VkFormat p_format,
+        uint32_t p_downsample_rate = 2);
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
@@ -100,6 +105,7 @@ private:
     Ref<RenderObjectContainerVK> mip_chain_view_container;
     VkExtent2D base_extent{};
     uint32_t mipmap_level_count = 1;
+    uint32_t downsample_rate = 2;
 };
 
 } // namespace WhiteBirdEngine

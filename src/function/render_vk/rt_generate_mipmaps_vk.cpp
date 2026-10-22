@@ -22,15 +22,14 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_params_generate_mipmaps_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/type_uuid.gen.hh"
+#include "utils/defs.hh"
 #include <algorithm>
-#include <bit>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -39,14 +38,29 @@
 
 namespace WhiteBirdEngine {
 
+namespace {
+
+// Number of mip levels, including the base level, until the largest dimension reaches 1 at the downsample rate.
+uint32_t full_mipmap_level_count(VkExtent2D p_base_extent, uint32_t p_downsample_rate) {
+    WBE_DEBUG_ASSERT(p_downsample_rate >= 2);
+    uint32_t level_count = 1;
+    for (uint32_t size = std::max(p_base_extent.width, p_base_extent.height); size > 1; size /= p_downsample_rate) {
+        ++level_count;
+    }
+    return level_count;
+}
+
+} // namespace
+
 RTGenerateMipmapsVK::RTGenerateMipmapsVK(const RenderContextVK* p_render_data,
     std::string_view p_source_view_id,
     std::string_view p_mip_chain_view_id,
     VkExtent2D p_base_extent,
     uint32_t p_mipmap_level_count,
-    VkFormat p_format)
+    VkFormat p_format,
+    uint32_t p_downsample_rate)
     : render_data(p_render_data), source_view_id(p_source_view_id), mip_chain_view_id(p_mip_chain_view_id),
-      base_extent(p_base_extent), mipmap_level_count(p_mipmap_level_count) {
+      base_extent(p_base_extent), mipmap_level_count(p_mipmap_level_count), downsample_rate(p_downsample_rate) {
     if (render_data == nullptr || render_data->physical_device == VK_NULL_HANDLE) {
         // Format capabilities cannot be queried without a valid physical device.
         throw std::runtime_error("RTGenerateMipmapsVK: physical device is missing.");
@@ -55,8 +69,12 @@ RTGenerateMipmapsVK::RTGenerateMipmapsVK(const RenderContextVK* p_render_data,
         // Empty images and mip chains cannot produce a valid blit sequence.
         throw std::runtime_error("RTGenerateMipmapsVK: image extent and mip level count must be non-zero.");
     }
+    if (downsample_rate < 2) {
+        // A rate below 2 would never shrink the levels.
+        throw std::runtime_error("RTGenerateMipmapsVK: downsample rate must be at least 2.");
+    }
     // Limit the mip chain to the number of levels supported by the base extent.
-    const uint32_t maximum_mipmap_level_count = std::bit_width(std::max(base_extent.width, base_extent.height));
+    const uint32_t maximum_mipmap_level_count = full_mipmap_level_count(base_extent, downsample_rate);
     if (mipmap_level_count > maximum_mipmap_level_count) {
         // A longer chain would address mip levels that do not exist for this extent.
         throw std::runtime_error("RTGenerateMipmapsVK: mip level count exceeds the levels supported by the base extent.");
@@ -104,10 +122,13 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
         // The declared accesses only describe the blits when both views reference the same image.
         throw std::runtime_error("RTGenerateMipmapsVK: source and mip-chain views reference different images.");
     }
-    // Generate each destination mip from the preceding level at half resolution.
+    // Generate each destination mip from the preceding level, shrunk by the downsample rate.
     Ref<ROImageVK> image = mip_chain_view->fields().image;
+    const int32_t rate = static_cast<int32_t>(downsample_rate);
     int32_t source_width = static_cast<int32_t>(base_extent.width);
     int32_t source_height = static_cast<int32_t>(base_extent.height);
+    int32_t source_depth =
+        image->fields().view_type == VK_IMAGE_VIEW_TYPE_3D ? static_cast<int32_t>(image->fields().extent.depth) : 1;
     for (uint32_t mip_level = 1; mip_level < mipmap_level_count; ++mip_level) {
         if (mip_level > 1) {
             // Make a previously generated source mip visible before reading it in the next blit.
@@ -141,8 +162,9 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
             .apply_barrier(p_command_buffer);
 
         // Describe the linear blit from the source mip into the next smaller level.
-        const int32_t destination_width = std::max(source_width / 2, 1);
-        const int32_t destination_height = std::max(source_height / 2, 1);
+        const int32_t destination_width = std::max(source_width / rate, 1);
+        const int32_t destination_height = std::max(source_height / rate, 1);
+        const int32_t destination_depth = std::max(source_depth / rate, 1);
         VkImageBlit2 image_blit{};
         image_blit.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
         image_blit.srcSubresource = {
@@ -151,14 +173,14 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        image_blit.srcOffsets[1] = {.x = source_width, .y = source_height, .z = 1};
+        image_blit.srcOffsets[1] = {.x = source_width, .y = source_height, .z = source_depth};
         image_blit.dstSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .mipLevel = mip_level,
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        image_blit.dstOffsets[1] = {.x = destination_width, .y = destination_height, .z = 1};
+        image_blit.dstOffsets[1] = {.x = destination_width, .y = destination_height, .z = destination_depth};
         // Record the filtered blit with both subresources in the general layout.
         VkBlitImageInfo2 blit_info{};
         blit_info.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
@@ -173,6 +195,7 @@ void RTGenerateMipmapsVK::record(VkCommandBuffer p_command_buffer, double /*p_de
         // Advance the source dimensions for the next mip-generation iteration.
         source_width = destination_width;
         source_height = destination_height;
+        source_depth = destination_depth;
     }
 }
 
@@ -182,15 +205,19 @@ Unique<IRenderTaskVK> RTGenerateMipmapsVK::create(
         throw std::runtime_error("RTGenerateMipmapsVK: render data is unavailable.");
     }
     const VkExtent2D base_extent = p_params.base_extent.resolve(p_context);
-    const uint32_t mipmap_level_count = p_params.mipmap_level_count.value_or(
-        static_cast<uint32_t>(std::bit_width(std::max(base_extent.width, base_extent.height))));
+    if (p_params.downsample_rate < 2) {
+        throw std::runtime_error("RTGenerateMipmapsVK: downsample rate must be at least 2.");
+    }
+    const uint32_t mipmap_level_count =
+        p_params.mipmap_level_count.value_or(full_mipmap_level_count(base_extent, p_params.downsample_rate));
     return make_unique<RTGenerateMipmapsVK>(p_render_data->allocator,
         p_render_data,
         p_params.source_view,
         p_params.mip_chain_view,
         base_extent,
         mipmap_level_count,
-        to_vk_format(p_params.format));
+        to_vk_format(p_params.format),
+        p_params.downsample_rate);
 }
 
 } // namespace WhiteBirdEngine

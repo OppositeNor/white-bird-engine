@@ -53,7 +53,4 @@ void main(uint p_thread_id : SV_DispatchThreadID) {
         SVOWriteImage<float>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
 
     svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);
-    GroupMemoryBarrierWithGroupSync();
-    SVOLeaf leaf = tree_leaves[p_thread_id];
-    SVONode parent = tree_nodes[leaf.parent_index];
 }

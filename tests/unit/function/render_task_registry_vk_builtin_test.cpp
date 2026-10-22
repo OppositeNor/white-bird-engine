@@ -189,6 +189,14 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, CreateValidatesCrossFieldParameters) {
                      parse_task_params(R"({"source_view": "a", "mip_chain_view": "b", "format": "R8G8B8A8_UNORM", "base_extent": {"width": 4}})"),
                      &render_data)(context),
         std::runtime_error);
+    // A rate below 2 never shrinks the levels; rejected before the default mip level count is derived from it.
+    for (const char* rate : {"0", "1"}) {
+        EXPECT_THROW((void)RenderTaskRegistryVK::create_factory("generate_mipmaps",
+                         parse_task_params(std::string(R"({"source_view": "a", "mip_chain_view": "b", "format": "R8G8B8A8_UNORM", "downsample_rate": )") + rate + "}"),
+                         &render_data)(context),
+            std::runtime_error)
+            << rate;
+    }
 }
 
 TEST(WBERenderTaskRegistryVKBuiltinTest, FullMemoryBarrierWritesItsResourceOnTheGraphicsQueue) {
