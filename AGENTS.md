@@ -420,7 +420,7 @@ Document contracts, ownership, threading, and errors; do not restate signatures.
   `WBE_SERIALIZATION_ALIASES(name, ...)`, each a name of letters, digits, and underscores.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.
-- `generate.json` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, and `source_dir`.
+- Each `[[generate]]` entry of a `generate.toml` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, and `source_dir`.
 
 ## Python Scripts
 

@@ -29,8 +29,9 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
 
     slangpy's build writes its extension module, generated stubs, and a build-directory marker into the source package
     dependencies/slangpy/slangpy (all ignored by its .gitignore), so only one slangpy build directory may exist. The
-    extension is installed into a copy of the Python package. The build does not use vcpkg: slangpy's optional libraries
-    (libjpeg, libpng, OpenEXR, asmjit) are taken from the system when found and are otherwise disabled.
+    extension is installed into a copy of the Python package. The build does not use vcpkg: libpng is built from
+    dependencies/libpng as a static library and passed to slangpy explicitly, while its other optional libraries (libjpeg,
+    OpenEXR, asmjit) are taken from the system when found and are otherwise disabled.
     """
 
     def __init__(self, p_build_root_dir: Path, p_dependencies_dir: Path, p_build_info: dict[str, Any]) -> None:
@@ -40,6 +41,7 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
         :param p_build_info: The shared dependency build settings.
         """
         self._source_dir = p_dependencies_dir / "slangpy"
+        self._libpng_source_dir = p_dependencies_dir / "libpng"
         self._build_dir = p_build_root_dir / "slangpy"
         self._build_info = p_build_info
 
@@ -50,7 +52,48 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
         """Return the directory to add to the Python path to import slangpy."""
         return self._build_dir / "python"
 
+    def _compile_libpng(self) -> tuple[Path, Path]:
+        """
+        Build and install the vendored libpng as a position-independent static library for libsgl to link.
+
+        libpng is always built in release so that its library name does not depend on the build type.
+
+        :return: The installed static library and include directory.
+        :raises RuntimeError: If libpng fails to build.
+        """
+        cmake_build_dir = self._build_dir / "libpng" / "cmake"
+        install_dir = self._build_dir / "libpng" / "install"
+        configure_command = [
+            "cmake",
+            "-S", self._libpng_source_dir.as_posix(),
+            "-B", cmake_build_dir.as_posix(),
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DCMAKE_C_COMPILER={self._build_info['c-compiler']}",
+            f"-DCMAKE_INSTALL_PREFIX={install_dir.as_posix()}",
+            "-DCMAKE_INSTALL_LIBDIR=lib",
+            "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+            "-DPNG_SHARED=OFF",
+            "-DPNG_STATIC=ON",
+            "-DPNG_TESTS=OFF",
+            "-DPNG_TOOLS=OFF",
+        ]
+        if self._build_info.get("generator") is not None:
+            configure_command.extend(["-G", self._build_info["generator"]])
+        self._discard_cmake_cache_on_generator_change(cmake_build_dir, self._build_info.get("generator"))
+        if subprocess.run(configure_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to configure libpng.")
+        build_command = ["cmake", "--build", cmake_build_dir.as_posix(), "--config", "Release"]
+        if os.cpu_count() is not None:
+            build_command.extend(["-j", str(os.cpu_count())])
+        if subprocess.run(build_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to build libpng.")
+        install_command = ["cmake", "--install", cmake_build_dir.as_posix(), "--config", "Release"]
+        if subprocess.run(install_command, check=False).returncode != 0:
+            raise RuntimeError("Failed to install libpng.")
+        return install_dir / "lib" / "libpng16.a", install_dir / "include"
+
     def compile(self) -> None:
+        png_library, png_include_dir = self._compile_libpng()
         cmake_build_dir = self._build_dir / "cmake"
         package_dir = self.get_python_package_dir() / "slangpy"
         shutil.copytree(self._source_dir / "slangpy", package_dir, dirs_exist_ok=True,
@@ -71,6 +114,10 @@ class WBEBuildDependencySlangPy(WBEBuildDependency):
             "-DCMAKE_INSTALL_DATAROOTDIR=.",
             "-DSGL_BUILD_EXAMPLES=OFF",
             "-DSGL_BUILD_TESTS=OFF",
+            # Passed explicitly so that FindPNG neither searches the system nor keeps a library found by an earlier
+            # configure.
+            f"-DPNG_LIBRARY_RELEASE:FILEPATH={png_library.as_posix()}",
+            f"-DPNG_PNG_INCLUDE_DIR:PATH={png_include_dir.as_posix()}",
             # Third-party warnings, such as clang's macro redefinitions from the conda Python headers, must not fail
             # the engine build.
             "-DSGL_WARNINGS_AS_ERRORS=OFF",
