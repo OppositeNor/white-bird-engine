@@ -164,6 +164,28 @@ struct CameraInfo {
     float4 world_position;
 };
 
+/**
+ * @brief Multiply a vector by matrix rows loaded individually from descriptor-heap memory.
+ * This is a temporary work around for a bug of the NVIDIA driver when loading matrix rows.
+ * @param p_row_0 First matrix row.
+ * @param p_row_1 Second matrix row.
+ * @param p_row_2 Third matrix row.
+ * @param p_row_3 Fourth matrix row.
+ * @param p_vector Vector to transform.
+ * @return The matrix-vector product.
+ */
+float4 software_mul_float4x4_vector(
+    float4 p_row_0, float4 p_row_1, float4 p_row_2, float4 p_row_3, float4 p_vector) {
+    return float4(dot(p_row_0, p_vector), dot(p_row_1, p_vector), dot(p_row_2, p_vector), dot(p_row_3, p_vector));
+}
+
+// Temporary workaround for whole matrix loads ignoring MatrixStride through SPV_EXT_descriptor_heap.
+#define WBE_SOFTWARE_MATRIX_ROWS(p_matrix)                                                                                 \
+    float4((p_matrix)[0][0], (p_matrix)[1][0], (p_matrix)[2][0], (p_matrix)[3][0]),                                      \
+        float4((p_matrix)[0][1], (p_matrix)[1][1], (p_matrix)[2][1], (p_matrix)[3][1]),                                  \
+        float4((p_matrix)[0][2], (p_matrix)[1][2], (p_matrix)[2][2], (p_matrix)[3][2]),                                  \
+        float4((p_matrix)[0][3], (p_matrix)[1][3], (p_matrix)[2][3], (p_matrix)[3][3])
+
 /** Maximum number of bindless material entries addressable by one draw pass. */
 static const uint WBE_MAX_MATERIAL_COUNT = 32;
 

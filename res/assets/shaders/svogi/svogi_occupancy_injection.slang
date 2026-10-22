@@ -46,13 +46,23 @@ void main(uint p_group_id : SV_GroupThreadID, uint p_thread_id : SV_DispatchThre
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
+    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
     // Injection writes the SVO's normal distribution function.
     SVOWriteImage<float> svo_occupancy =
         SVOWriteImage<float>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
 
-    svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);
+    if (svo_occupancy.svo.is_leaf_occupied(p_thread_id, frame_slot)) {
+        svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);
+    }
     GroupMemoryBarrierWithGroupSync();
-
-
+    // The thread with the top left corner is responsible for the 
+    if (p_thread_id % 8 != 0) {
+        // We extract the thread on the first corner, which is responsible for updating the state of its parent.
+        return;
+    }
+    // Because we have the workgroup grouped in 128 invocations, which is a multiple of 8, meaning we could safely assume that
+    // all the 8 leaves shares the same parent node are allocated in the same workgroup.
+    uint parent_index = svo_occupancy.svo.get_leaf(p_thread_id).parent_index;
+    SVONode parent = svo_occupancy.svo.get_node(parent_index);
 }

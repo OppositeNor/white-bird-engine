@@ -105,10 +105,10 @@ VSOutput build_billboard_vertex(uint p_vertex_id,
 
     float2 quad_corner = quad_corner_from_vertex_id(p_vertex_id);
     float3 world_position = billboard_position + right * quad_corner.x * p_billboard_info.size.x + up * quad_corner.y * p_billboard_info.size.y;
-    float4 view_position = mul(p_camera_info.view, float4(world_position, 1.0));
+    float4 view_position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(p_camera_info.view), float4(world_position, 1.0));
 
     VSOutput output;
-    output.position = mul(p_camera_info.proj, view_position);
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(p_camera_info.proj), view_position);
     output.uv = quad_uv_from_vertex_id(p_vertex_id);
     return output;
 }

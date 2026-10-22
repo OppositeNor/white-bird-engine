@@ -56,6 +56,44 @@ struct SVONode {
      * @brief Original child description saved by the dynamic allocation owner.
      */
     uint original_children_data;
+
+    /**
+     * @brief Decodes the ChildrenState of children_data.
+     */
+    ChildrenState get_children_state() {
+        return ChildrenState(children_data >> SVO_CHILDREN_STATE_SHIFT);
+    }
+
+    /**
+     * @brief Decodes the eight-child block index of children_data.
+     * @details NODE_DYNAMIC block indices are virtual, offset by max_node_count.
+     */
+    uint get_children_block_index() {
+        return children_data & SVO_CHILDREN_BLOCK_INDEX_MASK;
+    }
+
+    /**
+     * @brief Decodes the index of the first child of the block in children_data.
+     */
+    uint get_children_index() {
+        return get_children_block_index() * 8;
+    }
+
+    /**
+     * @brief Decodes the eight sector occupancy bits of children_data; bit 0 is sector zero.
+     * @details Meaningful for LEAF and LEAF_DYNAMIC, and for svo_2's ALLOCATING and ALLOCATING_DYNAMIC before publication.
+     */
+    uint get_children_occupancy() {
+        return (children_data & SVO_CHILDREN_OCCUPANCY_MASK) >> SVO_CHILDREN_OCCUPANCY_SHIFT;
+    }
+
+    /**
+     * @brief Tests the occupancy bit of one sector in children_data.
+     * @param p_sector Sector below eight, as returned by get_svo_node_subregion().
+     */
+    bool is_sector_occupied(uint p_sector) {
+        return (children_data & (1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + p_sector))) != 0;
+    }
 };
 
 /**

@@ -92,10 +92,11 @@ SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVert
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
     float voxel_width = svo_info.width / float(1u << svo_info.max_depth);
     float3 world_position = svo_info.origin + float3(grid_position + corner) * voxel_width;
-    float4 view_position = mul(camera_info.view, float4(world_position, 1.0));
+    float4 view_position =
+        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), float4(world_position, 1.0));
 
     SVOPreDeferredDebugDrawVertexOutput output;
-    output.position = mul(camera_info.proj, view_position);
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
     output.color = is_deferred_task ? float4(1.0, 0.0, 0.0, 1.0) : float4(1.0);
     return output;
 }

@@ -88,9 +88,10 @@ SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint 
         float voxel_width = svo_info.width / float(1u << svo_info.max_depth);
         world_position = svo_info.origin + float3(leaf_grid_position + corner) * voxel_width;
     }
-    float4 view_position = mul(camera_info.view, float4(world_position, 1.0));
+    float4 view_position =
+        software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), float4(world_position, 1.0));
     SVODebugDrawVertexOutput output;
-    output.position = mul(camera_info.proj, view_position);
+    output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
     output.color = is_bounds ? float4(1.0, 0.0, 0.0, 1.0) : float4(1.0);
     return output;
 }

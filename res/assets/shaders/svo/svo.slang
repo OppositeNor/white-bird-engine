@@ -132,7 +132,7 @@ struct SVO {
 
     /**
      * @brief Count the allocated leaves in static and dynamic storage.
-     * @return The upper bound of the leaf indices taken by read_leaf(), is_leaf_occupied(), and get_leaf_grid_position().
+     * @return The upper bound of the leaf indices taken by get_leaf(), is_leaf_occupied(), and get_leaf_grid_position().
      */
     uint get_total_leaves() {
         return info.leaves_count + info.dynamic_leaves_count;
@@ -150,7 +150,7 @@ struct SVO {
      * @brief Read a node from static or dynamic storage.
      * @param p_index Node index; static below info.max_node_count, dynamic from it on.
      */
-    SVONode read_node(uint p_index) {
+    SVONode get_node(uint p_index) {
         if (p_index < info.max_node_count) {
             return nodes[p_index];
         }
@@ -161,7 +161,7 @@ struct SVO {
      * @brief Read a leaf from static or dynamic storage.
      * @param p_index Leaf index below get_total_leaves(); static below info.leaves_count, dynamic from it on.
      */
-    SVOLeaf read_leaf(uint p_index) {
+    SVOLeaf get_leaf(uint p_index) {
         if (p_index < info.leaves_count) {
             return leaves[p_index];
         }
@@ -174,15 +174,15 @@ struct SVO {
      * @details When the dynamic construction replaces a static node's leaf block, the superseded static leaves still name
      * that node as their parent; they are reported unoccupied because the parent no longer references their block. In
      * shader-debug builds, an invalid parent index reports SVO_NODE_INDEX_OVERFLOW.
-     * @param p_index Leaf index below get_total_leaves(), as in read_leaf().
+     * @param p_index Leaf index below get_total_leaves(), as in get_leaf().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
     bool is_leaf_occupied(uint p_index, uint p_frame_slot) {
-        SVOLeaf leaf = read_leaf(p_index);
+        SVOLeaf leaf = get_leaf(p_index);
         WBE_SHADER_DEBUG_ASSERT(leaf.parent_index >= 0 && uint(leaf.parent_index) < info.max_node_count + info.dynamic_node_count,
             ShaderDebugError::SVO_NODE_INDEX_OVERFLOW,
             p_frame_slot);
-        SVONode parent = read_node(uint(leaf.parent_index));
+        SVONode parent = get_node(uint(leaf.parent_index));
         bool dynamic = p_index >= info.leaves_count;
         uint local = dynamic ? p_index - info.leaves_count : p_index;
         uint expected = uint(dynamic ? SVONode::ChildrenState::LEAF_DYNAMIC : SVONode::ChildrenState::LEAF);
@@ -195,7 +195,7 @@ struct SVO {
 
     /**
      * @brief Reconstruct a leaf's grid position by walking from the leaf to the root.
-     * @param p_index Leaf index below get_total_leaves(), as in read_leaf().
+     * @param p_index Leaf index below get_total_leaves(), as in get_leaf().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      * @return Integer position of the leaf in the finest SVO grid.
      */
@@ -203,12 +203,12 @@ struct SVO {
         uint3 result = uint3(0);
         WBE_SHADER_DEBUG_ASSERT(p_index < get_total_leaves(), ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
         uint child_index = p_index < info.leaves_count ? p_index : p_index - info.leaves_count;
-        int parent_index = read_leaf(p_index).parent_index;
+        int parent_index = get_leaf(p_index).parent_index;
         uint traversed_depth = 0;
         for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
             WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < info.max_node_count + info.dynamic_node_count,
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
-            SVONode parent = read_node(uint(parent_index));
+            SVONode parent = get_node(uint(parent_index));
             WBE_SHADER_DEBUG_ASSERT(child_index >= get_svo_children_index(parent) &&
                 child_index - get_svo_children_index(parent) < 8,
                 ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED, p_frame_slot);
