@@ -197,7 +197,7 @@ bool is_svo_leaf_occupied(uint p_leaf_index,
  * @details p_trace_info.node_index is a static node index; p_trace_info.index_type is ignored. Node descriptions are
  * read without synchronization, so they must not change during the calling pass.
  */
-void traverse_static_svo(RWStructuredBuffer<SVONode> p_nodes, inout SVONodeTraceInfo p_trace_info) {
+void traverse_static_svo(StructuredBuffer<SVONode> p_nodes, inout SVONodeTraceInfo p_trace_info) {
     uint node_index = p_trace_info.node_index;
     uint curr_depth = p_trace_info.curr_depth;
     for (int depth = 0; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
@@ -235,8 +235,8 @@ void traverse_static_svo(RWStructuredBuffer<SVONode> p_nodes, inout SVONodeTrace
  * @param p_traverse_dynamic Whether to follow dynamic children.
  * @param p_trace_info Traversal state, updated in place.
  */
-void traverse_svo(RWStructuredBuffer<SVONode> p_nodes,
-    RWStructuredBuffer<SVONode> p_dynamic_nodes,
+void traverse_svo(StructuredBuffer<SVONode> p_nodes,
+    StructuredBuffer<SVONode> p_dynamic_nodes,
     SVOInfo p_tree_info,
     bool p_traverse_dynamic,
     inout SVONodeTraceInfo p_trace_info) {

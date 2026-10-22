@@ -14,7 +14,7 @@
 */
 #include "utils/utils.slang"
 #include "svo/svo_utils.slang"
-#include "svo/svo_dynamic_read.slang"
+#include "svo/svo.slang"
 
 struct SVOPreDeferredDebugDrawDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
@@ -76,10 +76,10 @@ SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVert
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
     SVOInfo svo_info = svo_info_buffer[0];
+    SVO svo = SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true);
 
-    bool is_deferred_task = p_instance_id >= (svo_info.leaves_count + svo_info.dynamic_leaves_count);
-    if (!is_deferred_task && !is_incremental_leaf_occupied(
-            p_instance_id, tree_nodes, tree_leaves, dynamic_nodes, dynamic_leaves, svo_info, descriptor_indices.shader_debug_frame_slot)) {
+    bool is_deferred_task = p_instance_id >= svo.get_total_leaves();
+    if (!is_deferred_task && !svo.is_leaf_occupied(p_instance_id, descriptor_indices.shader_debug_frame_slot)) {
         SVOPreDeferredDebugDrawVertexOutput empty_output;
         empty_output.position = float4(2.0, 2.0, 2.0, 1.0);
         empty_output.color = float4(0.0);
@@ -87,9 +87,8 @@ SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVert
     }
     uint3 grid_position = is_deferred_task
         ? get_deferred_task_grid_position(
-              deferred_list[p_instance_id - (svo_info.leaves_count + svo_info.dynamic_leaves_count)], svo_info)
-        : get_leaf_grid_position(
-              p_instance_id, tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, descriptor_indices.shader_debug_frame_slot);
+              deferred_list[p_instance_id - svo.get_total_leaves()], svo_info)
+        : svo.get_leaf_grid_position(p_instance_id, descriptor_indices.shader_debug_frame_slot);
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
     float voxel_width = svo_info.width / float(1u << svo_info.max_depth);
     float3 world_position = svo_info.origin + float3(grid_position + corner) * voxel_width;

@@ -16,7 +16,6 @@
 #include "deferred_composition/deferred_composition_utils.slang"
 #include "svo/svo.slang"
 #include "svo/svo_utils.slang"
-#include "svo/svo_dynamic_read.slang"
 
 struct DescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "svo_pre_deferred_debug_info_buffer")]
@@ -39,11 +38,11 @@ struct DescriptorIndices {
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 [shader("compute")]
-[numthreads(64, 1, 1)]
-void main(uint p_thread_id : SV_DispatchThreadID) {
+[numthreads(128, 1, 1)]
+void main(uint p_group_id : SV_GroupThreadID, uint p_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    StructuredBuffer<SVONode> dynamic_nodes = ResourceDescriptorHeap[descriptor_indices.dynamic_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves = ResourceDescriptorHeap[descriptor_indices.dynamic_leaves.x];
     RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
@@ -53,4 +52,7 @@ void main(uint p_thread_id : SV_DispatchThreadID) {
         SVOWriteImage<float>(SVO(tree_nodes, dynamic_nodes, tree_leaves, dynamic_leaves, svo_info, true), occupancy);
 
     svo_occupancy.write_leaf_data(p_thread_id, 1.0, descriptor_indices.shader_debug_frame_slot);
+    GroupMemoryBarrierWithGroupSync();
+
+
 }

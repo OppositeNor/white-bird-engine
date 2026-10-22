@@ -21,8 +21,8 @@
 #include "utils/utils.slang"
 #include "svo/svo_common.slang"
 
-RWStructuredBuffer<SVONode> nodes;
-RWStructuredBuffer<SVONode> dynamic_nodes;
+StructuredBuffer<SVONode> nodes;
+StructuredBuffer<SVONode> dynamic_nodes;
 RWStructuredBuffer<SVOInfo> tree_info;
 RWStructuredBuffer<SVONodeTraceInfo> traces;
 
