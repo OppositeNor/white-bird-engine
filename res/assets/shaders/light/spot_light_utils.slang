@@ -83,8 +83,6 @@ struct LightParamDescriptorIndices {
     uint2 shadowmap_sampler;
 };
 
-// Structured-buffer matrices use ordinary mul(). The uniform-buffer scalar-load workaround
-// transposes these matrices and must not be applied to this returned value.
 SpotLightInfo get_spot_light_info(uint2 p_light_infos, uint p_spot_light_index) {
     StructuredBuffer<SpotLightInfoBuffer> light_infos = ResourceDescriptorHeap[p_light_infos.x];
     return light_infos[0].spot_light_info[p_spot_light_index];

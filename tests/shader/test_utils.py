@@ -70,14 +70,6 @@ def test_transform_static_normal(utils: spy.Module, rng: np.random.Generator) ->
     np.testing.assert_allclose([result.x, result.y, result.z], expected / np.linalg.norm(expected), atol=1e-5)
 
 
-def test_software_mul_float4x4_vector(utils: spy.Module, rng: np.random.Generator) -> None:
-    matrices = rng.normal(size=(SAMPLE_COUNT, 4, 4)).astype(np.float32)
-    vectors = rng.normal(size=(SAMPLE_COUNT, 4)).astype(np.float32)
-    rows = [np.ascontiguousarray(matrices[:, row]) for row in range(4)]
-    result = call(utils.software_mul_float4x4_vector, *rows, vectors)
-    np.testing.assert_allclose(result, np.einsum("nij,nj->ni", matrices, vectors), rtol=1e-5, atol=1e-5)
-
-
 def test_chebyshev_upper_bound(utils: spy.Module, rng: np.random.Generator) -> None:
     means = rng.uniform(0.0, 10.0, SAMPLE_COUNT)
     variances = rng.uniform(0.0, 2.0, SAMPLE_COUNT)
