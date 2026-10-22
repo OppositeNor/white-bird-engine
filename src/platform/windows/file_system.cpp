@@ -25,7 +25,6 @@
 namespace WhiteBirdEngine {
 
 FileSystem::FileSystem() : FileSystem(get_executable_dir()) {
-    singleton = this;
 }
 
 FileSystem::~FileSystem() {
@@ -33,6 +32,7 @@ FileSystem::~FileSystem() {
 }
 
 FileSystem::FileSystem(const Path& p_root_dir) {
+    singleton = this;
     root_directory = p_root_dir.lexically_normal();
     resource_directory = root_directory / "res";
     config_directory = resource_directory / "config";

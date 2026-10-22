@@ -309,8 +309,4 @@ class WBEACP:
             raise RuntimeError(
                 f"WBEACP: Resource type '{resource_type}' in {manifest_rel_path} still declares source-only fields after compilation."
             )
-        if "file" in result:
-            raise RuntimeError(
-                f"WBEACP: Resource type '{resource_type}' declares file in {manifest_rel_path} but has no registered compiler."
-            )
         return result

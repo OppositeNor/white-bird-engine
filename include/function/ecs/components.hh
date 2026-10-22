@@ -40,10 +40,18 @@ struct WBE_META(WBE_COMPONENT) ComponentLabel {
     // The buffer for the name.
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     Buffer<MAX_NAME_SIZE + 1> name_buffer;
-    // The name of the component.
-    std::string_view name;
 
-    ComponentLabel() : name_buffer({.buffer = ""}), name(name_buffer.buffer) {
+    ComponentLabel() : name_buffer({.buffer = ""}) {
+    }
+
+    /**
+     * @brief Get the name of the entity.
+     *
+     * @return A view of the null-terminated name stored in this component's own buffer; it stays valid across copies
+     * and moves of the component only as long as this instance is alive.
+     */
+    std::string_view get_name() const {
+        return name_buffer.buffer;
     }
 };
 

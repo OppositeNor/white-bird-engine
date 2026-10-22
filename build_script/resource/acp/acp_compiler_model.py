@@ -32,7 +32,7 @@ class WBEACPCompilerModel(WBEACPCompiler):
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         resolved_resource = dict(resource)
-        source_type = resource.get("source_type", resource.get("type"))
+        source_type = self._get_source_resource_type(resource)
         resolved_resource["type"] = "static_geometry" if source_type == "static_geometry" else "model"
         if source_type == "static_geometry":
             source_files = resource.get("source_files")

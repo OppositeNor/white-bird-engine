@@ -18,7 +18,6 @@
 #include "core/allocator/stack_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
-#include "core/object/object.hh"
 #include "core/parser/parser_json.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -92,12 +91,6 @@ public:
         memcpy(copy_to, p_res, p_res_size);
         RefRes<char> result(result_mem_id, allocator);
         return result;
-    }
-
-    virtual RefRes<Object> register_object(Unique<Object>&& p_object) override {
-        objects.emplace_back(std::move(p_object));
-        auto& object = objects.back();
-        return RefRes<Object>(object);
     }
 
     virtual size_t get_size() const override {
@@ -177,8 +170,6 @@ private:
     std::unordered_map<std::string, RefRes<char>, TransparentStrHash, TransparentEqual> resource_map;
     std::vector<ResourceReference> ref_map;
     std::vector<ResourceDestructor> resource_destructors;
-    // For resources that needs RAII support.
-    std::vector<Unique<Object>> objects;
     StackAllocator* allocator;
 
     void resolve_load_resource(std::vector<std::string>& p_included_pathes, std::string_view p_res_chunk_path);

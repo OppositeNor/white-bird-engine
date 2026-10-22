@@ -474,7 +474,7 @@ public:
          * @param p_src_access_mask The access bit mask.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask) {
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags2 p_src_access_mask) {
             src_access_mask = p_src_access_mask;
             return *this;
         }
@@ -486,7 +486,7 @@ public:
          * @param p_src_stage The source pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_src_access(VkAccessFlags p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
+        MemoryBarrierBuilder& set_src_access(VkAccessFlags2 p_src_access_mask, VkPipelineStageFlags2 p_src_stage_mask) {
             src_access_mask = p_src_access_mask;
             src_stage_mask = p_src_stage_mask;
             return *this;
@@ -498,7 +498,7 @@ public:
          * @param p_dst_access_mask The access bit mask.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask) {
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags2 p_dst_access_mask) {
             dst_access_mask = p_dst_access_mask;
             return *this;
         }
@@ -510,7 +510,7 @@ public:
          * @param p_dst_stage_mask The destination pipeline stage.
          * @return *this.
          */
-        MemoryBarrierBuilder& set_dst_access(VkAccessFlags p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
+        MemoryBarrierBuilder& set_dst_access(VkAccessFlags2 p_dst_access_mask, VkPipelineStageFlags2 p_dst_stage_mask) {
             dst_access_mask = p_dst_access_mask;
             dst_stage_mask = p_dst_stage_mask;
             return *this;
@@ -523,7 +523,7 @@ public:
          * @param p_dst_access_mask The destination access bit mask.
          * @return
          */
-        MemoryBarrierBuilder& set_access(VkAccessFlags p_src_access_mask, VkAccessFlags p_dst_access_mask) {
+        MemoryBarrierBuilder& set_access(VkAccessFlags2 p_src_access_mask, VkAccessFlags2 p_dst_access_mask) {
             src_access_mask = p_src_access_mask;
             dst_access_mask = p_dst_access_mask;
             return *this;

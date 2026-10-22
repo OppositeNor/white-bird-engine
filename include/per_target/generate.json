@@ -5,7 +5,6 @@
         "template" : "serializables_sd.hh.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "serializables" : ".serializables",
             "static_serializables" : ".static_serializables",
             "strict_deserializations" : ".strict_deserializations"
         }
@@ -25,7 +24,6 @@
         "template" : "serializables_access.hh.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "serializables" : ".serializables",
             "static_serializables" : ".static_serializables"
         }
     },
@@ -35,8 +33,7 @@
         "template" : "serializable_factory.hh.jinja",
         "data" : {
             "metadata" : ".metadata",
-            "serializables" : ".serializables",
-            "static_serializables" : ".static_serializables"
+            "serializables" : ".serializables"
         }
     },
     {

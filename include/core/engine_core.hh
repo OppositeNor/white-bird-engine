@@ -87,11 +87,6 @@ public:
      */
     EngineConfig* engine_config = nullptr;
     /**
-     * @brief Single tick stack allocator. Contents will be cleared every time a
-     * tick ends.
-     */
-    StackAllocator* single_tick_allocator = nullptr;
-    /**
      * @brief Global pool allocator.
      */
     HeapAllocatorGlobal* pool_allocator = nullptr;

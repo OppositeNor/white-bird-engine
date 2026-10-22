@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from build_script.reflection.reflect import WBEReflector
 
 WBE_REFLECT = "WBE_REFLECT"
-WBE_COMPONENT = "WBE_COMPONENT"
 
 # Bump whenever the extracted metadata changes, so cached metadata of unchanged headers is reparsed. Changes to the clang
 # arguments invalidate the cache on their own.
@@ -52,7 +51,6 @@ class WBEMetaparser:
         self.cache_dir = cache_dir
         self.sources = sources
         self._metadata: dict[str, WBEFileMetadata] = {}
-        self._class_table: dict[str, WBEClassMetadata] = {}
         self._parser_signature = hash_str_sha256("\0".join([str(METAPARSER_VERSION), *clang_args]))
 
     def parse(self, cpp_file_path : str) -> None:
@@ -218,13 +216,6 @@ class WBEMetaparser:
                                                                  aliases=value_aliases))
             metadata.enums.append(enum_metadata)
             return
-
-    def _read_from_cache(self, cpp_file_path: str, cache_path: str) -> WBEFileMetadata:
-        with open(cache_path) as f:
-            data = json.load(f)
-        metadata = WBEFileMetadata(**data)
-        self._metadata[cpp_file_path] = metadata
-        return metadata
 
     def _get_include_deps(self, tu: clang.cindex.TranslationUnit) -> list[str]:
         deps: set[str] = set()

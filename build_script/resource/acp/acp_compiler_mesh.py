@@ -52,7 +52,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
     @override
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
-        resource_type = resource.get("source_type", resource.get("type"))
+        resource_type = self._get_source_resource_type(resource)
         if resource_type == "mesh":
             return self._compile_mesh(resource, manifest_path, res_output_dir)
         raise RuntimeError(

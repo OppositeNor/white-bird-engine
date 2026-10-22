@@ -17,7 +17,6 @@ import ctypes
 import math
 import os
 from pathlib import Path
-import shutil
 import sys
 from threading import Lock
 from typing import Any, override
@@ -33,7 +32,6 @@ from wbe_utils_model_compiler import TextureCompileRequest, TextureCompiler
 
 
 _FORMATS = {"rgb", "srgb", "bc5", "bc7", "sbc7"}
-_KTX2_IDENTIFIER = b"\xABKTX 20\xBB\r\n\x1A\n"
 
 
 class TextureCompilerPyKTX(TextureCompiler):
@@ -246,7 +244,7 @@ class WBEACPCompilerTexture(WBEACPCompiler):
 
     @override
     def get_supported_resource_types(self) -> list[str]:
-        return ["ktx_texture", "image_texture"]
+        return ["image_texture"]
 
     @staticmethod
     def _resolve_output_path(p_path: str, p_manifest_path: Path, p_res_output_dir: Path) -> tuple[Path, Path]:
@@ -264,20 +262,7 @@ class WBEACPCompilerTexture(WBEACPCompiler):
     def compile(self, resource: ManifestResource, manifest_path: Path,
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         source_type = self._get_source_resource_type(resource)
-        if source_type == "ktx_texture":
-            source_file = self._get_source_resource_file(resource)
-            if source_file is None:
-                raise RuntimeError(f"ktx_texture requires source_file in {manifest_path}.")
-            source_path, relative_source = self._resolve_resource_file_path(source_file, manifest_path, res_dir)
-            if source_path.suffix.lower() != ".ktx2":
-                raise RuntimeError(f"ktx_texture accepts only .ktx2 files in {manifest_path}.")
-            output_path, relative_output = self._resolve_output_path(relative_source.as_posix(), manifest_path, res_output_dir)
-            with source_path.open("rb") as source_stream:
-                if source_stream.read(len(_KTX2_IDENTIFIER)) != _KTX2_IDENTIFIER:
-                    raise RuntimeError(f"ktx_texture source is not a KTX2 file in {manifest_path}: {source_file}.")
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source_path, output_path)
-        elif source_type == "image_texture":
+        if source_type == "image_texture":
             source_value = resource.get("src")
             destination_value = resource.get("dst")
             source_format = resource.get("source_format")
@@ -324,7 +309,6 @@ class WBEACPCompilerTexture(WBEACPCompiler):
             "source_format",
             "target_format",
             "generate_mipmap",
-            "file",
         ):
             result.pop(key, None)
         return [result]

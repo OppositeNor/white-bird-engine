@@ -190,7 +190,7 @@ else()
     add_compile_options(-O0 -g -fno-inline -fno-omit-frame-pointer -D_DEBUG)
 endif()
 
-if (WBE_MAKE_TEST AND CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
+if (WBE_MAKE_TEST AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message("Enabling coverage tests.")
     add_compile_options(--coverage -Wno-stringop-truncation)
     add_link_options(--coverage)

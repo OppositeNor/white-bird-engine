@@ -13,7 +13,6 @@
 # limitations under the License.
 import json
 import os
-import importlib.util
 from typing import Any, Callable
 from build_script.reflection.code_gen import WBECodeGenerator
 from build_script.reflection.metadata_types import WBEMetadata
@@ -41,26 +40,6 @@ class WBEReflector:
         self.metadata_path = metadata_path
         self.metadata = WBEMetadata()
         self._gen_file_infos = gen_file_infos
-
-    def load_script_config(self, load_path : str) -> None:
-        """Load config scripts.
-
-        Args:
-            load_path: The path to load the config script.
-
-        Raises:
-            RuntimeError: If the config script is not runnable.
-        """
-        print("WBEReflect: Loading configuration script: " + load_path)
-        if not os.path.exists(load_path):
-            raise FileNotFoundError(f"File not found: {load_path}")
-        spec = importlib.util.spec_from_file_location("config", load_path)
-        if spec is None:
-            raise RuntimeError(f"Failed to load spec from path: {load_path}")
-        module_config = importlib.util.module_from_spec(spec)
-        if spec.loader is not None:
-            spec.loader.exec_module(module_config)
-            module_config.register(self)
 
     def register_metadata(self, metadata: WBEMetadata) -> None:
         self.metadata = metadata

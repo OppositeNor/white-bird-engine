@@ -61,7 +61,6 @@ class WBEACPCompilerFile(WBEACPCompiler):
         result["path"] = relative_output_file.as_posix()
         result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
         result.pop(SOURCE_RESOURCE_FILE_KEY, None)
-        result.pop("file", None)
         return [result]
 
     def _get_default_output_file(self, relative_file: Path) -> Path:

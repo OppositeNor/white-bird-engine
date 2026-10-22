@@ -64,7 +64,6 @@ build tests, every resource (global and test-only) under `test_env/res`.
 | --- | --- | --- |
 | `shader` | Slang to SPIR-V plus reflection metadata | `shader` (`path`, `metadata`) |
 | `image_texture` | Image to KTX2 (`src`, `dst`, `source_format` / `target_format` among `rgb`, `srgb`, `bc5`, `bc7`, `sbc7`, `generate_mipmap`, optional `flip_h` / `flip_v`) | `texture` (`path`) |
-| `ktx_texture` | Copies a `.ktx2` `source_file` | `texture` (`path`) |
 | `model` / `static_geometry` | `wbe-utils-model-compiler` | meshes, materials, textures, skeletons, binaries |
 | `mesh` | Hand-authored vertex and index data | `mesh` with binaries |
 | `script` | Copies Lua; type-checks and compiles Teal | `script` (`path`) |
