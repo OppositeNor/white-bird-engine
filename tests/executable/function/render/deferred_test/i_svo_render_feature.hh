@@ -87,7 +87,6 @@ public:
 
     static constexpr std::string_view SVO_INFO = "svo_info";
     static constexpr std::string_view SVO_NODE_BUFFER = "svo_node_buffer";
-    static constexpr std::string_view SVO_DYNAMIC_LEAVES = "svo_dynamic_leaves";
     static constexpr std::string_view SVO_LEAF_BUFFER = "svo_leaf_buffer";
     static constexpr std::string_view SVO_DEBUG_DRAW_INDEX_BUFFER = "svo_debug_draw_index_buffer";
     static constexpr std::string_view SVO_DEBUG_DRAW_INDIRECT_BUFFER = "svo_debug_draw_indirect_buffer";
@@ -177,8 +176,9 @@ private:
     static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t SVO_EXTENT = size_t{1} << SVO_MAX_DEPTH;
-    static constexpr size_t SVO_MAX_LEAVES_COUNT = SVO_VOXEL_COUNT / 8;
-    static constexpr size_t SVO_MAX_DYNAMIC_LEAVES_COUNT = SVO_MAX_LEAVES_COUNT / 1024;
+    static constexpr size_t SVO_MAX_DYNAMIC_LEAVES_COUNT = SVO_VOXEL_COUNT / 8 / 1024;
+    // The dynamic leaves follow the static leaves in the leaf buffer, whose blocks share the 21-bit block index.
+    static constexpr size_t SVO_MAX_LEAVES_COUNT = SVO_VOXEL_COUNT / 8 - SVO_MAX_DYNAMIC_LEAVES_COUNT;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_NODE_COUNT) / 8U);
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_LEAVES_COUNT) / 8U);
@@ -244,11 +244,8 @@ private:
         int32_t parent_index;
     };
 
-    struct SVODynamicLeafBlock {
-        SVOLeaf leaves[8];
-    };
-    static_assert(SVO_MAX_DYNAMIC_LEAVES_COUNT % 8 == 0 && SVO_MAX_DYNAMIC_LEAVES_COUNT <= (1U << 21U) * 8U);
-    static_assert(sizeof(SVODynamicLeafBlock) == 64);
+    static_assert(SVO_MAX_DYNAMIC_LEAVES_COUNT % 8 == 0);
+    static_assert(SVO_MAX_LEAVES_COUNT + SVO_MAX_DYNAMIC_LEAVES_COUNT <= (1U << 21U) * 8U);
     static_assert(offsetof(SVONode, original_children_data) == 12);
     static_assert(SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
 
@@ -265,7 +262,6 @@ private:
     VoxelVolume svo_volume;
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
-    Ref<ROBufferVK> dynamic_leaves;
     Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;
     std::string shader_prefix;
     std::string dynamic_shader_prefix;

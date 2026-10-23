@@ -23,7 +23,6 @@
 
 StructuredBuffer<SVONode> nodes;
 StructuredBuffer<SVOLeaf> leaves;
-StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves;
 StructuredBuffer<SVOInfo> tree_info;
 RWStructuredBuffer<uint> occupied;
 RWStructuredBuffer<uint4> grid_positions;
@@ -32,7 +31,7 @@ RWStructuredBuffer<uint2> totals;
 [shader("compute")]
 [numthreads(32, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    SVO svo = SVO(nodes, leaves, dynamic_leaves, tree_info[0], true);
+    SVO svo = SVO(nodes, leaves, tree_info[0], true);
     uint index = p_dispatch_thread_id.x;
     if (index == 0) {
         totals[0] = uint2(svo.get_total_leaves(), svo.get_total_nodes());

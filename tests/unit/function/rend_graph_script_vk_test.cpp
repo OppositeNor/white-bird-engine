@@ -1428,7 +1428,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         svo.set_value("variant", std::string("pass_published"));
         svo.set_value("shader_prefix", std::string("svo_2"));
         svo.set_value("dynamic_shader_prefix", std::string("svo_2_dynamic"));
-        svo.set_entry("imports", make_imports({"svo_info", "svo_node_buffer", "svo_dynamic_leaves", "svo_leaf_buffer", "svo_debug_draw_index_buffer",
+        svo.set_entry("imports", make_imports({"svo_info", "svo_node_buffer", "svo_leaf_buffer", "svo_debug_draw_index_buffer",
             "svo_debug_draw_indirect_buffer", "svo_pre_deferred_debug_draw_indirect_buffer"}));
         svo.set_value("extent", 512);
         svo.set_value("max_depth", 9);

@@ -124,10 +124,9 @@ void ISVORenderFeature::create_resources() {
     // The node buffer holds the static nodes followed by the dynamic nodes.
     svo_nodes = render_context->create_buffer(ROBufferVK::Builder().set_properties(
         sizeof(SVONode), SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    dynamic_leaves = render_context->create_buffer(ROBufferVK::Builder()
-                         .set_properties(sizeof(SVODynamicLeafBlock), SVO_MAX_DYNAMIC_LEAVES_COUNT / 8, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    svo_leaves =
-        render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    // The leaf buffer holds the static leaves followed by the dynamic leaves.
+    svo_leaves = render_context->create_buffer(ROBufferVK::Builder().set_properties(
+        sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT + SVO_MAX_DYNAMIC_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_INDICES));
     const VkDrawIndexedIndirectCommand initial_debug_draw_command{
@@ -216,11 +215,10 @@ void ISVORenderFeature::configure_recipe(
         params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
     }
     // The buffers holding initial contents or state shared by both graphs; the module declares the per-frame scratch buffers.
-    const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 7> buffers{
+    const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 6> buffers{
         {
             {SVO_INFO, &svo_info},
             {SVO_NODE_BUFFER, &svo_nodes},
-            {SVO_DYNAMIC_LEAVES, &dynamic_leaves},
             {SVO_LEAF_BUFFER, &svo_leaves},
             {SVO_DEBUG_DRAW_INDEX_BUFFER, &svo_debug_draw_index_buffer},
             {SVO_DEBUG_DRAW_INDIRECT_BUFFER, &svo_debug_draw_indirect_buffer},

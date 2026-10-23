@@ -23,7 +23,6 @@
 
 StructuredBuffer<SVONode> nodes;
 StructuredBuffer<SVOLeaf> leaves;
-StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves;
 RWStructuredBuffer<SVOInfo> tree_info;
 StructuredBuffer<float4> positions;
 RWStructuredBuffer<uint> results;
@@ -39,7 +38,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (index >= position_count) {
         return;
     }
-    SVO svo = SVO(nodes, leaves, dynamic_leaves, tree_info[0], TRAVERSE_DYNAMIC != 0);
+    SVO svo = SVO(nodes, leaves, tree_info[0], TRAVERSE_DYNAMIC != 0);
     SVONodeTraceInfo trace_info;
     results[index] = svo.trace_data(positions[index].xyz, trace_info);
     traces[index] = trace_info;

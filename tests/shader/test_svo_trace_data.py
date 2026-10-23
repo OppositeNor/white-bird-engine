@@ -26,7 +26,6 @@ RANDOM_SEED = 20251003
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
-DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("leaves", LEAF_DTYPE, 8)])
 # Data indices are offset per storage so a result identifies the storage it was read from.
 DYNAMIC_LEAF_DATA_OFFSET = 200
 # A non-unit SVO placement, exactly representable so world positions map back to voxel centers without rounding.
@@ -39,7 +38,7 @@ def rng() -> np.random.Generator:
     return np.random.default_rng(RANDOM_SEED)
 
 
-def run_trace_data(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_leaves: np.ndarray, p_dynamic_leaves: np.ndarray, p_tree_info: np.ndarray, p_voxels: list[Voxel],
+def run_trace_data(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_leaves: np.ndarray, p_tree_info: np.ndarray, p_voxels: list[Voxel],
         p_traverse_dynamic: bool) -> tuple[np.ndarray, np.ndarray]:
     """Trace every voxel center in world space and return the traced data indices and final traces."""
     max_depth = int(p_tree_info[0]["max_depth"])
@@ -54,14 +53,9 @@ def run_trace_data(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: n
     traces = make_buffer(p_device, np.zeros(len(p_voxels), dtype=TRACE_DTYPE))
     kernel.dispatch(thread_count=[len(p_voxels), 1, 1], vars={"nodes": make_buffer(p_device, p_nodes),
         "leaves": make_buffer(p_device, p_leaves),
-        "dynamic_leaves": make_buffer(p_device, p_dynamic_leaves),
         "tree_info": make_buffer(p_device, tree_info), "positions": make_buffer(p_device, positions),
         "results": results, "traces": traces})
     return read_buffer(results, np.uint32), read_buffer(traces, TRACE_DTYPE)
-
-
-def empty_dynamic_leaves() -> np.ndarray:
-    return np.zeros(1, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
 
 
 @pytest.mark.parametrize("p_max_depth", [2, 3, 5])
@@ -72,7 +66,7 @@ def test_trace_data_static(device: spy.Device, load_kernel: KernelLoader, rng: n
     queries = static_query_voxels(rng, tree, 64)
     nodes = tree.node_array()
     leaves = tree.leaf_array()
-    results, traces = run_trace_data(device, load_kernel, nodes, leaves, empty_dynamic_leaves(),
+    results, traces = run_trace_data(device, load_kernel, nodes, leaves,
         make_tree_info(p_max_depth, len(nodes)), queries, False)
     for voxel, result, trace in zip(queries, results, traces):
         if voxel in tree.leaf_of_voxel:
@@ -103,13 +97,12 @@ DYNAMIC_TRACE_CASES = [
 def test_trace_data_dynamic(device: spy.Device, load_kernel: KernelLoader, p_traverse_dynamic: bool) -> None:
     nodes, tree_info = dynamic_svo()
     nodes["data_index"] = np.arange(len(nodes))
-    # Dynamic node 3 owns dynamic leaf block 2.
-    dynamic_leaves = np.zeros(3, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
-    dynamic_leaves["leaves"]["data_index"] = DYNAMIC_LEAF_DATA_OFFSET + np.arange(24).reshape(3, 8)
-    dynamic_leaves["leaves"]["parent_index"][2] = DYNAMIC_SVO_NODE_COUNT + 3
+    # There are no static leaves, so the leaf buffer holds only the dynamic leaves; dynamic node 3 owns leaf block 2.
+    leaves = np.zeros(24, dtype=LEAF_DTYPE)
+    leaves["data_index"] = DYNAMIC_LEAF_DATA_OFFSET + np.arange(24)
+    leaves["parent_index"][16:24] = DYNAMIC_SVO_NODE_COUNT + 3
     voxels = [case[0] for case in DYNAMIC_TRACE_CASES]
-    results, traces = run_trace_data(device, load_kernel, nodes, np.zeros(1, dtype=LEAF_DTYPE),
-        dynamic_leaves, tree_info, voxels, p_traverse_dynamic)
+    results, traces = run_trace_data(device, load_kernel, nodes, leaves, tree_info, voxels, p_traverse_dynamic)
     expected_data = {
         INDEX_NODE: lambda p_index: p_index,
         INDEX_DYNAMIC_LEAF: lambda p_index: DYNAMIC_LEAF_DATA_OFFSET + p_index,

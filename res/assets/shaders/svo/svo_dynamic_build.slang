@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_SVO_DYNAMIC_BUILD_SLANG
 #define WBE_FILE_SVO_DYNAMIC_BUILD_SLANG
 #include "svo/svo_utils.slang"
-#include "svo/svo_dynamic_types.slang"
 
 /**
  * @brief Extends static topology with dynamic children that are initialized and published by the CAS owner.
@@ -26,8 +25,7 @@
  * @return True when the voxel's leaf occupancy is recorded; false with p_trace at the contended node otherwise.
  */
 bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_nodes,
-    RWStructuredBuffer<SVOLeaf> p_static_leaves,
-    RWStructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
+    RWStructuredBuffer<SVOLeaf> p_leaves,
     RWStructuredBuffer<SVOInfo> p_info,
     inout SVONodeTraceInfo p_trace,
     uint p_frame_slot) {
@@ -76,23 +74,25 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_nodes,
         uint children;
         uint published;
         if (is_leaf) {
-            InterlockedAdd(p_info[0].dynamic_leaves_count, 8, children);
+            uint dynamic_index;
+            InterlockedAdd(p_info[0].dynamic_leaves_count, 8, dynamic_index);
             WBE_SHADER_DEBUG_ASSERT(
-                children < p_info[0].max_dynamic_leaves_count, ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
-            uint block = children / 8;
+                dynamic_index < p_info[0].max_dynamic_leaves_count, ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
+            // Dynamic leaves follow the static leaves, whose count is fixed while dynamic construction runs.
+            children = p_info[0].leaves_count + dynamic_index;
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVOLeaf leaf;
                 if (state == uint(SVONode::ChildrenState::LEAF)) {
-                    leaf = p_static_leaves[(original & SVO_CHILDREN_BLOCK_INDEX_MASK) * 8 + i];
+                    leaf = p_leaves[(original & SVO_CHILDREN_BLOCK_INDEX_MASK) * 8 + i];
                 } else {
-                    leaf.data_index = p_info[0].data_count + p_info[0].max_dynamic_node_count + children + i;
+                    leaf.data_index = p_info[0].data_count + p_info[0].max_dynamic_node_count + dynamic_index + i;
                     leaf.parent_index = int(node_index);
                 }
-                p_dynamic_leaves[block].leaves[i] = leaf;
+                p_leaves[children + i] = leaf;
             }
             // The owner's occupancy is published together with the block.
             uint occupancy = (original & SVO_CHILDREN_OCCUPANCY_MASK) | (1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + sector));
-            published = (uint(SVONode::ChildrenState::LEAF_DYNAMIC) << SVO_CHILDREN_STATE_SHIFT) | occupancy | block;
+            published = (uint(SVONode::ChildrenState::LEAF_DYNAMIC) << SVO_CHILDREN_STATE_SHIFT) | occupancy | (children / 8);
         } else {
             uint dynamic_index;
             InterlockedAdd(p_info[0].dynamic_node_count, 8, dynamic_index);

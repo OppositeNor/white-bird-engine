@@ -204,9 +204,6 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
         { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
-    graph:chain(buffers.svo_dynamic_leaves,
-        sequence({ dynamic[1], dynamic[2] }, dynamic_publication,
-            { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
     graph:chain(buffers.svo_leaf_buffer, {
         build,
         build_double_sided,

@@ -16,15 +16,15 @@
 #define WBE_FILE_SVO_SLANG
 
 #include "utils/utils.slang"
-#include "svo/svo_dynamic_types.slang"
+#include "svo/svo_common.slang"
 
 /**
  * @brief Read-only view of an already constructed SVO that resolves positions to the data_index of their nodes and leaves.
  * @details Every stored node and leaf owns one data element through its data_index; the SVO does not own or read the data,
  * so callers index their own data buffer with the traced index. The construction passes assign the static node and leaf
  * data first, followed by the dynamic node data and then the dynamic leaf data. The node buffer holds the static nodes
- * followed by the dynamic nodes, so node indices below info.node_count are static and the dynamic ones follow them, while
- * leaf indices span both storages, covering the static leaves followed by the dynamic leaves. The SVO must be fully
+ * followed by the dynamic nodes, so node indices below info.node_count are static and the dynamic ones follow them; the leaf
+ * buffer likewise holds the static leaves followed by the dynamic leaves from info.leaves_count on. The SVO must be fully
  * constructed and published, and its buffers must not change during the calling pass, because node descriptions are read
  * without synchronization. Construction is not performed through this type.
  */
@@ -35,13 +35,10 @@ struct SVO {
      */
     StructuredBuffer<SVONode> nodes;
     /**
-     * @brief Static SVO leaf storage.
+     * @brief SVO leaf storage: the static leaves followed by the dynamic leaves, which traces reach only when
+     * traverse_dynamic is true.
      */
     StructuredBuffer<SVOLeaf> leaves;
-    /**
-     * @brief Dynamic SVO leaf blocks; traces read them only when traverse_dynamic is true.
-     */
-    StructuredBuffer<SVODynamicLeafBlock> dynamic_leaves;
     /**
      * @brief Spatial configuration of the SVO.
      */
@@ -56,12 +53,10 @@ struct SVO {
      */
     __init(StructuredBuffer<SVONode> p_nodes,
         StructuredBuffer<SVOLeaf> p_leaves,
-        StructuredBuffer<SVODynamicLeafBlock> p_dynamic_leaves,
         SVOInfo p_info,
         bool p_traverse_dynamic) {
         nodes = p_nodes;
         leaves = p_leaves;
-        dynamic_leaves = p_dynamic_leaves;
         info = p_info;
         traverse_dynamic = p_traverse_dynamic;
     }
@@ -115,9 +110,8 @@ struct SVO {
     uint get_data_index(SVONodeTraceInfo p_trace_info) {
         switch (p_trace_info.index_type) {
         case SVONodeTraceInfo::IndexType::STATIC_LEAF:
-            return leaves[p_trace_info.node_index].data_index;
         case SVONodeTraceInfo::IndexType::DYNAMIC_LEAF:
-            return dynamic_leaves[p_trace_info.node_index / 8].leaves[p_trace_info.node_index % 8].data_index;
+            return leaves[p_trace_info.node_index].data_index;
         default:
             return nodes[p_trace_info.node_index].data_index;
         }
@@ -152,11 +146,7 @@ struct SVO {
      * @param p_index Leaf index below get_total_leaves(); static below info.leaves_count, dynamic from it on.
      */
     SVOLeaf get_leaf(uint p_index) {
-        if (p_index < info.leaves_count) {
-            return leaves[p_index];
-        }
-        uint local = p_index - info.leaves_count;
-        return dynamic_leaves[local / 8].leaves[local % 8];
+        return leaves[p_index];
     }
 
     /**
@@ -174,13 +164,12 @@ struct SVO {
             p_frame_slot);
         SVONode parent = get_node(uint(leaf.parent_index));
         bool dynamic = p_index >= info.leaves_count;
-        uint local = dynamic ? p_index - info.leaves_count : p_index;
         uint expected = uint(dynamic ? SVONode::ChildrenState::LEAF_DYNAMIC : SVONode::ChildrenState::LEAF);
         if ((parent.children_data >> SVO_CHILDREN_STATE_SHIFT) != expected ||
-            get_svo_children_index(parent) / 8 != local / 8) {
+            get_svo_children_index(parent) / 8 != p_index / 8) {
             return false;
         }
-        return (parent.children_data & (1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + local % 8))) != 0;
+        return (parent.children_data & (1u << (SVO_CHILDREN_OCCUPANCY_SHIFT + p_index % 8))) != 0;
     }
 
     /**
@@ -192,7 +181,7 @@ struct SVO {
     uint3 get_leaf_grid_position(uint p_index, uint p_frame_slot) {
         uint3 result = uint3(0);
         WBE_SHADER_DEBUG_ASSERT(p_index < get_total_leaves(), ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
-        uint child_index = p_index < info.leaves_count ? p_index : p_index - info.leaves_count;
+        uint child_index = p_index;
         int parent_index = get_leaf(p_index).parent_index;
         uint traversed_depth = 0;
         for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
@@ -341,11 +330,11 @@ struct SVOWriteImage<T : ITexelElement> {
     }
 
     /**
-     * @brief Overwrite the voxel data of a static leaf.
+     * @brief Overwrite the voxel data of a leaf.
      * @details The texel is located from the leaf's data_index as in trace_data(), with the same shader-debug overflow
      * check. The store is not atomic; callers must ensure no other invocation accesses the same texel during the calling
      * pass.
-     * @param p_leaf_index Index into svo.leaves; must be below the static leaf count.
+     * @param p_leaf_index Index into svo.leaves; must be below get_total_leaves().
      * @param p_value Value stored into the leaf's texel.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */

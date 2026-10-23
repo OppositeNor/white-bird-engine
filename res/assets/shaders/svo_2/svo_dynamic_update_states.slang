@@ -14,7 +14,6 @@
 */
 #include "utils/utils.slang"
 #include "svo_2/svo_utils.slang"
-#include "svo/svo_dynamic_types.slang"
 /**
  * @brief Descriptor-heap resources used by incremental maintenance.
  */
@@ -29,11 +28,6 @@ struct DynamicDescriptorIndices {
      */
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
-    /**
-     * @brief Descriptor-heap reference to svo_dynamic_leaves.
-     */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_dynamic_leaves", "read")]
-    uint2 dynamic_leaves;
 };
 [[vk::push_constant]]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;

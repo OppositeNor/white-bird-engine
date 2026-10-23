@@ -37,7 +37,7 @@ struct SVONode {
      * LEAF uses bits 28:21 for occupancy (bit 21 is sector zero) and bits 20:0 for an eight-leaf block index.
      * NODE uses bits 20:0 for an eight-node block index; bits 28:21 are unused.
      * NODE_DYNAMIC indexes a block of dynamic nodes, which follow the static nodes in the node buffer; LEAF_DYNAMIC indexes
-     * a dynamic leaf block.
+     * a block of dynamic leaves, which follow the static leaves in the leaf buffer.
      * EMPTY, ALLOCATING and ALLOCATING_DYNAMIC ignore the lower twenty-nine bits during traversal. In svo_2,
      * ALLOCATING and ALLOCATING_DYNAMIC carry the new block index and occupancy until the publication pass, where zero
      * occupancy identifies a node block and nonzero occupancy identifies a leaf block.
@@ -152,7 +152,7 @@ struct SVOInfo {
      */
     uint max_node_count;
     /**
-     * @brief The capacity of the leaf buffer.
+     * @brief The capacity of the static leaves; the leaf buffer holds max_leaves_count + max_dynamic_leaves_count leaves.
      */
     uint max_leaves_count;
     /**
@@ -161,7 +161,7 @@ struct SVOInfo {
      */
     uint node_count;
     /**
-     * @brief The number of leaves.
+     * @brief The number of static leaves; the dynamic leaves follow them in the leaf buffer.
      */
     uint leaves_count;
     /**
@@ -177,7 +177,7 @@ struct SVOInfo {
      */
     uint max_dynamic_node_count;
     /**
-     * @brief Capacity in leaf slots; the dynamic array stores blocks of eight leaves.
+     * @brief Capacity of the dynamic leaves, stored after the static leaves in the leaf buffer.
      */
     uint max_dynamic_leaves_count;
     /**
@@ -186,7 +186,7 @@ struct SVOInfo {
      */
     uint dynamic_node_count;
     /**
-     * @brief Allocated dynamic leaf slots, always a multiple of eight.
+     * @brief Allocated dynamic leaf slots, starting at leaves_count in the leaf buffer; always a multiple of eight.
      */
     uint dynamic_leaves_count;
 };

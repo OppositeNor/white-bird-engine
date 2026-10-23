@@ -50,7 +50,6 @@ INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u
     ("max_leaves_count", "<u4"), ("node_count", "<u4"), ("leaves_count", "<u4"), ("data_count", "<u4"),
     ("max_deferred_task_count", "<u4"), ("max_dynamic_node_count", "<u4"), ("max_dynamic_leaves_count", "<u4"),
     ("dynamic_node_count", "<u4"), ("dynamic_leaves_count", "<u4")])
-DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("leaves", LEAF_DTYPE, 8)])
 TRACE_DTYPE = np.dtype([("node_index", "<u4"), ("index_type", "<u4"), ("curr_depth", "<u4"), ("remain_depth", "<i4"),
     ("svo_position", "<f4", 3), ("voxel_index", "<u4")])
 BUFFER_USAGE = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
@@ -216,13 +215,6 @@ def test_svo_struct_layouts(svo_common: spy.Module) -> None:
         assert [(field.name, field.offset) for field in layout.fields] == [
             (name, dtype.fields[name][1]) for name in dtype.names], type_name
     assert svo_common.layout.find_type_by_name("SVONode").buffer_layout.reflection.stride == 16
-
-
-def test_svo_dynamic_leaf_block_layout(svo_common: spy.Module) -> None:
-    # The block holds only its eight leaves; the parent's original description is saved in the parent node.
-    layout = svo_common.layout.find_type_by_name("SVODynamicLeafBlock").buffer_layout.reflection
-    assert [field.name for field in layout.fields] == ["leaves"]
-    assert layout.stride == 8 * LEAF_DTYPE.itemsize
 
 
 def test_svo_layout_constants(svo_common: spy.Module) -> None:
@@ -462,20 +454,23 @@ def test_is_svo_leaf_occupied(device: spy.Device, load_kernel: KernelLoader, rng
 
 def run_leaf_queries(p_device: spy.Device, p_load_kernel: KernelLoader, p_tree: StaticSVO, p_dynamic_leaves: np.ndarray,
         p_dynamic_node_count: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Run svo_leaf_queries.slang over p_tree plus p_dynamic_leaves; return the occupancy, grid positions, and totals."""
+    """
+    Run svo_leaf_queries.slang over p_tree with p_dynamic_leaves following its leaves in the leaf buffer; return the
+    occupancy, grid positions, and totals.
+    """
     nodes = p_tree.node_array()
     tree_info = make_tree_info(p_tree.max_depth, len(nodes))
     tree_info["node_count"] = len(p_tree.nodes)
     tree_info["leaves_count"] = len(p_tree.leaves)
     tree_info["dynamic_node_count"] = p_dynamic_node_count
-    tree_info["dynamic_leaves_count"] = 8 * len(p_dynamic_leaves)
-    leaf_count = len(p_tree.leaves) + 8 * len(p_dynamic_leaves)
+    tree_info["dynamic_leaves_count"] = len(p_dynamic_leaves)
+    leaves = np.concatenate([p_tree.leaf_array(), p_dynamic_leaves])
+    leaf_count = len(leaves)
     occupied = make_buffer(p_device, np.zeros(leaf_count, dtype=np.uint32))
     grid_positions = make_buffer(p_device, np.zeros((leaf_count, 4), dtype=np.uint32))
     totals = make_buffer(p_device, np.zeros((1, 2), dtype=np.uint32))
-    dynamic_leaves = p_dynamic_leaves if len(p_dynamic_leaves) != 0 else np.zeros(1, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
     p_load_kernel("svo_leaf_queries.slang", {}).dispatch(thread_count=[leaf_count, 1, 1], vars={
-        "nodes": make_buffer(p_device, nodes), "leaves": make_buffer(p_device, p_tree.leaf_array()), "dynamic_leaves": make_buffer(p_device, dynamic_leaves),
+        "nodes": make_buffer(p_device, nodes), "leaves": make_buffer(p_device, leaves),
         "tree_info": make_buffer(p_device, tree_info), "occupied": occupied, "grid_positions": grid_positions,
         "totals": totals})
     return (read_buffer(occupied, np.uint32), read_buffer(grid_positions, np.uint32).reshape(-1, 4)[:, :3],
@@ -487,7 +482,7 @@ def test_svo_static_leaf_queries(device: spy.Device, load_kernel: KernelLoader, 
         p_max_depth: int) -> None:
     tree = build_static_svo(random_voxels(rng, 40, p_max_depth), p_max_depth)
     occupied, grid_positions, totals = run_leaf_queries(device, load_kernel, tree,
-        np.zeros(0, dtype=DYNAMIC_LEAF_BLOCK_DTYPE), 0)
+        np.zeros(0, dtype=LEAF_DTYPE), 0)
     np.testing.assert_array_equal(totals, [len(tree.leaves), len(tree.nodes)])
     expected = np.zeros(len(tree.leaves), dtype=np.uint32)
     expected[list(tree.leaf_of_voxel.values())] = 1
@@ -501,14 +496,15 @@ def test_svo_leaf_queries_hide_superseded_static_leaves(device: spy.Device, load
     max_depth = 3
     voxels = random_voxels(rng, 20, max_depth)
     tree = build_static_svo(voxels, max_depth)
-    # Move the leaf block of the first voxel's parent into dynamic block 0, keeping only that voxel occupied.
+    # Move the leaf block of the first voxel's parent into the first dynamic block, which follows the static leaves,
+    # keeping only that voxel occupied.
     voxel = voxels[0]
     static_leaf = tree.leaf_of_voxel[voxel]
     parent = tree.leaves[static_leaf][1]
     sector = static_leaf % 8
-    tree.nodes[parent][0] = pack_children_data(STATE_LEAF_DYNAMIC, 0, 1 << sector)
-    dynamic_leaves = np.zeros(1, dtype=DYNAMIC_LEAF_BLOCK_DTYPE)
-    dynamic_leaves[0]["leaves"]["parent_index"] = parent
+    tree.nodes[parent][0] = pack_children_data(STATE_LEAF_DYNAMIC, len(tree.leaves) // 8, 1 << sector)
+    dynamic_leaves = np.zeros(8, dtype=LEAF_DTYPE)
+    dynamic_leaves["parent_index"] = parent
     occupied, grid_positions, totals = run_leaf_queries(device, load_kernel, tree, dynamic_leaves, 8)
     # Dynamic node slots count toward the total.
     np.testing.assert_array_equal(totals, [len(tree.leaves) + 8, len(tree.nodes) + 8])
