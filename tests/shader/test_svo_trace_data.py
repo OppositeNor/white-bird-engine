@@ -26,7 +26,7 @@ RANDOM_SEED = 20251003
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
-DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("original_children_data", "<u4"), ("leaves", LEAF_DTYPE, 8)])
+DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("leaves", LEAF_DTYPE, 8)])
 # Data indices are offset per storage so a result identifies the storage it was read from.
 DYNAMIC_LEAF_DATA_OFFSET = 200
 # A non-unit SVO placement, exactly representable so world positions map back to voxel centers without rounding.

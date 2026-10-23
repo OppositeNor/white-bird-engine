@@ -80,7 +80,6 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_nodes,
             WBE_SHADER_DEBUG_ASSERT(
                 children < p_info[0].max_dynamic_leaves_count, ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
             uint block = children / 8;
-            p_dynamic_leaves[block].original_children_data = original;
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVOLeaf leaf;
                 if (state == uint(SVONode::ChildrenState::LEAF)) {

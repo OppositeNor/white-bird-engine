@@ -18,13 +18,9 @@
 #include "svo/svo_common.slang"
 
 /**
- * @brief Copy-on-write leaf block: the original packed parent state followed by its eight leaves.
+ * @brief Copy-on-write block of eight leaves; the parent's original description is saved in the parent node.
  */
 struct SVODynamicLeafBlock {
-    /**
-     * @brief Complete original parent description, including static occupancy and block index.
-     */
-    uint original_children_data;
     /**
      * @brief Copied static leaves or newly initialized dynamic leaves.
      */

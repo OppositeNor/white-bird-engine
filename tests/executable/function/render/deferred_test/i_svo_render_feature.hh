@@ -245,12 +245,10 @@ private:
     };
 
     struct SVODynamicLeafBlock {
-        uint32_t original_children_data;
         SVOLeaf leaves[8];
     };
     static_assert(SVO_MAX_DYNAMIC_LEAVES_COUNT % 8 == 0 && SVO_MAX_DYNAMIC_LEAVES_COUNT <= (1U << 21U) * 8U);
-    static_assert(sizeof(SVODynamicLeafBlock) == 68);
-    static_assert(offsetof(SVODynamicLeafBlock, leaves) == 4);
+    static_assert(sizeof(SVODynamicLeafBlock) == 64);
     static_assert(offsetof(SVONode, original_children_data) == 12);
     static_assert(SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
 

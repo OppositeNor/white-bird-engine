@@ -50,7 +50,7 @@ INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u
     ("max_leaves_count", "<u4"), ("node_count", "<u4"), ("leaves_count", "<u4"), ("data_count", "<u4"),
     ("max_deferred_task_count", "<u4"), ("max_dynamic_node_count", "<u4"), ("max_dynamic_leaves_count", "<u4"),
     ("dynamic_node_count", "<u4"), ("dynamic_leaves_count", "<u4")])
-DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("original_children_data", "<u4"), ("leaves", LEAF_DTYPE, 8)])
+DYNAMIC_LEAF_BLOCK_DTYPE = np.dtype([("leaves", LEAF_DTYPE, 8)])
 TRACE_DTYPE = np.dtype([("node_index", "<u4"), ("index_type", "<u4"), ("curr_depth", "<u4"), ("remain_depth", "<i4"),
     ("svo_position", "<f4", 3), ("voxel_index", "<u4")])
 BUFFER_USAGE = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
@@ -219,11 +219,10 @@ def test_svo_struct_layouts(svo_common: spy.Module) -> None:
 
 
 def test_svo_dynamic_leaf_block_layout(svo_common: spy.Module) -> None:
-    # The saved parent word is followed by eight leaves.
+    # The block holds only its eight leaves; the parent's original description is saved in the parent node.
     layout = svo_common.layout.find_type_by_name("SVODynamicLeafBlock").buffer_layout.reflection
-    assert [field.name for field in layout.fields] == ["original_children_data", "leaves"]
-    assert layout.fields[1].offset == 4
-    assert layout.stride == 4 + 8 * LEAF_DTYPE.itemsize
+    assert [field.name for field in layout.fields] == ["leaves"]
+    assert layout.stride == 8 * LEAF_DTYPE.itemsize
 
 
 def test_svo_layout_constants(svo_common: spy.Module) -> None:

@@ -53,7 +53,8 @@ struct SVONode {
      */
     int parent_index;
     /**
-     * @brief Original child description saved by the dynamic allocation owner.
+     * @brief Original child description saved by the dynamic allocation owner; the dynamic clear restores LEAF_DYNAMIC
+     * nodes from it.
      */
     uint original_children_data;
 
@@ -176,7 +177,7 @@ struct SVOInfo {
      */
     uint max_dynamic_node_count;
     /**
-     * @brief Capacity in leaf slots; the dynamic array stores blocks of eight leaves plus a saved parent word.
+     * @brief Capacity in leaf slots; the dynamic array stores blocks of eight leaves.
      */
     uint max_dynamic_leaves_count;
     /**
