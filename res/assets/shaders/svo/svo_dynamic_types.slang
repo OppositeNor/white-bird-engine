@@ -20,7 +20,7 @@
 /**
  * @brief Copy-on-write leaf block: the original packed parent state followed by its eight leaves.
  */
-[WBE_DATA_TYPE] struct SVODynamicLeafBlock {
+struct SVODynamicLeafBlock {
     /**
      * @brief Complete original parent description, including static occupancy and block index.
      */

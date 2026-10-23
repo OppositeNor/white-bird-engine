@@ -20,7 +20,6 @@
 /**
  * @brief Four scalar fields with a 16-byte storage-buffer array stride.
  */
-[WBE_DATA_TYPE]
 struct SVONode {
     enum class ChildrenState {
         NODE = 0,
@@ -120,7 +119,6 @@ static const uint SVO_CHILDREN_PAYLOAD_MASK = 0x1fffffffu;
 /**
  * @brief One initialized leaf slot; occupancy is published in its parent node.
  */
-[WBE_DATA_TYPE]
 struct SVOLeaf {
     /**
      * @brief Index of the data in the data buffer.
@@ -135,7 +133,6 @@ struct SVOLeaf {
 /**
  * @brief Immutable spatial configuration and mutable construction counters.
  */
-[WBE_DATA_TYPE]
 struct SVOInfo {
     /**
      * @brief The origin of the SVO in world space.

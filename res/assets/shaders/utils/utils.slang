@@ -108,13 +108,6 @@ struct WBE_PUSH_CONSTANTAttribute {
     string value;
 };
 
-/** Marks a struct as an engine-discoverable data type in reflection metadata. */
-[__AttributeUsage(_AttributeTargets.Struct)]
-struct WBE_DATA_TYPEAttribute {
-    /** Optional logical type name; an empty value means to use the struct name. */
-    string type_name = "";
-};
-
 /**
  * @brief The input data from the vertex buffer
  */
@@ -198,7 +191,6 @@ struct WBE_TEXTUREAttribute {
 
 #ifdef WBE_REFLECTION_METADATA
 /** Reflection-only view of the material texture contract. */
-[WBE_DATA_TYPE]
 struct MaterialTextureContractMetadata {
     SamplerState material_sampler;
     Texture2D<float4> textures[];
@@ -206,7 +198,6 @@ struct MaterialTextureContractMetadata {
 #endif
 
 /** Fixed descriptor indices for one material's textures. */
-[WBE_DATA_TYPE]
 struct MaterialParams {
     /** Albedo texture descriptor index. */
     [WBE_TEXTURE("albedo")]
@@ -220,14 +211,12 @@ struct MaterialParams {
 };
 
 /** Fixed descriptor-index table for every material addressed by an indirect draw. */
-[WBE_DATA_TYPE]
 struct MaterialParamsBuffer {
     /** Material entries indexed by the indirect draw's material index. */
     MaterialParams materials[WBE_MAX_MATERIAL_COUNT];
 };
 
 /** Per-submesh metadata for one mesh draw entry. */
-[WBE_DATA_TYPE]
 struct SubmeshData {
     /** Material table entry used by this submesh. */
     uint material_id;
@@ -237,7 +226,6 @@ struct SubmeshData {
 };
 
 /** Transform payload of one mesh node, or of the whole mesh. */
-[WBE_DATA_TYPE]
 struct NodeData {
     /** Engine-space column-major transform. */
     float4x4 transform;
@@ -246,7 +234,6 @@ struct NodeData {
 };
 
 /** Per-drawn-instance metadata linking one submesh to one node transform. */
-[WBE_DATA_TYPE]
 struct InstanceData {
     /** Index into the mesh.submeshes storage buffer. */
     uint submesh_index;
@@ -258,7 +245,6 @@ struct InstanceData {
 
 #ifdef WBE_REFLECTION_METADATA
 /** Reflection-only view of the mesh storage-buffer contract. */
-[WBE_DATA_TYPE]
 struct MeshContractMetadata {
     StructuredBuffer<SubmeshData> submeshes;
     StructuredBuffer<NodeData> nodes;

@@ -134,7 +134,6 @@ and `transform` / `normal_transform` offsets from the global `mesh` parameter.
 
 ### Other attributes
 
-- `[WBE_DATA_TYPE("name")]` on structs is preserved in metadata; it has no C++ consumer beyond tests.
 - `WBE_SHADER_DEBUG_ASSERT` writes `ShaderDebugError` into the shader-debug buffer at reserved descriptor index 0 when
   `WBE_SHADER_DEBUG` is defined.
 - `software_mul_float4x4_vector` / `WBE_SOFTWARE_MATRIX_ROWS` work around whole-matrix loads through descriptor heaps; use
