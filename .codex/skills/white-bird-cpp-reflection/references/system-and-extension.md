@@ -35,7 +35,7 @@ its rendered content changes.
 | `WBE_STRICT_DESERIALIZATION` | strict_deserializations | strict `deserialize`; effective only with a static-serializable category |
 | `WBE_REFLECT_ENUM` / `WBE_REFLECT_ENUM_IGNORE` | reflected_enums | `EnumReflection<E>` and enum `SerializableSD` |
 | `WBE_REFLECT_SCRIPT` | reflect_script | Teal declaration plus SD/Access or `EnumReflection` |
-| `WBE_RENDER_TASK`, `WBE_RENDER_TASK(<method>)` | render_tasks | `render_task_registry.gen.cpp`; with a method, its recipe constructor in `build/<target>/teal/utils/render_graph_tasks.tl` |
+| `WBE_RENDER_TASK`, `WBE_RENDER_TASK(<method>)` | render_tasks | `render_task_registry.gen.cpp`; with a method, its recipe constructor in `build/<target>/teal/render_graph_utils/render_graph_tasks.tl` |
 | `WBE_CLA_CONFIGURATION` | cla_configurations | `CLAConfiguration<T>` |
 | `WBE_LABEL(name, CATEGORY)` | static/dynamic labels | `LabelName<hash>`, `LabelManager` |
 | any annotated class | — | `TypeUUID<T>`, `TypeUUIDManager` (enums excluded) |
