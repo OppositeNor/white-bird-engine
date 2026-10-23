@@ -37,13 +37,9 @@ struct SVONodeTraceInfo {
          */
         NODE = 0,
         /**
-         * @brief Index into the static leaf buffer.
+         * @brief Index into the leaf buffer, which holds the static leaves followed by the dynamic leaves.
          */
-        STATIC_LEAF = 1,
-        /**
-         * @brief Leaf slot in the dynamic leaf blocks; block local_index / 8, leaf local_index % 8.
-         */
-        DYNAMIC_LEAF = 2
+        LEAF = 1
     };
     /**
      * @brief Index of the node where traversal resumes.

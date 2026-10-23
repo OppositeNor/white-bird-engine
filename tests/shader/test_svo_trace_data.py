@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 import slangpy as spy
 
-from test_svo_common import (DYNAMIC_SVO_NODE_COUNT, INDEX_DYNAMIC_LEAF, INDEX_NODE, INDEX_STATIC_LEAF, LEAF_DTYPE,
+from test_svo_common import (DYNAMIC_SVO_NODE_COUNT, INDEX_LEAF, INDEX_NODE, LEAF_DTYPE,
     TRACE_DTYPE, Voxel, assert_trace, build_static_svo, dynamic_svo, expected_stop_depth, make_buffer, make_tree_info,
     random_voxels, read_buffer, static_query_voxels, voxel_center, voxel_prefix)
 
@@ -26,8 +26,8 @@ RANDOM_SEED = 20251003
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
-# Data indices are offset per storage so a result identifies the storage it was read from.
-DYNAMIC_LEAF_DATA_OFFSET = 200
+# Leaf data indices are offset from the node ones so a result identifies the storage it was read from.
+LEAF_DATA_OFFSET = 200
 # A non-unit SVO placement, exactly representable so world positions map back to voxel centers without rounding.
 SVO_ORIGIN = np.array([-3.0, 1.5, 2.0], dtype=np.float32)
 SVO_WIDTH = 8.0
@@ -71,7 +71,7 @@ def test_trace_data_static(device: spy.Device, load_kernel: KernelLoader, rng: n
     for voxel, result, trace in zip(queries, results, traces):
         if voxel in tree.leaf_of_voxel:
             stop_depth = p_max_depth
-            index, index_type = tree.leaf_of_voxel[voxel], INDEX_STATIC_LEAF
+            index, index_type = tree.leaf_of_voxel[voxel], INDEX_LEAF
             data_index = int(leaves[index]["data_index"])
         else:
             stop_depth = expected_stop_depth(tree, voxel)
@@ -86,7 +86,7 @@ def test_trace_data_static(device: spy.Device, load_kernel: KernelLoader, rng: n
 # (voxel, expected with dynamic traversal, expected without), each expectation being (index, index type, depth), as in
 # test_svo_common.DYNAMIC_TRAVERSAL_CASES.
 DYNAMIC_TRACE_CASES = [
-    ((1, 2, 3), (16 + 5, INDEX_DYNAMIC_LEAF, 3), (0, INDEX_NODE, 1)),
+    ((1, 2, 3), (16 + 5, INDEX_LEAF, 3), (0, INDEX_NODE, 1)),
     ((1, 2, 2), (DYNAMIC_SVO_NODE_COUNT + 3, INDEX_NODE, 2), (0, INDEX_NODE, 1)),
     ((4, 6, 4), (8 + 2, INDEX_NODE, 2), (8 + 2, INDEX_NODE, 2)),
     ((5, 1, 1), (4, INDEX_NODE, 1), (4, INDEX_NODE, 1)),
@@ -99,13 +99,13 @@ def test_trace_data_dynamic(device: spy.Device, load_kernel: KernelLoader, p_tra
     nodes["data_index"] = np.arange(len(nodes))
     # There are no static leaves, so the leaf buffer holds only the dynamic leaves; dynamic node 3 owns leaf block 2.
     leaves = np.zeros(24, dtype=LEAF_DTYPE)
-    leaves["data_index"] = DYNAMIC_LEAF_DATA_OFFSET + np.arange(24)
+    leaves["data_index"] = LEAF_DATA_OFFSET + np.arange(24)
     leaves["parent_index"][16:24] = DYNAMIC_SVO_NODE_COUNT + 3
     voxels = [case[0] for case in DYNAMIC_TRACE_CASES]
     results, traces = run_trace_data(device, load_kernel, nodes, leaves, tree_info, voxels, p_traverse_dynamic)
     expected_data = {
         INDEX_NODE: lambda p_index: p_index,
-        INDEX_DYNAMIC_LEAF: lambda p_index: DYNAMIC_LEAF_DATA_OFFSET + p_index,
+        INDEX_LEAF: lambda p_index: LEAF_DATA_OFFSET + p_index,
     }
     for (voxel, with_dynamic, without_dynamic), result, trace in zip(DYNAMIC_TRACE_CASES, results, traces):
         index, index_type, depth = with_dynamic if p_traverse_dynamic else without_dynamic

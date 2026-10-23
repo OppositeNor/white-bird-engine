@@ -148,11 +148,11 @@ struct SVOInfo {
      */
     uint max_depth;
     /**
-     * @brief The capacity of the static nodes; the node buffer holds max_node_count + max_dynamic_node_count nodes.
+     * @brief The capacity of the node buffer, shared by the static nodes and the dynamic nodes that follow them.
      */
     uint max_node_count;
     /**
-     * @brief The capacity of the static leaves; the leaf buffer holds max_leaves_count + max_dynamic_leaves_count leaves.
+     * @brief The capacity of the leaf buffer, shared by the static leaves and the dynamic leaves that follow them.
      */
     uint max_leaves_count;
     /**
@@ -172,14 +172,6 @@ struct SVOInfo {
      * @brief The maximum number of entries each deferred list can hold, excluding its count element.
      */
     uint max_deferred_task_count;
-    /**
-     * @brief Capacity of the dynamic nodes, stored after the static nodes in the node buffer.
-     */
-    uint max_dynamic_node_count;
-    /**
-     * @brief Capacity of the dynamic leaves, stored after the static leaves in the leaf buffer.
-     */
-    uint max_dynamic_leaves_count;
     /**
      * @brief Allocated dynamic node slots, starting at node_count in the node buffer; reset after restoring static parent
      * links.
@@ -277,8 +269,7 @@ void traverse_svo(StructuredBuffer<SVONode> p_nodes, bool p_traverse_dynamic, in
     uint curr_depth = p_trace_info.curr_depth;
     int depth = 0;
     for (; p_trace_info.remain_depth < 0 || depth < p_trace_info.remain_depth; ++depth) {
-        if (index_type == SVONodeTraceInfo::IndexType::STATIC_LEAF ||
-            index_type == SVONodeTraceInfo::IndexType::DYNAMIC_LEAF) {
+        if (index_type == SVONodeTraceInfo::IndexType::LEAF) {
             // Leaves have no children.
             break;
         }
@@ -290,11 +281,10 @@ void traverse_svo(StructuredBuffer<SVONode> p_nodes, bool p_traverse_dynamic, in
         if (children_state == SVONode::ChildrenState::NODE ||
             (children_state == SVONode::ChildrenState::NODE_DYNAMIC && p_traverse_dynamic)) {
             node_index = children_index + sector;
-        } else if (children_state == SVONode::ChildrenState::LEAF && is_occupied) {
-            index_type = SVONodeTraceInfo::IndexType::STATIC_LEAF;
-            node_index = children_index + sector;
-        } else if (children_state == SVONode::ChildrenState::LEAF_DYNAMIC && p_traverse_dynamic && is_occupied) {
-            index_type = SVONodeTraceInfo::IndexType::DYNAMIC_LEAF;
+        } else if ((children_state == SVONode::ChildrenState::LEAF ||
+                       (children_state == SVONode::ChildrenState::LEAF_DYNAMIC && p_traverse_dynamic)) &&
+            is_occupied) {
+            index_type = SVONodeTraceInfo::IndexType::LEAF;
             node_index = children_index + sector;
         } else {
             // Traced to an empty/allocating node, an unoccupied leaf, or a dynamic child not being followed.

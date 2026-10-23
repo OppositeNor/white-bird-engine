@@ -124,8 +124,8 @@ protected:
     Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_id) const;
     static constexpr size_t SVO_MAX_DEPTH = 9;
     static constexpr size_t SVO_VOXEL_COUNT = (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH);
-    static constexpr size_t SVO_MAX_NODE_COUNT = SVO_VOXEL_COUNT / 64;
-    static constexpr size_t SVO_MAX_DYNAMIC_NODE_COUNT = SVO_MAX_NODE_COUNT;
+    // Shared by the static nodes and the dynamic nodes that follow them in the node buffer.
+    static constexpr size_t SVO_MAX_NODE_COUNT = SVO_VOXEL_COUNT / 32;
     static constexpr size_t SVO_MAX_DEFERRED_TASK_COUNT = SVO_VOXEL_COUNT / 8;
     // Each deferred list stores its entry count in element zero, followed by up to SVO_MAX_DEFERRED_TASK_COUNT entries.
     static constexpr size_t SVO_DEFERRED_LIST_ELEMENT_COUNT = SVO_MAX_DEFERRED_TASK_COUNT + 1;
@@ -176,9 +176,8 @@ private:
     static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t SVO_EXTENT = size_t{1} << SVO_MAX_DEPTH;
-    static constexpr size_t SVO_MAX_DYNAMIC_LEAVES_COUNT = SVO_VOXEL_COUNT / 8 / 1024;
-    // The dynamic leaves follow the static leaves in the leaf buffer, whose blocks share the 21-bit block index.
-    static constexpr size_t SVO_MAX_LEAVES_COUNT = SVO_VOXEL_COUNT / 8 - SVO_MAX_DYNAMIC_LEAVES_COUNT;
+    // Shared by the static leaves and the dynamic leaves that follow them in the leaf buffer.
+    static constexpr size_t SVO_MAX_LEAVES_COUNT = SVO_VOXEL_COUNT / 8;
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_NODE_COUNT) / 8U);
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_LEAVES_COUNT) / 8U);
@@ -193,14 +192,12 @@ private:
         uint32_t leaves_count;
         uint32_t data_count;
         uint32_t max_deferred_task_count;
-        uint32_t max_dynamic_node_count;
-        uint32_t max_dynamic_leaves_count;
         uint32_t dynamic_node_count;
         uint32_t dynamic_leaves_count;
     };
 
-    static_assert(sizeof(SVOInfo) == 60);
-    static_assert(offsetof(SVOInfo, dynamic_node_count) == 52);
+    static_assert(sizeof(SVOInfo) == 52);
+    static_assert(offsetof(SVOInfo, dynamic_node_count) == 44);
 
     struct SVONode {
         enum class ChildrenState {
@@ -244,10 +241,7 @@ private:
         int32_t parent_index;
     };
 
-    static_assert(SVO_MAX_DYNAMIC_LEAVES_COUNT % 8 == 0);
-    static_assert(SVO_MAX_LEAVES_COUNT + SVO_MAX_DYNAMIC_LEAVES_COUNT <= (1U << 21U) * 8U);
     static_assert(offsetof(SVONode, original_children_data) == 12);
-    static_assert(SVO_MAX_NODE_COUNT + SVO_MAX_DYNAMIC_NODE_COUNT <= (1U << 21U) * 8U);
 
     // Deferred-list entries are uint32_t voxel indices packing max_depth bits per axis.
     static_assert(SVO_MAX_DEPTH <= 10);

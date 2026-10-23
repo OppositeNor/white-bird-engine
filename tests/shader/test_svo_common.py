@@ -40,16 +40,15 @@ BLOCK_INDEX_BIT_COUNT = 21
 
 # SVONodeTraceInfo::IndexType values.
 INDEX_NODE = 0
-INDEX_STATIC_LEAF = 1
-INDEX_DYNAMIC_LEAF = 2
+INDEX_LEAF = 1
 
 NODE_DTYPE = np.dtype([("children_data", "<u4"), ("data_index", "<u4"), ("parent_index", "<i4"),
     ("original_children_data", "<u4")])
 LEAF_DTYPE = np.dtype([("data_index", "<u4"), ("parent_index", "<i4")])
 INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u4"), ("max_node_count", "<u4"),
     ("max_leaves_count", "<u4"), ("node_count", "<u4"), ("leaves_count", "<u4"), ("data_count", "<u4"),
-    ("max_deferred_task_count", "<u4"), ("max_dynamic_node_count", "<u4"), ("max_dynamic_leaves_count", "<u4"),
-    ("dynamic_node_count", "<u4"), ("dynamic_leaves_count", "<u4")])
+    ("max_deferred_task_count", "<u4"), ("dynamic_node_count", "<u4"),
+    ("dynamic_leaves_count", "<u4")])
 TRACE_DTYPE = np.dtype([("node_index", "<u4"), ("index_type", "<u4"), ("curr_depth", "<u4"), ("remain_depth", "<i4"),
     ("svo_position", "<f4", 3), ("voxel_index", "<u4")])
 BUFFER_USAGE = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
@@ -337,7 +336,7 @@ def test_traverse_svo_static(device: spy.Device, load_kernel: KernelLoader, rng:
     for voxel, trace in zip(queries, result):
         if voxel in tree.leaf_of_voxel:
             stop_depth = p_max_depth
-            stop = (tree.leaf_of_voxel[voxel], INDEX_STATIC_LEAF)
+            stop = (tree.leaf_of_voxel[voxel], INDEX_LEAF)
         else:
             stop_depth = expected_stop_depth(tree, voxel)
             stop = (tree.node_of_prefix[(stop_depth, voxel_prefix(voxel, stop_depth, p_max_depth))], INDEX_NODE)
@@ -384,7 +383,7 @@ def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
     Return the nodes and tree info of a depth-three tree whose root sector 0 has dynamic children.
 
     The node buffer holds 16 static nodes followed by one block of 8 dynamic nodes. Root sector 0 is NODE_DYNAMIC with
-    that block; dynamic node 3 owns dynamic leaf block 2 with only sector 5 occupied, and every other dynamic node is
+    that block; dynamic node 3 owns leaf block 2 with only sector 5 occupied, and every other dynamic node is
     EMPTY. Root sector 7 is a static node whose children are EMPTY.
     """
     nodes = np.zeros(DYNAMIC_SVO_NODE_COUNT + 8, dtype=NODE_DTYPE)
@@ -392,9 +391,8 @@ def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
     nodes[0]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, DYNAMIC_SVO_NODE_COUNT // 8)
     nodes[7]["children_data"] = pack_children_data(STATE_NODE, 1)
     nodes[DYNAMIC_SVO_NODE_COUNT + 3]["children_data"] = pack_children_data(STATE_LEAF_DYNAMIC, 2, 1 << 5)
-    tree_info = make_tree_info(3, DYNAMIC_SVO_NODE_COUNT)
+    tree_info = make_tree_info(3, DYNAMIC_SVO_NODE_COUNT + 8)
     tree_info["node_count"] = DYNAMIC_SVO_NODE_COUNT
-    tree_info["max_dynamic_node_count"] = 8
     tree_info["dynamic_node_count"] = 8
     return nodes, tree_info
 
@@ -402,7 +400,7 @@ def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
 # (voxel, expected with dynamic traversal, expected without), each expectation being (index, index type, depth).
 DYNAMIC_TRAVERSAL_CASES = [
     # Root sector 0, dynamic node 3 (sector bits 011), occupied leaf sector 5 (101).
-    ((1, 2, 3), (16 + 5, INDEX_DYNAMIC_LEAF, 3), (0, INDEX_NODE, 1)),
+    ((1, 2, 3), (16 + 5, INDEX_LEAF, 3), (0, INDEX_NODE, 1)),
     # Same dynamic node, unoccupied leaf sector 4 (100).
     ((1, 2, 2), (DYNAMIC_SVO_NODE_COUNT + 3, INDEX_NODE, 2), (0, INDEX_NODE, 1)),
     # Root sector 0, EMPTY dynamic node 6 (110).
@@ -432,7 +430,7 @@ def test_traverse_svo_resumes_from_dynamic_node(device: spy.Device, load_kernel:
     traces[0] = (DYNAMIC_SVO_NODE_COUNT + 3, INDEX_NODE, 2, 4, np.modf(voxel_center(voxel, 3) * 4.0)[0],
         voxel_index(voxel, 3))
     result = run_traverse(device, load_kernel, nodes, tree_info, traces, False, True)
-    assert_trace(result[0], 16 + 5, INDEX_DYNAMIC_LEAF, 3, 3, np.modf(voxel_center(voxel, 3) * 8.0)[0])
+    assert_trace(result[0], 16 + 5, INDEX_LEAF, 3, 3, np.modf(voxel_center(voxel, 3) * 8.0)[0])
 
 
 @pytest.mark.parametrize("p_max_depth", [2, 4])

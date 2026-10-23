@@ -109,8 +109,7 @@ struct SVO {
      */
     uint get_data_index(SVONodeTraceInfo p_trace_info) {
         switch (p_trace_info.index_type) {
-        case SVONodeTraceInfo::IndexType::STATIC_LEAF:
-        case SVONodeTraceInfo::IndexType::DYNAMIC_LEAF:
+        case SVONodeTraceInfo::IndexType::LEAF:
             return leaves[p_trace_info.node_index].data_index;
         default:
             return nodes[p_trace_info.node_index].data_index;

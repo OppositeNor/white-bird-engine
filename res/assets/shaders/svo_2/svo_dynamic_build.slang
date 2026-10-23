@@ -70,16 +70,20 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<SVONode> p_nodes,
         if (is_leaf) {
             uint dynamic_index;
             InterlockedAdd(p_info[0].dynamic_leaves_count, 8, dynamic_index);
-            WBE_SHADER_DEBUG_ASSERT(
-                dynamic_index < p_info[0].max_dynamic_leaves_count, ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
-            // Dynamic leaves follow the static leaves, whose count is fixed while dynamic construction runs.
+            // Dynamic leaves follow the static leaves, whose count is fixed while dynamic construction runs, and share
+            // the leaf buffer's capacity with them.
             children = p_info[0].leaves_count + dynamic_index;
+            WBE_SHADER_DEBUG_ASSERT(children <= p_info[0].max_leaves_count && p_info[0].max_leaves_count - children >= 8,
+                ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW,
+                p_frame_slot);
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVOLeaf leaf;
                 if (state == uint(SVONode::ChildrenState::LEAF)) {
                     leaf = p_leaves[(original & SVO_CHILDREN_BLOCK_INDEX_MASK) * 8 + i];
                 } else {
-                    leaf.data_index = p_info[0].data_count + p_info[0].max_dynamic_node_count + dynamic_index + i;
+                    // Dynamic leaf data follows the data of every dynamic node the node buffer can hold.
+                    leaf.data_index =
+                        p_info[0].data_count + (p_info[0].max_node_count - dynamic_begin) + dynamic_index + i;
                     leaf.parent_index = int(node_index);
                 }
                 p_leaves[children + i] = leaf;
@@ -88,9 +92,11 @@ bool try_dynamic_voxel_allocate(RWStructuredBuffer<SVONode> p_nodes,
         } else {
             uint dynamic_index;
             InterlockedAdd(p_info[0].dynamic_node_count, 8, dynamic_index);
-            WBE_SHADER_DEBUG_ASSERT(
-                dynamic_index < p_info[0].max_dynamic_node_count, ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+            // Dynamic nodes share the node buffer's capacity with the static nodes they follow.
             children = dynamic_begin + dynamic_index;
+            WBE_SHADER_DEBUG_ASSERT(children <= p_info[0].max_node_count && p_info[0].max_node_count - children >= 8,
+                ShaderDebugError::SVO_NODE_INDEX_OVERFLOW,
+                p_frame_slot);
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVONode child;
                 child.children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
