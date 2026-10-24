@@ -38,7 +38,10 @@ handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, imp
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
 
 `graph:build()` collects every resource reachable from task params, aliases, edges, `uses`, and ports (views pull in their
-image), emits each once, and omits unused handles. Two different owned handles with the same id fail. A view may also be
+image), emits each once, and omits unused handles. Two different owned handles with the same id fail. The handle methods
+do not touch the graph; the module exposes them as functions too (`Graph.storage_buffer()`, `Graph.compute_pipeline()`,
+`Graph.graphics_pipeline()`, `Graph.import_resource()`, `Graph.indirect_dispatch()`, ...), so helpers that only build
+handles or dispatches take no graph. A view may also be
 taken of an import, reference, or port; C++ validates the actual kind.
 
 ### Tasks
@@ -175,8 +178,11 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 - `require` is the only import mechanism; modules load once per backend and cyclic requires fail. New import sources are
   `IScriptModuleResolver`s whose `try_resolve()` must not throw.
 
-`render_graph_utils.sort` provides `radix_sort_buffers(names, max_count, graph?)` and
-`add_radix_sort_task(graph, id, buffers, queue_family?)`; `utils.math` provides `ceil_div` and `clamp`.
+`render_graph_utils.sort` provides `radix_sort_buffers(names, max_count, key_type?)` and
+`add_radix_sort_task(graph, id, buffers, queue_family?, options?)`, for `uint` keys or `uint2` keys ordered by `x` then
+`y`, sorted by every bit or by an `options` bit range of an even number of 8-bit digits (bits `[32, 64)` of `uint2` keys
+sort by `x` and carry `y` as a payload, which `add_radix_sort_key_value_task(graph, id, buffers,
+queue_family?)` does); `utils.math` provides `ceil_div` and `clamp`.
 
 ## Tests
 

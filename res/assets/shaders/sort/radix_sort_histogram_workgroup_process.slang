@@ -24,8 +24,6 @@ struct DescriptorIndices {
 ConstantBuffer<DescriptorIndices> descriptor_indices;
 
 #define WORKGROUP_SIZE 64
-// The sub-histograms start after the metadata of the histogram buffer.
-#define LANE_START 4
 
 groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 
@@ -33,8 +31,9 @@ groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 // [g * elements_per_group, (g + 1) * elements_per_group), with elements_per_group = ceil(element_count / sub_histogram_num),
 // and writes the raw digit counts of that range to sub-histogram g. The input buffer holds the element count and the local sort count in its
 // metadata, and the keys from WBE_RADIX_SORT_DATA_START. The histogram buffer receives its metadata: the sub-histogram count,
-// equal to the local sort count; the start of the overflow histograms, after the last sub-histogram; and LANE_START, where
-// sub-histogram g starts at LANE_START + g * WBE_RADIX_SORT_BUCKET_COUNT. Must be dispatched with the local sort dispatch.
+// equal to the local sort count; the start of the overflow histograms, after the last sub-histogram; and
+// WBE_RADIX_SORT_LANE_START, where sub-histogram g starts at WBE_RADIX_SORT_LANE_START + g * WBE_RADIX_SORT_BUCKET_COUNT.
+// Must be dispatched with the local sort dispatch.
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
@@ -51,8 +50,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     }
     if (group_id == 0 && group_thread_id == 0) {
         histogram_buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX] = sub_histogram_num;
-        histogram_buffer[WBE_RADIX_SORT_OVERFLOW_START_INDEX] = LANE_START + sub_histogram_num * WBE_RADIX_SORT_BUCKET_COUNT;
-        histogram_buffer[WBE_RADIX_SORT_LANE_START_INDEX] = LANE_START;
+        histogram_buffer[WBE_RADIX_SORT_OVERFLOW_START_INDEX] =
+            WBE_RADIX_SORT_LANE_START + sub_histogram_num * WBE_RADIX_SORT_BUCKET_COUNT;
+        histogram_buffer[WBE_RADIX_SORT_LANE_START_INDEX] = WBE_RADIX_SORT_LANE_START;
     }
     [unroll] for (uint i = 0; i < 4; ++i) {
         // Initialize the original value in the histogram to 0.
@@ -66,7 +66,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     workgroup_scope_radix_sort_histogram<uint, WORKGROUP_SIZE>(input_buffer, WBE_RADIX_SORT_DATA_START + group_begin,
         group_end - group_begin, histogram, group_thread_id, WBE_RADIX_HISTOGRAM_BIT_REGION);
 
-    uint sub_histogram_start = LANE_START + group_id * WBE_RADIX_SORT_BUCKET_COUNT;
+    uint sub_histogram_start = WBE_RADIX_SORT_LANE_START + group_id * WBE_RADIX_SORT_BUCKET_COUNT;
     [unroll] for (uint i = 0; i < 4; ++i) {
         histogram_buffer[sub_histogram_start + thread_data_start + i] = histogram[thread_data_start + i];
     }

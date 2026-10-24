@@ -121,26 +121,26 @@ local record Pipelines
     light_billboard: Graph.Resource
 end
 
-local function make_pipelines(p_graph: Graph.Graph): Pipelines
+local function make_pipelines(): Pipelines
     return {
-        shadow_opaque = p_graph:add_graphics_pipeline("deferred_shadow_opaque"),
-        shadow_double_sided = p_graph:add_graphics_pipeline("deferred_shadow_double_sided"),
-        shadow_dynamic = p_graph:add_graphics_pipeline("deferred_shadow_dynamic"),
-        gbuffer_opaque = p_graph:add_graphics_pipeline("deferred_gbuffer_opaque"),
-        gbuffer_double_sided = p_graph:add_graphics_pipeline("deferred_gbuffer_double_sided"),
-        gbuffer_dynamic = p_graph:add_graphics_pipeline("deferred_gbuffer_dynamic"),
-        shadow_sat_horizontal = p_graph:add_compute_pipeline("shadow_moments_summed_area_table_horizontal_shader"),
-        shadow_sat_vertical = p_graph:add_compute_pipeline("shadow_moments_summed_area_table_vertical_shader"),
-        direct_lighting = p_graph:add_compute_pipeline("direct_lighting_shader"),
-        direct_lighting_sat = p_graph:add_compute_pipeline("direct_lighting_summed_area_table_shader"),
-        indirect_lighting = p_graph:add_compute_pipeline("indirect_lighting_rsm_shader"),
-        indirect_lighting_debug_view = p_graph:add_compute_pipeline("indirect_lighting_rsm_debug_view_shader"),
-        combine_lighting = p_graph:add_compute_pipeline("combine_lighting_shader"),
-        extract_bloom = p_graph:add_compute_pipeline("bloom_shader_extract"),
-        blur_ping = p_graph:add_compute_pipeline("kawase_blur_pong_write_shader"),
-        blur_pong = p_graph:add_compute_pipeline("kawase_blur_ping_write_shader"),
-        present = p_graph:add_graphics_pipeline("present_post_processing"),
-        light_billboard = p_graph:add_graphics_pipeline("deferred_light_billboard_pipeline"),
+        shadow_opaque = Graph.graphics_pipeline("deferred_shadow_opaque"),
+        shadow_double_sided = Graph.graphics_pipeline("deferred_shadow_double_sided"),
+        shadow_dynamic = Graph.graphics_pipeline("deferred_shadow_dynamic"),
+        gbuffer_opaque = Graph.graphics_pipeline("deferred_gbuffer_opaque"),
+        gbuffer_double_sided = Graph.graphics_pipeline("deferred_gbuffer_double_sided"),
+        gbuffer_dynamic = Graph.graphics_pipeline("deferred_gbuffer_dynamic"),
+        shadow_sat_horizontal = Graph.compute_pipeline("shadow_moments_summed_area_table_horizontal_shader"),
+        shadow_sat_vertical = Graph.compute_pipeline("shadow_moments_summed_area_table_vertical_shader"),
+        direct_lighting = Graph.compute_pipeline("direct_lighting_shader"),
+        direct_lighting_sat = Graph.compute_pipeline("direct_lighting_summed_area_table_shader"),
+        indirect_lighting = Graph.compute_pipeline("indirect_lighting_rsm_shader"),
+        indirect_lighting_debug_view = Graph.compute_pipeline("indirect_lighting_rsm_debug_view_shader"),
+        combine_lighting = Graph.compute_pipeline("combine_lighting_shader"),
+        extract_bloom = Graph.compute_pipeline("bloom_shader_extract"),
+        blur_ping = Graph.compute_pipeline("kawase_blur_pong_write_shader"),
+        blur_pong = Graph.compute_pipeline("kawase_blur_ping_write_shader"),
+        present = Graph.graphics_pipeline("present_post_processing"),
+        light_billboard = Graph.graphics_pipeline("deferred_light_billboard_pipeline"),
     }
 end
 
@@ -683,7 +683,7 @@ function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeV
         resources = {},
         static_mesh = graph:add_mesh("static_mesh"),
         dynamic_mesh = graph:add_mesh("dynamic_mesh"),
-        pipelines = make_pipelines(graph),
+        pipelines = make_pipelines(),
         graph = graph,
         tasks = { indirect_lighting = {} },
         light_tasks = {},

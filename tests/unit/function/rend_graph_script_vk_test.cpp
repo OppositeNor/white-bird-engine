@@ -1387,6 +1387,104 @@ TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequ
     EXPECT_EQ(bound(dispatches[29], "unique_keys"), "svo_3_unique_leaves");
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsUInt2KeysByEveryBitOrABitRange) {
+    const DataValue result = RendGraphScriptVK::run("radix_sort_uint2", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
+return { build = function()
+    local graph = Graph.new()
+    local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
+    local buffers = sort.radix_sort_buffers(names, 1000, "uint2")
+    sort.add_radix_sort_task(graph, "full", buffers)
+    sort.add_radix_sort_task(graph, "key_value", buffers, nil, { begin_bit = 32 })
+    sort.add_radix_sort_key_value_task(graph, "key_value_task", buffers, "compute_1")
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const DataValue::List& tasks = result.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 3U);
+    const auto pipeline = [&](size_t p_task, size_t p_dispatch) {
+        return tasks[p_task].get_entry("params").get_entry("dispatches").as_list()[p_dispatch].get_value<std::string>(
+            "pipeline");
+    };
+    // The preparation and 5 passes for each of the 8 digits, or of the 4 digits of x.
+    EXPECT_EQ(tasks[0].get_entry("params").get_entry("dispatches").as_list().size(), 41U);
+    EXPECT_EQ(pipeline(0, 0), "radix_sort_prepare_dispatch");
+    EXPECT_EQ(pipeline(0, 1), "radix_sort_uint2_histogram_workgroup_process_0_8");
+    EXPECT_EQ(pipeline(0, 2), "radix_sort_histogram_prefix_sum");
+    EXPECT_EQ(pipeline(0, 5), "radix_sort_uint2_scatter_0_8");
+    EXPECT_EQ(pipeline(0, 40), "radix_sort_uint2_scatter_56_64");
+    EXPECT_EQ(tasks[1].get_entry("params").get_entry("dispatches").as_list().size(), 21U);
+    EXPECT_EQ(pipeline(1, 1), "radix_sort_uint2_histogram_workgroup_process_32_40");
+    EXPECT_EQ(pipeline(1, 20), "radix_sort_uint2_scatter_56_64");
+    // The key-value task runs the same dispatches as the bits [32, 64) sort, on its queue family.
+    EXPECT_EQ(tasks[2].get_entry("params").get_entry("dispatches"), tasks[1].get_entry("params").get_entry("dispatches"));
+    EXPECT_EQ(tasks[2].get_entry("params").get_value<std::string>("queue_family"), "compute_1");
+    // The metadata and 1000 keys of 8 bytes each.
+    for (const DataValue& resource : result.get_entry("resources").as_list()) {
+        const std::string id = resource.get_value<std::string>("id");
+        if (id == "keys" || id == "keys_swap") {
+            EXPECT_EQ(resource.get_entry("buffer").get_value<int64_t>("size"), 8016);
+        }
+    }
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsUIntKeysByABitRange) {
+    const DataValue result = RendGraphScriptVK::run("radix_sort_uint_range", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
+return { build = function()
+    local graph = Graph.new()
+    local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
+    graph:add(sort.radix_sort_task("sort", sort.radix_sort_buffers(names, 1000), nil, { begin_bit = 8, end_bit = 24 }))
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const DataValue& task = result.get_entry("tasks").as_list().at(0);
+    const DataValue::List& dispatches = task.get_entry("params").get_entry("dispatches").as_list();
+    ASSERT_EQ(dispatches.size(), 11U);
+    EXPECT_EQ(dispatches[1].get_value<std::string>("pipeline"), "radix_sort_histogram_workgroup_process_8_16");
+    EXPECT_EQ(dispatches[10].get_value<std::string>("pipeline"), "radix_sort_scatter_16_24");
+    // The second pass scatters back into the key buffer.
+    EXPECT_EQ(task.get_entry("aliases").get_value<std::string>(
+                  dispatches[10].get_entry("aliases").get_value<std::string>("output_buffer")),
+        "keys");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsRejectInvalidBitRanges) {
+    const auto run_sort = [](std::string_view p_key_type, std::string_view p_options) {
+        const std::string source = std::string(R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
+return { build = function()
+    local graph = Graph.new()
+    local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
+    local buffers = sort.radix_sort_buffers(names, 1000, ")") +
+            std::string(p_key_type) + "\")\n    sort.add_radix_sort_task(graph, \"sort\", buffers, nil, " +
+            std::string(p_options) + ")\n    return graph:build()\nend }\n";
+        return RendGraphScriptVK::run("radix_sort_range", source, DataValue::make_map());
+    };
+    EXPECT_NO_THROW((void)run_sort("uint2", "{ begin_bit = 32 }"));
+    EXPECT_NO_THROW((void)run_sort("uint", "{ begin_bit = 16 }"));
+    for (const std::string_view options : {"{ begin_bit = 4 }", "{ end_bit = 60 }", "{ begin_bit = -16 }",
+             "{ end_bit = 72 }", "{ begin_bit = 32, end_bit = 32 }", "{ begin_bit = 40 }"}) {
+        EXPECT_THROW((void)run_sort("uint2", options), std::runtime_error) << options;
+    }
+    // A range past the 32 bits of uint keys.
+    EXPECT_THROW((void)run_sort("uint", "{ begin_bit = 32, end_bit = 48 }"), std::runtime_error);
+    // The key-value sort orders the x of uint2 keys.
+    EXPECT_THROW((void)RendGraphScriptVK::run("radix_sort_key_value_uint", R"(
+local Graph = require("render_graph_utils.render_graph_utils")
+local sort = require("render_graph_utils.sort")
+return { build = function()
+    local graph = Graph.new()
+    local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
+    sort.add_radix_sort_key_value_task(graph, "sort", sort.radix_sort_buffers(names, 1000))
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxelAndPixelSortFeatures) {
     RenderAllocator allocator(WBE_KI_B(16));
     RenderContextVK render_data(&allocator);

@@ -63,4 +63,5 @@ void main(uint p_group_id : SV_GroupID, uint p_group_thread_id : SV_GroupThreadI
     uint parent_index = svo_occupancy.svo.get_leaf(responsible_index).parent_index;
     SVONode parent = svo_occupancy.svo.get_node(parent_index);
     // We already have the info of the first children, so we 
+    // TODO
 }

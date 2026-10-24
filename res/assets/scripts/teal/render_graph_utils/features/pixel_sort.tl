@@ -98,7 +98,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     local column_offsets = graph:add_storage_buffer(
         "pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE)
     -- The sort is sized for every pixel inside the mask.
-    local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count, graph)
+    local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
 
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
     local copy_source_pipeline = graph:add_compute_pipeline("copy_pixel_sort_source_shader")

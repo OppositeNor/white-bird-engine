@@ -42,6 +42,8 @@
 #define WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX 0
 #define WBE_RADIX_SORT_OVERFLOW_START_INDEX 1
 #define WBE_RADIX_SORT_LANE_START_INDEX 2
+// The sub-histograms start after the metadata of the histogram buffer.
+#define WBE_RADIX_SORT_LANE_START 4
 // The number of consecutive sub-histograms each histogram prefix scan workgroup scans in groupshared memory.
 #define WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM 16
 #define WBE_RADIX_SORT_SCAN_ENTRY_NUM (WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM * WBE_RADIX_SORT_BUCKET_COUNT)
