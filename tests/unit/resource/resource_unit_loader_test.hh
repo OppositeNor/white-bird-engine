@@ -1854,6 +1854,43 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     ASSERT_EQ(created_ref_keys.size(), 2U);
     EXPECT_EQ(created_ref_keys[0], "normal_texture");
     EXPECT_EQ(created_ref_keys[1], "normal_texture");
+    EXPECT_EQ(captured_material->pipeline_variant, nullptr);
+    EXPECT_EQ(captured_material->get_pipeline_variant(), WBE::MATERIAL_PIPELINE_VARIANT_DEFAULT);
+}
+
+TEST_F(ResourcePopulatorTest, MaterialPipelineVariant) {
+    WBE::ResourceUnitLoaderMaterial loader;
+    WBE::StackAllocator stack_allocator(64 * 1024);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RUMaterial> captured_material;
+
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
+                             [&captured_material, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
+                                 WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                                 captured_material = saved_resource.force_cast<WBE::RUMaterial>();
+                                 return saved_resource;
+                             }))
+                         .build(stream);
+
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(R"({"id": "tinted_material", "type": "material", "textures": [], "pipeline_variant": "tinted"})");
+    loader.populate_scheme_from_data(*res_chunk, parser.get_data());
+    ASSERT_NE(captured_material, nullptr);
+    EXPECT_STREQ(captured_material->pipeline_variant.get(), "tinted");
+    EXPECT_EQ(captured_material->get_pipeline_variant(), "tinted");
+
+    WBE::ParserJSON empty_parser;
+    empty_parser.parse_from_buffer(R"({"id": "empty_variant_material", "type": "material", "textures": [], "pipeline_variant": ""})");
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, empty_parser.get_data()), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {

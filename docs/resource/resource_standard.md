@@ -127,6 +127,11 @@ textures = [
 Materials do not declare a `material_type` or graphics pipelines; the graphics pipeline the application draws them with and its
 reflected shader metadata define the rendering contract.
 
+- An optional `pipeline_variant` (a non-empty string without NUL, `default` when absent) names which of a draw task's pipelines
+  draws the material, for example `pipeline_variant = "foliage"`. Variant names are free strings: the recipe maps each to a
+  compiled pipeline per pass (see `docs/renderer_vk/renderer_vk.md`, Drawing), so a material stays independent of passes and
+  attachment formats.
+
 - Each texture slot requires a non-empty `texture_role`. Shaders select roles through reflected `WBE_TEXTURE` attributes.
 - The loader retains each exact texture role name together with its runtime hash; consumers use both and never treat a hash alone
   as identity. Resource units do not use closed role enums.

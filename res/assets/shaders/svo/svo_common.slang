@@ -88,6 +88,14 @@ struct SVONode {
     }
 
     /**
+     * @brief Counts the occupied sectors in children_data.
+     * @details Meaningful wherever get_children_occupancy() is.
+     */
+    uint count_children_occupancy() {
+        return countbits(get_children_occupancy());
+    }
+
+    /**
      * @brief Tests the occupancy bit of one sector in children_data.
      * @param p_sector Sector below eight, as returned by get_svo_node_subregion().
      */

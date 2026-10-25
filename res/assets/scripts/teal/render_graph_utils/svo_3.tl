@@ -60,7 +60,7 @@ function svo_3.add_leaf_deduplication(p_graph: Graph.Graph, p_params: svo_3.Leaf
     local extent = 1 << p_params.max_depth
     local gather = p_graph:draw_mesh("svo_3_gather_leaves", {
         mesh = p_params.mesh,
-        pipeline = p_graph:add_graphics_pipeline("svo_3_gather_leaves_pipeline"),
+        pipeline = { default = p_graph:add_graphics_pipeline("svo_3_gather_leaves_pipeline") },
         parts = { "opaque", "double_sided" },
         render_extent = { width = extent, height = extent },
     }, { aliases = { svo_info = p_params.svo_info, svo_deferred_list = deferred_list } })

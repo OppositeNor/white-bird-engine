@@ -413,6 +413,15 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
         }
         texture_slots.push_back(texture_slot);
     }
+    if (p_material.pipeline_variant.has_value()) {
+        if (p_material.pipeline_variant->empty()) {
+            throw std::runtime_error("Failed to populate material resource: pipeline_variant must not be empty.");
+        }
+        if (p_material.pipeline_variant->contains('\0')) {
+            throw std::runtime_error("Failed to populate material resource: pipeline_variant must not contain NUL.");
+        }
+        resource_unit.pipeline_variant = populate_text(p_res_chunk, *p_material.pipeline_variant);
+    }
     resource_unit.texture_count = texture_slots.size();
     if (!texture_slots.empty()) {
         resource_unit.textures =

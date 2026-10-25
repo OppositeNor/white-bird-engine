@@ -24,6 +24,10 @@ name = "vulkan_draw_cube_unshaded_test"
 sources = ["vulkan_draw_cube_unshaded_test.cpp"]
 
 [[generate.data.exes]]
+name = "vulkan_draw_material_variants_test"
+sources = ["vulkan_draw_material_variants_test.cpp"]
+
+[[generate.data.exes]]
 name = "vulkan_draw_sponza_deferred_test"
 sources = ["deferred_test/*", "entity_draw_data.cpp"]
 

@@ -190,6 +190,12 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMaterial : public RUSchema {
     /** Shader-defined texture slots used by the material. Texture roles must not be empty or duplicated. */
     WBE_META(WBE_REFLECT)
     std::vector<RUSchemaMaterialTextureSlot> textures;
+    /**
+     * Pipeline variant that draws the material. Draw tasks map variants to compiled pipelines; absent means
+     * MATERIAL_PIPELINE_VARIANT_DEFAULT. Must not be empty or contain NUL.
+     */
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> pipeline_variant;
 };
 
 /**
@@ -499,6 +505,11 @@ struct RUShaderRole {
 };
 
 /**
+ * @brief Pipeline variant of a material that does not declare one; draw tasks draw it with their default pipeline.
+ */
+inline constexpr std::string_view MATERIAL_PIPELINE_VARIANT_DEFAULT = "default";
+
+/**
  * @class RUMaterial
  * @brief Typed material resource unit.
  */
@@ -514,6 +525,16 @@ struct RUMaterial : public ResourceUnit {
     RefRes<TextureSlot> textures;
     /** Number of entries in textures. */
     size_t texture_count = 0;
+    /** Chunk-owned NUL-terminated pipeline variant; null for MATERIAL_PIPELINE_VARIANT_DEFAULT. */
+    RefRes<char> pipeline_variant;
+
+    /**
+     * @brief Get the pipeline variant that draws the material.
+     * @return The declared variant, or MATERIAL_PIPELINE_VARIANT_DEFAULT when none is declared.
+     */
+    std::string_view get_pipeline_variant() const {
+        return pipeline_variant == nullptr ? MATERIAL_PIPELINE_VARIANT_DEFAULT : std::string_view(pipeline_variant.get());
+    }
 };
 
 /**

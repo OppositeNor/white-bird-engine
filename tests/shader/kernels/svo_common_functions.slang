@@ -40,6 +40,15 @@ uint svo_children_index(uint p_children_data) {
 }
 
 /**
+ * @brief Counts the occupied sectors of a node with the given packed description.
+ */
+uint svo_count_children_occupancy(uint p_children_data) {
+    SVONode node;
+    node.children_data = p_children_data;
+    return node.count_children_occupancy();
+}
+
+/**
  * @brief Returns (SVO_CHILDREN_OCCUPANCY_MASK, SVO_CHILDREN_BLOCK_INDEX_MASK, SVO_CHILDREN_PAYLOAD_MASK).
  */
 uint3 svo_children_masks() {

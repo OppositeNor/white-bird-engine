@@ -172,6 +172,28 @@ struct SVO {
     }
 
     /**
+     * @brief Get a node's depth by walking from the node to the root.
+     * @details In shader-debug builds, an invalid parent index reports SVO_NODE_INDEX_OVERFLOW and a chain longer than
+     * info.max_depth - 1 nodes reports SVO_DEEPER_THAN_EXPECTED.
+     * @param p_index Node index below get_total_nodes(), as in get_node().
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return The depth of the node: one for the root's sectors and info.max_depth - 1 for the parents of leaves.
+     */
+    uint get_node_depth(uint p_index, uint p_frame_slot) {
+        WBE_SHADER_DEBUG_ASSERT(p_index < get_total_nodes(), ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+        uint depth = 1;
+        int parent_index = get_node(p_index).parent_index;
+        for (; parent_index >= 0 && depth < info.max_depth; ++depth) {
+            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
+                ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+            parent_index = get_node(uint(parent_index)).parent_index;
+        }
+        WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && depth < info.max_depth,
+            ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
+        return depth;
+    }
+
+    /**
      * @brief Reconstruct a leaf's grid position by walking from the leaf to the root.
      * @param p_index Leaf index below get_total_leaves(), as in get_leaf().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
@@ -324,21 +346,31 @@ struct SVOWriteImage<T : ITexelElement> {
      * @param p_value Value stored into the reached node's or leaf's texel.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
-    void write_data(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
+    void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
         voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
     }
 
     /**
-     * @brief Overwrite the voxel data of a leaf.
-     * @details The texel is located from the leaf's data_index as in trace_data(), with the same shader-debug overflow
-     * check. The store is not atomic; callers must ensure no other invocation accesses the same texel during the calling
-     * pass.
-     * @param p_leaf_index Index into svo.leaves; must be below get_total_leaves().
-     * @param p_value Value stored into the leaf's texel.
+     * @brief Read the voxel data at a data index.
+     * @details The texel is located from the data index as in trace_data(), with the same shader-debug overflow check.
+     * @param p_data_index Data index of a node or leaf, such as SVONode::data_index or SVOLeaf::data_index.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return The stored texel.
+     */
+    T read_data_at_index(uint p_data_index, uint p_frame_slot) {
+        return voxel_data[get_data_texel(p_data_index, p_frame_slot)];
+    }
+
+    /**
+     * @brief Overwrite the voxel data at a data index.
+     * @details The texel is located from the data index as in trace_data(), with the same shader-debug overflow check. The
+     * store is not atomic; callers must ensure no other invocation accesses the same texel during the calling pass.
+     * @param p_data_index Data index of a node or leaf, such as SVONode::data_index or SVOLeaf::data_index.
+     * @param p_value Value stored into the texel.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
-    void write_leaf_data(uint p_leaf_index, T p_value, uint p_frame_slot) {
-        voxel_data[get_data_texel(svo.leaves[p_leaf_index].data_index, p_frame_slot)] = p_value;
+    void write_data_at_index(uint p_data_index, T p_value, uint p_frame_slot) {
+        voxel_data[get_data_texel(p_data_index, p_frame_slot)] = p_value;
     }
 
     uint3 trace_texel(float3 p_global_position, uint p_depth, uint p_frame_slot) {
@@ -454,7 +486,7 @@ struct SVOWriteBrick<T : ITexelElement> {
      * @param p_value Value stored into the selected sub-voxel.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
-    void write_data(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
+    void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
         uint3 dimensions;

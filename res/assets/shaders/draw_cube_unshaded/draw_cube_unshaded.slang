@@ -83,3 +83,15 @@ VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_Vulk
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
     return float4(p_input.normal * 0.5 + 0.5, 1.0);
 }
+
+/**
+ * @brief Visualize the surface normal like fragment_main, tinted orange; drawn for materials of the "tinted" pipeline
+ * variant.
+ * @param p_input The interpolated vertex output.
+ * @return The tinted normal color.
+ */
+[shader("fragment")]
+float4 fragment_tinted_main(VSOutput p_input) : SV_Target0 {
+    const float3 normal_color = p_input.normal * 0.5 + 0.5;
+    return float4(normal_color * float3(1.0, 0.45, 0.1), 1.0);
+}

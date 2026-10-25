@@ -299,7 +299,7 @@ local function add_mesh_draws(p_builder: Builder)
 
         tasks.run_shadow_opaque = graph:draw_mesh(light_id("run_shadow_opaque", light), {
             mesh = p_builder.static_mesh,
-            pipeline = p_builder.pipelines.shadow_opaque,
+            pipeline = { default = p_builder.pipelines.shadow_opaque },
             parts = { "opaque" },
             render_extent = shadow_extent,
             clear_values = clear_values,
@@ -312,7 +312,7 @@ local function add_mesh_draws(p_builder: Builder)
 
         tasks.run_shadow_double_sided = graph:draw_mesh(light_id("run_shadow_double_sided", light), {
             mesh = p_builder.static_mesh,
-            pipeline = p_builder.pipelines.shadow_double_sided,
+            pipeline = { default = p_builder.pipelines.shadow_double_sided },
             parts = { "double_sided" },
             render_extent = shadow_extent,
             clear_values = clear_values,
@@ -325,7 +325,7 @@ local function add_mesh_draws(p_builder: Builder)
 
         tasks.dynamic_shadow = graph:draw_mesh(light_id("dynamic_shadow", light), {
             mesh = p_builder.dynamic_mesh,
-            pipeline = p_builder.pipelines.shadow_dynamic,
+            pipeline = { default = p_builder.pipelines.shadow_dynamic },
             parts = { "opaque" },
             transform = graph:reference(dynamic_transforms[1]),
             render_extent = shadow_extent,
@@ -339,7 +339,7 @@ local function add_mesh_draws(p_builder: Builder)
 
         tasks.dynamic_shadow_second = graph:draw_mesh(light_id("dynamic_shadow_second", light), {
             mesh = p_builder.dynamic_mesh,
-            pipeline = p_builder.pipelines.shadow_dynamic,
+            pipeline = { default = p_builder.pipelines.shadow_dynamic },
             parts = { "opaque" },
             transform = graph:reference(dynamic_transforms[2]),
             render_extent = shadow_extent,
@@ -356,7 +356,7 @@ local function add_mesh_draws(p_builder: Builder)
 
     p_builder.tasks.run_gbuffer = graph:draw_mesh("run_gbuffer", {
         mesh = p_builder.static_mesh,
-        pipeline = p_builder.pipelines.gbuffer_opaque,
+        pipeline = { default = p_builder.pipelines.gbuffer_opaque },
         parts = { "opaque" },
         clear_values = gbuffer_clear_values,
         color_load_op = "clear",
@@ -369,7 +369,7 @@ local function add_mesh_draws(p_builder: Builder)
 
     p_builder.tasks.run_gbuffer_double_sided = graph:draw_mesh("run_gbuffer_double_sided", {
         mesh = p_builder.static_mesh,
-        pipeline = p_builder.pipelines.gbuffer_double_sided,
+        pipeline = { default = p_builder.pipelines.gbuffer_double_sided },
         parts = { "double_sided" },
         clear_values = gbuffer_clear_values,
         color_load_op = "load",
@@ -382,7 +382,7 @@ local function add_mesh_draws(p_builder: Builder)
 
     p_builder.tasks.dynamic_gbuffer = graph:draw_mesh("dynamic_gbuffer", {
         mesh = p_builder.dynamic_mesh,
-        pipeline = p_builder.pipelines.gbuffer_dynamic,
+        pipeline = { default = p_builder.pipelines.gbuffer_dynamic },
         parts = { "opaque" },
         transform = graph:reference(dynamic_transforms[1]),
         clear_values = {},
@@ -396,7 +396,7 @@ local function add_mesh_draws(p_builder: Builder)
 
     p_builder.tasks.dynamic_gbuffer_second = graph:draw_mesh("dynamic_gbuffer_second", {
         mesh = p_builder.dynamic_mesh,
-        pipeline = p_builder.pipelines.gbuffer_dynamic,
+        pipeline = { default = p_builder.pipelines.gbuffer_dynamic },
         parts = { "opaque" },
         transform = graph:reference(dynamic_transforms[2]),
         clear_values = {},

@@ -239,6 +239,18 @@ def test_get_svo_children_state_and_index(svo_common: spy.Module, rng: np.random
         block_indices.astype(np.uint32) * 8)
 
 
+def test_count_svo_children_occupancy(svo_common: spy.Module, rng: np.random.Generator) -> None:
+    states = rng.integers(0, 7, 1024)
+    block_indices = rng.integers(0, 1 << BLOCK_INDEX_BIT_COUNT, 1024)
+    # Every occupancy value, so each count from zero to eight appears.
+    occupancies = np.concatenate([np.arange(256), rng.integers(0, 256, 1024 - 256)])
+    children_data = np.array([pack_children_data(int(state), int(block), int(occupancy))
+        for state, block, occupancy in zip(states, block_indices, occupancies)], dtype=np.uint32)
+    # The state and block index bits must not be counted.
+    np.testing.assert_array_equal(svo_common.svo_count_children_occupancy(children_data, _result="numpy"),
+        [bin(int(occupancy)).count("1") for occupancy in occupancies])
+
+
 def test_get_svo_node_subregion(svo_common: spy.Module, rng: np.random.Generator) -> None:
     positions = rng.uniform(0.0, 1.0, (1024, 3)).astype(np.float32)
     # Exact halves belong to the upper sector, values just below them to the lower one.

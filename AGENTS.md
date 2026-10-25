@@ -116,6 +116,8 @@ For non-trivial implementation tasks:
 - Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
   assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each compiled mesh in the render database under
   the graph id its draws name (`mesh`), which they import it under, so shared meshes are compiled and imported once.
+  `pipeline` maps material pipeline variants to pipelines (`pipeline = { default = ..., foliage = ... }`); draws batch per
+  variant, and the task's pipelines must share render targets and one material texture contract.
 - A rebuild callback may add to the descriptor `RendGraphRecipeBuilderVK::build()` returns, for parts not yet expressed
   in Lua (the deferred test adds its acceleration structure and dynamic mesh entities that way); keep everything else in
   the recipe.
@@ -283,7 +285,8 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 ### Material Texture Contract
 
 - Materials do not have a `material_type`. Their graphics pipeline and its reflected shader metadata define the rendering
-  contract.
+  contract. A material may set a free-string `pipeline_variant` (`default` when absent); draw tasks map variants to compiled
+  pipelines, so materials never name pipelines or passes.
 - Every material texture slot has a non-empty, shader-defined `texture_role`; do not introduce a closed engine-side texture-role
   enum or whitelist.
 - Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `utils/utils.slang`.

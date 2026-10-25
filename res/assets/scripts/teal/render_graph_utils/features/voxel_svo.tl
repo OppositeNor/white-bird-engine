@@ -86,7 +86,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
         local params: Graph.RTParamsGraphicsDrawMeshVK = {
             mesh = p_mesh,
-            pipeline = p_pipeline,
+            pipeline = { default = p_pipeline },
             parts = { p_part },
             transform = p_transform,
             render_extent = extent,

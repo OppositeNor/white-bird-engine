@@ -49,7 +49,7 @@ function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local camera_info = graph:import_resource("camera_info")
     graph:draw_mesh("run_static_mesh", {
         mesh = graph:add_mesh("model_cube_static.mesh"),
-        pipeline = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline"),
+        pipeline = { default = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline") },
         parts = { "opaque" },
     }, { uses = { camera_info } }):color_target(0, swap_chain)
     return graph:build()
@@ -88,6 +88,9 @@ module, a context struct, a trigger or toggle, an imported task, or a new task t
   Keep the description structs' `operator==` complete, because diffing relies on it.
 - **Meshes** are drawn with `graph:draw_mesh()` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), which imports the mesh
   under its render-database key. Do not hand-assemble mesh draws.
+- **Per-material pipelines.** `pipeline` maps material pipeline variants to pipelines:
+  `pipeline = { default = ..., foliage = ... }`; a material without `pipeline_variant` is `default`. Draws batch per variant;
+  an unmapped variant throws, and the pipelines must share render targets and one material texture contract.
 - **Queues.** Compute tasks default to `GRAPHICS`; set `queue_family = "compute_1"` or `"compute_2"` to run asynchronously.
   Same-queue edges become pipeline barriers; cross-queue edges use timeline semaphores. Every task on another queue must
   reach a graphics task.

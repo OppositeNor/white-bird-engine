@@ -887,7 +887,7 @@ return { build = function()
     local compute = graph:add_compute_pipeline("shared_name")
     graph:add_mesh("unused_mesh")
     assert(#graph.tasks == 0)
-    local draw = graph:draw_mesh("mesh", { mesh = mesh, pipeline = graphics, parts = { "opaque" } })
+    local draw = graph:draw_mesh("mesh", { mesh = mesh, pipeline = { default = graphics }, parts = { "opaque" } })
     graph:compute("compute", { pipeline = compute })
     graph:compute_sequential("sequence", { dispatches = { { pipeline = compute } } })
     graph:ping_pong("ping_pong", { ping_pipeline = compute, pong_pipeline = compute, iterations = 2,
@@ -904,7 +904,7 @@ end }
     const auto& tasks = recipe.get_entry("tasks").as_list();
     ASSERT_EQ(tasks.size(), 5U);
     EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("mesh"), "static_mesh");
-    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("pipeline"), "shared_name");
+    EXPECT_EQ(tasks[0].get_entry("params").get_entry("pipeline").get_value<std::string>("default"), "shared_name");
     EXPECT_EQ(tasks[1].get_entry("params").get_value<std::string>("pipeline"), "shared_name");
     const auto& dispatch = tasks[2].get_entry("params").get_entry("dispatches").as_list()[0];
     EXPECT_EQ(dispatch.get_value<std::string>("pipeline"), "shared_name");
@@ -940,8 +940,8 @@ return { build = function()
         function() graph:compute("invalid", { pipeline = "compute" }) end,
         function() graph:compute("invalid", { pipeline = graphics }) end,
         function() graph:draw("invalid", { pipeline = compute }) end,
-        function() graph:draw_mesh("invalid", { mesh = graphics, pipeline = graphics, parts = { "opaque" } }) end,
-        function() graph:draw_mesh("invalid", { mesh = mesh, pipeline = mesh, parts = { "opaque" } }) end,
+        function() graph:draw_mesh("invalid", { mesh = graphics, pipeline = { default = graphics }, parts = { "opaque" } }) end,
+        function() graph:draw_mesh("invalid", { mesh = mesh, pipeline = { default = mesh }, parts = { "opaque" } }) end,
         function() graph:compute("invalid", { pipeline = graph_utils.import_resource("compute") }) end,
         function() graph:compute("invalid", { pipeline = { id = "", kind = "database", dependencies = {},
             resource_type = compute.resource_type } }) end,
@@ -1341,6 +1341,22 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedPixelSortingRecipe) {
     EXPECT_EQ(radix_sort.get_value<std::string>("type"), "run_compute_pipelines_sequential");
     EXPECT_EQ(radix_sort.get_entry("params").get_entry("dispatches").as_list().size(), 21U);
     EXPECT_EQ(recipe.get_entry("resources").as_list().size(), 12U);
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedMaterialVariantsRecipeAndLowersVariantPipelines) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    RenderContextVK render_data(&allocator);
+    render_data.frames_in_flight = 2;
+    render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
+    const DataValue recipe =
+        RendGraphScriptVK::run("render_graphs.draw_material_variants", RendGraphScriptVK::make_context(render_data, RendGraphContextVK{}));
+    const DataValue::List& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 1U);
+    const DataValue& params = tasks[0].get_entry("params");
+    const DataValue& pipelines = params.get_entry("pipeline");
+    ASSERT_TRUE(pipelines.get_kind() == DataValueKind::MAP);
+    EXPECT_EQ(pipelines.get_value<std::string>("default"), "draw_cube_unshaded_pipeline");
+    EXPECT_EQ(pipelines.get_value<std::string>("tinted"), "draw_cube_unshaded_tinted_pipeline");
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequentialTask) {
