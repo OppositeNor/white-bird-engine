@@ -32,12 +32,12 @@ local ceil_div = math_utils.ceil_div
 
 -- VK_REMAINING_MIP_LEVELS: a view of every mip level from the base level on.
 local REMAINING_MIP_LEVELS = 4294967295
--- One workgroup per 8x8 tile of the lit images, which have the swap chain extent.
-local SCREEN_TILE_SIZE = 8
+-- One workgroup per 16x16 tile of the lit images, which have the swap chain extent.
+local SCREEN_TILE_SIZE = 16
 -- One invocation per shadow-map line in the summed-area-table passes.
 local SUMMED_AREA_TABLE_WORKGROUP_SIZE = 64
--- One workgroup per 8x8 tile of the bloom images.
-local BLOOM_TILE_SIZE = 8
+-- One workgroup per 16x16 tile of the bloom images.
+local BLOOM_TILE_SIZE = 16
 
 local record VoxelFeature
     -- The structure as a subgraph task, whose overlays draw on the target's color and depth.

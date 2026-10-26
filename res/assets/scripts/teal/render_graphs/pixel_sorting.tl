@@ -21,7 +21,7 @@
 -- Imported tasks: `draw_imgui`, the application's ImGui overlay, drawn after `present_sorted_pixels`.
 
 -- Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
-local PIXEL_SORT_TILE_SIZE = 8
+local PIXEL_SORT_TILE_SIZE = 16
 -- Must match the numthreads of count_pixel_sort_mask.slang and register_pixel_sort_keys.slang, which run one invocation
 -- per line.
 local PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64

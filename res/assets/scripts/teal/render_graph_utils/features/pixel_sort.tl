@@ -24,7 +24,7 @@ local sort = require("render_graph_utils.sort")
 local ceil_div = math_utils.ceil_div
 
 -- Must match the numthreads of copy_pixel_sort_source.slang and write_sorted_pixels.slang.
-local PIXEL_SORT_TILE_SIZE = 8
+local PIXEL_SORT_TILE_SIZE = 16
 -- Must match the numthreads of count_pixel_sort_mask.slang and register_pixel_sort_keys.slang, which run one invocation
 -- per sorted line.
 local PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64

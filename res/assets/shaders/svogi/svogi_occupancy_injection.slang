@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-#include "deferred_composition/deferred_composition_utils.slang"
+#include "utils/utils.slang"
 #include "svogi/svogi_utils.slang"
 
 struct DescriptorIndices {

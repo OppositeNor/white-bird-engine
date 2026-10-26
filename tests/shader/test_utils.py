@@ -78,6 +78,33 @@ def test_software_mul_float4x4_vector(utils: spy.Module, rng: np.random.Generato
     np.testing.assert_allclose(result, np.einsum("nij,nj->ni", matrices, vectors), rtol=1e-5, atol=1e-5)
 
 
+def random_view_projection(p_rng: np.random.Generator) -> np.ndarray:
+    """A perspective projection times a random rigid view transform."""
+    near, far, focal = 0.1, 100.0, 1.5
+    projection = np.array([[focal, 0.0, 0.0, 0.0], [0.0, focal, 0.0, 0.0],
+        [0.0, 0.0, far / (far - near), -far * near / (far - near)], [0.0, 0.0, 1.0, 0.0]])
+    rotation, _ = np.linalg.qr(p_rng.normal(size=(3, 3)))
+    view = np.eye(4)
+    view[:3, :3] = rotation
+    view[:3, 3] = p_rng.normal(size=3)
+    return projection @ view
+
+
+def test_world_position_from_depth(utils: spy.Module, rng: np.random.Generator) -> None:
+    view_projection = random_view_projection(rng)
+    inverse_view_projection = np.linalg.inv(view_projection)
+    # Pick points in view space inside the frustum, then map them back to world space.
+    ndc = np.stack([rng.uniform(-1.0, 1.0, SAMPLE_COUNT), rng.uniform(-1.0, 1.0, SAMPLE_COUNT),
+        rng.uniform(0.05, 0.99, SAMPLE_COUNT), np.ones(SAMPLE_COUNT)], axis=1)
+    world = ndc @ inverse_view_projection.T
+    world = world[:, :3] / world[:, 3:]
+    uvs = (ndc[:, :2] * 0.5 + 0.5).astype(np.float32)
+    depths = ndc[:, 2].astype(np.float32)
+    rows = [np.tile(inverse_view_projection[row].astype(np.float32), (SAMPLE_COUNT, 1)) for row in range(4)]
+    result = call(utils.world_position_from_depth, uvs, depths, *rows)
+    np.testing.assert_allclose(result, world, rtol=1e-3, atol=1e-3)
+
+
 def test_chebyshev_upper_bound(utils: spy.Module, rng: np.random.Generator) -> None:
     means = rng.uniform(0.0, 10.0, SAMPLE_COUNT)
     variances = rng.uniform(0.0, 2.0, SAMPLE_COUNT)
@@ -187,6 +214,18 @@ def test_z_order_swizzle_8x8(utils: spy.Module) -> None:
     expected_y = ((linear >> 1) & 1) | ((linear >> 2) & 2) | ((linear >> 3) & 4)
     np.testing.assert_array_equal(result, np.stack([expected_x, expected_y], axis=1) + np.array(group_id) * 8)
     assert len({tuple(pixel) for pixel in result}) == 64
+
+
+def test_z_order_swizzle_16x16(utils: spy.Module) -> None:
+    group_id = (3, 5)
+    threads = np.array([(x, y) for y in range(16) for x in range(16)], dtype=np.uint32)
+    groups = np.tile(np.array(group_id, dtype=np.uint32), (len(threads), 1))
+    result = call(utils.z_order_swizzle_16x16, groups, threads)
+    linear = threads[:, 1] * 16 + threads[:, 0]
+    expected_x = sum(((linear >> (2 * bit)) & 1) << bit for bit in range(4))
+    expected_y = sum(((linear >> (2 * bit + 1)) & 1) << bit for bit in range(4))
+    np.testing.assert_array_equal(result, np.stack([expected_x, expected_y], axis=1) + np.array(group_id) * 16)
+    assert len({tuple(pixel) for pixel in result}) == 256
 
 
 def test_random_range(utils: spy.Module, rng: np.random.Generator) -> None:

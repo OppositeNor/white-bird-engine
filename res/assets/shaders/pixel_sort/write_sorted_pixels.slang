@@ -15,7 +15,7 @@
 /**
  * @file write_sorted_pixels.slang
  * @brief Compute pass that writes the pixels of the source image in the order of the sorted radix sort keys.
- * @details Dispatch one 8x8 workgroup per 8x8 pixel tile. A pixel inside the contrast mask receives the source pixel of
+ * @details Dispatch one 16x16 workgroup per 16x16 pixel tile. A pixel inside the contrast mask receives the source pixel of
  * the sorted key at its line rank, which register_pixel_sort_keys stored in the mask image. That key belongs to the
  * same line, so the masked pixels of every line end up sorted by the metric selected in PixelSortContrast, from the
  * smallest value, top to bottom in the vertical variant and left to right in the horizontal variant. With the span scope,
@@ -46,7 +46,7 @@ struct WriteSortedPixelsDescriptorIndices {
 ConstantBuffer<WriteSortedPixelsDescriptorIndices> descriptor_indices;
 
 [shader("compute")]
-[numthreads(8, 8, 1)]
+[numthreads(16, 16, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     Texture2D<float4> source = ResourceDescriptorHeap[descriptor_indices.source.x];
     RWStructuredBuffer<uint> keys = ResourceDescriptorHeap[descriptor_indices.keys.x];

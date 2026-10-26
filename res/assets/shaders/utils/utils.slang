@@ -179,6 +179,26 @@ float4 software_mul_float4x4_vector(
         float4((p_matrix)[0][2], (p_matrix)[1][2], (p_matrix)[2][2], (p_matrix)[3][2]),                                  \
         float4((p_matrix)[0][3], (p_matrix)[1][3], (p_matrix)[2][3], (p_matrix)[3][3])
 
+/**
+ * @brief Reconstruct a world-space position from a screen UV and its depth.
+ * @details The UV maps to normalized device coordinates x and y in [-1, 1]; the depth is used as the NDC z unchanged. The
+ * matrix rows are loaded individually as in software_mul_float4x4_vector().
+ * @param p_uv Screen UV in [0, 1].
+ * @param p_depth Depth sampled at the UV, in NDC.
+ * @param p_row_0 First row of the inverse view-projection matrix.
+ * @param p_row_1 Second row of the inverse view-projection matrix.
+ * @param p_row_2 Third row of the inverse view-projection matrix.
+ * @param p_row_3 Fourth row of the inverse view-projection matrix.
+ * @return The world-space position after the perspective divide.
+ */
+float3 world_position_from_depth(
+    float2 p_uv, float p_depth, float4 p_row_0, float4 p_row_1, float4 p_row_2, float4 p_row_3) {
+    float2 ndc_xy = p_uv * 2.0 - 1.0;
+    float4 ndc = float4(ndc_xy, p_depth, 1.0);
+    float4 world = software_mul_float4x4_vector(p_row_0, p_row_1, p_row_2, p_row_3, ndc);
+    return world.xyz / world.w;
+}
+
 /** Maximum number of bindless material entries addressable by one draw pass. */
 static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
@@ -425,6 +445,23 @@ uint2 z_order_swizzle_8x8(uint2 p_group_id, uint2 p_group_thread_id) {
     uint swizzled_x = ((linear_index >> 0) & 0x1) | ((linear_index >> 1) & 0x2) | ((linear_index >> 2) & 0x4);
     uint swizzled_y = ((linear_index >> 1) & 0x1) | ((linear_index >> 2) & 0x2) | ((linear_index >> 3) & 0x4);
     return p_group_id * 8 + uint2(swizzled_x, swizzled_y);
+}
+
+/**
+ * @brief Map a thread of a 16x16 workgroup to its pixel, visiting the workgroup's 16x16 tile in Z order.
+ * @details The thread's row-major index within the workgroup is read as a Morton code: its even bits are the x offset
+ * within the tile and its odd bits the y offset.
+ * @param p_group_id Workgroup id; each workgroup covers one 16x16 tile.
+ * @param p_group_thread_id Thread id within the workgroup, each component in [0, 16).
+ * @return The pixel the thread processes.
+ */
+uint2 z_order_swizzle_16x16(uint2 p_group_id, uint2 p_group_thread_id) {
+    uint linear_index = p_group_thread_id.y * 16 + p_group_thread_id.x;
+    uint swizzled_x = ((linear_index >> 0) & 0x1) | ((linear_index >> 1) & 0x2) | ((linear_index >> 2) & 0x4)
+        | ((linear_index >> 3) & 0x8);
+    uint swizzled_y = ((linear_index >> 1) & 0x1) | ((linear_index >> 2) & 0x2) | ((linear_index >> 3) & 0x4)
+        | ((linear_index >> 4) & 0x8);
+    return p_group_id * 16 + uint2(swizzled_x, swizzled_y);
 }
 
 /**
