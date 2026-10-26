@@ -22,12 +22,12 @@
 StructuredBuffer<SVONode> nodes;
 StructuredBuffer<SVOLeaf> leaves;
 StructuredBuffer<SVOInfo> tree_info;
-RWTexture3D<float> occupancy;
+RWStructuredBuffer<float> occupancy;
 uniform uint child_depth;
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    SVOWriteImage<float> svo_occupancy = SVOWriteImage<float>(SVO(nodes, leaves, tree_info[0], true), occupancy);
+    SVOWriteBuffer<float> svo_occupancy = SVOWriteBuffer<float>(SVO(nodes, leaves, tree_info[0], true), occupancy);
     propagate_svo_occupancy(svo_occupancy, p_dispatch_thread_id.x * 8, child_depth, 0);
 }

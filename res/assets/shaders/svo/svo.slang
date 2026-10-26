@@ -252,137 +252,145 @@ struct SVO {
 };
 
 /**
- * @brief An SVO paired with a read-only voxel data image.
- * @details The image holds the data of the SVO's nodes and leaves; its layout and indexing are defined by the caller. The
- * same synchronization requirements as SVO apply, and the image must not be written during the calling pass.
- * @tparam T Texel type of the voxel data image.
+ * @brief An SVO paired with a read-only voxel data buffer.
+ * @details The buffer holds one element per data index of the SVO's nodes and leaves; its contents are defined by the
+ * caller. The same synchronization requirements as SVO apply, and the buffer must not be written during the calling pass.
+ * @tparam T Element type of the voxel data buffer.
  */
-struct SVOReadImage<T : ITexelElement> {
+struct SVOReadBuffer<T> {
     /**
      * @brief The SVO the voxel data belongs to.
      */
     SVO svo;
     /**
-     * @brief Read-only atlas holding the voxel data.
+     * @brief Read-only atlas holding the voxel data, indexed by data index.
      */
-    Texture3D<T> atlas;
+    StructuredBuffer<T> atlas;
+    /**
+     * @brief Number of elements of the atlas, queried once at construction.
+     */
+    uint atlas_element_count;
 
     /**
-     * @brief Pair an SVO with its voxel data image.
+     * @brief Pair an SVO with its voxel data buffer.
      */
-    __init(SVO p_svo, Texture3D<T> p_atlas) {
+    __init(SVO p_svo, StructuredBuffer<T> p_atlas) {
         svo = p_svo;
         atlas = p_atlas;
+        uint stride;
+        atlas.GetDimensions(atlas_element_count, stride);
     }
 
     /**
      * @brief Trace the SVO to a depth and read the voxel data of the reached node or leaf.
-     * @details The traced data index is expanded into the image's dimensions row-major, x fastest and z slowest. In
-     * shader-debug builds, a data index past the image's texel count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the read is
-     * not guarded otherwise.
+     * @details In shader-debug builds, a data index past the buffer's element count reports SVO_VOXEL_DATA_INDEX_OVERFLOW;
+     * the read is not guarded otherwise.
      * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
      * svo.info.width).
      * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
-     * @return The stored texel holding the reached node's or leaf's data.
+     * @return The stored element holding the reached node's or leaf's data.
      */
     T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
-        uint3 dimensions;
-        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        uint3 texel = unflatten_index_3d_checked(
-            data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
-        return atlas.Load(int4(int3(texel), 0));
+        WBE_SHADER_DEBUG_ASSERT(
+            data_index < atlas_element_count, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
+        return atlas[data_index];
     }
 };
 
 /**
- * @brief An SVO paired with a writable voxel data image.
- * @details The image holds the data of the SVO's nodes and leaves; its layout and indexing are defined by the caller, who is
- * also responsible for synchronizing writes to it. The same synchronization requirements as SVO apply to the SVO itself.
- * @tparam T Texel type of the voxel data image.
+ * @brief An SVO paired with a writable voxel data buffer.
+ * @details The buffer holds one element per data index of the SVO's nodes and leaves; its contents are defined by the
+ * caller, who is also responsible for synchronizing writes to it. The same synchronization requirements as SVO apply to
+ * the SVO itself.
+ * @tparam T Element type of the voxel data buffer.
  */
-struct SVOWriteImage<T : ITexelElement> {
+struct SVOWriteBuffer<T> {
     /**
      * @brief The SVO the voxel data belongs to.
      */
     SVO svo;
     /**
-     * @brief Writable atlas holding the voxel data.
+     * @brief Writable atlas holding the voxel data, indexed by data index.
      */
-    RWTexture3D<T> atlas;
+    RWStructuredBuffer<T> atlas;
+    /**
+     * @brief Number of elements of the atlas, queried once at construction.
+     */
+    uint atlas_element_count;
 
     /**
-     * @brief Pair an SVO with its voxel data image.
+     * @brief Pair an SVO with its voxel data buffer.
      */
-    __init(SVO p_svo, RWTexture3D<T> p_atlas) {
+    __init(SVO p_svo, RWStructuredBuffer<T> p_atlas) {
         svo = p_svo;
         atlas = p_atlas;
+        uint stride;
+        atlas.GetDimensions(atlas_element_count, stride);
     }
 
     /**
      * @brief Trace the SVO to a depth and read the voxel data of the reached node or leaf.
-     * @details The traced data index is expanded into the image's dimensions row-major, x fastest and z slowest. In
-     * shader-debug builds, a data index past the image's texel count reports SVO_VOXEL_DATA_INDEX_OVERFLOW; the read is
-     * not guarded otherwise.
+     * @details In shader-debug builds, a data index past the buffer's element count reports SVO_VOXEL_DATA_INDEX_OVERFLOW;
+     * the read is not guarded otherwise.
      * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
      * svo.info.width).
      * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
-     * @return The stored texel holding the reached node's or leaf's data.
+     * @return The stored element holding the reached node's or leaf's data.
      */
     T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
-        return atlas[trace_texel(p_global_position, p_depth, p_frame_slot)];
+        return atlas[trace_index(p_global_position, p_depth, p_frame_slot)];
     }
 
     /**
      * @brief Trace the SVO to a depth and overwrite the voxel data of the reached node or leaf.
-     * @details The texel is located as in trace_data(), with the same shader-debug overflow check. The store is not atomic;
-     * callers must ensure no other invocation accesses the same texel during the calling pass.
+     * @details The element is located as in trace_data(), with the same shader-debug overflow check. The store is not
+     * atomic; callers must ensure no other invocation accesses the same element during the calling pass.
      * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
      * svo.info.width).
      * @param p_depth Maximum depth of the reached node or leaf, as in SVO::trace_data().
-     * @param p_value Value stored into the reached node's or leaf's texel.
+     * @param p_value Value stored into the reached node's or leaf's element.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
     void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
-        atlas[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
+        atlas[trace_index(p_global_position, p_depth, p_frame_slot)] = p_value;
     }
 
     /**
      * @brief Read the voxel data at a data index.
-     * @details The texel is located from the data index as in trace_data(), with the same shader-debug overflow check.
+     * @details In shader-debug builds, a data index past the buffer's element count reports SVO_VOXEL_DATA_INDEX_OVERFLOW.
      * @param p_data_index Data index of a node or leaf, such as SVONode::data_index or SVOLeaf::data_index.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
-     * @return The stored texel.
+     * @return The stored element.
      */
     T read_data_at_index(uint p_data_index, uint p_frame_slot) {
-        return atlas[get_data_texel(p_data_index, p_frame_slot)];
+        return atlas[checked_data_index(p_data_index, p_frame_slot)];
     }
 
     /**
      * @brief Overwrite the voxel data at a data index.
-     * @details The texel is located from the data index as in trace_data(), with the same shader-debug overflow check. The
-     * store is not atomic; callers must ensure no other invocation accesses the same texel during the calling pass.
+     * @details In shader-debug builds, a data index past the buffer's element count reports SVO_VOXEL_DATA_INDEX_OVERFLOW.
+     * The store is not atomic; callers must ensure no other invocation accesses the same element during the calling pass.
      * @param p_data_index Data index of a node or leaf, such as SVONode::data_index or SVOLeaf::data_index.
-     * @param p_value Value stored into the texel.
+     * @param p_value Value stored into the element.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
     void write_data_at_index(uint p_data_index, T p_value, uint p_frame_slot) {
-        atlas[get_data_texel(p_data_index, p_frame_slot)] = p_value;
+        atlas[checked_data_index(p_data_index, p_frame_slot)] = p_value;
     }
 
-    uint3 trace_texel(float3 p_global_position, uint p_depth, uint p_frame_slot) {
+    uint trace_index(float3 p_global_position, uint p_depth, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
-        return get_data_texel(svo.trace_data(p_global_position, p_depth, trace_info), p_frame_slot);
+        return checked_data_index(svo.trace_data(p_global_position, p_depth, trace_info), p_frame_slot);
     }
 
-    uint3 get_data_texel(uint p_data_index, uint p_frame_slot) {
-        uint3 dimensions;
-        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        return unflatten_index_3d_checked(
-            p_data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
+    uint checked_data_index(uint p_data_index, uint p_frame_slot) {
+        WBE_SHADER_DEBUG_ASSERT(
+            p_data_index < atlas_element_count, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
+        return p_data_index;
     }
 };
 
@@ -409,6 +417,10 @@ struct SVOReadBrick<T : ITexelElement> {
      */
     Texture3D<T> atlas;
     /**
+     * @brief Extent of the atlas in texels, queried once at construction.
+     */
+    uint3 atlas_dimensions;
+    /**
      * @brief Sampler used to read the bricks; it must filter linearly within a mip level.
      */
     SamplerState brick_sampler;
@@ -419,6 +431,7 @@ struct SVOReadBrick<T : ITexelElement> {
     __init(SVO p_svo, Texture3D<T> p_atlas, SamplerState p_brick_sampler) {
         svo = p_svo;
         atlas = p_atlas;
+        atlas.GetDimensions(atlas_dimensions.x, atlas_dimensions.y, atlas_dimensions.z);
         brick_sampler = p_brick_sampler;
     }
 
@@ -436,14 +449,12 @@ struct SVOReadBrick<T : ITexelElement> {
     T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
-        uint3 dimensions;
-        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
+        uint3 brick_origin = unflatten_index_3d_checked(data_index, atlas_dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
             SVO_BRICK_SIZE;
         // Sub-voxel centers sit at local 0, 0.5, and 1, the centers of the brick's texels 0, 1, and 2.
         float3 texel_position = float3(brick_origin) + 0.5 + trace_info.svo_position * float(SVO_BRICK_SIZE - 1);
-        return atlas.SampleLevel(brick_sampler, texel_position / float3(dimensions), 0.0);
+        return atlas.SampleLevel(brick_sampler, texel_position / float3(atlas_dimensions), 0.0);
     }
 };
 
@@ -464,6 +475,10 @@ struct SVOWriteBrick<T : ITexelElement> {
      * @brief Writable brick image.
      */
     RWTexture3D<T> atlas;
+    /**
+     * @brief Extent of the atlas in texels, queried once at construction.
+     */
+    uint3 atlas_dimensions;
 
     /**
      * @brief Pair an SVO with its brick image.
@@ -471,6 +486,7 @@ struct SVOWriteBrick<T : ITexelElement> {
     __init(SVO p_svo, RWTexture3D<T> p_atlas) {
         svo = p_svo;
         atlas = p_atlas;
+        atlas.GetDimensions(atlas_dimensions.x, atlas_dimensions.y, atlas_dimensions.z);
     }
 
     /**
@@ -489,9 +505,7 @@ struct SVOWriteBrick<T : ITexelElement> {
     void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
-        uint3 dimensions;
-        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
-        uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
+        uint3 brick_origin = unflatten_index_3d_checked(data_index, atlas_dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
             SVO_BRICK_SIZE;
         // Round to the nearest sub-voxel center at local 0, 0.5, or 1.

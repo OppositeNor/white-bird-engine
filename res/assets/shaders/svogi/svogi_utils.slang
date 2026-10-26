@@ -30,13 +30,13 @@ struct SVOGIData {
 
 /**
  * @brief Inject the occupancy of one leaf.
- * @details Writes 1 to the texel of a leaf that svo.is_leaf_occupied() reports; nothing is written for an unoccupied or
+ * @details Writes 1 to the element of a leaf that svo.is_leaf_occupied() reports; nothing is written for an unoccupied or
  * superseded leaf, or for an index past svo.get_total_leaves().
- * @param p_svo_occupancy The SVO with its occupancy image, indexed by data index.
+ * @param p_svo_occupancy The SVO with its occupancy buffer, indexed by data index.
  * @param p_leaf_index Index of the leaf.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
-void inject_svo_leaf_occupancy(SVOWriteImage<float> p_svo_occupancy, uint p_leaf_index, uint p_frame_slot) {
+void inject_svo_leaf_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_leaf_index, uint p_frame_slot) {
     SVO svo = p_svo_occupancy.svo;
     if (p_leaf_index < svo.get_total_leaves() && svo.is_leaf_occupied(p_leaf_index, p_frame_slot)) {
         p_svo_occupancy.write_data_at_index(svo.get_leaf(p_leaf_index).data_index, 1.0f, p_frame_slot);
@@ -45,15 +45,15 @@ void inject_svo_leaf_occupancy(SVOWriteImage<float> p_svo_occupancy, uint p_leaf
 
 /**
  * @brief Inject the occupancy of the parent of one block of eight sibling leaves.
- * @details Writes the fraction of the parent's occupied sectors, from its children_data, to the parent's texel, so it
- * does not depend on the leaves' texels. Nothing is written when the block lies past svo.get_total_leaves() or is a static
+ * @details Writes the fraction of the parent's occupied sectors, from its children_data, to the parent's element, so it
+ * does not depend on the leaves' elements. Nothing is written when the block lies past svo.get_total_leaves() or is a static
  * block superseded by a dynamic one, which still names its parent; only the referenced block writes a parent, so the
  * blocks may be injected concurrently.
- * @param p_svo_occupancy The SVO with its occupancy image, indexed by data index.
+ * @param p_svo_occupancy The SVO with its occupancy buffer, indexed by data index.
  * @param p_block_index Index of the block's first leaf; a multiple of eight.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
-void inject_svo_leaf_parent_occupancy(SVOWriteImage<float> p_svo_occupancy, uint p_block_index, uint p_frame_slot) {
+void inject_svo_leaf_parent_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block_index, uint p_frame_slot) {
     SVO svo = p_svo_occupancy.svo;
     if (p_block_index >= svo.get_total_leaves()) {
         return;
@@ -69,18 +69,18 @@ void inject_svo_leaf_parent_occupancy(SVOWriteImage<float> p_svo_occupancy, uint
 
 /**
  * @brief Propagate the occupancy of one block of eight sibling nodes to their parent.
- * @details Writes the average of the siblings' occupancy to the parent's texel, reading a sibling's texel only when it has
+ * @details Writes the average of the siblings' occupancy to the parent's element, reading a sibling's element only when it has
  * children, since only those were written; the others count as empty. Nothing is written when the block lies past
  * svo.get_total_nodes(), holds the root's sectors, is not at p_child_depth, or is a static block superseded by a dynamic
  * one, which still names its parent. Every sibling with children must already hold its occupancy, so the levels are
  * propagated from the deepest up, after the leaves' parents at depth svo.info.max_depth - 1 are written. Only the
  * referenced block writes a parent, so the blocks of one depth may be propagated concurrently.
- * @param p_svo_occupancy The SVO with its occupancy image, indexed by data index.
+ * @param p_svo_occupancy The SVO with its occupancy buffer, indexed by data index.
  * @param p_block_index Index of the block's first node; a multiple of eight.
  * @param p_child_depth Depth of the siblings to propagate, in [2, svo.info.max_depth - 1].
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
-void propagate_svo_occupancy(SVOWriteImage<float> p_svo_occupancy, uint p_block_index, uint p_child_depth,
+void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block_index, uint p_child_depth,
     uint p_frame_slot) {
     SVO svo = p_svo_occupancy.svo;
     if (p_block_index >= svo.get_total_nodes()) {

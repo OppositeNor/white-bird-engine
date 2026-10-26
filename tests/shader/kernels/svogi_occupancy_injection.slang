@@ -25,7 +25,7 @@
 StructuredBuffer<SVONode> nodes;
 StructuredBuffer<SVOLeaf> leaves;
 StructuredBuffer<SVOInfo> tree_info;
-RWTexture3D<float> occupancy;
+RWStructuredBuffer<float> occupancy;
 uniform uint invocation_count;
 
 [shader("compute")]
@@ -34,7 +34,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (p_dispatch_thread_id.x >= invocation_count) {
         return;
     }
-    SVOWriteImage<float> svo_occupancy = SVOWriteImage<float>(SVO(nodes, leaves, tree_info[0], true), occupancy);
+    SVOWriteBuffer<float> svo_occupancy = SVOWriteBuffer<float>(SVO(nodes, leaves, tree_info[0], true), occupancy);
 #if INJECT_PARENTS
     inject_svo_leaf_parent_occupancy(svo_occupancy, p_dispatch_thread_id.x * 8, 0);
 #else

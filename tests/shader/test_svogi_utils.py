@@ -19,17 +19,15 @@ import slangpy as spy
 
 from test_svo_common import (LEAF_DTYPE, OCCUPANCY_BIT_OFFSET, STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF,
     STATE_LEAF_DYNAMIC, STATE_NODE_DYNAMIC, StaticSVO, build_static_svo, make_buffer, make_tree_info, pack_children_data,
-    random_voxels, voxel_prefix)
+    random_voxels, read_buffer, voxel_prefix)
 
 
 RANDOM_SEED = 20261024
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
-# Texels nothing is expected to write; not a valid occupancy.
+# Elements nothing is expected to write; not a valid occupancy.
 UNWRITTEN = -1.0
-# Width and height of the occupancy image; data index i is texel (i % 8, i / 8 % 8, i / 64).
-IMAGE_EXTENT = 8
 
 
 @pytest.fixture
@@ -37,37 +35,31 @@ def rng() -> np.random.Generator:
     return np.random.default_rng(RANDOM_SEED)
 
 
-def make_occupancy_image(p_device: spy.Device, p_values: np.ndarray) -> spy.Texture:
-    depth = -(-len(p_values) // (IMAGE_EXTENT * IMAGE_EXTENT))
-    texels = np.full(depth * IMAGE_EXTENT * IMAGE_EXTENT, UNWRITTEN, dtype=np.float32)
-    texels[:len(p_values)] = p_values
-    texture = p_device.create_texture(type=spy.TextureType.texture_3d, format=spy.Format.r32_float, width=IMAGE_EXTENT,
-        height=IMAGE_EXTENT, depth=depth, usage=spy.TextureUsage.shader_resource | spy.TextureUsage.unordered_access)
-    texture.copy_from_numpy(texels.reshape(depth, IMAGE_EXTENT, IMAGE_EXTENT))
-    return texture
+def make_occupancy_buffer(p_device: spy.Device, p_values: np.ndarray) -> spy.Buffer:
+    return make_buffer(p_device, p_values.astype(np.float32))
 
 
-def read_occupancy_image(p_texture: spy.Texture, p_count: int) -> np.ndarray:
-    return p_texture.to_numpy().reshape(-1)[:p_count]
+def read_occupancy_buffer(p_buffer: spy.Buffer, p_count: int) -> np.ndarray:
+    return read_buffer(p_buffer, np.float32)[:p_count]
 
 
 def run_propagation(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_leaves: np.ndarray,
-        p_tree_info: np.ndarray, p_image: spy.Texture, p_child_depth: int) -> None:
+        p_tree_info: np.ndarray, p_occupancy: spy.Buffer, p_child_depth: int) -> None:
     p_load_kernel("svogi_occupancy_propagation.slang", {}).dispatch(thread_count=[-(-len(p_nodes) // 8), 1, 1], vars={
         "nodes": make_buffer(p_device, p_nodes), "leaves": make_buffer(p_device, p_leaves),
-        "tree_info": make_buffer(p_device, p_tree_info), "occupancy": p_image, "child_depth": p_child_depth})
+        "tree_info": make_buffer(p_device, p_tree_info), "occupancy": p_occupancy, "child_depth": p_child_depth})
 
 
 def run_injection(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.ndarray, p_leaves: np.ndarray,
-        p_tree_info: np.ndarray, p_image: spy.Texture, p_inject_parents: bool, p_thread_count: int) -> None:
+        p_tree_info: np.ndarray, p_occupancy: spy.Buffer, p_inject_parents: bool, p_thread_count: int) -> None:
     p_load_kernel("svogi_occupancy_injection.slang", {"INJECT_PARENTS": int(p_inject_parents)}).dispatch(
         thread_count=[p_thread_count, 1, 1], vars={"nodes": make_buffer(p_device, p_nodes),
-        "leaves": make_buffer(p_device, p_leaves), "tree_info": make_buffer(p_device, p_tree_info), "occupancy": p_image,
+        "leaves": make_buffer(p_device, p_leaves), "tree_info": make_buffer(p_device, p_tree_info), "occupancy": p_occupancy,
         "invocation_count": p_thread_count})
 
 
 def injection_leaves(p_tree: StaticSVO, p_dynamic_leaves: np.ndarray, p_node_count: int) -> np.ndarray:
-    """The static leaves followed by p_dynamic_leaves, with data indices past the nodes' so the two never share a texel."""
+    """The static leaves followed by p_dynamic_leaves, with data indices past the nodes' so the two never share an element."""
     leaves = np.concatenate([p_tree.leaf_array()[:len(p_tree.leaves)], p_dynamic_leaves])
     leaves["data_index"] = p_node_count + np.arange(len(leaves))
     return leaves
@@ -111,13 +103,13 @@ def test_inject_svo_leaf_occupancy_writes_occupied_leaves(device: spy.Device, lo
     nodes = tree.node_array()
     leaves = injection_leaves(tree, np.zeros(0, dtype=LEAF_DTYPE), len(nodes))
     nodes, leaves = add_unallocated_leaf_block(nodes, leaves)
-    image = make_occupancy_image(device, np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32))
+    occupancy = make_occupancy_buffer(device, np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32))
     # Threads past the last allocated leaf write nothing.
-    run_injection(device, load_kernel, nodes, leaves, make_static_tree_info(tree), image, False, len(leaves) + 13)
+    run_injection(device, load_kernel, nodes, leaves, make_static_tree_info(tree), occupancy, False, len(leaves) + 13)
     expected = np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32)
     for leaf_index in tree.leaf_of_voxel.values():
         expected[leaves[leaf_index]["data_index"]] = 1.0
-    np.testing.assert_array_equal(read_occupancy_image(image, len(expected)), expected)
+    np.testing.assert_array_equal(read_occupancy_buffer(occupancy, len(expected)), expected)
 
 
 def test_inject_svo_leaf_occupancy_skips_superseded_leaves(device: spy.Device, load_kernel: KernelLoader,
@@ -131,15 +123,15 @@ def test_inject_svo_leaf_occupancy_skips_superseded_leaves(device: spy.Device, l
     tree_info = make_static_tree_info(tree)
     tree_info["dynamic_node_count"] = 8
     tree_info["dynamic_leaves_count"] = 8
-    image = make_occupancy_image(device, np.full(len(nodes) + len(leaves), UNWRITTEN, dtype=np.float32))
-    run_injection(device, load_kernel, nodes, leaves, tree_info, image, False, len(leaves))
+    occupancy = make_occupancy_buffer(device, np.full(len(nodes) + len(leaves), UNWRITTEN, dtype=np.float32))
+    run_injection(device, load_kernel, nodes, leaves, tree_info, occupancy, False, len(leaves))
     expected = np.full(len(nodes) + len(leaves), UNWRITTEN, dtype=np.float32)
     for leaf_index in tree.leaf_of_voxel.values():
         if leaf_index // 8 * 8 != static_block:
             expected[leaves[leaf_index]["data_index"]] = 1.0
     # Only the moved voxel's dynamic leaf is written in place of its superseded static block.
     expected[leaves[len(tree.leaves) + tree.leaf_of_voxel[voxels[0]] % 8]["data_index"]] = 1.0
-    np.testing.assert_array_equal(read_occupancy_image(image, len(expected)), expected)
+    np.testing.assert_array_equal(read_occupancy_buffer(occupancy, len(expected)), expected)
 
 
 @pytest.mark.parametrize("p_max_depth", [2, 4])
@@ -150,14 +142,14 @@ def test_inject_svo_leaf_parent_occupancy_writes_occupied_fraction(device: spy.D
     nodes = tree.node_array()
     leaves = injection_leaves(tree, np.zeros(0, dtype=LEAF_DTYPE), len(nodes))
     nodes, leaves = add_unallocated_leaf_block(nodes, leaves)
-    image = make_occupancy_image(device, np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32))
+    occupancy = make_occupancy_buffer(device, np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32))
     # Threads past the last allocated block write nothing.
-    run_injection(device, load_kernel, nodes, leaves, make_static_tree_info(tree), image, True, len(leaves) // 8 + 5)
+    run_injection(device, load_kernel, nodes, leaves, make_static_tree_info(tree), occupancy, True, len(leaves) // 8 + 5)
     expected = np.full(len(nodes) + len(leaves) + 1, UNWRITTEN, dtype=np.float32)
     for node_index, (children_data, data_index, _) in enumerate(tree.nodes):
         if children_data >> STATE_BIT_OFFSET == STATE_LEAF:
             expected[data_index] = occupancy_count(children_data) / 8.0
-    np.testing.assert_array_equal(read_occupancy_image(image, len(expected)), expected)
+    np.testing.assert_array_equal(read_occupancy_buffer(occupancy, len(expected)), expected)
 
 
 def test_inject_svo_leaf_parent_occupancy_skips_superseded_blocks(device: spy.Device, load_kernel: KernelLoader,
@@ -171,14 +163,14 @@ def test_inject_svo_leaf_parent_occupancy_skips_superseded_blocks(device: spy.De
     tree_info = make_static_tree_info(tree)
     tree_info["dynamic_node_count"] = 8
     tree_info["dynamic_leaves_count"] = 8
-    image = make_occupancy_image(device, np.full(len(nodes) + len(leaves), UNWRITTEN, dtype=np.float32))
+    occupancy = make_occupancy_buffer(device, np.full(len(nodes) + len(leaves), UNWRITTEN, dtype=np.float32))
     # Inject only the static blocks: the superseded one must not write the parent its dynamic block now owns.
-    run_injection(device, load_kernel, nodes, leaves, tree_info, image, True, len(tree.leaves) // 8)
-    result = read_occupancy_image(image, len(nodes) + len(leaves))
+    run_injection(device, load_kernel, nodes, leaves, tree_info, occupancy, True, len(tree.leaves) // 8)
+    result = read_occupancy_buffer(occupancy, len(nodes) + len(leaves))
     assert result[nodes[parent]["data_index"]] == UNWRITTEN
     # The dynamic block writes it.
-    run_injection(device, load_kernel, nodes, leaves, tree_info, image, True, len(leaves) // 8)
-    result = read_occupancy_image(image, len(nodes) + len(leaves))
+    run_injection(device, load_kernel, nodes, leaves, tree_info, occupancy, True, len(leaves) // 8)
+    result = read_occupancy_buffer(occupancy, len(nodes) + len(leaves))
     assert result[nodes[parent]["data_index"]] == 1.0 / 8.0
 
 
@@ -216,16 +208,16 @@ def test_propagate_svo_occupancy_writes_one_level_per_dispatch(device: spy.Devic
     for node_index, depth in depths.items():
         if depth == p_max_depth - 1:
             initial[node_index] = expected[node_index]
-    image = make_occupancy_image(device, initial)
+    occupancy = make_occupancy_buffer(device, initial)
     nodes = tree.node_array()
     for child_depth in range(p_max_depth - 1, 1, -1):
-        run_propagation(device, load_kernel, nodes, tree.leaf_array(), make_static_tree_info(tree), image, child_depth)
+        run_propagation(device, load_kernel, nodes, tree.leaf_array(), make_static_tree_info(tree), occupancy, child_depth)
         # Each dispatch writes only the level above its children; shallower levels are still unwritten.
         written = np.array([UNWRITTEN if depths[i] < child_depth - 1 else expected[i] for i in range(len(tree.nodes))],
             dtype=np.float32)
-        np.testing.assert_allclose(read_occupancy_image(image, len(tree.nodes)), written, rtol=1e-6)
+        np.testing.assert_allclose(read_occupancy_buffer(occupancy, len(tree.nodes)), written, rtol=1e-6)
     # Every root sector with voxels below it has its fraction of occupied leaves.
-    np.testing.assert_allclose(read_occupancy_image(image, len(tree.nodes)), expected, rtol=1e-6)
+    np.testing.assert_allclose(read_occupancy_buffer(occupancy, len(tree.nodes)), expected, rtol=1e-6)
 
 
 def test_propagate_svo_occupancy_reads_the_referenced_dynamic_block(device: spy.Device, load_kernel: KernelLoader,
@@ -251,9 +243,9 @@ def test_propagate_svo_occupancy_reads_the_referenced_dynamic_block(device: spy.
         if tree.nodes[node_index][0] >> STATE_BIT_OFFSET == STATE_LEAF:
             initial[node_index] = expected[node_index]
     initial[dynamic_block] = 0.5
-    image = make_occupancy_image(device, initial)
-    run_propagation(device, load_kernel, nodes, tree.leaf_array(), tree_info, image, 2)
-    result = read_occupancy_image(image, dynamic_block + 8)
+    occupancy = make_occupancy_buffer(device, initial)
+    run_propagation(device, load_kernel, nodes, tree.leaf_array(), tree_info, occupancy, 2)
+    result = read_occupancy_buffer(occupancy, dynamic_block + 8)
     # The superseded static block does not write its former parent.
     assert result[sector] == pytest.approx(0.5 / 8.0)
     # The other root sectors still read their static blocks.

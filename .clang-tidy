@@ -38,6 +38,7 @@ Checks: >
   -misc-no-recursion,
   -misc-const-correctness,
   -misc-confusable-identifiers,
+  -misc-multiple-inheritance,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-avoid-do-while,

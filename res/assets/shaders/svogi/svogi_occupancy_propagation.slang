@@ -22,7 +22,7 @@ struct DescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_image", "atlas", "read_write")]
+    [WBE_DESCRIPTOR("storage_buffer", "atlas", "read_write")]
     uint2 atlas;
     [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
@@ -45,11 +45,11 @@ void main(uint p_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.atlas.x];
+    RWStructuredBuffer<float> occupancy = ResourceDescriptorHeap[descriptor_indices.atlas.x];
     uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
-    SVOWriteImage<float> svo_occupancy =
-        SVOWriteImage<float>(SVO(tree_nodes, tree_leaves, svo_info, true), occupancy);
+    SVOWriteBuffer<float> svo_occupancy =
+        SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), occupancy);
     // Nodes are allocated in blocks of eight siblings, so the invocation of a block is responsible for their parent.
     propagate_svo_occupancy(svo_occupancy, p_thread_id * 8, descriptor_indices.child_depth, frame_slot);
 }

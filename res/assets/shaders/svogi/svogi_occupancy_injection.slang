@@ -23,7 +23,7 @@ struct DescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_image", "atlas", "write")]
+    [WBE_DESCRIPTOR("storage_buffer", "atlas", "write")]
     uint2 atlas;
     [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
@@ -38,12 +38,12 @@ void main(uint p_group_id : SV_GroupID, uint p_group_thread_id : SV_GroupThreadI
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWTexture3D<float> atlas = ResourceDescriptorHeap[descriptor_indices.atlas.x];
+    RWStructuredBuffer<float> atlas = ResourceDescriptorHeap[descriptor_indices.atlas.x];
     uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
     // Injection writes the SVO's normal distribution function.
-    SVOWriteImage<float> svo_occupancy =
-        SVOWriteImage<float>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);
+    SVOWriteBuffer<float> svo_occupancy =
+        SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);
     inject_svo_leaf_occupancy(svo_occupancy, p_thread_id, frame_slot);
     GroupMemoryBarrierWithGroupSync();
     // The thread with the top left corner is responsible for the write of the parent node.
