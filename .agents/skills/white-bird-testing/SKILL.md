@@ -25,7 +25,7 @@ running or changing anything under `tests/executable/`, or verifying rendering o
 | Leak check (manual, slow) | `valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=42 ./build/debug/bin/wbe_unit_test` |
 | Benchmarks | `./build/<target>/bin/wbe_benchmark_test` (prefer a release target) |
 | Capture a render frame | `WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/abs/path.png WBE_CAPTURE_FRAME=5 ./build/debug/bin/wbe_render_test_<name>` |
-| Automated deferred checks | `python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2` |
+| Automated deferred checks | `python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo 2` |
 
 Never invoke `cmake` directly — `build.py` runs the reflection/codegen and ACP resource pipeline before CMake, and
 reconfigures CMake on every run. Skipping it produces stale generated code and missing test resources.

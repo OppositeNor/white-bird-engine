@@ -36,5 +36,12 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
+    RWTexture3D<float4> atlas = ResourceDescriptorHeap[descriptor_indices.atlas.x];
+    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
+    SVOWriteBrick<float4> svo_radiance = SVOWriteBrick<float4>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);
+    
 }

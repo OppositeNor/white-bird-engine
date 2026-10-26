@@ -71,7 +71,7 @@ Readback stalls the GPU and can change timing. Verify crashes and synchronizatio
 
 ## Automated deferred checks
 
-Use [check_deferred.py](../../../../.codex/skills/white-bird-render-testing/scripts/check_deferred.py) for the deferred executable's `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read the handlers in `deferred_test/application_vulkan_deferred_pbr_test.cpp` if they change.
+Use [check_deferred.py](../scripts/check_deferred.py) for the deferred executable's `R` lighting switch, `V` voxel overlay, and `F1` renderer capture controls. Re-read the handlers in `deferred_test/application_vulkan_deferred_pbr_test.cpp` if they change.
 
 The deferred executable's controls:
 
@@ -87,11 +87,11 @@ The static voxel build is an `RTTriggeredVK` disabled after the first recorded f
 From the repository root:
 
 ```sh
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 2 --mode stability --duration 25
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo 1 --full-scene-reconstruct
-python .codex/skills/white-bird-render-testing/scripts/check_deferred.py --svo octree
+python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo 2
+python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo 1
+python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo 2 --mode stability --duration 25
+python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo 1 --full-scene-reconstruct
+python .agents/skills/white-bird-testing/scripts/check_deferred.py --svo octree
 ```
 
 `--full-scene-reconstruct` sets `WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1`, which rebuilds the static SVO every frame

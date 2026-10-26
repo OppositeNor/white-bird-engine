@@ -41,9 +41,7 @@ void main(uint p_group_id : SV_GroupID, uint p_group_thread_id : SV_GroupThreadI
     RWStructuredBuffer<float> atlas = ResourceDescriptorHeap[descriptor_indices.atlas.x];
     uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
-    // Injection writes the SVO's normal distribution function.
-    SVOWriteBuffer<float> svo_occupancy =
-        SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);
+    SVOWriteBuffer<float> svo_occupancy = SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);
     inject_svo_leaf_occupancy(svo_occupancy, p_thread_id, frame_slot);
     GroupMemoryBarrierWithGroupSync();
     // The thread with the top left corner is responsible for the write of the parent node.
