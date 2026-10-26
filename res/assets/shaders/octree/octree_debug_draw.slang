@@ -67,7 +67,7 @@ struct OctreeDebugDrawVertexOutput {
     float4 color : COLOR0;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<OctreeDebugDrawDescriptorIndices> descriptor_indices;
 
 /**

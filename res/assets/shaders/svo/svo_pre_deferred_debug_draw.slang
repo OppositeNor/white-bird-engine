@@ -46,7 +46,7 @@ struct SVOPreDeferredDebugDrawVertexOutput {
     float4 color : COLOR0;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<SVOPreDeferredDebugDrawDescriptorIndices> descriptor_indices;
 
 uint3 get_deferred_task_grid_position(uint p_task, SVOInfo p_tree_info) {

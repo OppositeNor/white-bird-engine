@@ -28,7 +28,7 @@ struct PrefixSumPixelSortColumnsDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<PrefixSumPixelSortColumnsDescriptorIndices> descriptor_indices;
 
 groupshared uint prefix_sum_scratch[64];

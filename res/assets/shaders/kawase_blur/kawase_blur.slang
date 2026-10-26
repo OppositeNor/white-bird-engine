@@ -46,7 +46,7 @@ struct KawaseBlurDescriptorIndices {
     [WBE_DESCRIPTOR("sampler", "kawase_blur_sampler")] uint2 blur_sampler;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<KawaseBlurDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

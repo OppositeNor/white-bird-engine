@@ -67,7 +67,7 @@ struct DrawSkinnedMeshDescriptorIndices {
     uint2 skinning_transforms;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DrawSkinnedMeshDescriptorIndices> descriptor_indices;
 
 /**

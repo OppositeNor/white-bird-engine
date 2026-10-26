@@ -30,7 +30,7 @@ struct DeferredGBufferDescriptorIndices {
     MeshDescriptorIndices mesh;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DeferredGBufferDescriptorIndices> descriptor_indices;
 
 /**

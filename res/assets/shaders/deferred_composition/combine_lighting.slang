@@ -25,7 +25,7 @@ struct CombineLightingDescriptorIndices {
     uint2 result_image;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<CombineLightingDescriptorIndices> descriptor_indices;
 
 /**

@@ -105,7 +105,7 @@ struct SVODescriptorIndices {
     MeshDescriptorIndices mesh;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<SVODescriptorIndices> descriptor_indices;
 
 /**

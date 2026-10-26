@@ -22,8 +22,8 @@ struct DescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_image", "occupancy", "read_write")]
-    uint2 occupancy;
+    [WBE_DESCRIPTOR("storage_image", "atlas", "read_write")]
+    uint2 atlas;
     [WBE_PUSH_CONSTANT("frame_slot")]
     uint shader_debug_frame_slot;
     /**
@@ -45,7 +45,7 @@ void main(uint p_thread_id : SV_DispatchThreadID) {
     ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
+    RWTexture3D<float> occupancy = ResourceDescriptorHeap[descriptor_indices.atlas.x];
     uint frame_slot = descriptor_indices.shader_debug_frame_slot;
 
     SVOWriteImage<float> svo_occupancy =

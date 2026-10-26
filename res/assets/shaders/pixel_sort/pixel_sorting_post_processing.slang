@@ -39,7 +39,7 @@ struct PixelSortingPostProcessingDescriptorIndices {
     [WBE_DESCRIPTOR("storage_image", "pixel_sorting_post_processing_output", "write")] uint2 output;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<PixelSortingPostProcessingDescriptorIndices> descriptor_indices;
 
 /**

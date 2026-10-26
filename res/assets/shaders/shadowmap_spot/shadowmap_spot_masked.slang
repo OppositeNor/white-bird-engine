@@ -37,7 +37,7 @@ struct MaskedShadowDescriptorIndices {
     MeshDescriptorIndices mesh;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<MaskedShadowDescriptorIndices> descriptor_indices;
 
 /**

@@ -39,7 +39,7 @@ struct DynamicDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list_pong;
 };
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 
 /**

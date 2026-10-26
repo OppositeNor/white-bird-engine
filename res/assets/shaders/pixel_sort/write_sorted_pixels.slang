@@ -42,7 +42,7 @@ struct WriteSortedPixelsDescriptorIndices {
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_destination", "write")] uint2 destination;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<WriteSortedPixelsDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

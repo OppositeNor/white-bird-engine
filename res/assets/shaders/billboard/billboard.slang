@@ -31,7 +31,7 @@ struct BillboardDescriptorIndices {
     uint2 texture_sampler;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<BillboardDescriptorIndices> descriptor_indices;
 
 struct VSOutput {

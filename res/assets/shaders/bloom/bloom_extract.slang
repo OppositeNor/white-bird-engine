@@ -23,7 +23,7 @@ struct BloomExtractDescriptorIndices {
 static const float BLOOM_THRESHOLD = 1.0;
 static const float BLOOM_THRESHOLD_EPSILON = 0.0001;
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<BloomExtractDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

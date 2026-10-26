@@ -31,7 +31,7 @@ struct MaxDownsampleDescriptorIndices {
     [WBE_DESCRIPTOR("storage_image", "max_downsample_destination", "write")] uint2 destination;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<MaxDownsampleDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

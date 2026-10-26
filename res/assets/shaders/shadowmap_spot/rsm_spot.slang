@@ -41,7 +41,7 @@ struct RSMDescriptorIndices {
     MeshDescriptorIndices mesh;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<RSMDescriptorIndices> descriptor_indices;
 
 struct RSMFragmentOutput {

@@ -34,7 +34,7 @@ struct IndirectLightingDescriptorIndices {
     uint2 indirect_lighting_output;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<IndirectLightingDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

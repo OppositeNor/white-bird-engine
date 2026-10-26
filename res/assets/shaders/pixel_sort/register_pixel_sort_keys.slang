@@ -44,7 +44,7 @@ struct RegisterPixelSortKeysDescriptorIndices {
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "write")] uint2 mask;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<RegisterPixelSortKeysDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

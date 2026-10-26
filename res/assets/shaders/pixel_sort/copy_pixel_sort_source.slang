@@ -28,7 +28,7 @@ struct CopyPixelSortSourceDescriptorIndices {
     [WBE_DESCRIPTOR("storage_image", "pixel_sort_source", "write")] uint2 source;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<CopyPixelSortSourceDescriptorIndices> descriptor_indices;
 
 [shader("compute")]

@@ -263,16 +263,16 @@ struct SVOReadImage<T : ITexelElement> {
      */
     SVO svo;
     /**
-     * @brief Read-only voxel data image.
+     * @brief Read-only atlas holding the voxel data.
      */
-    Texture3D<T> voxel_data;
+    Texture3D<T> atlas;
 
     /**
      * @brief Pair an SVO with its voxel data image.
      */
-    __init(SVO p_svo, Texture3D<T> p_voxel_data) {
+    __init(SVO p_svo, Texture3D<T> p_atlas) {
         svo = p_svo;
-        voxel_data = p_voxel_data;
+        atlas = p_atlas;
     }
 
     /**
@@ -290,10 +290,10 @@ struct SVOReadImage<T : ITexelElement> {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
         uint3 dimensions;
-        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
         uint3 texel = unflatten_index_3d_checked(
             data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
-        return voxel_data.Load(int4(int3(texel), 0));
+        return atlas.Load(int4(int3(texel), 0));
     }
 };
 
@@ -309,16 +309,16 @@ struct SVOWriteImage<T : ITexelElement> {
      */
     SVO svo;
     /**
-     * @brief Writable voxel data image.
+     * @brief Writable atlas holding the voxel data.
      */
-    RWTexture3D<T> voxel_data;
+    RWTexture3D<T> atlas;
 
     /**
      * @brief Pair an SVO with its voxel data image.
      */
-    __init(SVO p_svo, RWTexture3D<T> p_voxel_data) {
+    __init(SVO p_svo, RWTexture3D<T> p_atlas) {
         svo = p_svo;
-        voxel_data = p_voxel_data;
+        atlas = p_atlas;
     }
 
     /**
@@ -333,7 +333,7 @@ struct SVOWriteImage<T : ITexelElement> {
      * @return The stored texel holding the reached node's or leaf's data.
      */
     T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
-        return voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)];
+        return atlas[trace_texel(p_global_position, p_depth, p_frame_slot)];
     }
 
     /**
@@ -347,7 +347,7 @@ struct SVOWriteImage<T : ITexelElement> {
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
     void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
-        voxel_data[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
+        atlas[trace_texel(p_global_position, p_depth, p_frame_slot)] = p_value;
     }
 
     /**
@@ -358,7 +358,7 @@ struct SVOWriteImage<T : ITexelElement> {
      * @return The stored texel.
      */
     T read_data_at_index(uint p_data_index, uint p_frame_slot) {
-        return voxel_data[get_data_texel(p_data_index, p_frame_slot)];
+        return atlas[get_data_texel(p_data_index, p_frame_slot)];
     }
 
     /**
@@ -370,7 +370,7 @@ struct SVOWriteImage<T : ITexelElement> {
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
     void write_data_at_index(uint p_data_index, T p_value, uint p_frame_slot) {
-        voxel_data[get_data_texel(p_data_index, p_frame_slot)] = p_value;
+        atlas[get_data_texel(p_data_index, p_frame_slot)] = p_value;
     }
 
     uint3 trace_texel(float3 p_global_position, uint p_depth, uint p_frame_slot) {
@@ -380,7 +380,7 @@ struct SVOWriteImage<T : ITexelElement> {
 
     uint3 get_data_texel(uint p_data_index, uint p_frame_slot) {
         uint3 dimensions;
-        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
         return unflatten_index_3d_checked(
             p_data_index, dimensions, ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot);
     }
@@ -407,7 +407,7 @@ struct SVOReadBrick<T : ITexelElement> {
     /**
      * @brief Read-only brick image.
      */
-    Texture3D<T> voxel_data;
+    Texture3D<T> atlas;
     /**
      * @brief Sampler used to read the bricks; it must filter linearly within a mip level.
      */
@@ -416,9 +416,9 @@ struct SVOReadBrick<T : ITexelElement> {
     /**
      * @brief Pair an SVO with its brick image and the sampler that reads it.
      */
-    __init(SVO p_svo, Texture3D<T> p_voxel_data, SamplerState p_brick_sampler) {
+    __init(SVO p_svo, Texture3D<T> p_atlas, SamplerState p_brick_sampler) {
         svo = p_svo;
-        voxel_data = p_voxel_data;
+        atlas = p_atlas;
         brick_sampler = p_brick_sampler;
     }
 
@@ -437,13 +437,13 @@ struct SVOReadBrick<T : ITexelElement> {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
         uint3 dimensions;
-        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
         uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
             SVO_BRICK_SIZE;
         // Sub-voxel centers sit at local 0, 0.5, and 1, the centers of the brick's texels 0, 1, and 2.
         float3 texel_position = float3(brick_origin) + 0.5 + trace_info.svo_position * float(SVO_BRICK_SIZE - 1);
-        return voxel_data.SampleLevel(brick_sampler, texel_position / float3(dimensions), 0.0);
+        return atlas.SampleLevel(brick_sampler, texel_position / float3(dimensions), 0.0);
     }
 };
 
@@ -463,14 +463,14 @@ struct SVOWriteBrick<T : ITexelElement> {
     /**
      * @brief Writable brick image.
      */
-    RWTexture3D<T> voxel_data;
+    RWTexture3D<T> atlas;
 
     /**
      * @brief Pair an SVO with its brick image.
      */
-    __init(SVO p_svo, RWTexture3D<T> p_voxel_data) {
+    __init(SVO p_svo, RWTexture3D<T> p_atlas) {
         svo = p_svo;
-        voxel_data = p_voxel_data;
+        atlas = p_atlas;
     }
 
     /**
@@ -490,13 +490,13 @@ struct SVOWriteBrick<T : ITexelElement> {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
         uint3 dimensions;
-        voxel_data.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
+        atlas.GetDimensions(dimensions.x, dimensions.y, dimensions.z);
         uint3 brick_origin = unflatten_index_3d_checked(data_index, dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
             SVO_BRICK_SIZE;
         // Round to the nearest sub-voxel center at local 0, 0.5, or 1.
         uint3 sub_voxel = min(uint3(trace_info.svo_position * float(SVO_BRICK_SIZE - 1) + 0.5), uint3(SVO_BRICK_SIZE - 1));
-        voxel_data[brick_origin + sub_voxel] = p_value;
+        atlas[brick_origin + sub_voxel] = p_value;
     }
 };
 

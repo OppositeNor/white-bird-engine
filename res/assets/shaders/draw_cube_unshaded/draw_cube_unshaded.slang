@@ -49,7 +49,7 @@ struct DrawCubeUnshadedDescriptorIndices {
     MeshDescriptorIndices mesh;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
 
 /**

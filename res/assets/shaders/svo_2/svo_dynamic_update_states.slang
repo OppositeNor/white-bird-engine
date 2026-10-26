@@ -29,7 +29,7 @@ struct DynamicDescriptorIndices {
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
 };
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 
 /**

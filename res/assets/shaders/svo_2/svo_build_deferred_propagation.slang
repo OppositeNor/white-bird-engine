@@ -68,7 +68,7 @@ struct SVODescriptorIndices {
     uint shader_debug_frame_slot;
 };
 
-[[vk::push_constant]]
+[vk::push_constant]
 ConstantBuffer<SVODescriptorIndices> descriptor_indices;
 
 /**
