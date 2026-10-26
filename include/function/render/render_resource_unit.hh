@@ -364,6 +364,37 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
     /** Resource ID of the skeleton the submesh joint bindings index. */
     WBE_META(WBE_REFLECT)
     std::optional<std::string> skeleton_id;
+    /** Resource ID of the signed distance field of the mesh's geometry. */
+    WBE_META(WBE_REFLECT)
+    std::optional<std::string> sdf_id;
+};
+
+/**
+ * @enum RUSDFDataStructure
+ * @brief Layout of the samples of a signed distance field.
+ *
+ * Reflected; the aliases are the names used by RUSchemaSDF::data_structure.
+ */
+enum class WBE_META(WBE_REFLECT_ENUM) RUSDFDataStructure : uint8_t {
+    // A 3D KTX 2 texture with one VK_FORMAT_R16_SFLOAT texel per sample.
+    TEXTURE_3D WBE_META(WBE_SERIALIZATION_ALIASES(texture_3d)),
+};
+
+/**
+ * @class RUSchemaSDF
+ * @brief The scheme of RUSDF.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaSDF : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaSDF)
+    /** Layout of the samples, deserialized from a RUSDFDataStructure name or alias such as "texture_3d". */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSDFDataStructure data_structure = RUSDFDataStructure::TEXTURE_3D;
+    /** Resource ID of the texture holding the samples, laid out as data_structure describes. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string texture_id;
+    /** Box covered by the samples. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    RUSchemaAABB3D aabb;
 };
 
 /**
@@ -798,6 +829,37 @@ struct RUSubmeshInstance3D {
 };
 
 /**
+ * @class RUSDF
+ * @brief Signed distance field resource unit: distances sampled on a uniform grid over a box, stored in a binary resource.
+ *
+ * Distances are negative inside the surface. The grid divides aabb into one cell per texel along each axis, and each
+ * sample lies at the center of its cell, so sampling the texture at normalized coordinates (p - aabb minimum) / aabb size
+ * reads the distance at p. A mesh's field is in the mesh's space, before any instance or entity transform. The texture is
+ * resolved after the resource chunk loads. The unit is a shallow chunk view and is copyable and movable.
+ */
+struct RUSDF : public ResourceUnit {
+    /** Layout of the samples. */
+    RUSDFDataStructure data_structure = RUSDFDataStructure::TEXTURE_3D;
+    /** Texture holding the samples: for TEXTURE_3D, a 3D VK_FORMAT_R16_SFLOAT texture with one texel per sample. */
+    RefRes<RUTexture> texture;
+    /** Box covered by the samples. */
+    RUAABB3D aabb;
+
+    /**
+     * @brief Get the number of samples along X, Y, and Z.
+     * @throws std::runtime_error If the texture is missing or is not a 3D VK_FORMAT_R16_SFLOAT texture with loaded data.
+     */
+    glm::uvec3 get_extent() const;
+    /**
+     * @brief Read one sample from the texture.
+     * @param p_coordinate Sample index along X, Y, and Z.
+     * @return The signed distance at the sample.
+     * @throws std::runtime_error If the coordinate is outside the extent, or under the conditions of get_extent().
+     */
+    float get_sample(const glm::uvec3& p_coordinate) const;
+};
+
+/**
  * @class RUMesh3D
  * @brief 3D mesh resource unit: opaque, masked, and double-sided opaque submesh categories.
  *
@@ -813,6 +875,8 @@ struct RUMesh3D : public ResourceUnit {
     RUSubmeshInstance3D double_sided_opaque_instances;
     /** Referenced skeleton, or null when the mesh is not skinned. */
     RefRes<RUSkeleton> skeleton;
+    /** Referenced signed distance field of the mesh's geometry, or null when the mesh has none. */
+    RefRes<RUSDF> sdf;
 
     /**
      * @brief Compute the axis-aligned bounds of every submesh of every category, with their instance transforms applied.

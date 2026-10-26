@@ -281,6 +281,9 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest to skip its entire include tree, or on an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
 - `wbe-utils-model-compiler` owns final mesh and material resource shaping. Keep `acp_compiler_model.py` limited to ACP path/schema
   adaptation; do not normalize compiled material textures in the ACP adapter.
+- Mesh SDFs (`sdf_config` on `model`, `static_geometry`, and `mesh`) are emitted by the model compiler's `MeshSDFBuilder`
+  for both mesh compilers; only the injected host `SDFCompiler` (`SDFCompilerMeshToSDF`, mesh-to-sdf) samples distances. Do
+  not sample SDFs anywhere else.
 
 ### Material Texture Contract
 
