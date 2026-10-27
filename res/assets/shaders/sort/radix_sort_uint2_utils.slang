@@ -158,7 +158,7 @@ void radix_sort_uint2_scatter(RWStructuredBuffer<uint2> p_input_keys, RWStructur
         p_scratch[thread_data_start + i] = p_histogram_buffer[last_sub_histogram_start + thread_data_start + i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint digit = thread_data_start + i;
         // The index of the first digit underflows past the end, so it reads zero.

@@ -71,6 +71,20 @@ struct SVONodeTraceInfo {
      * to SVO::voxel_index_to_global() with curr_depth to locate the reached node or leaf.
      */
     uint voxel_index;
+
+    /**
+     * @brief Test whether node_index refers to the node buffer.
+     */
+    bool is_node() {
+        return index_type == IndexType::NODE;
+    }
+
+    /**
+     * @brief Test whether node_index refers to the leaf buffer.
+     */
+    bool is_leaf() {
+        return index_type == IndexType::LEAF;
+    }
 };
 
 /**

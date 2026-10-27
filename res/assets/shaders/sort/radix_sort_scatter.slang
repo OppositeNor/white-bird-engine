@@ -70,7 +70,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         sort_scratch[thread_data_start + i] = histogram_buffer[last_sub_histogram_start + thread_data_start + i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256(sort_scratch, thread_data_start);
+    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(sort_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint digit = thread_data_start + i;
         // The index of the first digit underflows past the end, so it reads zero.

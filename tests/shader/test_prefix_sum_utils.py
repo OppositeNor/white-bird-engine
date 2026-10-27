@@ -128,3 +128,43 @@ def test_workgroup_general_prefix_sum_single_element(device: spy.Device, load_ke
     data = general_prefix_sum_input(rng, 0, p_data_count, values)
     result = run_general_prefix_sum(device, load_kernel, data, 0, p_data_count, p_workgroup_size)
     np.testing.assert_array_equal(result, general_prefix_sum_expected(data, 0, p_data_count))
+
+
+def run_general_prefix_scan_generic(p_device: spy.Device, p_load_kernel: KernelLoader, p_data: np.ndarray,
+        p_data_start: int, p_data_count: int, p_element_type: str, p_operator: str) -> np.ndarray:
+    kernel = p_load_kernel("workgroup_general_prefix_scan_generic.slang", {"KERNEL_WORKGROUP_SIZE": FIXED_WORKGROUP_SIZE,
+        "DATA_START": p_data_start, "DATA_COUNT": p_data_count, "ELEMENT_TYPE": p_element_type,
+        "OPERATOR": p_operator})
+    buffer = p_device.create_buffer(element_count=len(p_data), struct_size=p_data.itemsize * p_data[0].size,
+        usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access, data=p_data)
+    kernel.dispatch(thread_count=[FIXED_WORKGROUP_SIZE, 1, 1], vars={"data": buffer})
+    return buffer.to_numpy().view(np.uint32).reshape(p_data.shape)
+
+
+@pytest.mark.parametrize("p_data_count", [0, 100, 1000])
+def test_workgroup_general_prefix_scan_uint2_add(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator, p_data_count: int) -> None:
+    # Each component is summed independently; elements outside the range must be left unchanged.
+    data_start = 8
+    data = rng.integers(0, 1000, (data_start + p_data_count + GUARD_COUNT, 2), dtype=np.uint32)
+    expected = data.copy()
+    expected[data_start:data_start + p_data_count] = np.cumsum(data[data_start:data_start + p_data_count], axis=0,
+        dtype=np.uint32)
+    result = run_general_prefix_scan_generic(device, load_kernel, data, data_start, p_data_count, "uint2", "Add")
+    np.testing.assert_array_equal(result, expected)
+
+
+def test_workgroup_general_prefix_scan_non_commutative(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator) -> None:
+    # Each element becomes the last non-zero element up to it, which holds only if earlier elements are passed first.
+    data_count = 1000
+    values = rng.integers(0, 1000, data_count, dtype=np.uint32)
+    values[rng.random(data_count) < 0.7] = 0
+    data = general_prefix_sum_input(rng, 0, data_count, values)
+    expected = data.copy()
+    last = np.uint32(0)
+    for i in range(data_count):
+        last = values[i] if values[i] != 0 else last
+        expected[i] = last
+    result = run_general_prefix_scan_generic(device, load_kernel, data, 0, data_count, "uint", "LastNonZero")
+    np.testing.assert_array_equal(result, expected)

@@ -108,12 +108,10 @@ struct SVO {
      * @return The data_index of the referenced node or leaf.
      */
     uint get_data_index(SVONodeTraceInfo p_trace_info) {
-        switch (p_trace_info.index_type) {
-        case SVONodeTraceInfo::IndexType::LEAF:
+        if (p_trace_info.is_leaf()) {
             return leaves[p_trace_info.node_index].data_index;
-        default:
-            return nodes[p_trace_info.node_index].data_index;
         }
+        return nodes[p_trace_info.node_index].data_index;
     }
 
     /**
@@ -505,13 +503,64 @@ struct SVOWriteBrick<T : ITexelElement> {
     void write_data_at_position(float3 p_global_position, uint p_depth, T p_value, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
-        uint3 brick_origin = unflatten_index_3d_checked(data_index, atlas_dimensions / SVO_BRICK_SIZE,
-                                 ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
-            SVO_BRICK_SIZE;
+        write_subvoxel(data_index, trace_info, p_value, p_frame_slot);
+    }
+
+    /**
+     * @brief Trace the SVO to the deepest stored node or occupied leaf and overwrite its sub-voxel containing a position.
+     * @details Behaves like the depth-limited overload, but the trace runs as in SVO::trace_data() without a depth limit.
+     * @param p_global_position Position in world space; every component must lie in [svo.info.origin, svo.info.origin +
+     * svo.info.width).
+     * @param p_value Value stored into the selected sub-voxel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void write_data_at_position(float3 p_global_position, T p_value, uint p_frame_slot) {
+        SVONodeTraceInfo trace_info;
+        uint data_index = svo.trace_data(p_global_position, trace_info);
+        write_subvoxel(data_index, trace_info, p_value, p_frame_slot);
+    }
+
+    /**
+     * @brief Overwrite the sub-voxel of a traced node or leaf containing the traced position.
+     * @details The sub-voxel is selected as in write_data_at_position(). The store is not atomic; callers must ensure no
+     * other invocation accesses the same texel during the calling pass. In shader-debug builds, a data index past the
+     * image's brick count reports SVO_VOXEL_DATA_INDEX_OVERFLOW.
+     * @param p_data_index Data index of the traced node or leaf, as returned by SVO::trace_data().
+     * @param p_trace_info Traversal state produced by the same SVO::trace_data() call.
+     * @param p_value Value stored into the selected sub-voxel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void write_subvoxel(uint p_data_index, SVONodeTraceInfo p_trace_info, T p_value, uint p_frame_slot) {
+        atlas[get_subvoxel_texel(p_data_index, p_trace_info, p_frame_slot)] = p_value;
+    }
+
+    uint3 get_subvoxel_texel(uint p_data_index, SVONodeTraceInfo p_trace_info, uint p_frame_slot) {
+        uint3 brick_origin = unflatten_index_3d_checked(p_data_index, atlas_dimensions / SVO_BRICK_SIZE,
+                                 ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) * SVO_BRICK_SIZE;
         // Round to the nearest sub-voxel center at local 0, 0.5, or 1.
-        uint3 sub_voxel = min(uint3(trace_info.svo_position * float(SVO_BRICK_SIZE - 1) + 0.5), uint3(SVO_BRICK_SIZE - 1));
-        atlas[brick_origin + sub_voxel] = p_value;
+        uint3 subvoxel = min(uint3(p_trace_info.svo_position * float(SVO_BRICK_SIZE - 1) + 0.5), uint3(SVO_BRICK_SIZE - 1));
+        return brick_origin + subvoxel;
     }
 };
+
+/**
+ * @brief Atomic operations of SVOWriteBrick, available for texel types that support atomic arithmetic.
+ * @tparam T Texel type of the brick image.
+ */
+extension<T : ITexelElement & IArithmeticAtomicable> SVOWriteBrick<T> {
+    /**
+     * @brief Atomically add a value onto the sub-voxel of a traced node or leaf containing the traced position.
+     * @details The sub-voxel is selected as in write_subvoxel(). The addition is atomic with respect to other atomic
+     * operations on the same texel. In shader-debug builds, a data index past the image's brick count reports
+     * SVO_VOXEL_DATA_INDEX_OVERFLOW.
+     * @param p_data_index Data index of the traced node or leaf, as returned by SVO::trace_data().
+     * @param p_trace_info Traversal state produced by the same SVO::trace_data() call.
+     * @param p_value Value added onto the selected sub-voxel.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     */
+    void atomic_add_subvoxel(uint p_data_index, SVONodeTraceInfo p_trace_info, T p_value, uint p_frame_slot) {
+        InterlockedAdd(atlas[get_subvoxel_texel(p_data_index, p_trace_info, p_frame_slot)], p_value);
+    }
+}
 
 #endif

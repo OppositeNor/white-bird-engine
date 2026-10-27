@@ -209,7 +209,7 @@ void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
     }
     GroupMemoryBarrierWithGroupSync();
     // Perform the prefix sum, to transform each entry of it to the histogram till the corresponding point.
-    workgroup_inclusive_prefix_sum_64_256(p_scratch, p_thread_id * 4);
+    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, p_thread_id * 4);
     // The last element is the workgroup histogram.
     uint histogram = p_scratch[255];
     // Exclusive prefix sum of the packed histogram
