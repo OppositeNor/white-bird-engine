@@ -24,8 +24,9 @@
 interface IOperator<T> {
     /**
      * @brief Get the identity element of the operator.
-     * @details Scans combine it with the elements that fall outside the scanned range, so for every x,
-     * apply(identity(), x) and apply(x, identity()) must equal x.
+     * @details Scans use it as the combination of no elements, always as the earlier element, so for every x,
+     * apply(identity(), x) must equal x. Scans never pass it as the later element, so apply(x, identity()) may differ
+     * from x.
      * @return The identity element.
      */
     static T identity();
@@ -50,6 +51,35 @@ struct Add<T : IArithmetic> : IOperator<T> {
 
     static T apply(T p_val1, T p_val2) {
         return p_val1 + p_val2;
+    }
+}
+
+struct SegmentedWrapper<T> {
+    T value;
+    uint break;
+};
+
+struct SegmentedPrefix<T : IArithmetic, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
+    static SegmentedWrapper<T> identity() {
+        return { O::identity(), 0 };
+    }
+    static SegmentedWrapper<T> apply(SegmentedWrapper<T> p_val1, SegmentedWrapper<T> p_val2) {
+        return {
+            p_val2.break == 0 ? O::apply(p_val1.value, p_val2.value) : p_val2.value,
+            p_val1.break > 0 || p_val2.break > 0 ? 1 : 0,
+        };
+    }
+}
+
+struct SegmentedBreakPrefix<T : IArithmetic, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
+    static SegmentedWrapper<T> identity() {
+        return { O::identity(), 0 };
+    }
+    static SegmentedWrapper<T> apply(SegmentedWrapper<T> p_val1, SegmentedWrapper<T> p_val2) {
+        return {
+            p_val2.value,
+            p_val1.break + p_val2.break,
+        };
     }
 }
 
@@ -121,15 +151,21 @@ T workgroup_general_prefix_sum<T, O : IOperator<T>, let N : uint>(RWStructuredBu
     T carry = O::identity();
     for (uint chunk_start = 0; chunk_start < p_element_count; chunk_start += 4 * N) {
         uint element_start = chunk_start + p_thread_id * 4;
-        // Elements past the range are the identity, so they do not change the scan.
+        // The number of this invocation's elements inside the range. Elements past the range are ignored, so the
+        // identity is never combined as the later element.
+        uint valid_count = element_start < p_element_count ? min(p_element_count - element_start, 4u) : 0;
         T values[4];
         [unroll] for (uint k = 0; k < 4; ++k) {
-            values[k] = element_start + k < p_element_count ? p_buffer[p_start + element_start + k] : O::identity();
+            values[k] = k < valid_count ? p_buffer[p_start + element_start + k] : O::identity();
         }
         [unroll] for (uint k = 1; k < 4; ++k) {
-            values[k] = O::apply(values[k - 1], values[k]);
+            if (k < valid_count) {
+                values[k] = O::apply(values[k - 1], values[k]);
+            }
         }
-        p_scratch[p_thread_id] = values[3];
+        // Invocations past the range hold the identity. Their scanned totals are never read: invocations inside the
+        // range only combine the totals of earlier invocations, which are inside the range too.
+        p_scratch[p_thread_id] = valid_count > 0 ? values[valid_count - 1] : O::identity();
         GroupMemoryBarrierWithGroupSync();
         // Inclusive scan of the invocation totals.
         for (uint offset = 1; offset < N; offset <<= 1) {
@@ -148,7 +184,9 @@ T workgroup_general_prefix_sum<T, O : IOperator<T>, let N : uint>(RWStructuredBu
                 p_buffer[p_start + element_start + k] = O::apply(thread_offset, values[k]);
             }
         }
-        carry = O::apply(carry, p_scratch[N - 1]);
+        // The last invocation with elements inside the range holds the total of the chunk.
+        uint last_thread_id = min((p_element_count - chunk_start - 1) / 4, N - 1);
+        carry = O::apply(carry, p_scratch[last_thread_id]);
         // Every invocation has read p_scratch before the next chunk overwrites it.
         GroupMemoryBarrierWithGroupSync();
     }
