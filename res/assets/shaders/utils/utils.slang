@@ -44,6 +44,8 @@ enum class ShaderDebugError {
     OCTREE_LEAF_LIST_OVERFLOW = 7,
     OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
     SVO_VOXEL_DATA_INDEX_OVERFLOW = 9,
+    COUNTED_BUFFER_OVERFLOW = 10,
+    COUNTED_BUFFER_UNALIGNED_SIZE = 11,
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */
@@ -490,29 +492,57 @@ uint morton_encode_3d(uint3 p_coordinate) {
 }
 
 /**
- * @brief Flattens a 3D coordinate into a linear index, with x varying fastest and z slowest.
- * @param p_coordinate The coordinate to flatten; x must be less than p_width and y less than p_height.
- * @param p_width The grid's extent along x.
- * @param p_height The grid's extent along y.
- * @return p_coordinate.x + p_width * (p_coordinate.y + p_height * p_coordinate.z).
+ * @brief Linear indexing of 2D grid coordinates, with x varying fastest and y slowest.
  */
-uint flatten_index_3d(uint3 p_coordinate, uint p_width, uint p_height) {
-    return p_coordinate.x + p_width * (p_coordinate.y + p_height * p_coordinate.z);
+extension uint2 {
+    /**
+     * @brief Flattens the coordinate into a linear index.
+     * @param p_width The grid's extent along x; x must be less than it.
+     * @return x + p_width * y.
+     */
+    uint flatten(uint p_width) {
+        return this.x + p_width * this.y;
+    }
+
+    /**
+     * @brief Recovers the coordinate of a linear index, inverting flatten().
+     * @param p_index The linear index.
+     * @param p_width The grid's extent along x; must be nonzero.
+     * @return The coordinate whose flattened index is p_index.
+     */
+    static uint2 unflatten(uint p_index, uint p_width) {
+        return uint2(p_index % p_width, p_index / p_width);
+    }
 }
 
 /**
- * @brief Recovers the 3D coordinate of a linear index, inverting flatten_index_3d().
- * @param p_index The linear index.
- * @param p_width The grid's extent along x; must be nonzero.
- * @param p_height The grid's extent along y; must be nonzero.
- * @return The coordinate whose flattened index is p_index.
+ * @brief Linear indexing of 3D grid coordinates, with x varying fastest and z slowest.
  */
-uint3 unflatten_index_3d(uint p_index, uint p_width, uint p_height) {
-    return uint3(p_index % p_width, (p_index / p_width) % p_height, p_index / (p_width * p_height));
+extension uint3 {
+    /**
+     * @brief Flattens the coordinate into a linear index.
+     * @param p_width The grid's extent along x; x must be less than it.
+     * @param p_height The grid's extent along y; y must be less than it.
+     * @return x + p_width * (y + p_height * z).
+     */
+    uint flatten(uint p_width, uint p_height) {
+        return this.x + p_width * (this.y + p_height * this.z);
+    }
+
+    /**
+     * @brief Recovers the coordinate of a linear index, inverting flatten().
+     * @param p_index The linear index.
+     * @param p_width The grid's extent along x; must be nonzero.
+     * @param p_height The grid's extent along y; must be nonzero.
+     * @return The coordinate whose flattened index is p_index.
+     */
+    static uint3 unflatten(uint p_index, uint p_width, uint p_height) {
+        return uint3(p_index % p_width, (p_index / p_width) % p_height, p_index / (p_width * p_height));
+    }
 }
 
 /**
- * @brief Recovers the 3D coordinate of a linear index like unflatten_index_3d(), checking it against the grid's depth.
+ * @brief Recovers the 3D coordinate of a linear index like uint3::unflatten(), checking it against the grid's depth.
  * @details In shader-debug builds, an index past the grid's cell count reports p_overflow_error; the result is not clamped
  * otherwise.
  * @param p_index The linear index.
@@ -521,8 +551,8 @@ uint3 unflatten_index_3d(uint p_index, uint p_width, uint p_height) {
  * @param p_frame_slot Renderer frame slot receiving the error.
  * @return The coordinate whose flattened index is p_index.
  */
-uint3 unflatten_index_3d_checked(uint p_index, uint3 p_extent, ShaderDebugError p_overflow_error, uint p_frame_slot) {
-    uint3 coordinate = unflatten_index_3d(p_index, p_extent.x, p_extent.y);
+uint3 unflatten_index_checked(uint p_index, uint3 p_extent, ShaderDebugError p_overflow_error, uint p_frame_slot) {
+    uint3 coordinate = uint3::unflatten(p_index, p_extent.x, p_extent.y);
     WBE_SHADER_DEBUG_ASSERT(coordinate.z < p_extent.z, p_overflow_error, p_frame_slot);
     return coordinate;
 }

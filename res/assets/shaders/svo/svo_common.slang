@@ -156,14 +156,6 @@ struct SVOInfo {
      */
     uint max_depth;
     /**
-     * @brief The capacity of the node buffer, shared by the static nodes and the dynamic nodes that follow them.
-     */
-    uint max_node_count;
-    /**
-     * @brief The capacity of the leaf buffer, shared by the static leaves and the dynamic leaves that follow them.
-     */
-    uint max_leaves_count;
-    /**
      * @brief The number of static nodes, including the first eight sectors but excluding the implicit root; the dynamic
      * nodes follow them in the node buffer.
      */
@@ -190,6 +182,30 @@ struct SVOInfo {
      */
     uint dynamic_leaves_count;
 };
+
+/**
+ * @brief Get the capacity of the node buffer, shared by the static nodes and the dynamic nodes that follow them.
+ * @param p_nodes The node buffer.
+ * @return The number of nodes the buffer holds, from its dimensions.
+ */
+uint get_svo_node_capacity(RWStructuredBuffer<SVONode> p_nodes) {
+    uint node_count;
+    uint stride;
+    p_nodes.GetDimensions(node_count, stride);
+    return node_count;
+}
+
+/**
+ * @brief Get the capacity of the leaf buffer, shared by the static leaves and the dynamic leaves that follow them.
+ * @param p_leaves The leaf buffer.
+ * @return The number of leaves the buffer holds, from its dimensions.
+ */
+uint get_svo_leaf_capacity(RWStructuredBuffer<SVOLeaf> p_leaves) {
+    uint leaf_count;
+    uint stride;
+    p_leaves.GetDimensions(leaf_count, stride);
+    return leaf_count;
+}
 
 /**
  * @brief Selects one of eight sectors in parent-local coordinates.

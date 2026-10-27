@@ -54,12 +54,34 @@ struct Add<T : IArithmetic> : IOperator<T> {
     }
 }
 
+/**
+ * @brief An element of a segmented prefix scan: a value and a flag marking where a segment starts.
+ * @tparam T The value type.
+ */
 struct SegmentedWrapper<T> {
+    /**
+     * @brief The value combined within its segment.
+     */
     T value;
+    /**
+     * @brief Nonzero when a segment starts at this element.
+     * @details In a scan result, nonzero when a segment starts at or before the element in the scanned range, as computed
+     * by the operator.
+     */
     uint break;
 };
 
-struct SegmentedPrefix<T : IArithmetic, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
+/**
+ * @brief Combines the values of SegmentedWrapper elements with O within segments, making a prefix scan a segmented scan.
+ * @details A segment starts at every element whose break is nonzero, and at the start of the scanned range. An inclusive
+ * scan gives each element the combination with O of the values from the start of its segment up to and including the
+ * element, so every segment is scanned independently, and a break of 1 when a segment starts at or before the element in
+ * the range, 0 otherwise. The operator is associative whenever O is: combining an earlier part with a later part that
+ * contains a break keeps the later part's value, and otherwise combines both values.
+ * @tparam T The value type.
+ * @tparam O The operator the values are combined with within a segment.
+ */
+struct SegmentedPrefix<T, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
     static SegmentedWrapper<T> identity() {
         return { O::identity(), 0 };
     }
@@ -71,7 +93,17 @@ struct SegmentedPrefix<T : IArithmetic, O : IOperator<T>> : IOperator<SegmentedW
     }
 }
 
-struct SegmentedBreakPrefix<T : IArithmetic, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
+/**
+ * @brief Sums the breaks of SegmentedWrapper elements and keeps their values, making a prefix scan number the segments.
+ * @details An inclusive scan leaves every value unchanged and gives each element the sum of the breaks from the start of
+ * the scanned range up to and including the element. With breaks of 0 or 1, that is the number of segments starting at
+ * or before the element, so the elements of each segment share one count: the segment's index, plus one when a segment
+ * starts at the first element. The breaks are summed with wrap-around, so nonzero breaks other than 1 add their value
+ * rather than counting once. The operator is associative: combining keeps the later value and adds the breaks.
+ * @tparam T The value type.
+ * @tparam O The operator whose identity is the value of identity(); it does not combine values.
+ */
+struct SegmentedBreakPrefix<T, O : IOperator<T>> : IOperator<SegmentedWrapper<T>> {
     static SegmentedWrapper<T> identity() {
         return { O::identity(), 0 };
     }

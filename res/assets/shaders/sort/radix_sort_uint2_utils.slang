@@ -22,17 +22,12 @@
 // whose bits [0, 32) are y and bits [32, 64) are x. Each pass sorts stably by one WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit,
 // so sorting only the digits of x orders the keys by x and carries y as a payload that keeps its input order among equal x.
 // The passes share the histogram buffer, the histogram prefix sum passes, and the dispatch preparation of the uint radix
-// sort. A uint2 key buffer has the metadata of a uint radix sort key buffer, which a uint view of the buffer reads and
-// writes at the same indices, followed by the keys from WBE_RADIX_SORT_UINT2_DATA_START.
+// sort. A uint2 key buffer is a uint2 counted buffer whose header holds the same words as a uint radix sort key buffer.
 
 // The number of invocations of the histogram and scatter passes.
 #define WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE 64
 // The number of elements the scatter pass sorts in groupshared memory at once.
 #define WBE_RADIX_SORT_UINT2_BATCH_SIZE 256
-// The index of the uint2 holding the metadata: the element count in x and the local sort count in y.
-#define WBE_RADIX_SORT_UINT2_METADATA_INDEX 0
-// The metadata occupies the first WBE_RADIX_SORT_DATA_START uints, i.e. the first two uint2.
-#define WBE_RADIX_SORT_UINT2_DATA_START (WBE_RADIX_SORT_DATA_START / 2)
 // The scatter pass sorts a batch by entries packing the digit of an element above its index in the batch.
 #define WBE_RADIX_SORT_UINT2_ENTRY_INDEX_BIT_SIZE 8
 #define WBE_RADIX_SORT_UINT2_ENTRY_INDEX_MASK ((1u << WBE_RADIX_SORT_UINT2_ENTRY_INDEX_BIT_SIZE) - 1)
@@ -66,13 +61,12 @@ uint radix_sort_digit(uint2 p_key, uint p_bit_region) {
  * @param p_group_thread_id The local invocation index in [0, WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE).
  * @param p_bit_region The bit offset of the digit to count, as for radix_sort_digit(uint2, uint).
  */
-void radix_sort_uint2_histogram(RWStructuredBuffer<uint2> p_keys, RWStructuredBuffer<uint> p_histogram_buffer,
+void radix_sort_uint2_histogram(CountedBuffer<uint2> p_keys, RWStructuredBuffer<uint> p_histogram_buffer,
         __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_COUNT], uint p_group_id, uint p_group_thread_id,
         uint p_bit_region) {
     uint thread_data_start = p_group_thread_id * 4;
-    uint2 metadata = p_keys[WBE_RADIX_SORT_UINT2_METADATA_INDEX];
-    uint element_count = metadata.x;
-    uint sub_histogram_num = metadata.y;
+    uint element_count = p_keys.size();
+    uint sub_histogram_num = p_keys.get_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX);
     if (p_group_id >= sub_histogram_num) {
         return;
     }
@@ -96,7 +90,7 @@ void radix_sort_uint2_histogram(RWStructuredBuffer<uint2> p_keys, RWStructuredBu
     uint section_begin = group_begin + p_group_thread_id * operate_stride;
     uint section_end = min(section_begin + operate_stride, group_end);
     for (uint i = section_begin; i < section_end; ++i) {
-        InterlockedAdd(p_histogram[radix_sort_digit(p_keys[WBE_RADIX_SORT_UINT2_DATA_START + i], p_bit_region)], 1);
+        InterlockedAdd(p_histogram[radix_sort_digit(p_keys.get(i), p_bit_region)], 1);
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -115,12 +109,12 @@ void radix_sort_uint2_histogram(RWStructuredBuffer<uint2> p_keys, RWStructuredBu
  * the same digit in earlier sub-histograms) + (rank among the keys with the same digit in this sub-histogram). The range is
  * sorted in batches of WBE_RADIX_SORT_UINT2_BATCH_SIZE: each key of a batch is stored in groupshared memory, and an entry
  * packing its digit above its index in the batch is sorted stably by the digit, so the scatter is stable. Workgroup 0 also
- * copies the metadata of the input keys to the output keys. Workgroups at or past the sub-histogram count do nothing.
- * Every invocation of the WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE-invocation workgroup must call this function with the same
- * arguments except p_group_thread_id.
+ * copies the element count and the local sort count of the input keys to the output keys. Workgroups at or past the
+ * sub-histogram count do nothing. Every invocation of the WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE-invocation workgroup must
+ * call this function with the same arguments except p_group_thread_id.
  * @param p_input_keys The uint2 key buffer read.
  * @param p_histogram_buffer The prefix-summed histogram buffer.
- * @param p_output_keys The uint2 key buffer receiving the scattered keys and the metadata.
+ * @param p_output_keys The uint2 key buffer receiving the scattered keys, the element count, and the local sort count.
  * @param p_entries Groupshared scratch for the sorted batch entries; its contents are overwritten.
  * @param p_scratch Groupshared scratch for the batch sort; its contents are overwritten.
  * @param p_batch_keys Groupshared scratch for the keys of a batch; its contents are overwritten.
@@ -132,23 +126,24 @@ void radix_sort_uint2_histogram(RWStructuredBuffer<uint2> p_keys, RWStructuredBu
  * @param p_group_thread_id The local invocation index in [0, WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE).
  * @param p_bit_region The bit offset of the digit to sort by, as for radix_sort_digit(uint2, uint).
  */
-void radix_sort_uint2_scatter(RWStructuredBuffer<uint2> p_input_keys, RWStructuredBuffer<uint> p_histogram_buffer,
-        RWStructuredBuffer<uint2> p_output_keys, __ref groupshared uint p_entries[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
+void radix_sort_uint2_scatter(CountedBuffer<uint2> p_input_keys, RWStructuredBuffer<uint> p_histogram_buffer,
+        CountedBuffer<uint2> p_output_keys, __ref groupshared uint p_entries[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint p_scratch[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint2 p_batch_keys[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint p_digit_offsets[WBE_RADIX_SORT_BUCKET_COUNT],
         __ref groupshared uint p_batch_digit_starts[WBE_RADIX_SORT_BUCKET_COUNT], uint p_group_id, uint p_group_thread_id,
         uint p_bit_region) {
     uint thread_data_start = p_group_thread_id * 4;
-    uint2 metadata = p_input_keys[WBE_RADIX_SORT_UINT2_METADATA_INDEX];
-    uint element_count = metadata.x;
+    uint element_count = p_input_keys.size();
     uint sub_histogram_num = p_histogram_buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX];
     uint lane_start = p_histogram_buffer[WBE_RADIX_SORT_LANE_START_INDEX];
     if (p_group_id >= sub_histogram_num) {
         return;
     }
     if (p_group_id == 0 && p_group_thread_id == 0) {
-        p_output_keys[WBE_RADIX_SORT_UINT2_METADATA_INDEX] = metadata;
+        p_output_keys.set_size(element_count);
+        p_output_keys.set_header(
+            WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX, p_input_keys.get_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX));
     }
 
     // The last sub-histogram holds the total count of each digit after the column-wise inclusive prefix sum. An exclusive
@@ -183,7 +178,7 @@ void radix_sort_uint2_scatter(RWStructuredBuffer<uint2> p_input_keys, RWStructur
             uint index = thread_data_start + i;
             uint digit = WBE_RADIX_SORT_BUCKET_MASK;
             if (index < batch_count) {
-                uint2 key = p_input_keys[WBE_RADIX_SORT_UINT2_DATA_START + batch_begin + index];
+                uint2 key = p_input_keys.get(batch_begin + index);
                 p_batch_keys[index] = key;
                 digit = radix_sort_digit(key, p_bit_region);
             }
@@ -217,8 +212,7 @@ void radix_sort_uint2_scatter(RWStructuredBuffer<uint2> p_input_keys, RWStructur
             uint index = thread_data_start + i;
             if (index < batch_count) {
                 uint rank = index - p_batch_digit_starts[digits[i]];
-                p_output_keys[WBE_RADIX_SORT_UINT2_DATA_START + p_digit_offsets[digits[i]] + rank] =
-                    p_batch_keys[sources[i]];
+                p_output_keys.set(p_digit_offsets[digits[i]] + rank, p_batch_keys[sources[i]]);
                 if (index == batch_count - 1
                     || (p_entries[index + 1] >> WBE_RADIX_SORT_UINT2_ENTRY_INDEX_BIT_SIZE) != digits[i]) {
                     batch_digit_counts[i] = rank + 1;

@@ -27,6 +27,11 @@ def utils(device: spy.Device, shader_include_dir: Path) -> spy.Module:
     return spy.Module.load_from_file(device, str(shader_include_dir / "utils" / "utils.slang"))
 
 
+@pytest.fixture(scope="module")
+def flatten_functions(device: spy.Device) -> spy.Module:
+    return spy.Module.load_from_file(device, str(Path(__file__).parent / "kernels" / "flatten_index_functions.slang"))
+
+
 @pytest.fixture
 def rng() -> np.random.Generator:
     return np.random.default_rng(RANDOM_SEED)
@@ -182,17 +187,29 @@ def test_morton_encode_3d(utils: spy.Module, rng: np.random.Generator) -> None:
     np.testing.assert_array_equal(result, expected)
 
 
+@pytest.mark.parametrize("p_extent", [(1, 1), (3, 5), (16, 8)])
+def test_flatten_index_2d(flatten_functions: spy.Module, rng: np.random.Generator, p_extent: tuple[int, int]) -> None:
+    width, height = p_extent
+    coordinates = np.stack([rng.integers(0, extent, SAMPLE_COUNT, dtype=np.uint32) for extent in p_extent], axis=1)
+    widths = np.full(SAMPLE_COUNT, width, dtype=np.uint32)
+    result = call(flatten_functions.flatten_2d, coordinates, widths)
+    # x varies fastest, as in a C-ordered [height][width] array.
+    expected = np.ravel_multi_index((coordinates[:, 1], coordinates[:, 0]), (height, width))
+    np.testing.assert_array_equal(result, expected.astype(np.uint32))
+    np.testing.assert_array_equal(call(flatten_functions.unflatten_2d, result, widths), coordinates)
+
+
 @pytest.mark.parametrize("p_extent", [(1, 1, 1), (3, 5, 7), (16, 8, 4)])
-def test_flatten_index_3d(utils: spy.Module, rng: np.random.Generator, p_extent: tuple[int, int, int]) -> None:
+def test_flatten_index_3d(flatten_functions: spy.Module, rng: np.random.Generator, p_extent: tuple[int, int, int]) -> None:
     width, height, depth = p_extent
     coordinates = np.stack([rng.integers(0, extent, SAMPLE_COUNT, dtype=np.uint32) for extent in p_extent], axis=1)
     widths = np.full(SAMPLE_COUNT, width, dtype=np.uint32)
     heights = np.full(SAMPLE_COUNT, height, dtype=np.uint32)
-    result = call(utils.flatten_index_3d, coordinates, widths, heights)
+    result = call(flatten_functions.flatten_3d, coordinates, widths, heights)
     # x varies fastest and z slowest, as in a C-ordered [depth][height][width] array.
     expected = np.ravel_multi_index((coordinates[:, 2], coordinates[:, 1], coordinates[:, 0]), (depth, height, width))
     np.testing.assert_array_equal(result, expected.astype(np.uint32))
-    np.testing.assert_array_equal(call(utils.unflatten_index_3d, result, widths, heights), coordinates)
+    np.testing.assert_array_equal(call(flatten_functions.unflatten_3d, result, widths, heights), coordinates)
 
 
 def test_morton_delta(utils: spy.Module, rng: np.random.Generator) -> None:

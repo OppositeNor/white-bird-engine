@@ -21,9 +21,9 @@
  */
 #include "sort/radix_sort_uint2_utils.slang"
 
-RWStructuredBuffer<uint2> input_keys;
+RWByteAddressBuffer input_keys;
 RWStructuredBuffer<uint> histogram_buffer;
-RWStructuredBuffer<uint2> output_keys;
+RWByteAddressBuffer output_keys;
 
 groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 groupshared uint sort_entries[WBE_RADIX_SORT_UINT2_BATCH_SIZE];
@@ -35,11 +35,13 @@ groupshared uint batch_digit_starts[WBE_RADIX_SORT_BUCKET_COUNT];
 [shader("compute")]
 [numthreads(WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
+    CountedBuffer<uint2> input = CountedBuffer<uint2>(input_keys, 0);
+    CountedBuffer<uint2> output = CountedBuffer<uint2>(output_keys, 0);
 #if KERNEL_PASS == 0
-    radix_sort_uint2_histogram(input_keys, histogram_buffer, histogram, p_group_id.x, p_group_thread_id.x,
+    radix_sort_uint2_histogram(input, histogram_buffer, histogram, p_group_id.x, p_group_thread_id.x,
         WBE_RADIX_HISTOGRAM_BIT_REGION);
 #else
-    radix_sort_uint2_scatter(input_keys, histogram_buffer, output_keys, sort_entries, sort_scratch, batch_keys,
-        digit_offsets, batch_digit_starts, p_group_id.x, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
+    radix_sort_uint2_scatter(input, histogram_buffer, output, sort_entries, sort_scratch, batch_keys, digit_offsets,
+        batch_digit_starts, p_group_id.x, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
 #endif
 }

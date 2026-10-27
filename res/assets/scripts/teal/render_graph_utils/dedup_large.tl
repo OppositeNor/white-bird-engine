@@ -18,7 +18,7 @@
 -- key its index among the unique keys, to which it is scattered. The application compiles the pipelines under their shader ids
 -- (dedup_large_prepare_dispatch, dedup_large_mark, dedup_large_scatter), and those of the radix sort (see
 -- render_graph_utils.sort) and the large prefix scan (see render_graph_utils.large_prefix_scan). The key buffer and the
--- unique keys hold the key count in their metadata, followed by the keys; see dedup_large_utils.slang.
+-- unique keys are counted buffers of the keys; see dedup_large_utils.slang and counted_buffer.slang.
 
 local Graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")

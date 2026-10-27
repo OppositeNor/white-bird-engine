@@ -151,8 +151,6 @@ void ISVORenderFeature::initialize() {
         .origin = svo_volume.origin,
         .width = svo_volume.width,
         .max_depth = SVO_MAX_DEPTH,
-        .max_node_count = SVO_MAX_NODE_COUNT,
-        .max_leaves_count = SVO_MAX_LEAVES_COUNT,
         .node_count = 8,
         .leaves_count = 0,
         .data_count = 8,

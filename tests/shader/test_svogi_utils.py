@@ -190,7 +190,7 @@ def expected_occupancy(p_tree: StaticSVO, p_voxels: list[tuple[int, int, int]]) 
 
 
 def make_static_tree_info(p_tree: StaticSVO) -> np.ndarray:
-    tree_info = make_tree_info(p_tree.max_depth, len(p_tree.nodes))
+    tree_info = make_tree_info(p_tree.max_depth)
     tree_info["node_count"] = len(p_tree.nodes)
     tree_info["leaves_count"] = len(p_tree.leaves)
     return tree_info

@@ -27,6 +27,7 @@ ELEMENTS_PER_WORKGROUP = 256
 MAX_WORKGROUP_COUNT = 16384
 SCAN_HISTOGRAM_NUM = 16
 DATA_START = 4
+KEY_BYTE_SIZE = 8
 LANE_START = 4
 SUB_HISTOGRAM_NUM_INDEX = 0
 OVERFLOW_START_INDEX = 1
@@ -46,8 +47,9 @@ def local_sort_num(p_element_count: int) -> int:
 
 
 def make_key_buffer(p_device: spy.Device, p_keys: np.ndarray) -> spy.Buffer:
-    """A uint2 key buffer holding the metadata and p_keys, an (n, 2) uint32 array of (x, y) keys."""
-    metadata = np.array([len(p_keys), local_sort_num(len(p_keys)), 0, 0], dtype=np.uint32)
+    """A uint2 key buffer holding the header, with the byte size of the keys, and p_keys, an (n, 2) uint32 array of (x, y)
+    keys."""
+    metadata = np.array([len(p_keys) * KEY_BYTE_SIZE, local_sort_num(len(p_keys)), 0, 0], dtype=np.uint32)
     data = np.concatenate([metadata, p_keys.reshape(-1)])
     return p_device.create_buffer(element_count=len(data) // 2, struct_size=8, usage=USAGE, data=data)
 
@@ -106,7 +108,7 @@ def check_sort(p_device: spy.Device, p_load_kernel: KernelLoader, p_keys: np.nda
     for pass_index, bit_region in enumerate(range(p_begin_bit, p_end_bit, DIGIT_BIT_SIZE)):
         run_pass(p_device, p_load_kernel, buffers[pass_index % 2], buffers[(pass_index + 1) % 2], keys, bit_region)
         metadata, keys = read_keys(buffers[(pass_index + 1) % 2])
-        np.testing.assert_array_equal(metadata[:2], [len(p_keys), local_sort_num(len(p_keys))])
+        np.testing.assert_array_equal(metadata[:2], [len(p_keys) * KEY_BYTE_SIZE, local_sort_num(len(p_keys))])
         np.testing.assert_array_equal(keys, sort_reference(p_keys, p_begin_bit, bit_region + DIGIT_BIT_SIZE))
     np.testing.assert_array_equal(keys, sort_reference(p_keys, p_begin_bit, p_end_bit))
 

@@ -67,7 +67,7 @@ def test_trace_data_static(device: spy.Device, load_kernel: KernelLoader, rng: n
     nodes = tree.node_array()
     leaves = tree.leaf_array()
     results, traces = run_trace_data(device, load_kernel, nodes, leaves,
-        make_tree_info(p_max_depth, len(nodes)), queries, False)
+        make_tree_info(p_max_depth), queries, False)
     for voxel, result, trace in zip(queries, results, traces):
         if voxel in tree.leaf_of_voxel:
             stop_depth = p_max_depth

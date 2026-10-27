@@ -186,8 +186,6 @@ private:
         glm::vec3 origin;
         float width;
         uint32_t max_depth;
-        uint32_t max_node_count;
-        uint32_t max_leaves_count;
         uint32_t node_count;
         uint32_t leaves_count;
         uint32_t data_count;
@@ -196,8 +194,8 @@ private:
         uint32_t dynamic_leaves_count;
     };
 
-    static_assert(sizeof(SVOInfo) == 52);
-    static_assert(offsetof(SVOInfo, dynamic_node_count) == 44);
+    static_assert(sizeof(SVOInfo) == 44);
+    static_assert(offsetof(SVOInfo, dynamic_node_count) == 36);
 
     struct SVONode {
         enum class ChildrenState {
@@ -209,7 +207,7 @@ private:
             NODE_DYNAMIC = 5,
             LEAF_DYNAMIC = 6,
         };
-        enum Subregion {
+        enum class Subregion {
             XYZ_000,
             XYZ_001,
             XYZ_010,

@@ -45,9 +45,8 @@ INDEX_LEAF = 1
 NODE_DTYPE = np.dtype([("children_data", "<u4"), ("data_index", "<u4"), ("parent_index", "<i4"),
     ("original_children_data", "<u4")])
 LEAF_DTYPE = np.dtype([("data_index", "<u4"), ("parent_index", "<i4")])
-INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u4"), ("max_node_count", "<u4"),
-    ("max_leaves_count", "<u4"), ("node_count", "<u4"), ("leaves_count", "<u4"), ("data_count", "<u4"),
-    ("max_deferred_task_count", "<u4"), ("dynamic_node_count", "<u4"),
+INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u4"), ("node_count", "<u4"),
+    ("leaves_count", "<u4"), ("data_count", "<u4"), ("max_deferred_task_count", "<u4"), ("dynamic_node_count", "<u4"),
     ("dynamic_leaves_count", "<u4")])
 TRACE_DTYPE = np.dtype([("node_index", "<u4"), ("index_type", "<u4"), ("curr_depth", "<u4"), ("remain_depth", "<i4"),
     ("svo_position", "<f4", 3), ("voxel_index", "<u4")])
@@ -179,10 +178,10 @@ def read_buffer(p_buffer: spy.Buffer, p_dtype: np.dtype) -> np.ndarray:
     return p_buffer.to_numpy().view(p_dtype)
 
 
-def make_tree_info(p_max_depth: int, p_max_node_count: int) -> np.ndarray:
+def make_tree_info(p_max_depth: int) -> np.ndarray:
+    """Return a tree info; the node and leaf capacities are the sizes of the node and leaf buffers."""
     info = np.zeros(1, dtype=INFO_DTYPE)
     info["max_depth"] = p_max_depth
-    info["max_node_count"] = p_max_node_count
     return info
 
 
@@ -343,7 +342,7 @@ def test_traverse_svo_static(device: spy.Device, load_kernel: KernelLoader, rng:
     tree = build_static_svo(random_voxels(rng, 24, p_max_depth), p_max_depth)
     queries = static_query_voxels(rng, tree, 64)
     nodes = tree.node_array()
-    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth, len(nodes)),
+    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth),
         root_traces(queries, p_max_depth, p_remain_depth), False, False)
     for voxel, trace in zip(queries, result):
         if voxel in tree.leaf_of_voxel:
@@ -369,7 +368,7 @@ def test_traverse_static_svo(device: spy.Device, load_kernel: KernelLoader, rng:
     tree = build_static_svo(random_voxels(rng, 24, p_max_depth), p_max_depth)
     queries = static_query_voxels(rng, tree, 64)
     nodes = tree.node_array()
-    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth, len(nodes)),
+    result = run_traverse(device, load_kernel, nodes, make_tree_info(p_max_depth),
         root_traces(queries, p_max_depth, p_remain_depth), True, False)
     for voxel, trace in zip(queries, result):
         # Static traversal stops at the first node that is not NODE, so leaf blocks are never entered.
@@ -403,7 +402,7 @@ def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
     nodes[0]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, DYNAMIC_SVO_NODE_COUNT // 8)
     nodes[7]["children_data"] = pack_children_data(STATE_NODE, 1)
     nodes[DYNAMIC_SVO_NODE_COUNT + 3]["children_data"] = pack_children_data(STATE_LEAF_DYNAMIC, 2, 1 << 5)
-    tree_info = make_tree_info(3, DYNAMIC_SVO_NODE_COUNT + 8)
+    tree_info = make_tree_info(3)
     tree_info["node_count"] = DYNAMIC_SVO_NODE_COUNT
     tree_info["dynamic_node_count"] = 8
     return nodes, tree_info
@@ -451,7 +450,7 @@ def test_is_svo_leaf_occupied(device: spy.Device, load_kernel: KernelLoader, rng
     tree = build_static_svo(random_voxels(rng, 40, p_max_depth), p_max_depth)
     leaves = tree.leaf_array()
     nodes = tree.node_array()
-    tree_info = make_tree_info(p_max_depth, len(nodes))
+    tree_info = make_tree_info(p_max_depth)
     tree_info["node_count"] = len(tree.nodes)
     occupied = make_buffer(device, np.zeros(len(tree.leaves), dtype=np.uint32))
     load_kernel("svo_leaf_occupied.slang", {}).dispatch(thread_count=[len(tree.leaves), 1, 1], vars={
@@ -469,7 +468,7 @@ def run_leaf_queries(p_device: spy.Device, p_load_kernel: KernelLoader, p_tree: 
     occupancy, grid positions, and totals.
     """
     nodes = p_tree.node_array()
-    tree_info = make_tree_info(p_tree.max_depth, len(nodes))
+    tree_info = make_tree_info(p_tree.max_depth)
     tree_info["node_count"] = len(p_tree.nodes)
     tree_info["leaves_count"] = len(p_tree.leaves)
     tree_info["dynamic_node_count"] = p_dynamic_node_count

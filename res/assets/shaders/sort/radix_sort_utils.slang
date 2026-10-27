@@ -16,6 +16,7 @@
 #define WBE_FILE_SORT_SLANG
 
 #include "utils/utils.slang"
+#include "utils/counted_buffer.slang"
 #include "prefix_sum/prefix_sum_utils.slang"
 
 #define WBE_RADIX_SORT_BUCKET_BIT_SIZE 8
@@ -32,9 +33,8 @@
 // size. Past WBE_RADIX_SORT_MAX_WORKGROUP_COUNT local sorts, each local sort owns more elements instead.
 #define WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP 256
 #define WBE_RADIX_SORT_MAX_WORKGROUP_COUNT 16384
-// The first entries of the radix sort key buffers are metadata: the element count, then the number of local sorts.
-#define WBE_RADIX_SORT_DATA_START 4
-#define WBE_RADIX_SORT_ELEMENT_COUNT_INDEX 0
+// The radix sort key buffers are counted buffers whose header also holds the number of local sorts, at header word
+// WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX.
 #define WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX 1
 
 // The histogram buffer holds the sub-histogram count at index 0, the start of the overflow histograms at index 1, and the

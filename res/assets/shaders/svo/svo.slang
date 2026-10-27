@@ -398,6 +398,26 @@ struct SVOWriteBuffer<T> {
 static const uint SVO_BRICK_SIZE = 3;
 
 /**
+ * @brief Convert a position local to a node or leaf into its sub-voxel and the position inside that sub-voxel.
+ * @details The sub-voxel is selected as in SVOWriteBrick::write_data_at_position(). Each sub-voxel is
+ * 1 / (SVO_BRICK_SIZE - 1) the width of its node or leaf and centered at its texel's local coordinate, so the returned
+ * position is 0.5 at the sub-voxel's center. The low and high sub-voxels extend past the node or leaf, so on those axes
+ * the position lies in [0.5, 1) and [0, 0.5) respectively.
+ * @param p_svo_position Position in the node's or leaf's local unit cube, such as SVONodeTraceInfo::svo_position after
+ * SVO::trace_data(); every component must lie in [0, 1).
+ * @param p_subvoxel_index Receives the sub-voxel's texel in the brick, flattened as by uint3::flatten() with x fastest and
+ * z slowest.
+ * @return The position in the sub-voxel's local unit cube.
+ */
+float3 svo_pos_to_subvoxel_pos(float3 p_svo_position, out uint p_subvoxel_index) {
+    float3 brick_position = p_svo_position * float(SVO_BRICK_SIZE - 1);
+    // Round to the nearest sub-voxel center at local 0, 0.5, or 1.
+    uint3 subvoxel = min(uint3(brick_position + 0.5), uint3(SVO_BRICK_SIZE - 1));
+    p_subvoxel_index = subvoxel.flatten(SVO_BRICK_SIZE, SVO_BRICK_SIZE);
+    return brick_position - float3(subvoxel) + 0.5;
+}
+
+/**
  * @brief An SVO paired with a read-only image of 3x3x3 voxel data bricks.
  * @details Each node or leaf owns the brick at its data index, expanded row-major, x fastest and z slowest, into the
  * image's dimensions divided by SVO_BRICK_SIZE. A brick's texels are sub-voxels of its node or leaf centered at its local
@@ -447,7 +467,7 @@ struct SVOReadBrick<T : ITexelElement> {
     T trace_data(float3 p_global_position, uint p_depth, uint p_frame_slot) {
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(p_global_position, p_depth, trace_info);
-        uint3 brick_origin = unflatten_index_3d_checked(data_index, atlas_dimensions / SVO_BRICK_SIZE,
+        uint3 brick_origin = unflatten_index_checked(data_index, atlas_dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) *
             SVO_BRICK_SIZE;
         // Sub-voxel centers sit at local 0, 0.5, and 1, the centers of the brick's texels 0, 1, and 2.
@@ -535,7 +555,7 @@ struct SVOWriteBrick<T : ITexelElement> {
     }
 
     uint3 get_subvoxel_texel(uint p_data_index, SVONodeTraceInfo p_trace_info, uint p_frame_slot) {
-        uint3 brick_origin = unflatten_index_3d_checked(p_data_index, atlas_dimensions / SVO_BRICK_SIZE,
+        uint3 brick_origin = unflatten_index_checked(p_data_index, atlas_dimensions / SVO_BRICK_SIZE,
                                  ShaderDebugError::SVO_VOXEL_DATA_INDEX_OVERFLOW, p_frame_slot) * SVO_BRICK_SIZE;
         // Round to the nearest sub-voxel center at local 0, 0.5, or 1.
         uint3 subvoxel = min(uint3(p_trace_info.svo_position * float(SVO_BRICK_SIZE - 1) + 0.5), uint3(SVO_BRICK_SIZE - 1));
