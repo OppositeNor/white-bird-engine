@@ -550,12 +550,11 @@ constexpr uint32_t morton_encode(uint32_t p_x, uint32_t p_y) {
     p_x = (p_x | (p_x << 4)) & 0x0F0F0F0F;
     p_x = (p_x | (p_x << 2)) & 0x33333333;
     p_x = (p_x | (p_x << 1)) & 0x55555555;
-    p_y <<= 1;
     p_y = (p_y | (p_y << 8)) & 0x00FF00FF;
     p_y = (p_y | (p_y << 4)) & 0x0F0F0F0F;
     p_y = (p_y | (p_y << 2)) & 0x33333333;
     p_y = (p_y | (p_y << 1)) & 0x55555555;
-    return p_x | p_y;
+    return p_x | (p_y << 1);
 }
 
 WBE_DECL_CRTP_CONCEPT(BufferBase);

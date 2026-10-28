@@ -15,6 +15,7 @@
 // NOLINTBEGIN
 #include "core/allocator/heap_allocator_ram.hh"
 #include "heap_allocator_align_pool_test.hh"
+#include "heap_allocator_aligned_ram_test.hh"
 #include "heap_allocator_aligned_pool_impl_list_test.hh"
 #include "heap_allocator_atomic_arena_aligned_pool_impl_list_test.hh"
 #include "heap_allocator_atomic_mutex_aligned_pool_impl_list_test.hh"
