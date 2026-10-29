@@ -176,7 +176,9 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
         .lighting = RendRecipeSelectVK{.event = std::string(VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID),
             .branch = get_voxel_debug_view_lighting_branch(applied_voxel_debug_view_mode)},
         .enabled = make_toggle(0),
-        .post_svo_build = make_toggle(1),
+        .tree_view = make_toggle(1),
+        .tree_draw = RendRecipeSelectVK{.event = std::string(VOXEL_DEBUG_TREE_DRAW_EVENT_ID),
+            .branch = get_voxel_debug_tree_draw_branch(applied_voxel_debug_view_mode, applied_voxel_debug_draw_style)},
         .pre_deferred_propagation = make_toggle(2),
     };
     for (size_t entity = 0; entity < dynamic_mesh->get_entity_count(); ++entity) {
@@ -268,7 +270,7 @@ bool ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled(size_t
     case 0:
         return p_mode != VoxelDebugViewMode::DISABLED;
     case 1:
-        return p_mode == VoxelDebugViewMode::POST_SVO_BUILD;
+        return p_mode == VoxelDebugViewMode::POST_SVO_BUILD || p_mode == VoxelDebugViewMode::OCCUPANCY;
     case 2:
         return p_mode == VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
     default:
@@ -281,20 +283,50 @@ uint32_t ApplicationVulkanDeferredPBRTest::get_voxel_debug_view_lighting_branch(
     return p_mode == VoxelDebugViewMode::DISABLED ? 0U : 1U;
 }
 
+uint32_t ApplicationVulkanDeferredPBRTest::get_voxel_debug_tree_draw_branch(VoxelDebugViewMode p_mode, VoxelDebugDrawStyle p_style) {
+    return static_cast<uint32_t>(p_style) + (p_mode == VoxelDebugViewMode::OCCUPANCY ? 2U : 0U);
+}
+
+VoxelDebugViewMode ApplicationVulkanDeferredPBRTest::get_next_voxel_debug_view_mode(VoxelDebugViewMode p_mode) const {
+    static constexpr std::array<VoxelDebugViewMode, 4> CYCLE{
+        VoxelDebugViewMode::DISABLED,
+        VoxelDebugViewMode::POST_SVO_BUILD,
+        VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+        VoxelDebugViewMode::OCCUPANCY,
+    };
+    const auto current = std::ranges::find(CYCLE, p_mode);
+    if (current == CYCLE.end()) {
+        throw std::runtime_error("Unknown voxel debug view mode.");
+    }
+    size_t index = static_cast<size_t>(current - CYCLE.begin());
+    do {
+        index = (index + 1) % CYCLE.size();
+    } while (!voxel_structure->supports_debug_view(CYCLE[index]));
+    return CYCLE[index];
+}
+
 void ApplicationVulkanDeferredPBRTest::apply_voxel_debug_view_mode() {
     const VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
-    if (mode == applied_voxel_debug_view_mode) {
+    const VoxelDebugDrawStyle style = voxel_debug_draw_style.load(std::memory_order_relaxed);
+    if (mode == applied_voxel_debug_view_mode && style == applied_voxel_debug_draw_style) {
         return;
+    }
+    // The style selects the index count the voxel structure's tree draw setup writes and the branch that draws it, so both
+    // change between the same frames.
+    if (voxel_structure->supports_debug_draw_styles()) {
+        voxel_structure->set_debug_draw_style(style);
     }
     // Emitted between frames, so every toggled and multiplexed task of both graphs records the new mode from the same frame
     // on.
     EventManager* event_manager = EventManager::get_singleton();
     event_manager->emit(VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_view_lighting_branch(mode)});
+    event_manager->emit(VOXEL_DEBUG_TREE_DRAW_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_tree_draw_branch(mode, style)});
     for (size_t group = 0; group < VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS.size(); ++group) {
         event_manager->emit(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[group],
             RTToggleVK::Command{.enabled = is_voxel_debug_view_toggle_enabled(group, mode)});
     }
     applied_voxel_debug_view_mode = mode;
+    applied_voxel_debug_draw_style = style;
 }
 
 void ApplicationVulkanDeferredPBRTest::finish_voxel_static_build() {

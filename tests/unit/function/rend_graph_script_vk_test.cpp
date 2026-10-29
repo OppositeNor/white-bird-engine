@@ -1590,7 +1590,8 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         svo.set_value("shader_prefix", std::string("svo_2"));
         svo.set_value("dynamic_shader_prefix", std::string("svo_2_dynamic"));
         svo.set_entry("imports", make_imports({"svo_info", "svo_node_buffer", "svo_leaf_buffer", "svo_debug_draw_index_buffer",
-            "svo_debug_draw_indirect_buffer", "svo_pre_deferred_debug_draw_indirect_buffer"}));
+            "svo_debug_draw_indirect_buffer", "svo_pre_deferred_debug_draw_indirect_buffer", "svo_debug_draw_settings",
+            "svo_debug_draw_solid_index_buffer"}));
         svo.set_value("extent", 512);
         svo.set_value("max_depth", 9);
         DataValue buffer_sizes = DataValue::make_map();
@@ -1600,6 +1601,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         buffer_sizes.set_value("occupancy", 1024);
         buffer_sizes.set_value("radiance_index", 528);
         buffer_sizes.set_value("radiance_staged", 4096);
+        buffer_sizes.set_value("debug_draw_node_list", 256);
         svo.set_entry("buffer_sizes", buffer_sizes);
         for (const char* group_count : {
                  "reset_group_count",
@@ -1611,6 +1613,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
                  "occupancy_injection_group_count_y",
                  "occupancy_propagation_group_count",
                  "radiance_injection_group_count",
+                 "debug_draw_node_search_group_count",
              }) {
             svo.set_value(group_count, 4);
         }
@@ -1654,7 +1657,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         transforms.push_back(DataValue::make_string("dynamic_mesh_entity_1.transform"));
         context.set_entry("dynamic_mesh_transform_ids", transforms);
         DataValue toggles = DataValue::make_map();
-        for (const char* group : {"enabled", "post_svo_build", "pre_deferred_propagation"}) {
+        for (const char* group : {"enabled", "tree_view", "pre_deferred_propagation"}) {
             DataValue toggle = DataValue::make_map();
             toggle.set_value("event", std::string("test.voxel_debug_view.") + group);
             toggle.set_value("enabled", false);
@@ -1664,6 +1667,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         lighting.set_value("event", std::string("test.voxel_debug_view.lighting"));
         lighting.set_value("branch", 0);
         toggles.set_entry("lighting", lighting);
+        DataValue tree_draw = DataValue::make_map();
+        tree_draw.set_value("event", std::string("test.voxel_debug_view.tree_draw"));
+        tree_draw.set_value("branch", 0);
+        toggles.set_entry("tree_draw", tree_draw);
         context.set_entry("voxel_debug_view_toggles", toggles);
         if (p_post_processing) {
             DataValue post_processing = DataValue::make_map();
@@ -1726,9 +1733,9 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(count_tasks_with(octree_recipe.get_entry("tasks").as_list(), "toggle"), 4U);
     EXPECT_TRUE(contains_import(octree_recipe, "octree_dynamic"));
     EXPECT_EQ(octree->get_entry("ports").get_value<std::string>("depth"), "gbuffer_depth");
-    // The pass-published SVO subgraph holds 19 tasks, 4 of them the SVOGI occupancy injection and propagation and the
-    // radiance index reset and injection: the 5 static construction tasks are triggered, and the pre-deferred capture and
-    // the 2 overlays toggled. The pixel sort subgraph holds 6 tasks, and its one toggle gates them all.
+    // The pass-published SVO subgraph holds 20 tasks, 4 of them the SVOGI occupancy injection and propagation and the
+    // radiance index reset and injection: the 5 static construction tasks are triggered, and the pre-deferred capture, the
+    // debug view's node search, and the 2 overlays toggled. The pixel sort subgraph holds 6 tasks, and its one toggle gates them all.
     const DataValue summed_area_table = run(true, true, make_svo());
     const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
     ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 1);
@@ -1737,13 +1744,27 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     ASSERT_NE(svo, nullptr);
     const DataValue& svo_recipe = svo->get_entry("subgraph");
     const DataValue::List& svo_tasks = svo_recipe.get_entry("tasks").as_list();
-    EXPECT_EQ(svo_tasks.size(), 19U);
-    EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
+    EXPECT_EQ(svo_tasks.size(), 20U);
+    EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 4U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
     EXPECT_TRUE(contains_import(svo_recipe, "svo_node_buffer"));
-    // The SVO declares its 4 construction and 3 SVOGI scratch buffers with the sizes it is given.
+    // The SVO declares its 4 construction, 3 SVOGI, and 1 debug node list scratch buffers with the sizes it is given.
     const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
-    EXPECT_EQ(svo_resources.size(), 7U);
+    EXPECT_EQ(svo_resources.size(), 8U);
+    const DataValue* node_list = find_by_id(svo_resources, "svo_debug_draw_node_list");
+    ASSERT_NE(node_list, nullptr);
+    EXPECT_EQ(node_list->get_entry("buffer").get_value<int64_t>("size"), 256);
+    // The tree draw multiplexes every style and coloring, and follows the occupancy propagation it may read.
+    const DataValue* tree_draw = find_by_id(svo_tasks, "run_svo_debug_draw");
+    ASSERT_NE(tree_draw, nullptr);
+    EXPECT_EQ(tree_draw->get_entry("branches").as_list().size(), 4U);
+    EXPECT_EQ(tree_draw->get_entry("select").get_value<std::string>("event"), "test.voxel_debug_view.tree_draw");
+    const DataValue* propagation = find_by_id(svo_tasks, "propagate_svogi_occupancy");
+    ASSERT_NE(propagation, nullptr);
+    EXPECT_TRUE(std::ranges::any_of(propagation->get_entry("connect").as_list(), [](const DataValue& p_connection) {
+        return p_connection.get_value<std::string>("to") == "run_svo_debug_draw" &&
+            p_connection.get_value<std::string>("resource") == "svogi_occupancy_buffer";
+    }));
     const DataValue* deferred_list = find_by_id(svo_resources, "svo_deferred_list_ping");
     ASSERT_NE(deferred_list, nullptr);
     EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);

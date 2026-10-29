@@ -76,7 +76,7 @@ Use [check_deferred.py](../scripts/check_deferred.py) for the deferred executabl
 The deferred executable's controls:
 
 - `R`: switches between the mipmap and summed-area-table graphs (`activate_render_graph`), logging `Deferred shadow filtering:`.
-- `V`: cycles the voxel debug view (disabled, post SVO build, pre deferred propagation) through `RTToggleVK` events passed to the recipe as `VoxelDebugViewToggles`.
+- `V`: cycles the voxel debug view (disabled, post SVO build, pre deferred propagation, and, for the SVOs, occupancy) through `RTToggleVK` and `RTMultiplexerVK` events passed to the recipe as `VoxelDebugViewToggles`. While the post-build or occupancy view is shown, the configuration window's "Voxel draw style" combo (wireframe or solid) and "Voxel debug depth" slider select how and which tree depth it draws; they have no keys.
 - `1`: toggles pixel-sort post-processing (`pixel_sort.toggle`). `B`: triggers bloom acquisition (`RTTriggeredVK`).
 - `F1`: captures to `test_env/captures/deferred_<ms>_frame_<n>.png`. `T`: selects the next spot light.
 - Arrows and `WASDQE` move the camera; `I J K L U O Y P H ;` move and aim the selected spot light.

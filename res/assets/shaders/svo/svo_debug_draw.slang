@@ -16,6 +16,9 @@
 #include "svo/svo_utils.slang"
 #include "svo/svo.slang"
 
+// Variants: WBE_SVO_DEBUG_DRAW_SOLID draws each voxel's shaded faces, shrunk by SOLID_VOXEL_SCALE so the borders between
+// voxels show, instead of its edges; WBE_SVO_DEBUG_DRAW_OCCUPANCY colors each voxel by its injected occupancy.
+
 struct SVODebugDrawDescriptorIndices {
     [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
@@ -23,6 +26,14 @@ struct SVODebugDrawDescriptorIndices {
     uint2 tree_nodes;
     [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_debug_draw_settings")]
+    uint2 settings;
+    [WBE_DESCRIPTOR("storage_buffer", "svo_debug_draw_node_list", "read")]
+    uint2 node_list;
+#if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
+    [WBE_DESCRIPTOR("storage_buffer", "svogi_occupancy_buffer", "read")]
+    uint2 occupancy;
+#endif
 
     [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
@@ -31,7 +42,7 @@ struct SVODebugDrawDescriptorIndices {
 };
 
 /**
- * @brief Vertex output for SVO debug wireframes.
+ * @brief Vertex output for SVO debug draws.
  */
 struct SVODebugDrawVertexOutput {
     /**
@@ -39,7 +50,7 @@ struct SVODebugDrawVertexOutput {
      */
     float4 position : SV_Position;
     /**
-     * @brief Wireframe color.
+     * @brief Voxel color, shaded per face in the solid variants.
      */
     float4 color : COLOR0;
 };
@@ -47,8 +58,32 @@ struct SVODebugDrawVertexOutput {
 [vk::push_constant]
 ConstantBuffer<SVODebugDrawDescriptorIndices> descriptor_indices;
 
+// The edge length of a solid voxel relative to its cell.
+static const float SOLID_VOXEL_SCALE = 0.85;
+
 /**
- * @brief Produces one of the eight corners of a leaf voxel or the SVO bounds without a vertex buffer.
+ * @brief A vertex outside the clip volume, which drops its primitive.
+ */
+SVODebugDrawVertexOutput discarded_vertex() {
+    SVODebugDrawVertexOutput output;
+    output.position = float4(2.0, 2.0, 2.0, 1.0);
+    output.color = float4(0.0);
+    return output;
+}
+
+/**
+ * @brief The outward normal of a solid cube face, ordered as in VOXEL_DEBUG_CUBE_SOLID_INDICES: -x, +x, -y, +y, -z, +z.
+ */
+float3 face_normal(uint p_face) {
+    float3 normal = float3(0.0);
+    normal[p_face / 2] = (p_face % 2) == 0 ? -1.0 : 1.0;
+    return normal;
+}
+
+/**
+ * @brief Produces one of the corners of a leaf voxel, a node at the drawn depth, or the SVO bounds without a vertex buffer;
+ * see svo_debug_draw_setup for the instance layout of each depth. A wireframe index is the corner; a solid one is
+ * face * 8 + corner. The bounds are drawn only as edges.
  */
 [shader("vertex")]
 SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
@@ -56,35 +91,72 @@ SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint 
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[descriptor_indices.settings.x];
+    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[descriptor_indices.node_list.x];
+    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
-    uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
-    bool is_bounds = p_instance_id == svo.get_total_leaves();
-    float3 world_position;
+    uint corner_index = p_vertex_id & 7;
+    float3 corner = float3((corner_index >> 2) & 1, (corner_index >> 1) & 1, corner_index & 1);
+    bool draws_leaves = settings.depth + 1 >= svo_info.max_depth;
+    bool is_bounds = draws_leaves ? p_instance_id == svo.get_total_leaves() : p_instance_id == 0;
+    float3 cell_origin;
+    float cell_width;
+    uint data_index;
     if (is_bounds) {
-        world_position = svo_info.origin + float3(corner) * svo_info.width;
+#if defined(WBE_SVO_DEBUG_DRAW_SOLID)
+        return discarded_vertex();
+#endif
+        cell_origin = svo_info.origin;
+        cell_width = svo_info.width;
+        data_index = 0;
+    }
+    else if (!draws_leaves) {
+        uint node_index = node_list[p_instance_id - 1];
+        uint node_depth;
+        uint3 node_grid_position = svo.get_node_grid_position(node_index, node_depth, frame_slot);
+        cell_width = svo_info.width / float(1u << node_depth);
+        cell_origin = svo_info.origin + float3(node_grid_position) * cell_width;
+        data_index = svo.get_node(node_index).data_index;
     }
     else {
-        if (!svo.is_leaf_occupied(p_instance_id, descriptor_indices.shader_debug_frame_slot)) {
-            SVODebugDrawVertexOutput empty_output;
-            empty_output.position = float4(2.0, 2.0, 2.0, 1.0);
-            empty_output.color = float4(0.0);
-            return empty_output;
+        if (!svo.is_leaf_occupied(p_instance_id, frame_slot)) {
+            return discarded_vertex();
         }
-        uint3 leaf_grid_position = svo.get_leaf_grid_position(p_instance_id, descriptor_indices.shader_debug_frame_slot);
-        float voxel_width = svo_info.width / float(1u << svo_info.max_depth);
-        world_position = svo_info.origin + float3(leaf_grid_position + corner) * voxel_width;
+        uint3 leaf_grid_position = svo.get_leaf_grid_position(p_instance_id, frame_slot);
+        cell_width = svo_info.width / float(1u << svo_info.max_depth);
+        cell_origin = svo_info.origin + float3(leaf_grid_position) * cell_width;
+        data_index = svo.get_leaf(p_instance_id).data_index;
     }
+#if defined(WBE_SVO_DEBUG_DRAW_SOLID)
+    float3 world_position = cell_origin + (0.5 + (corner - 0.5) * SOLID_VOXEL_SCALE) * cell_width;
+#else
+    float3 world_position = cell_origin + corner * cell_width;
+#endif
+    float3 color = float3(1.0);
+#if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
+    if (!is_bounds) {
+        StructuredBuffer<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
+        // The gray level is the occupancy: black for empty, white for full.
+        color = float3(saturate(occupancy[data_index]));
+    }
+#endif
+#if defined(WBE_SVO_DEBUG_DRAW_SOLID) && !defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
+    // Faces facing the fixed light direction are brighter, so the cube's shape reads without textures. The occupancy view
+    // keeps every face at its exact gray level.
+    float3 light_direction = normalize(float3(0.4, 1.0, 0.25));
+    color *= 0.55 + 0.45 * dot(face_normal(p_vertex_id / 8), light_direction);
+#endif
     float4 view_position =
         software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.view), float4(world_position, 1.0));
     SVODebugDrawVertexOutput output;
     output.position = software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(camera_info.proj), view_position);
-    output.color = is_bounds ? float4(1.0, 0.0, 0.0, 1.0) : float4(1.0);
+    output.color = is_bounds ? float4(1.0, 0.0, 0.0, 1.0) : float4(color, 1.0);
     return output;
 }
 
 /**
- * @brief Colors each debug wireframe.
+ * @brief Colors each debug voxel.
  */
 [shader("fragment")]
 float4 fragment_main(SVODebugDrawVertexOutput p_input) : SV_Target0 {

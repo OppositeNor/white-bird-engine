@@ -21,6 +21,7 @@
 #include "glm/ext/vector_float3.hpp"
 #include <array>
 #include <cstdint>
+#include <stdexcept>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -36,6 +37,20 @@ enum class VoxelDebugViewMode : uint32_t {
     DISABLED,
     POST_SVO_BUILD,
     PRE_DEFERRED_PROPAGATION,
+    // The post-construction tree colored by its injected occupancy; only structures with an occupancy support it (see
+    // IVoxelRenderFeature::supports_debug_view()).
+    OCCUPANCY,
+};
+
+/**
+ * @enum VoxelDebugDrawStyle
+ * @brief How the debug views of the post-construction tree draw each voxel.
+ */
+enum class VoxelDebugDrawStyle : uint32_t {
+    // The cube's edges.
+    WIREFRAME,
+    // The cube's faces, shaded and slightly shrunk so the borders between voxels show.
+    SOLID,
 };
 
 /**
@@ -71,6 +86,20 @@ inline constexpr std::array<uint32_t, 24> VOXEL_DEBUG_CUBE_INDICES{
     6,
     3,
     7,
+};
+
+/**
+ * @brief Triangle-list indices of the six faces of the unit cube, with corners as in VOXEL_DEBUG_CUBE_INDICES.
+ * @details Each index is face * 8 + corner, faces ordered -x, +x, -y, +y, -z, +z, so the vertex shader derives both the
+ * corner and the face's normal from it.
+ */
+inline constexpr std::array<uint32_t, 36> VOXEL_DEBUG_CUBE_SOLID_INDICES{
+    0, 1, 3, 0, 3, 2,
+    8 + 4, 8 + 5, 8 + 7, 8 + 4, 8 + 7, 8 + 6,
+    16 + 0, 16 + 1, 16 + 5, 16 + 0, 16 + 5, 16 + 4,
+    24 + 2, 24 + 3, 24 + 7, 24 + 2, 24 + 7, 24 + 6,
+    32 + 0, 32 + 2, 32 + 6, 32 + 0, 32 + 6, 32 + 4,
+    40 + 1, 40 + 3, 40 + 7, 40 + 1, 40 + 7, 40 + 5,
 };
 
 /**
@@ -132,6 +161,55 @@ public:
      * @brief Human-readable name of what the debug overlay draws in a mode.
      */
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const = 0;
+
+    /**
+     * @brief Whether the structure draws a debug view mode; the application offers only the supported modes.
+     * @return True for every mode but VoxelDebugViewMode::OCCUPANCY, which needs an occupancy.
+     */
+    virtual bool supports_debug_view(VoxelDebugViewMode p_mode) const {
+        return p_mode != VoxelDebugViewMode::OCCUPANCY;
+    }
+
+    /**
+     * @brief Whether the debug views of the post-construction tree can switch VoxelDebugDrawStyle.
+     */
+    virtual bool supports_debug_draw_styles() const {
+        return false;
+    }
+
+    /**
+     * @brief Select how the debug views of the post-construction tree draw each voxel, from the next frame on. Call between
+     * frames, together with the matching RTMultiplexerVK selection of the tree draw.
+     * @throws std::runtime_error If supports_debug_draw_styles() is false.
+     */
+    virtual void set_debug_draw_style(VoxelDebugDrawStyle /*p_style*/) {
+        throw std::runtime_error("IVoxelRenderFeature: this structure has no debug draw styles.");
+    }
+
+    /**
+     * @brief Number of depths the post-construction debug view can draw, from the root's sectors at 0 down to the leaves.
+     * @return 0 when the structure draws one fixed view.
+     */
+    virtual uint32_t get_debug_depth_count() const {
+        return 0;
+    }
+
+    /**
+     * @brief Get the depth the post-construction debug view draws.
+     * @throws std::runtime_error If get_debug_depth_count() is 0.
+     */
+    virtual uint32_t get_debug_depth() const {
+        throw std::runtime_error("IVoxelRenderFeature: this structure has no debug depth.");
+    }
+
+    /**
+     * @brief Select the depth the post-construction debug view draws from the next frame on. Call between frames.
+     * @param p_depth Below get_debug_depth_count().
+     * @throws std::runtime_error If p_depth is out of range, or get_debug_depth_count() is 0.
+     */
+    virtual void set_debug_depth(uint32_t /*p_depth*/) {
+        throw std::runtime_error("IVoxelRenderFeature: this structure has no debug depth.");
+    }
 
     /**
      * @brief Describe the structure to a recipe that includes it, and supply its resources and C++ tasks.

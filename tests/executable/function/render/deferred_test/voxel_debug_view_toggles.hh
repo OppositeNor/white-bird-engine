@@ -23,8 +23,9 @@ namespace WhiteBirdEngine {
 /**
  * @class VoxelDebugViewToggles
  * @brief The RTToggleVK toggles of the tasks each voxel debug view mode group records, and the RTMultiplexerVK selection of
- * the lighting; see ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled() and
- * ApplicationVulkanDeferredPBRTest::get_voxel_debug_view_lighting_branch(). Copyable and movable.
+ * the lighting and the tree draw; see ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled(),
+ * ApplicationVulkanDeferredPBRTest::get_voxel_debug_view_lighting_branch(), and
+ * ApplicationVulkanDeferredPBRTest::get_voxel_debug_tree_draw_branch(). Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) VoxelDebugViewToggles {
     /**
@@ -39,10 +40,16 @@ struct WBE_META(WBE_REFLECT_SCRIPT) VoxelDebugViewToggles {
     WBE_META(WBE_REFLECT)
     RendRecipeToggleVK enabled;
     /**
-     * @brief Enabled while the post-construction view is shown.
+     * @brief Enabled while the post-construction tree is drawn: in the post-SVO-build and occupancy views.
      */
     WBE_META(WBE_REFLECT)
-    RendRecipeToggleVK post_svo_build;
+    RendRecipeToggleVK tree_view;
+    /**
+     * @brief Selects the tree draw's branch: the VoxelDebugDrawStyle, plus two in the occupancy view; see
+     * ApplicationVulkanDeferredPBRTest::get_voxel_debug_tree_draw_branch().
+     */
+    WBE_META(WBE_REFLECT)
+    RendRecipeSelectVK tree_draw;
     /**
      * @brief Enabled while the pre-propagation view is shown.
      */

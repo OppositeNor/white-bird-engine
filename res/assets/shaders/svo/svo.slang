@@ -234,6 +234,39 @@ struct SVO {
     }
 
     /**
+     * @brief Reconstruct a node's grid position by walking from the node to the root.
+     * @param p_index Node index below get_total_nodes(), as in get_node().
+     * @param p_depth Receives the node's depth: one for the root's sectors and info.max_depth - 1 for the parents of
+     * leaves.
+     * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
+     * @return Integer position of the node in the grid of extent 2^p_depth.
+     */
+    uint3 get_node_grid_position(uint p_index, out uint p_depth, uint p_frame_slot) {
+        uint3 result = uint3(0);
+        WBE_SHADER_DEBUG_ASSERT(p_index < get_total_nodes(), ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+        uint child_index = p_index;
+        int parent_index = get_node(p_index).parent_index;
+        uint traversed_depth = 0;
+        for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
+            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
+                ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+            uint subregion = child_index % 8;
+            result.x |= ((subregion >> 2) & 1) << traversed_depth;
+            result.y |= ((subregion >> 1) & 1) << traversed_depth;
+            result.z |= (subregion & 1) << traversed_depth;
+            child_index = uint(parent_index);
+            parent_index = get_node(uint(parent_index)).parent_index;
+        }
+        WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && child_index < 8, ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
+        // The remaining node is one of the eight sectors of the implicit root.
+        result.x |= ((child_index >> 2) & 1) << traversed_depth;
+        result.y |= ((child_index >> 1) & 1) << traversed_depth;
+        result.z |= (child_index & 1) << traversed_depth;
+        p_depth = traversed_depth + 1;
+        return result;
+    }
+
+    /**
      * @brief Get the world-space minimum corner of the node or leaf containing a voxel at a depth.
      * @details Only the top p_depth bits of each axis are read, so a node may be located by any voxel below it, such as
      * SVONodeTraceInfo::voxel_index. The cell's width is info.width / 2^p_depth.

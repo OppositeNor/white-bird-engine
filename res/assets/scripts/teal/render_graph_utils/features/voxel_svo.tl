@@ -60,6 +60,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     buffers.svogi_occupancy_buffer = graph:add_storage_buffer("svogi_occupancy_buffer", sizes.occupancy)
     buffers.svogi_radiance_index_buffer = graph:add_storage_buffer("svogi_radiance_index_buffer", sizes.radiance_index)
     buffers.svogi_radiance_staged_buffer = graph:add_storage_buffer("svogi_radiance_staged_buffer", sizes.radiance_staged)
+    -- The post-construction view's node list, rewritten each frame at a node depth before the draw reads it.
+    buffers.svo_debug_draw_node_list = graph:add_storage_buffer("svo_debug_draw_node_list", sizes.debug_draw_node_list)
     local color = graph:port("color")
     local depth = graph:port("depth")
     local prefix = p_params.shader_prefix
@@ -79,6 +81,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         reset_pong = graph:add_compute_pipeline("svo_deferred_count_reset_ping_shader"),
         capture_pre_deferred_debug = graph:add_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
         setup_debug_draw = graph:add_compute_pipeline("svo_debug_draw_setup_shader"),
+        find_debug_draw_nodes = graph:add_compute_pipeline("svo_debug_draw_find_nodes_shader"),
         occupancy_injection = graph:add_compute_pipeline("svogi_occupancy_injection"),
         occupancy_propagation = graph:add_compute_pipeline("svogi_occupancy_propagation"),
         radiance_injection = graph:add_compute_pipeline("svogi_radiance_injection"),
@@ -86,7 +89,12 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local graphics_pipelines: {string:Graph.Resource} = {
         static_construction = graph:add_graphics_pipeline(prefix .. "_build_static_mesh_pipeline"),
         dynamic_construction = graph:add_graphics_pipeline(dynamic_prefix .. "_build_static_mesh_pipeline"),
-        debug_draw = graph:add_graphics_pipeline("svo_debug_draw_pipeline"),
+        -- The tree draw's branches, in the order the application selects them: the VoxelDebugDrawStyle, plus two in the
+        -- occupancy view.
+        tree_draw_wireframe = graph:add_graphics_pipeline("svo_debug_draw_pipeline"),
+        tree_draw_solid = graph:add_graphics_pipeline("svo_debug_draw_solid_pipeline"),
+        tree_draw_wireframe_occupancy = graph:add_graphics_pipeline("svo_debug_draw_occupancy_pipeline"),
+        tree_draw_solid_occupancy = graph:add_graphics_pipeline("svo_debug_draw_solid_occupancy_pipeline"),
         pre_deferred_debug_draw = graph:add_graphics_pipeline("svo_pre_deferred_debug_draw_pipeline"),
     }
     local toggles = p_target.debug_view_toggles
@@ -243,8 +251,35 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     }
     local radiance_injection = graph:compute("inject_svogi_radiance", radiance_injection_params, { aliases = radiance_aliases })
     local setup_debug_draw = compute("setup_svo_debug_draw", compute_pipelines.setup_debug_draw, 1)
+    -- The post-construction view's nodes at the depth svo_debug_draw_settings selects; the setup writes the root's sectors.
+    local find_debug_draw_nodes = compute("find_svo_debug_draw_nodes", compute_pipelines.find_debug_draw_nodes,
+        p_params.debug_draw_node_search_group_count)
+    find_debug_draw_nodes.toggle = toggles.tree_view
     -- Debug views.
-    local debug_draw = overlay("run_svo_debug_draw", graphics_pipelines.debug_draw, buffers.svo_debug_draw_indirect_buffer, toggles.post_svo_build)
+    -- The post-construction tree, drawn by the post-SVO-build and occupancy views: one multiplexer of every style and
+    -- coloring, whose branches share the indirect command and the targets. The solid styles index the cube's faces.
+    local branch_graph = Graph.new()
+    local tree_draw_branches: {Graph.Task} = {}
+    for _, branch in ipairs({
+        { pipeline = graphics_pipelines.tree_draw_wireframe, index_buffer = buffers.svo_debug_draw_index_buffer },
+        { pipeline = graphics_pipelines.tree_draw_solid, index_buffer = buffers.svo_debug_draw_solid_index_buffer },
+        { pipeline = graphics_pipelines.tree_draw_wireframe_occupancy, index_buffer = buffers.svo_debug_draw_index_buffer },
+        { pipeline = graphics_pipelines.tree_draw_solid_occupancy, index_buffer = buffers.svo_debug_draw_solid_index_buffer },
+    }) do
+        local params: Graph.RTParamsRunGraphicsPipelineIndirectVK = {
+            pipeline = branch.pipeline,
+            index_buffer = branch.index_buffer,
+            indirect_buffer = buffers.svo_debug_draw_indirect_buffer,
+            color_load_op = "load",
+            depth_load_op = "load",
+        }
+        tree_draw_branches[#tree_draw_branches + 1] =
+            branch_graph:draw_indirect("tree_draw_" .. #tree_draw_branches, params):color_target(0, color):depth_target(depth)
+    end
+    local debug_draw = graph:multiplex("run_svo_debug_draw", tree_draw_branches, {
+        select = p_target.debug_view_toggles.tree_draw,
+        toggle = toggles.tree_view,
+    })
     local pre_deferred_debug_draw = overlay("run_svo_pre_deferred_debug_draw", graphics_pipelines.pre_deferred_debug_draw, buffers.svo_pre_deferred_debug_draw_indirect_buffer,
         toggles.pre_deferred_propagation)
 
@@ -264,10 +299,10 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain(buffers.svo_info, { frame_begin, reset })
     graph:chain(buffers.svo_info, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
-        { capture_pre_deferred_debug, dynamic_deferred }, injection, { setup_debug_draw, debug_draw }))
+        { capture_pre_deferred_debug, dynamic_deferred }, injection, { setup_debug_draw, find_debug_draw_nodes, debug_draw }))
     graph:chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
-        { dynamic_deferred }, injection, { debug_draw, pre_deferred_debug_draw }))
+        { dynamic_deferred }, injection, { setup_debug_draw, find_debug_draw_nodes, debug_draw, pre_deferred_debug_draw }))
     graph:chain(buffers.svo_leaf_buffer, sequence({
         build,
         build_double_sided,
@@ -275,7 +310,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         dynamic[1],
         dynamic[2],
         dynamic_deferred,
-    }, injection, { debug_draw, pre_deferred_debug_draw }))
+    }, injection, { find_debug_draw_nodes, debug_draw, pre_deferred_debug_draw }))
     graph:chain(buffers.svo_deferred_list_ping, {
         reset,
         build,
@@ -290,8 +325,10 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain(buffers.svo_deferred_list_pong, { reset, static_deferred, clear_dynamic, dynamic_deferred })
     graph:chain({ buffers.svo_pre_deferred_debug_info_buffer, buffers.svo_pre_deferred_debug_list_buffer,
         buffers.svo_pre_deferred_debug_draw_indirect_buffer }, { capture_pre_deferred_debug, pre_deferred_debug_draw })
-    graph:chain(buffers.svo_debug_draw_indirect_buffer, { setup_debug_draw, debug_draw })
-    graph:chain(buffers.svogi_occupancy_buffer, { occupancy_injection, occupancy_propagation })
+    graph:chain({ buffers.svo_debug_draw_indirect_buffer, buffers.svo_debug_draw_node_list },
+        { setup_debug_draw, find_debug_draw_nodes, debug_draw })
+    -- The occupancy view reads the propagated occupancy.
+    graph:chain(buffers.svogi_occupancy_buffer, { occupancy_injection, occupancy_propagation, debug_draw })
     graph:chain(buffers.svogi_radiance_index_buffer, { reset_radiance_index, radiance_injection })
     -- The overlays draw in this order.
     graph:chain({ color, depth }, { debug_draw, pre_deferred_debug_draw })

@@ -99,6 +99,7 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
         compile_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_shader_prefix));
     svo_pre_deferred_debug_capture_compute_pipeline = compile_compute_pipeline("svo_pre_deferred_debug_capture_shader");
     svo_debug_draw_setup_compute_pipeline = compile_compute_pipeline("svo_debug_draw_setup_shader");
+    svo_debug_draw_find_nodes_compute_pipeline = compile_compute_pipeline("svo_debug_draw_find_nodes_shader");
     svogi_occupancy_injection_compute_pipeline = compile_compute_pipeline("svogi_occupancy_injection");
     svogi_occupancy_propagation_compute_pipeline = compile_compute_pipeline("svogi_occupancy_propagation");
     svogi_radiance_injection_compute_pipeline = compile_compute_pipeline("svogi_radiance_injection");
@@ -120,6 +121,23 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
             .compile("svo_pre_deferred_debug_draw_pipeline",
                 resource_manager->get_resource<RUGraphicsPipeline>("svo_pre_deferred_debug_draw_pipeline"))
             .graphics_pipeline;
+    svo_debug_draw_occupancy_graphics_pipeline =
+        GraphicsPipelineCompilerVK(svo_debug_draw_context)
+            .compile("svo_debug_draw_occupancy_pipeline",
+                resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_occupancy_pipeline"))
+            .graphics_pipeline;
+    // The solid styles draw the cubes' faces.
+    GraphicsPipelineCompilerVKContext svo_debug_draw_solid_context = svo_debug_draw_context;
+    svo_debug_draw_solid_context.primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    svo_debug_draw_solid_graphics_pipeline =
+        GraphicsPipelineCompilerVK(svo_debug_draw_solid_context)
+            .compile("svo_debug_draw_solid_pipeline", resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_solid_pipeline"))
+            .graphics_pipeline;
+    svo_debug_draw_solid_occupancy_graphics_pipeline =
+        GraphicsPipelineCompilerVK(svo_debug_draw_solid_context)
+            .compile("svo_debug_draw_solid_occupancy_pipeline",
+                resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_solid_occupancy_pipeline"))
+            .graphics_pipeline;
 }
 
 void ISVORenderFeature::create_resources() {
@@ -134,6 +152,8 @@ void ISVORenderFeature::create_resources() {
         sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_INDICES));
+    svo_debug_draw_solid_index_buffer = create_initialized_buffer(
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_SOLID_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_SOLID_INDICES));
     const VkDrawIndexedIndirectCommand initial_debug_draw_command{
         .indexCount = VOXEL_DEBUG_CUBE_INDICES.size(),
         .instanceCount = 0,
@@ -148,6 +168,9 @@ void ISVORenderFeature::create_resources() {
         create_initialized_buffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             &initial_debug_draw_command,
             sizeof(initial_debug_draw_command));
+    const SVODebugDrawSettings initial_debug_draw_settings{.depth = debug_depth, .style = static_cast<uint32_t>(debug_draw_style)};
+    svo_debug_draw_settings =
+        create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &initial_debug_draw_settings, sizeof(initial_debug_draw_settings));
     initialize();
 }
 
@@ -187,8 +210,28 @@ const char* ISVORenderFeature::get_debug_view_name(VoxelDebugViewMode p_mode) co
         return "Post SVO build";
     case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
         return "Pre deferred propagation";
+    case VoxelDebugViewMode::OCCUPANCY:
+        return "Occupancy";
     }
     throw std::runtime_error("ISVORenderFeature: unknown voxel debug view mode.");
+}
+
+void ISVORenderFeature::set_debug_depth(uint32_t p_depth) {
+    if (p_depth >= SVO_MAX_DEPTH) {
+        throw std::runtime_error(std::format("ISVORenderFeature: debug depth {} is not below {}.", p_depth, SVO_MAX_DEPTH));
+    }
+    debug_depth = p_depth;
+    upload_debug_draw_settings();
+}
+
+void ISVORenderFeature::set_debug_draw_style(VoxelDebugDrawStyle p_style) {
+    debug_draw_style = p_style;
+    upload_debug_draw_settings();
+}
+
+void ISVORenderFeature::upload_debug_draw_settings() {
+    const SVODebugDrawSettings settings{.depth = debug_depth, .style = static_cast<uint32_t>(debug_draw_style)};
+    svo_debug_draw_settings->update_buffer(&settings, sizeof(settings));
 }
 
 void ISVORenderFeature::configure_recipe(
@@ -215,6 +258,8 @@ void ISVORenderFeature::configure_recipe(
     params.occupancy_propagation_group_count = static_cast<uint32_t>(
         (SVO_MAX_NODE_COUNT / 8 + SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP - 1) / SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP);
     params.radiance_injection_group_count = SVOGI_RADIANCE_SAMPLE_EXTENT / SVOGI_RADIANCE_TILE_SIZE;
+    params.debug_draw_node_search_group_count = static_cast<uint32_t>(
+        (SVO_MAX_LEAVES_COUNT / 8 + SVO_DEBUG_DRAW_NODE_SEARCH_THREADS_PER_GROUP - 1) / SVO_DEBUG_DRAW_NODE_SEARCH_THREADS_PER_GROUP);
     // Byte sizes of the scratch buffers the module declares, from the capacities svo_info records.
     params.buffer_sizes = SVOBufferSizes{
         .deferred_list = sizeof(uint32_t) * SVO_DEFERRED_LIST_ELEMENT_COUNT,
@@ -223,12 +268,13 @@ void ISVORenderFeature::configure_recipe(
         .occupancy = sizeof(float) * SVO_MAX_DATA_COUNT,
         .radiance_index = COUNTED_BUFFER_HEADER_BYTE_SIZE + SVOGI_RADIANCE_INDEX_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
         .radiance_staged = SVOGI_RADIANCE_STAGED_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
+        .debug_draw_node_list = sizeof(uint32_t) * SVO_MAX_NODE_COUNT,
     };
     if (!rebuild_static_every_frame) {
         params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
     }
     // The buffers holding initial contents or state shared by both graphs; the module declares the per-frame scratch buffers.
-    const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 6> buffers{
+    const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 8> buffers{
         {
             {SVO_INFO, &svo_info},
             {SVO_NODE_BUFFER, &svo_nodes},
@@ -236,6 +282,8 @@ void ISVORenderFeature::configure_recipe(
             {SVO_DEBUG_DRAW_INDEX_BUFFER, &svo_debug_draw_index_buffer},
             {SVO_DEBUG_DRAW_INDIRECT_BUFFER, &svo_debug_draw_indirect_buffer},
             {SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER, &svo_pre_deferred_debug_draw_indirect_buffer},
+            {SVO_DEBUG_DRAW_SETTINGS, &svo_debug_draw_settings},
+            {SVO_DEBUG_DRAW_SOLID_INDEX_BUFFER, &svo_debug_draw_solid_index_buffer},
         },
     };
     for (const auto& [name, buffer] : buffers) {

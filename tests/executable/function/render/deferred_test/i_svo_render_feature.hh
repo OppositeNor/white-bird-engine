@@ -65,6 +65,39 @@ public:
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
 
     /**
+     * @brief The post-construction view draws one of SVO_MAX_DEPTH depths: the root's sectors at 0 down to the leaves.
+     */
+    virtual uint32_t get_debug_depth_count() const override {
+        return static_cast<uint32_t>(SVO_MAX_DEPTH);
+    }
+
+    virtual uint32_t get_debug_depth() const override {
+        return debug_depth;
+    }
+
+    /**
+     * @brief Write the depth to the debug draw settings buffer both graphs import. The renderer waits for each frame before
+     * it starts the next, so no frame in flight reads it.
+     */
+    virtual void set_debug_depth(uint32_t p_depth) override;
+
+    /**
+     * @brief The SVO injects occupancy, so it supports every mode.
+     */
+    virtual bool supports_debug_view(VoxelDebugViewMode /*p_mode*/) const override {
+        return true;
+    }
+
+    virtual bool supports_debug_draw_styles() const override {
+        return true;
+    }
+
+    /**
+     * @brief Write the style to the debug draw settings buffer, which selects the index count of the tree draw.
+     */
+    virtual void set_debug_draw_style(VoxelDebugDrawStyle p_style) override;
+
+    /**
      * @brief Describe the SVO to the render_graph_utils.features.voxel_svo module, and supply its buffers.
      */
     virtual void configure_recipe(
@@ -91,6 +124,8 @@ public:
     static constexpr std::string_view SVO_DEBUG_DRAW_INDEX_BUFFER = "svo_debug_draw_index_buffer";
     static constexpr std::string_view SVO_DEBUG_DRAW_INDIRECT_BUFFER = "svo_debug_draw_indirect_buffer";
     static constexpr std::string_view SVO_PRE_DEFERRED_DEBUG_DRAW_INDIRECT_BUFFER = "svo_pre_deferred_debug_draw_indirect_buffer";
+    static constexpr std::string_view SVO_DEBUG_DRAW_SETTINGS = "svo_debug_draw_settings";
+    static constexpr std::string_view SVO_DEBUG_DRAW_SOLID_INDEX_BUFFER = "svo_debug_draw_solid_index_buffer";
 
 protected:
     /**
@@ -201,6 +236,12 @@ private:
     // The std430 stride of SegmentedWrapper<float3x3>: three 16-byte matrix rows and the segment flag, padded to 16 bytes.
     static constexpr size_t SVOGI_RADIANCE_STAGED_BYTE_SIZE = 64;
     static_assert(SVOGI_RADIANCE_SAMPLE_EXTENT % SVOGI_RADIANCE_TILE_SIZE == 0);
+    static constexpr uint32_t SVO_DEBUG_DRAW_NODE_SEARCH_THREADS_PER_GROUP = 64;
+    // Mirrors SVODebugDrawSettings in svo/svo_common.slang.
+    struct SVODebugDrawSettings {
+        uint32_t depth;
+        uint32_t style;
+    };
 
     struct SVOInfo {
         glm::vec3 origin;
@@ -282,8 +323,12 @@ private:
     Ref<ROComputePipelineVK> svo_reset_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svo_pre_deferred_debug_capture_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svo_debug_draw_setup_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> svo_debug_draw_find_nodes_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> svo_debug_draw_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> svo_pre_deferred_debug_draw_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> svo_debug_draw_solid_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> svo_debug_draw_occupancy_graphics_pipeline = MEM_NULL;
+    Ref<ROGraphicsPipelineVK> svo_debug_draw_solid_occupancy_graphics_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svogi_occupancy_injection_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svogi_occupancy_propagation_compute_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> svogi_radiance_injection_compute_pipeline = MEM_NULL;
@@ -293,6 +338,14 @@ private:
     Ref<ROBufferVK> svo_debug_draw_index_buffer;
     Ref<ROBufferVK> svo_debug_draw_indirect_buffer;
     Ref<ROBufferVK> svo_pre_deferred_debug_draw_indirect_buffer;
+    Ref<ROBufferVK> svo_debug_draw_settings;
+    Ref<ROBufferVK> svo_debug_draw_solid_index_buffer;
+    // The depth the post-construction view draws; the leaves until the application selects another.
+    uint32_t debug_depth = static_cast<uint32_t>(SVO_MAX_DEPTH - 1);
+    VoxelDebugDrawStyle debug_draw_style = VoxelDebugDrawStyle::WIREFRAME;
+
+    // Write the debug depth and style to the settings buffer.
+    void upload_debug_draw_settings();
 };
 
 } // namespace WhiteBirdEngine

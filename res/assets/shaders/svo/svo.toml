@@ -129,6 +129,13 @@ dst = "assets/shaders/svo/svo_debug_draw_setup.spv"
 metadata = "assets/shaders/svo/svo_debug_draw_setup.json"
 
 [[resources]]
+id = "svo_debug_draw_find_nodes_shader"
+source_type = "shader"
+src = "assets/shaders/svo/svo_debug_draw_find_nodes.slang"
+dst = "assets/shaders/svo/svo_debug_draw_find_nodes.spv"
+metadata = "assets/shaders/svo/svo_debug_draw_find_nodes.json"
+
+[[resources]]
 id = "svo_debug_draw_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw.slang"
@@ -142,6 +149,67 @@ vertex_stage_id = "svo_debug_draw_shader"
 fragment_stage_id = "svo_debug_draw_shader"
 depth_test = true
 depth_write = false
+cull_backfaces = false
+
+# The post-construction tree drawn as shaded faces.
+[[resources]]
+id = "svo_debug_draw_solid_shader"
+source_type = "shader"
+src = "assets/shaders/svo/svo_debug_draw.slang"
+dst = "assets/shaders/svo/svo_debug_draw_solid.spv"
+metadata = "assets/shaders/svo/svo_debug_draw_solid.json"
+macros = [
+    { name = "WBE_SVO_DEBUG_DRAW_SOLID" },
+]
+
+[[resources]]
+id = "svo_debug_draw_solid_pipeline"
+type = "graphics_pipeline"
+vertex_stage_id = "svo_debug_draw_solid_shader"
+fragment_stage_id = "svo_debug_draw_solid_shader"
+depth_test = true
+depth_write = true
+cull_backfaces = false
+
+# The post-construction tree drawn as edges, colored by occupancy.
+[[resources]]
+id = "svo_debug_draw_occupancy_shader"
+source_type = "shader"
+src = "assets/shaders/svo/svo_debug_draw.slang"
+dst = "assets/shaders/svo/svo_debug_draw_occupancy.spv"
+metadata = "assets/shaders/svo/svo_debug_draw_occupancy.json"
+macros = [
+    { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY" },
+]
+
+[[resources]]
+id = "svo_debug_draw_occupancy_pipeline"
+type = "graphics_pipeline"
+vertex_stage_id = "svo_debug_draw_occupancy_shader"
+fragment_stage_id = "svo_debug_draw_occupancy_shader"
+depth_test = true
+depth_write = false
+cull_backfaces = false
+
+# The post-construction tree drawn as shaded faces, colored by occupancy.
+[[resources]]
+id = "svo_debug_draw_solid_occupancy_shader"
+source_type = "shader"
+src = "assets/shaders/svo/svo_debug_draw.slang"
+dst = "assets/shaders/svo/svo_debug_draw_solid_occupancy.spv"
+metadata = "assets/shaders/svo/svo_debug_draw_solid_occupancy.json"
+macros = [
+    { name = "WBE_SVO_DEBUG_DRAW_SOLID" },
+    { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY" },
+]
+
+[[resources]]
+id = "svo_debug_draw_solid_occupancy_pipeline"
+type = "graphics_pipeline"
+vertex_stage_id = "svo_debug_draw_solid_occupancy_shader"
+fragment_stage_id = "svo_debug_draw_solid_occupancy_shader"
+depth_test = true
+depth_write = true
 cull_backfaces = false
 
 [[resources]]

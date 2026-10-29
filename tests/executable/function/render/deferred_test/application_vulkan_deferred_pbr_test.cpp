@@ -165,19 +165,8 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
 
     bool voxel_debug_view_key_down = input_manager->get_input_status(KEYCODE_V).is_down();
     if (voxel_debug_view_key_down && !voxel_debug_view_key_was_down) {
-        VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
-        switch (mode) {
-        case VoxelDebugViewMode::DISABLED:
-            mode = VoxelDebugViewMode::POST_SVO_BUILD;
-            break;
-        case VoxelDebugViewMode::POST_SVO_BUILD:
-            mode = VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
-            break;
-        case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
-            mode = VoxelDebugViewMode::DISABLED;
-            break;
-        }
-        voxel_debug_view_mode.store(mode, std::memory_order_relaxed);
+        voxel_debug_view_mode.store(get_next_voxel_debug_view_mode(voxel_debug_view_mode.load(std::memory_order_relaxed)),
+            std::memory_order_relaxed);
     }
     voxel_debug_view_key_was_down = voxel_debug_view_key_down;
 
@@ -542,31 +531,48 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     if (ImGui::Combo("Controlled light (T)", &controlled_light, SPOT_LIGHT_NAMES.data(), static_cast<int>(SPOT_LIGHT_NAMES.size()))) {
         controlled_spot_light.store(static_cast<uint32_t>(controlled_light), std::memory_order_relaxed);
     }
-    // The combo lists the modes in the order the V key cycles through them.
-    int voxel_debug_view = 0;
-    switch (voxel_debug_view_mode.load(std::memory_order_relaxed)) {
-    case VoxelDebugViewMode::DISABLED:
-        voxel_debug_view = 0;
-        break;
-    case VoxelDebugViewMode::POST_SVO_BUILD:
-        voxel_debug_view = 1;
-        break;
-    case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
-        voxel_debug_view = 2;
-        break;
-    }
-    constexpr std::array<VoxelDebugViewMode, 3> VOXEL_DEBUG_VIEW_MODES{
+    // The combo lists the supported modes in the order the V key cycles through them.
+    constexpr std::array<VoxelDebugViewMode, 4> VOXEL_DEBUG_VIEW_MODES{
         VoxelDebugViewMode::DISABLED,
         VoxelDebugViewMode::POST_SVO_BUILD,
         VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
+        VoxelDebugViewMode::OCCUPANCY,
     };
+    std::array<VoxelDebugViewMode, VOXEL_DEBUG_VIEW_MODES.size()> voxel_debug_view_modes{};
     std::array<const char*, VOXEL_DEBUG_VIEW_MODES.size()> voxel_debug_view_names{};
-    for (size_t i = 0; i < VOXEL_DEBUG_VIEW_MODES.size(); ++i) {
-        voxel_debug_view_names[i] = voxel_structure->get_debug_view_name(VOXEL_DEBUG_VIEW_MODES[i]);
+    size_t voxel_debug_view_count = 0;
+    const VoxelDebugViewMode current_mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
+    int voxel_debug_view = 0;
+    for (VoxelDebugViewMode mode : VOXEL_DEBUG_VIEW_MODES) {
+        if (voxel_structure->supports_debug_view(mode)) {
+            if (mode == current_mode) {
+                voxel_debug_view = static_cast<int>(voxel_debug_view_count);
+            }
+            voxel_debug_view_modes[voxel_debug_view_count] = mode;
+            voxel_debug_view_names[voxel_debug_view_count] = voxel_structure->get_debug_view_name(mode);
+            ++voxel_debug_view_count;
+        }
     }
-    if (ImGui::Combo(
-            "Voxel debug view (V)", &voxel_debug_view, voxel_debug_view_names.data(), static_cast<int>(voxel_debug_view_names.size()))) {
-        voxel_debug_view_mode.store(VOXEL_DEBUG_VIEW_MODES[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);
+    if (ImGui::Combo("Voxel debug view (V)", &voxel_debug_view, voxel_debug_view_names.data(), static_cast<int>(voxel_debug_view_count))) {
+        voxel_debug_view_mode.store(voxel_debug_view_modes[static_cast<size_t>(voxel_debug_view)], std::memory_order_relaxed);
+    }
+    // The post-SVO-build and occupancy views draw the post-construction tree at one depth, in one style: the root's sectors
+    // at depth 0 down to the leaves at the last. Their controls show only while one of those views does.
+    const bool draws_tree = current_mode == VoxelDebugViewMode::POST_SVO_BUILD || current_mode == VoxelDebugViewMode::OCCUPANCY;
+    if (draws_tree && voxel_structure->supports_debug_draw_styles()) {
+        static constexpr std::array<const char*, 2> VOXEL_DEBUG_DRAW_STYLE_NAMES{"Wireframe", "Solid"};
+        int style = static_cast<int>(voxel_debug_draw_style.load(std::memory_order_relaxed));
+        if (ImGui::Combo("Voxel draw style", &style, VOXEL_DEBUG_DRAW_STYLE_NAMES.data(), static_cast<int>(VOXEL_DEBUG_DRAW_STYLE_NAMES.size()))) {
+            voxel_debug_draw_style.store(static_cast<VoxelDebugDrawStyle>(style), std::memory_order_relaxed);
+        }
+    }
+    const uint32_t debug_depth_count = voxel_structure->get_debug_depth_count();
+    if (draws_tree && debug_depth_count > 0) {
+        int debug_depth = static_cast<int>(voxel_structure->get_debug_depth());
+        if (ImGui::SliderInt(
+                "Voxel debug depth", &debug_depth, 0, static_cast<int>(debug_depth_count) - 1, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+            voxel_structure->set_debug_depth(static_cast<uint32_t>(debug_depth));
+        }
     }
     bool post_processing_enabled = post_processing_requested.load(std::memory_order_relaxed);
     const std::string post_processing_label = std::format("Post-processing: {} (1)", post_processing->get_name());

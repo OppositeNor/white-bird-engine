@@ -71,6 +71,11 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVOBufferSizes {
      */
     WBE_META(WBE_REFLECT)
     uint64_t radiance_staged = 0;
+    /**
+     * @brief svo_debug_draw_node_list, the node indices the post-construction debug view draws at a node depth.
+     */
+    WBE_META(WBE_REFLECT)
+    uint64_t debug_draw_node_list = 0;
 };
 
 /**
@@ -160,6 +165,11 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVORecipeParams : public RecipeFeatureParams
      */
     WBE_META(WBE_REFLECT)
     uint32_t radiance_injection_group_count = 0;
+    /**
+     * @brief Workgroups of the debug view's node search, which runs one invocation per block of eight leaves.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t debug_draw_node_search_group_count = 0;
     /**
      * @brief The trigger of the static construction tasks, which record once; unset to rebuild them every frame.
      */

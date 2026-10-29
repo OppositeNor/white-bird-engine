@@ -187,6 +187,8 @@ const char* VoxelRenderFeatureOctree::get_debug_view_name(VoxelDebugViewMode p_m
         return "Octree leaves";
     case VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION:
         return "Octree nodes";
+    case VoxelDebugViewMode::OCCUPANCY:
+        break;
     }
     throw std::runtime_error("VoxelRenderFeatureOctree: unknown voxel debug view mode.");
 }

@@ -140,6 +140,21 @@ struct SVOLeaf {
 };
 
 /**
+ * @brief What the post-construction debug view draws, written by the application between frames.
+ */
+struct SVODebugDrawSettings {
+    /**
+     * @brief The drawn depth below the implicit root: 0 draws the root's eight sectors, and info.max_depth - 1 the leaves.
+     * Every node at tree depth depth + 1 is drawn otherwise.
+     */
+    uint depth;
+    /**
+     * @brief The VoxelDebugDrawStyle: 0 draws each voxel's edges, 1 its faces.
+     */
+    uint style;
+};
+
+/**
  * @brief Immutable spatial configuration and mutable construction counters.
  */
 struct SVOInfo {
