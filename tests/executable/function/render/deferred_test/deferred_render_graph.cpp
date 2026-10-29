@@ -36,6 +36,7 @@
 #include "function/render_vk/rt_build_acceleration_structures_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_generate_mipmaps_vk.hh"
+#include "function/render_vk/rt_multiplexer_vk.hh"
 #include "function/render_vk/rt_ping_pong_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
@@ -165,17 +166,18 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
     context.bloom_acquire_event = BLOOM_ACQUIRE_EVENT_IDS[graph_index];
     context.frame_sequence_event = FRAME_SEQUENCE_EVENT_IDS[graph_index];
     context.has_mesh_acceleration_structure = mesh_acceleration_structure != MEM_NULL;
-    // A rebuild creates the toggled tasks in the mode the rendering thread applied last; later changes reach them through
-    // the toggle events (see apply_voxel_debug_view_mode()).
+    // A rebuild creates the toggled and multiplexed tasks in the mode the rendering thread applied last; later changes reach
+    // them through the toggle and selection events (see apply_voxel_debug_view_mode()).
     const auto make_toggle = [this](size_t p_group) {
         return RendRecipeToggleVK{.event = std::string(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[p_group]),
             .enabled = is_voxel_debug_view_toggle_enabled(p_group, applied_voxel_debug_view_mode)};
     };
     context.voxel_debug_view_toggles = VoxelDebugViewToggles{
-        .disabled = make_toggle(0),
-        .enabled = make_toggle(1),
-        .post_svo_build = make_toggle(2),
-        .pre_deferred_propagation = make_toggle(3),
+        .lighting = RendRecipeSelectVK{.event = std::string(VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID),
+            .branch = get_voxel_debug_view_lighting_branch(applied_voxel_debug_view_mode)},
+        .enabled = make_toggle(0),
+        .post_svo_build = make_toggle(1),
+        .pre_deferred_propagation = make_toggle(2),
     };
     for (size_t entity = 0; entity < dynamic_mesh->get_entity_count(); ++entity) {
         context.dynamic_mesh_transform_ids.emplace_back(dynamic_mesh->get_entity_transform_id(entity));
@@ -264,12 +266,10 @@ ApplicationVulkanDeferredPBRTest::CompositionCameraInfo ApplicationVulkanDeferre
 bool ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled(size_t p_group, VoxelDebugViewMode p_mode) {
     switch (p_group) {
     case 0:
-        return p_mode == VoxelDebugViewMode::DISABLED;
-    case 1:
         return p_mode != VoxelDebugViewMode::DISABLED;
-    case 2:
+    case 1:
         return p_mode == VoxelDebugViewMode::POST_SVO_BUILD;
-    case 3:
+    case 2:
         return p_mode == VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION;
     default:
         break;
@@ -277,13 +277,19 @@ bool ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled(size_t
     throw std::runtime_error(std::format("Unknown voxel debug view toggle group {}.", p_group));
 }
 
+uint32_t ApplicationVulkanDeferredPBRTest::get_voxel_debug_view_lighting_branch(VoxelDebugViewMode p_mode) {
+    return p_mode == VoxelDebugViewMode::DISABLED ? 0U : 1U;
+}
+
 void ApplicationVulkanDeferredPBRTest::apply_voxel_debug_view_mode() {
     const VoxelDebugViewMode mode = voxel_debug_view_mode.load(std::memory_order_relaxed);
     if (mode == applied_voxel_debug_view_mode) {
         return;
     }
-    // Emitted between frames, so every toggled task of both graphs records the new mode from the same frame on.
+    // Emitted between frames, so every toggled and multiplexed task of both graphs records the new mode from the same frame
+    // on.
     EventManager* event_manager = EventManager::get_singleton();
+    event_manager->emit(VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_view_lighting_branch(mode)});
     for (size_t group = 0; group < VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS.size(); ++group) {
         event_manager->emit(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[group],
             RTToggleVK::Command{.enabled = is_voxel_debug_view_toggle_enabled(group, mode)});

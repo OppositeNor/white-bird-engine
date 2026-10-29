@@ -96,6 +96,27 @@ public:
         const RenderContextVK* p_render_data);
 
     /**
+     * @brief Prepare one render task for an existing task descriptor without adding a task to the graph.
+     *
+     * Deserializes the parameters as create_factory() does and calls the task type's prepare_graph() on p_task if it
+     * declares one, so the imports and aliases the task type needs land in p_graph and p_task. Used to build tasks that
+     * compose several registered tasks in one descriptor, such as an RTMultiplexerVK's branches.
+     *
+     * @param p_graph The graph descriptor p_task will be added to.
+     * @param p_task The descriptor that receives the task type's aliases; its factory is left unchanged.
+     * @param p_task_type A registered task type name.
+     * @param p_params The task parameters.
+     * @param p_render_data Render data passed to create() and prepare_graph(); it must outlive the factory.
+     * @return The task's factory, suitable for RendTaskDescVK::factory or for composing.
+     * @throws std::runtime_error Under the conditions of create_factory(), or whatever prepare_graph() throws.
+     */
+    static RendTaskFactoryVK prepare_task(RendGraphDescVK& p_graph,
+        RendTaskDescVK& p_task,
+        std::string_view p_task_type,
+        const DataValue& p_params,
+        const RenderContextVK* p_render_data);
+
+    /**
      * @brief Check whether a task type name is registered.
      */
     static bool contains(std::string_view p_task_type);

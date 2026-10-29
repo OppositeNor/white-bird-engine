@@ -12,8 +12,12 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Sparse voxel octree construction and debug views, for recipes that include it as a feature: the atomic-publication
--- ("atomic") and pass-publication ("pass_published") implementations. The application compiles the pipelines and owns
+-- Sparse voxel octree construction, SVOGI injection, and debug views, for recipes that include it as a feature: the
+-- atomic-publication ("atomic") and pass-publication ("pass_published") implementations. After each frame's construction
+-- the occupancy injection writes the tree's occupancy, which propagates up to the root's sectors, and the radiance
+-- injection stages the reflective shadow maps' flux, unreduced, as one entry per sample and light in the leaf it falls
+-- in. The radiance injection binds the target's reflective-shadow-map slots, so the including recipe orders it after the
+-- lights' shadow passes through edges to the subgraph. The application compiles the pipelines and owns
 -- the SVO buffers with initial contents or state both deferred graphs share, which every graph imports; the module
 -- declares the scratch buffers each frame rewrites before reading. See ISVORenderFeature in
 -- tests/executable/function/render/deferred_test/i_svo_render_feature.hh.
@@ -22,7 +26,12 @@ local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
 local Graph = require("render_graph_utils.render_graph_utils")
 
-local voxel_svo = {}
+local record voxel_svo
+    -- The subgraph injects radiance from the target's reflective-shadow-map slots.
+    injects_radiance: boolean
+end
+
+voxel_svo.injects_radiance = true
 
 -- The SVO as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
 function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): Graph.Task
@@ -46,6 +55,11 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         graph:add_storage_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
     buffers.svo_pre_deferred_debug_list_buffer =
         graph:add_storage_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
+    -- The SVOGI injection rewrites these every frame: the occupancy of every occupied leaf and every node with children,
+    -- and the radiance entries after the count reset.
+    buffers.svogi_occupancy_buffer = graph:add_storage_buffer("svogi_occupancy_buffer", sizes.occupancy)
+    buffers.svogi_radiance_index_buffer = graph:add_storage_buffer("svogi_radiance_index_buffer", sizes.radiance_index)
+    buffers.svogi_radiance_staged_buffer = graph:add_storage_buffer("svogi_radiance_staged_buffer", sizes.radiance_staged)
     local color = graph:port("color")
     local depth = graph:port("depth")
     local prefix = p_params.shader_prefix
@@ -65,6 +79,9 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         reset_pong = graph:add_compute_pipeline("svo_deferred_count_reset_ping_shader"),
         capture_pre_deferred_debug = graph:add_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
         setup_debug_draw = graph:add_compute_pipeline("svo_debug_draw_setup_shader"),
+        occupancy_injection = graph:add_compute_pipeline("svogi_occupancy_injection"),
+        occupancy_propagation = graph:add_compute_pipeline("svogi_occupancy_propagation"),
+        radiance_injection = graph:add_compute_pipeline("svogi_radiance_injection"),
     }
     local graphics_pipelines: {string:Graph.Resource} = {
         static_construction = graph:add_graphics_pipeline(prefix .. "_build_static_mesh_pipeline"),
@@ -180,12 +197,59 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local capture_pre_deferred_debug = compute("capture_svo_pre_deferred_debug", compute_pipelines.capture_pre_deferred_debug, p_params.deferred_dispatch_group_count)
     capture_pre_deferred_debug.toggle = toggles.pre_deferred_propagation
     local dynamic_deferred = deferred_construction("run_build_svo_deferred", true)
+    -- SVOGI injection into the completed tree. The occupancy injection writes the leaves and their parents; propagation
+    -- then writes one level further up per dispatch, from the parents of the leaves' parents to the root's sectors.
+    local occupancy_injection_params: Graph.RTParamsRunComputePipelineVK = {
+        pipeline = compute_pipelines.occupancy_injection,
+        group_count_x = p_params.occupancy_injection_group_count_x,
+        group_count_y = p_params.occupancy_injection_group_count_y,
+        queue_family = "compute_1",
+    }
+    local occupancy_injection = graph:compute("inject_svogi_occupancy", occupancy_injection_params, {
+        aliases = { atlas = buffers.svogi_occupancy_buffer },
+    })
+    local propagation_dispatches: {Graph.RTParamsComputeDispatchVK} = {}
+    for child_depth = p_params.max_depth - 1, 2, -1 do
+        propagation_dispatches[#propagation_dispatches + 1] = {
+            pipeline = compute_pipelines.occupancy_propagation,
+            group_count_x = p_params.occupancy_propagation_group_count,
+            push_constants = { child_depth = child_depth },
+        }
+    end
+    local propagation_params: Graph.RTParamsRunComputePipelinesSequentialVK =
+        { dispatches = propagation_dispatches, queue_family = "compute_1" }
+    local occupancy_propagation = graph:compute_sequential("propagate_svogi_occupancy", propagation_params, {
+        aliases = { atlas = buffers.svogi_occupancy_buffer },
+    })
+    -- The radiance index buffer is a counted buffer, whose element byte size shares the deferred lists' count element; the
+    -- pong list's count reset clears it.
+    local reset_radiance_index_params: Graph.RTParamsRunComputePipelineVK =
+        { pipeline = compute_pipelines.reset_ping, queue_family = "compute_1" }
+    local reset_radiance_index = graph:compute("reset_svogi_radiance_index", reset_radiance_index_params, {
+        aliases = { svo_deferred_list_pong = buffers.svogi_radiance_index_buffer },
+    })
+    local radiance_aliases: {string:Graph.Resource} = {
+        index_buffer = buffers.svogi_radiance_index_buffer,
+        staged_buffer = buffers.svogi_radiance_staged_buffer,
+    }
+    for slot, id in pairs(p_target.rsm_slot_ids) do
+        radiance_aliases[slot] = graph:reference(id)
+    end
+    local radiance_injection_params: Graph.RTParamsRunComputePipelineVK = {
+        pipeline = compute_pipelines.radiance_injection,
+        group_count_x = p_params.radiance_injection_group_count,
+        group_count_y = p_params.radiance_injection_group_count,
+        queue_family = "compute_1",
+    }
+    local radiance_injection = graph:compute("inject_svogi_radiance", radiance_injection_params, { aliases = radiance_aliases })
     local setup_debug_draw = compute("setup_svo_debug_draw", compute_pipelines.setup_debug_draw, 1)
     -- Debug views.
     local debug_draw = overlay("run_svo_debug_draw", graphics_pipelines.debug_draw, buffers.svo_debug_draw_indirect_buffer, toggles.post_svo_build)
     local pre_deferred_debug_draw = overlay("run_svo_pre_deferred_debug_draw", graphics_pipelines.pre_deferred_debug_draw, buffers.svo_pre_deferred_debug_draw_indirect_buffer,
         toggles.pre_deferred_propagation)
 
+    -- The injection reads the completed tree; it reaches the graphics queue through the overlays that follow it.
+    local injection = { occupancy_injection, occupancy_propagation, radiance_injection }
     -- Every task using a buffer, in execution order; the publication passes of the pass-published implementation take
     -- their place in the chains of the buffers they publish.
     local function sequence(...: {Graph.Task}): {Graph.Task}
@@ -200,20 +264,18 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain(buffers.svo_info, { frame_begin, reset })
     graph:chain(buffers.svo_info, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
-        { capture_pre_deferred_debug, dynamic_deferred, setup_debug_draw, debug_draw }))
+        { capture_pre_deferred_debug, dynamic_deferred }, injection, { setup_debug_draw, debug_draw }))
     graph:chain(buffers.svo_node_buffer, sequence({ reset, build, build_double_sided }, static_publication,
         { static_deferred, clear_dynamic, dynamic[1], dynamic[2] }, dynamic_publication,
-        { dynamic_deferred, debug_draw, pre_deferred_debug_draw }))
-    graph:chain(buffers.svo_leaf_buffer, {
+        { dynamic_deferred }, injection, { debug_draw, pre_deferred_debug_draw }))
+    graph:chain(buffers.svo_leaf_buffer, sequence({
         build,
         build_double_sided,
         static_deferred,
         dynamic[1],
         dynamic[2],
         dynamic_deferred,
-        debug_draw,
-        pre_deferred_debug_draw,
-    })
+    }, injection, { debug_draw, pre_deferred_debug_draw }))
     graph:chain(buffers.svo_deferred_list_ping, {
         reset,
         build,
@@ -229,6 +291,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     graph:chain({ buffers.svo_pre_deferred_debug_info_buffer, buffers.svo_pre_deferred_debug_list_buffer,
         buffers.svo_pre_deferred_debug_draw_indirect_buffer }, { capture_pre_deferred_debug, pre_deferred_debug_draw })
     graph:chain(buffers.svo_debug_draw_indirect_buffer, { setup_debug_draw, debug_draw })
+    graph:chain(buffers.svogi_occupancy_buffer, { occupancy_injection, occupancy_propagation })
+    graph:chain(buffers.svogi_radiance_index_buffer, { reset_radiance_index, radiance_injection })
     -- The overlays draw in this order.
     graph:chain({ color, depth }, { debug_draw, pre_deferred_debug_draw })
     return graph:as_subgraph(p_id, { color = p_target.color_target, depth = p_target.depth_target }, p_params.imports)

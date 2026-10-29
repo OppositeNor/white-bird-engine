@@ -22,15 +22,17 @@ namespace WhiteBirdEngine {
 
 /**
  * @class VoxelDebugViewToggles
- * @brief The RTToggleVK toggles of the tasks each voxel debug view mode group records; see
- * ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled(). Copyable and movable.
+ * @brief The RTToggleVK toggles of the tasks each voxel debug view mode group records, and the RTMultiplexerVK selection of
+ * the lighting; see ApplicationVulkanDeferredPBRTest::is_voxel_debug_view_toggle_enabled() and
+ * ApplicationVulkanDeferredPBRTest::get_voxel_debug_view_lighting_branch(). Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) VoxelDebugViewToggles {
     /**
-     * @brief Enabled while the voxel debug view is disabled.
+     * @brief Selects the indirect lighting's branch: 0, the lit result, while the voxel debug view is disabled, and 1, the
+     * debug view, while any is shown.
      */
     WBE_META(WBE_REFLECT)
-    RendRecipeToggleVK disabled;
+    RendRecipeSelectVK lighting;
     /**
      * @brief Enabled while any voxel debug view is shown.
      */

@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <gtest/gtest.h>
 #include <initializer_list>
 #include <memory>
@@ -824,10 +825,44 @@ end }
 )", DataValue::make_map()), std::runtime_error);
 }
 
+TEST_F(WBERendGraphScriptVKResourceTest, MultiplexRejectsBranchesItCannotCombine) {
+    const auto run = [](std::string_view p_body) {
+        return RendGraphScriptVK::run("multiplex_error", std::format(R"(
+local graph_utils = require("render_graph_utils.render_graph_utils")
+return {{ build = function()
+    local graph = graph_utils.graph()
+    local branches = graph_utils.graph()
+    local first = graph_utils.storage_buffer("first", 16)
+    local second = graph_utils.storage_buffer("second", 16)
+    {}
+    return graph:build()
+end }}
+)", p_body), DataValue::make_map());
+    };
+    // Branches on the multiplexer's own graph would also be standalone tasks.
+    EXPECT_THROW((void)run(R"(graph:multiplex("m", { graph:add({ id = "a", type = "registry_probe" }) }, { select = { event = "e" } }))"),
+        std::runtime_error);
+    // Branches share one resource map, so a task-local id cannot name two resources.
+    EXPECT_THROW((void)run(R"(graph:multiplex("m", {
+        branches:add({ id = "a", type = "registry_probe", aliases = { input = first } }),
+        branches:add({ id = "b", type = "registry_probe", aliases = { input = second } }),
+    }, { select = { event = "e" } }))"),
+        std::runtime_error);
+    // Ordering and gating belong to the multiplexer, not to a branch.
+    EXPECT_THROW((void)run(R"(graph:multiplex("m", { branches:add({ id = "a", type = "registry_probe", toggle = { event = "t" } }) },
+        { select = { event = "e" } }))"),
+        std::runtime_error);
+    EXPECT_THROW((void)run(R"(graph:multiplex("m", { branches:add({ id = "a", type = "registry_probe" }) }, {}))"), std::runtime_error);
+    EXPECT_NO_THROW((void)run(R"(graph:multiplex("m", {
+        branches:add({ id = "a", type = "registry_probe", aliases = { input = first } }),
+        branches:add({ id = "b", type = "registry_probe", aliases = { input = first } }),
+    }, { select = { event = "e" } }))"));
+}
+
 TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParametersAndKeepPlainRecipeTables) {
     const DataValue recipe = RendGraphScriptVK::run("tests.teal_graph_api", DataValue::make_map());
     const auto& tasks = recipe.get_entry("tasks").as_list();
-    ASSERT_EQ(tasks.size(), 11U);
+    ASSERT_EQ(tasks.size(), 12U);
     EXPECT_EQ(tasks[0].get_value<std::string>("type"), "run_compute_pipeline");
     EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("pipeline"), "prepare_pipeline");
     EXPECT_TRUE(tasks[0].get_entry("trigger").get_value<bool>("activate"));
@@ -860,9 +895,21 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParameter
     EXPECT_EQ(tasks[8].get_value<std::string>("type"), "full_memory_barrier");
     EXPECT_EQ(tasks[8].get_entry("params").get_value<std::string>("resource"), "commands");
     EXPECT_EQ(tasks[9].get_value<std::string>("type"), "ping_pong");
-    EXPECT_TRUE(tasks[10].get_value<bool>("import"));
-    EXPECT_FALSE(tasks[10].contains("params"));
+    // The multiplexer sets no type or params of its own; its branches carry them, and their aliases are merged.
     EXPECT_FALSE(tasks[10].contains("type"));
+    EXPECT_FALSE(tasks[10].contains("params"));
+    const auto& branches = tasks[10].get_entry("branches").as_list();
+    ASSERT_EQ(branches.size(), 2U);
+    EXPECT_EQ(branches[0].get_value<std::string>("type"), "run_compute_pipeline");
+    EXPECT_EQ(branches[0].get_entry("params").get_value<int64_t>("group_count_x"), 4);
+    EXPECT_EQ(branches[1].get_entry("params").get_value<std::string>("pipeline"), "indirect_pipeline");
+    EXPECT_EQ(tasks[10].get_entry("select").get_value<std::string>("event"), "select_event");
+    EXPECT_EQ(tasks[10].get_entry("select").get_value<int64_t>("branch"), 1);
+    EXPECT_TRUE(tasks[10].get_entry("toggle").get_value<bool>("enabled"));
+    EXPECT_EQ(tasks[10].get_entry("aliases").get_value<std::string>("shader_input"), "input");
+    EXPECT_TRUE(tasks[11].get_value<bool>("import"));
+    EXPECT_FALSE(tasks[11].contains("params"));
+    EXPECT_FALSE(tasks[11].contains("type"));
     for (const auto& task : tasks) {
         EXPECT_FALSE(task.contains("uses"));
         EXPECT_FALSE(task.contains("graph"));
@@ -1550,6 +1597,9 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         buffer_sizes.set_value("deferred_list", 516);
         buffer_sizes.set_value("pre_deferred_debug_info", 60);
         buffer_sizes.set_value("pre_deferred_debug_list", 512);
+        buffer_sizes.set_value("occupancy", 1024);
+        buffer_sizes.set_value("radiance_index", 528);
+        buffer_sizes.set_value("radiance_staged", 4096);
         svo.set_entry("buffer_sizes", buffer_sizes);
         for (const char* group_count : {
                  "reset_group_count",
@@ -1557,6 +1607,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
                  "dynamic_clear_group_count",
                  "static_publication_group_count",
                  "dynamic_publication_group_count",
+                 "occupancy_injection_group_count_x",
+                 "occupancy_injection_group_count_y",
+                 "occupancy_propagation_group_count",
+                 "radiance_injection_group_count",
              }) {
             svo.set_value(group_count, 4);
         }
@@ -1600,12 +1654,16 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         transforms.push_back(DataValue::make_string("dynamic_mesh_entity_1.transform"));
         context.set_entry("dynamic_mesh_transform_ids", transforms);
         DataValue toggles = DataValue::make_map();
-        for (const char* group : {"disabled", "enabled", "post_svo_build", "pre_deferred_propagation"}) {
+        for (const char* group : {"enabled", "post_svo_build", "pre_deferred_propagation"}) {
             DataValue toggle = DataValue::make_map();
             toggle.set_value("event", std::string("test.voxel_debug_view.") + group);
-            toggle.set_value("enabled", std::string_view(group) == "disabled");
+            toggle.set_value("enabled", false);
             toggles.set_entry(group, toggle);
         }
+        DataValue lighting = DataValue::make_map();
+        lighting.set_value("event", std::string("test.voxel_debug_view.lighting"));
+        lighting.set_value("branch", 0);
+        toggles.set_entry("lighting", lighting);
         context.set_entry("voxel_debug_view_toggles", toggles);
         if (p_post_processing) {
             DataValue post_processing = DataValue::make_map();
@@ -1642,14 +1700,22 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         }
         return nullptr;
     };
-    // 2 lights x (4 shadow mesh draws + 1 filter), 4 G-buffer mesh draws, indirect lighting and its debug view, the frame
-    // sequence acquisition, ImGui, direct and combine lighting, extract and blur bloom, the bloom acquisition, 2 presents,
-    // 2 billboards, and the voxel subgraph.
-    constexpr size_t BASE_TASK_COUNT = 10 + 4 + 2 + 1 + 1 + 2 + 2 + 1 + 2 + 2 + 1;
+    // 2 lights x (4 shadow mesh draws + 1 filter), 4 G-buffer mesh draws, indirect lighting multiplexing its debug view,
+    // the frame sequence acquisition, ImGui, direct and combine lighting, extract and blur bloom, the bloom acquisition, 2
+    // presents, 2 billboards, and the voxel subgraph.
+    constexpr size_t BASE_TASK_COUNT = 10 + 4 + 1 + 1 + 1 + 2 + 2 + 1 + 2 + 2 + 1;
     const DataValue mipmap = run(false, false, make_octree());
     const DataValue::List& mipmap_tasks = mipmap.get_entry("tasks").as_list();
     EXPECT_EQ(mipmap_tasks.size(), BASE_TASK_COUNT);
-    EXPECT_EQ(count_tasks_with(mipmap_tasks, "toggle"), 2U);
+    EXPECT_EQ(count_tasks_with(mipmap_tasks, "toggle"), 0U);
+    // Indirect lighting is one multiplexer of the lit result and the debug view, which share its aliases.
+    const DataValue* indirect_lighting = find_by_id(mipmap_tasks, "run_indirect_lighting");
+    ASSERT_NE(indirect_lighting, nullptr);
+    const DataValue::List& indirect_branches = indirect_lighting->get_entry("branches").as_list();
+    ASSERT_EQ(indirect_branches.size(), 2U);
+    EXPECT_EQ(indirect_branches[1].get_entry("params").get_value<std::string>("pipeline"), "indirect_lighting_rsm_debug_view_shader");
+    EXPECT_EQ(indirect_lighting->get_entry("select").get_value<std::string>("event"), "test.voxel_debug_view.lighting");
+    EXPECT_EQ(indirect_lighting->get_entry("aliases").get_value<std::string>("shadowmap_color[1]"), "shadowmap_color_1");
     EXPECT_EQ(count_tasks_with(mipmap_tasks, "trigger"), 2U);
     // The octree subgraph holds its frame-begin barrier, 6 imported C++ tasks, and 2 gathers and 2 overlays, all toggled,
     // and imports the application's textures and buffers.
@@ -1660,29 +1726,48 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(count_tasks_with(octree_recipe.get_entry("tasks").as_list(), "toggle"), 4U);
     EXPECT_TRUE(contains_import(octree_recipe, "octree_dynamic"));
     EXPECT_EQ(octree->get_entry("ports").get_value<std::string>("depth"), "gbuffer_depth");
-    // The pass-published SVO subgraph holds 15 tasks: the 5 static construction tasks are triggered, and the pre-deferred
-    // capture and the 2 overlays toggled. The pixel sort subgraph holds 6 tasks, and its one toggle gates them all.
+    // The pass-published SVO subgraph holds 19 tasks, 4 of them the SVOGI occupancy injection and propagation and the
+    // radiance index reset and injection: the 5 static construction tasks are triggered, and the pre-deferred capture and
+    // the 2 overlays toggled. The pixel sort subgraph holds 6 tasks, and its one toggle gates them all.
     const DataValue summed_area_table = run(true, true, make_svo());
     const DataValue::List& tasks = summed_area_table.get_entry("tasks").as_list();
     ASSERT_EQ(tasks.size(), BASE_TASK_COUNT + 1);
-    EXPECT_EQ(count_tasks_with(tasks, "toggle"), 2U + 1U);
+    EXPECT_EQ(count_tasks_with(tasks, "toggle"), 1U);
     const DataValue* svo = find_by_id(tasks, "voxel");
     ASSERT_NE(svo, nullptr);
     const DataValue& svo_recipe = svo->get_entry("subgraph");
     const DataValue::List& svo_tasks = svo_recipe.get_entry("tasks").as_list();
-    EXPECT_EQ(svo_tasks.size(), 15U);
+    EXPECT_EQ(svo_tasks.size(), 19U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "toggle"), 3U);
     EXPECT_EQ(count_tasks_with(svo_tasks, "trigger"), 5U);
     EXPECT_TRUE(contains_import(svo_recipe, "svo_node_buffer"));
-    // The SVO declares its 4 scratch buffers with the sizes it is given.
+    // The SVO declares its 4 construction and 3 SVOGI scratch buffers with the sizes it is given.
     const DataValue::List& svo_resources = svo_recipe.get_entry("resources").as_list();
-    EXPECT_EQ(svo_resources.size(), 4U);
+    EXPECT_EQ(svo_resources.size(), 7U);
     const DataValue* deferred_list = find_by_id(svo_resources, "svo_deferred_list_ping");
     ASSERT_NE(deferred_list, nullptr);
     EXPECT_EQ(deferred_list->get_entry("buffer").get_value<int64_t>("size"), 516);
     const DataValue* pre_deferred_debug_list = find_by_id(svo_resources, "svo_pre_deferred_debug_list_buffer");
     ASSERT_NE(pre_deferred_debug_list, nullptr);
     EXPECT_EQ(pre_deferred_debug_list->get_entry("buffer").get_value<int64_t>("size"), 512);
+    const DataValue* radiance_staged = find_by_id(svo_resources, "svogi_radiance_staged_buffer");
+    ASSERT_NE(radiance_staged, nullptr);
+    EXPECT_EQ(radiance_staged->get_entry("buffer").get_value<int64_t>("size"), 4096);
+    // The radiance injection binds the reflective-shadow-map slots of the enclosing graph; slots past the light count
+    // reuse light zero.
+    const DataValue* radiance_injection = find_by_id(svo_tasks, "inject_svogi_radiance");
+    ASSERT_NE(radiance_injection, nullptr);
+    const DataValue& radiance_aliases = radiance_injection->get_entry("aliases");
+    EXPECT_EQ(radiance_aliases.get_value<std::string>("shadowmap_color[1]"), "shadowmap_color_1");
+    EXPECT_EQ(radiance_aliases.get_value<std::string>("shadow_moments_sampled[3]"), "shadow_moments_0");
+    EXPECT_EQ(radiance_aliases.get_value<std::string>("index_buffer"), "svogi_radiance_index_buffer");
+    // The subgraph follows every light's last shadow pass on the reflective shadow maps it reads.
+    const DataValue* dynamic_shadow = find_by_id(tasks, "dynamic_shadow_second_1");
+    ASSERT_NE(dynamic_shadow, nullptr);
+    EXPECT_TRUE(std::ranges::any_of(dynamic_shadow->get_entry("connect").as_list(), [](const DataValue& p_connection) {
+        return p_connection.get_value<std::string>("to") == "voxel" &&
+            p_connection.get_value<std::string>("resource") == "shadowmap_color_1";
+    }));
     const DataValue* pixel_sort = find_by_id(tasks, "post_processing");
     ASSERT_NE(pixel_sort, nullptr);
     EXPECT_TRUE(pixel_sort->contains("toggle"));

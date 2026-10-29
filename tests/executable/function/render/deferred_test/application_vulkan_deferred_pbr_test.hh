@@ -185,12 +185,14 @@ private:
     static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
     // Event ids of the RTToggleVK::Command that gates the tasks of each voxel debug view mode group, shared by both graphs;
     // see is_voxel_debug_view_toggle_enabled(). The recipe receives them as VoxelDebugViewToggles.
-    static constexpr std::array<std::string_view, 4> VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS = {
-        "deferred_pbr_test.voxel_debug_view.disabled",
+    static constexpr std::array<std::string_view, 3> VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS = {
         "deferred_pbr_test.voxel_debug_view.enabled",
         "deferred_pbr_test.voxel_debug_view.post_svo_build",
         "deferred_pbr_test.voxel_debug_view.pre_deferred_propagation",
     };
+    // Event id of the RTMultiplexerVK::Command that selects the indirect lighting's branch in both graphs; see
+    // get_voxel_debug_view_lighting_branch(). The recipe receives it as VoxelDebugViewToggles::lighting.
+    static constexpr std::string_view VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID = "deferred_pbr_test.voxel_debug_view.lighting";
     static constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
     // RTTriggeredVK event of the voxel structure's static construction tasks in both graphs; see finish_voxel_static_build().
     static constexpr std::string_view VOXEL_STATIC_BUILD_EVENT_ID = "deferred_pbr_test.voxel_static_build";
@@ -261,9 +263,12 @@ private:
     // The application-owned resources the recipe imports, and the tasks built in C++ that it imports.
     RendGraphRecipeImportsVK make_deferred_recipe_imports(bool p_use_summed_area_table);
     RendTaskDescVK create_mesh_acceleration_structure_build_task_desc();
-    // Whether a voxel debug view toggle group records in a mode: 0 while the debug view is disabled, 1 while it is
-    // enabled, 2 in the post-SVO-build view, and 3 in the pre-deferred-propagation view.
+    // Whether a voxel debug view toggle group records in a mode: 0 while the debug view is enabled, 1 in the
+    // post-SVO-build view, and 2 in the pre-deferred-propagation view.
     static bool is_voxel_debug_view_toggle_enabled(size_t p_group, VoxelDebugViewMode p_mode);
+    // The indirect lighting's RTMultiplexerVK branch in a mode: 0, the lit result, while the debug view is disabled, and
+    // 1, the debug view, otherwise.
+    static uint32_t get_voxel_debug_view_lighting_branch(VoxelDebugViewMode p_mode);
     // Emit the toggle events of a changed voxel debug view mode. Runs on the rendering thread, between frames.
     void apply_voxel_debug_view_mode();
     // Disable the voxel static construction once a graph has recorded it, so neither the other graph nor a rebuild records

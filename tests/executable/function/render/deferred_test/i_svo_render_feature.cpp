@@ -99,6 +99,9 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
         compile_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_shader_prefix));
     svo_pre_deferred_debug_capture_compute_pipeline = compile_compute_pipeline("svo_pre_deferred_debug_capture_shader");
     svo_debug_draw_setup_compute_pipeline = compile_compute_pipeline("svo_debug_draw_setup_shader");
+    svogi_occupancy_injection_compute_pipeline = compile_compute_pipeline("svogi_occupancy_injection");
+    svogi_occupancy_propagation_compute_pipeline = compile_compute_pipeline("svogi_occupancy_propagation");
+    svogi_radiance_injection_compute_pipeline = compile_compute_pipeline("svogi_radiance_injection");
     GraphicsPipelineCompilerVKContext svo_debug_draw_context{
         .allocator = render_allocator,
         .render_data = render_context,
@@ -120,7 +123,9 @@ void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std:
 }
 
 void ISVORenderFeature::create_resources() {
-    svo_info = render_context->create_buffer(ROBufferVK::Builder().set_properties(sizeof(SVOInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    // The construction writes the info as a storage buffer; the passes that only read it bind it as a uniform buffer.
+    svo_info = render_context->create_buffer(ROBufferVK::Builder().set_properties(
+        sizeof(SVOInfo), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
     // The node buffer holds the static nodes followed by the dynamic nodes.
     svo_nodes = render_context->create_buffer(
         ROBufferVK::Builder().set_properties(sizeof(SVONode), SVO_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
@@ -201,11 +206,23 @@ void ISVORenderFeature::configure_recipe(
     // The static publication runs one invocation per node, the dynamic one per static and dynamic node.
     params.static_publication_group_count = (SVO_MAX_NODE_COUNT + 63) / 64;
     params.dynamic_publication_group_count = (SVO_MAX_NODE_COUNT + 127) / 128;
+    // The occupancy injection runs one invocation per leaf, and each propagation level one per block of eight nodes.
+    constexpr size_t occupancy_injection_group_count =
+        (SVO_MAX_LEAVES_COUNT + SVOGI_OCCUPANCY_INJECTION_THREADS_PER_GROUP - 1) / SVOGI_OCCUPANCY_INJECTION_THREADS_PER_GROUP;
+    params.occupancy_injection_group_count_x = SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X;
+    params.occupancy_injection_group_count_y = static_cast<uint32_t>(
+        (occupancy_injection_group_count + SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X - 1) / SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X);
+    params.occupancy_propagation_group_count = static_cast<uint32_t>(
+        (SVO_MAX_NODE_COUNT / 8 + SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP - 1) / SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP);
+    params.radiance_injection_group_count = SVOGI_RADIANCE_SAMPLE_EXTENT / SVOGI_RADIANCE_TILE_SIZE;
     // Byte sizes of the scratch buffers the module declares, from the capacities svo_info records.
     params.buffer_sizes = SVOBufferSizes{
         .deferred_list = sizeof(uint32_t) * SVO_DEFERRED_LIST_ELEMENT_COUNT,
         .pre_deferred_debug_info = sizeof(SVOInfo),
         .pre_deferred_debug_list = sizeof(uint32_t) * SVO_MAX_DEFERRED_TASK_COUNT,
+        .occupancy = sizeof(float) * SVO_MAX_DATA_COUNT,
+        .radiance_index = COUNTED_BUFFER_HEADER_BYTE_SIZE + SVOGI_RADIANCE_INDEX_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
+        .radiance_staged = SVOGI_RADIANCE_STAGED_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
     };
     if (!rebuild_static_every_frame) {
         params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};

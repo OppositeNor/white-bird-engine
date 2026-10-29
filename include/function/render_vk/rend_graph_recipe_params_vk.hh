@@ -21,6 +21,7 @@
 #include "function/render_vk/rend_image_params_vk.hh"
 #include "function/render_vk/rend_image_view_params_vk.hh"
 #include "function/render_vk/rend_sampler_params_vk.hh"
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -132,12 +133,49 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
 };
 
 /**
+ * @class RendRecipeSelectVK
+ * @brief Selects the recorded branch of a multiplexer recipe task; see RTMultiplexerVK::combine_factories(). Copyable and
+ * movable; strict.
+ * A rebuild re-runs the recipe, so pass the application's current branch through the context to keep it across rebuilds.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeSelectVK {
+    /**
+     * @brief Event id the task receives RTMultiplexerVK::Command events under.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string event;
+    /**
+     * @brief Index of the branch the task records until a command changes the selection.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t branch = 0;
+};
+
+/**
+ * @class RendRecipeBranchVK
+ * @brief One branch of a multiplexer recipe task: a registered task type and its parameters. Copyable and movable; strict.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeBranchVK {
+    /**
+     * @brief A task type name registered in RenderTaskRegistryVK.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string type;
+    /**
+     * @brief The branch task's parameters, deserialized by the registry into the task type's parameter struct.
+     */
+    WBE_META(WBE_REFLECT)
+    DataValue params;
+};
+
+/**
  * @class RendRecipeTaskVK
  * @brief A task of a render graph recipe. Copyable and movable; strict.
  *
  * A task either has a registered `type` and its `params`, or is an import (`import = true`): a task the caller supplies
  * through RendGraphRecipeImportsVK::add_task() under the same id, which the recipe can only `connect`, or is a subgraph
- * (`subgraph`): a nested recipe added with RendGraphDescVK::add_subgraph(), which other tasks connect to by this id.
+ * (`subgraph`): a nested recipe added with RendGraphDescVK::add_subgraph(), which other tasks connect to by this id, or
+ * is a multiplexer (`branches`): an RTMultiplexerVK of the branch tasks, which records the branch its `select` chooses.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeTaskVK {
     /**
@@ -146,7 +184,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string id;
     /**
-     * @brief A task type name registered in RenderTaskRegistryVK; required unless the task is an import.
+     * @brief A task type name registered in RenderTaskRegistryVK; required unless the task is an import, a subgraph, or a
+     * multiplexer.
      */
     WBE_META(WBE_REFLECT)
     std::string type;
@@ -192,6 +231,17 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
      */
     WBE_META(WBE_REFLECT)
     DataValue ports;
+    /**
+     * @brief The branches that make this task a multiplexer, which sets no type, params, import, or subgraph. The branches
+     * share the task's aliases and must run on one queue family; its trigger and toggle gate the multiplexer as a whole.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<RendRecipeBranchVK> branches;
+    /**
+     * @brief The branch selection of a multiplexer; required exactly when branches are set.
+     */
+    WBE_META(WBE_REFLECT)
+    std::optional<RendRecipeSelectVK> select;
 };
 
 /**

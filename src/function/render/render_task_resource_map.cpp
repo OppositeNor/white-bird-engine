@@ -44,6 +44,31 @@ RenderTaskResourceMap& RenderTaskResourceMap::bind(std::string_view p_task_resou
     return *this;
 }
 
+RenderTaskResourceMap& RenderTaskResourceMap::merge(const RenderTaskResourceMap& p_other) {
+    if (!p_other.scope.empty()) {
+        throw std::runtime_error("RenderTaskResourceMap: a map enclosed in a scope cannot be merged.");
+    }
+    for (const Entry& other : p_other.entries) {
+        bool present = false;
+        for (const Entry& entry : entries) {
+            if (entry.source != other.source) {
+                continue;
+            }
+            if (entry.target != other.target) {
+                throw std::runtime_error(std::format("RenderTaskResourceMap: resource '{}' is mapped to both '{}' and '{}'.",
+                    other.source,
+                    entry.target,
+                    other.target));
+            }
+            present = true;
+        }
+        if (!present) {
+            bind(other.source, other.target);
+        }
+    }
+    return *this;
+}
+
 RenderTaskResourceMap& RenderTaskResourceMap::enclose(std::span<const ScopeBinding> p_scope) {
     for (size_t i = 0; i < p_scope.size(); ++i) {
         if (p_scope[i].source.empty() || p_scope[i].target.empty()) {

@@ -24,7 +24,7 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct SVODebugDrawSetupDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
@@ -39,11 +39,11 @@ ConstantBuffer<SVODebugDrawSetupDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    StructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
     DrawIndexedIndirectCommand command;
     command.index_count = 24;
-    command.instance_count = svo_info[0].leaves_count + svo_info[0].dynamic_leaves_count + 1;
+    command.instance_count = svo_info.leaves_count + svo_info.dynamic_leaves_count + 1;
     command.first_index = 0;
     command.vertex_offset = 0;
     command.first_instance = 0;

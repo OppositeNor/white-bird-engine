@@ -112,6 +112,10 @@ For non-trivial implementation tasks:
   emitted as `connect` entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`, and an
   optional `toggle` (`{ event, enabled }`) wraps it with `RTToggleVK`, outside any trigger. Rebuilds re-run the recipe, so
   pass a toggle's current state through the context.
+- A task that records one of several alternatives is a multiplexer (`RTMultiplexerVK`): build the branches with the typed
+  constructors on a scratch `Graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
+  It is one graph node reporting every branch's accesses; the branches share its aliases and one queue family, and
+  `RTMultiplexerVK::Command` events select the branch. Pass the current branch through the context, as for a toggle.
 - Task `pipeline` params are render-database keys; the application compiles those pipelines and keeps them alive.
 - Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
   assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each compiled mesh in the render database under

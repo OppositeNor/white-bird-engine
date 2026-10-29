@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/rend_graph_recipe_params_vk.hh"
@@ -20,6 +21,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_task_registry_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/rt_multiplexer_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "generated/serializables_sd.gen.hh"
@@ -188,6 +190,50 @@ void add_imported_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recip
     p_graph.add_task(*task);
 }
 
+// Add a multiplexer task: one descriptor whose factory multiplexes its branches' tasks, which share its aliases.
+void add_multiplexer_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recipe_task, BuildState& p_state, std::string_view p_location) {
+    if (!p_recipe_task.type.empty()) {
+        throw std::runtime_error(
+            std::format("Failed to build render graph recipe: {} is a multiplexer, so it cannot set a type; each branch does.", p_location));
+    }
+    if (!p_recipe_task.params.is_nil()) {
+        throw std::runtime_error(
+            std::format("Failed to build render graph recipe: {} is a multiplexer, so it cannot set params; each branch does.", p_location));
+    }
+    if (!p_recipe_task.select.has_value()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} sets branches but no select.", p_location));
+    }
+    if (p_recipe_task.select->event.empty()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} select event is empty.", p_location));
+    }
+    RendTaskDescVK task(p_graph.allocator);
+    task.task_id = p_recipe_task.id;
+    Vector<RendTaskFactoryVK, RenderAllocator> factories(p_graph.allocator);
+    factories.reserve(p_recipe_task.branches.size());
+    // Each branch prepares its own descriptor, so branches whose task types add the same alias share it.
+    for (size_t i = 0; i < p_recipe_task.branches.size(); ++i) {
+        const RendRecipeBranchVK& branch = p_recipe_task.branches[i];
+        if (branch.type.empty()) {
+            throw std::runtime_error(std::format("Failed to build render graph recipe: {} branches[{}] sets no type.", p_location, i));
+        }
+        RendTaskDescVK branch_task(p_graph.allocator);
+        branch_task.task_id = p_recipe_task.id;
+        factories.push_back(RenderTaskRegistryVK::prepare_task(p_graph, branch_task, branch.type, branch.params, p_state.render_data));
+        task.resource_map.merge(branch_task.resource_map);
+    }
+    if (p_recipe_task.select->branch >= factories.size()) {
+        throw std::runtime_error(std::format("Failed to build render graph recipe: {} selects branch {} of {}.",
+            p_location,
+            p_recipe_task.select->branch,
+            factories.size()));
+    }
+    task.factory = RTMultiplexerVK::combine_factories(
+        std::move(factories), p_recipe_task.select->event, p_state.render_data, p_recipe_task.select->branch);
+    apply_aliases(task, p_recipe_task.aliases, p_location);
+    task.factory = wrap_gating(std::move(task.factory), p_recipe_task, p_state.render_data, p_location);
+    p_graph.add_task(std::move(task));
+}
+
 void build_level(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, BuildState& p_state, std::string_view p_scope);
 
 // Build a subgraph task's nested recipe and add it to the graph under the task's id.
@@ -230,6 +276,13 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, Buil
         if (!ids.insert(recipe_task.id).second) {
             throw std::runtime_error(std::format("Failed to build render graph recipe: {} repeats a task id.", location));
         }
+        if (recipe_task.select.has_value() && recipe_task.branches.empty()) {
+            throw std::runtime_error(std::format("Failed to build render graph recipe: {} sets a select but no branches.", location));
+        }
+        if (!recipe_task.branches.empty() && (recipe_task.import || !recipe_task.subgraph.is_nil())) {
+            throw std::runtime_error(
+                std::format("Failed to build render graph recipe: {} sets branches, so it cannot be an import or a subgraph.", location));
+        }
         if (!recipe_task.subgraph.is_nil()) {
             add_subgraph_task(p_graph, recipe_task, p_state, location);
             subgraph_ids.insert(recipe_task.id);
@@ -240,6 +293,10 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, Buil
         }
         if (recipe_task.import) {
             add_imported_task(p_graph, recipe_task, p_state, location);
+            continue;
+        }
+        if (!recipe_task.branches.empty()) {
+            add_multiplexer_task(p_graph, recipe_task, p_state, location);
             continue;
         }
         if (recipe_task.type.empty()) {

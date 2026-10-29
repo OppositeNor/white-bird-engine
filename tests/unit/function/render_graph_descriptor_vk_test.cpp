@@ -324,6 +324,27 @@ TEST(WBERenderGraphDescriptorVKTest, ResourceMapScopesApplyAfterTheTaskBindingsW
     EXPECT_THROW(map.enclose(repeated), std::runtime_error);
 }
 
+TEST(WBERenderGraphDescriptorVKTest, ResourceMapMergeKeepsSharedBindingsAndRejectsConflicts) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderTaskResourceMap map(&allocator);
+    map.bind("input", "buffer_a");
+    RenderTaskResourceMap other(&allocator);
+    other.bind("input", "buffer_a").bind("output", "image_b");
+    map.merge(other);
+    EXPECT_EQ(map.resolve("input"), "buffer_a");
+    EXPECT_EQ(map.resolve("output"), "image_b");
+    // The shared binding is kept once, so resolving both entries leaves none unused.
+    EXPECT_NO_THROW(map.validate_all_used("task"));
+
+    RenderTaskResourceMap conflicting(&allocator);
+    conflicting.bind("input", "buffer_c");
+    EXPECT_THROW(map.merge(conflicting), std::runtime_error);
+    RenderTaskResourceMap scoped(&allocator);
+    const std::array<RenderTaskResourceMap::ScopeBinding, 1> scope{{{.source = "x", .target = "y"}}};
+    scoped.enclose(scope);
+    EXPECT_THROW(map.merge(scoped), std::runtime_error);
+}
+
 TEST(WBERenderGraphDescriptorVKTest, SubgraphsArePrefixedAndResolveTheirPortsAndResources) {
     RenderAllocator allocator(WBE_KI_B(128));
     RendGraphDescVK descriptor(&allocator);

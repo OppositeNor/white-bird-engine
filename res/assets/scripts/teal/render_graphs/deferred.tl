@@ -42,6 +42,9 @@ local BLOOM_TILE_SIZE = 16
 local record VoxelFeature
     -- The structure as a subgraph task, whose overlays draw on the target's color and depth.
     subgraph: function(p_id: string, p_params: any, p_target: voxel.Target): Graph.Task
+    -- Whether the subgraph injects radiance from the target's reflective-shadow-map slots, so it follows the lights' shadow
+    -- passes.
+    injects_radiance: boolean
 end
 
 local record PostProcessingTarget
@@ -90,7 +93,7 @@ local record Tasks
     dynamic_gbuffer: Graph.Task
     dynamic_gbuffer_second: Graph.Task
     run_direct_lighting: Graph.Task
-    indirect_lighting: {Graph.Task}
+    indirect_lighting: Graph.Task
     combine_lighting: Graph.Task
     post_processing: Graph.Task
     extract_bloom: Graph.Task
@@ -156,27 +159,7 @@ local record Builder
     graph: Graph.Graph
     tasks: Tasks
     light_tasks: {LightTasks}
-end
-
--- Indirect lighting runs as two toggled tasks, the normal one and the voxel debug view. Expand its first handle to both.
-local function chain(p_builder: Builder, p_resources: any, p_tasks: {Graph.Task})
-    local expanded: {Graph.Task} = {}
-    for _, task in ipairs(p_tasks) do
-        if task == p_builder.tasks.indirect_lighting[1] then
-            for _, indirect in ipairs(p_builder.tasks.indirect_lighting) do
-                expanded[#expanded + 1] = indirect
-            end
-        else
-            expanded[#expanded + 1] = task
-        end
-    end
-    if (p_resources as Graph.ResourceBundle).resources ~= nil then
-        p_builder.graph:chain(p_resources as Graph.ResourceBundle, expanded)
-    elseif (p_resources as Graph.Resource).id ~= nil then
-        p_builder.graph:chain(p_resources as Graph.Resource, expanded)
-    else
-        p_builder.graph:chain(p_resources as {Graph.Resource}, expanded)
-    end
+    voxel_injects_radiance: boolean
 end
 
 local function compute(p_builder: Builder, p_id: string, p_pipeline: Graph.Resource, p_group_count_x: integer,
@@ -184,6 +167,22 @@ local function compute(p_builder: Builder, p_id: string, p_pipeline: Graph.Resou
     local params: Graph.RTParamsRunComputePipelineVK =
         { pipeline = p_pipeline, group_count_x = p_group_count_x, group_count_y = p_group_count_y, queue_family = "compute_1" }
     return p_builder.graph:compute(p_id, params, { aliases = p_aliases })
+end
+
+-- The reflective-shadow-map resources of every slot of the lighting shaders' lights[] array, by task-local id; slots past
+-- the light count reuse light zero, so that every reflected descriptor binds. Only mip level zero of the moments is loaded,
+-- so the mip-chain slot binds the base moments view, which the summed-area-table graph orders without a mip generation pass.
+local function rsm_slot_resources(p_builder: Builder): {string:Graph.Resource}
+    local resources = p_builder.resources
+    local context = p_builder.context
+    local slots: {string:Graph.Resource} = {}
+    for slot = 0, context.max_spot_light_info_count - 1 do
+        local light = slot < context.spot_light_count and slot or 0
+        slots["shadow_moments_sampled[" .. slot .. "]"] = resources[light_id("shadow_moments", light)]
+        slots["shadowmap_color[" .. slot .. "]"] = resources[light_id("shadowmap_color", light)]
+        slots["rsm_normal[" .. slot .. "]"] = resources[light_id("rsm_normal", light)]
+    end
+    return slots
 end
 
 -- Shadow and reflective-shadow-map targets of every light. Every light shares one shadow sampler.
@@ -268,11 +267,17 @@ local function add_voxel(p_builder: Builder)
     local context = p_builder.context
     local voxel_params = context.voxel as wbe.RecipeFeatureParams
     local voxel_feature = require(voxel_params.module) as VoxelFeature
+    local rsm_slot_ids: {string:string} = {}
+    for slot, resource in pairs(rsm_slot_resources(p_builder)) do
+        rsm_slot_ids[slot] = resource.id
+    end
+    p_builder.voxel_injects_radiance = voxel_feature.injects_radiance == true
     p_builder.tasks.voxel = p_builder.graph:add(voxel_feature.subgraph(VOXEL, voxel_params, {
         dynamic_mesh_transform_ids = context.dynamic_mesh_transform_ids,
         debug_view_toggles = context.voxel_debug_view_toggles,
         color_target = resources.swap_chain,
         depth_target = resources.gbuffer_depth,
+        rsm_slot_ids = rsm_slot_ids,
     }))
 end
 
@@ -477,29 +482,22 @@ local function add_lighting(p_builder: Builder)
     p_builder.tasks.run_direct_lighting = compute(p_builder, "run_direct_lighting",
         summed_area_table and p_builder.pipelines.direct_lighting_sat or p_builder.pipelines.direct_lighting, screen_tiles_x,
         screen_tiles_y, direct_lighting_aliases)
-    -- Indirect lighting only loads mip level zero of the moments, so its mip-chain slot binds the base moments view, which
-    -- the summed-area-table graph orders without a mip generation pass. The debug view variant replaces it while a voxel
-    -- debug view is shown.
-    local indirect_lighting_aliases: {string:Graph.Resource} = {
-        gbuffer_sampler = resources.gbuffer_sampler,
-        shadow_sampler = resources.shadow_sampler,
-    }
-    for slot = 0, context.max_spot_light_info_count - 1 do
-        local light = slot < light_count and slot or 0
-        indirect_lighting_aliases["shadow_moments_sampled[" .. slot .. "]"] = resources[light_id("shadow_moments", light)]
-        indirect_lighting_aliases["shadowmap_color[" .. slot .. "]"] = resources[light_id("shadowmap_color", light)]
-        indirect_lighting_aliases["rsm_normal[" .. slot .. "]"] = resources[light_id("rsm_normal", light)]
-    end
-    local debug_view_toggles = context.voxel_debug_view_toggles
+    -- Indirect lighting binds the reflective-shadow-map slots. It multiplexes the lit result and the voxel debug view,
+    -- which the selection records while a voxel debug view is shown; the branches share its aliases.
+    local indirect_lighting_aliases = rsm_slot_resources(p_builder)
+    indirect_lighting_aliases.gbuffer_sampler = resources.gbuffer_sampler
+    indirect_lighting_aliases.shadow_sampler = resources.shadow_sampler
+    local branch_graph = Graph.new()
+    local branches: {Graph.Task} = {}
     for index, pipeline in ipairs({ p_builder.pipelines.indirect_lighting, p_builder.pipelines.indirect_lighting_debug_view }) do
         local params: Graph.RTParamsRunComputePipelineVK =
             { pipeline = pipeline, group_count_x = screen_tiles_x, group_count_y = screen_tiles_y, queue_family = "compute_2" }
-        p_builder.tasks.indirect_lighting[index] = p_builder.graph:compute(
-            index == 1 and "run_indirect_lighting" or "run_indirect_lighting_debug_view", params, {
-            aliases = indirect_lighting_aliases,
-            toggle = index == 1 and debug_view_toggles.disabled or debug_view_toggles.enabled,
-        })
+        branches[index] = branch_graph:compute("indirect_lighting_branch_" .. index, params)
     end
+    p_builder.tasks.indirect_lighting = p_builder.graph:multiplex("run_indirect_lighting", branches, {
+        select = context.voxel_debug_view_toggles.lighting,
+        aliases = indirect_lighting_aliases,
+    })
     p_builder.tasks.combine_lighting = compute(p_builder, "combine_lighting", p_builder.pipelines.combine_lighting, screen_tiles_x, screen_tiles_y)
 end
 
@@ -515,7 +513,7 @@ local function add_post_processing(p_builder: Builder): Graph.Task
     local post_processing_feature = require(post_processing.module) as PostProcessingFeature
     p_builder.tasks.post_processing = p_builder.graph:add(post_processing_feature.subgraph(POST_PROCESSING, post_processing,
         { color_view = resources.result_image, width = screen.width, height = screen.height }))
-    chain(p_builder, resources.result_image, { p_builder.tasks.combine_lighting, p_builder.tasks.post_processing })
+    p_builder.graph:chain(resources.result_image, { p_builder.tasks.combine_lighting, p_builder.tasks.post_processing })
     return p_builder.tasks.post_processing
 end
 
@@ -602,19 +600,29 @@ local function connect_shadow_passes(p_builder: Builder)
         local normal = resources[light_id("rsm_normal", light)]
         local colors = p_builder.graph:resource_bundle({ color, normal })
         local moments = resources[light_id("shadow_moments", light)]
-        chain(p_builder, { color, normal, moments, resources[light_id("shadowmap_depth", light)] }, passes)
-        chain(p_builder, colors, { dynamic_second, tasks.run_direct_lighting })
-        chain(p_builder, colors, { dynamic_second, tasks.indirect_lighting[1] })
+        p_builder.graph:chain({ color, normal, moments, resources[light_id("shadowmap_depth", light)] }, passes)
+        p_builder.graph:chain(colors, { dynamic_second, tasks.run_direct_lighting })
+        p_builder.graph:chain(colors, { dynamic_second, tasks.indirect_lighting })
+        -- The radiance injection reads the same reflective-shadow-map slots as indirect lighting.
+        if p_builder.voxel_injects_radiance then
+            dynamic_second:connect(tasks.voxel, colors)
+        end
         if p_builder.context.summed_area_table then
             local build = light_tasks.build_shadow_sat
             build:inputs_from(dynamic_second, { shadow_moments = moments })
-            chain(p_builder, moments, { dynamic_second, tasks.run_direct_lighting })
-            chain(p_builder, moments, { dynamic_second, tasks.indirect_lighting[1] })
-            chain(p_builder, resources[light_id("shadow_sat", light)], { build, tasks.run_direct_lighting })
+            p_builder.graph:chain(moments, { dynamic_second, tasks.run_direct_lighting })
+            p_builder.graph:chain(moments, { dynamic_second, tasks.indirect_lighting })
+            p_builder.graph:chain(resources[light_id("shadow_sat", light)], { build, tasks.run_direct_lighting })
+            if p_builder.voxel_injects_radiance then
+                dynamic_second:connect(tasks.voxel, moments)
+            end
         else
             local mipmaps = light_tasks.generate_shadow_mipmaps
-            chain(p_builder, moments, { dynamic_second, mipmaps, tasks.indirect_lighting[1] })
-            chain(p_builder, resources[light_id("shadow_moments_sampled", light)], { mipmaps, tasks.run_direct_lighting })
+            p_builder.graph:chain(moments, { dynamic_second, mipmaps, tasks.indirect_lighting })
+            p_builder.graph:chain(resources[light_id("shadow_moments_sampled", light)], { mipmaps, tasks.run_direct_lighting })
+            if p_builder.voxel_injects_radiance then
+                mipmaps:connect(tasks.voxel, moments)
+            end
         end
     end
 end
@@ -636,16 +644,16 @@ local function connect_gbuffer_passes(p_builder: Builder)
         resources.gbuffer_rma,
         resources.gbuffer_depth
     })
-    chain(p_builder, gbuffer_resources, gbuffer_passes)
-    chain(p_builder, gbuffer_resources, { tasks.dynamic_gbuffer_second, tasks.indirect_lighting[1] })
-    chain(p_builder, resources.gbuffer_rma, { tasks.dynamic_gbuffer_second, tasks.combine_lighting })
+    p_builder.graph:chain(gbuffer_resources, gbuffer_passes)
+    p_builder.graph:chain(gbuffer_resources, { tasks.dynamic_gbuffer_second, tasks.indirect_lighting })
+    p_builder.graph:chain(resources.gbuffer_rma, { tasks.dynamic_gbuffer_second, tasks.combine_lighting })
     -- The voxel overlays depth-test against the G-buffer depth after lighting has sampled it.
-    chain(p_builder, resources.gbuffer_depth, { tasks.run_direct_lighting, tasks.voxel })
-    local depth_overlays = { tasks.indirect_lighting[1], tasks.voxel }
+    p_builder.graph:chain(resources.gbuffer_depth, { tasks.run_direct_lighting, tasks.voxel })
+    local depth_overlays = { tasks.indirect_lighting, tasks.voxel }
     for light = 0, p_builder.context.spot_light_count - 1 do
         depth_overlays[#depth_overlays + 1] = p_builder.light_tasks[light + 1].run_light_billboard
     end
-    chain(p_builder, resources.gbuffer_depth, depth_overlays)
+    p_builder.graph:chain(resources.gbuffer_depth, depth_overlays)
 end
 
 -- Lighting composition, post-processing, bloom, and presentation. p_result_writer is the last task that writes the
@@ -653,20 +661,20 @@ end
 local function connect_composition(p_builder: Builder, p_result_writer: Graph.Task)
     local resources = p_builder.resources
     local tasks = p_builder.tasks
-    chain(p_builder, resources.direct_lighting, { tasks.run_direct_lighting, tasks.combine_lighting })
-    chain(p_builder, resources.indirect_lighting, { tasks.indirect_lighting[1], tasks.combine_lighting })
+    p_builder.graph:chain(resources.direct_lighting, { tasks.run_direct_lighting, tasks.combine_lighting })
+    p_builder.graph:chain(resources.indirect_lighting, { tasks.indirect_lighting, tasks.combine_lighting })
     p_result_writer:connect_all({ tasks.extract_bloom, tasks.present_result_image, tasks.present_frame_sequence }, resources.result_image)
     -- The blur task ping-pongs between the bloom images internally; only its final ping result leaves the task.
-    chain(p_builder, resources.bloom_ping, { tasks.extract_bloom, tasks.blur_bloom, tasks.acquire_bloom, tasks.present_result_image })
+    p_builder.graph:chain(resources.bloom_ping, { tasks.extract_bloom, tasks.blur_bloom, tasks.acquire_bloom, tasks.present_result_image })
     -- The frame sequence presents the same result and bloom into its own image, which it then acquires.
-    chain(p_builder, resources.bloom_ping, { tasks.blur_bloom, tasks.present_frame_sequence })
-    chain(p_builder, resources.frame_sequence, { tasks.present_frame_sequence, tasks.acquire_frame_sequence })
+    p_builder.graph:chain(resources.bloom_ping, { tasks.blur_bloom, tasks.present_frame_sequence })
+    p_builder.graph:chain(resources.frame_sequence, { tasks.present_frame_sequence, tasks.acquire_frame_sequence })
     local swap_chain_users = { tasks.present_result_image, tasks.voxel }
     for light = 0, p_builder.context.spot_light_count - 1 do
         swap_chain_users[#swap_chain_users + 1] = p_builder.light_tasks[light + 1].run_light_billboard
     end
     swap_chain_users[#swap_chain_users + 1] = tasks.draw_imgui
-    chain(p_builder, resources.swap_chain, swap_chain_users)
+    p_builder.graph:chain(resources.swap_chain, swap_chain_users)
 end
 
 local exports = {}
@@ -685,7 +693,7 @@ function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeV
         dynamic_mesh = graph:add_mesh("dynamic_mesh"),
         pipelines = make_pipelines(),
         graph = graph,
-        tasks = { indirect_lighting = {} },
+        tasks = {},
         light_tasks = {},
     }
     for _, id in ipairs(builder.imports) do

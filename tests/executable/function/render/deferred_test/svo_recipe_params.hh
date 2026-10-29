@@ -56,6 +56,21 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVOBufferSizes {
      */
     WBE_META(WBE_REFLECT)
     uint64_t pre_deferred_debug_list = 0;
+    /**
+     * @brief svogi_occupancy_buffer, one float per SVO data index.
+     */
+    WBE_META(WBE_REFLECT)
+    uint64_t occupancy = 0;
+    /**
+     * @brief svogi_radiance_index_buffer, a counted buffer of the radiance injection's (key, entry) pairs.
+     */
+    WBE_META(WBE_REFLECT)
+    uint64_t radiance_index = 0;
+    /**
+     * @brief svogi_radiance_staged_buffer, the radiance injection's entries.
+     */
+    WBE_META(WBE_REFLECT)
+    uint64_t radiance_staged = 0;
 };
 
 /**
@@ -124,6 +139,27 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVORecipeParams : public RecipeFeatureParams
      */
     WBE_META(WBE_REFLECT)
     uint32_t dynamic_publication_group_count = 0;
+    /**
+     * @brief Workgroups along x of the occupancy injection, which flattens its 2D grid row by row.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t occupancy_injection_group_count_x = 0;
+    /**
+     * @brief Workgroups along y of the occupancy injection.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t occupancy_injection_group_count_y = 0;
+    /**
+     * @brief Workgroups of each occupancy propagation level.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t occupancy_propagation_group_count = 0;
+    /**
+     * @brief Workgroups along each axis of the radiance injection, whose 16x16 workgroups sample every light's reflective
+     * shadow map on a grid of 16 times this many points per axis.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t radiance_injection_group_count = 0;
     /**
      * @brief The trigger of the static construction tasks, which record once; unset to rebuild them every frame.
      */

@@ -45,9 +45,9 @@ class DynamicMeshRenderFeature;
 /**
  * @class ISVORenderFeature
  * @brief Interface of the deferred test's SVO construction and debug rendering.
- * @details Owns the buffers, raster construction, deferred-list debugging, and debug draws shared by every construction
- * algorithm; implementations supply their publication strategy, deferred retries, and implementation-specific resource
- * ordering. Neither copyable nor movable. All methods and destruction are confined to the rendering thread. Registered
+ * @details Owns the buffers, raster construction, deferred-list debugging, debug draws, and SVOGI occupancy and radiance
+ * injection pipelines shared by every construction algorithm; implementations supply their publication strategy, deferred
+ * retries, and implementation-specific resource ordering. Neither copyable nor movable. All methods and destruction are confined to the rendering thread. Registered
  * graphs retain their resource handles and task factories; borrowed renderer and debug state must remain alive.
  */
 class ISVORenderFeature : public IVoxelRenderFeature {
@@ -181,6 +181,26 @@ private:
     // A voxel can hold at most one unreturned eight-slot ticket; include transient overflow reservations.
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_NODE_COUNT) / 8U);
     static_assert(SVO_VOXEL_COUNT <= (0xffffffffU - SVO_MAX_LEAVES_COUNT) / 8U);
+    // Every static and dynamic node and leaf owns one data index, below the node capacity plus the leaf capacity.
+    static constexpr size_t SVO_MAX_DATA_COUNT = SVO_MAX_NODE_COUNT + SVO_MAX_LEAVES_COUNT;
+    static constexpr uint32_t SVOGI_OCCUPANCY_INJECTION_THREADS_PER_GROUP = 256;
+    static constexpr uint32_t SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X = 1024;
+    static constexpr uint32_t SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP = 64;
+    // The radiance injection samples each light's reflective shadow map on a grid of this many points per axis, in
+    // 16x16 workgroups.
+    static constexpr uint32_t SVOGI_RADIANCE_SAMPLE_EXTENT = 256;
+    static constexpr uint32_t SVOGI_RADIANCE_TILE_SIZE = 16;
+    // WBE_MAX_SPOT_LIGHT_COUNT in light/spot_light_utils.slang: every sample may inject one entry per light.
+    static constexpr size_t SVOGI_MAX_SPOT_LIGHT_COUNT = 4;
+    static constexpr size_t SVOGI_RADIANCE_ENTRY_COUNT =
+        size_t{SVOGI_RADIANCE_SAMPLE_EXTENT} * SVOGI_RADIANCE_SAMPLE_EXTENT * SVOGI_MAX_SPOT_LIGHT_COUNT;
+    // WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE in utils/counted_buffer.slang.
+    static constexpr size_t COUNTED_BUFFER_HEADER_BYTE_SIZE = 16;
+    // A uint2 (key, entry) pair.
+    static constexpr size_t SVOGI_RADIANCE_INDEX_BYTE_SIZE = sizeof(uint32_t) * 2;
+    // The std430 stride of SegmentedWrapper<float3x3>: three 16-byte matrix rows and the segment flag, padded to 16 bytes.
+    static constexpr size_t SVOGI_RADIANCE_STAGED_BYTE_SIZE = 64;
+    static_assert(SVOGI_RADIANCE_SAMPLE_EXTENT % SVOGI_RADIANCE_TILE_SIZE == 0);
 
     struct SVOInfo {
         glm::vec3 origin;
@@ -264,6 +284,9 @@ private:
     Ref<ROComputePipelineVK> svo_debug_draw_setup_compute_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> svo_debug_draw_graphics_pipeline = MEM_NULL;
     Ref<ROGraphicsPipelineVK> svo_pre_deferred_debug_draw_graphics_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> svogi_occupancy_injection_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> svogi_occupancy_propagation_compute_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> svogi_radiance_injection_compute_pipeline = MEM_NULL;
     Ref<ROBufferVK> svo_info;
     Ref<ROBufferVK> svo_nodes;
     Ref<ROBufferVK> svo_leaves;

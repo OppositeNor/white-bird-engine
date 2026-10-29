@@ -22,7 +22,7 @@ struct SVOUpdateStatesDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
@@ -42,9 +42,9 @@ ConstantBuffer<SVOUpdateStatesDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    ConstantBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     uint node_index = p_dispatch_thread_id.x;
-    if (node_index >= tree_info[0].node_count) {
+    if (node_index >= tree_info.node_count) {
         return;
     }
     RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];

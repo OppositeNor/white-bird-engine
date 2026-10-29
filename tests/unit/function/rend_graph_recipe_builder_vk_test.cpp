@@ -23,6 +23,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/rt_multiplexer_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
@@ -396,6 +397,75 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, SubgraphGatingWrapsEveryTaskOfThe
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(first.get()), nullptr);
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(second.get()), nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.post"), 2U);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, BuildsMultiplexersOnTheSelectedBranch) {
+    const RendGraphRecipeImportsVK imports;
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "tasks": [{"id": "lighting", "select": {"event": "recipe.lighting", "branch": 1},
+                   "branches": [{"type": "registry_probe", "params": {"label": "lit"}},
+                                {"type": "registry_probe", "params": {"label": "debug"}}]}]
+    })"),
+        imports,
+        &render_data);
+    ASSERT_EQ(graph.tasks.size(), 1U);
+    const Unique<IRenderTaskVK> task = graph.get_task("lighting").factory(RendGraphContextVK{});
+    const auto* multiplexer = dynamic_cast<const RTMultiplexerVK*>(task.get());
+    ASSERT_NE(multiplexer, nullptr);
+    EXPECT_EQ(multiplexer->get_branch_count(), 2U);
+    EXPECT_EQ(multiplexer->get_branch(), 1U);
+    EventManager::get_singleton()->emit("recipe.lighting", RTMultiplexerVK::Command{.branch = 0});
+    EXPECT_EQ(multiplexer->get_branch(), 0U);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, MultiplexerBranchesShareTheirPreparedAliases) {
+    const RendGraphRecipeImportsVK imports;
+    // Both branches prepare the same alias to the same buffer, which the multiplexer keeps once.
+    RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
+        "tasks": [{"id": "pair", "select": {"event": "recipe.pair"},
+                   "branches": [{"type": "registry_preparing_probe", "params": {"label": "shared"}},
+                                {"type": "registry_preparing_probe", "params": {"label": "shared"}}]}]
+    })"),
+        imports,
+        &render_data);
+    EXPECT_EQ(graph.get_task("pair").resource_map.resolve(RTRegistryPreparingProbeVK::INPUT_ID), "shared.prepared");
+    EXPECT_TRUE(graph.contains_resource("shared.prepared"));
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "pair", "select": {"event": "recipe.pair"},
+                   "branches": [{"type": "registry_preparing_probe", "params": {"label": "a"}},
+                                {"type": "registry_preparing_probe", "params": {"label": "b"}}]}]})",
+                  imports,
+                  &render_data)
+                  .find("is mapped to both 'a.prepared' and 'b.prepared'"),
+        std::string::npos);
+}
+
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, RejectsMalformedMultiplexers) {
+    const RendGraphRecipeImportsVK imports;
+    const auto error = [&](std::string_view p_recipe) {
+        return build_error(builder, p_recipe, imports, &render_data);
+    };
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "type": "registry_probe", "params": {"label": "x"}, "select": {"event": "e"}}]})")
+                  .find("tasks[0] 'm' sets a select but no branches"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "branches": [{"type": "registry_probe", "params": {"label": "x"}}]}]})")
+                  .find("tasks[0] 'm' sets branches but no select"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "type": "registry_probe", "select": {"event": "e"},
+                   "branches": [{"type": "registry_probe", "params": {"label": "x"}}]}]})")
+                  .find("tasks[0] 'm' is a multiplexer, so it cannot set a type"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "import": true, "select": {"event": "e"},
+                   "branches": [{"type": "registry_probe", "params": {"label": "x"}}]}]})")
+                  .find("tasks[0] 'm' sets branches, so it cannot be an import or a subgraph"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "select": {"event": "e", "branch": 1},
+                   "branches": [{"type": "registry_probe", "params": {"label": "x"}}]}]})")
+                  .find("tasks[0] 'm' selects branch 1 of 1"),
+        std::string::npos);
+    EXPECT_NE(error(R"({"tasks": [{"id": "m", "select": {"event": ""},
+                   "branches": [{"type": "registry_probe", "params": {"label": "x"}}]}]})")
+                  .find("tasks[0] 'm' select event is empty"),
+        std::string::npos);
 }
 
 } // namespace WhiteBirdEngine

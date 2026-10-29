@@ -72,6 +72,16 @@ public:
     RenderTaskResourceMap& bind(std::string_view p_task_resource_id, std::string_view p_graph_resource_id);
 
     /**
+     * @brief Add every binding of another map, for tasks that share one map such as an RTMultiplexerVK's branches.
+     * A binding this map already has with the same graph identifier is kept once.
+     * @param p_other The map whose bindings are added; it must be enclosed in no scope.
+     * @return *this.
+     * @throws std::runtime_error If p_other is enclosed in a scope, or binds a task-local identifier this map binds to a
+     * different graph identifier.
+     */
+    RenderTaskResourceMap& merge(const RenderTaskResourceMap& p_other);
+
+    /**
      * @brief Enclose the task in a scope that renames resource identifiers.
      *
      * An identifier resolves through the task's own bindings, then through every scope from the innermost to the outermost.

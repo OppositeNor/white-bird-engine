@@ -17,7 +17,7 @@
 #include "svo/svo.slang"
 
 struct SVODebugDrawDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
@@ -52,11 +52,10 @@ ConstantBuffer<SVODebugDrawDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
     StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
     ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    SVOInfo svo_info = svo_info_buffer[0];
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);

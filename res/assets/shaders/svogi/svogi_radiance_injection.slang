@@ -20,7 +20,7 @@
 #include "light/spot_light_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_pre_deferred_debug_info_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
@@ -74,6 +74,11 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         uint2 shadow_size = spot_light.get_shadow_size();
         uint2 texel = min(uint2(uv * float2(shadow_size)), shadow_size - 1);
         float3 position = spot_light.shadow_texel_world_position(uv);
+        // The trace wraps positions outside the SVO into it, so those are skipped.
+        float3 svo_position = svo.get_svo_position(position);
+        if (any(svo_position < 0.0) || any(svo_position >= 1.0)) {
+            continue;
+        }
         SVONodeTraceInfo trace_info;
         uint data_index = svo.trace_data(position, trace_info);
         if (trace_info.is_node()) {

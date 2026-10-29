@@ -21,7 +21,7 @@ struct DynamicDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
@@ -38,11 +38,11 @@ ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    StructuredBuffer<SVOInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
+    ConstantBuffer<SVOInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
     RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
     uint index = p_id.x;
     // The node buffer holds the static nodes followed by the dynamic nodes.
-    if (index >= info[0].node_count + info[0].dynamic_node_count) {
+    if (index >= info.node_count + info.dynamic_node_count) {
         return;
     }
     uint description = nodes[index].children_data;

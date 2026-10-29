@@ -612,6 +612,66 @@ function render_graph.graph(): render_graph.Graph
         return self:add({ id = p_id, import = true })
     end
 
+    function graph:multiplex(p_id: string, p_branches: {render_graph.Task},
+        p_options: render_graph.MultiplexOptions): render_graph.Task
+        validate_list(p_branches, "branch", false)
+        if p_options == nil or p_options.select == nil then
+            error("render_graph: multiplexer '" .. tostring(p_id) .. "' sets no select.", 2)
+        end
+        local aliases: {string:render_graph.Resource} = {}
+        local function add_alias(p_local_name: string, p_resource: render_graph.Resource)
+            local previous = aliases[p_local_name]
+            if previous ~= nil and previous.id ~= p_resource.id then
+                error("render_graph: multiplexer '" .. p_id .. "' maps task-local resource '" .. p_local_name ..
+                    "' to more than one graph resource.", 3)
+            end
+            aliases[p_local_name] = previous or p_resource
+        end
+        for local_name, resource in pairs(p_options.aliases or {}) do
+            add_alias(local_name, resource)
+        end
+        local uses: {render_graph.Resource} = {}
+        for _, resource in ipairs(p_options.uses or {}) do
+            uses[#uses + 1] = resource
+        end
+        -- The branches' parameter handles keep their identity aliases from being redirected.
+        local ids: {string:boolean} = {}
+        local branches: {wbe.RendRecipeBranchVK} = {}
+        for index, branch in ipairs(p_branches) do
+            if branch.graph == self then
+                error("render_graph: multiplexer '" .. p_id .. "' branch " .. index ..
+                    " belongs to the same graph; build branches on a separate graph.", 2)
+            end
+            if branch.type == nil or branch.import or branch.subgraph ~= nil or branch.branches ~= nil then
+                error("render_graph: multiplexer '" .. p_id .. "' branch " .. index .. " is not a typed task.", 2)
+            end
+            if branch.edges ~= nil or branch.trigger ~= nil or branch.toggle ~= nil then
+                error("render_graph: multiplexer '" .. p_id .. "' branch " .. index ..
+                    " connects, triggers, or toggles; set those on the multiplexer.", 2)
+            end
+            branches[#branches + 1] = { type = branch.type, params = copy_data(branch.params) }
+            for local_name, resource in pairs(branch.aliases or {}) do
+                add_alias(local_name, resource)
+            end
+            for _, resource in ipairs(branch.uses or {}) do
+                uses[#uses + 1] = resource
+                ids[resource.id] = true
+            end
+        end
+        local task: render_graph.Task = {
+            id = p_id,
+            branches = branches,
+            select = copy_data(p_options.select) as wbe.RendRecipeSelectVK,
+            aliases = next(aliases) ~= nil and aliases or nil,
+            uses = uses,
+            trigger = copy_data(p_options.trigger) as wbe.RendRecipeTriggerVK,
+            toggle = copy_data(p_options.toggle) as wbe.RendRecipeToggleVK,
+        }
+        parameter_ids[task] = ids
+        validate_parameter_aliases(task)
+        return graph:add(task)
+    end
+
     function graph:get(p_id: string): render_graph.Task
         local task = task_by_id[p_id]
         if task == nil then
@@ -746,6 +806,8 @@ function render_graph.graph(): render_graph.Graph
                 trigger = task.trigger,
                 toggle = task.toggle,
                 subgraph = task.subgraph,
+                branches = task.branches,
+                select = task.select,
             }
             if task.aliases ~= nil then
                 wire_task.aliases = bindings(task.aliases)

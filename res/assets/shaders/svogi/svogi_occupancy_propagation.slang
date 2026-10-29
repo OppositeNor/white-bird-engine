@@ -16,7 +16,7 @@
 #include "svogi/svogi_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_pre_deferred_debug_info_buffer")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;

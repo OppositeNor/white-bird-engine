@@ -24,7 +24,7 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct SVOPreDeferredDebugCaptureDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")]
+    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
     uint2 svo_info;
     [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list;
@@ -45,14 +45,14 @@ ConstantBuffer<SVOPreDeferredDebugCaptureDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    StructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
     StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
     RWStructuredBuffer<SVOInfo> captured_svo_info = ResourceDescriptorHeap[descriptor_indices.captured_svo_info.x];
     RWStructuredBuffer<uint> captured_deferred_list =
         ResourceDescriptorHeap[descriptor_indices.captured_deferred_list.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
 
-    SVOInfo info = svo_info[0];
+    SVOInfo info = svo_info;
     uint deferred_task_count = deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX];
     if (p_dispatch_thread_id.x == 0) {
         captured_svo_info[0] = info;

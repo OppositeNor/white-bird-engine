@@ -46,6 +46,15 @@ local record render_graph
         toggle: wbe.RendRecipeToggleVK
     end
 
+    -- Options of Graph:multiplex(): the branch selection, and what applies to the multiplexer as a whole.
+    record MultiplexOptions
+        select: wbe.RendRecipeSelectVK
+        aliases: {string:Resource}
+        uses: {Resource}
+        trigger: wbe.RendRecipeTriggerVK
+        toggle: wbe.RendRecipeToggleVK
+    end
+
     record Edge
         to: Task
         resource: Resource
@@ -74,6 +83,8 @@ local record render_graph
         toggle: wbe.RendRecipeToggleVK
         subgraph: wbe.RendGraphRecipeVK
         ports: {string:Resource}
+        branches: {wbe.RendRecipeBranchVK}
+        select: wbe.RendRecipeSelectVK
         -- Collect resources without declaring an access or adding an ordering edge.
         uses: {Resource}
     end
@@ -112,6 +123,10 @@ local record render_graph
         add: function(self: Graph, p_task: Task): Task
         get: function(self: Graph, p_id: string): Task
         import_task: function(self: Graph, p_id: string): Task
+        -- A multiplexer task that records the selected one of p_branches: typed tasks built on another graph, such as a
+        -- scratch Graph.new(), without edges, triggers, or toggles. It takes their types, params, aliases, and uses; the
+        -- branches share its aliases, and must run on one queue family.
+        multiplex: function(self: Graph, p_id: string, p_branches: {Task}, p_options: MultiplexOptions): Task
         chain: function(self: Graph, p_resource: Resource, p_tasks: {Task})
         chain: function(self: Graph, p_resources: {Resource}, p_tasks: {Task})
         chain: function(self: Graph, p_bundle: ResourceBundle, p_tasks: {Task})

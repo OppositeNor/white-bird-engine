@@ -180,8 +180,8 @@ void RTRunComputePipelinesSequentialVK::record(VkCommandBuffer p_command_buffer,
             .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
             .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | (next_indirect ? VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT : VK_PIPELINE_STAGE_2_NONE),
-            .dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT |
-                             (next_indirect ? VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT : VK_ACCESS_2_NONE),
+            .dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                             VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | (next_indirect ? VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT : VK_ACCESS_2_NONE),
         };
         VkDependencyInfo dependency_info{
             .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,

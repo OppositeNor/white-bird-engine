@@ -112,6 +112,12 @@ Examples: `tests/executable/function/render/pixel_sorting_recipe_context.hh`,
   (`Command::enable()` / `disable()`). Rebuilds re-run the recipe, so pass the toggle's current state through the context.
 - A trigger or toggle on a subgraph task wraps every member; set it on the task `as_subgraph()` returns
   (`subgraph.toggle = { ... }`).
+- A multiplexer records one of several branch tasks: build them with the typed constructors on a scratch graph and pass them
+  to `graph:multiplex(id, branches, { select = { event, branch }, aliases?, uses?, trigger?, toggle? })`, emitted as
+  `branches = { { type, params } }` and `select`. `RTMultiplexerVK` is one graph node: it reports and binds every branch,
+  records the selected one, and switches on `RTMultiplexerVK::Command { branch }`; an out-of-range branch throws. Branches
+  share one resource map (identical aliases merge, conflicting ones throw) and must run on one queue family, and they set
+  no edges, triggers, or toggles of their own. Pass the current branch through the context.
 
 `EventManager` lives in `function/event/event_manager.hh`; CPU readback tasks also emit their results through it under the
 source resource id.
