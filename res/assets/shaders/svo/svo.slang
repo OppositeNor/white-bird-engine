@@ -170,24 +170,17 @@ struct SVO {
     }
 
     /**
-     * @brief Get a node's depth by walking from the node to the root.
-     * @details In shader-debug builds, an invalid parent index reports SVO_NODE_INDEX_OVERFLOW and a chain longer than
-     * info.max_depth - 1 nodes reports SVO_DEEPER_THAN_EXPECTED.
+     * @brief Get a node's stored depth.
+     * @details In shader-debug builds, an invalid node index reports SVO_NODE_INDEX_OVERFLOW and a depth outside
+     * [1, info.max_depth - 1] reports SVO_DEEPER_THAN_EXPECTED.
      * @param p_index Node index below get_total_nodes(), as in get_node().
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      * @return The depth of the node: one for the root's sectors and info.max_depth - 1 for the parents of leaves.
      */
     uint get_node_depth(uint p_index, uint p_frame_slot) {
         WBE_SHADER_DEBUG_ASSERT(p_index < get_total_nodes(), ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
-        uint depth = 1;
-        int parent_index = get_node(p_index).parent_index;
-        for (; parent_index >= 0 && depth < info.max_depth; ++depth) {
-            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
-                ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
-            parent_index = get_node(uint(parent_index)).parent_index;
-        }
-        WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && depth < info.max_depth,
-            ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
+        uint depth = get_node(p_index).get_depth();
+        WBE_SHADER_DEBUG_ASSERT(depth >= 1 && depth < info.max_depth, ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
         return depth;
     }
 
@@ -201,12 +194,14 @@ struct SVO {
         uint3 result = uint3(0);
         WBE_SHADER_DEBUG_ASSERT(p_index < get_total_leaves(), ShaderDebugError::SVO_LEAF_INDEX_OVERFLOW, p_frame_slot);
         uint child_index = p_index;
-        int parent_index = get_leaf(p_index).parent_index;
+        int leaf_parent_index = get_leaf(p_index).parent_index;
+        bool has_parent = leaf_parent_index >= 0;
+        uint parent_index = uint(leaf_parent_index);
         uint traversed_depth = 0;
-        for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
-            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
+        for (; traversed_depth < info.max_depth && has_parent; ++traversed_depth) {
+            WBE_SHADER_DEBUG_ASSERT(parent_index < get_total_nodes(),
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
-            SVONode parent = get_node(uint(parent_index));
+            SVONode parent = get_node(parent_index);
             WBE_SHADER_DEBUG_ASSERT(child_index >= get_svo_children_index(parent) &&
                 child_index - get_svo_children_index(parent) < 8,
                 ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED, p_frame_slot);
@@ -214,10 +209,11 @@ struct SVO {
             result.x |= ((subregion >> 2) & 1) << traversed_depth;
             result.y |= ((subregion >> 1) & 1) << traversed_depth;
             result.z |= (subregion & 1) << traversed_depth;
-            child_index = uint(parent_index);
-            parent_index = parent.parent_index;
+            child_index = parent_index;
+            has_parent = parent.has_parent();
+            parent_index = parent.get_parent_index();
         }
-        if (parent_index < 0) {
+        if (!has_parent) {
             WBE_SHADER_DEBUG_ASSERT(child_index < 8 && traversed_depth < 32,
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
             // The remaining node is one of the eight sectors of the implicit root.
@@ -226,9 +222,9 @@ struct SVO {
             result.z |= (child_index & 1) << traversed_depth;
             ++traversed_depth;
         }
-        WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && traversed_depth <= info.max_depth,
+        WBE_SHADER_DEBUG_ASSERT(!has_parent && traversed_depth <= info.max_depth,
             ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
-        WBE_SHADER_DEBUG_ASSERT(parent_index >= 0 || traversed_depth >= info.max_depth,
+        WBE_SHADER_DEBUG_ASSERT(has_parent || traversed_depth >= info.max_depth,
             ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED, p_frame_slot);
         return result;
     }
@@ -236,33 +232,34 @@ struct SVO {
     /**
      * @brief Reconstruct a node's grid position by walking from the node to the root.
      * @param p_index Node index below get_total_nodes(), as in get_node().
-     * @param p_depth Receives the node's depth: one for the root's sectors and info.max_depth - 1 for the parents of
-     * leaves.
+     * @param p_depth Receives the node's stored depth: one for the root's sectors and info.max_depth - 1 for the parents
+     * of leaves.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      * @return Integer position of the node in the grid of extent 2^p_depth.
      */
     uint3 get_node_grid_position(uint p_index, out uint p_depth, uint p_frame_slot) {
         uint3 result = uint3(0);
-        WBE_SHADER_DEBUG_ASSERT(p_index < get_total_nodes(), ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
+        p_depth = get_node_depth(p_index, p_frame_slot);
         uint child_index = p_index;
-        int parent_index = get_node(p_index).parent_index;
+        SVONode child = get_node(p_index);
         uint traversed_depth = 0;
-        for (; traversed_depth < info.max_depth && parent_index >= 0; ++traversed_depth) {
-            WBE_SHADER_DEBUG_ASSERT(uint(parent_index) < get_total_nodes(),
+        for (; traversed_depth + 1 < p_depth && child.has_parent(); ++traversed_depth) {
+            uint parent_index = child.get_parent_index();
+            WBE_SHADER_DEBUG_ASSERT(parent_index < get_total_nodes(),
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW, p_frame_slot);
             uint subregion = child_index % 8;
             result.x |= ((subregion >> 2) & 1) << traversed_depth;
             result.y |= ((subregion >> 1) & 1) << traversed_depth;
             result.z |= (subregion & 1) << traversed_depth;
-            child_index = uint(parent_index);
-            parent_index = get_node(uint(parent_index)).parent_index;
+            child_index = parent_index;
+            child = get_node(parent_index);
         }
-        WBE_SHADER_DEBUG_ASSERT(parent_index < 0 && child_index < 8, ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
+        WBE_SHADER_DEBUG_ASSERT(!child.has_parent() && child_index < 8 && traversed_depth + 1 == p_depth,
+            ShaderDebugError::SVO_DEEPER_THAN_EXPECTED, p_frame_slot);
         // The remaining node is one of the eight sectors of the implicit root.
         result.x |= ((child_index >> 2) & 1) << traversed_depth;
         result.y |= ((child_index >> 1) & 1) << traversed_depth;
         result.z |= (child_index & 1) << traversed_depth;
-        p_depth = traversed_depth + 1;
         return result;
     }
 

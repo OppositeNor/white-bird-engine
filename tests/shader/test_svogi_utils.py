@@ -18,8 +18,8 @@ import pytest
 import slangpy as spy
 
 from test_svo_common import (LEAF_DTYPE, OCCUPANCY_BIT_OFFSET, STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF,
-    STATE_LEAF_DYNAMIC, STATE_NODE_DYNAMIC, StaticSVO, build_static_svo, make_buffer, make_tree_info, pack_children_data,
-    random_voxels, read_buffer, voxel_prefix)
+    STATE_LEAF_DYNAMIC, STATE_NODE_DYNAMIC, StaticSVO, build_static_svo, make_buffer, make_tree_info, node_depth,
+    pack_children_data, pack_parent_data, random_voxels, read_buffer, voxel_prefix)
 
 
 RANDOM_SEED = 20261024
@@ -88,7 +88,8 @@ def add_unallocated_leaf_block(p_nodes: np.ndarray, p_leaves: np.ndarray) -> tup
     that only the bounds of the SVO's totals keep them from being injected.
     """
     nodes = np.concatenate([p_nodes, np.zeros(1, dtype=p_nodes.dtype)])
-    nodes[-1] = (pack_children_data(STATE_LEAF_DYNAMIC, len(p_leaves) // 8, 0xFF), len(nodes) + len(p_leaves) + 8, 0, 0)
+    nodes[-1] = (pack_children_data(STATE_LEAF_DYNAMIC, len(p_leaves) // 8, 0xFF), len(nodes) + len(p_leaves) + 8,
+        pack_parent_data(0, 2), 0)
     leaves = np.concatenate([p_leaves, np.zeros(8, dtype=LEAF_DTYPE)])
     leaves[-8:]["data_index"] = len(nodes) + len(p_leaves) + np.arange(8)
     leaves[-8:]["parent_index"] = len(nodes) - 1
@@ -233,7 +234,7 @@ def test_propagate_svo_occupancy_reads_the_referenced_dynamic_block(device: spy.
     nodes = tree.node_array(dynamic_block + 8)
     nodes[sector]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, dynamic_block // 8)
     nodes[dynamic_block:]["data_index"] = np.arange(dynamic_block, dynamic_block + 8)
-    nodes[dynamic_block:]["parent_index"] = sector
+    nodes[dynamic_block:]["parent_data"] = pack_parent_data(sector, node_depth(int(nodes[sector]["parent_data"])) + 1)
     nodes[dynamic_block]["children_data"] = pack_children_data(STATE_LEAF, 0, 1)
     tree_info = make_static_tree_info(tree)
     tree_info["dynamic_node_count"] = 8

@@ -37,12 +37,16 @@ STATE_LEAF_DYNAMIC = 6
 STATE_BIT_OFFSET = 29
 OCCUPANCY_BIT_OFFSET = 21
 BLOCK_INDEX_BIT_COUNT = 21
+# SVONode::parent_data: bit 31 marks a root sector, bits 30:27 hold the depth, and bits 26:0 the parent index.
+PARENT_ROOT_BIT = 1 << 31
+PARENT_DEPTH_SHIFT = 27
+PARENT_INDEX_MASK = (1 << PARENT_DEPTH_SHIFT) - 1
 
 # SVONodeTraceInfo::IndexType values.
 INDEX_NODE = 0
 INDEX_LEAF = 1
 
-NODE_DTYPE = np.dtype([("children_data", "<u4"), ("data_index", "<u4"), ("parent_index", "<i4"),
+NODE_DTYPE = np.dtype([("children_data", "<u4"), ("data_index", "<u4"), ("parent_data", "<u4"),
     ("original_children_data", "<u4")])
 LEAF_DTYPE = np.dtype([("data_index", "<u4"), ("parent_index", "<i4")])
 INFO_DTYPE = np.dtype([("origin", "<f4", 3), ("width", "<f4"), ("max_depth", "<u4"), ("node_count", "<u4"),
@@ -65,6 +69,26 @@ def svo_common(device: spy.Device) -> spy.Module:
 
 def pack_children_data(p_state: int, p_block_index: int = 0, p_occupancy: int = 0) -> int:
     return (p_state << STATE_BIT_OFFSET) | (p_occupancy << OCCUPANCY_BIT_OFFSET) | p_block_index
+
+
+def pack_parent_data(p_parent_index: int, p_depth: int) -> int:
+    """Pack an SVONode::parent_data; a negative p_parent_index marks a root sector."""
+    if p_parent_index < 0:
+        return PARENT_ROOT_BIT | (p_depth << PARENT_DEPTH_SHIFT)
+    return (p_depth << PARENT_DEPTH_SHIFT) | p_parent_index
+
+
+def node_parent_index(p_parent_data: np.ndarray | int) -> np.ndarray | int:
+    """Decode the parent index of SVONode::parent_data, -1 for a root sector."""
+    parent_data = np.asarray(p_parent_data, dtype=np.uint32)
+    result = np.where(parent_data & PARENT_ROOT_BIT, -1, (parent_data & PARENT_INDEX_MASK).astype(np.int64))
+    return int(result) if result.ndim == 0 else result
+
+
+def node_depth(p_parent_data: np.ndarray | int) -> np.ndarray | int:
+    """Decode the depth of SVONode::parent_data."""
+    result = (np.asarray(p_parent_data, dtype=np.uint32) >> PARENT_DEPTH_SHIFT) & 0xF
+    return int(result) if result.ndim == 0 else result
 
 
 def subregion_reference(p_positions: np.ndarray) -> np.ndarray:
@@ -122,7 +146,12 @@ class StaticSVO:
         result = np.zeros(max(p_capacity, len(self.nodes)), dtype=NODE_DTYPE)
         result["children_data"] = pack_children_data(STATE_EMPTY)
         for index, (children_data, data_index, parent_index) in enumerate(self.nodes):
-            result[index] = (children_data, data_index, parent_index, 0)
+            depth = 1
+            ancestor = parent_index
+            while ancestor >= 0:
+                depth += 1
+                ancestor = self.nodes[ancestor][2]
+            result[index] = (children_data, data_index, pack_parent_data(parent_index, depth), 0)
         return result
 
     def leaf_array(self) -> np.ndarray:
@@ -205,7 +234,7 @@ def run_traverse(p_device: spy.Device, p_load_kernel: KernelLoader, p_nodes: np.
 
 
 def test_svo_struct_layouts(svo_common: spy.Module) -> None:
-    # SVONode documents a 16-byte stride; the other dtypes mirror the reflected layouts used by these tests.
+    # The dtypes mirror the documented storage-buffer layouts used by these tests.
     for type_name, dtype in [("SVONode", NODE_DTYPE), ("SVOLeaf", LEAF_DTYPE), ("SVOInfo", INFO_DTYPE),
             ("SVONodeTraceInfo", TRACE_DTYPE)]:
         layout = svo_common.layout.find_type_by_name(type_name).buffer_layout.reflection
@@ -213,6 +242,21 @@ def test_svo_struct_layouts(svo_common: spy.Module) -> None:
         assert [(field.name, field.offset) for field in layout.fields] == [
             (name, dtype.fields[name][1]) for name in dtype.names], type_name
     assert svo_common.layout.find_type_by_name("SVONode").buffer_layout.reflection.stride == 16
+
+
+def test_svo_parent_data_packing(svo_common: spy.Module) -> None:
+    root = svo_common.svo_root_parent_data()
+    assert root == pack_parent_data(-1, 1)
+    fields = svo_common.svo_parent_fields(root)
+    assert (fields.x, fields.y, fields.z) == (0, 0, 1)
+    # Each child is one level deeper than its parent and keeps the full 27-bit parent index.
+    parent_data = root
+    for depth, parent_index in enumerate([5, PARENT_INDEX_MASK, 0, 123456], start=2):
+        parent_data = svo_common.svo_child_parent_data(parent_index, parent_data)
+        assert parent_data == pack_parent_data(parent_index, depth)
+        fields = svo_common.svo_parent_fields(parent_data)
+        assert (fields.x, fields.y, fields.z) == (1, parent_index, depth)
+    assert svo_common.svo_child_parent_data(7, pack_parent_data(3, 14)) == pack_parent_data(7, 15)
 
 
 def test_svo_layout_constants(svo_common: spy.Module) -> None:
@@ -398,6 +442,9 @@ def dynamic_svo() -> tuple[np.ndarray, np.ndarray]:
     EMPTY. Root sector 7 is a static node whose children are EMPTY.
     """
     nodes = np.zeros(DYNAMIC_SVO_NODE_COUNT + 8, dtype=NODE_DTYPE)
+    nodes["parent_data"][:8] = pack_parent_data(-1, 1)
+    nodes["parent_data"][8:DYNAMIC_SVO_NODE_COUNT] = pack_parent_data(7, 2)
+    nodes["parent_data"][DYNAMIC_SVO_NODE_COUNT:] = pack_parent_data(0, 2)
     nodes["children_data"] = pack_children_data(STATE_EMPTY)
     nodes[0]["children_data"] = pack_children_data(STATE_NODE_DYNAMIC, DYNAMIC_SVO_NODE_COUNT // 8)
     nodes[7]["children_data"] = pack_children_data(STATE_NODE, 1)

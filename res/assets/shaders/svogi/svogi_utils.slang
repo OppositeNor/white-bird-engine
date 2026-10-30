@@ -86,15 +86,15 @@ void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block
     if (p_block_index >= svo.get_total_nodes()) {
         return;
     }
-    int signed_parent_index = svo.get_node(p_block_index).parent_index;
+    SVONode first_child = svo.get_node(p_block_index);
     // The root's sectors have no stored parent.
-    if (signed_parent_index < 0) {
+    if (!first_child.has_parent()) {
         return;
     }
     if (svo.get_node_depth(p_block_index, p_frame_slot) != p_child_depth) {
         return;
     }
-    SVONode parent = svo.get_node(uint(signed_parent_index));
+    SVONode parent = svo.get_node(first_child.get_parent_index());
     SVONode::ChildrenState expected_state =
         p_block_index >= svo.info.node_count ? SVONode::ChildrenState::NODE_DYNAMIC : SVONode::ChildrenState::NODE;
     if (parent.get_children_state() != expected_state || parent.get_children_index() != p_block_index) {

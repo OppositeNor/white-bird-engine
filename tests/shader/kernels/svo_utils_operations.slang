@@ -82,7 +82,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     results[index] = uint4(1, 0, 0, 0);
 #elif OPERATION == OPERATION_LOAD_NODE
     SVONode node = load_svo_node(nodes, arguments[index].x);
-    results[index] = uint4(node.children_data, node.data_index, uint(node.parent_index), 0);
+    results[index] = uint4(node.children_data, node.data_index, node.parent_data, 0);
 #elif OPERATION == OPERATION_PUBLISH_CHILDREN_DATA
     publish_svo_children_data(nodes, arguments[index].x, arguments[index].y);
     results[index] = uint4(1, 0, 0, 0);

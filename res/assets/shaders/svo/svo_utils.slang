@@ -31,7 +31,7 @@ SVONode load_svo_node(RWStructuredBuffer<SVONode> p_nodes, uint p_node_index) {
     SVONode result;
     result.children_data = children_data;
     result.data_index = p_nodes[p_node_index].data_index;
-    result.parent_index = p_nodes[p_node_index].parent_index;
+    result.parent_data = p_nodes[p_node_index].parent_data;
     return result;
 }
 
@@ -73,11 +73,12 @@ bool create_svo_children_node(RWStructuredBuffer<SVONode> p_nodes,
     if (!try_reserve_svo_nodes(p_nodes, p_tree_info, p_frame_slot, p_children_index)) {
         return false;
     }
+    uint child_parent_data = make_svo_child_parent_data(p_parent_node_index, p_nodes[p_parent_node_index].parent_data);
     [unroll] for (uint i = 0; i < 8; ++i) {
         // Initialize all of the children to empty
         uint child_index = p_children_index + i;
         p_nodes[child_index].children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
-        p_nodes[child_index].parent_index = p_parent_node_index;
+        p_nodes[child_index].parent_data = child_parent_data;
     }
     uint new_data_index;
     InterlockedAdd(p_tree_info[0].data_count, 8, new_data_index);

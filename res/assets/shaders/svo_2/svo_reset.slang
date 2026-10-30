@@ -57,7 +57,7 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     if (index < 8) {
         tree_nodes[index].children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
         tree_nodes[index].data_index = index;
-        tree_nodes[index].parent_index = -1;
+        tree_nodes[index].parent_data = make_svo_root_parent_data();
     }
     if (index == 0) {
         svo_info[0].node_count = 8;

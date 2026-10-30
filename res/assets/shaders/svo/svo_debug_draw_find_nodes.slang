@@ -99,18 +99,19 @@ void main(uint p_thread_id : SV_DispatchThreadID) {
                 return;
             }
         }
-        int next_index = svo.get_node(current).parent_index;
-        WBE_SHADER_DEBUG_ASSERT(next_index >= 0, ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED, frame_slot);
-        if (next_index < 0) {
+        SVONode current_node = svo.get_node(current);
+        WBE_SHADER_DEBUG_ASSERT(current_node.has_parent(), ShaderDebugError::SVO_SHALLOWER_THAN_EXPECTED, frame_slot);
+        if (!current_node.has_parent()) {
             return;
         }
-        SVONode next = svo.get_node(uint(next_index));
+        uint next_index = current_node.get_parent_index();
+        SVONode next = svo.get_node(next_index);
         SVONode::ChildrenState expected_node_state =
             sibling_block >= svo_info.node_count ? SVONode::ChildrenState::NODE_DYNAMIC : SVONode::ChildrenState::NODE;
         if (next.get_children_state() != expected_node_state || next.get_children_index() != sibling_block) {
             return;
         }
-        current = uint(next_index);
+        current = next_index;
     }
     uint instance;
     InterlockedAdd(indirect_draw[0].instance_count, 1, instance);

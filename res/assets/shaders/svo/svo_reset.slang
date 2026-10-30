@@ -50,6 +50,6 @@ void main() {
         // Reset the top most portion of the tree.
         tree_nodes[i].children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
         tree_nodes[i].data_index = i;
-        tree_nodes[i].parent_index = -1;
+        tree_nodes[i].parent_data = make_svo_root_parent_data();
     }
 }

@@ -48,15 +48,38 @@ struct SVONode {
      */
     uint data_index;
     /**
-     * @brief The index to the parent node. < 0 if no parent present, which represents
-     * this node as one of the implicit root's eight sectors.
+     * @brief Packed parent link and tree depth; immutable after initialization.
+     * @details Bit 31 (SVO_PARENT_ROOT_BIT) is set for the implicit root's eight sectors, which have no parent. Bits 30:27
+     * hold the depth, starting at one for those sectors. Bits 26:0 hold the parent node's index, zero for the sectors.
+     * Build it with make_svo_root_parent_data() or make_svo_child_parent_data().
      */
-    int parent_index;
+    uint parent_data;
     /**
      * @brief Original child description saved by the dynamic allocation owner; the dynamic clear restores LEAF_DYNAMIC
      * nodes from it.
      */
     uint original_children_data;
+
+    /**
+     * @brief Whether parent_data names a parent; false for the implicit root's eight sectors.
+     */
+    bool has_parent() {
+        return (parent_data & SVO_PARENT_ROOT_BIT) == 0;
+    }
+
+    /**
+     * @brief Decodes the parent node's index of parent_data; meaningful only when has_parent().
+     */
+    uint get_parent_index() {
+        return parent_data & SVO_PARENT_INDEX_MASK;
+    }
+
+    /**
+     * @brief Decodes the tree depth of parent_data: one for the root's sectors.
+     */
+    uint get_depth() {
+        return (parent_data & SVO_PARENT_DEPTH_MASK) >> SVO_PARENT_DEPTH_SHIFT;
+    }
 
     /**
      * @brief Decodes the ChildrenState of children_data.
@@ -124,6 +147,39 @@ static const uint SVO_CHILDREN_BLOCK_INDEX_MASK = 0x001fffffu;
  * @brief Mask of every bit below the ChildrenState field (occupancy and block index) in SVONode::children_data.
  */
 static const uint SVO_CHILDREN_PAYLOAD_MASK = 0x1fffffffu;
+/**
+ * @brief Bit of SVONode::parent_data set for the implicit root's eight sectors, which have no parent.
+ */
+static const uint SVO_PARENT_ROOT_BIT = 0x80000000u;
+/**
+ * @brief Bit offset of the depth field (bits 30:27) in SVONode::parent_data.
+ */
+static const uint SVO_PARENT_DEPTH_SHIFT = 27;
+/**
+ * @brief Mask of the depth field (bits 30:27) in SVONode::parent_data.
+ */
+static const uint SVO_PARENT_DEPTH_MASK = 0x78000000u;
+/**
+ * @brief Mask of the parent node index (bits 26:0) in SVONode::parent_data.
+ */
+static const uint SVO_PARENT_INDEX_MASK = 0x07ffffffu;
+
+/**
+ * @brief The SVONode::parent_data of one of the implicit root's eight sectors: no parent, depth one.
+ */
+uint make_svo_root_parent_data() {
+    return SVO_PARENT_ROOT_BIT | (1u << SVO_PARENT_DEPTH_SHIFT);
+}
+
+/**
+ * @brief The SVONode::parent_data of a child of a node, one level deeper than it.
+ * @param p_parent_index Index of the parent node, below 2^27.
+ * @param p_parent_parent_data The parent node's own parent_data, whose depth is below 15.
+ */
+uint make_svo_child_parent_data(uint p_parent_index, uint p_parent_parent_data) {
+    return ((p_parent_parent_data & SVO_PARENT_DEPTH_MASK) + (1u << SVO_PARENT_DEPTH_SHIFT)) |
+        (p_parent_index & SVO_PARENT_INDEX_MASK);
+}
 
 /**
  * @brief One initialized leaf slot; occupancy is published in its parent node.

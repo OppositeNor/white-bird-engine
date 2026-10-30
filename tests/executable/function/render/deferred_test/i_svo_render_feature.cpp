@@ -191,7 +191,7 @@ void ISVORenderFeature::initialize() {
         first_sectors[i] = SVONode{
             .children_data = static_cast<uint32_t>(SVONode::ChildrenState::EMPTY) << 29U,
             .data_index = i,
-            .parent_index = -1,
+            .parent_data = SVO_PARENT_ROOT_BIT | (1U << SVO_PARENT_DEPTH_SHIFT),
         };
     }
     svo_info->update_buffer(&initial_svo_info, sizeof(initial_svo_info));

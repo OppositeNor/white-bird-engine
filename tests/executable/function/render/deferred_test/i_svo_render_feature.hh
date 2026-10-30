@@ -283,14 +283,21 @@ private:
         // nodes use block 20:0 with bits 28:21 unused. Block indices address eight entries.
         uint32_t children_data;
         uint32_t data_index;
-        int32_t parent_index;
+        // Mirrors the packed Slang parent data: root flag 31, depth 30:27, parent node index 26:0.
+        uint32_t parent_data;
         uint32_t original_children_data;
     };
+
+    static constexpr uint32_t SVO_PARENT_ROOT_BIT = 1U << 31U;
+    static constexpr uint32_t SVO_PARENT_DEPTH_SHIFT = 27U;
 
     static_assert(sizeof(SVONode) == 16);
     static_assert(alignof(SVONode) == alignof(uint32_t));
     static_assert(offsetof(SVONode, data_index) == 4);
-    static_assert(offsetof(SVONode, parent_index) == 8);
+    static_assert(offsetof(SVONode, parent_data) == 8);
+    // Node depths reach SVO_MAX_DEPTH - 1 in the four depth bits; node indices fit the 27 parent index bits.
+    static_assert(SVO_MAX_DEPTH - 1 < 16);
+    static_assert(SVO_MAX_NODE_COUNT <= (1U << 27U));
     static_assert(SVO_MAX_DEPTH >= 2);
     static_assert(SVO_MAX_NODE_COUNT % 8 == 0 && SVO_MAX_NODE_COUNT <= (1U << 21U) * 8U);
     static_assert(SVO_MAX_LEAVES_COUNT % 8 == 0 && SVO_MAX_LEAVES_COUNT <= (1U << 21U) * 8U);

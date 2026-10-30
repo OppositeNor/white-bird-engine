@@ -107,11 +107,12 @@ bool try_dynamic_voxel_allocate_atomic(RWStructuredBuffer<SVONode> p_nodes,
             WBE_SHADER_DEBUG_ASSERT(children <= node_capacity && node_capacity - children >= 8,
                 ShaderDebugError::SVO_NODE_INDEX_OVERFLOW,
                 p_frame_slot);
+            uint child_parent_data = make_svo_child_parent_data(node_index, p_nodes[node_index].parent_data);
             [unroll] for (uint i = 0; i < 8; ++i) {
                 SVONode child;
                 child.children_data = uint(SVONode::ChildrenState::EMPTY) << SVO_CHILDREN_STATE_SHIFT;
                 child.data_index = p_info[0].data_count + dynamic_index + i;
-                child.parent_index = int(node_index);
+                child.parent_data = child_parent_data;
                 child.original_children_data = child.children_data;
                 p_nodes[children + i] = child;
             }

@@ -49,6 +49,29 @@ uint svo_count_children_occupancy(uint p_children_data) {
 }
 
 /**
+ * @brief Returns make_svo_root_parent_data().
+ */
+uint svo_root_parent_data() {
+    return make_svo_root_parent_data();
+}
+
+/**
+ * @brief Returns make_svo_child_parent_data(p_parent_index, p_parent_parent_data).
+ */
+uint svo_child_parent_data(uint p_parent_index, uint p_parent_parent_data) {
+    return make_svo_child_parent_data(p_parent_index, p_parent_parent_data);
+}
+
+/**
+ * @brief Decodes (has_parent(), get_parent_index(), get_depth()) of a node with the given packed parent data.
+ */
+uint3 svo_parent_fields(uint p_parent_data) {
+    SVONode node;
+    node.parent_data = p_parent_data;
+    return uint3(node.has_parent() ? 1 : 0, node.get_parent_index(), node.get_depth());
+}
+
+/**
  * @brief Returns (SVO_CHILDREN_OCCUPANCY_MASK, SVO_CHILDREN_BLOCK_INDEX_MASK, SVO_CHILDREN_PAYLOAD_MASK).
  */
 uint3 svo_children_masks() {

@@ -19,8 +19,8 @@ import pytest
 import slangpy as spy
 
 from test_svo_common import (BLOCK_INDEX_BIT_COUNT, LEAF_DTYPE, NODE_DTYPE, OCCUPANCY_BIT_OFFSET, STATE_ALLOCATING,
-    STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF, STATE_NODE, TRACE_DTYPE, Voxel, make_buffer, make_tree_info,
-    pack_children_data, random_voxels, read_buffer, root_traces, subregion_reference, voxel_prefix, voxel_sector)
+    STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF, STATE_NODE, TRACE_DTYPE, Voxel, make_buffer, make_tree_info, node_depth,
+    node_parent_index, pack_children_data, pack_parent_data, random_voxels, read_buffer, root_traces, subregion_reference, voxel_prefix, voxel_sector)
 
 
 RANDOM_SEED = 20251003
@@ -68,7 +68,7 @@ def reset_svo(p_max_depth: int, p_node_capacity: int, p_leaf_capacity: int) -> S
     nodes = np.zeros(p_node_capacity, dtype=NODE_DTYPE)
     nodes["children_data"] = pack_children_data(STATE_EMPTY)
     nodes["data_index"][:8] = np.arange(8)
-    nodes["parent_index"][:8] = -1
+    nodes["parent_data"][:8] = pack_parent_data(-1, 1)
     tree_info = make_tree_info(p_max_depth)
     tree_info["node_count"] = 8
     tree_info["data_count"] = 8
@@ -122,7 +122,7 @@ def test_create_svo_children(device: spy.Device, load_kernel: KernelLoader, p_ve
         p_is_leaf: bool) -> None:
     invocation_count = 40
     state = reset_svo(4, 8 + 8 * invocation_count, 8 * invocation_count)
-    parents = np.arange(invocation_count, dtype=np.uint32) + 3
+    parents = np.arange(invocation_count, dtype=np.uint32) % 8
     operation = OPERATION_CREATE_CHILDREN_LEAF if p_is_leaf else OPERATION_CREATE_CHILDREN_NODE
     result = run_operation(device, load_kernel, p_version, operation, state, invocation_count, parents)
     assert np.all(result.results[:, 0] == 1)
@@ -131,11 +131,13 @@ def test_create_svo_children(device: spy.Device, load_kernel: KernelLoader, p_ve
     assert np.all(first_children % 8 == 0)
     for parent, first_child in zip(parents, first_children):
         block = children[first_child:first_child + 8]
-        np.testing.assert_array_equal(block["parent_index"], parent)
+        block_parents = block["parent_index"] if p_is_leaf else node_parent_index(block["parent_data"])
+        np.testing.assert_array_equal(block_parents, parent)
         # Each block owns eight consecutive data slots.
         np.testing.assert_array_equal(block["data_index"], block["data_index"][0] + np.arange(8))
         if not p_is_leaf:
             np.testing.assert_array_equal(block["children_data"], pack_children_data(STATE_EMPTY))
+            np.testing.assert_array_equal(node_depth(block["parent_data"]), 2)
     data_indices = np.concatenate([children[first:first + 8]["data_index"] for first in first_children])
     np.testing.assert_array_equal(np.sort(data_indices), 8 + np.arange(8 * invocation_count))
     assert result.tree_info["data_count"][0] == 8 + 8 * invocation_count
@@ -167,8 +169,10 @@ def test_try_create_svo_entry_on_empty_node(device: spy.Device, load_kernel: Ker
         position[0])
     assert result.tree_info["node_count"][0] == (8 if p_is_leaf else 16)
     assert result.tree_info["leaves_count"][0] == (8 if p_is_leaf else 0)
-    children = result.leaves[:8] if p_is_leaf else result.nodes[8:16]
-    np.testing.assert_array_equal(children["parent_index"], 5)
+    if p_is_leaf:
+        np.testing.assert_array_equal(result.leaves[:8]["parent_index"], 5)
+    else:
+        np.testing.assert_array_equal(result.nodes[8:16]["parent_data"], pack_parent_data(5, 2))
 
 
 @pytest.mark.parametrize("p_version", UTILS_VERSIONS, ids=UTILS_VERSION_IDS)
@@ -238,12 +242,13 @@ def test_load_svo_node(device: spy.Device, load_kernel: KernelLoader, p_version:
     descriptions = [pack_children_data(STATE_NODE, 7), pack_children_data(STATE_LEAF, 9, 0x42),
         pack_children_data(STATE_EMPTY), pack_children_data(STATE_ALLOCATING, 3, 0x01)]
     for index, children_data in enumerate(descriptions):
-        state.nodes[8 + index] = (children_data, 100 + index, index - 1, 0)
+        state.nodes[8 + index] = (children_data, 100 + index, pack_parent_data(index - 1, index + 1), 0)
     result = run_operation(device, load_kernel, p_version, OPERATION_LOAD_NODE, state, len(descriptions),
         np.arange(8, 8 + len(descriptions)))
     np.testing.assert_array_equal(result.results[:, 0], descriptions)
     np.testing.assert_array_equal(result.results[:, 1], 100 + np.arange(len(descriptions)))
-    np.testing.assert_array_equal(result.results[:, 2].view(np.int32), np.arange(len(descriptions)) - 1)
+    np.testing.assert_array_equal(node_parent_index(result.results[:, 2]), np.arange(len(descriptions)) - 1)
+    np.testing.assert_array_equal(node_depth(result.results[:, 2]), 1 + np.arange(len(descriptions)))
 
 
 def test_publish_svo_children_data(device: spy.Device, load_kernel: KernelLoader) -> None:
@@ -336,11 +341,19 @@ def assert_built_svo(p_state: SVOState, p_voxels: list[Voxel], p_queries: list[V
     assert int(p_state.tree_info["data_count"][0]) == node_count + leaves_count
     nodes = p_state.nodes[:node_count]
     leaves = p_state.leaves[:leaves_count]
+    np.testing.assert_array_equal(node_parent_index(nodes["parent_data"][:8]), -1)
+    np.testing.assert_array_equal(node_depth(nodes["parent_data"][:8]), 1)
+    for node in nodes[8:]:
+        parent = node_parent_index(int(node["parent_data"]))
+        assert parent >= 0
+        assert node_depth(int(node["parent_data"])) == node_depth(int(nodes["parent_data"][parent])) + 1
     data_indices = np.concatenate([nodes["data_index"], leaves["data_index"]])
     np.testing.assert_array_equal(np.sort(data_indices), np.arange(node_count + leaves_count))
     # Every child links back to the node whose published block contains it.
     for children, expected_state in [(nodes[8:], STATE_NODE), (leaves, STATE_LEAF)]:
-        for child_index, parent_index in enumerate(children["parent_index"]):
+        parent_indices = node_parent_index(children["parent_data"]) if expected_state == STATE_NODE \
+            else children["parent_index"]
+        for child_index, parent_index in enumerate(parent_indices):
             parent_data = int(nodes["children_data"][parent_index])
             assert children_state(parent_data) == expected_state
             first_child = (parent_data & BLOCK_MASK) * 8 - (8 if expected_state == STATE_NODE else 0)
