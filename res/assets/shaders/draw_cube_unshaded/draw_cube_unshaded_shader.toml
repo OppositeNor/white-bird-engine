@@ -17,8 +17,6 @@ include = []
 id = "draw_cube_unshaded_shader"
 source_type = "shader"
 src = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.slang"
-dst = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.spv"
-metadata = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.json"
 
 [[resources]]
 id = "draw_cube_unshaded_pipeline"

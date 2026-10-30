@@ -17,15 +17,11 @@ include = []
 id = "deferred_gbuffer_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang"
-dst = "assets/shaders/deferred_gbuffer/deferred_gbuffer.spv"
-metadata = "assets/shaders/deferred_gbuffer/deferred_gbuffer.json"
 
 [[resources]]
 id = "deferred_gbuffer_mesh_transform_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang"
-dst = "assets/shaders/deferred_gbuffer/deferred_gbuffer_mesh_transform.spv"
-metadata = "assets/shaders/deferred_gbuffer/deferred_gbuffer_mesh_transform.json"
 macros = [
     { name = "WBE_MESH_TRANSFORM" },
 ]

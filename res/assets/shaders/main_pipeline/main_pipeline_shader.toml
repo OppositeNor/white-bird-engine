@@ -17,8 +17,6 @@ include = []
 id = "main_pipeline_shader"
 source_type = "shader"
 src = "assets/shaders/main_pipeline/main_pipeline.slang"
-dst = "assets/shaders/main_pipeline/main_pipeline.spv"
-metadata = "assets/shaders/main_pipeline/main_pipeline.json"
 
 [[resources]]
 id = "main_pipeline"

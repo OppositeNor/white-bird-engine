@@ -17,8 +17,6 @@ include = []
 id = "octree_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/octree/octree_build_static_mesh.slang"
-dst = "assets/shaders/octree/octree_build_static_mesh.spv"
-metadata = "assets/shaders/octree/octree_build_static_mesh.json"
 
 [[resources]]
 id = "octree_build_static_mesh_pipeline"
@@ -35,8 +33,6 @@ conservative_rasterization = false
 id = "octree_dynamic_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/octree/octree_build_static_mesh.slang"
-dst = "assets/shaders/octree/octree_dynamic_build_static_mesh.spv"
-metadata = "assets/shaders/octree/octree_dynamic_build_static_mesh.json"
 macros = [
     { name = "WBE_DYNAMIC_BUILD" },
     { name = "WBE_MESH_TRANSFORM" },
@@ -56,22 +52,16 @@ cull_backfaces = false
 id = "octree_debug_gather_leaves_shader"
 source_type = "shader"
 src = "assets/shaders/octree/octree_debug_gather_leaves.slang"
-dst = "assets/shaders/octree/octree_debug_gather_leaves.spv"
-metadata = "assets/shaders/octree/octree_debug_gather_leaves.json"
 
 [[resources]]
 id = "octree_debug_gather_nodes_shader"
 source_type = "shader"
 src = "assets/shaders/octree/octree_debug_gather_nodes.slang"
-dst = "assets/shaders/octree/octree_debug_gather_nodes.spv"
-metadata = "assets/shaders/octree/octree_debug_gather_nodes.json"
 
 [[resources]]
 id = "octree_debug_draw_shader"
 source_type = "shader"
 src = "assets/shaders/octree/octree_debug_draw.slang"
-dst = "assets/shaders/octree/octree_debug_draw.spv"
-metadata = "assets/shaders/octree/octree_debug_draw.json"
 
 [[resources]]
 id = "octree_debug_draw_pipeline"
@@ -86,8 +76,6 @@ cull_backfaces = false
 id = "octree_debug_node_draw_shader"
 source_type = "shader"
 src = "assets/shaders/octree/octree_debug_draw.slang"
-dst = "assets/shaders/octree/octree_debug_node_draw.spv"
-metadata = "assets/shaders/octree/octree_debug_node_draw.json"
 macros = [
     { name = "WBE_OCTREE_DEBUG_NODES" },
 ]

@@ -65,7 +65,7 @@ protected:
 TEST_F(WBEShaderMetadataLoaderTest, LoadsMetadataFromResourceRelativePath) {
     const ShaderMetadataLoader loader;
     RefRes<RUShader> shader =
-        make_test_shader(storage, "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.json");
+        make_test_shader(storage, "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json");
 
     const ShaderMetadata metadata = loader.load(shader);
 

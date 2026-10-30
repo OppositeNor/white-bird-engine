@@ -17,15 +17,11 @@ include = []
 id = "kawase_blur_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/kawase_blur/kawase_blur.slang"
-dst = "assets/shaders/kawase_blur/kawase_blur_pong_write.spv"
-metadata = "assets/shaders/kawase_blur/kawase_blur_pong_write.json"
 
 [[resources]]
 id = "kawase_blur_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/kawase_blur/kawase_blur.slang"
-dst = "assets/shaders/kawase_blur/kawase_blur_ping_write.spv"
-metadata = "assets/shaders/kawase_blur/kawase_blur_ping_write.json"
 macros = [
     { name = "WBE_KAWASE_BLUR_WRITE_PING" },
 ]

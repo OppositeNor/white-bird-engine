@@ -17,29 +17,21 @@ include = []
 id = "shadow_moments_summed_area_table_horizontal_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.slang"
-dst = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.spv"
-metadata = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.json"
 
 [[resources]]
 id = "shadow_moments_summed_area_table_vertical_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.slang"
-dst = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.spv"
-metadata = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.json"
 
 [[resources]]
 id = "direct_lighting_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/direct_lighting.slang"
-dst = "assets/shaders/deferred_composition/direct_lighting.spv"
-metadata = "assets/shaders/deferred_composition/direct_lighting.json"
 
 [[resources]]
 id = "direct_lighting_summed_area_table_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/direct_lighting.slang"
-dst = "assets/shaders/deferred_composition/direct_lighting_summed_area_table.spv"
-metadata = "assets/shaders/deferred_composition/direct_lighting_summed_area_table.json"
 macros = [
     { name = "WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS", value = "1" },
 ]
@@ -48,15 +40,11 @@ macros = [
 id = "indirect_lighting_rsm_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang"
-dst = "assets/shaders/deferred_composition/indirect_lighting_rsm.spv"
-metadata = "assets/shaders/deferred_composition/indirect_lighting_rsm.json"
 
 [[resources]]
 id = "indirect_lighting_rsm_debug_view_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang"
-dst = "assets/shaders/deferred_composition/indirect_lighting_rsm_debug_view.spv"
-metadata = "assets/shaders/deferred_composition/indirect_lighting_rsm_debug_view.json"
 macros = [
     { name = "WBE_VOXEL_DEBUG_VIEW", value = "1" },
 ]
@@ -65,15 +53,11 @@ macros = [
 id = "combine_lighting_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/combine_lighting.slang"
-dst = "assets/shaders/deferred_composition/combine_lighting.spv"
-metadata = "assets/shaders/deferred_composition/combine_lighting.json"
 
 [[resources]]
 id = "present_post_processing_shader"
 source_type = "shader"
 src = "assets/shaders/deferred_composition/present_post_processing.slang"
-dst = "assets/shaders/deferred_composition/present_post_processing.spv"
-metadata = "assets/shaders/deferred_composition/present_post_processing.json"
 
 [[resources]]
 id = "present_post_processing"

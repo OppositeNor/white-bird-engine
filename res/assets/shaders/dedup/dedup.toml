@@ -17,19 +17,13 @@ include = []
 id = "dedup_large_prepare_dispatch"
 source_type = "shader"
 src = "assets/shaders/dedup/dedup_large_prepare_dispatch.slang"
-dst = "assets/shaders/dedup/dedup_large_prepare_dispatch.spv"
-metadata = "assets/shaders/dedup/dedup_large_prepare_dispatch.json"
 
 [[resources]]
 id = "dedup_large_mark"
 source_type = "shader"
 src = "assets/shaders/dedup/dedup_large_mark.slang"
-dst = "assets/shaders/dedup/dedup_large_mark.spv"
-metadata = "assets/shaders/dedup/dedup_large_mark.json"
 
 [[resources]]
 id = "dedup_large_scatter"
 source_type = "shader"
 src = "assets/shaders/dedup/dedup_large_scatter.slang"
-dst = "assets/shaders/dedup/dedup_large_scatter.spv"
-metadata = "assets/shaders/dedup/dedup_large_scatter.json"

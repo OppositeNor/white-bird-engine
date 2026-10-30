@@ -42,48 +42,64 @@ class WBEACPCompilerShader(WBEACPCompiler):
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
         result.setdefault("type", self._get_source_resource_type(result) or "shader")
-        metadata_rel_path = result.get("metadata")
-        if not isinstance(metadata_rel_path, str) or not metadata_rel_path:
-            raise RuntimeError(
-                f"Shader resource missing metadata path in {manifest_path}: {resource}."
-            )
-
-        metadata_rel = self._normalize_resource_path(metadata_rel_path, manifest_path)
+        for derived_field in ("dst", "metadata"):
+            if derived_field in result:
+                raise RuntimeError(
+                    f"Shader resource must not declare {derived_field}; its outputs are derived from src and id in "
+                    f"{manifest_path}: {resource}."
+                )
         source_rel_path = result.get("src")
-        # Preferred schema: compile source shader and emit normalized runtime fields.
-        if isinstance(source_rel_path, str) and source_rel_path:
-            destination_rel_path = result.get("dst")
-            if not isinstance(destination_rel_path, str) or not destination_rel_path:
-                raise RuntimeError(
-                    f"Shader resource with src must also declare dst in {manifest_path}: {resource}."
-                )
-            stage = result.get("stage")
-            if stage is not None and not isinstance(stage, str):
-                raise RuntimeError(
-                    f"Shader resource stage must be a string in {manifest_path}: {resource}."
-                )
-            entry = result.get("entry")
-            if entry is not None and not isinstance(entry, str):
-                raise RuntimeError(
-                    f"Shader resource entry must be a string in {manifest_path}: {resource}."
-                )
-            macro_definitions = self._read_macro_definitions(result, manifest_path)
-            source_file_path, _ = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
-            dst_rel = self._normalize_resource_path(destination_rel_path, manifest_path)
-            self._compile_resource(
-                source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions
+        if not isinstance(source_rel_path, str) or not source_rel_path:
+            raise RuntimeError(
+                f"Shader resource must provide a src field in {manifest_path}: {resource}."
             )
-            result["path"] = dst_rel.as_posix()
-            result["metadata"] = metadata_rel.as_posix()
-            result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
-            result.pop("src", None)
-            result.pop("dst", None)
-            result.pop("macros", None)
-            return [result]
-
-        raise RuntimeError(
-            f"Shader resource must provide src/dst fields in {manifest_path}: {resource}."
+        resource_id = result.get("id")
+        if not isinstance(resource_id, str) or not resource_id:
+            raise RuntimeError(
+                f"Shader resource must provide a non-empty id in {manifest_path}: {resource}."
+            )
+        if Path(resource_id).name != resource_id:
+            raise RuntimeError(
+                f"Shader resource id must be usable as a file name in {manifest_path}: {resource}."
+            )
+        stage = result.get("stage")
+        if stage is not None and not isinstance(stage, str):
+            raise RuntimeError(
+                f"Shader resource stage must be a string in {manifest_path}: {resource}."
+            )
+        entry = result.get("entry")
+        if entry is not None and not isinstance(entry, str):
+            raise RuntimeError(
+                f"Shader resource entry must be a string in {manifest_path}: {resource}."
+            )
+        macro_definitions = self._read_macro_definitions(result, manifest_path)
+        source_file_path, source_rel = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
+        dst_rel, metadata_rel = self._get_output_files(source_rel, resource_id)
+        self._compile_resource(
+            source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions
         )
+        result["path"] = dst_rel.as_posix()
+        result["metadata"] = metadata_rel.as_posix()
+        result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
+        result.pop("src", None)
+        result.pop("macros", None)
+        return [result]
+
+    def _get_output_files(self, source_rel: Path, resource_id: str) -> tuple[Path, Path]:
+        """Get the compiled SPIR-V and reflection metadata files of a shader resource.
+
+        Both sit next to the source as <source stem>.<resource id>, so the variants of one source, which differ in id,
+        never share an output.
+
+        Args:
+            source_rel: The source file, relative to the resource directory.
+            resource_id: The shader resource's id.
+
+        Returns:
+            The SPIR-V and metadata files, relative to the output resource directory.
+        """
+        output_base = source_rel.with_name(f"{source_rel.stem}.{resource_id}")
+        return output_base.with_name(f"{output_base.name}.spv"), output_base.with_name(f"{output_base.name}.json")
 
     def _read_macro_definitions(self, resource: ManifestResource, manifest_path: Path) -> list[str]:
         raw_macros = resource.get("macros")

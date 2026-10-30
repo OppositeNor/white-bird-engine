@@ -17,8 +17,6 @@ include = []
 id = "svo_3_gather_leaves"
 source_type = "shader"
 src = "assets/shaders/svo_3/svo_gather_leaves.slang"
-dst = "assets/shaders/svo_3/svo_3_gather_leaves.spv"
-metadata = "assets/shaders/svo_3/svo_3_gather_leaves.json"
 
 [[resources]]
 id = "svo_3_gather_leaves_pipeline"
@@ -35,6 +33,4 @@ conservative_rasterization = false
 id = "svo_3_prepare_leaves_shader"
 source_type = "shader"
 src = "assets/shaders/svo_3/svo_3_prepare_leaves.slang"
-dst = "assets/shaders/svo_3/svo_3_prepare_leaves.spv"
-metadata = "assets/shaders/svo_3/svo_3_prepare_leaves.json"
 

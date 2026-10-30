@@ -17,8 +17,6 @@ include = []
 id = "svo_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_static_mesh.slang"
-dst = "assets/shaders/svo/svo_build_static_mesh.spv"
-metadata = "assets/shaders/svo/svo_build_static_mesh.json"
 
 [[resources]]
 id = "svo_build_static_mesh_pipeline"
@@ -35,22 +33,16 @@ conservative_rasterization = false
 id = "svo_reset_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_reset.slang"
-dst = "assets/shaders/svo/svo_reset.spv"
-metadata = "assets/shaders/svo/svo_reset.json"
 
 [[resources]]
 id = "svo_deferred_count_reset_pong_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_deferred_count_reset.slang"
-dst = "assets/shaders/svo/svo_deferred_count_reset_pong.spv"
-metadata = "assets/shaders/svo/svo_deferred_count_reset_pong.json"
 
 [[resources]]
 id = "svo_deferred_count_reset_ping_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_deferred_count_reset.slang"
-dst = "assets/shaders/svo/svo_deferred_count_reset_ping.spv"
-metadata = "assets/shaders/svo/svo_deferred_count_reset_ping.json"
 macros = [
     { name = "WBE_RESET_PING_COUNT" },
 ]
@@ -59,15 +51,11 @@ macros = [
 id = "svo_build_deferred_propagation_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo/svo_build_deferred_propagation_pong_write.spv"
-metadata = "assets/shaders/svo/svo_build_deferred_propagation_pong_write.json"
 
 [[resources]]
 id = "svo_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo/svo_build_deferred_propagation_ping_write.spv"
-metadata = "assets/shaders/svo/svo_build_deferred_propagation_ping_write.json"
 macros = [
     { name = "WBE_USE_PING_WRITE" },
 ]
@@ -76,8 +64,6 @@ macros = [
 id = "svo_dynamic_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_static_mesh.slang"
-dst = "assets/shaders/svo/svo_dynamic_build_static_mesh.spv"
-metadata = "assets/shaders/svo/svo_dynamic_build_static_mesh.json"
 macros = [
     { name = "WBE_DYNAMIC_BUILD" },
     { name = "WBE_MESH_TRANSFORM" },
@@ -97,8 +83,6 @@ cull_backfaces = false
 id = "svo_dynamic_build_deferred_propagation_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo/svo_dynamic_build_deferred_propagation_pong_write.spv"
-metadata = "assets/shaders/svo/svo_dynamic_build_deferred_propagation_pong_write.json"
 macros = [
     { name = "WBE_DYNAMIC_BUILD" },
 ]
@@ -107,8 +91,6 @@ macros = [
 id = "svo_dynamic_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo/svo_dynamic_build_deferred_propagation_ping_write.spv"
-metadata = "assets/shaders/svo/svo_dynamic_build_deferred_propagation_ping_write.json"
 macros = [
     { name = "WBE_USE_PING_WRITE" },
     { name = "WBE_DYNAMIC_BUILD" },
@@ -118,29 +100,21 @@ macros = [
 id = "svo_pre_deferred_debug_capture_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_pre_deferred_debug_capture.slang"
-dst = "assets/shaders/svo/svo_pre_deferred_debug_capture.spv"
-metadata = "assets/shaders/svo/svo_pre_deferred_debug_capture.json"
 
 [[resources]]
 id = "svo_debug_draw_setup_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw_setup.slang"
-dst = "assets/shaders/svo/svo_debug_draw_setup.spv"
-metadata = "assets/shaders/svo/svo_debug_draw_setup.json"
 
 [[resources]]
 id = "svo_debug_draw_find_nodes_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw_find_nodes.slang"
-dst = "assets/shaders/svo/svo_debug_draw_find_nodes.spv"
-metadata = "assets/shaders/svo/svo_debug_draw_find_nodes.json"
 
 [[resources]]
 id = "svo_debug_draw_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw.slang"
-dst = "assets/shaders/svo/svo_debug_draw.spv"
-metadata = "assets/shaders/svo/svo_debug_draw.json"
 
 [[resources]]
 id = "svo_debug_draw_pipeline"
@@ -156,8 +130,6 @@ cull_backfaces = false
 id = "svo_debug_draw_solid_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw.slang"
-dst = "assets/shaders/svo/svo_debug_draw_solid.spv"
-metadata = "assets/shaders/svo/svo_debug_draw_solid.json"
 macros = [
     { name = "WBE_SVO_DEBUG_DRAW_SOLID" },
 ]
@@ -176,8 +148,6 @@ cull_backfaces = false
 id = "svo_debug_draw_occupancy_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw.slang"
-dst = "assets/shaders/svo/svo_debug_draw_occupancy.spv"
-metadata = "assets/shaders/svo/svo_debug_draw_occupancy.json"
 macros = [
     { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY" },
 ]
@@ -196,8 +166,6 @@ cull_backfaces = false
 id = "svo_debug_draw_solid_occupancy_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_debug_draw.slang"
-dst = "assets/shaders/svo/svo_debug_draw_solid_occupancy.spv"
-metadata = "assets/shaders/svo/svo_debug_draw_solid_occupancy.json"
 macros = [
     { name = "WBE_SVO_DEBUG_DRAW_SOLID" },
     { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY" },
@@ -216,8 +184,6 @@ cull_backfaces = false
 id = "svo_pre_deferred_debug_draw_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_pre_deferred_debug_draw.slang"
-dst = "assets/shaders/svo/svo_pre_deferred_debug_draw.spv"
-metadata = "assets/shaders/svo/svo_pre_deferred_debug_draw.json"
 
 [[resources]]
 id = "svo_pre_deferred_debug_draw_pipeline"
@@ -232,5 +198,3 @@ cull_backfaces = false
 id = "svo_dynamic_clear_shader"
 source_type = "shader"
 src = "assets/shaders/svo/svo_clear_dynamic.slang"
-dst = "assets/shaders/svo/svo_dynamic_clear.spv"
-metadata = "assets/shaders/svo/svo_dynamic_clear.json"

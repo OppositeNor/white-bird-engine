@@ -17,33 +17,23 @@ include = []
 id = "large_prefix_scan_prepare_dispatch"
 source_type = "shader"
 src = "assets/shaders/prefix_sum/large_prefix_scan_prepare_dispatch.slang"
-dst = "assets/shaders/prefix_sum/large_prefix_scan_prepare_dispatch.spv"
-metadata = "assets/shaders/prefix_sum/large_prefix_scan_prepare_dispatch.json"
 
 [[resources]]
 id = "large_prefix_scan_blocks"
 source_type = "shader"
 src = "assets/shaders/prefix_sum/large_prefix_scan_blocks.slang"
-dst = "assets/shaders/prefix_sum/large_prefix_scan_blocks.spv"
-metadata = "assets/shaders/prefix_sum/large_prefix_scan_blocks.json"
 
 [[resources]]
 id = "large_prefix_scan_sections"
 source_type = "shader"
 src = "assets/shaders/prefix_sum/large_prefix_scan_sections.slang"
-dst = "assets/shaders/prefix_sum/large_prefix_scan_sections.spv"
-metadata = "assets/shaders/prefix_sum/large_prefix_scan_sections.json"
 
 [[resources]]
 id = "large_prefix_scan_totals"
 source_type = "shader"
 src = "assets/shaders/prefix_sum/large_prefix_scan_totals.slang"
-dst = "assets/shaders/prefix_sum/large_prefix_scan_totals.spv"
-metadata = "assets/shaders/prefix_sum/large_prefix_scan_totals.json"
 
 [[resources]]
 id = "large_prefix_scan_add"
 source_type = "shader"
 src = "assets/shaders/prefix_sum/large_prefix_scan_add.slang"
-dst = "assets/shaders/prefix_sum/large_prefix_scan_add.spv"
-metadata = "assets/shaders/prefix_sum/large_prefix_scan_add.json"

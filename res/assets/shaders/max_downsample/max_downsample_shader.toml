@@ -17,5 +17,3 @@ include = []
 id = "max_downsample_shader"
 source_type = "shader"
 src = "assets/shaders/max_downsample/max_downsample.slang"
-dst = "assets/shaders/max_downsample/max_downsample.spv"
-metadata = "assets/shaders/max_downsample/max_downsample.json"

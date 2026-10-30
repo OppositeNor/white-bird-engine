@@ -28,8 +28,6 @@ include = ["assets/materials/default_material.toml"]
 id = "example_shader"
 source_type = "shader"
 src = "assets/shaders/example.slang"
-dst = "assets/shaders/example.spv"
-metadata = "assets/shaders/example.json"
 ```
 
 A manifest with no resources still declares `resources = []`. TOML has no null; omit optional fields instead.
@@ -78,8 +76,10 @@ The engine loads `audio`, `binary`, `font`, `image`, `texture`, `text`, `script`
 ## Shader Resources
 
 - `src`: source shader file in `res`.
-- `dst`: compiled shader output path; emitted as the runtime `path`.
-- `metadata`: reflection metadata output path.
+- The compiled SPIR-V and the reflection metadata are written next to the source as `<source stem>.<id>.spv` and
+  `<source stem>.<id>.json`, and emitted as the runtime `path` and `metadata`; `assets/shaders/example.slang` with id
+  `example_shader` compiles to `assets/shaders/example.example_shader.spv`. Since ids are unique, variants of one source
+  never share an output. Declaring `dst` or `metadata` is a build error.
 - `macros`: optional compile-time Slang macro definitions. Each entry requires a non-empty `name` and may provide a string
   `value`.
 - `stage` and `entry`: optional Slang stage and entry-point name; declare both or neither. Without them, every
@@ -93,8 +93,6 @@ Shader macros are compile-only and are not emitted into the runtime manifest. Th
 id = "example_shader_variant"
 source_type = "shader"
 src = "assets/shaders/example.slang"
-dst = "assets/shaders/example_variant.spv"
-metadata = "assets/shaders/example_variant.json"
 macros = [
     { name = "WBE_MACRO_1" },
     { name = "WBE_MACRO_2", value = "1" },

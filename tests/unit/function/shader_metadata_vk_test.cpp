@@ -190,7 +190,7 @@ TEST(WBEShaderMetadataVKTest, PreservesWrappedTypeAttributesAndNames) {
 
 TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/reflection_attributes") / "reflection_attributes.json"));
+    parser.parse((Path("test_env/res/assets/shaders/reflection_attributes") / "reflection_attributes.reflection_attributes_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -263,7 +263,7 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
 
 TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/descriptor_heap_reflection") / "descriptor_heap_reflection.json"));
+    parser.parse((Path("test_env/res/assets/shaders/descriptor_heap_reflection") / "descriptor_heap_reflection.descriptor_heap_reflection_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -343,7 +343,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.forward_cook_torrance_pbr_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -376,7 +376,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
 
 TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.forward_cook_torrance_pbr_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -416,7 +416,7 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) 
 
 TEST(WBEShaderMetadataVKTest, LoadsMeshNodeContractFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.json"));
+    parser.parse((Path("test_env/res/assets/shaders/forward_cook_torrance_pbr") / "forward_cook_torrance_pbr.forward_cook_torrance_pbr_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -455,7 +455,7 @@ TEST(WBEShaderMetadataVKTest, DeferredMaskedPipelineResourceUsesMaskedFragmentEn
 
 TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocations) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/vertex_input_attributes") / "vertex_input_attributes.json"));
+    parser.parse((Path("test_env/res/assets/shaders/vertex_input_attributes") / "vertex_input_attributes.vertex_input_attributes_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 

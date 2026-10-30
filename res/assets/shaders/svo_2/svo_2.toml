@@ -17,8 +17,6 @@ include = []
 id = "svo_2_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_static_mesh.slang"
-dst = "assets/shaders/svo_2/svo_2_build_static_mesh.spv"
-metadata = "assets/shaders/svo_2/svo_2_build_static_mesh.json"
 depth_test = false
 cull_backfaces = false
 
@@ -37,22 +35,16 @@ conservative_rasterization = false
 id = "svo_2_reset_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_reset.slang"
-dst = "assets/shaders/svo_2/svo_2_reset.spv"
-metadata = "assets/shaders/svo_2/svo_2_reset.json"
 
 [[resources]]
 id = "svo_2_build_deferred_propagation_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo_2/svo_2_build_deferred_propagation_pong_write.spv"
-metadata = "assets/shaders/svo_2/svo_2_build_deferred_propagation_pong_write.json"
 
 [[resources]]
 id = "svo_2_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo_2/svo_2_build_deferred_propagation_ping_write.spv"
-metadata = "assets/shaders/svo_2/svo_2_build_deferred_propagation_ping_write.json"
 macros = [
     { name = "WBE_USE_PING_WRITE" },
 ]
@@ -61,15 +53,11 @@ macros = [
 id = "svo_2_update_states_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_update_states.slang"
-dst = "assets/shaders/svo_2/svo_update_states.spv"
-metadata = "assets/shaders/svo_2/svo_update_states.json"
 
 [[resources]]
 id = "svo_2_dynamic_build_static_mesh"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_static_mesh.slang"
-dst = "assets/shaders/svo_2/svo_2_dynamic_build_static_mesh.spv"
-metadata = "assets/shaders/svo_2/svo_2_dynamic_build_static_mesh.json"
 depth_test = false
 cull_backfaces = false
 macros = [
@@ -92,8 +80,6 @@ conservative_rasterization = false
 id = "svo_2_dynamic_build_deferred_propagation_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo_2/svo_2_dynamic_build_deferred_propagation_pong_write.spv"
-metadata = "assets/shaders/svo_2/svo_2_dynamic_build_deferred_propagation_pong_write.json"
 macros = [
     { name = "WBE_DYNAMIC_BUILD" },
 ]
@@ -102,8 +88,6 @@ macros = [
 id = "svo_2_dynamic_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
-dst = "assets/shaders/svo_2/svo_2_dynamic_build_deferred_propagation_ping_write.spv"
-metadata = "assets/shaders/svo_2/svo_2_dynamic_build_deferred_propagation_ping_write.json"
 macros = [
     { name = "WBE_USE_PING_WRITE" },
     { name = "WBE_DYNAMIC_BUILD" },
@@ -113,12 +97,8 @@ macros = [
 id = "svo_2_dynamic_update_states_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_dynamic_update_states.slang"
-dst = "assets/shaders/svo_2/svo_2_dynamic_update_states.spv"
-metadata = "assets/shaders/svo_2/svo_2_dynamic_update_states.json"
 
 [[resources]]
 id = "svo_2_dynamic_clear_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_clear_dynamic.slang"
-dst = "assets/shaders/svo_2/svo_2_dynamic_clear.spv"
-metadata = "assets/shaders/svo_2/svo_2_dynamic_clear.json"

@@ -17,8 +17,6 @@ include = []
 id = "shadowmap_spot_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/shadowmap_spot.slang"
-dst = "assets/shaders/shadowmap_spot/shadowmap_spot.spv"
-metadata = "assets/shaders/shadowmap_spot/shadowmap_spot.json"
 
 [[resources]]
 id = "shadowmap_spot"
@@ -33,8 +31,6 @@ color_blend = false
 id = "shadowmap_spot_masked_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/shadowmap_spot_masked.slang"
-dst = "assets/shaders/shadowmap_spot/shadowmap_spot_masked.spv"
-metadata = "assets/shaders/shadowmap_spot/shadowmap_spot_masked.json"
 
 [[resources]]
 id = "shadowmap_spot_masked"
@@ -50,15 +46,11 @@ color_blend = false
 id = "rsm_spot_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/rsm_spot.slang"
-dst = "assets/shaders/shadowmap_spot/rsm_spot.spv"
-metadata = "assets/shaders/shadowmap_spot/rsm_spot.json"
 
 [[resources]]
 id = "rsm_spot_mesh_transform_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/rsm_spot.slang"
-dst = "assets/shaders/shadowmap_spot/rsm_spot_mesh_transform.spv"
-metadata = "assets/shaders/shadowmap_spot/rsm_spot_mesh_transform.json"
 macros = [
     { name = "WBE_MESH_TRANSFORM" },
 ]
@@ -87,8 +79,6 @@ color_blend = false
 id = "rsm_spot_masked_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/rsm_spot_masked.slang"
-dst = "assets/shaders/shadowmap_spot/rsm_spot_masked.spv"
-metadata = "assets/shaders/shadowmap_spot/rsm_spot_masked.json"
 
 [[resources]]
 id = "rsm_spot_masked"

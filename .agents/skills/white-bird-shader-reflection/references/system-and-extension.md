@@ -2,8 +2,9 @@
 
 ## Pipeline map
 
-1. A shader entry in an ACP manifest supplies `src`, `dst`, `metadata`, and optionally `stage` and `entry` (both or
-   neither) and `macros` (`{ name, value? }`), which select shader variants.
+1. A shader entry in an ACP manifest supplies `src`, and optionally `stage` and `entry` (both or neither) and `macros`
+   (`{ name, value? }`), which select shader variants. Its SPIR-V and metadata outputs are derived next to the source as
+   `<source stem>.<id>.spv` and `.json`; declaring `dst` or `metadata` is an error.
 2. `build_script/resource/acp/acp_compiler_shader.py` runs `slangc` from `PATH` with profile
    `spirv_1_6+spvDescriptorHeapEXT+vk_mem_model` (shaders under `sort/` or `pixel_sort/` temporarily omit `vk_mem_model`),
    include paths `res/assets/shaders` and `res/assets/shaders/utils`, `-DWBE_SHADER_DEBUG` when the target enables shader

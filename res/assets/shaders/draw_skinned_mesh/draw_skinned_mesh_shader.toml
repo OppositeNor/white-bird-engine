@@ -17,8 +17,6 @@ include = []
 id = "draw_skinned_mesh_shader"
 source_type = "shader"
 src = "assets/shaders/draw_skinned_mesh/draw_skinned_mesh.slang"
-dst = "assets/shaders/draw_skinned_mesh/draw_skinned_mesh.spv"
-metadata = "assets/shaders/draw_skinned_mesh/draw_skinned_mesh.json"
 
 [[resources]]
 id = "draw_skinned_mesh_pipeline"

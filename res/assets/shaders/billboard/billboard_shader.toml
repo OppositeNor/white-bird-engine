@@ -17,8 +17,6 @@ include = []
 id = "billboard_shader"
 source_type = "shader"
 src = "assets/shaders/billboard/billboard.slang"
-dst = "assets/shaders/billboard/billboard.spv"
-metadata = "assets/shaders/billboard/billboard.json"
 
 [[resources]]
 id = "billboard_face_camera_pipeline"
