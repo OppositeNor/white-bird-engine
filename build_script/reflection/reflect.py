@@ -58,6 +58,9 @@ class WBEReflector:
             "root_dir": build_setup.root_dir,
             "include_dir": build_setup.include_dir,
             "source_dir": build_setup.source_dir,
+            # The project root and its script module directory; the engine's own when building without a project.
+            "project_dir": build_setup.project_dir,
+            "project_script_dir": build_setup.project_script_modules_dir,
         })
         generator = WBECodeGenerator(
             gen_info | {"metadata" : self.metadata},

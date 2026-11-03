@@ -78,8 +78,9 @@ def list_files(dir: str | Path, ignore_dirs: list[str] | None = None) -> list[st
     result: list[str] = []
     for path in root.rglob('*'):
         # Skip directories.
-        # If any of the parent directories are ignored, ignore.
-        if any(ignored in path.parts for ignored in ignore_set):
+        # If any of the parent directories below the listed directory are ignored, ignore. Directories above it are not
+        # matched, so that the listing does not depend on where the directory is checked out.
+        if any(ignored in path.relative_to(root).parts for ignored in ignore_set):
             continue
         if not path.is_dir():
             result.append(str(path))

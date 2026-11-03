@@ -234,6 +234,19 @@ python build.py -t release-gcc  # release with GCC
 
 Build outputs land in `build/<target>/`. Test binaries: `build/<target>/bin/`, e.g. `build/debug/bin/wbe_unit_test`.
 
+### Projects
+
+- A game in another repository is a project: a directory with a `wbe_project.toml` (`[project]` with `name`,
+  `include_dirs`, `source_dirs`, `resource_dir`, `generate_files`; see `build_script/project/project.py`) and a `CMakeLists.txt`.
+  Build it with `python <engine>/build.py -t <target> --project <dir>`; output lands in `<dir>/build/<target>/`, and the
+  engine's tests are not built.
+- Reflection is closed-world: the project's headers are reflected together with the engine's, and the generated registries
+  are compiled into the engine library. The project's `CMakeLists.txt` therefore adds sources defining what its reflected
+  headers declare with `wbe_add_project_sources()`, and its executables with `wbe_add_executable()`. Reflected project
+  types must be in the `WhiteBirdEngine` namespace, since generated code names them unqualified.
+- Project resources are compiled into the same runtime `res` directory after the engine's. Project shaders may include
+  engine shaders, and project scripts may `require` engine modules; project `res/config` files override the engine's.
+
 ## Build/Test Logs
 
 Build and test outputs can be large. Always check the end of the previous output first using `tail`.
@@ -266,9 +279,10 @@ Per-directory CMakeLists.txt use `file(GLOB *.cpp)`; new test files are picked u
 - `dependencies/` — vendored third-party (do not modify).
 - `todos/` — per-layer todo lists.
 
-Generated files:
-- src/per_target/<target>/generated/
-- include/per_target/<target>/generated/
+Generated files (under the build directory, `build/<target>/`, or `<project>/build/<target>/` for a project build):
+- `generated/src/`
+- `generated/include/generated/` (included as `"generated/<name>.gen.hh"`)
+- `teal/`
 
 Never edit generated files.
 
@@ -435,7 +449,8 @@ Document contracts, ownership, threading, and errors; do not restate signatures.
   `WBE_SERIALIZATION_ALIASES(name, ...)`, each a name of letters, digits, and underscores.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.
 - Templates for codegen live in `templates/*.jinja`.
-- Each `[[generate]]` entry of a `generate.toml` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, and `source_dir`.
+- Each `[[generate]]` entry of a `generate.toml` supports `${name}` replacement in `output_name`, `template`, `out_dir`, and nested string values under `data`. Per-entry `params` override built-ins; built-ins include `build_target`, `build_dir`, `binary_dir`, `root_dir`, `include_dir`, `source_dir`, `project_dir`,
+  and `project_script_dir` (the last two name the engine's own root and script directory when building without a project).
 
 ## Python Scripts
 

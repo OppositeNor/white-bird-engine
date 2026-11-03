@@ -18,6 +18,7 @@ from pathlib import Path
 import sys
 import shutil
 import build_config
+from build_script.project.project import load_project
 from build_script.resource.acp.acp import WBEACP
 from build_script.build_dependency.build_dependency import WBEBuildDependencies
 from build_script.build_dependency.build_dependency_acp import WBEBuildDependencyACP
@@ -31,21 +32,35 @@ arg_parser = ArgumentParser(
     description="Build script to build White Bird Engine."
 )
 arg_parser.add_argument("-t", "--target", help="Build target.", choices=list(build_config.target_info.keys()), default=build_config.default_target)
+arg_parser.add_argument("-p", "--project", help="Directory of a game project (containing wbe_project.toml) to build against the engine.",
+                        default=None)
 args = arg_parser.parse_args()
 
-build_target = build_config.target_info[args.target]
+# Copy the target so that project builds can adjust it without changing build_config.
+build_target = dict(build_config.target_info[args.target])
 
 # Sources dirs
 root_dir = build_config.root_dir
 include_dir = os.path.join(root_dir, build_config.include_dir)
 source_dir = os.path.join(root_dir, build_config.source_dir)
-per_target_include_dir = os.path.join(include_dir, "per_target", args.target)
 test_dir = os.path.join(root_dir, build_config.test_dir)
 test_env_dir = os.path.join(root_dir, build_config.test_env_dir)
-build_root_dir = os.path.join(root_dir, "build")
-dependency_build_dir = os.path.join(build_root_dir, build_config.dependency_build_dir)
+# Engine build dependencies (build/dependencies) are shared by the engine and every project built against it.
+dependency_build_dir = os.path.join(root_dir, "build", build_config.dependency_build_dir)
+
+# Project. Without --project, the engine repository is the project.
+project = load_project(args.project) if args.project is not None else None
+if project is not None:
+    # Projects build only the engine library and their own targets; the engine's tests are built from the engine repository.
+    build_target["generate-tests"] = False
+project_dir = project.root_dir if project is not None else root_dir
+
+build_root_dir = os.path.join(project_dir, "build")
 build_dir = os.path.join(build_root_dir, build_target["export-directory"])
 binary_dir = os.path.join(build_dir, "bin")
+# Reflection output, regenerated each build: headers are included as "generated/<name>.gen.hh".
+per_target_include_dir = os.path.join(build_dir, "generated", "include")
+generated_source_dir = os.path.join(build_dir, "generated", "src")
 dependencies_dir = os.path.join(root_dir, "dependencies")
 template_dir = os.path.join(root_dir, "templates")
 teal_dir = os.path.join(dependencies_dir, "tl")
@@ -67,6 +82,12 @@ script_modules_dir = os.path.join(assets_dir, "scripts", "teal")
 script_types_dir = os.path.join(build_dir, "teal")
 assets_output_dir = os.path.join(resource_output_dir, "assets")
 metadata_path = os.path.join(test_env_dir, "metadata.json")
+# Project resources are compiled into the same runtime resource directory, after the engine's, and may use the engine's
+# shader includes and script modules.
+project_resource_dir = project.resource_dir if project is not None else None
+project_shaders_incl_dir = os.path.join(project_resource_dir, "assets", "shaders") if project_resource_dir is not None else None
+project_script_modules_dir = (os.path.join(project_resource_dir, "assets", "scripts", "teal")
+                              if project_resource_dir is not None else script_modules_dir)
 cache_dir = os.path.join(build_dir, "build_cache")
 metadata_cache_dir = os.path.join(cache_dir, "source_metadata")
 model_compiler_cache_dir = os.path.join(cache_dir, "model_compiler")
@@ -79,6 +100,9 @@ os.makedirs(model_compiler_cache_dir, exist_ok=True)
 os.makedirs(resource_dir, exist_ok=True)
 os.makedirs(licenses_output_dir, exist_ok=True)
 shutil.copytree(config_dir, config_output_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns("test"))
+if project_resource_dir is not None and os.path.isdir(os.path.join(project_resource_dir, "config")):
+    # Project configuration files override the engine's files of the same name.
+    shutil.copytree(os.path.join(project_resource_dir, "config"), config_output_dir, dirs_exist_ok=True)
 if build_target["generate-tests"]:
     shutil.copytree(config_dir, test_env_config_output_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns("test"))
     shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
@@ -88,6 +112,8 @@ acp_dependencies_compiler = WBEBuildDependencyACP(
     Path(root_dir), Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info)
 acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
 test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
+project_acp = (WBEACP(Path(project_resource_dir), Path(resource_output_dir), enabled_test=False)
+               if project_resource_dir is not None else None)
 acp_compilers_configured = False
 
 # Setup build dependencies
@@ -117,19 +143,19 @@ def setup_acp_compilers() -> None:
     texture_compiler = TextureCompilerPyKTX(
         acp_dependencies_compiler.get_ktx_library_dir(), acp_dependencies_compiler.get_python_package_dir())
     sdf_compiler = SDFCompilerMeshToSDF(texture_compiler)
-    acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
-    acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
-    acp.add_compiler(WBEACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
-    acp.add_compiler(WBEACPCompilerMesh(sdf_compiler))
-    acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    acp.add_compiler(WBEACPCompilerScript(
-        Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)], Path(script_types_dir)))
+    def add_compilers(p_acp: WBEACP, p_shader_include_dirs: list[str], p_script_module_dirs: list[str]) -> None:
+        p_acp.add_compiler(WBEACPCompilerShader([Path(include_dir) for include_dir in p_shader_include_dirs]))
+        p_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
+        p_acp.add_compiler(WBEACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
+        p_acp.add_compiler(WBEACPCompilerMesh(sdf_compiler))
+        p_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+        p_acp.add_compiler(WBEACPCompilerScript(
+            Path(teal_dir), [Path(module_dir) for module_dir in p_script_module_dirs], Path(script_types_dir)))
 
-    test_env_acp.add_compiler(WBEACPCompilerShader(Path(shaders_incl_dir)))
-    test_env_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
-    test_env_acp.add_compiler(WBEACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
-    test_env_acp.add_compiler(WBEACPCompilerMesh(sdf_compiler))
-    test_env_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-    test_env_acp.add_compiler(WBEACPCompilerScript(
-        Path(teal_dir), [Path(script_modules_dir), Path(script_types_dir)], Path(script_types_dir)))
+    add_compilers(acp, [shaders_incl_dir], [script_modules_dir, script_types_dir])
+    add_compilers(test_env_acp, [shaders_incl_dir], [script_modules_dir, script_types_dir])
+    if project_acp is not None and project_shaders_incl_dir is not None:
+        # Project modules and shader includes are searched before the engine's.
+        add_compilers(project_acp, [project_shaders_incl_dir, shaders_incl_dir],
+                      [project_script_modules_dir, script_modules_dir, script_types_dir])
     acp_compilers_configured = True

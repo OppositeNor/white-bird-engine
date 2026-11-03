@@ -18,7 +18,7 @@
 -- for itself, so it is not configured here. The language server requires paths relative to the repository root.
 return {
     include_dir = {
-{% for directory in include_dirs %}
+{% for directory in include_dirs | unique %}
         "{{ directory | to_relative }}",
 {% endfor %}
     },

@@ -25,13 +25,14 @@ import build_setup
 class WBEACPCompilerShader(WBEACPCompiler):
     """The shader compiler.
     """
-    def __init__(self, shader_include_dir: Path) -> None:
+    def __init__(self, shader_include_dirs: list[Path]) -> None:
         """Constructor.
 
         Args:
-            shader_include_dir: The include directory for the shaders.
+            shader_include_dirs: The include directories for the shaders, in search order. Each directory's `utils`
+                subdirectory is searched right after it.
         """
-        self._shader_include_dir = shader_include_dir
+        self._shader_include_dirs = shader_include_dirs
 
     @override
     def get_supported_resource_types(self) -> list[str]:
@@ -201,9 +202,9 @@ class WBEACPCompilerShader(WBEACPCompiler):
             cmd.append("-DWBE_SHADER_DEBUG")
         for macro_definition in macro_definitions:
             cmd.append(f"-D{macro_definition}")
+        for shader_include_dir in self._shader_include_dirs:
+            cmd.extend(["-I", str(shader_include_dir), "-I", str(shader_include_dir / "utils")])
         cmd.extend([
-            "-I", str(self._shader_include_dir),
-            "-I", str(self._shader_include_dir / "utils"),
             "-o", str(output_file),
             "-reflection-json", str(shader_metadata_file),
             str(shader_file),

@@ -46,4 +46,5 @@ target_include_directories(wbe_executable_test_utilities PUBLIC
 target_link_libraries(wbe_executable_test_utilities PUBLIC
     WBE_ENGINE
     wbe_executable_test_imgui
+    wbe_test_dependency_includes
 )

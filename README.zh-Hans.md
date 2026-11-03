@@ -75,6 +75,34 @@ python ./build.py -t release-gcc    # 使用 GCC 的 Release 构建
 python ./build.py -t deploy         # 使用 GCC 的部署构建
 ```
 
+### 在其他仓库中使用引擎
+
+游戏位于独立的仓库中，作为项目基于引擎构建。将引擎加入游戏仓库（例如作为 git 子模块），然后在游戏根目录放置
+`wbe_project.toml` 与 `CMakeLists.txt`：
+
+```toml
+# wbe_project.toml
+[project]
+name = "my_game"
+include_dirs = ["include"]   # 公共头文件；参与反射并加入头文件搜索路径
+source_dirs = ["src"]        # 此处的私有头文件同样参与反射
+resource_dir = "res"         # 目录结构与引擎的 res 目录相同（res_chunks/、assets/、config/）
+```
+
+```cmake
+# CMakeLists.txt，由引擎的 CMakeLists.txt 引入
+wbe_add_project_sources(src/my_component.cpp)   # 反射类型的实现，编译进引擎库
+wbe_add_executable(my_game src/main.cpp)
+```
+
+```sh
+python ./engine/build.py -t debug --project .
+./build/debug/bin/my_game
+```
+
+游戏的头文件与引擎的头文件一起参与反射，因此其组件、渲染任务与可序列化类型会像引擎自身的一样被注册。其资源编译进同一个
+`res` 目录；其着色器可以包含引擎的着色器，其脚本可以 `require` 引擎的模块。
+
 ### 静态模型分类
 
 `res/assets/models/models.json` 中的静态模型通过 `source_files` 将多个模型合并到共享几何缓冲区。

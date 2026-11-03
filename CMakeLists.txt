@@ -227,6 +227,9 @@ add_definitions(-DTOML_EXCEPTIONS=0)
 if (NOT DEFINED WBE_DEPENDENCY_INCLUDE_DIRS OR NOT DEFINED WBE_TEST_DEPENDENCY_INCLUDE_DIRS)
     message(FATAL_ERROR "WBE_DEPENDENCY_INCLUDE_DIRS and WBE_TEST_DEPENDENCY_INCLUDE_DIRS are not set; configure through build.py.")
 endif()
+if (NOT DEFINED WBE_GENERATED_SOURCE_DIR)
+    message(FATAL_ERROR "WBE_GENERATED_SOURCE_DIR is not set; configure through build.py.")
+endif()
 set(include_dirs
     ${Vulkan_INCLUDE_DIR}
     ${WBE_INCLUDE_DIR}
@@ -236,14 +239,6 @@ set(include_dirs
 
 if (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android include directories. SDL2/include comes from build_config.dependency_include_dirs on every platform.
-endif()
-
-include_directories(
-    ${include_dirs}
-)
-# Test-only third-party headers (googletest, benchmark, imgui) are system headers, so -Werror does not apply to them.
-if (WBE_MAKE_TEST)
-    include_directories(SYSTEM ${WBE_TEST_DEPENDENCY_INCLUDE_DIRS})
 endif()
 
 set(libs ${libs}
@@ -271,6 +266,11 @@ add_library(WBE_ENGINE ${WBE_LIB_BUILD_TYPE}
 )
 add_library(WBE::Engine ALIAS WBE_ENGINE)
 
+# The engine's include directories are usage requirements: every target linking the engine gets them.
+target_include_directories(WBE_ENGINE PUBLIC
+    ${include_dirs}
+)
+
 target_link_libraries(WBE_ENGINE PUBLIC
     ${libs}
 )
@@ -279,8 +279,40 @@ set(libs ${libs}
     WBE_ENGINE
 )
 
-# Create executable
-if (WBE_BUILD_PLATFORM STREQUAL "Android")
+# Project API. A project (see build_script/project/project.py) is a separate repository built against the engine with
+# `build.py --project <dir>`; its CMakeLists.txt is added below and uses these functions.
+
+# Adds sources to the engine library. Sources defining what the project's reflected headers declare (component, render
+# task, and serializable implementations) must be added this way: the generated registries compiled into the engine library
+# refer to them.
+function(wbe_add_project_sources)
+    target_sources(WBE_ENGINE PRIVATE ${ARGN})
+endfunction()
+
+# Adds an executable linked against the engine and written to the binary directory next to the runtime resources.
+function(wbe_add_executable p_name)
+    add_executable(${p_name} ${ARGN})
+    target_link_libraries(${p_name} PRIVATE WBE_ENGINE)
+    if (WBE_USE_RPATH_LIBRARY)
+        set_target_properties(${p_name} PROPERTIES
+            BUILD_WITH_INSTALL_RPATH TRUE
+            INSTALL_RPATH "$ORIGIN/libs"
+            SKIP_BUILD_RPATH FALSE
+        )
+    endif()
+endfunction()
+
+if (DEFINED WBE_PROJECT_DIR)
+    message("Building project ${WBE_PROJECT_NAME} at ${WBE_PROJECT_DIR}.")
+    if (WBE_PROJECT_INCLUDE_DIRS)
+        target_include_directories(WBE_ENGINE PUBLIC ${WBE_PROJECT_INCLUDE_DIRS})
+    endif()
+    add_subdirectory(${WBE_PROJECT_DIR} ${CMAKE_BINARY_DIR}/project)
+endif()
+
+# Create executable. Projects provide their own executables.
+if (DEFINED WBE_PROJECT_DIR)
+elseif (WBE_BUILD_PLATFORM STREQUAL "Android")
     # TODO: Android build
 else()
     add_executable(${PROJECT_NAME}

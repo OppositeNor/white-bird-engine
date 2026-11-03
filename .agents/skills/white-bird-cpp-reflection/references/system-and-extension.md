@@ -11,7 +11,8 @@
    attributes, and aliases, labels, type spellings, and annotation strings (`metadata_types.py`).
 4. Metadata is ordered by include-dependency depth. `WBEReflector` checks label redefinition, enum qualified-name
    redefinition, and label hash collisions, then renders every `generate.toml` entry.
-5. Generated headers go to `include/per_target/<target>/generated/`, sources to `src/per_target/<target>/generated/`.
+5. Generated headers go to `build/<target>/generated/include/generated/`, sources to `build/<target>/generated/src/`
+   (under `<project>/build/<target>/` for a project build, which also reflects the project's headers).
 
 `include/core/reflection/reflection_defs.hh` holds only the `WBE_META` / `WBE_LABEL` macros and optional helpers. Never write
 runtime logic that inspects `WBE_META`.

@@ -15,6 +15,8 @@
 #ifndef WBE_FILE_SVOGI_UTILS_SLANG
 #define WBE_FILE_SVOGI_UTILS_SLANG
 
+#define WBE_SVO_CONE_TRACE_MAX_STEPS 128
+
 #include "svo/svo.slang"
 
 struct SVOGIData {
@@ -110,6 +112,22 @@ void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block
         }
     }
     p_svo_occupancy.write_data_at_index(parent.data_index, occupancy_sum / 8.0f, p_frame_slot);
+}
+
+struct Cone {
+    float3 start_pos;
+    float3 dir;
+    float cone_angle_tanhalf;
+    float max_distance;
+};
+
+float cone_tracing<T>(SVOReadBuffer<float> p_occupancy, StructuredBuffer<T> p_data, Cone p_cone, float p_beta = 0.5) {
+    float3 svo_position = p_occupancy.svo.get_svo_position(p_cone.start_pos);
+    float t = 0.0;
+    T accumulated = T();
+    for (uint i = 0; i < WBE_SVO_CONE_TRACE_MAX_STEPS; ++i) {
+        // TODO
+    }
 }
 
 #endif

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [[generate]]
-out_dir = "${source_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/src"
 output_name = "serializable_impl.gen.cpp"
 template = "serializable_impl.cpp.jinja"
 
@@ -22,7 +22,7 @@ metadata = ".metadata"
 serializables = ".serializables"
 
 [[generate]]
-out_dir = "${source_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/src"
 output_name = "render_task_registry.gen.cpp"
 template = "render_task_registry.cpp.jinja"
 
@@ -60,9 +60,9 @@ render_tasks = ".render_tasks"
 reflect_script = ".reflect_script"
 
 [[generate]]
-out_dir = "${root_dir}"
+out_dir = "${project_dir}"
 output_name = "tlconfig.lua"
 template = "tlconfig.lua.jinja"
 
 [generate.data]
-include_dirs = ["${root_dir}/res/assets/scripts/teal", "${build_dir}/teal"]
+include_dirs = ["${project_script_dir}", "${root_dir}/res/assets/scripts/teal", "${build_dir}/teal"]

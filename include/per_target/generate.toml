@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "serializables_sd.gen.hh"
 template = "serializables_sd.hh.jinja"
 
@@ -23,7 +23,7 @@ static_serializables = ".static_serializables"
 strict_deserializations = ".strict_deserializations"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "enum_reflection.gen.hh"
 template = "enum_reflection.hh.jinja"
 
@@ -32,7 +32,7 @@ metadata = ".metadata"
 reflected_enums = ".reflected_enums"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "serializables_access.gen.hh"
 template = "serializables_access.hh.jinja"
 
@@ -41,7 +41,7 @@ metadata = ".metadata"
 static_serializables = ".static_serializables"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "serializable_factory.gen.hh"
 template = "serializable_factory.hh.jinja"
 
@@ -50,7 +50,7 @@ metadata = ".metadata"
 serializables = ".serializables"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "label_manager.gen.hh"
 template = "label_manager.hh.jinja"
 
@@ -60,7 +60,7 @@ static_labels = ".static_labels"
 dynamic_labels = ".dynamic_labels"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "type_uuid.gen.hh"
 template = "type_uuid.hh.jinja"
 
@@ -68,7 +68,7 @@ template = "type_uuid.hh.jinja"
 metadata = ".metadata"
 
 [[generate]]
-out_dir = "${include_dir}/per_target/${build_target}/generated"
+out_dir = "${build_dir}/generated/include/generated"
 output_name = "cla_configuration.gen.hh"
 template = "cla_configuration.hh.jinja"
 

@@ -57,6 +57,7 @@ metaparser_clang_args: list[str] = [
     f"-I{build_setup.include_dir}",
     f"-I{build_setup.per_target_include_dir}",
     *[f"-I{include_dir}" for include_dir in metaparser_test_include_dirs],
+    *[f"-I{include_dir}" for include_dir in (build_setup.project.include_dirs if build_setup.project is not None else [])],
     *[f"-isystem{include_dir}" for include_dir in metaparser_dependency_include_dirs],
     "-DWBE_REFLECTION_PARSER"
 ]
@@ -76,6 +77,11 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     result.append(f"-DWBE_BUILD_TARGET={build_setup.args.target}")
     result.append(f"-DWBE_INCLUDE_DIR={build_setup.include_dir}")
     result.append(f"-DWBE_PER_TARGET_INCLUDE_DIR={build_setup.per_target_include_dir}")
+    result.append(f"-DWBE_GENERATED_SOURCE_DIR={build_setup.generated_source_dir}")
+    if build_setup.project is not None:
+        result.append(f"-DWBE_PROJECT_DIR={build_setup.project.root_dir}")
+        result.append(f"-DWBE_PROJECT_NAME={build_setup.project.name}")
+        result.append(f"-DWBE_PROJECT_INCLUDE_DIRS={';'.join(build_setup.project.include_dirs)}")
     if build_info.get("cpp-compiler") is not None:
         result.append(f"-DCMAKE_CXX_COMPILER={build_info["cpp-compiler"]}")
     if build_info.get("c-compiler") is not None:
@@ -94,7 +100,8 @@ def _get_cmake_command_from_info(build_info: dict[str, Any]) -> list[str]:
     return result
 
 def _configure_cmake(build_info: dict[str, Any]) -> None:
-    result = subprocess.run(_get_cmake_command_from_info(build_info), check=False)
+    # Configure from the engine's source tree regardless of the working directory; projects are added from it.
+    result = subprocess.run(_get_cmake_command_from_info(build_info) + ["-S", build_setup.root_dir], check=False)
     if result.returncode != 0:
         raise RuntimeError("Failed to setup cmake build.")
 
@@ -140,9 +147,20 @@ def _gather_license() -> None:
                     target_path = os.path.join(output_dir, target_name)
                     shutil.copy2(nf, target_path)
 
+def _gather_gen_info_files() -> list[str]:
+    """Return the generate.toml files of the build: the engine's, without its tests' when tests are not built, and the
+    project's."""
+    gen_info_files = build_config.gen_info_files
+    if not build_setup.build_target["generate-tests"]:
+        test_dir = Path(build_setup.test_dir)
+        gen_info_files = [gen_info_file for gen_info_file in gen_info_files if not Path(gen_info_file).is_relative_to(test_dir)]
+    if build_setup.project is not None:
+        gen_info_files = gen_info_files + build_setup.project.gen_info_files
+    return gen_info_files
+
 def _gather_gen_infos() -> list[WBEGenFileInfo]:
     gen_infos: list[WBEGenFileInfo] = []
-    for gen_info_file in build_config.gen_info_files:
+    for gen_info_file in _gather_gen_info_files():
         with open(gen_info_file, "rb") as f:
             data = tomllib.load(f)
         file_infos = [WBEGenFileInfo(**info) for info in data["generate"]]
@@ -164,6 +182,9 @@ if __name__ == "__main__":
             headers = build_config.project_headers
         else:
             headers = build_config.project_headers_exclude_tests
+        if build_setup.project is not None:
+            print(f"WBEBuilder: Building project {build_setup.project.name} at {build_setup.project.root_dir}.")
+            headers = headers + build_setup.project.get_headers()
         print("WBEBuilder: Gathering generate.toml...")
         gen_infos = _gather_gen_infos()
 
@@ -177,6 +198,9 @@ if __name__ == "__main__":
         if build_setup.build_target["generate-tests"]:
             print("WBEBuilder: Running asset conditioning pipeline with test resources...")
             build_setup.test_env_acp.process_resources()
+        if build_setup.project_acp is not None:
+            print("WBEBuilder: Running asset conditioning pipeline with project resources...")
+            build_setup.project_acp.process_resources()
         print("WBEBuilder: Gathering licenses...")
         _gather_license()
 
@@ -187,8 +211,8 @@ if __name__ == "__main__":
 
         # Keep compile database available in both conventional locations used by tooling.
         compile_commands_path = os.path.join(build_setup.build_dir, "compile_commands.json")
-        shutil.copy(compile_commands_path, "build")
-        shutil.copy(compile_commands_path, "compile_commands.json")
+        shutil.copy(compile_commands_path, build_setup.build_root_dir)
+        shutil.copy(compile_commands_path, os.path.join(build_setup.project_dir, "compile_commands.json"))
         print("WBEBuilder: Finished!")
 
     except Exception as e:

@@ -11,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# Test-only third-party headers (googletest, benchmark, imgui) are system headers, so -Werror does not apply to them.
+add_library(wbe_test_dependency_includes INTERFACE)
+target_include_directories(wbe_test_dependency_includes SYSTEM INTERFACE
+    ${WBE_TEST_DEPENDENCY_INCLUDE_DIRS}
+)
+
 add_subdirectory(executable)
 
 file(GLOB_RECURSE WBE_UNIT_TEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/unit/*.cpp)
@@ -22,6 +28,7 @@ add_executable(wbe_unit_test
 target_link_libraries(wbe_unit_test PRIVATE
     WBE_ENGINE
     gtest_main
+    wbe_test_dependency_includes
 )
 
 # Shared unit test support headers, such as test_global.hh.
@@ -39,6 +46,7 @@ add_executable(wbe_benchmark_test
 target_link_libraries(wbe_benchmark_test PRIVATE
     WBE_ENGINE
     benchmark_main
+    wbe_test_dependency_includes
 )
 
 if (WBE_USE_RPATH_LIBRARY)

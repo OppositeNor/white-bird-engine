@@ -76,6 +76,35 @@ python ./build.py -t release-gcc    # Release target with GCC compiler
 python ./build.py -t deploy         # Deploy target with GCC compiler
 ```
 
+### Using the engine from another repository
+
+A game lives in its own repository and builds against the engine as a project. Add the engine (for example as a git
+submodule), then put a `wbe_project.toml` and a `CMakeLists.txt` at the game's root:
+
+```toml
+# wbe_project.toml
+[project]
+name = "my_game"
+include_dirs = ["include"]   # public headers; reflected and added to the include path
+source_dirs = ["src"]        # private headers here are reflected too
+resource_dir = "res"         # laid out like the engine's res directory (res_chunks/, assets/, config/)
+```
+
+```cmake
+# CMakeLists.txt, added by the engine's CMakeLists.txt
+wbe_add_project_sources(src/my_component.cpp)   # code behind reflected types, compiled into the engine library
+wbe_add_executable(my_game src/main.cpp)
+```
+
+```sh
+python ./engine/build.py -t debug --project .
+./build/debug/bin/my_game
+```
+
+The game's headers are reflected together with the engine's, so its components, render tasks, and serializables are
+registered like the engine's own. Its resources are compiled into the same `res` directory; its shaders can include the
+engine's shaders, and its scripts can `require` the engine's modules.
+
 ### Static model categories
 
 Static models in `res/assets/models/models.json` use `source_files` to combine models into shared geometry.

@@ -225,3 +225,4 @@ project_headers_exclude_tests = [path for path in project_sources_exclude_tests 
 gen_info_files = list_files(root_dir, ignore_dirs=[".cache", ".git",
                                                    ".github", "__pycache__", "build"])
 gen_info_files = [gen_info for gen_info in gen_info_files if os.path.basename(gen_info) == "generate.toml"]
+
