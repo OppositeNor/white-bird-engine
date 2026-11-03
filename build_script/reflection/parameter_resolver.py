@@ -16,11 +16,11 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any
 
-from build_script.reflection.gen_file_info import WBEGenFileInfo
+from build_script.reflection.gen_file_info import GenFileInfo
 
 
-class WBEParameterSource(ABC):
-    """Abstract base for parameter value providers used by WBEParameterResolver.
+class ParameterSource(ABC):
+    """Abstract base for parameter value providers used by ParameterResolver.
 
     Implementations supply string values for named parameters referenced as
     ${name} inside generate.toml fields.
@@ -37,7 +37,7 @@ class WBEParameterSource(ABC):
         """
 
 
-class WBEDictParameterSource(WBEParameterSource):
+class DictParameterSource(ParameterSource):
     """Parameter source backed by an explicit dict[str, str].
 
     Args:
@@ -51,7 +51,7 @@ class WBEDictParameterSource(WBEParameterSource):
         return self._params.get(name)
 
 
-class WBEEnvParameterSource(WBEParameterSource):
+class EnvParameterSource(ParameterSource):
     """Parameter source backed by environment variables.
 
     Args:
@@ -69,7 +69,7 @@ class WBEEnvParameterSource(WBEParameterSource):
 _PATTERN: re.Pattern[str] = re.compile(r"\$\{([^}]+)\}")
 
 
-class WBEParameterResolver:
+class ParameterResolver:
     """Resolves ${name} patterns in strings using an ordered list of sources.
 
     Sources are queried in declaration order; the first non-None result wins.
@@ -77,24 +77,24 @@ class WBEParameterResolver:
     generate.toml data tree can be resolved in one call.
 
     Args:
-        sources: Ordered list of WBEParameterSource instances. First match wins.
+        sources: Ordered list of ParameterSource instances. First match wins.
         strict: If True (default), raise ValueError for any ${name} that no
                 source can resolve. If False, unresolved patterns are left as-is.
     """
 
-    def __init__(self, sources: list[WBEParameterSource], strict: bool = True) -> None:
+    def __init__(self, sources: list[ParameterSource], strict: bool = True) -> None:
         self._sources = sources
         self._strict = strict
 
-    def with_prepended(self, source: WBEParameterSource) -> "WBEParameterResolver":
+    def with_prepended(self, source: ParameterSource) -> "ParameterResolver":
         """Return a new resolver with source injected at highest priority.
 
         Args:
             source: The source to prepend.
         Returns:
-            A new WBEParameterResolver whose source list is [source] + self._sources.
+            A new ParameterResolver whose source list is [source] + self._sources.
         """
-        return WBEParameterResolver([source] + self._sources, self._strict)
+        return ParameterResolver([source] + self._sources, self._strict)
 
     def resolve_str(self, text: str) -> str:
         """Replace all ${name} occurrences in text.
@@ -142,8 +142,8 @@ class WBEParameterResolver:
             return {k: self.resolve_value(v) for k, v in value.items()}
         return value
 
-    def resolve_gen_file_info(self, generate_info: WBEGenFileInfo) -> WBEGenFileInfo:
-        """Resolve all ${name} patterns in a WBEGenFileInfo entry.
+    def resolve_gen_file_info(self, generate_info: GenFileInfo) -> GenFileInfo:
+        """Resolve all ${name} patterns in a GenFileInfo entry.
 
         The entry's own params dict is prepended as the highest-priority source
         before resolution, so per-entry declarations override everything else.
@@ -152,13 +152,13 @@ class WBEParameterResolver:
         Args:
             generate_info: The generation entry to resolve.
         Returns:
-            A new WBEGenFileInfo with output_name, template, out_dir, and all
+            A new GenFileInfo with output_name, template, out_dir, and all
             data string values resolved.
         """
         resolver = self
         if generate_info.params:
-            resolver = self.with_prepended(WBEDictParameterSource(generate_info.params))
-        return WBEGenFileInfo(
+            resolver = self.with_prepended(DictParameterSource(generate_info.params))
+        return GenFileInfo(
             output_name=resolver.resolve_str(generate_info.output_name),
             template=resolver.resolve_str(generate_info.template),
             out_dir=resolver.resolve_str(generate_info.out_dir),

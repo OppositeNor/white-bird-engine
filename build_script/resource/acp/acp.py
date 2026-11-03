@@ -17,12 +17,12 @@ import os
 import tomllib
 from pathlib import Path
 from typing import Any
-from build_script.resource.acp.acp_compiler import ManifestData, ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestData, ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, ACPCompiler
 
 SOURCE_MANIFEST_SUFFIX = ".toml"
 RUNTIME_MANIFEST_SUFFIX = ".json"
 
-class WBEACP:
+class ACP:
     """The asset conditioning pipeline.
 
     This pipeline consumes TOML manifest files from the source resource
@@ -35,13 +35,13 @@ class WBEACP:
         self._res_dir = res_dir
         self._res_output_dir = res_output_dir
         self._enabled_test = enabled_test
-        self._compiler_map: dict[str, WBEACPCompiler] = {}
+        self._compiler_map: dict[str, ACPCompiler] = {}
         self._root_manifest_paths: list[str] = []
         self._manifest_sources: dict[str, dict[str, Any]] = {}
         self._processed_manifests: dict[str, dict[str, Any]] = {}
         self._seen_resource_ids: set[str] = set()
 
-    def add_compiler(self, compiler: WBEACPCompiler) -> None:
+    def add_compiler(self, compiler: ACPCompiler) -> None:
         """Register a compiler for one or more resource types.
 
         Args:

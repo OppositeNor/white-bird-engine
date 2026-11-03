@@ -20,10 +20,10 @@ import subprocess
 import sys
 from typing import Any
 
-from build_script.build_dependency.build_dependency import WBEBuildDependency
+from build_script.build_dependency.build_dependency import BuildDependency
 
 
-class WBEBuildDependencyACP(WBEBuildDependency):
+class BuildDependencyACP(BuildDependency):
     """Configure and build native libraries required by the ACP."""
 
     def __init__(self,

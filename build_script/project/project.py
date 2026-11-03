@@ -23,7 +23,7 @@ PROJECT_MANIFEST_NAME = "wbe_project.toml"
 
 
 @dataclass
-class WBEProject:
+class Project:
     """A game project built against the engine, described by its wbe_project.toml.
 
     Attributes:
@@ -51,7 +51,7 @@ class WBEProject:
         return headers
 
 
-def load_project(p_project_dir: str) -> WBEProject:
+def load_project(p_project_dir: str) -> Project:
     """Load the project whose wbe_project.toml is in p_project_dir.
 
     Raises:
@@ -118,5 +118,5 @@ def load_project(p_project_dir: str) -> WBEProject:
             raise RuntimeError(f"Project manifest {manifest_path}: `generate_files` entry {relative_file} does not exist.")
         gen_files.append(gen_file)
 
-    return WBEProject(name=name, root_dir=project_root, include_dirs=resolve_dirs("include_dirs"),
+    return Project(name=name, root_dir=project_root, include_dirs=resolve_dirs("include_dirs"),
                       source_dirs=resolve_dirs("source_dirs"), resource_dir=resource_dir, gen_info_files=gen_files)

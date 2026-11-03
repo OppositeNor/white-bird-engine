@@ -14,7 +14,7 @@
 from typing import Any
 from pydantic import BaseModel, Field
 
-class WBEFieldMetadata(BaseModel):
+class FieldMetadata(BaseModel):
     """Field metadata.
 
     Attributes: 
@@ -28,7 +28,7 @@ class WBEFieldMetadata(BaseModel):
     name : str = ""
     type : str = ""
 
-class WBEMethodMetadata(BaseModel):
+class MethodMetadata(BaseModel):
     """Method metadata.
 
     Attributes: 
@@ -52,7 +52,7 @@ class WBEMethodMetadata(BaseModel):
     is_static : bool = False
     is_const : bool = False
 
-class WBEClassMetadata(BaseModel):
+class ClassMetadata(BaseModel):
     """Class metadata.
 
     Attributes: 
@@ -69,10 +69,10 @@ class WBEClassMetadata(BaseModel):
     attribute : list[str] = Field(default_factory=list[str])
     attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
-    fields : list[WBEFieldMetadata] = Field(default_factory=list[WBEFieldMetadata])
-    methods : list[WBEMethodMetadata] = Field(default_factory=list[WBEMethodMetadata])
+    fields : list[FieldMetadata] = Field(default_factory=list[FieldMetadata])
+    methods : list[MethodMetadata] = Field(default_factory=list[MethodMetadata])
 
-class WBEEnumValueMetadata(BaseModel):
+class EnumValueMetadata(BaseModel):
     """Enumerator metadata.
 
     Attributes:
@@ -88,7 +88,7 @@ class WBEEnumValueMetadata(BaseModel):
     attribute_parameters : dict[str, list[str]] = Field(default_factory=dict)
     aliases : list[str] = Field(default_factory=list[str])
 
-class WBEEnumMetadata(BaseModel):
+class EnumMetadata(BaseModel):
     """Enum metadata.
 
     Attributes:
@@ -110,9 +110,9 @@ class WBEEnumMetadata(BaseModel):
     aliases : list[str] = Field(default_factory=list[str])
     underlying_type : str = ""
     is_scoped : bool = False
-    values : list[WBEEnumValueMetadata] = Field(default_factory=list[WBEEnumValueMetadata])
+    values : list[EnumValueMetadata] = Field(default_factory=list[EnumValueMetadata])
 
-class WBELabelMetadata(BaseModel):
+class LabelMetadata(BaseModel):
     """Label metadata.
 
     Attributes: 
@@ -125,7 +125,7 @@ class WBELabelMetadata(BaseModel):
     aliases : list[str] = Field(default_factory=list[str])
     name : str = ""
 
-class WBEFileMetadata(BaseModel):
+class FileMetadata(BaseModel):
     """Metadata in a single C++ file.
 
     Attributes: 
@@ -142,11 +142,11 @@ class WBEFileMetadata(BaseModel):
     hashcode : str = ""
     parser_signature : str = ""
     deps : list[str] = Field(default_factory=list)
-    labels : list[WBELabelMetadata] = Field(default_factory=list)
-    classes : list[WBEClassMetadata] = Field(default_factory=list)
-    enums : list[WBEEnumMetadata] = Field(default_factory=list)
+    labels : list[LabelMetadata] = Field(default_factory=list)
+    classes : list[ClassMetadata] = Field(default_factory=list)
+    enums : list[EnumMetadata] = Field(default_factory=list)
 
-class WBEMetadata(BaseModel):
+class Metadata(BaseModel):
     """Metadata.
 
     Attributes:
@@ -154,9 +154,9 @@ class WBEMetadata(BaseModel):
         classes: The registrated classes.
         enums: The registrated enums.
     """
-    labels : list[WBELabelMetadata] = Field(default_factory=list[WBELabelMetadata])
-    classes : list[WBEClassMetadata] = Field(default_factory=list[WBEClassMetadata])
-    enums : list[WBEEnumMetadata] = Field(default_factory=list[WBEEnumMetadata])
+    labels : list[LabelMetadata] = Field(default_factory=list[LabelMetadata])
+    classes : list[ClassMetadata] = Field(default_factory=list[ClassMetadata])
+    enums : list[EnumMetadata] = Field(default_factory=list[EnumMetadata])
 
     def sort(self) -> None:
         """Sor the fields. This may gurantee the order it generates will always be the same,

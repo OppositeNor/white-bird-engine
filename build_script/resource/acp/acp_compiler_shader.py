@@ -18,11 +18,11 @@ from pathlib import Path
 import subprocess
 import shutil
 from typing import Any, override
-from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_TYPE_KEY, ACPCompiler
 import build_setup
 
 
-class WBEACPCompilerShader(WBEACPCompiler):
+class ACPCompilerShader(ACPCompiler):
     """The shader compiler.
     """
     def __init__(self, shader_include_dirs: list[Path]) -> None:

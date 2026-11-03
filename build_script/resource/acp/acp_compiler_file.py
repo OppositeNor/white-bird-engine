@@ -16,10 +16,10 @@ import os
 from pathlib import Path
 import shutil
 from typing import override
-from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, ACPCompiler
 
 
-class WBEACPCompilerFile(WBEACPCompiler):
+class ACPCompilerFile(ACPCompiler):
     """ACP compiler that copies one file-backed resource into the output tree."""
 
     def __init__(self, supported_resource_types: list[str]) -> None:

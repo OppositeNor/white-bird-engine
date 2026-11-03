@@ -16,12 +16,12 @@ from pathlib import Path
 import re
 import struct
 from typing import Any, override
-from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, ACPCompiler
 
 from wbe_utils_model_compiler import MeshSDFBuilder, SDFCompiler, SDFConfig
 
 
-class WBEACPCompilerMesh(WBEACPCompiler):
+class ACPCompilerMesh(ACPCompiler):
     """Compile hand-authored mesh source geometry into a runtime mesh and its binary sections.
 
     Source submeshes have no instance data, so they are emitted as opaque submeshes drawn with one identity instance. A mesh
@@ -65,13 +65,13 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         if resource_type == "mesh":
             return self._compile_mesh(resource, manifest_path, res_output_dir)
         raise RuntimeError(
-            f"WBEACPCompilerMesh does not support resource type '{resource_type}' in {manifest_path}."
+            f"ACPCompilerMesh does not support resource type '{resource_type}' in {manifest_path}."
         )
 
     def _compile_mesh(self, resource: ManifestResource, manifest_path: Path, res_output_dir: Path) -> list[ManifestResource]:
         if "vertices_data" in resource or "indices_data" in resource:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: mesh resources must declare geometry through submeshes in {manifest_path}."
+                f"ACPCompilerMesh: mesh resources must declare geometry through submeshes in {manifest_path}."
             )
 
         sdf_config = SDFConfig.parse(resource)
@@ -81,11 +81,11 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         submeshes = result.pop("submeshes", None)
         if submeshes is None:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: mesh resources must declare submeshes in {manifest_path}."
+                f"ACPCompilerMesh: mesh resources must declare submeshes in {manifest_path}."
             )
         if not isinstance(submeshes, list):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: mesh submeshes must be an array in {manifest_path}."
+                f"ACPCompilerMesh: mesh submeshes must be an array in {manifest_path}."
             )
 
         resource_id = resource.get("id")
@@ -94,7 +94,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         for submesh_index, submesh in enumerate(submeshes):
             if not isinstance(submesh, dict):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: mesh submeshes must be objects in {manifest_path}."
+                    f"ACPCompilerMesh: mesh submeshes must be objects in {manifest_path}."
                 )
             result_submesh = dict(submesh)
             if geometry_output_dir is not None and "geometry_output_dir" not in result_submesh:
@@ -105,7 +105,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
                 compiled_submesh_entries = self._compile_submesh(result_submesh, manifest_path, res_output_dir)
                 if len(compiled_submesh_entries) != 2:
                     raise RuntimeError(
-                        f"WBEACPCompilerMesh: nested source submesh must compile to one submesh and one binary in {manifest_path}."
+                        f"ACPCompilerMesh: nested source submesh must compile to one submesh and one binary in {manifest_path}."
                     )
                 result_submeshes.append(self._to_mesh_submesh(compiled_submesh_entries[0]))
                 sibling_resources.append(compiled_submesh_entries[1])
@@ -135,14 +135,14 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         for legacy_field in self._LEGACY_VERTEX_FIELDS:
             if legacy_field in resource:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: submesh field '{legacy_field}' is no longer supported; declare vertex views in vertex_bindings in {manifest_path}."
+                    f"ACPCompilerMesh: submesh field '{legacy_field}' is no longer supported; declare vertex views in vertex_bindings in {manifest_path}."
                 )
         has_inline_vertices = "vertices_data" in resource
         has_inline_indices = "indices_data" in resource
         has_runtime_geometry = "vertex_bindings" in resource or "indices" in resource
         if has_runtime_geometry and (has_inline_vertices or has_inline_indices):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: submesh cannot mix inline geometry and runtime views in {manifest_path}."
+                f"ACPCompilerMesh: submesh cannot mix inline geometry and runtime views in {manifest_path}."
             )
         if has_runtime_geometry:
             self._validate_runtime_submesh(resource, manifest_path)
@@ -151,18 +151,18 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             return [result]
         if has_inline_vertices != has_inline_indices:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: inline submesh requires both vertices_data and indices_data in {manifest_path}."
+                f"ACPCompilerMesh: inline submesh requires both vertices_data and indices_data in {manifest_path}."
             )
         if not has_inline_vertices:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: submesh requires vertex_bindings/indices views or vertices_data/indices_data in {manifest_path}."
+                f"ACPCompilerMesh: submesh requires vertex_bindings/indices views or vertices_data/indices_data in {manifest_path}."
             )
 
         vertices = resource["vertices_data"]
         indices = resource["indices_data"]
         if not isinstance(vertices, list) or not isinstance(indices, list):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: vertices_data and indices_data must be arrays in {manifest_path}."
+                f"ACPCompilerMesh: vertices_data and indices_data must be arrays in {manifest_path}."
             )
 
         output_rel_path = self._geometry_output_path(resource, manifest_path)
@@ -197,12 +197,12 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         raw_output_dir = resource.get("geometry_output_dir", manifest_path.parent.as_posix())
         if not isinstance(raw_output_dir, str):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: geometry_output_dir must be a string in {manifest_path}."
+                f"ACPCompilerMesh: geometry_output_dir must be a string in {manifest_path}."
             )
         output_dir = Path(raw_output_dir)
         if output_dir.is_absolute():
             raise RuntimeError(
-                f"WBEACPCompilerMesh: geometry_output_dir must be resource-root-relative in {manifest_path}: {raw_output_dir}."
+                f"ACPCompilerMesh: geometry_output_dir must be resource-root-relative in {manifest_path}: {raw_output_dir}."
             )
         output_dir = Path(output_dir.as_posix())
         output_name = resource.get("_geometry_output_name", resource.get("id", manifest_path.stem))
@@ -235,7 +235,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         for vertex in vertices:
             if not isinstance(vertex, dict):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertices_data entries must be objects in {manifest_path}."
+                    f"ACPCompilerMesh: vertices_data entries must be objects in {manifest_path}."
                 )
             for slot in vertex_slots:
                 components = 2 if slot == "uv" else 3
@@ -251,7 +251,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
     def _compute_aabb(self, vertices: list[Any], manifest_path: Path) -> dict[str, Any]:
         if not vertices:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: cannot compute bounds for a submesh without vertices in {manifest_path}."
+                f"ACPCompilerMesh: cannot compute bounds for a submesh without vertices in {manifest_path}."
             )
         positions = [self._read_vertex_vector(vertex, "position", 3, manifest_path, True) for vertex in vertices]
         minimum = [min(position[axis] for position in positions) for axis in range(3)]
@@ -266,16 +266,16 @@ class WBEACPCompilerMesh(WBEACPCompiler):
     def _append_indices(self, payload: bytearray, indices: list[Any], vertex_count: int, manifest_path: Path) -> None:
         if len(indices) % 3 != 0:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: indices_data size {len(indices)} is not a multiple of 3 in {manifest_path}."
+                f"ACPCompilerMesh: indices_data size {len(indices)} is not a multiple of 3 in {manifest_path}."
             )
         for index in indices:
             if not isinstance(index, int) or isinstance(index, bool):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: indices_data entries must be integers in {manifest_path}."
+                    f"ACPCompilerMesh: indices_data entries must be integers in {manifest_path}."
                 )
             if index < 0 or index >= vertex_count:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: index {index} is out of range for {vertex_count} vertices in {manifest_path}."
+                    f"ACPCompilerMesh: index {index} is out of range for {vertex_count} vertices in {manifest_path}."
                 )
             payload.extend(struct.pack("<I", index))
 
@@ -288,12 +288,12 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         if raw_value is None:
             if is_required:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex is missing required '{slot}' in {manifest_path}."
+                    f"ACPCompilerMesh: vertex is missing required '{slot}' in {manifest_path}."
                 )
             return tuple(0.0 for _ in range(component_count))
         if not isinstance(raw_value, dict):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: vertex '{slot}' must be an object in {manifest_path}."
+                f"ACPCompilerMesh: vertex '{slot}' must be an object in {manifest_path}."
             )
         component_names = ("u", "v") if slot == "uv" else ("x", "y", "z")
         fallback_component_names = ("x", "y") if slot == "uv" else component_names
@@ -302,7 +302,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
             component = raw_value.get(component_name, raw_value.get(fallback_component_name))
             if not isinstance(component, int | float) or isinstance(component, bool):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex '{slot}.{component_name}' must be numeric in {manifest_path}."
+                    f"ACPCompilerMesh: vertex '{slot}.{component_name}' must be numeric in {manifest_path}."
                 )
             values.append(float(component))
         return tuple(values)
@@ -311,29 +311,29 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         vertex_bindings = resource.get("vertex_bindings")
         if not isinstance(vertex_bindings, list):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: runtime submesh vertex_bindings must be an array in {manifest_path}."
+                f"ACPCompilerMesh: runtime submesh vertex_bindings must be an array in {manifest_path}."
             )
         if not vertex_bindings:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: runtime submesh vertex_bindings must not be empty in {manifest_path}."
+                f"ACPCompilerMesh: runtime submesh vertex_bindings must not be empty in {manifest_path}."
             )
         indices = resource.get("indices")
         if not isinstance(indices, dict):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: runtime submesh requires an indices object in {manifest_path}."
+                f"ACPCompilerMesh: runtime submesh requires an indices object in {manifest_path}."
             )
         seen_roles: set[str] = set()
         vertex_count: int | None = None
         for vertex_binding in vertex_bindings:
             if not isinstance(vertex_binding, dict):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: runtime submesh vertex_bindings entries must be objects in {manifest_path}."
+                    f"ACPCompilerMesh: runtime submesh vertex_bindings entries must be objects in {manifest_path}."
                 )
             self._validate_runtime_vertex_view(vertex_binding, seen_roles, manifest_path)
             binding_vertex_count = self._runtime_vertex_count(vertex_binding, manifest_path)
             if vertex_count is not None and binding_vertex_count != vertex_count:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: runtime submesh vertex_bindings must all hold the same vertex count in {manifest_path}."
+                    f"ACPCompilerMesh: runtime submesh vertex_bindings must all hold the same vertex count in {manifest_path}."
                 )
             vertex_count = binding_vertex_count
         self._validate_runtime_index_view(indices, manifest_path)
@@ -343,7 +343,7 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         stride = vertex_binding["stride"]
         if size % stride != 0:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: vertex binding size must be a multiple of its stride in {manifest_path}."
+                f"ACPCompilerMesh: vertex binding size must be a multiple of its stride in {manifest_path}."
             )
         return size // stride
 
@@ -352,42 +352,42 @@ class WBEACPCompilerMesh(WBEACPCompiler):
         stride = vertices.get("stride")
         if not isinstance(stride, int) or isinstance(stride, bool) or stride <= 0:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: vertex stride must be a positive integer in {manifest_path}."
+                f"ACPCompilerMesh: vertex stride must be a positive integer in {manifest_path}."
             )
         attributes = vertices.get("attributes")
         if not isinstance(attributes, list) or not attributes:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: vertices attributes must be a non-empty array in {manifest_path}."
+                f"ACPCompilerMesh: vertices attributes must be a non-empty array in {manifest_path}."
             )
         for attribute in attributes:
             if not isinstance(attribute, dict):
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex attributes must be objects in {manifest_path}."
+                    f"ACPCompilerMesh: vertex attributes must be objects in {manifest_path}."
                 )
             role = attribute.get("role")
             if not isinstance(role, str) or not role:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex attribute role must be a non-empty string in {manifest_path}."
+                    f"ACPCompilerMesh: vertex attribute role must be a non-empty string in {manifest_path}."
                 )
             if role in seen_roles:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: duplicate vertex attribute role '{role}' across the submesh vertex_bindings in {manifest_path}."
+                    f"ACPCompilerMesh: duplicate vertex attribute role '{role}' across the submesh vertex_bindings in {manifest_path}."
                 )
             seen_roles.add(role)
             attribute_type = attribute.get("type")
             if attribute_type not in self._RUNTIME_VERTEX_TYPES:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex attribute '{role}' has invalid type in {manifest_path}."
+                    f"ACPCompilerMesh: vertex attribute '{role}' has invalid type in {manifest_path}."
                 )
             joint_binding_type = self._JOINT_BINDING_TYPES.get(role)
             if joint_binding_type is not None and attribute_type != joint_binding_type:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex attribute '{role}' must have type {joint_binding_type} in {manifest_path}."
+                    f"ACPCompilerMesh: vertex attribute '{role}' must have type {joint_binding_type} in {manifest_path}."
                 )
             offset = attribute.get("offset")
             if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: vertex attribute '{role}' offset must be a non-negative integer in {manifest_path}."
+                    f"ACPCompilerMesh: vertex attribute '{role}' offset must be a non-negative integer in {manifest_path}."
                 )
 
     def _validate_runtime_index_view(self, indices: ManifestResource, manifest_path: Path) -> None:
@@ -396,16 +396,16 @@ class WBEACPCompilerMesh(WBEACPCompiler):
     def _validate_binary_view(self, binary_view: Any, manifest_path: Path, context: str) -> None:
         if not isinstance(binary_view, dict):
             raise RuntimeError(
-                f"WBEACPCompilerMesh: {context} binary view must be an object in {manifest_path}."
+                f"ACPCompilerMesh: {context} binary view must be an object in {manifest_path}."
             )
         binary_id = binary_view.get("binary_id")
         if not isinstance(binary_id, str) or not binary_id:
             raise RuntimeError(
-                f"WBEACPCompilerMesh: {context} binary_id must be a non-empty string in {manifest_path}."
+                f"ACPCompilerMesh: {context} binary_id must be a non-empty string in {manifest_path}."
             )
         for key in ("start", "size"):
             value = binary_view.get(key)
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 raise RuntimeError(
-                    f"WBEACPCompilerMesh: {context} binary {key} must be a non-negative integer in {manifest_path}."
+                    f"ACPCompilerMesh: {context} binary {key} must be a non-negative integer in {manifest_path}."
                 )

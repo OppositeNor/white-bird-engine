@@ -15,7 +15,7 @@
 interfaces and constructors in the shared `render_graph` module."""
 import re
 from typing import Any, Callable
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEMetadata
+from build_script.reflection.metadata_types import ClassMetadata, FieldMetadata, Metadata
 
 
 def _strip(p_type: str) -> str:
@@ -144,7 +144,7 @@ def _template_argument(p_type: str) -> tuple[str, str]:
 class _RenderTaskDescriber:
     """Describes render-task constructors and the authoring interfaces of the params whose fields hold resource ids."""
 
-    def __init__(self, p_metadata: WBEMetadata, p_reflect_script: list[str]) -> None:
+    def __init__(self, p_metadata: Metadata, p_reflect_script: list[str]) -> None:
         script = set(p_reflect_script)
         self._classes = {cpp_class.name: cpp_class for cpp_class in p_metadata.classes}
         self._scope: dict[str, Any] = {
@@ -156,7 +156,7 @@ class _RenderTaskDescriber:
         self._visiting: set[str] = set()
         self.interfaces: dict[str, dict[str, Any]] = {}
 
-    def constructor(self, p_task: WBEClassMetadata, p_method: str) -> dict[str, Any]:
+    def constructor(self, p_task: ClassMetadata, p_method: str) -> dict[str, Any]:
         """Describe the constructor of a render task."""
         creates = [method for method in p_task.methods if method.method_name == "create" and method.is_static]
         if len(creates) != 1 or len(creates[0].type) != 3:
@@ -173,16 +173,16 @@ class _RenderTaskDescriber:
             "fields": fields,
         }
 
-    def _fields(self, p_class: WBEClassMetadata) -> list[WBEFieldMetadata]:
+    def _fields(self, p_class: ClassMetadata) -> list[FieldMetadata]:
         """The reflected fields of a class, the inherited ones first."""
-        fields: list[WBEFieldMetadata] = []
+        fields: list[FieldMetadata] = []
         for parent in p_class.extended_parents:
             parent_class = self._classes.get(_strip(str(parent)))
             if parent_class is not None:
                 fields.extend(self._fields(parent_class))
         return fields + p_class.fields
 
-    def _resource_scope(self, p_field: WBEFieldMetadata) -> tuple[str, str] | None:
+    def _resource_scope(self, p_field: FieldMetadata) -> tuple[str, str] | None:
         """The scope and optional render-object type of a resource field, or None for an ordinary field."""
         if _RECIPE_RESOURCE not in p_field.attribute:
             return None
@@ -254,7 +254,7 @@ class _RenderTaskDescriber:
         return teal_name(p_class)
 
 
-def teal_render_tasks(p_metadata: WBEMetadata, p_render_tasks: list[str], p_reflect_script: list[str]) -> dict[str, Any]:
+def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect_script: list[str]) -> dict[str, Any]:
     """Describe the Graph constructors of render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
 
     A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated

@@ -14,15 +14,15 @@
 import json
 import os
 from typing import Any, Callable
-from build_script.reflection.code_gen import WBECodeGenerator
-from build_script.reflection.metadata_types import WBEMetadata
-from build_script.reflection.gen_file_info import WBEGenFileInfo
-from build_script.reflection.parameter_resolver import WBEDictParameterSource
+from build_script.reflection.code_gen import CodeGenerator
+from build_script.reflection.metadata_types import Metadata
+from build_script.reflection.gen_file_info import GenFileInfo
+from build_script.reflection.parameter_resolver import DictParameterSource
 from build_config import gen_info
 from build_script.utils import hash_str
 import build_setup
 
-class WBEReflector:
+class Reflector:
     """Reflector. Used for managing all the reflections.
 
     Attributes: 
@@ -30,7 +30,7 @@ class WBEReflector:
         metadata: The metadata of the engine.
     """
 
-    def __init__(self, metadata_path : str, gen_file_infos : list[WBEGenFileInfo]) -> None:
+    def __init__(self, metadata_path : str, gen_file_infos : list[GenFileInfo]) -> None:
         """Constructor.
 
         Args:
@@ -38,10 +38,10 @@ class WBEReflector:
             gen_file_infos: The list of code generation information.
         """
         self.metadata_path = metadata_path
-        self.metadata = WBEMetadata()
+        self.metadata = Metadata()
         self._gen_file_infos = gen_file_infos
 
-    def register_metadata(self, metadata: WBEMetadata) -> None:
+    def register_metadata(self, metadata: Metadata) -> None:
         self.metadata = metadata
 
     def dump(self) -> None:
@@ -51,7 +51,7 @@ class WBEReflector:
             # Output metadata for debug purpose.
             self._write_to_file(build_setup.metadata_path, json.dumps(self.metadata.model_dump(), indent=4))
         # Generate code
-        builtin_source = WBEDictParameterSource({
+        builtin_source = DictParameterSource({
             "build_target": build_setup.args.target,
             "build_dir": build_setup.build_dir,
             "binary_dir": build_setup.binary_dir,
@@ -62,7 +62,7 @@ class WBEReflector:
             "project_dir": build_setup.project_dir,
             "project_script_dir": build_setup.project_script_modules_dir,
         })
-        generator = WBECodeGenerator(
+        generator = CodeGenerator(
             gen_info | {"metadata" : self.metadata},
             self._gen_file_infos,
             extra_sources=[builtin_source],

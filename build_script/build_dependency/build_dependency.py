@@ -19,7 +19,7 @@ from pathlib import Path
 import shutil
 
 
-class WBEBuildDependency(ABC):
+class BuildDependency(ABC):
     """A dependency that build.py compiles before running the resource pipeline and CMake."""
 
     @abstractmethod
@@ -59,7 +59,7 @@ class WBEBuildDependency(ABC):
         shutil.rmtree(p_cmake_build_dir / "CMakeFiles", ignore_errors=True)
 
 
-class WBEBuildDependencies:
+class BuildDependencies:
     """
     Ordered set of build dependencies compiled as one build task.
 
@@ -72,9 +72,9 @@ class WBEBuildDependencies:
         :param p_build_dir: The dependency build directory shared by every target.
         """
         self._build_dir = p_build_dir
-        self._dependencies: list[WBEBuildDependency] = []
+        self._dependencies: list[BuildDependency] = []
 
-    def add(self, p_dependency: WBEBuildDependency) -> None:
+    def add(self, p_dependency: BuildDependency) -> None:
         """Register a dependency; dependencies compile in registration order."""
         self._dependencies.append(p_dependency)
 

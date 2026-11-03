@@ -4,12 +4,12 @@
 
 1. `build.py` collects project `.hh` headers (excluding dependencies, generated output, caches, and build directories).
    `tests/` is scanned only for targets with `generate-tests`.
-2. `build_script/on_build.py` constructs `WBEMetaparser` and `WBEReflector`. Reflection runs before the ACP.
+2. `build_script/on_build.py` constructs `Metaparser` and `Reflector`. Reflection runs before the ACP.
 3. `build_script/reflection/metaparser.py` runs Clang under `WBE_REFLECTION_PARSER`, where `WBE_META` becomes an `annotate`
    attribute. It records, per header and only for what that header declares: classes, base specifiers, `WBE_REFLECT`
    fields, `WBE_REFLECT` methods (name, arguments, return type, static, const), annotated enums with enumerators, values,
    attributes, and aliases, labels, type spellings, and annotation strings (`metadata_types.py`).
-4. Metadata is ordered by include-dependency depth. `WBEReflector` checks label redefinition, enum qualified-name
+4. Metadata is ordered by include-dependency depth. `Reflector` checks label redefinition, enum qualified-name
    redefinition, and label hash collisions, then renders every `generate.toml` entry.
 5. Generated headers go to `build/<target>/generated/include/generated/`, sources to `build/<target>/generated/src/`
    (under `<project>/build/<target>/` for a project build, which also reflects the project's headers).

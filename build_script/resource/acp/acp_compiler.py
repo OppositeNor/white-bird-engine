@@ -21,7 +21,7 @@ ManifestData = dict[str, Any]
 SOURCE_RESOURCE_TYPE_KEY = "source_type"
 SOURCE_RESOURCE_FILE_KEY = "source_file"
 
-class WBEACPCompiler(abc.ABC):
+class ACPCompiler(abc.ABC):
     """The compiler interface for the ACP."""
     @abc.abstractmethod
     def get_supported_resource_types(self) -> list[str]:

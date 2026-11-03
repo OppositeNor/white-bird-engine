@@ -221,7 +221,7 @@ graph construction throw, and cycles must be rejected. Rebuild changes need diff
 
 ### Scripts, recipes, and Teal
 
-Teal type-checking is a build step: `WBEACPCompilerScript` compiles every `.tl` script against the generated
+Teal type-checking is a build step: `ACPCompilerScript` compiles every `.tl` script against the generated
 `build/<target>/teal/wbe.d.tl`, so a type error fails `build.py` before any test runs. Read the end of the build log for
 the Teal diagnostic. Runtime behavior is unit-tested:
 

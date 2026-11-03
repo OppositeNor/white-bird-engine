@@ -20,7 +20,7 @@ from typing import Any
 from build_script import on_build
 import shutil
 import build_config
-from build_script.reflection.code_gen import WBEGenFileInfo
+from build_script.reflection.code_gen import GenFileInfo
 import build_setup
 
 def _get_clang_resource_dir() -> str:
@@ -158,12 +158,12 @@ def _gather_gen_info_files() -> list[str]:
         gen_info_files = gen_info_files + build_setup.project.gen_info_files
     return gen_info_files
 
-def _gather_gen_infos() -> list[WBEGenFileInfo]:
-    gen_infos: list[WBEGenFileInfo] = []
+def _gather_gen_infos() -> list[GenFileInfo]:
+    gen_infos: list[GenFileInfo] = []
     for gen_info_file in _gather_gen_info_files():
         with open(gen_info_file, "rb") as f:
             data = tomllib.load(f)
-        file_infos = [WBEGenFileInfo(**info) for info in data["generate"]]
+        file_infos = [GenFileInfo(**info) for info in data["generate"]]
         for file_info in file_infos:
             if not file_info.out_dir:
                 file_info.out_dir = os.path.dirname(gen_info_file)

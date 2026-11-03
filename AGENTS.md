@@ -176,7 +176,7 @@ For non-trivial implementation tasks:
 - A script's resource id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes
   (`render_graph_utils/render_graph_utils.tl` is `render_graph_utils.render_graph_utils`). Keep the two in sync, so that
   `require` resolves the same module at runtime (through `SMRResourceManager`) and in the editor.
-- Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `WBEACPCompilerScript` copies Lua sources and type-checks and
+- Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `ACPCompilerScript` copies Lua sources and type-checks and
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
   a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/teal/` at compile time, so a
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
@@ -458,3 +458,5 @@ Document contracts, ownership, threading, and errors; do not restate signatures.
 - Prefer concrete generics (`list[str]`, `dict[str, Any]`) over bare `list` / `dict`. Use `from typing import Any, Callable` etc. when needed.
 - Annotate non-trivial local variables whose type cannot be obviously inferred (e.g. empty containers: `result: list[str] = []`).
 - Use PEP 604 unions (`X | None`) rather than `Optional[X]`.
+- Do not prefix Python types with `WBE`; modules namespace them. Derived implementations still start with their base
+  type's name (`ACPCompiler` → `ACPCompilerShader`). Log tags such as `WBEBuilder:` and `WBEACP:` are output text, not types.

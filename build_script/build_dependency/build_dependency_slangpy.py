@@ -20,10 +20,10 @@ import subprocess
 import sys
 from typing import Any
 
-from build_script.build_dependency.build_dependency import WBEBuildDependency
+from build_script.build_dependency.build_dependency import BuildDependency
 
 
-class WBEBuildDependencySlangPy(WBEBuildDependency):
+class BuildDependencySlangPy(BuildDependency):
     """
     Build slangpy from dependencies/slangpy for the shader tests.
 

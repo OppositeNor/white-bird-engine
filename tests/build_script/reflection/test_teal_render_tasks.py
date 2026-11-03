@@ -19,35 +19,35 @@ import unittest
 from jinja2 import Environment, FileSystemLoader
 import lupa.lua55
 
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEMetadata, WBEMethodMetadata
+from build_script.reflection.metadata_types import ClassMetadata, FieldMetadata, Metadata, MethodMetadata
 from build_script.reflection.teal_types import TEAL_FILTERS, teal_render_tasks
-from build_script.resource.acp.acp_compiler_script import WBEACPCompilerScript
+from build_script.resource.acp.acp_compiler_script import ACPCompilerScript
 
 _ROOT = Path(__file__).resolve().parents[3]
 
 
-def _params(p_name: str, p_fields: list[WBEFieldMetadata]) -> WBEClassMetadata:
-    return WBEClassMetadata(name=p_name, attribute=["WBE", "WBE_REFLECT_SCRIPT"], fields=p_fields)
+def _params(p_name: str, p_fields: list[FieldMetadata]) -> ClassMetadata:
+    return ClassMetadata(name=p_name, attribute=["WBE", "WBE_REFLECT_SCRIPT"], fields=p_fields)
 
 
-def _task(p_name: str, p_method: str | None, p_params: str, p_aliases: list[str] | None = None) -> WBEClassMetadata:
-    return WBEClassMetadata(name=p_name, attribute=["WBE", "WBE_RENDER_TASK"],
+def _task(p_name: str, p_method: str | None, p_params: str, p_aliases: list[str] | None = None) -> ClassMetadata:
+    return ClassMetadata(name=p_name, attribute=["WBE", "WBE_RENDER_TASK"],
                             attribute_parameters={} if p_method is None else {"WBE_RENDER_TASK": [p_method]},
                             aliases=["wire_" + str(p_method)] if p_aliases is None else p_aliases,
-                            methods=[WBEMethodMetadata(method_name="create", is_static=True,
+                            methods=[MethodMetadata(method_name="create", is_static=True,
                                                        type=["const RenderContextVK *", f"const {p_params} &",
                                                              "const RendGraphContextVK &"])])
 
 
-def _field(p_name: str, p_type: str, p_scope: str | None = None) -> WBEFieldMetadata:
+def _field(p_name: str, p_type: str, p_scope: str | None = None) -> FieldMetadata:
     if p_scope is None:
-        return WBEFieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT"])
-    return WBEFieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT", "WBE_RECIPE_RESOURCE"],
+        return FieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT"])
+    return FieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT", "WBE_RECIPE_RESOURCE"],
                             attribute_parameters={"WBE_RECIPE_RESOURCE": [p_scope]})
 
 
-def _describe(p_classes: list[WBEClassMetadata]) -> dict[str, Any]:
-    return teal_render_tasks(WBEMetadata(classes=p_classes), ["WBE_RENDER_TASK"], ["WBE_REFLECT_SCRIPT"])
+def _describe(p_classes: list[ClassMetadata]) -> dict[str, Any]:
+    return teal_render_tasks(Metadata(classes=p_classes), ["WBE_RENDER_TASK"], ["WBE_REFLECT_SCRIPT"])
 
 
 class TealRenderTasksTest(unittest.TestCase):
@@ -125,7 +125,7 @@ class TealRenderTasksTest(unittest.TestCase):
             _describe([params, task])
         with self.assertRaisesRegex(ValueError, "WBE_REFLECT_SCRIPT"):
             _describe([params, _task("RTComputeVK", "compute", "RTParamsHiddenVK")])
-        nested = WBEClassMetadata(name="RTParamsHiddenVK", fields=[_field("buffer", "std::string", "graph")])
+        nested = ClassMetadata(name="RTParamsHiddenVK", fields=[_field("buffer", "std::string", "graph")])
         params.fields = [_field("hidden", "RTParamsHiddenVK")]
         with self.assertRaisesRegex(ValueError, "WBE_REFLECT_SCRIPT"):
             _describe([params, nested, _task("RTComputeVK", "compute", params.name)])
@@ -133,7 +133,7 @@ class TealRenderTasksTest(unittest.TestCase):
     def test_generated_module_type_checks_and_packages_from_the_generated_directory(self) -> None:
         params = _params("RTParamsCopyVK", [_field("pipeline", "std::string"),
                                             _field("buffer", "std::optional<std::string>", "graph")])
-        metadata = WBEMetadata(classes=[params, _task("RTCopyVK", "copy", params.name)])
+        metadata = Metadata(classes=[params, _task("RTCopyVK", "copy", params.name)])
         environment = Environment(loader=FileSystemLoader(_ROOT / "templates"), trim_blocks=True, lstrip_blocks=True)
         environment.filters.update(TEAL_FILTERS)
         module = environment.get_template("teal_render_graph_tasks.tl.jinja").render(
@@ -178,7 +178,7 @@ local captured = task.params as Graph.RTParamsCopyVK
 assert(captured.pipeline == "pipeline")
 return graph
 ''')
-            compiler = WBEACPCompilerScript(_ROOT / "dependencies" / "tl", [generated], generated)
+            compiler = ACPCompilerScript(_ROOT / "dependencies" / "tl", [generated], generated)
             self.assertNotIn("<Resource>", common)
             self.assertNotIn("install<", module)
             self.assertNotIn('require("render_graph_utils.', common)

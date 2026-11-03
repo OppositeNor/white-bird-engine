@@ -25,7 +25,7 @@ from build_script.resource.acp.acp_compiler import (
     ManifestResource,
     SOURCE_RESOURCE_FILE_KEY,
     SOURCE_RESOURCE_TYPE_KEY,
-    WBEACPCompiler,
+    ACPCompiler,
 )
 
 from wbe_utils_model_compiler import TextureCompileRequest, TextureCompiler
@@ -238,7 +238,7 @@ class TextureCompilerPyKTX(TextureCompiler):
             self.destroy_texture(pyktx, texture)
 
 
-class WBEACPCompilerTexture(WBEACPCompiler):
+class ACPCompilerTexture(ACPCompiler):
     """Adapt texture manifest entries to the shared texture compiler API."""
 
     def __init__(self, p_texture_compiler: TextureCompiler) -> None:

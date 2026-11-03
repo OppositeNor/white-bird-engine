@@ -20,58 +20,58 @@ import unittest
 
 from jinja2 import Environment, FileSystemLoader
 
-from build_script.reflection.metadata_types import WBEClassMetadata, WBEFieldMetadata, WBEMetadata, WBEMethodMetadata
+from build_script.reflection.metadata_types import ClassMetadata, FieldMetadata, Metadata, MethodMetadata
 from build_script.reflection.teal_types import TEAL_FILTERS, teal_render_tasks
-from build_script.resource.acp.acp_compiler_script import WBEACPCompilerScript
+from build_script.resource.acp.acp_compiler_script import ACPCompilerScript
 
 _ROOT = Path(__file__).resolve().parents[3]
 
 
-def _field(p_name: str, p_type: str, p_parameters: list[str] | None = None) -> WBEFieldMetadata:
-    return WBEFieldMetadata(name=p_name, type=p_type,
+def _field(p_name: str, p_type: str, p_parameters: list[str] | None = None) -> FieldMetadata:
+    return FieldMetadata(name=p_name, type=p_type,
                             attribute=["WBE_REFLECT"] + ([] if p_parameters is None else ["WBE_RECIPE_RESOURCE"]),
                             attribute_parameters={} if p_parameters is None else {"WBE_RECIPE_RESOURCE": p_parameters})
 
 
-def _params(p_name: str, p_fields: list[WBEFieldMetadata]) -> WBEClassMetadata:
-    return WBEClassMetadata(name=p_name, attribute=["WBE_REFLECT_SCRIPT"], fields=p_fields)
+def _params(p_name: str, p_fields: list[FieldMetadata]) -> ClassMetadata:
+    return ClassMetadata(name=p_name, attribute=["WBE_REFLECT_SCRIPT"], fields=p_fields)
 
 
-def _metadata(p_fields: list[WBEFieldMetadata]) -> WBEMetadata:
-    return WBEMetadata(classes=[
-        WBEClassMetadata(name="MeshResourcesVK", attribute=["WBE_RENDER_OBJECT"],
+def _metadata(p_fields: list[FieldMetadata]) -> Metadata:
+    return Metadata(classes=[
+        ClassMetadata(name="MeshResourcesVK", attribute=["WBE_RENDER_OBJECT"],
                          fields=[_field("private_cpp_state", "uint32_t")]),
-        WBEClassMetadata(name="ROGraphicsPipelineVK", attribute=["WBE_RENDER_OBJECT"]),
-        WBEClassMetadata(name="ROComputePipelineVK", attribute=["WBE_RENDER_OBJECT"]),
+        ClassMetadata(name="ROGraphicsPipelineVK", attribute=["WBE_RENDER_OBJECT"]),
+        ClassMetadata(name="ROComputePipelineVK", attribute=["WBE_RENDER_OBJECT"]),
         _params("RTParamsDrawVK", p_fields),
-        WBEClassMetadata(name="RTDrawVK", attribute=["WBE_RENDER_TASK"],
+        ClassMetadata(name="RTDrawVK", attribute=["WBE_RENDER_TASK"],
                          attribute_parameters={"WBE_RENDER_TASK": ["draw"]}, aliases=["wire_draw"],
-                         methods=[WBEMethodMetadata(method_name="create", is_static=True,
+                         methods=[MethodMetadata(method_name="create", is_static=True,
                                                     type=["const RenderContextVK *", "const RTParamsDrawVK &",
                                                           "const RendGraphContextVK &"])])])
 
 
-def _describe(p_metadata: WBEMetadata) -> dict[str, Any]:
+def _describe(p_metadata: Metadata) -> dict[str, Any]:
     return teal_render_tasks(p_metadata, ["WBE_RENDER_TASK"], ["WBE_REFLECT_SCRIPT"])
 
 
-def _render(p_metadata: WBEMetadata, p_template: str) -> str:
+def _render(p_metadata: Metadata, p_template: str) -> str:
     environment = Environment(loader=FileSystemLoader(_ROOT / "templates"), trim_blocks=True, lstrip_blocks=True)
     environment.filters.update(TEAL_FILTERS)
     return environment.get_template(p_template).render(metadata=p_metadata, render_tasks=["WBE_RENDER_TASK"],
                                                         reflect_script=["WBE_REFLECT_SCRIPT"], _prefix="Test.")
 
 
-def _write_modules(p_directory: Path, p_metadata: WBEMetadata) -> WBEACPCompilerScript:
+def _write_modules(p_directory: Path, p_metadata: Metadata) -> ACPCompilerScript:
     core_types = ["RendRecipeResourceVK", "RendImageViewParamsVK", "RendRecipeTriggerVK", "RendRecipeToggleVK",
                   "RendGraphRecipeVK", "RendResPrimaryUsageVK", "ImageFormatVK", "RendExtent2DParamsVK",
                   "ImageUsageFlagVK", "RendSamplerParamsVK", "RTParamsComputeDispatchVK"]
-    metadata = WBEMetadata(classes=p_metadata.classes + [_params(name, []) for name in core_types])
+    metadata = Metadata(classes=p_metadata.classes + [_params(name, []) for name in core_types])
     (p_directory / "render_graph_utils").mkdir()
     (p_directory / "wbe.d.tl").write_text(_render(metadata, "teal_types.d.tl.jinja"))
     (p_directory / "render_graph_utils/render_graph.tl").write_text(_render(metadata, "teal_render_graph.tl.jinja"))
     (p_directory / "render_graph_utils/render_graph_tasks.tl").write_text(_render(metadata, "teal_render_graph_tasks.tl.jinja"))
-    return WBEACPCompilerScript(_ROOT / "dependencies/tl", [p_directory], p_directory)
+    return ACPCompilerScript(_ROOT / "dependencies/tl", [p_directory], p_directory)
 
 
 class DatabaseRecipeResourcesTest(unittest.TestCase):

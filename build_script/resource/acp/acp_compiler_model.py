@@ -14,11 +14,11 @@
 
 from pathlib import Path
 from typing import override
-from build_script.resource.acp.acp_compiler import ManifestResource, WBEACPCompiler
+from build_script.resource.acp.acp_compiler import ManifestResource, ACPCompiler
 
 from wbe_utils_model_compiler import SDFCompiler, TextureCompiler, WBEUtilsModelCompiler
 
-class WBEACPCompilerModel(WBEACPCompiler):
+class ACPCompilerModel(ACPCompiler):
     """The model compiler.
     """
     def __init__(self, texture_compiler: TextureCompiler, sdf_compiler: SDFCompiler, cache_dir: Path | None = None) -> None:

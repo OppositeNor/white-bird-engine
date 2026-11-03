@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class WBEGenFileInfo(BaseModel):
+class GenFileInfo(BaseModel):
     """Information of a generated file.
 
     Attributes:

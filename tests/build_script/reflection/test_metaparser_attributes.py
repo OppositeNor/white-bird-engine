@@ -20,8 +20,8 @@ from unittest.mock import patch
 
 import clang.cindex
 
-from build_script.reflection.metadata_types import WBEFileMetadata, WBEMetadata
-from build_script.reflection.metaparser import WBEMetaparser
+from build_script.reflection.metadata_types import FileMetadata, Metadata
+from build_script.reflection.metaparser import Metaparser
 
 
 _HEADER = r'''
@@ -48,9 +48,9 @@ struct WBE_META() Empty {};
 
 class _MetadataSink:
     def __init__(self) -> None:
-        self.metadata = WBEMetadata()
+        self.metadata = Metadata()
 
-    def register_metadata(self, metadata: WBEMetadata) -> None:
+    def register_metadata(self, metadata: Metadata) -> None:
         self.metadata = metadata
 
 
@@ -61,7 +61,7 @@ class MetaparserAttributesTest(unittest.TestCase):
             header = directory / "attributes.hh"
             header.write_text(_HEADER)
             sink = _MetadataSink()
-            parser = WBEMetaparser(sink, ["-x", "c++", "-std=c++20"], temporary_directory, [str(header)])
+            parser = Metaparser(sink, ["-x", "c++", "-std=c++20"], temporary_directory, [str(header)])
 
             # Check the fixture itself before asserting on the metadata extracted from clang.
             translation_unit = clang.cindex.Index.create().parse(str(header), args=parser.clang_args)
@@ -95,10 +95,10 @@ class MetaparserAttributesTest(unittest.TestCase):
             self.assertEqual(sink.metadata.labels[0].aliases, ["old_label"])
 
             cache_path = next(directory.glob("*.json"))
-            cached_file = WBEFileMetadata.model_validate_json(cache_path.read_text())
-            self.assertEqual(WBEFileMetadata.model_validate_json(cached_file.model_dump_json()), cached_file)
+            cached_file = FileMetadata.model_validate_json(cache_path.read_text())
+            self.assertEqual(FileMetadata.model_validate_json(cached_file.model_dump_json()), cached_file)
             cache_sink = _MetadataSink()
-            cached_parser = WBEMetaparser(cache_sink, parser.clang_args, temporary_directory, [str(header)])
+            cached_parser = Metaparser(cache_sink, parser.clang_args, temporary_directory, [str(header)])
             with patch.object(cached_parser, "_register_from_clang", side_effect=AssertionError("Cache was not reused")):
                 cached_parser.parse(str(header))
             cached_parser.export()
@@ -108,11 +108,11 @@ class MetaparserAttributesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             header = Path(temporary_directory) / "attributes.hh"
             header.write_text(_HEADER)
-            first = WBEMetaparser(_MetadataSink(), ["-x", "c++", "-std=c++20"], temporary_directory, [str(header)])
+            first = Metaparser(_MetadataSink(), ["-x", "c++", "-std=c++20"], temporary_directory, [str(header)])
             with redirect_stdout(io.StringIO()):
                 first.parse(str(header))
             with patch("build_script.reflection.metaparser.METAPARSER_VERSION", 0):
-                changed_parser = WBEMetaparser(_MetadataSink(), first.clang_args, temporary_directory, [str(header)])
+                changed_parser = Metaparser(_MetadataSink(), first.clang_args, temporary_directory, [str(header)])
             with patch.object(changed_parser, "_register_from_clang", wraps=changed_parser._register_from_clang) as parse:
                 with redirect_stdout(io.StringIO()):
                     changed_parser.parse(str(header))

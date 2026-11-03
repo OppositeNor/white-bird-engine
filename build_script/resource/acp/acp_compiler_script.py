@@ -17,7 +17,7 @@ from typing import Any, override
 
 import lupa.lua55
 
-from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
+from build_script.resource.acp.acp_compiler_file import ACPCompilerFile
 
 LUA_SUFFIX = ".lua"
 TEAL_SUFFIX = ".tl"
@@ -47,7 +47,7 @@ end
 """
 
 
-class WBEACPCompilerScript(WBEACPCompilerFile):
+class ACPCompilerScript(ACPCompilerFile):
     """ACP compiler for script resources.
 
     Lua sources (.lua) are copied. Teal sources (.tl) are type-checked and compiled to Lua with the Teal compiler,

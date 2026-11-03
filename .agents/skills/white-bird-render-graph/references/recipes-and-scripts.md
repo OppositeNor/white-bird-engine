@@ -177,7 +177,7 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
   sync so `require` resolves the same module at runtime and in the editor.
 - Reflection generates `render_graph_utils.render_graph` (declarations) and `render_graph_utils.render_graph_tasks`
   (constructor installer) into `build/<target>/teal/`; their manifest entries give `source_file` relative to that directory.
-- `WBEACPCompilerScript` copies `.lua` sources and type-checks and compiles `.tl` sources with the vendored compiler; a type
+- `ACPCompilerScript` copies `.lua` sources and type-checks and compiles `.tl` sources with the vendored compiler; a type
   error fails the build. A Teal module requires a Lua module only through a `.d.tl` declaration next to it.
 - Import engine types as types only (`local type wbe = require("wbe")`); declare data C++ hands a recipe as
   `WBE_REFLECT_SCRIPT` structs rather than Teal records.

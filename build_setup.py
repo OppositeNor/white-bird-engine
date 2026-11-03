@@ -19,10 +19,10 @@ import sys
 import shutil
 import build_config
 from build_script.project.project import load_project
-from build_script.resource.acp.acp import WBEACP
-from build_script.build_dependency.build_dependency import WBEBuildDependencies
-from build_script.build_dependency.build_dependency_acp import WBEBuildDependencyACP
-from build_script.build_dependency.build_dependency_slangpy import WBEBuildDependencySlangPy
+from build_script.resource.acp.acp import ACP
+from build_script.build_dependency.build_dependency import BuildDependencies
+from build_script.build_dependency.build_dependency_acp import BuildDependencyACP
+from build_script.build_dependency.build_dependency_slangpy import BuildDependencySlangPy
 
 # SETUP
 print("WBEBuilder: Setting up...")
@@ -108,19 +108,19 @@ if build_target["generate-tests"]:
     shutil.copytree(test_env_config_dir, test_env_config_output_dir, dirs_exist_ok=True)
 
 # Setup ACP
-acp_dependencies_compiler = WBEBuildDependencyACP(
+acp_dependencies_compiler = BuildDependencyACP(
     Path(root_dir), Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info)
-acp = WBEACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
-test_env_acp = WBEACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
-project_acp = (WBEACP(Path(project_resource_dir), Path(resource_output_dir), enabled_test=False)
+acp = ACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
+test_env_acp = ACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
+project_acp = (ACP(Path(project_resource_dir), Path(resource_output_dir), enabled_test=False)
                if project_resource_dir is not None else None)
 acp_compilers_configured = False
 
 # Setup build dependencies
-build_dependencies = WBEBuildDependencies(Path(dependency_build_dir))
+build_dependencies = BuildDependencies(Path(dependency_build_dir))
 build_dependencies.add(acp_dependencies_compiler)
 if build_target["generate-tests"]:
-    build_dependencies.add(WBEBuildDependencySlangPy(
+    build_dependencies.add(BuildDependencySlangPy(
         Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info))
 
 
@@ -132,24 +132,24 @@ def setup_acp_compilers() -> None:
     if python_package_path not in sys.path:
         sys.path.insert(0, python_package_path)
 
-    from build_script.resource.acp.acp_compiler_file import WBEACPCompilerFile
-    from build_script.resource.acp.acp_compiler_mesh import WBEACPCompilerMesh
-    from build_script.resource.acp.acp_compiler_model import WBEACPCompilerModel
-    from build_script.resource.acp.acp_compiler_script import WBEACPCompilerScript
-    from build_script.resource.acp.acp_compiler_shader import WBEACPCompilerShader
-    from build_script.resource.acp.acp_compiler_texture import TextureCompilerPyKTX, WBEACPCompilerTexture
+    from build_script.resource.acp.acp_compiler_file import ACPCompilerFile
+    from build_script.resource.acp.acp_compiler_mesh import ACPCompilerMesh
+    from build_script.resource.acp.acp_compiler_model import ACPCompilerModel
+    from build_script.resource.acp.acp_compiler_script import ACPCompilerScript
+    from build_script.resource.acp.acp_compiler_shader import ACPCompilerShader
+    from build_script.resource.acp.acp_compiler_texture import TextureCompilerPyKTX, ACPCompilerTexture
     from build_script.resource.acp.sdf_compiler_mesh_to_sdf import SDFCompilerMeshToSDF
 
     texture_compiler = TextureCompilerPyKTX(
         acp_dependencies_compiler.get_ktx_library_dir(), acp_dependencies_compiler.get_python_package_dir())
     sdf_compiler = SDFCompilerMeshToSDF(texture_compiler)
-    def add_compilers(p_acp: WBEACP, p_shader_include_dirs: list[str], p_script_module_dirs: list[str]) -> None:
-        p_acp.add_compiler(WBEACPCompilerShader([Path(include_dir) for include_dir in p_shader_include_dirs]))
-        p_acp.add_compiler(WBEACPCompilerTexture(texture_compiler))
-        p_acp.add_compiler(WBEACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
-        p_acp.add_compiler(WBEACPCompilerMesh(sdf_compiler))
-        p_acp.add_compiler(WBEACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
-        p_acp.add_compiler(WBEACPCompilerScript(
+    def add_compilers(p_acp: ACP, p_shader_include_dirs: list[str], p_script_module_dirs: list[str]) -> None:
+        p_acp.add_compiler(ACPCompilerShader([Path(include_dir) for include_dir in p_shader_include_dirs]))
+        p_acp.add_compiler(ACPCompilerTexture(texture_compiler))
+        p_acp.add_compiler(ACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
+        p_acp.add_compiler(ACPCompilerMesh(sdf_compiler))
+        p_acp.add_compiler(ACPCompilerFile(["audio", "binary", "font", "image", "text", "video"]))
+        p_acp.add_compiler(ACPCompilerScript(
             Path(teal_dir), [Path(module_dir) for module_dir in p_script_module_dirs], Path(script_types_dir)))
 
     add_compilers(acp, [shaders_incl_dir], [script_modules_dir, script_types_dir])

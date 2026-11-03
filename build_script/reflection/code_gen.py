@@ -18,11 +18,11 @@ from build_script.reflection.teal_types import TEAL_FILTERS
 from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from build_script.utils import hash_file, hash_str_sha256
-from build_script.reflection.gen_file_info import WBEGenFileInfo
+from build_script.reflection.gen_file_info import GenFileInfo
 from build_script.reflection.parameter_resolver import (
-    WBEParameterSource,
-    WBEEnvParameterSource,
-    WBEParameterResolver,
+    ParameterSource,
+    EnvParameterSource,
+    ParameterResolver,
 )
 import build_setup
 
@@ -39,24 +39,24 @@ def to_relative(p_path: str) -> str:
     return Path(os.path.relpath(p_path, build_setup.project_dir)).as_posix()
 
 
-class WBECodeGenerator:
+class CodeGenerator:
     """The code generator."""
-    def __init__(self, attributes: dict[str, Any], generate_infos: list[WBEGenFileInfo],
-                 extra_sources: list[WBEParameterSource] | None = None) -> None:
+    def __init__(self, attributes: dict[str, Any], generate_infos: list[GenFileInfo],
+                 extra_sources: list[ParameterSource] | None = None) -> None:
         """Constructor.
 
         Args:
             attributes: The attributes to replace the data starting with '.'.
             generate_infos: The generation infos.
-            extra_sources: Optional list of WBEParameterSource instances injected
+            extra_sources: Optional list of ParameterSource instances injected
                            at build level. Queried after per-entry params but before
                            environment variables.
         """
         self._attributes = attributes
         # Build the base resolver: extra_sources first, then env vars as fallback.
-        base_sources: list[WBEParameterSource] = list(extra_sources) if extra_sources else []
-        base_sources.append(WBEEnvParameterSource())
-        self._base_resolver = WBEParameterResolver(base_sources)
+        base_sources: list[ParameterSource] = list(extra_sources) if extra_sources else []
+        base_sources.append(EnvParameterSource())
+        self._base_resolver = ParameterResolver(base_sources)
         # Create a template environment in the root_dir
         self._env = Environment(
             loader=FileSystemLoader(build_setup.template_dir),
@@ -73,7 +73,7 @@ class WBECodeGenerator:
         for generate_info in self._generate_infos:
             self._generate(generate_info)
 
-    def _generate(self, generate_info: WBEGenFileInfo) -> None:
+    def _generate(self, generate_info: GenFileInfo) -> None:
         resolved = self._base_resolver.resolve_gen_file_info(generate_info)
 
         data: dict[str, Any] = resolved.data

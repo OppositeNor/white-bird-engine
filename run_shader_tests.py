@@ -20,7 +20,7 @@ import sys
 from typing import TextIO
 
 import build_config
-from build_script.build_dependency.build_dependency_slangpy import WBEBuildDependencySlangPy
+from build_script.build_dependency.build_dependency_slangpy import BuildDependencySlangPy
 
 
 ROOT_DIR = Path(build_config.root_dir)
@@ -34,7 +34,7 @@ def get_slangpy_python_dir() -> Path:
     :return: The Python package directory of the slangpy build dependency shared by every target.
     """
     dependency_build_dir = ROOT_DIR / "build" / build_config.dependency_build_dir
-    return WBEBuildDependencySlangPy(dependency_build_dir, ROOT_DIR / "dependencies",
+    return BuildDependencySlangPy(dependency_build_dir, ROOT_DIR / "dependencies",
         build_config.dependency_build_info).get_python_package_dir()
 
 
