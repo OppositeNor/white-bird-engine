@@ -17,9 +17,11 @@
 
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/memory/subobject_offset.hh"
 #include "utils/defs.hh"
 #include <concepts>
 #include <cstddef>
+#include <functional>
 #include <stdexcept>
 
 namespace WhiteBirdEngine {
@@ -27,6 +29,9 @@ namespace WhiteBirdEngine {
 /**
  * @class Unique.
  * @brief Ensures an instance to only exists once, to make it memory safe.
+ *
+ * Movable, not copyable. A moved-from instance is null. An instance converted to a base type views that base
+ * subobject.
  *
  * @tparam T The type of the instance.
  */
@@ -37,6 +42,8 @@ class Unique {
     template <typename T1, typename AllocType1, bool AllowDestruct>
     friend class RefRaw;
 
+    friend struct ::std::hash<Unique<T, AllocType>>;
+
 public:
     Unique() : mem_id(MEM_NULL), allocator(nullptr) {
     }
@@ -45,29 +52,38 @@ public:
     }
     // Unique is not copyable.
     Unique(const Unique&) = delete;
-    Unique(Unique&& p_other) noexcept : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    Unique(Unique&& p_other) noexcept
+        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.object_offset) {
         p_other.mem_id = MEM_NULL;
     }
     Unique& operator=(const Unique&) = delete;
     Unique& operator=(Unique&& p_other) noexcept {
+        if (this == &p_other) {
+            return *this;
+        }
         reset();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
+        object_offset = p_other.object_offset;
         p_other.mem_id = MEM_NULL;
         return *this;
     }
 
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
-    Unique(Unique<T1, AllocType1>&& p_other) : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    Unique(Unique<T1, AllocType1>&& p_other)
+        : mem_id(p_other.mem_id), allocator(p_other.allocator),
+          object_offset(get_converted_subobject_offset<T>(p_other.get(), p_other.object_offset)) {
         p_other.mem_id = MEM_NULL;
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Unique& operator=(Unique<T1, AllocType1>&& p_other) {
+        std::ptrdiff_t offset = get_converted_subobject_offset<T>(p_other.get(), p_other.object_offset);
         reset();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
+        object_offset = offset;
         p_other.mem_id = MEM_NULL;
         return *this;
     }
@@ -101,10 +117,10 @@ public:
      * @return The instance of the object.
      */
     T* get() {
-        if (allocator == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        return allocator->template get_obj<T>(mem_id);
+        return get_object();
     }
 
     /**
@@ -113,53 +129,57 @@ public:
      * @return The instance of the object.
      */
     const T* get() const {
-        if (allocator == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        return allocator->template get_obj<T>(mem_id);
+        return get_object();
     }
 
     /**
      * @brief Release the instance.
      */
     void reset() {
-        if (allocator != nullptr && mem_id != MEM_NULL) {
-            destroy_obj<T>(*allocator, mem_id);
-            mem_id = MEM_NULL;
+        if (is_null()) {
+            return;
         }
+        // Destroy through the viewed subobject, but free the whole allocation.
+        get_object()->~T();
+        allocator->deallocate(mem_id);
+        mem_id = MEM_NULL;
+        object_offset = 0;
     }
 
     T* operator->() {
-        return static_cast<T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     const T* operator->() const {
-        return static_cast<T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     T& operator*() {
-        return *static_cast<T*>(allocator->get(mem_id));
+        return *get_object();
     }
 
     const T& operator*() const {
-        return *static_cast<T*>(allocator->get(mem_id));
+        return *get_object();
     }
 
-    bool operator==(MemID p_mem_id) {
+    bool operator==(MemID p_mem_id) const {
         if (p_mem_id != MEM_NULL) {
             throw std::runtime_error("Cannot compare a unique with a memory ID that is not MEM_NULL.");
         }
         return mem_id == MEM_NULL;
     }
 
-    bool operator==(void* p_ptr) {
+    bool operator==(void* p_ptr) const {
         if (p_ptr != nullptr) {
             throw std::runtime_error("Cannot compare a unique with a pointer that is not nullptr.");
         }
         return mem_id == MEM_NULL;
     }
 
-    bool operator==(std::nullptr_t) {
+    bool operator==(std::nullptr_t) const {
         return mem_id == MEM_NULL;
     }
 
@@ -173,8 +193,14 @@ public:
     }
 
 private:
+    T* get_object() const {
+        WBE_DEBUG_ASSERT(allocator != nullptr);
+        return apply_subobject_offset<T>(allocator->get(mem_id), object_offset);
+    }
+
     MemID mem_id;
     AllocType* allocator;
+    std::ptrdiff_t object_offset = 0;
 };
 
 /**
@@ -205,11 +231,11 @@ namespace std {
  */
 template <typename T, typename AllocType>
 struct hash<::WhiteBirdEngine::Unique<T, AllocType>> { // NOLINT
-    size_t operator()(const ::WhiteBirdEngine::Unique<T, AllocType>& p_unique) {
+    size_t operator()(const ::WhiteBirdEngine::Unique<T, AllocType>& p_unique) const {
         if (p_unique.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }
-        return std::hash<AllocType*>{}(p_unique.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.control_block->mem_id);
+        return std::hash<AllocType*>{}(p_unique.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.mem_id);
     }
 };
 

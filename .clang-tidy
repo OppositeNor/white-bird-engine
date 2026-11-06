@@ -49,6 +49,8 @@ Checks: >
   -cert-dcl03-c,
   -google-readability-avoid-underscore-in-googletest-name,
   -google-explicit-constructor,
+  -misc-explicit-constructor,
+  -cppcoreguidelines-explicit-constructor,
   -google-readability-todo,
   -google-default-arguments,
   -hicpp-named-parameter,

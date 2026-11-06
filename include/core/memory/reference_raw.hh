@@ -18,6 +18,7 @@
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/memory/subobject_offset.hh"
 #include "core/memory/unique.hh"
 #include "utils/defs.hh"
 #include <concepts>
@@ -30,6 +31,9 @@ namespace WhiteBirdEngine {
  * @class RefRaw
  * @brief Raw reference. Act like raw pointers. Requires manual resource
  * management.
+ *
+ * Copyable and movable. A moved-from reference is null. A reference converted to a base type views that base
+ * subobject, while delete_ref() still frees the whole allocation.
  *
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
@@ -45,9 +49,11 @@ public:
     using ObjType = T;
     RefRaw() = default;
     ~RefRaw() = default;
-    RefRaw(const RefRaw& p_other) : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    RefRaw(const RefRaw& p_other)
+        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.object_offset) {
     }
-    RefRaw(RefRaw&& p_other) noexcept : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    RefRaw(RefRaw&& p_other) noexcept
+        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.object_offset) {
         p_other.mem_id = MEM_NULL;
     }
     RefRaw& operator=(const RefRaw& p_other) {
@@ -56,11 +62,16 @@ public:
         }
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
+        object_offset = p_other.object_offset;
         return *this;
     }
     RefRaw& operator=(RefRaw&& p_other) noexcept {
+        if (&p_other == this) {
+            return *this;
+        }
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
+        object_offset = p_other.object_offset;
         p_other.mem_id = MEM_NULL;
         return *this;
     }
@@ -89,30 +100,35 @@ public:
     template <typename T1, typename AllocType1, bool AllowDestruct1>
         requires std::convertible_to<T1*, T*> &&
                      (!std::same_as<T1, T> || !std::same_as<AllocType1, AllocType> || AllowDestruct1 != AllowDestruct)
-    RefRaw(const RefRaw<T1, AllocType1, AllowDestruct1>& p_other) : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    RefRaw(const RefRaw<T1, AllocType1, AllowDestruct1>& p_other)
+        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.template get_converted_offset<T>()) {
     }
     template <typename T1, typename AllocType1, bool AllowDestruct1>
         requires std::convertible_to<T1*, T*> &&
                      (!std::same_as<T1, T> || !std::same_as<AllocType1, AllocType> || AllowDestruct1 != AllowDestruct)
-    RefRaw(RefRaw<T1, AllocType1, AllowDestruct1>&& p_other) : mem_id(p_other.mem_id), allocator(p_other.allocator) {
+    RefRaw(RefRaw<T1, AllocType1, AllowDestruct1>&& p_other)
+        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.template get_converted_offset<T>()) {
         p_other.mem_id = MEM_NULL;
     }
     template <typename T1, typename AllocType1, bool AllowDestruct1>
         requires std::convertible_to<T1*, T*> &&
                  (!std::same_as<T1, T> || !std::same_as<AllocType1, AllocType> || AllowDestruct1 != AllowDestruct)
     RefRaw& operator=(const RefRaw<T1, AllocType1, AllowDestruct1>& p_other) {
+        object_offset = p_other.template get_converted_offset<T>();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         return *this;
     }
     RefRaw& operator=(std::nullptr_t) {
         mem_id = MEM_NULL;
+        object_offset = 0;
         return *this;
     }
     template <typename T1, typename AllocType1, bool AllowDestruct1>
         requires std::convertible_to<T1*, T*> &&
                  (!std::same_as<T1, T> || !std::same_as<AllocType1, AllocType> || AllowDestruct1 != AllowDestruct)
     RefRaw& operator=(RefRaw<T1, AllocType1, AllowDestruct1>&& p_other) {
+        object_offset = p_other.template get_converted_offset<T>();
         mem_id = p_other.mem_id;
         allocator = p_other.allocator;
         p_other.mem_id = MEM_NULL;
@@ -121,12 +137,15 @@ public:
 
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*> && (!AllowDestruct)
-    RefRaw(Unique<T1, AllocType1>& p_reference) : mem_id(p_reference.mem_id), allocator(p_reference.allocator) {
+    RefRaw(Unique<T1, AllocType1>& p_reference)
+        : mem_id(p_reference.mem_id), allocator(p_reference.allocator),
+          object_offset(get_converted_subobject_offset<T>(p_reference.get(), p_reference.object_offset)) {
     }
 
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*> && (!AllowDestruct)
     RefRaw& operator=(Unique<T1, AllocType1>& p_reference) {
+        object_offset = get_converted_subobject_offset<T>(p_reference.get(), p_reference.object_offset);
         mem_id = p_reference.mem_id;
         allocator = p_reference.allocator;
         return *this;
@@ -136,6 +155,7 @@ public:
         requires std::convertible_to<T1*, T*> && (!std::same_as<T1, T>)
     operator RefRaw<T1, AllocType1, AllowDestruct>() {
         RefRaw<T1, AllocType1, AllowDestruct> converted(mem_id, allocator);
+        converted.object_offset = get_converted_offset<T1>();
         return converted;
     }
 
@@ -148,6 +168,8 @@ public:
     template <typename T1, typename AllocType1 = AllocType>
     RefRaw<T1, AllocType1, AllowDestruct> force_cast() {
         RefRaw<T1, AllocType1, AllowDestruct> result(mem_id, allocator);
+        // Reinterpreting keeps the viewed address.
+        result.object_offset = object_offset;
         return result;
     }
 
@@ -164,13 +186,10 @@ public:
         if (p_allocator == nullptr) {
             throw std::runtime_error("Allocator cannot be nullptr.");
         }
-        if constexpr (std::same_as<T, StackAllocator>) {
+        if constexpr (std::same_as<AllocType, StackAllocator>) {
             MemID id = create_stack_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
             return RefRaw<T, StackAllocator, AllowDestruct>(id, p_allocator);
         } else {
-            if (p_allocator == nullptr) {
-                throw std::runtime_error("Allocator cannot be nullptr.");
-            }
             MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
             return RefRaw<T, AllocType, AllowDestruct>(id, p_allocator);
         }
@@ -179,42 +198,44 @@ public:
     /**
      * @brief Delete a reference. Note that manual deleting from the allocator
      * should do the same job as calling this function. No other hidden
-     * operations are done.
+     * operations are done. The object is destroyed through the viewed type, and the whole allocation is freed.
      *
-     * @param p_ref The reference to be deleted.
+     * @param p_ref The reference to be deleted. For a StackAllocator, it must be the top of the stack.
+     * @throws std::runtime_error If a stack reference is not the top of the stack.
      */
     static void delete_ref(RefRaw<T, AllocType, AllowDestruct>&& p_ref) {
-        if (p_ref.allocator == nullptr || p_ref.mem_id == MEM_NULL) {
+        if (p_ref.is_null()) {
             return;
         }
         if constexpr (AllowDestruct) {
-            if constexpr (std::same_as<T, StackAllocator>) {
-                pop_stack_obj<T>(*(p_ref.allocator), p_ref.mem_id);
+            void* allocation = p_ref.allocator->get(p_ref.mem_id);
+            p_ref.get_object()->~T();
+            if constexpr (std::same_as<AllocType, StackAllocator>) {
+                if (p_ref.allocator->pop_stack(sizeof(T)) != allocation) {
+                    throw std::runtime_error("Stack references must be deleted in reverse order of creation.");
+                }
             } else {
-                destroy_obj<T>(*(p_ref.allocator), p_ref.mem_id);
+                p_ref.allocator->deallocate(p_ref.mem_id);
             }
         }
         p_ref.mem_id = MEM_NULL;
+        p_ref.object_offset = 0;
     }
 
     T* operator->() {
-        WBE_DEBUG_ASSERT(allocator != nullptr);
-        return static_cast<T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     const T* operator->() const {
-        WBE_DEBUG_ASSERT(allocator != nullptr);
-        return static_cast<T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     T& operator*() {
-        WBE_DEBUG_ASSERT(allocator != nullptr);
-        return *static_cast<T*>(allocator->get(mem_id));
+        return *get_object();
     }
 
     const T& operator*() const {
-        WBE_DEBUG_ASSERT(allocator != nullptr);
-        return *static_cast<T*>(allocator->get(mem_id));
+        return *get_object();
     }
 
     /**
@@ -224,10 +245,10 @@ public:
      * MEM_NULL.
      */
     T* get() {
-        if (allocator == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        return static_cast<T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     /**
@@ -237,10 +258,10 @@ public:
      * MEM_NULL.
      */
     const T* get() const {
-        if (allocator == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        return static_cast<const T*>(allocator->get(mem_id));
+        return get_object();
     }
 
     template <typename T1, typename AllocType1, bool AllowDestruct1>
@@ -295,8 +316,22 @@ public:
     }
 
 private:
+    T* get_object() const {
+        WBE_DEBUG_ASSERT(allocator != nullptr);
+        return apply_subobject_offset<T>(allocator->get(mem_id), object_offset);
+    }
+
+    template <typename T1>
+    std::ptrdiff_t get_converted_offset() const {
+        if (is_null()) {
+            return 0;
+        }
+        return get_converted_subobject_offset<T1>(get_object(), object_offset);
+    }
+
     MemID mem_id = MEM_NULL;
     AllocType* allocator = nullptr;
+    std::ptrdiff_t object_offset = 0;
 };
 
 template <typename T, typename AllocType = HeapAllocator, bool AllowDestruct = true, typename... Args>
@@ -338,7 +373,7 @@ namespace std {
  */
 template <typename T, typename AllocType, bool AllowDestruct>
 struct hash<::WhiteBirdEngine::RefRaw<T, AllocType, AllowDestruct>> { // NOLINT
-    size_t operator()(const ::WhiteBirdEngine::RefRaw<T, AllocType, AllowDestruct>& p_ref) {
+    size_t operator()(const ::WhiteBirdEngine::RefRaw<T, AllocType, AllowDestruct>& p_ref) const {
         if (p_ref.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }

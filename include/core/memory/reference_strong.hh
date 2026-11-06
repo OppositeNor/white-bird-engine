@@ -17,6 +17,7 @@
 
 #include "core/allocator/heap_allocator.hh"
 #include "core/allocator/i_allocator.hh"
+#include "core/memory/subobject_offset.hh"
 #include "utils/defs.hh"
 #include <atomic>
 #include <concepts>
@@ -28,8 +29,60 @@
 namespace WhiteBirdEngine {
 
 /**
+ * @struct RefControlBlock
+ * @brief The shared state of the Ref and RefWeak handles of one object.
+ *
+ * Every strong reference also holds a hidden weak reference, so the block is destroyed by the last reference of either
+ * kind. The block does not depend on the viewed type, so handles of any type converted from one object share it.
+ *
+ * @tparam AllocType The type of the allocator.
+ */
+template <typename AllocType>
+struct RefControlBlock {
+    /**
+     * @brief Destroys the object and frees its allocation. Captured with the type the object was created as, so the
+     * last reference destroys that type whatever type it views.
+     */
+    using DestroyObjectFunction = void (*)(void* p_allocator, MemID p_mem_id);
+
+    RefControlBlock(AllocType* p_allocator, MemID p_mem_id, DestroyObjectFunction p_destroy_object)
+        : mem_id(p_mem_id), allocator(p_allocator), destroy_object(p_destroy_object) {
+        weak_ref_counter.store(0, std::memory_order_release);
+        strong_ref_counter.store(0, std::memory_order_release);
+    }
+
+    /**
+     * @brief The memory ID of this control block.
+     */
+    MemID control_block_mem_id = MEM_NULL;
+    /**
+     * @brief The memory ID of the whole object allocation.
+     */
+    MemID mem_id;
+    /**
+     * @brief The allocator of both the object and this control block.
+     */
+    AllocType* allocator;
+    /**
+     * @brief Destroys the object as the type it was created as.
+     */
+    DestroyObjectFunction destroy_object;
+    /**
+     * @brief The number of weak references, including one hidden weak reference per strong reference.
+     */
+    std::atomic<uint64_t> weak_ref_counter;
+    /**
+     * @brief The number of strong references.
+     */
+    std::atomic<uint64_t> strong_ref_counter;
+};
+
+/**
  * @class Ref
  * @brief The reference to a memory resource.
+ *
+ * Copyable and movable. A moved-from reference is null. A reference converted to a base type views that base
+ * subobject, and the last reference destroys the object as the type it was created as.
  *
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
@@ -44,48 +97,46 @@ class Ref {
 
     friend struct ::std::hash<Ref<T, AllocType>>;
 
-    struct ControlBlock;
+    using ControlBlock = RefControlBlock<AllocType>;
 
 public:
     using ObjType = T;
 
-    Ref() {
-        control_block = nullptr;
-        ref();
+    Ref() : control_block(nullptr) {
     }
     ~Ref() {
         deref();
     }
-    Ref(const Ref& p_other) {
-        p_other.ref();
-        control_block = p_other.control_block;
+    Ref(const Ref& p_other) : control_block(p_other.control_block), object_offset(p_other.object_offset) {
+        ref();
     }
-    Ref(Ref&& p_other) noexcept {
-        control_block = p_other.control_block;
+    Ref(Ref&& p_other) noexcept : control_block(p_other.control_block), object_offset(p_other.object_offset) {
         p_other.control_block = nullptr;
     }
     Ref& operator=(const Ref& p_other) {
         if (this == &p_other) {
             return *this;
         }
-        deref();
         p_other.ref();
+        deref();
         control_block = p_other.control_block;
+        object_offset = p_other.object_offset;
         return *this;
     }
     Ref& operator=(Ref&& p_other) noexcept {
-        if (*this == p_other) {
+        if (this == &p_other) {
             return *this;
         }
+        // Safe when both share the control block: p_other still holds its strong reference.
         deref();
         control_block = p_other.control_block;
+        object_offset = p_other.object_offset;
         p_other.control_block = nullptr;
         return *this;
     }
 
-    Ref(MemID p_mem_id) {
+    Ref(MemID p_mem_id) : control_block(nullptr) {
         if (p_mem_id == MEM_NULL) {
-            control_block = nullptr;
             return;
         }
         throw std::runtime_error("Cannot directly asign an memory id to a "
@@ -94,85 +145,97 @@ public:
 
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
-    Ref(const Ref<T1, AllocType1>& p_other) {
-        p_other.ref();
-        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+    Ref(const Ref<T1, AllocType1>& p_other)
+        : control_block(reinterpret_cast<ControlBlock*>(p_other.control_block)), object_offset(get_converted_offset(p_other)) {
+        ref();
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
-    Ref(Ref<T1, AllocType1>&& p_other) noexcept {
-        control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+    Ref(Ref<T1, AllocType1>&& p_other) noexcept
+        : control_block(reinterpret_cast<ControlBlock*>(p_other.control_block)), object_offset(get_converted_offset(p_other)) {
         p_other.control_block = nullptr;
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(const Ref<T1, AllocType1>& p_other) {
-        if (*this == p_other) {
-            return *this;
-        }
-        deref();
+        std::ptrdiff_t offset = get_converted_offset(p_other);
         p_other.ref();
+        deref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+        object_offset = offset;
         return *this;
     }
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Ref& operator=(Ref<T1, AllocType1>&& p_other) noexcept {
-        if (*this == p_other) {
-            return *this;
-        }
+        std::ptrdiff_t offset = get_converted_offset(p_other);
         deref();
         control_block = reinterpret_cast<ControlBlock*>(p_other.control_block);
+        object_offset = offset;
         p_other.control_block = nullptr;
         return *this;
     }
 
     Ref& operator=(std::nullptr_t) {
         deref();
-        control_block = nullptr;
         return *this;
     }
 
+    /**
+     * @brief Reset the reference.
+     *
+     * @param p_ptr Must be nullptr.
+     * @throws std::runtime_error If p_ptr is not nullptr.
+     */
     Ref& operator=(void* p_ptr) {
-        WBE_DEBUG_ASSERT(p_ptr == nullptr);
+        if (p_ptr != nullptr) {
+            throw std::runtime_error("Cannot assign a pointer that is not nullptr to a reference.");
+        }
         deref();
-        control_block = nullptr;
         return *this;
     }
 
+    /**
+     * @brief Reset the reference.
+     *
+     * @param p_mem_id Must be MEM_NULL.
+     * @throws std::runtime_error If p_mem_id is not MEM_NULL.
+     */
     Ref& operator=(MemID p_mem_id) {
-        WBE_DEBUG_ASSERT(p_mem_id == MEM_NULL);
+        if (p_mem_id != MEM_NULL) {
+            throw std::runtime_error("Cannot assign a memory ID that is not MEM_NULL to a reference.");
+        }
         deref();
-        control_block = nullptr;
         return *this;
     }
 
     /**
      * @brief Create a reference with a given allocator and memory ID.
      *
+     * The object is destroyed as T when the last reference is released.
+     *
      * @param p_allocator The allocator that allocated the memory for memory ID.
      * @param p_mem_id The memory ID.
      */
     Ref(AllocType* p_allocator, MemID p_mem_id) {
         WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        MemID control_block_mem_id = create_obj<ControlBlock>(*p_allocator, p_allocator, p_mem_id);
+        MemID control_block_mem_id = create_obj<ControlBlock>(*p_allocator, p_allocator, p_mem_id, &destroy_created_object);
         control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
         control_block->control_block_mem_id = control_block_mem_id;
         ref();
     }
 
     /**
-     * @brief Make a reference with given constructor arguments.
+     * @brief Make a reference with given constructor arguments. Same as the free make_ref().
      *
      * @tparam Args The argument types of the constructor.
      * @param p_allocator The allocator to allocate the object.
      * @param p_args The arguments of the constructor.
      * @return The created reference.
+     * @throws std::runtime_error If p_allocator is nullptr.
      */
     template <typename... Args>
-    static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
-        return Ref(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
-    }
+    static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args);
 
     /**
      * @brief Get the resource pointer.
@@ -181,11 +244,10 @@ public:
      * MEM_NULL.
      */
     T* get() {
-        if (control_block == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return get_object();
     }
 
     /**
@@ -195,30 +257,30 @@ public:
      * MEM_NULL.
      */
     const T* get() const {
-        if (control_block == nullptr) {
+        if (is_null()) {
             return nullptr;
         }
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return get_object();
     }
 
     /**
      * @brief Dynamic cast to a different type of reference.
      *
-     * @todo Test
      * @tparam T1 The type to cast to.
-     * @return The casted reference. MEM_NULL if the cast fails.
+     * @return The casted reference, sharing ownership with this one and viewing the T1 subobject. MEM_NULL if the cast
+     * fails.
      */
     template <typename T1>
     Ref<T1, AllocType> dynamic_cast_ref() const {
-        if (control_block == nullptr || control_block->allocator == nullptr) {
-            return Ref<T1, AllocType>(nullptr);
+        if (is_null()) {
+            return Ref<T1, AllocType>();
         }
-        T1* casted_ptr = dynamic_cast<T1*>(static_cast<T*>(control_block->allocator->get(control_block->mem_id)));
+        T1* casted_ptr = dynamic_cast<T1*>(get_object());
         if (casted_ptr == nullptr) {
-            return MEM_NULL;
+            return Ref<T1, AllocType>();
         }
-        return Ref<T1, AllocType>(reinterpret_cast<Ref<T1, AllocType>::ControlBlock*>(control_block));
+        void* allocation = control_block->allocator->get(control_block->mem_id);
+        return Ref<T1, AllocType>(control_block, get_address_offset(allocation, casted_ptr));
     }
 
     /**
@@ -231,27 +293,19 @@ public:
     }
 
     T* operator->() {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return get_object();
     }
 
     const T* operator->() const {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return get_object();
     }
 
     T& operator*() {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<T*>(control_block->allocator->get(control_block->mem_id));
+        return *get_object();
     }
 
     const T& operator*() const {
-        WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return *static_cast<const T*>(control_block->allocator->get(control_block->mem_id));
+        return *get_object();
     }
 
     template <typename T1, typename AllocType1>
@@ -283,45 +337,81 @@ public:
         return !(*this == p_obj);
     }
 
-    int operator<=>(Ref<T> p_obj) const {
-        if (is_null()) {
-            if (p_obj.is_null()) {
-                return 0;
-            }
+    /**
+     * @brief Order references by their control block. Null references order first and equal to each other.
+     *
+     * @return Negative, zero, or positive.
+     */
+    template <typename T1, typename AllocType1>
+    int operator<=>(const Ref<T1, AllocType1>& p_obj) const {
+        const void* self = is_null() ? nullptr : static_cast<const void*>(control_block);
+        const void* other = p_obj.is_null() ? nullptr : static_cast<const void*>(p_obj.control_block);
+        if (std::less<const void*>{}(self, other)) {
             return -1;
         }
-        if (p_obj.is_null()) {
+        if (std::less<const void*>{}(other, self)) {
             return 1;
         }
-        // Compare based on the control block.
-        return static_cast<int>(std::hash<ControlBlock*>{}(control_block)) - std::hash<ControlBlock*>{}(p_obj.control_block);
+        return 0;
     }
 
 private:
-    Ref(ControlBlock* p_control_block) : control_block(p_control_block) {
+    Ref(ControlBlock* p_control_block, std::ptrdiff_t p_object_offset)
+        : control_block(p_control_block), object_offset(p_object_offset) {
         ref();
     }
 
-    struct ControlBlock {
-        ControlBlock(AllocType* p_alloc_type, MemID p_mem_id) : mem_id(p_mem_id), allocator(p_alloc_type) {
-            weak_ref_counter.store(0, std::memory_order_release);
-            strong_ref_counter.store(0, std::memory_order_release);
+    /**
+     * @brief Acquire a strong reference unless the object has already been destroyed.
+     *
+     * The strong count is only incremented while it is nonzero, so a reference that is being released concurrently
+     * cannot be revived.
+     */
+    static Ref acquire_from_weak(ControlBlock* p_control_block, std::ptrdiff_t p_object_offset) {
+        Ref result;
+        if (p_control_block == nullptr) {
+            return result;
         }
-        MemID control_block_mem_id = MEM_NULL;
-        MemID mem_id;
-        AllocType* allocator;
-        std::atomic<uint64_t> weak_ref_counter;
-        std::atomic<uint64_t> strong_ref_counter;
-    };
+        uint64_t strong_count = p_control_block->strong_ref_counter.load(std::memory_order_acquire);
+        while (strong_count != 0) {
+            if (p_control_block->strong_ref_counter.compare_exchange_weak(
+                    strong_count, strong_count + 1, std::memory_order_acq_rel, std::memory_order_acquire)) {
+                // The caller's weak reference keeps the control block alive until the hidden weak reference is added.
+                p_control_block->weak_ref_counter.fetch_add(1, std::memory_order_relaxed);
+                result.control_block = p_control_block;
+                result.object_offset = p_object_offset;
+                return result;
+            }
+        }
+        return result;
+    }
+
+    template <typename T1, typename AllocType1>
+    static std::ptrdiff_t get_converted_offset(const Ref<T1, AllocType1>& p_other) {
+        if (p_other.is_null()) {
+            return 0;
+        }
+        return get_converted_subobject_offset<T>(p_other.get_object(), p_other.object_offset);
+    }
+
+    static void destroy_created_object(void* p_allocator, MemID p_mem_id) {
+        destroy_obj<T>(*static_cast<AllocType*>(p_allocator), p_mem_id);
+    }
+
+    T* get_object() const {
+        WBE_DEBUG_ASSERT(control_block != nullptr);
+        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
+        return apply_subobject_offset<T>(control_block->allocator->get(control_block->mem_id), object_offset);
+    }
 
     void ref() const {
         if (control_block == nullptr) {
             return;
         }
-        control_block->strong_ref_counter.fetch_add(1, std::memory_order_release);
+        control_block->strong_ref_counter.fetch_add(1, std::memory_order_relaxed);
         // For all strong reference, create a hidden weak reference, since only
         // weak reference could destruct control block.
-        control_block->weak_ref_counter.fetch_add(1, std::memory_order_release);
+        control_block->weak_ref_counter.fetch_add(1, std::memory_order_relaxed);
     }
 
     void deref() const {
@@ -331,24 +421,24 @@ private:
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             // If all the references of the control block is freed, destroy the
             // object.
-            destroy_obj<T>(*(control_block->allocator), control_block->mem_id);
+            control_block->destroy_object(control_block->allocator, control_block->mem_id);
         }
         // Dereference the hidden weak reference.
         weak_deref();
-        control_block = nullptr;
     }
 
     void weak_deref() const {
-        uint32_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
-        if (weak_ref_count == 1 && control_block->strong_ref_counter.load(std::memory_order_acquire) == 0) {
-            // If this is the last weak reference referencing this, and no
-            // strong reference is referencing this, destroy the control block.
-            destroy_obj<typename Ref<T>::ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
+        uint64_t weak_ref_count = control_block->weak_ref_counter.fetch_sub(1, std::memory_order_acq_rel);
+        if (weak_ref_count == 1) {
+            // Every strong reference holds a hidden weak reference, so the last weak reference is also past the last
+            // strong reference: destroy the control block.
+            destroy_obj<ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
         }
         control_block = nullptr;
     }
 
     mutable ControlBlock* control_block;
+    std::ptrdiff_t object_offset = 0;
 };
 
 template <typename T>
@@ -362,6 +452,7 @@ concept ThisRefAsignable = requires(T* p_ins, Ref<T> p_ref) { p_ins->set_ref_of_
  * @param p_allocator The allocator to allocate the object.
  * @param p_args The arguments of the constructor.
  * @return The created reference.
+ * @throws std::runtime_error If p_allocator is nullptr.
  */
 template <typename T, typename AllocType = HeapAllocator, typename... Args>
 Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
@@ -374,6 +465,12 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
         result->set_ref_of_this(result);
     }
     return result;
+}
+
+template <typename T, typename AllocType>
+template <typename... Args>
+Ref<T, AllocType> Ref<T, AllocType>::make_ref(AllocType* p_allocator, Args&&... p_args) {
+    return WhiteBirdEngine::make_ref<T, AllocType>(p_allocator, std::forward<Args>(p_args)...);
 }
 
 } // namespace WhiteBirdEngine

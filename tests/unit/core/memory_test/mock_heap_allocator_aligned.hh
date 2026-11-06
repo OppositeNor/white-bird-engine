@@ -16,6 +16,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "utils/defs.hh"
 #include <cstdlib>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -28,6 +29,7 @@ public:
     }
 
     virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override {
+        std::scoped_lock lock(mutex);
         call_log << "allocate(" << p_size << ", " << p_alignment << "); ";
         if (p_size == 0 || used_size + p_size > max_size) {
             return MEM_NULL;
@@ -43,6 +45,7 @@ public:
     }
 
     virtual void deallocate(MemID p_mem_id) override {
+        std::scoped_lock lock(mutex);
         call_log << "deallocate(" << p_mem_id << "); ";
         auto it = allocations.find(p_mem_id);
         if (it != allocations.end()) {
@@ -53,6 +56,7 @@ public:
     }
 
     virtual void* get(MemID p_mem_id) const override {
+        std::scoped_lock lock(mutex);
         call_log << "get(" << p_mem_id << "); ";
         if (allocations.contains(p_mem_id)) {
             return reinterpret_cast<void*>(p_mem_id);
@@ -61,11 +65,13 @@ public:
     }
 
     size_t get_remain_size() const {
+        std::scoped_lock lock(mutex);
         call_log << "get_remain_size(); ";
         return max_size - used_size;
     }
 
     virtual void clear() override {
+        std::scoped_lock lock(mutex);
         call_log << "clear(); ";
         for (auto& kv : allocations) {
             free(reinterpret_cast<void*>(kv.first));
@@ -75,11 +81,13 @@ public:
     }
 
     virtual bool is_empty() const override {
+        std::scoped_lock lock(mutex);
         call_log << "is_empty(); ";
         return allocations.empty();
     }
 
     virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
+        std::scoped_lock lock(mutex);
         call_log << "get_allocated_data_size(" << p_mem_id << "); ";
         auto it = allocations.find(p_mem_id);
         if (it != allocations.end()) {
@@ -89,10 +97,12 @@ public:
     }
 
     std::string get_call_log() const {
+        std::scoped_lock lock(mutex);
         return call_log.str();
     }
 
     void clear_call_log() {
+        std::scoped_lock lock(mutex);
         call_log.str("");
         call_log.clear();
     }
@@ -102,6 +112,8 @@ private:
     size_t used_size{0};
     std::unordered_map<MemID, size_t> allocations;
     mutable std::stringstream call_log;
+    // Ref handles call get() from several threads in the multithreaded tests.
+    mutable std::recursive_mutex mutex;
 };
 
 } // namespace WhiteBirdEngine

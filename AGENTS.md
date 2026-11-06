@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a C++20 engine project.
+This is a C++23 engine project.
 
 Follow repository conventions and existing patterns.
 
@@ -390,7 +390,7 @@ Rules:
 
 ## Style
 
-- C++20. `.clang-format` is authoritative; key rules:
+- C++23. `.clang-format` is authoritative; key rules:
   - `PointerAlignment: Left`, `ReferenceAlignment: Left` (`T* p`, `T& r`).
   - `ColumnLimit: 125`.
   - No short single-line forms: functions, lambdas, blocks, `if`, loops, `case`, `enum` all break to next line.
