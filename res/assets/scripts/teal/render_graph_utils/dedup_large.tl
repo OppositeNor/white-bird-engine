@@ -82,7 +82,7 @@ function dedup_large.dispatches(p_buffers: dedup_large.DedupLargeBuffers): {Grap
     local dispatch = p_buffers.dispatch
     local dispatches: {Graph.RTParamsComputeDispatchVK} = {
         { pipeline = Graph.compute_pipeline("dedup_large_prepare_dispatch"),
-            aliases = { keys = keys, dispatch_buffer = dispatch } },
+            bindings = { keys = keys, dispatch_buffer = dispatch } },
     }
     local function append(p_dispatches: {Graph.RTParamsComputeDispatchVK})
         for _, entry in ipairs(p_dispatches) do

@@ -44,51 +44,51 @@ namespace WhiteBirdEngine {
 namespace {
 
 // The entry pipeline's descriptor layout with the entry's resource renames applied to its reflected resource ids.
-ShaderDescriptorHeapLayoutVK aliased_layout(const RTRunComputePipelinesSequentialVK::Entry& p_entry) {
+ShaderDescriptorHeapLayoutVK bound_layout(const RTRunComputePipelinesSequentialVK::Entry& p_entry) {
     ShaderDescriptorHeapLayoutVK layout = p_entry.pipeline->get_descriptor_layout();
-    for (const auto& [shader_resource_id, task_resource_id] : p_entry.resource_aliases) {
+    for (const auto& [shader_resource_id, task_resource_id] : p_entry.resource_bindings) {
         const bool reflected = std::ranges::any_of(layout.fields, [&shader_resource_id](const ShaderDescriptorHeapFieldVK& p_field) {
             return p_field.resource_id == shader_resource_id;
         });
         if (!reflected) {
             throw std::runtime_error(std::format(
-                "RTRunComputePipelinesSequentialVK: resource alias '{}' is not reflected by the dispatch's compute pipeline.",
+                "RTRunComputePipelinesSequentialVK: binding '{}' is not reflected by the dispatch's compute pipeline.",
                 shader_resource_id));
         }
     }
     for (ShaderDescriptorHeapFieldVK& field : layout.fields) {
-        auto alias = p_entry.resource_aliases.find(field.resource_id);
-        if (alias != p_entry.resource_aliases.end()) {
-            field.resource_id = alias->second;
+        auto binding = p_entry.resource_bindings.find(field.resource_id);
+        if (binding != p_entry.resource_bindings.end()) {
+            field.resource_id = binding->second;
         }
     }
     return layout;
 }
 
-// Copy a dispatch's recipe aliases, a map from reflected resource ids to task-local id strings, into p_entry.
-void read_dispatch_aliases(const DataValue& p_aliases, size_t p_dispatch_index, RTRunComputePipelinesSequentialVK::Entry& p_entry) {
+// Copy a dispatch's recipe bindings, a map from reflected resource ids to task-local id strings, into p_entry.
+void read_dispatch_bindings(const DataValue& p_bindings, size_t p_dispatch_index, RTRunComputePipelinesSequentialVK::Entry& p_entry) {
     // An empty Lua table reads as an empty list.
-    if (p_aliases.is_nil() || (p_aliases.get_kind() == DataValueKind::LIST && p_aliases.as_list().empty())) {
+    if (p_bindings.is_nil() || (p_bindings.get_kind() == DataValueKind::LIST && p_bindings.as_list().empty())) {
         return;
     }
-    if (p_aliases.get_kind() != DataValueKind::MAP) {
+    if (p_bindings.get_kind() != DataValueKind::MAP) {
         throw std::runtime_error(
-            std::format("RTRunComputePipelinesSequentialVK: aliases of dispatch {} must be a map.", p_dispatch_index));
+            std::format("RTRunComputePipelinesSequentialVK: bindings of dispatch {} must be a map.", p_dispatch_index));
     }
-    for (const auto& [shader_resource_id, task_resource_id] : p_aliases.as_map()) {
+    for (const auto& [shader_resource_id, task_resource_id] : p_bindings.as_map()) {
         if (!task_resource_id.is_string()) {
             throw std::runtime_error(std::format(
-                "RTRunComputePipelinesSequentialVK: alias '{}' of dispatch {} must map to a task-local resource id string.",
+                "RTRunComputePipelinesSequentialVK: binding '{}' of dispatch {} must map to a task-local resource id string.",
                 shader_resource_id,
                 p_dispatch_index));
         }
-        p_entry.resource_aliases.emplace(shader_resource_id, task_resource_id.as_string());
+        p_entry.resource_bindings.emplace(shader_resource_id, task_resource_id.as_string());
     }
 }
 
 } // namespace
 
-RTRunComputePipelinesSequentialVK::Entry::Entry(RenderAllocator* p_allocator) : resource_aliases(p_allocator) {
+RTRunComputePipelinesSequentialVK::Entry::Entry(RenderAllocator* p_allocator) : resource_bindings(p_allocator) {
 }
 
 RTRunComputePipelinesSequentialVK::Dispatch::Dispatch(RenderAllocator* p_allocator) : allocator(p_allocator), entries(p_allocator) {
@@ -125,7 +125,7 @@ RTRunComputePipelinesSequentialVK::RTRunComputePipelinesSequentialVK(
         if (entry.indirect_buffer_id.empty() && entry.indirect_offset != 0) {
             throw std::runtime_error("RTRunComputePipelinesSequentialVK: a direct dispatch sets an indirect buffer offset.");
         }
-        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, aliased_layout(entry)));
+        descriptor_bindings.push_back(make_unique<PipelineDescriptorBindingsVK>(render_data->allocator, render_data, bound_layout(entry)));
     }
     indirect_buffer_containers.resize(entries.size(), MEM_NULL);
 }
@@ -235,7 +235,7 @@ Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderCont
         dispatch_entry.group_count = VkExtent3D{.width = entry.group_count_x, .height = entry.group_count_y, .depth = entry.group_count_z};
         dispatch_entry.indirect_buffer_id = entry.indirect_buffer;
         dispatch_entry.indirect_offset = entry.indirect_offset;
-        read_dispatch_aliases(entry.aliases, i, dispatch_entry);
+        read_dispatch_bindings(entry.bindings, i, dispatch_entry);
         dispatch.add_entry(std::move(dispatch_entry));
     }
     Unique<RTRunComputePipelinesSequentialVK> task =

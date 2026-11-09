@@ -81,12 +81,12 @@ function large_prefix_scan.dispatches(p_data: Graph.Resource,
     local dispatch = p_buffers.dispatch
     return {
         { pipeline = Graph.compute_pipeline("large_prefix_scan_prepare_dispatch"),
-            aliases = { data_buffer = p_data, dispatch_buffer = dispatch } },
+            bindings = { data_buffer = p_data, dispatch_buffer = dispatch } },
         Graph.indirect_dispatch(Graph.compute_pipeline("large_prefix_scan_blocks"), dispatch, 0,
             { data_buffer = p_data, sections_buffer = sections }),
         { pipeline = Graph.compute_pipeline("large_prefix_scan_sections"),
-            group_count_x = LARGE_PREFIX_SCAN_SECTION_NUM, aliases = { data_buffer = p_data, sections_buffer = sections } },
-        { pipeline = Graph.compute_pipeline("large_prefix_scan_totals"), aliases = { sections_buffer = sections } },
+            group_count_x = LARGE_PREFIX_SCAN_SECTION_NUM, bindings = { data_buffer = p_data, sections_buffer = sections } },
+        { pipeline = Graph.compute_pipeline("large_prefix_scan_totals"), bindings = { sections_buffer = sections } },
         Graph.indirect_dispatch(Graph.compute_pipeline("large_prefix_scan_add"), dispatch, 0,
             { data_buffer = p_data, sections_buffer = sections }),
     }

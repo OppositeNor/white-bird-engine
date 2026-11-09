@@ -67,7 +67,7 @@ function svo_3.add_leaf_deduplication(p_graph: Graph.Graph, p_params: svo_3.Leaf
     -- The clamping of the leaf count and the deduplication run as one task.
     local dispatches: {Graph.RTParamsComputeDispatchVK} = {
         { pipeline = p_graph:add_compute_pipeline("svo_3_prepare_leaves_shader"),
-            aliases = { svo_info = p_params.svo_info, svo_deferred_list = deferred_list } },
+            bindings = { svo_info = p_params.svo_info, svo_deferred_list = deferred_list } },
     }
     for _, dispatch in ipairs(dedup_large.dispatches(buffers)) do
         dispatches[#dispatches + 1] = dispatch

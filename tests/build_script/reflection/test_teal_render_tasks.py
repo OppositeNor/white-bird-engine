@@ -91,7 +91,7 @@ class TealRenderTasksTest(unittest.TestCase):
             {"name": "transform", "type": "Resource"},
             {"name": "counts", "type": "{integer}"},
         ])
-        self.assertEqual(interfaces["RTParamsDispatchVK"][2], {"name": "aliases", "type": "{string:Resource | string}"})
+        self.assertEqual(interfaces["RTParamsDispatchVK"][2], {"name": "aliases", "type": "{string:Resource}"})
 
     def test_bare_render_task_has_no_constructor(self) -> None:
         params = _params("RTParamsComputeVK", [])

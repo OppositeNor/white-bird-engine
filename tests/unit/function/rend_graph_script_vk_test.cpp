@@ -884,10 +884,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParameter
     const DataValue& sequence_aliases = tasks[5].get_entry("aliases");
     const std::string indirect_local = dispatches[1].get_value<std::string>("indirect_buffer");
     EXPECT_EQ(sequence_aliases.get_value<std::string>(indirect_local), "commands");
-    const std::string shader_local = dispatches[1].get_entry("aliases").get_value<std::string>("shader_buffer");
+    const std::string shader_local = dispatches[1].get_entry("bindings").get_value<std::string>("shader_buffer");
     EXPECT_EQ(sequence_aliases.get_value<std::string>(shader_local), "commands");
-    EXPECT_EQ(dispatches[2].get_value<std::string>("indirect_buffer"), "commands_local");
-    EXPECT_EQ(dispatches[2].get_entry("aliases").get_value<std::string>("shader_buffer"), "commands_local");
+    // A handle lowers to its graph id, which the task maps to itself.
+    EXPECT_EQ(dispatches[2].get_value<std::string>("indirect_buffer"), "commands");
+    EXPECT_EQ(dispatches[2].get_entry("bindings").get_value<std::string>("shader_buffer"), "commands");
     EXPECT_EQ(tasks[6].get_value<std::string>("type"), "generate_mipmaps");
     EXPECT_EQ(tasks[6].get_entry("params").get_value<std::string>("source_view"), "color_image.view");
     EXPECT_EQ(tasks[6].get_entry("params").get_value<std::string>("mip_chain_view"), "color_mips");
@@ -1084,7 +1085,7 @@ return { build = function()
             function() graph:compute_sequential("invalid", { dispatches = {
                 { pipeline = compute, indirect_buffer = resource } } }) end,
             function() graph:compute_sequential("invalid", { dispatches = {
-                { pipeline = compute, aliases = { invalid = resource } } } }) end,
+                { pipeline = compute, bindings = { invalid = resource } } } }) end,
             function() consumer:alias("invalid", resource) end,
             function() producer:connect(consumer, resource) end,
             function() producer:connect(consumer, { buffer, resource }) end,
@@ -1233,12 +1234,12 @@ return { build = function()
     params.indirect_buffer = other
     options.aliases.input = other
     graph:compute_indirect("second", params, options)
-    local dispatch = { pipeline = compute_pipeline("nested"), indirect_buffer = buffer, aliases = { shader_buffer = buffer } }
+    local dispatch = { pipeline = compute_pipeline("nested"), indirect_buffer = buffer, bindings = { shader_buffer = buffer } }
     graph:compute_sequential("sequence", { dispatches = { dispatch } })
     assert(dispatch.indirect_buffer == buffer)
-    assert(dispatch.aliases.shader_buffer == buffer)
+    assert(dispatch.bindings.shader_buffer == buffer)
     dispatch.indirect_buffer = other
-    dispatch.aliases.shader_buffer = other
+    dispatch.bindings.shader_buffer = other
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -1250,7 +1251,7 @@ end }
     const auto& dispatch = tasks[2].get_entry("params").get_entry("dispatches").as_list()[0];
     const auto& aliases = tasks[2].get_entry("aliases");
     EXPECT_EQ(aliases.get_value<std::string>(dispatch.get_value<std::string>("indirect_buffer")), "commands");
-    EXPECT_EQ(aliases.get_value<std::string>(dispatch.get_entry("aliases").get_value<std::string>("shader_buffer")), "commands");
+    EXPECT_EQ(aliases.get_value<std::string>(dispatch.get_entry("bindings").get_value<std::string>("shader_buffer")), "commands");
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, AttachmentMethodsKeepAliasesTaskScopedAndRejectDuplicateTargets) {
@@ -1303,7 +1304,7 @@ end }
 )", DataValue::make_map()), std::runtime_error);
 }
 
-TEST_F(WBERendGraphScriptVKResourceTest, SequentialHandleBindingsPreserveSameNameResourcesAndRejectConflictingAliases) {
+TEST_F(WBERendGraphScriptVKResourceTest, SequentialBindingsTakeHandlesAndRejectConflictingAliases) {
     const DataValue recipe = RendGraphScriptVK::run("sequential_identity_bindings", R"(
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
@@ -1312,20 +1313,37 @@ local function compute_pipeline(p_key)
 end
 return { build = function()
     local commands = graph_utils.storage_buffer("commands", 64)
-    local same_name = graph_utils.storage_buffer("__render_graph_resource_1", 64)
+    local input = graph_utils.storage_buffer("input_buffer", 64)
     local graph = graph_utils.graph()
     graph:compute_sequential("sequence", { dispatches = {
         { pipeline = compute_pipeline("first"), indirect_buffer = commands },
-        { pipeline = compute_pipeline("second"), aliases = { input = "__render_graph_resource_1" } },
-    } }, { uses = { same_name } })
+        { pipeline = compute_pipeline("second"), bindings = { input = input } },
+    } })
     return graph:build()
 end }
 )", DataValue::make_map());
     const auto& task = recipe.get_entry("tasks").as_list()[0];
     EXPECT_EQ(task.get_entry("aliases").get_value<std::string>("commands"), "commands");
-    EXPECT_FALSE(task.get_entry("aliases").contains("__render_graph_resource_1"));
+    EXPECT_EQ(task.get_entry("aliases").get_value<std::string>("input_buffer"), "input_buffer");
     const auto& dispatches = task.get_entry("params").get_entry("dispatches").as_list();
-    EXPECT_EQ(dispatches[1].get_entry("aliases").get_value<std::string>("input"), "__render_graph_resource_1");
+    EXPECT_EQ(dispatches[1].get_entry("bindings").get_value<std::string>("input"), "input_buffer");
+    // Bindings and indirect buffers take handles, not task-local names.
+    for (const char* dispatch : {"{ pipeline = compute_pipeline(\"second\"), bindings = { input = \"input_buffer\" } }",
+             "{ pipeline = compute_pipeline(\"second\"), indirect_buffer = \"commands\" }"}) {
+        SCOPED_TRACE(dispatch);
+        EXPECT_THROW((void)RendGraphScriptVK::run("string_binding", std::string(R"(
+local graph_utils = require("render_graph_utils.render_graph_utils")
+local helper_graph = graph_utils.new()
+local function compute_pipeline(p_key)
+    return helper_graph:add_compute_pipeline(p_key)
+end
+return { build = function()
+    local graph = graph_utils.graph()
+    graph:compute_sequential("sequence", { dispatches = { )") + dispatch + R"( } })
+    return graph:build()
+end }
+)", DataValue::make_map()), std::runtime_error);
+    }
     EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_sequential_alias", R"(
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
@@ -1472,7 +1490,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequ
     ASSERT_EQ(dispatches.size(), 30U);
     const DataValue& aliases = deduplicate.get_entry("aliases");
     const auto bound = [&](const DataValue& p_dispatch, std::string_view p_name) {
-        return aliases.get_value<std::string>(p_dispatch.get_entry("aliases").get_value<std::string>(p_name));
+        return aliases.get_value<std::string>(p_dispatch.get_entry("bindings").get_value<std::string>(p_name));
     };
     EXPECT_EQ(dispatches[0].get_value<std::string>("pipeline"), "svo_3_prepare_leaves_shader");
     EXPECT_EQ(dispatches[1].get_value<std::string>("pipeline"), "dedup_large_prepare_dispatch");
@@ -1542,7 +1560,7 @@ local sort = require("render_graph_utils.sort")
 return { build = function()
     local graph = Graph.new()
     local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
-    graph:add(sort.radix_sort_task("sort", sort.radix_sort_buffers(names, 1000), nil, { begin_bit = 8, end_bit = 24 }))
+    sort.add_radix_sort_task(graph, "sort", sort.radix_sort_buffers(names, 1000), nil, { begin_bit = 8, end_bit = 24 })
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -1553,7 +1571,7 @@ end }
     EXPECT_EQ(dispatches[10].get_value<std::string>("pipeline"), "radix_sort_scatter_16_24");
     // The second pass scatters back into the key buffer.
     EXPECT_EQ(task.get_entry("aliases").get_value<std::string>(
-                  dispatches[10].get_entry("aliases").get_value<std::string>("output_buffer")),
+                  dispatches[10].get_entry("bindings").get_value<std::string>("output_buffer")),
         "keys");
 }
 

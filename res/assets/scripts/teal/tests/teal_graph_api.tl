@@ -54,12 +54,11 @@ function exports.build(): wbe.RendGraphRecipeVK
         queue_family = "compute_1",
         dispatches = {
             { pipeline = direct_pipeline, group_count_x = 2 },
-            { pipeline = indirect_pipeline, indirect_buffer = buffer, aliases = { shader_buffer = buffer } },
-            graph:indirect_dispatch(local_pipeline, "commands_local", 0,
-                { shader_buffer = "commands_local" }),
+            { pipeline = indirect_pipeline, indirect_buffer = buffer, bindings = { shader_buffer = buffer } },
+            graph:indirect_dispatch(local_pipeline, buffer, 0, { shader_buffer = buffer }),
         },
     }
-    graph:compute_sequential("sequence", sequential_params, { aliases = { commands_local = buffer } })
+    graph:compute_sequential("sequence", sequential_params)
     graph:generate_mipmaps("mipmaps", { source_view = color, mip_chain_view = mip_chain, format = "r16g16b16a16_sfloat" })
     graph:cpu_acquire_image("readback", { image_view = color })
     graph:full_memory_barrier("barrier", { resource = buffer })

@@ -81,7 +81,7 @@ TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks
     EXPECT_NE(declarations.find("        transform: Resource\n"), std::string::npos);
     EXPECT_NE(declarations.find("        parts: {wbe.MeshPartVK}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        dispatches: {RTParamsComputeDispatchVK}\n"), std::string::npos);
-    EXPECT_NE(declarations.find("        aliases: {string:Resource | string}\n"), std::string::npos);
+    EXPECT_NE(declarations.find("        bindings: {string:Resource}\n"), std::string::npos);
     EXPECT_NE(constructors.find("{ name = \"mesh\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::MeshResourcesVK\" }"),
         std::string::npos);
     EXPECT_NE(constructors.find("{ name = \"pipeline\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::ROGraphicsPipelineVK\" }"),

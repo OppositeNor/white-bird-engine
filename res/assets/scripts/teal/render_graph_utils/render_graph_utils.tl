@@ -375,9 +375,9 @@ end
 
 -- A dispatch accepts graph handles or task-local strings, resolved inside the containing task's handle bindings.
 function render_graph.indirect_dispatch(p_pipeline: render_graph.Resource,
-    p_indirect_buffer: render_graph.Resource | string, p_offset: integer,
-    p_aliases?: {string:render_graph.Resource | string}): render_graph.RTParamsComputeDispatchVK
-    return { pipeline = p_pipeline, indirect_buffer = p_indirect_buffer, indirect_offset = p_offset, aliases = p_aliases }
+    p_indirect_buffer: render_graph.Resource, p_offset: integer,
+    p_bindings?: {string:render_graph.Resource}): render_graph.RTParamsComputeDispatchVK
+    return { pipeline = p_pipeline, indirect_buffer = p_indirect_buffer, indirect_offset = p_offset, bindings = p_bindings }
 end
 
 function render_graph.subgraph(p_id: string, p_recipe: wbe.RendGraphRecipeVK,
@@ -393,12 +393,9 @@ local function copy_fields<T>(p_value: T): {string:any}
     return result
 end
 
-local function resource_id(p_value: render_graph.Resource | string, p_uses: {render_graph.Resource}): string
+local function resource_id(p_value: render_graph.Resource, p_uses: {render_graph.Resource}): string
     if p_value == nil then
         return nil
-    end
-    if p_value is string then
-        return p_value
     end
     validate_graph_resource(p_value)
     p_uses[#p_uses + 1] = p_value
@@ -532,9 +529,9 @@ function render_graph.graph(): render_graph.Graph
     end
 
     function graph:indirect_dispatch(p_pipeline: render_graph.Resource,
-        p_indirect_buffer: render_graph.Resource | string, p_offset: integer,
-        p_aliases?: {string:render_graph.Resource | string}): render_graph.RTParamsComputeDispatchVK
-        return render_graph.indirect_dispatch(p_pipeline, p_indirect_buffer, p_offset, p_aliases)
+        p_indirect_buffer: render_graph.Resource, p_offset: integer,
+        p_bindings?: {string:render_graph.Resource}): render_graph.RTParamsComputeDispatchVK
+        return render_graph.indirect_dispatch(p_pipeline, p_indirect_buffer, p_offset, p_bindings)
     end
 
     function graph:as_subgraph(p_id: string, p_ports: {string:render_graph.Resource},
@@ -653,12 +650,12 @@ function render_graph.graph(): render_graph.Graph
                 if p_field.scope == "registered" then
                     return registered_key(p_value, p_field.expected_type, task_registrations)
                 end
-                local resource = p_value as render_graph.Resource | string
-                if resource is string and p_field.scope == "graph" then
-                    error("render_graph: graph resource fields take handles; name '" .. resource ..
+                if p_value is string then
+                    error("render_graph: resource fields take handles; name '" .. p_value ..
                         "' with graph:reference().", 4)
                 end
-                if not (resource is string) and p_field.scope == "task_local" then
+                local resource = p_value as render_graph.Resource
+                if p_field.scope == "task_local" then
                     task_local_uses[#task_local_uses + 1] = resource
                 end
                 return resource_id(resource, uses)

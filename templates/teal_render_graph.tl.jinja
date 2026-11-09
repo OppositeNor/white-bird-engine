@@ -130,8 +130,8 @@ local record render_graph
         port: function(self: Graph, p_id: string): Resource
         reference: function(self: Graph, p_id: string): Resource
         indirect_dispatch: function(self: Graph, p_pipeline: Resource,
-            p_indirect_buffer: Resource | string, p_offset: integer,
-            p_aliases?: {string:Resource | string}): {{ dispatch.type }}
+            p_indirect_buffer: Resource, p_offset: integer,
+            p_bindings?: {string:Resource}): {{ dispatch.type }}
         as_subgraph: function(self: Graph, p_id: string, p_ports: {string:Resource}, p_imports?: {string}): Task
         add: function(self: Graph, p_task: Task): Task
         get: function(self: Graph, p_id: string): Task
@@ -169,8 +169,8 @@ local record render_graph
     import_resource: function(p_id: string): Resource
     port: function(p_id: string): Resource
     reference: function(p_id: string): Resource
-    indirect_dispatch: function(p_pipeline: Resource, p_indirect_buffer: Resource | string, p_offset: integer,
-        p_aliases?: {string:Resource | string}): {{ dispatch.type }}
+    indirect_dispatch: function(p_pipeline: Resource, p_indirect_buffer: Resource, p_offset: integer,
+        p_bindings?: {string:Resource}): {{ dispatch.type }}
     subgraph: function(p_id: string, p_recipe: wbe.RendGraphRecipeVK, p_ports: {string:Resource}): Task
     graph: function(): Graph
     new: function(): Graph

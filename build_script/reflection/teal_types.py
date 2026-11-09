@@ -215,9 +215,8 @@ class _RenderTaskDescriber:
         if p_scope is not None:
             scope, target = p_scope
             resource = {"kind": "resource", "scope": scope}
-            # A task-local field may name a binding of the task's own namespace, which its aliases map; graph and
-            # registered fields take handles only (graph:reference() names a graph resource by id).
-            resource_type = "Resource | string" if scope == "task_local" else "Resource"
+            # Every resource field takes handles only; graph:reference() names a graph resource by id.
+            resource_type = "Resource"
             if scope == "registered":
                 resource["expected_type"] = "WhiteBirdEngine::" + target
                 resource_type = "Resource"
@@ -262,8 +261,9 @@ def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect
     """Describe the Graph constructors of render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
 
     A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated
-    WBE_RECIPE_RESOURCE(graph) hold graph resource ids and accept only handles, and those annotated
-    WBE_RECIPE_RESOURCE(task_local) hold ids the task's aliases map and also accept those ids as strings. WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T,
+    WBE_RECIPE_RESOURCE(graph) hold graph resource ids, and those annotated WBE_RECIPE_RESOURCE(task_local) hold ids the
+    task's aliases map; both take resource handles, which a task-local field lowers to the graph id with an identity
+    alias. WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T,
     whose canonical type is recorded for runtime validation.
     These are std::string fields, optional or in a vector, or a DataValue map of them. Params that hold such fields,
     directly or in nested params, get an authoring interface, which accepts resource handles in their place.

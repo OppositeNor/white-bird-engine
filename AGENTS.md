@@ -196,8 +196,10 @@ For non-trivial implementation tasks:
   (`templates/teal_render_graph_tasks.tl.jinja`) from the task classes annotated `WBE_RENDER_TASK(<method>)`; each creates
   the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare `WBE_RENDER_TASK` only registers the
   type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)`, `WBE_RECIPE_RESOURCE(task_local)`, or
-  `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor accepts resource
-  handles there; do not hand-write constructors or handle-bearing params records.
+  `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor takes resource
+  handles there, and only handles: a script names a resource by id with `graph:reference(id)`, never a string, and a
+  task-local field lowers its handle to the graph id with an identity alias. Do not hand-write constructors or
+  handle-bearing params records.
 
 ### Scripts
 

@@ -61,6 +61,11 @@ copied, so a table can be reused for several tasks.
   handle passed in params cannot be redirected by an alias of the same name.
 - `task:color_target(index, resource)` and `task:depth_target(resource)` alias `render_target_colors[<index>]` and
   `render_target_depth`.
+- A `compute_sequential` dispatch's `bindings` (and `indirect_dispatch()`'s last argument) map the shader resource ids
+  of that dispatch's pipeline to graph resource handles, so dispatches of one task can bind the same shader id
+  differently (the radix sort's passes alternate between its key buffers). Bindings belong to one dispatch; aliases
+  belong to the task. Resource fields of typed params take handles only, never id strings: name a resource by id with
+  `graph:reference(id)`.
 - `uses = { handle, ... }` keeps resources reachable that the task accesses only through same-name reflected shader
   bindings (for example a camera buffer or a single-task scratch buffer). It declares no access and adds no edge.
 - `graph:import_task(id)` references a C++ task supplied with `imports.add_task()`.
@@ -153,7 +158,7 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
 
 1. Write `include/function/render_vk/rt_params_<name>_vk.hh` with
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
-   fields `WBE_REFLECT_REQUIRED`. Mark fields that hold ids so the constructor accepts handles there:
+   fields `WBE_REFLECT_REQUIRED`. Mark fields that hold ids so the constructor takes handles (only handles) there:
    `WBE_RECIPE_RESOURCE(graph)` for graph resource ids, `WBE_RECIPE_RESOURCE(task_local)` for ids the task's aliases map,
    and `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` for keys registered on the graph such as pipelines and meshes (the type
    must be a `WBE_RENDER_OBJECT` class). Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.

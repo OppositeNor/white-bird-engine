@@ -48,12 +48,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     uint64_t indirect_offset = 0;
     /**
-     * @brief Map from a resource id the dispatch's pipeline reflects to the task-local resource id it binds, which the
-     * task's own aliases then map to a graph resource. Lets dispatches of one task bind one shader resource to different
-     * resources.
+     * @brief Bindings of the dispatch's pipeline: a map from a resource id the pipeline reflects to the task-local resource
+     * id it binds, which the task's aliases then map to a graph resource. Lets dispatches of one task bind one shader
+     * resource to different resources.
      */
     WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(task_local))
-    DataValue aliases;
+    DataValue bindings;
     /**
      * @brief Dispatch workgroup count along x passed to vkCmdDispatch.
      */
