@@ -110,7 +110,7 @@ For non-trivial implementation tasks:
 ### Render Graph Recipes
 
 - A recipe is a Teal `script` resource whose module exports `build(context)`. It creates a graph with
-  `Graph.new()` (`render_graph_utils.render_graph_utils`), declares resources as handles, adds tasks with the typed
+  `render_graph.new()` (`render_graph_utils.render_graph_utils`), declares resources as handles, adds tasks with the typed
   constructors, and returns `graph:build()`, which emits the plain `RendGraphRecipeVK` table (`imports`, `resources`,
   `tasks`; see `rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK` runs it and
   `RendGraphRecipeBuilderVK` turns it into a `RendGraphDescVK`; recipes only build descriptors and never touch render objects.
@@ -128,8 +128,8 @@ For non-trivial implementation tasks:
   `register_image()` (which returns an import handle), or `register_resource(key, type, description, resource_type)` for
   custom description types, emitted in order as `registrations` (`{ key, type, description }`, where `type` is the
   reflected name of the description struct, resolved through `TypeUUIDManager`) and applied before that level's imports and
-  tasks. A handle can also carry its registration: `Graph.compute_pipeline(key, description)`,
-  `Graph.graphics_pipeline(key, description)`, and `Graph.shader_compute_pipeline(shader)` (registered from the shader of
+  tasks. A handle can also carry its registration: `render_graph.compute_pipeline(key, description)`,
+  `render_graph.graphics_pipeline(key, description)`, and `render_graph.shader_compute_pipeline(shader)` (registered from the shader of
   the same key) need no graph, so shared helpers use them; a typed task (or a multiplexer's branches) naming such a handle
   emits its registration, and equal registrations of a key merge while different ones fail. Recipes and feature modules
   register the pipelines they name this way; C++ registers only what C++ tasks use or what needs a loaded handle.
@@ -142,7 +142,7 @@ For non-trivial implementation tasks:
   optional `toggle` (`{ event, enabled }`) wraps it with `RTToggleVK`, outside any trigger. Rebuilds re-run the recipe, so
   pass a toggle's current state through the context.
 - A task that records one of several alternatives is a multiplexer (`RTMultiplexerVK`): build the branches with the typed
-  constructors on a scratch `Graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
+  constructors on a scratch `render_graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
   It is one graph node reporting every branch's accesses; the branches share its bindings and one queue family, and
   `RTMultiplexerVK::Command` events select the branch. Pass the current branch through the context, as for a toggle.
 - Task `pipeline` params are registration keys of pipelines on the task's graph, registered by the callback or the recipe.
@@ -188,7 +188,7 @@ For non-trivial implementation tasks:
   wbe.RendGraphRecipeVK`. Reflected enum fields are declared as their Teal enum of names and aliases, without integers:
   enums serialize as their canonical names; compare `render_graph_utils.render_graph_utils.enum_name(value)` with the
   canonical upper-case name, which also accepts the lowercase aliases.
-  The typed constructors check params against the generated `Graph.RTParams<Name>VK` interfaces; when adding a raw task
+  The typed constructors check params against the generated `render_graph.RTParams<Name>VK` interfaces; when adding a raw task
   with `graph:add()`, type its `params` with the reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`),
   since `RendRecipeTaskVK.params` is untyped. The generated repo-root `tlconfig.lua` points the Teal language server at the
   same paths for the last built target.

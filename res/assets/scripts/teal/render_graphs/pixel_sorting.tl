@@ -31,7 +31,7 @@ local UINT32_SIZE = 4
 
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 
 local ceil_div = math_utils.ceil_div
@@ -62,7 +62,7 @@ local RADIX_SORT_BUFFER_NAMES: sort.RadixSortBufferNames = {
 local function make_layout(p_context: wbe.PixelSortingRecipeContext): Layout
     local width = p_context.source_width
     local height = p_context.source_height
-    local orientation_name = Graph.enum_name(p_context.orientation)
+    local orientation_name = render_graph.enum_name(p_context.orientation)
     if orientation_name ~= "VERTICAL" and orientation_name ~= "HORIZONTAL" then
         error("pixel_sorting: unknown orientation '" .. orientation_name .. "'.")
     end
@@ -82,48 +82,48 @@ local function make_layout(p_context: wbe.PixelSortingRecipeContext): Layout
 end
 
 local record Resources
-    column_offsets: Graph.Resource
-    destination: Graph.Resource
-    post_processing_output: Graph.Resource
-    mask: Graph.Resource
-    sampler: Graph.Resource
+    column_offsets: render_graph.Resource
+    destination: render_graph.Resource
+    post_processing_output: render_graph.Resource
+    mask: render_graph.Resource
+    sampler: render_graph.Resource
     sort_buffers: sort.RadixSortBuffers
-    swap_chain: Graph.Resource
-    source: Graph.Resource
-    contrast: Graph.Resource
-    post_processing_params: Graph.Resource
+    swap_chain: render_graph.Resource
+    source: render_graph.Resource
+    contrast: render_graph.Resource
+    post_processing_params: render_graph.Resource
 end
 
 local function make_resources(p_layout: Layout): Resources
     local width = p_layout.width
     local height = p_layout.height
     return {
-        column_offsets = Graph.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
-        destination = Graph.storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
+        column_offsets = render_graph.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
+        destination = render_graph.storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
             :view("pixel_sort_destination"),
         -- The screenshot reads the result back through a transfer.
-        post_processing_output = Graph.storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat",
+        post_processing_output = render_graph.storage_image("pixel_sorting_post_processing_output_image", "r16g16b16a16_sfloat",
             width, height, { "transfer_src" }):view("pixel_sorting_post_processing_output"),
         -- Stores each masked pixel's rank within its line, with 0xFFFF marking unmasked pixels.
-        mask = Graph.storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
-        sampler = Graph.clamp_to_edge_sampler("pixel_sort_sampler"),
+        mask = render_graph.storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
+        sampler = render_graph.clamp_to_edge_sampler("pixel_sort_sampler"),
         -- The register pass writes and the write pass reads the keys; size the sort for every masked pixel.
         sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, p_layout.element_count),
-        swap_chain = Graph.import_resource("swap_chain"),
-        source = Graph.import_resource("pixel_sort_source"),
-        contrast = Graph.import_resource("pixel_sort_contrast"),
-        post_processing_params = Graph.import_resource("pixel_sorting_post_processing_params"),
+        swap_chain = render_graph.import_resource("swap_chain"),
+        source = render_graph.import_resource("pixel_sort_source"),
+        contrast = render_graph.import_resource("pixel_sort_contrast"),
+        post_processing_params = render_graph.import_resource("pixel_sorting_post_processing_params"),
     }
 end
 
 local record KeyRegistrationTasks
-    count_mask: Graph.Task
-    prefix_sum: Graph.Task
-    register_keys: Graph.Task
+    count_mask: render_graph.Task
+    prefix_sum: render_graph.Task
+    register_keys: render_graph.Task
 end
 
 -- Count the masked pixels of every line, sum them into the column offsets, and register their sort keys.
-local function add_key_registration(p_graph: Graph.Graph, p_layout: Layout,
+local function add_key_registration(p_graph: render_graph.Graph, p_layout: Layout,
     p_resources: Resources): KeyRegistrationTasks
     local orientation = p_layout.orientation
     local count_mask_pipeline = p_graph:add_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
@@ -148,14 +148,14 @@ local function add_key_registration(p_graph: Graph.Graph, p_layout: Layout,
 end
 
 local record OutputTasks
-    write_pixels: Graph.Task
-    post_processing: Graph.Task
-    present: Graph.Task
-    draw_imgui: Graph.Task
+    write_pixels: render_graph.Task
+    post_processing: render_graph.Task
+    present: render_graph.Task
+    draw_imgui: render_graph.Task
 end
 
 -- Write the sorted pixels, post-process them, and present the result under the application's ImGui overlay.
-local function add_output(p_graph: Graph.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
+local function add_output(p_graph: render_graph.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
     local tile_group_count_x = p_layout.tile_group_count_x
     local tile_group_count_y = p_layout.tile_group_count_y
     local write_pixels_pipeline = p_graph:add_compute_pipeline("write_sorted_pixels_" .. p_layout.orientation .. "_shader")
@@ -187,8 +187,8 @@ end
 
 -- Order the line bookkeeping and the keys before the write, and the output images through post-processing and
 -- presentation.
-local function connect_tasks(p_graph: Graph.Graph, p_resources: Resources, p_registration: KeyRegistrationTasks,
-    p_radix_sort: Graph.Task, p_output: OutputTasks)
+local function connect_tasks(p_graph: render_graph.Graph, p_resources: Resources, p_registration: KeyRegistrationTasks,
+    p_radix_sort: render_graph.Task, p_output: OutputTasks)
     p_graph:chain(p_resources.column_offsets,
         { p_registration.count_mask, p_registration.prefix_sum, p_registration.register_keys, p_output.write_pixels })
     p_graph:chain(p_resources.mask, { p_registration.register_keys, p_output.write_pixels })
@@ -202,7 +202,7 @@ local exports = {}
 
 function exports.build(context: wbe.PixelSortingRecipeContext): wbe.RendGraphRecipeVK
     local layout = make_layout(context)
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local resources = make_resources(layout)
     local registration = add_key_registration(graph, layout, resources)
     local radix_sort = sort.add_radix_sort_task(graph, "radix_sort", resources.sort_buffers)

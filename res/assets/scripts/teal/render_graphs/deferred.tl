@@ -26,7 +26,7 @@
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
 local math_utils = require("utils.math")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 
 local ceil_div = math_utils.ceil_div
 
@@ -42,21 +42,21 @@ local BLOOM_TILE_SIZE = 16
 
 local record VoxelFeature
     -- The structure as a subgraph task, whose overlays draw on the target's color and depth.
-    subgraph: function(p_id: string, p_params: any, p_target: voxel.Target): Graph.Task
+    subgraph: function(p_id: string, p_params: any, p_target: voxel.Target): render_graph.Task
     -- Whether the subgraph injects radiance from the target's reflective-shadow-map slots, so it follows the lights' shadow
     -- passes.
     injects_radiance: boolean
 end
 
 local record PostProcessingTarget
-    color_view: Graph.Resource
+    color_view: render_graph.Resource
     width: integer
     height: integer
 end
 
 local record PostProcessingFeature
     -- The effect as a subgraph task, which modifies the target's color view in place.
-    subgraph: function(p_id: string, p_params: any, p_target: PostProcessingTarget): Graph.Task
+    subgraph: function(p_id: string, p_params: any, p_target: PostProcessingTarget): render_graph.Task
 end
 
 local function light_id(p_base: string, p_light: integer): string
@@ -75,54 +75,54 @@ local CLEAR_MOMENTS: wbe.RTParamsClearValueVK = { color = { 1.0, 1.0, 0.0, 0.0 }
 -- The recipe under construction, shared by the build steps. The handle map lets the per-light passes share their
 -- resources; the graph discovers declarations only from task references and connections.
 local record LightTasks
-    run_shadow_opaque: Graph.Task
-    run_shadow_double_sided: Graph.Task
-    dynamic_shadow: Graph.Task
-    dynamic_shadow_second: Graph.Task
-    build_shadow_sat: Graph.Task
-    generate_shadow_mipmaps: Graph.Task
-    run_light_billboard: Graph.Task
+    run_shadow_opaque: render_graph.Task
+    run_shadow_double_sided: render_graph.Task
+    dynamic_shadow: render_graph.Task
+    dynamic_shadow_second: render_graph.Task
+    build_shadow_sat: render_graph.Task
+    generate_shadow_mipmaps: render_graph.Task
+    run_light_billboard: render_graph.Task
 end
 
 local record Tasks
-    build_mesh_acceleration_structure: Graph.Task
-    acquire_frame_sequence: Graph.Task
-    draw_imgui: Graph.Task
-    voxel: Graph.Task
-    run_gbuffer: Graph.Task
-    run_gbuffer_double_sided: Graph.Task
-    dynamic_gbuffer: Graph.Task
-    dynamic_gbuffer_second: Graph.Task
-    run_direct_lighting: Graph.Task
-    indirect_lighting: Graph.Task
-    combine_lighting: Graph.Task
-    post_processing: Graph.Task
-    extract_bloom: Graph.Task
-    blur_bloom: Graph.Task
-    acquire_bloom: Graph.Task
-    present_result_image: Graph.Task
-    present_frame_sequence: Graph.Task
+    build_mesh_acceleration_structure: render_graph.Task
+    acquire_frame_sequence: render_graph.Task
+    draw_imgui: render_graph.Task
+    voxel: render_graph.Task
+    run_gbuffer: render_graph.Task
+    run_gbuffer_double_sided: render_graph.Task
+    dynamic_gbuffer: render_graph.Task
+    dynamic_gbuffer_second: render_graph.Task
+    run_direct_lighting: render_graph.Task
+    indirect_lighting: render_graph.Task
+    combine_lighting: render_graph.Task
+    post_processing: render_graph.Task
+    extract_bloom: render_graph.Task
+    blur_bloom: render_graph.Task
+    acquire_bloom: render_graph.Task
+    present_result_image: render_graph.Task
+    present_frame_sequence: render_graph.Task
 end
 
 local record Pipelines
-    shadow_opaque: Graph.Resource
-    shadow_double_sided: Graph.Resource
-    shadow_dynamic: Graph.Resource
-    gbuffer_opaque: Graph.Resource
-    gbuffer_double_sided: Graph.Resource
-    gbuffer_dynamic: Graph.Resource
-    shadow_sat_horizontal: Graph.Resource
-    shadow_sat_vertical: Graph.Resource
-    direct_lighting: Graph.Resource
-    direct_lighting_sat: Graph.Resource
-    indirect_lighting: Graph.Resource
-    indirect_lighting_debug_view: Graph.Resource
-    combine_lighting: Graph.Resource
-    extract_bloom: Graph.Resource
-    blur_ping: Graph.Resource
-    blur_pong: Graph.Resource
-    present: Graph.Resource
-    light_billboard: Graph.Resource
+    shadow_opaque: render_graph.Resource
+    shadow_double_sided: render_graph.Resource
+    shadow_dynamic: render_graph.Resource
+    gbuffer_opaque: render_graph.Resource
+    gbuffer_double_sided: render_graph.Resource
+    gbuffer_dynamic: render_graph.Resource
+    shadow_sat_horizontal: render_graph.Resource
+    shadow_sat_vertical: render_graph.Resource
+    direct_lighting: render_graph.Resource
+    direct_lighting_sat: render_graph.Resource
+    indirect_lighting: render_graph.Resource
+    indirect_lighting_debug_view: render_graph.Resource
+    combine_lighting: render_graph.Resource
+    extract_bloom: render_graph.Resource
+    blur_ping: render_graph.Resource
+    blur_pong: render_graph.Resource
+    present: render_graph.Resource
+    light_billboard: render_graph.Resource
 end
 
 -- The pipelines the passes draw and dispatch with, each registered on the render graph from its pipeline or shader
@@ -130,8 +130,8 @@ end
 local function make_pipelines(p_context: wbe.DeferredRecipeContext): Pipelines
     local formats = p_context.formats
     local function graphics(p_key: string, p_pipeline: string, p_color_formats: {wbe.ImageFormatVK},
-        p_depth_format?: wbe.ImageFormatVK): Graph.Resource
-        return Graph.graphics_pipeline(p_key, {
+        p_depth_format?: wbe.ImageFormatVK): render_graph.Resource
+        return render_graph.graphics_pipeline(p_key, {
             pipeline = p_pipeline,
             color_formats = p_color_formats,
             depth_format = p_depth_format,
@@ -139,7 +139,7 @@ local function make_pipelines(p_context: wbe.DeferredRecipeContext): Pipelines
     end
     local shadow_formats = { formats.rsm_flux, formats.rsm_normal, formats.shadow_moments }
     local gbuffer_formats = { formats.gbuffer_albedo, formats.gbuffer_normal, formats.gbuffer_rma }
-    local shader_pipeline = Graph.shader_compute_pipeline
+    local shader_pipeline = render_graph.shader_compute_pipeline
     return {
         shadow_opaque = graphics("deferred_shadow_opaque", "rsm_spot", shadow_formats, formats.shadowmap_depth),
         shadow_double_sided = graphics("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats,
@@ -172,11 +172,11 @@ local record Builder
     shadow_extent: wbe.RendExtent2DParamsVK
     bloom_extent: wbe.RendExtent2DParamsVK
     imports: {string}
-    resources: {string:Graph.Resource}
-    static_mesh: Graph.Resource
-    dynamic_mesh: Graph.Resource
+    resources: {string:render_graph.Resource}
+    static_mesh: render_graph.Resource
+    dynamic_mesh: render_graph.Resource
     pipelines: Pipelines
-    graph: Graph.Graph
+    graph: render_graph.Graph
     tasks: Tasks
     light_tasks: {LightTasks}
     voxel_injects_radiance: boolean
@@ -185,10 +185,10 @@ end
 -- The reflective-shadow-map resources of every slot of the lighting shaders' lights[] array, by task-local id; slots past
 -- the light count reuse light zero, so that every reflected descriptor binds. Only mip level zero of the moments is loaded,
 -- so the mip-chain slot binds the base moments view, which the summed-area-table graph orders without a mip generation pass.
-local function rsm_slot_resources(p_builder: Builder): {string:Graph.Resource}
+local function rsm_slot_resources(p_builder: Builder): {string:render_graph.Resource}
     local resources = p_builder.resources
     local context = p_builder.context
-    local slots: {string:Graph.Resource} = {}
+    local slots: {string:render_graph.Resource} = {}
     for slot = 0, context.max_spot_light_info_count - 1 do
         local light = slot < context.spot_light_count and slot or 0
         slots["shadow_moments_sampled[" .. slot .. "]"] = resources[light_id("shadow_moments", light)]
@@ -313,7 +313,7 @@ local function add_mesh_draws(p_builder: Builder)
         local shadow_moments = resources[light_id("shadow_moments", light)]
         local shadow_depth = resources[light_id("shadowmap_depth", light)]
         local clear_values = { CLEAR_BLACK, CLEAR_BLACK, CLEAR_MOMENTS, CLEAR_DEPTH }
-        local light_bindings: {string:Graph.Resource} = {
+        local light_bindings: {string:render_graph.Resource} = {
             shadow_light_info = resources[light_id("shadow_light_info", light)],
         }
 
@@ -456,7 +456,7 @@ local function add_shadow_filtering(p_builder: Builder)
                 },
             })
         else
-            local params: Graph.RTParamsGenerateMipmapsVK = {
+            local params: render_graph.RTParamsGenerateMipmapsVK = {
                 source_view = resources[light_id("shadow_moments", light)],
                 mip_chain_view = resources[light_id("shadow_moments_sampled", light)],
                 base_extent = p_builder.shadow_extent,
@@ -482,7 +482,7 @@ local function add_lighting(p_builder: Builder)
     else
         light_slots = { shadow_moments_sampled = "shadow_moments_sampled", shadowmap_color = "shadowmap_color", rsm_normal = "rsm_normal" }
     end
-    local direct_lighting_bindings: {string:Graph.Resource} = {
+    local direct_lighting_bindings: {string:render_graph.Resource} = {
         gbuffer_sampler = resources.gbuffer_sampler,
         shadow_sampler = resources.shadow_sampler,
     }
@@ -505,10 +505,10 @@ local function add_lighting(p_builder: Builder)
     local indirect_lighting_bindings = rsm_slot_resources(p_builder)
     indirect_lighting_bindings.gbuffer_sampler = resources.gbuffer_sampler
     indirect_lighting_bindings.shadow_sampler = resources.shadow_sampler
-    local branch_graph = Graph.new()
-    local branches: {Graph.Task} = {}
+    local branch_graph = render_graph.new()
+    local branches: {render_graph.Task} = {}
     for index, pipeline in ipairs({ p_builder.pipelines.indirect_lighting, p_builder.pipelines.indirect_lighting_debug_view }) do
-        local params: Graph.RTParamsRunComputePipelineVK =
+        local params: render_graph.RTParamsRunComputePipelineVK =
         { pipeline = pipeline, group_count_x = screen_tiles_x, group_count_y = screen_tiles_y, queue_family = "compute_2" }
         branches[index] = branch_graph:compute("indirect_lighting_branch_" .. index, params)
     end
@@ -526,7 +526,7 @@ end
 
 -- Post-processing, a subgraph, modifies the result image in place after composition. Returns the last task that writes
 -- the result image.
-local function add_post_processing(p_builder: Builder): Graph.Task
+local function add_post_processing(p_builder: Builder): render_graph.Task
     local resources = p_builder.resources
     local post_processing = p_builder.context.post_processing as wbe.RecipeFeatureParams
     if post_processing == nil then
@@ -570,11 +570,11 @@ local function add_bloom_and_presentation(p_builder: Builder)
             kawase_blur_sampler = resources.bloom_sampler
         },
     })
-    local acquire_params: Graph.RTParamsCPUInFlightAcquireVK = { image_view = resources.bloom_ping }
+    local acquire_params: render_graph.RTParamsCPUInFlightAcquireVK = { image_view = resources.bloom_ping }
     p_builder.tasks.acquire_bloom = graph:cpu_acquire_image("acquire_bloom", acquire_params, {
         trigger = { event = context.bloom_acquire_event },
     })
-    local present_params: Graph.RTParamsRunGraphicsPipelineVK = {
+    local present_params: render_graph.RTParamsRunGraphicsPipelineVK = {
         pipeline = p_builder.pipelines.present,
         clear_values = {
             {
@@ -593,7 +593,7 @@ end
 -- A billboard per light, drawn over the swap chain.
 local function add_light_billboards(p_builder: Builder)
     local resources = p_builder.resources
-    local billboard_params: Graph.RTParamsRunGraphicsPipelineVK = {
+    local billboard_params: render_graph.RTParamsRunGraphicsPipelineVK = {
         pipeline = p_builder.pipelines.light_billboard,
         color_load_op = "load",
         depth_load_op = "load",
@@ -685,7 +685,7 @@ end
 
 -- Lighting composition, post-processing, bloom, and presentation. p_result_writer is the last task that writes the
 -- result image.
-local function connect_composition(p_builder: Builder, p_result_writer: Graph.Task)
+local function connect_composition(p_builder: Builder, p_result_writer: render_graph.Task)
     local resources = p_builder.resources
     local tasks = p_builder.tasks
     p_builder.graph:chain(resources.direct_lighting, { tasks.run_direct_lighting, tasks.combine_lighting })
@@ -709,7 +709,7 @@ local exports = {}
 function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeVK
     local shadow = context.shadow_extent
     local bloom = context.bloom_extent
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local builder: Builder = {
         context = context,
         shadow_extent = { width = shadow.width, height = shadow.height },

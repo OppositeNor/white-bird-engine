@@ -16,7 +16,7 @@
 -- recipes that include them. Declarations only: import them with `local type voxel = require("render_graph_utils.features.voxel")`.
 
 local type wbe = require("wbe")
-local type Graph = require("render_graph_utils.render_graph")
+local type render_graph = require("render_graph_utils.render_graph")
 
 local record voxel
     -- What the including recipe supplies to a voxel structure's subgraph, whose ports `color` and `depth` the overlays draw
@@ -27,9 +27,9 @@ local record voxel
         -- The voxel debug view toggles by mode group.
         debug_view_toggles: wbe.VoxelDebugViewToggles
         -- The color target of the overlays.
-        color_target: Graph.Resource
+        color_target: render_graph.Resource
         -- The depth target the overlays test against.
-        depth_target: Graph.Resource
+        depth_target: render_graph.Resource
         -- The formats of the color and depth targets, which the overlay pipelines render to.
         color_format: wbe.ImageFormatVK
         depth_format: wbe.ImageFormatVK

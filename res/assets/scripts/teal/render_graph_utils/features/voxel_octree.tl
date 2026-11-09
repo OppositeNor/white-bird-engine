@@ -20,24 +20,24 @@
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 
 local voxel_octree = {}
 
 -- The octree as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
-function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p_target: voxel.Target): Graph.Task
-    local graph = Graph.new()
-    local resources: {string:Graph.Resource} = {}
+function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p_target: voxel.Target): render_graph.Task
+    local graph = render_graph.new()
+    local resources: {string:render_graph.Resource} = {}
     for _, id in ipairs(p_params.imports) do
         resources[id] = graph:import_resource(id)
     end
     local color = graph:port("color")
     local depth = graph:port("depth")
-    local gather_leaves_pipeline = Graph.shader_compute_pipeline("octree_debug_gather_leaves_shader")
-    local gather_nodes_pipeline = Graph.shader_compute_pipeline("octree_debug_gather_nodes_shader")
+    local gather_leaves_pipeline = render_graph.shader_compute_pipeline("octree_debug_gather_leaves_shader")
+    local gather_nodes_pipeline = render_graph.shader_compute_pipeline("octree_debug_gather_nodes_shader")
     -- The debug draws draw the cells' edges onto the target.
-    local function debug_draw_pipeline_of(p_key: string): Graph.Resource
-        return Graph.graphics_pipeline(p_key, {
+    local function debug_draw_pipeline_of(p_key: string): render_graph.Resource
+        return render_graph.graphics_pipeline(p_key, {
             pipeline = p_key,
             color_formats = { p_target.color_format },
             depth_format = p_target.depth_format,
@@ -49,7 +49,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     local toggles = p_target.debug_view_toggles
 
     -- The frame-begin barrier orders this frame's mutation after the previous frame's consumers.
-    local barrier_params: Graph.RTParamsFullMemoryBarrierVK = { resource = resources.octree_dynamic }
+    local barrier_params: render_graph.RTParamsFullMemoryBarrierVK = { resource = resources.octree_dynamic }
     local frame_begin = graph:full_memory_barrier("octree_frame_begin", barrier_params)
     -- Static scene: empty both textures, then occupy the rasterized leaves and their ancestors. Dynamic meshes: empty the
     -- dynamic texture, then rebuild it like the static scene.
@@ -61,7 +61,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     local dynamic_second = graph:import_task("dynamic_octree_second")
     -- Debug views: the leaf gather serves both views, and the node gather only the node view.
     local leaf_groups = p_params.leaf_gather_group_count
-    local leaf_gather_params: Graph.RTParamsRunComputePipelineVK = {
+    local leaf_gather_params: render_graph.RTParamsRunComputePipelineVK = {
         pipeline = gather_leaves_pipeline,
         group_count_x = leaf_groups.x,
         group_count_y = leaf_groups.y,
@@ -70,7 +70,7 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     }
     local gather_debug_leaves = graph:compute("gather_octree_debug_leaves", leaf_gather_params, { toggle = toggles.enabled })
     local node_groups = p_params.node_gather_group_count
-    local node_gather_params: Graph.RTParamsRunComputePipelineVK = {
+    local node_gather_params: render_graph.RTParamsRunComputePipelineVK = {
         pipeline = gather_nodes_pipeline,
         group_count_x = node_groups,
         group_count_y = node_groups,
@@ -80,9 +80,9 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     local gather_debug_nodes = graph:compute("gather_octree_debug_nodes", node_gather_params, {
         toggle = toggles.pre_deferred_propagation,
     })
-    local function overlay(p_task_id: string, p_pipeline: Graph.Resource, p_indirect_buffer: Graph.Resource, p_draw_count: integer,
-        p_toggle: wbe.RendRecipeToggleVK): Graph.Task
-        local params: Graph.RTParamsRunGraphicsPipelineIndirectVK = {
+    local function overlay(p_task_id: string, p_pipeline: render_graph.Resource, p_indirect_buffer: render_graph.Resource, p_draw_count: integer,
+        p_toggle: wbe.RendRecipeToggleVK): render_graph.Task
+        local params: render_graph.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = p_pipeline,
             index_buffer = resources.octree_debug_draw_index_buffer,
             indirect_buffer = p_indirect_buffer,

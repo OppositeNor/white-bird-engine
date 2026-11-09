@@ -196,15 +196,15 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, CollectsHandleBindingsEdgesAndImageDependencies) {
     const DataValue recipe = RendGraphScriptVK::run("handle_resources", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local image = graph:add_storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
     local view = graph:add_image_view("output", image)
     local sampler = graph:add_clamp_to_edge_sampler("sampler")
     local scratch = graph:add_buffer("scratch", "buffer_storage", 64)
     local unused = graph:add_storage_buffer("unused", 32)
-    assert(Graph.enum_name("image_read_write") == "IMAGE_READ_WRITE")
+    assert(render_graph.enum_name("image_read_write") == "IMAGE_READ_WRITE")
     local write = graph:add({ id = "write", type = "registry_probe", params = { label = "write" }, uses = { scratch } })
     local read = graph:add({ id = "read", type = "registry_probe", params = { label = "read" } })
     read:bind("input", view):bind("sampler", sampler)
@@ -246,14 +246,14 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, LowersImportedHandlesAndCollectsParentPortResources) {
     const DataValue recipe = RendGraphScriptVK::run("handle_ports", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local target_image = graph:add_storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
     local target = graph:add_image_view("target", target_image)
     local input = graph:import_resource("input")
     local member = graph:reference("input.member")
-    local nested = Graph.new()
+    local nested = render_graph.new()
     local color = nested:port("color")
     nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, bindings = { output = color } })
     local prepare = graph:add({ id = "prepare", type = "registry_probe", params = { label = "prepare" }, uses = { input, member } })
@@ -312,14 +312,14 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ReusesHandlesWithoutLeakingDeclarationsBetweenGraphs) {
     const DataValue result = RendGraphScriptVK::run("independent_graphs", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local first = Graph.new()
+    local first = render_graph.new()
     local shared = first:add_storage_buffer("shared", 16)
     first:add({ id = "first", type = "registry_probe", bindings = { input = shared }, uses = { shared, shared } })
-    local second = Graph.new()
+    local second = render_graph.new()
     second:add({ id = "second", type = "registry_probe" })
-    local third = Graph.new()
+    local third = render_graph.new()
     third:add({ id = "third", type = "registry_probe", uses = { shared } })
     return { first = first:build(), second = second:build(), third = third:build() }
 end }
@@ -453,9 +453,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesSnapshotMembersAndPreserveConnectionOrderAndDuplicates) {
     const DataValue recipe = RendGraphScriptVK::run("resource_bundle_connections", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local color = graph:add_storage_buffer("color", 16)
     local depth = graph:add_storage_buffer("depth", 32)
     local source = { depth, color, depth }
@@ -505,9 +505,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesCollectOnlyUsedMembersAndRetainImageViewDependenciesAcrossGraphs) {
     const DataValue recipe = RendGraphScriptVK::run("resource_bundle_collection", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local image = graph:add_storage_image("image", "r16g16b16a16_sfloat", 16, 8)
     local view = image:view()
     local scratch = graph:add_storage_buffer("scratch", 64)
@@ -518,7 +518,7 @@ return { build = function()
     local producer = graph:import_task("producer")
     local consumer = graph:import_task("consumer")
     graph:chain(bundle, { producer, consumer })
-    local other = Graph.new()
+    local other = render_graph.new()
     local other_producer = other:import_task("other_producer")
     local other_consumer = other:import_task("other_consumer")
     other_producer:connect(other_consumer, bundle)
@@ -543,9 +543,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConstructionRejectsInvalidAndNestedMembersWithoutCollectingResources) {
     const DataValue recipe = RendGraphScriptVK::run("resource_bundle_validation", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local resource = graph:add_storage_buffer("resource", 16)
     local other = graph:add_storage_buffer("other", 32)
     local mesh = graph:add_mesh("mesh")
@@ -579,16 +579,16 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConnectionFailuresLeaveExistingEdgesUnchanged) {
     const DataValue recipe = RendGraphScriptVK::run("resource_bundle_connection_validation", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local resource = graph:add_storage_buffer("resource", 16)
     local other = graph:add_storage_buffer("other", 32)
     local registered = graph:add_mesh("mesh")
     local producer = graph:import_task("producer")
     local consumer = graph:import_task("consumer")
     local third = graph:import_task("third")
-    local foreign = Graph.new():import_task("foreign")
+    local foreign = render_graph.new():import_task("foreign")
     local bundle = graph:resource_bundle({ resource, other })
     producer:connect(consumer, resource)
     local original_edge = producer.edges[1]
@@ -638,9 +638,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesPreserveConflictingOwnedHandlesForBuildValidation) {
     EXPECT_THROW((void)RendGraphScriptVK::run("conflicting_bundle_handles", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local first = graph:add_storage_buffer("same", 16)
     local second = graph:add_storage_buffer("same", 32)
     local bundle = graph:resource_bundle({ first, second })
@@ -1067,9 +1067,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectGraphBindingsBeforeChangingTasks) {
     const DataValue recipe = RendGraphScriptVK::run("registered_graph_bindings", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local compute = graph:add_compute_pipeline("compute")
     local graphics = graph:add_graphics_pipeline("graphics")
     local buffer = graph:add_storage_buffer("buffer", 16)
@@ -1124,7 +1124,7 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, BuildRejectsDatabaseResourcesInRawGraphBindings) {
     EXPECT_NO_THROW((void)RendGraphScriptVK::run("raw_registered_graph_bindings", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local invalid_bindings = {
         function(graph, producer, consumer, buffer, resource)
@@ -1158,7 +1158,7 @@ return { build = function()
     }
     for _, resource_kind in ipairs({ "mesh", "compute", "graphics" }) do
         for _, bind in ipairs(invalid_bindings) do
-            local graph = Graph.new()
+            local graph = render_graph.new()
             local resource = resource_kind == "mesh" and graph:add_mesh("resource") or
                 resource_kind == "compute" and graph:add_compute_pipeline("resource") or graph:add_graphics_pipeline("resource")
             local buffer = graph:add_storage_buffer("buffer", 16)
@@ -1175,9 +1175,9 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, ImageMethodsCacheDefaultViewsAndPreserveExplicitRanges) {
     const DataValue recipe = RendGraphScriptVK::run("image_methods", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local image = graph:add_image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
     local view = image:view()
     assert(image:view() == view)
@@ -1513,10 +1513,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequ
 
 TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsUInt2KeysByEveryBitOrABitRange) {
     const DataValue result = RendGraphScriptVK::run("radix_sort_uint2", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
     local buffers = sort.radix_sort_buffers(names, 1000, "uint2")
     sort.add_radix_sort_task(graph, "full", buffers)
@@ -1555,10 +1555,10 @@ end }
 
 TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsUIntKeysByABitRange) {
     const DataValue result = RendGraphScriptVK::run("radix_sort_uint_range", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
     sort.add_radix_sort_task(graph, "sort", sort.radix_sort_buffers(names, 1000), nil, { begin_bit = 8, end_bit = 24 })
     return graph:build()
@@ -1578,10 +1578,10 @@ end }
 TEST_F(WBERendGraphScriptVKResourceTest, RadixSortsRejectInvalidBitRanges) {
     const auto run_sort = [](std::string_view p_key_type, std::string_view p_options) {
         const std::string source = std::string(R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
     local buffers = sort.radix_sort_buffers(names, 1000, ")") +
             std::string(p_key_type) + "\")\n    sort.add_radix_sort_task(graph, \"sort\", buffers, nil, " +
@@ -1598,10 +1598,10 @@ return { build = function()
     EXPECT_THROW((void)run_sort("uint", "{ begin_bit = 32, end_bit = 48 }"), std::runtime_error);
     // The key-value sort orders the x of uint2 keys.
     EXPECT_THROW((void)RendGraphScriptVK::run("radix_sort_key_value_uint", R"(
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 return { build = function()
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local names = { keys = "keys", keys_swap = "keys_swap", histogram = "histogram", dispatch = "dispatch" }
     sort.add_radix_sort_key_value_task(graph, "sort", sort.radix_sort_buffers(names, 1000))
     return graph:build()

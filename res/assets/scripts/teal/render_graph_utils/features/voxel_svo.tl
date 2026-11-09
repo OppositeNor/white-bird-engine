@@ -24,7 +24,7 @@
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 
 local record voxel_svo
     -- The subgraph injects radiance from the target's reflective-shadow-map slots.
@@ -34,8 +34,8 @@ end
 voxel_svo.injects_radiance = true
 
 -- The SVO as a subgraph task with id p_id, whose overlays draw on its `color` and `depth` ports, bound to the target's.
-function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): Graph.Task
-    local variant = Graph.enum_name(p_params.variant)
+function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_target: voxel.Target): render_graph.Task
+    local variant = render_graph.enum_name(p_params.variant)
     local pass_published = variant == "PASS_PUBLISHED"
     if not pass_published and variant ~= "ATOMIC" then
         error("voxel_svo: unknown variant '" .. variant .. "'.")
@@ -43,8 +43,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     -- Scratch buffers: each frame's dynamic clear (and the static reset) empties the dynamic nodes' range and the
     -- deferred lists before the construction fills them, and the pre-deferred capture rewrites its copies before the
     -- debug draw reads them.
-    local graph = Graph.new()
-    local buffers: {string:Graph.Resource} = {}
+    local graph = render_graph.new()
+    local buffers: {string:render_graph.Resource} = {}
     for _, id in ipairs(p_params.imports) do
         buffers[id] = graph:import_resource(id)
     end
@@ -68,38 +68,38 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local dynamic_prefix = p_params.dynamic_shader_prefix
     local static_mesh = graph:add_mesh("static_mesh")
     local dynamic_mesh = graph:add_mesh("dynamic_mesh")
-    local compute_pipelines: {string:Graph.Resource} = {
-        reset = Graph.shader_compute_pipeline(prefix .. "_reset_shader"),
-        clear_dynamic = Graph.shader_compute_pipeline(dynamic_prefix .. "_clear_shader"),
-        static_ping = Graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_pong_write_shader"),
-        static_pong = Graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_ping_write_shader"),
-        dynamic_ping = Graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_pong_write_shader"),
-        dynamic_pong = Graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_ping_write_shader"),
-        static_publication = Graph.shader_compute_pipeline("svo_2_update_states_shader"),
-        dynamic_publication = Graph.shader_compute_pipeline("svo_2_dynamic_update_states_shader"),
-        reset_ping = Graph.shader_compute_pipeline("svo_deferred_count_reset_pong_shader"),
-        reset_pong = Graph.shader_compute_pipeline("svo_deferred_count_reset_ping_shader"),
-        capture_pre_deferred_debug = Graph.shader_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
-        setup_debug_draw = Graph.shader_compute_pipeline("svo_debug_draw_setup_shader"),
-        find_debug_draw_nodes = Graph.shader_compute_pipeline("svo_debug_draw_find_nodes_shader"),
-        occupancy_injection = Graph.shader_compute_pipeline("svogi_occupancy_injection"),
-        occupancy_propagation = Graph.shader_compute_pipeline("svogi_occupancy_propagation"),
-        radiance_injection = Graph.shader_compute_pipeline("svogi_radiance_injection"),
+    local compute_pipelines: {string:render_graph.Resource} = {
+        reset = render_graph.shader_compute_pipeline(prefix .. "_reset_shader"),
+        clear_dynamic = render_graph.shader_compute_pipeline(dynamic_prefix .. "_clear_shader"),
+        static_ping = render_graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_pong_write_shader"),
+        static_pong = render_graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_ping_write_shader"),
+        dynamic_ping = render_graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_pong_write_shader"),
+        dynamic_pong = render_graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_ping_write_shader"),
+        static_publication = render_graph.shader_compute_pipeline("svo_2_update_states_shader"),
+        dynamic_publication = render_graph.shader_compute_pipeline("svo_2_dynamic_update_states_shader"),
+        reset_ping = render_graph.shader_compute_pipeline("svo_deferred_count_reset_pong_shader"),
+        reset_pong = render_graph.shader_compute_pipeline("svo_deferred_count_reset_ping_shader"),
+        capture_pre_deferred_debug = render_graph.shader_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
+        setup_debug_draw = render_graph.shader_compute_pipeline("svo_debug_draw_setup_shader"),
+        find_debug_draw_nodes = render_graph.shader_compute_pipeline("svo_debug_draw_find_nodes_shader"),
+        occupancy_injection = render_graph.shader_compute_pipeline("svogi_occupancy_injection"),
+        occupancy_propagation = render_graph.shader_compute_pipeline("svogi_occupancy_propagation"),
+        radiance_injection = render_graph.shader_compute_pipeline("svogi_radiance_injection"),
     }
     -- The constructions rasterize without attachments; the tree draws draw the cubes' edges, or their faces in the solid
     -- styles, onto the target.
-    local function construction_pipeline(p_key: string): Graph.Resource
-        return Graph.graphics_pipeline(p_key, { pipeline = p_key })
+    local function construction_pipeline(p_key: string): render_graph.Resource
+        return render_graph.graphics_pipeline(p_key, { pipeline = p_key })
     end
-    local function overlay_pipeline(p_key: string, p_topology: wbe.PrimitiveTopologyVK): Graph.Resource
-        return Graph.graphics_pipeline(p_key, {
+    local function overlay_pipeline(p_key: string, p_topology: wbe.PrimitiveTopologyVK): render_graph.Resource
+        return render_graph.graphics_pipeline(p_key, {
             pipeline = p_key,
             color_formats = { p_target.color_format },
             depth_format = p_target.depth_format,
             primitive_topology = p_topology,
         })
     end
-    local graphics_pipelines: {string:Graph.Resource} = {
+    local graphics_pipelines: {string:render_graph.Resource} = {
         static_construction = construction_pipeline(prefix .. "_build_static_mesh_pipeline"),
         dynamic_construction = construction_pipeline(dynamic_prefix .. "_build_static_mesh_pipeline"),
         -- The tree draw's branches, in the order the application selects them: the VoxelDebugDrawStyle, plus two in the
@@ -114,15 +114,15 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local static_build = p_params.static_build
     local extent: wbe.RendExtent2DParamsVK = { width = p_params.extent, height = p_params.extent }
 
-    local function compute(p_task_id: string, p_pipeline: Graph.Resource, p_group_count_x: integer): Graph.Task
-        local params: Graph.RTParamsRunComputePipelineVK =
+    local function compute(p_task_id: string, p_pipeline: render_graph.Resource, p_group_count_x: integer): render_graph.Task
+        local params: render_graph.RTParamsRunComputePipelineVK =
             { pipeline = p_pipeline, group_count_x = p_group_count_x, queue_family = "compute_1" }
         return graph:compute(p_task_id, params)
     end
-    local function construction(p_task_id: string, p_mesh: Graph.Resource, p_pipeline: Graph.Resource, p_part: wbe.MeshPartVK,
-        p_transform: Graph.Resource, p_load: boolean): Graph.Task
+    local function construction(p_task_id: string, p_mesh: render_graph.Resource, p_pipeline: render_graph.Resource, p_part: wbe.MeshPartVK,
+        p_transform: render_graph.Resource, p_load: boolean): render_graph.Task
         local load_op: wbe.AttachmentLoadOpVK = p_load and "load" or "clear"
-        local params: Graph.RTParamsGraphicsDrawMeshVK = {
+        local params: render_graph.RTParamsGraphicsDrawMeshVK = {
             mesh = p_mesh,
             pipeline = { default = p_pipeline },
             parts = { p_part },
@@ -135,15 +135,15 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     end
     -- Rasterization allocates depth one's children; every propagation round publishes one further level, and an extra
     -- retry consumes leaf occupancy and drains the remaining deferred entries.
-    local function deferred_construction(p_task_id: string, p_dynamic: boolean): Graph.Task
+    local function deferred_construction(p_task_id: string, p_dynamic: boolean): render_graph.Task
         local ping = p_dynamic and compute_pipelines.dynamic_ping or compute_pipelines.static_ping
         local pong = p_dynamic and compute_pipelines.dynamic_pong or compute_pipelines.static_pong
-        local task: Graph.Task
+        local task: render_graph.Task
         if pass_published then
             local publication = p_dynamic and compute_pipelines.dynamic_publication or compute_pipelines.static_publication
             local publication_group_count =
                 p_dynamic and p_params.dynamic_publication_group_count or p_params.static_publication_group_count
-            local dispatches: {Graph.RTParamsComputeDispatchVK} = {}
+            local dispatches: {render_graph.RTParamsComputeDispatchVK} = {}
             for iteration = 0, p_params.max_depth - 1 do
                 local write_pong = iteration % 2 == 0
                 dispatches[#dispatches + 1] = {
@@ -152,11 +152,11 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
                 dispatches[#dispatches + 1] = { pipeline = write_pong and ping or pong, group_count_x = p_params.deferred_dispatch_group_count }
                 dispatches[#dispatches + 1] = { pipeline = publication, group_count_x = publication_group_count }
             end
-            local params: Graph.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = "compute_1" }
+            local params: render_graph.RTParamsRunComputePipelinesSequentialVK = { dispatches = dispatches, queue_family = "compute_1" }
             task = graph:compute_sequential(p_task_id, params)
         else
             -- A single raster pass can leave contenders at any depth; allow one retry per tree level.
-            local params: Graph.RTParamsPingPongVK = {
+            local params: render_graph.RTParamsPingPongVK = {
                 ping_pipeline = ping,
                 pong_pipeline = pong,
                 iterations = p_params.max_depth,
@@ -169,9 +169,9 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         end
         return task
     end
-    local function overlay(p_task_id: string, p_pipeline: Graph.Resource, p_indirect_buffer: Graph.Resource,
-        p_toggle: wbe.RendRecipeToggleVK): Graph.Task
-        local params: Graph.RTParamsRunGraphicsPipelineIndirectVK = {
+    local function overlay(p_task_id: string, p_pipeline: render_graph.Resource, p_indirect_buffer: render_graph.Resource,
+        p_toggle: wbe.RendRecipeToggleVK): render_graph.Task
+        local params: render_graph.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = p_pipeline,
             index_buffer = buffers.svo_debug_draw_index_buffer,
             indirect_buffer = p_indirect_buffer,
@@ -186,7 +186,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         return task
     end
     -- The frame-begin barrier orders this frame's SVO mutation after the previous frame's consumers.
-    local barrier_params: Graph.RTParamsFullMemoryBarrierVK = { resource = buffers.svo_info }
+    local barrier_params: render_graph.RTParamsFullMemoryBarrierVK = { resource = buffers.svo_info }
     local frame_begin = graph:full_memory_barrier("svo_frame_begin", barrier_params)
     -- Static scene, built once into the shared buffers unless the application rebuilds it every frame (no trigger).
     local reset = compute("reset_svo", compute_pipelines.reset, p_params.reset_group_count)
@@ -196,7 +196,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local build_double_sided = construction("run_build_svo_double_sided", static_mesh, graphics_pipelines.static_construction, "double_sided", nil,
         false)
     build_double_sided.trigger = static_build
-    local static_publication: {Graph.Task} = {}
+    local static_publication: {render_graph.Task} = {}
     if pass_published then
         local update_states = compute("update_svo_states", compute_pipelines.static_publication, p_params.static_publication_group_count)
         update_states.trigger = static_build
@@ -206,12 +206,12 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     static_deferred.trigger = static_build
     -- Dynamic meshes.
     local clear_dynamic = compute("clear_dynamic_svo", compute_pipelines.clear_dynamic, p_params.dynamic_clear_group_count)
-    local dynamic: {Graph.Task} = {}
+    local dynamic: {render_graph.Task} = {}
     for index, id in ipairs({ "dynamic_svo", "dynamic_svo_second" }) do
         dynamic[index] = construction(id, dynamic_mesh, graphics_pipelines.dynamic_construction, "opaque",
             graph:reference(p_target.dynamic_mesh_transform_ids[index]), true)
     end
-    local dynamic_publication: {Graph.Task} = {}
+    local dynamic_publication: {render_graph.Task} = {}
     if pass_published then
         dynamic_publication = { compute("publish_dynamic_svo", compute_pipelines.dynamic_publication, p_params.dynamic_publication_group_count) }
     end
@@ -220,7 +220,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local dynamic_deferred = deferred_construction("run_build_svo_deferred", true)
     -- SVOGI injection into the completed tree. The occupancy injection writes the leaves and their parents; propagation
     -- then writes one level further up per dispatch, from the parents of the leaves' parents to the root's sectors.
-    local occupancy_injection_params: Graph.RTParamsRunComputePipelineVK = {
+    local occupancy_injection_params: render_graph.RTParamsRunComputePipelineVK = {
         pipeline = compute_pipelines.occupancy_injection,
         group_count_x = p_params.occupancy_injection_group_count_x,
         group_count_y = p_params.occupancy_injection_group_count_y,
@@ -229,7 +229,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local occupancy_injection = graph:compute("inject_svogi_occupancy", occupancy_injection_params, {
         bindings = { atlas = buffers.svogi_occupancy_buffer },
     })
-    local propagation_dispatches: {Graph.RTParamsComputeDispatchVK} = {}
+    local propagation_dispatches: {render_graph.RTParamsComputeDispatchVK} = {}
     for child_depth = p_params.max_depth - 1, 2, -1 do
         propagation_dispatches[#propagation_dispatches + 1] = {
             pipeline = compute_pipelines.occupancy_propagation,
@@ -237,26 +237,26 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
             push_constants = { child_depth = child_depth },
         }
     end
-    local propagation_params: Graph.RTParamsRunComputePipelinesSequentialVK =
+    local propagation_params: render_graph.RTParamsRunComputePipelinesSequentialVK =
         { dispatches = propagation_dispatches, queue_family = "compute_1" }
     local occupancy_propagation = graph:compute_sequential("propagate_svogi_occupancy", propagation_params, {
         bindings = { atlas = buffers.svogi_occupancy_buffer },
     })
     -- The radiance index buffer is a counted buffer, whose element byte size shares the deferred lists' count element; the
     -- pong list's count reset clears it.
-    local reset_radiance_index_params: Graph.RTParamsRunComputePipelineVK =
+    local reset_radiance_index_params: render_graph.RTParamsRunComputePipelineVK =
         { pipeline = compute_pipelines.reset_ping, queue_family = "compute_1" }
     local reset_radiance_index = graph:compute("reset_svogi_radiance_index", reset_radiance_index_params, {
         bindings = { svo_deferred_list_pong = buffers.svogi_radiance_index_buffer },
     })
-    local radiance_bindings: {string:Graph.Resource} = {
+    local radiance_bindings: {string:render_graph.Resource} = {
         index_buffer = buffers.svogi_radiance_index_buffer,
         staged_buffer = buffers.svogi_radiance_staged_buffer,
     }
     for slot, id in pairs(p_target.rsm_slot_ids) do
         radiance_bindings[slot] = graph:reference(id)
     end
-    local radiance_injection_params: Graph.RTParamsRunComputePipelineVK = {
+    local radiance_injection_params: render_graph.RTParamsRunComputePipelineVK = {
         pipeline = compute_pipelines.radiance_injection,
         group_count_x = p_params.radiance_injection_group_count,
         group_count_y = p_params.radiance_injection_group_count,
@@ -271,15 +271,15 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     -- Debug views.
     -- The post-construction tree, drawn by the post-SVO-build and occupancy views: one multiplexer of every style and
     -- coloring, whose branches share the indirect command and the targets. The solid styles index the cube's faces.
-    local branch_graph = Graph.new()
-    local tree_draw_branches: {Graph.Task} = {}
+    local branch_graph = render_graph.new()
+    local tree_draw_branches: {render_graph.Task} = {}
     for _, branch in ipairs({
         { pipeline = graphics_pipelines.tree_draw_wireframe, index_buffer = buffers.svo_debug_draw_index_buffer },
         { pipeline = graphics_pipelines.tree_draw_solid, index_buffer = buffers.svo_debug_draw_solid_index_buffer },
         { pipeline = graphics_pipelines.tree_draw_wireframe_occupancy, index_buffer = buffers.svo_debug_draw_index_buffer },
         { pipeline = graphics_pipelines.tree_draw_solid_occupancy, index_buffer = buffers.svo_debug_draw_solid_index_buffer },
     }) do
-        local params: Graph.RTParamsRunGraphicsPipelineIndirectVK = {
+        local params: render_graph.RTParamsRunGraphicsPipelineIndirectVK = {
             pipeline = branch.pipeline,
             index_buffer = branch.index_buffer,
             indirect_buffer = buffers.svo_debug_draw_indirect_buffer,
@@ -300,8 +300,8 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local injection = { occupancy_injection, occupancy_propagation, radiance_injection }
     -- Every task using a buffer, in execution order; the publication passes of the pass-published implementation take
     -- their place in the chains of the buffers they publish.
-    local function sequence(...: {Graph.Task}): {Graph.Task}
-        local result: {Graph.Task} = {}
+    local function sequence(...: {render_graph.Task}): {render_graph.Task}
+        local result: {render_graph.Task} = {}
         for _, part in ipairs({ ... }) do
             for _, task in ipairs(part) do
                 result[#result + 1] = task

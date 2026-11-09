@@ -39,12 +39,12 @@ adds handles and tasks to it, and returns `graph:build()`:
 
 ```lua
 local type wbe = require("wbe")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local swap_chain = graph:import_resource("swap_chain")
     local camera_info = graph:import_resource("camera_info")
     graph:draw_mesh("run_static_mesh", {
@@ -61,7 +61,7 @@ return exports
 - **Handles, not strings.** Resource methods (`graph:add_image()`, `image:view()`, `graph:import_resource()`, ...) and
   registered-resource declarations (`graph:register_mesh()`, `graph:register_graphics_pipeline()`, ...,
   `graph:add_mesh()`, `graph:add_compute_pipeline()`, `graph:add_graphics_pipeline()`) return
-  `Graph.Resource` handles. Pass them to task params, `:bind()`, `:color_target()`, `:depth_target()`, edges, and subgraph
+  `render_graph.Resource` handles. Pass them to task params, `:bind()`, `:color_target()`, `:depth_target()`, edges, and subgraph
   ports. `graph:build()` emits only the resources reachable from tasks, so there is no resource list to maintain.
 - **Typed constructors.** `graph:compute()`, `:draw()`, `:draw_mesh()`, ... are generated from the task classes and
   type-check their params. Each takes `(id, params, { bindings?, uses?, trigger?, toggle? })` and returns a task handle.
@@ -92,7 +92,7 @@ p_graph.register_graphics_pipeline("main", pbr, RDParamsGraphicsPipelineVK{
 
 ```lua
 graph:register_compute_pipeline("blur", { shader = "blur_shader" })
-local scan = Graph.shader_compute_pipeline("prefix_scan_shader") -- registered when a task names it
+local scan = render_graph.shader_compute_pipeline("prefix_scan_shader") -- registered when a task names it
 local texture = graph:register_image("noise", { texture = "noise_texture" }) -- bound like an import
 ```
 

@@ -18,7 +18,7 @@
 
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local sort = require("render_graph_utils.sort")
 
 local ceil_div = math_utils.ceil_div
@@ -46,7 +46,7 @@ local record pixel_sort
     record Target
         -- The color image view sorted in place, bound to the subgraph's `color` port; it must be sampled
         -- and storage.
-        color_view: Graph.Resource
+        color_view: render_graph.Resource
         -- The width of the color image.
         width: integer
         -- The height of the color image.
@@ -56,13 +56,13 @@ end
 
 -- The effect as a subgraph task with id p_id, which sorts the target's color view in place through its `color` port. The
 -- params' toggle gates all of its tasks.
-function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): Graph.Task
-    local direction = Graph.enum_name(p_params.direction)
+function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): render_graph.Task
+    local direction = render_graph.enum_name(p_params.direction)
     local vertical = direction == "VERTICAL"
     if not vertical and direction ~= "HORIZONTAL" then
         error("pixel_sort: unknown direction '" .. direction .. "'.")
     end
-    local scope = Graph.enum_name(p_params.scope)
+    local scope = render_graph.enum_name(p_params.scope)
     if scope ~= "LINE" and scope ~= "SPAN" then
         error("pixel_sort: unknown scope '" .. scope .. "'.")
     end
@@ -88,7 +88,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     local tile_group_count_y = ceil_div(height, PIXEL_SORT_TILE_SIZE)
     local column_group_count = ceil_div(line_count, PIXEL_SORT_COLUMN_WORKGROUP_SIZE)
 
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local color = graph:port("color")
     local contrast = graph:import_resource(p_params.contrast_import)
     local source = graph:add_storage_image("pixel_sort_source_image", p_params.color_format, width, height)
@@ -101,11 +101,11 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
 
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
-    local copy_source_pipeline = Graph.shader_compute_pipeline("copy_pixel_sort_source_shader")
-    local count_mask_pipeline = Graph.shader_compute_pipeline("count_pixel_sort_mask" .. direction_suffix)
-    local prefix_sum_pipeline = Graph.shader_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
-    local register_keys_pipeline = Graph.shader_compute_pipeline("register_pixel_sort_keys" .. direction_suffix)
-    local write_pixels_pipeline = Graph.shader_compute_pipeline("write_sorted_pixels" .. direction_suffix)
+    local copy_source_pipeline = render_graph.shader_compute_pipeline("copy_pixel_sort_source_shader")
+    local count_mask_pipeline = render_graph.shader_compute_pipeline("count_pixel_sort_mask" .. direction_suffix)
+    local prefix_sum_pipeline = render_graph.shader_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = render_graph.shader_compute_pipeline("register_pixel_sort_keys" .. direction_suffix)
+    local write_pixels_pipeline = render_graph.shader_compute_pipeline("write_sorted_pixels" .. direction_suffix)
 
     local copy_source = graph:compute("copy_pixel_sort_source", {
         pipeline = copy_source_pipeline,

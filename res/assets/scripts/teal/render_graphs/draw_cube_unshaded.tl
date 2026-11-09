@@ -16,12 +16,12 @@
 -- Imports: `swap_chain` (the swap chain image views) and `camera_info` (the application's camera uniform buffer).
 
 local type wbe = require("wbe")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
-    local graph = Graph.new()
+    local graph = render_graph.new()
     local swap_chain = graph:import_resource("swap_chain")
     local camera_info = graph:import_resource("camera_info")
     -- The mesh and the pipeline are registered on the render graph from their resources; rebuilds keep them unless the

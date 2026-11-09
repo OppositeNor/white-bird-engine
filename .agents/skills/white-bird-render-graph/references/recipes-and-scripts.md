@@ -18,9 +18,10 @@ Recipes only build descriptors; they never touch render objects.
 
 ## The graph API
 
-`local Graph = require("render_graph_utils.render_graph_utils")` gives the implementation; `Graph.new()` creates a graph,
-and the module also exposes the types `Graph.Graph`, `Graph.Resource`, `Graph.Task`, `Graph.ResourceBundle`, and the
-handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, import the generated declarations with
+`local render_graph = require("render_graph_utils.render_graph_utils")` gives the implementation;
+`render_graph.new()` creates a graph, and the module also exposes the types `render_graph.Graph`, `render_graph.Resource`,
+`render_graph.Task`, `render_graph.ResourceBundle`, and the handle-accepting params interfaces
+`render_graph.RTParams<Name>VK`. For types only, import the generated declarations with
 `local type render_graph = require("render_graph_utils.render_graph")`.
 
 ### Resources
@@ -37,15 +38,15 @@ handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, imp
 | `:port(id)` | A port of this graph, bound when it becomes a subgraph |
 | `:add_mesh(key)`, `:add_compute_pipeline(key)`, `:add_graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
 | `:register_mesh(key, params)`, `:register_graphics_pipeline(key, params)`, `:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
-| `Graph.compute_pipeline(key, description)`, `Graph.graphics_pipeline(key, description)`, `Graph.shader_compute_pipeline(shader)` | A handle that carries its registration; a task naming it emits the registration, merging equal ones per key. Needs no graph, so shared helpers use it |
+| `render_graph.compute_pipeline(key, description)`, `render_graph.graphics_pipeline(key, description)`, `render_graph.shader_compute_pipeline(shader)` | A handle that carries its registration; a task naming it emits the registration, merging equal ones per key. Needs no graph, so shared helpers use it |
 | `:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
 | `:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
 
 `graph:build()` collects every resource reachable from task params, bindings, edges, `uses`, and ports (views pull in their
 image), emits each once, and omits unused handles. Two different owned handles with the same id fail. The handle methods
-do not touch the graph; the module exposes them as functions too (`Graph.storage_buffer()`, `Graph.compute_pipeline()`,
-`Graph.graphics_pipeline()`, `Graph.import_resource()`, `Graph.indirect_dispatch()`, ...), so helpers that only build
+do not touch the graph; the module exposes them as functions too (`render_graph.storage_buffer()`, `render_graph.compute_pipeline()`,
+`render_graph.graphics_pipeline()`, `render_graph.import_resource()`, `render_graph.indirect_dispatch()`, ...), so helpers that only build
 handles or dispatches take no graph. A view may also be
 taken of an import, reference, or port; C++ validates the actual kind.
 
@@ -53,8 +54,8 @@ taken of an import, reference, or port; C++ validates the actual kind.
 
 The typed constructors are generated from task classes annotated `WBE_RENDER_TASK(<method>)` (see the table in
 [system-and-usage.md](system-and-usage.md#built-in-task-types)). Each is `graph:<method>(id, params, options?)`, where
-`options` is `{ bindings?, uses?, trigger?, toggle? }`, and returns a `Graph.Task`. Params type-check against
-`Graph.RTParams<Name>VK`, which accepts handles in the fields marked `WBE_RECIPE_RESOURCE`. Params and option tables are
+`options` is `{ bindings?, uses?, trigger?, toggle? }`, and returns a `render_graph.Task`. Params type-check against
+`render_graph.RTParams<Name>VK`, which accepts handles in the fields marked `WBE_RECIPE_RESOURCE`. Params and option tables are
 copied, so a table can be reused for several tasks.
 
 - `task:bind(local_name, resource)` maps a task-local id. A name maps once per task; different tasks may reuse it. A
@@ -99,7 +100,7 @@ non-empty list, or a bundle.
   tasks carry only `id`, `import = true`, and `connect`.
 
 Params are strictly deserialized: unknown keys fail. Pipeline keys name pipelines the application compiled outside the
-callback and keeps alive. Enums serialize as canonical names; compare `Graph.enum_name(value) == "CANONICAL_NAME"`, which
+callback and keeps alive. Enums serialize as canonical names; compare `render_graph.enum_name(value) == "CANONICAL_NAME"`, which
 also accepts the lowercase aliases.
 
 ## Context
@@ -143,7 +144,7 @@ with `graph:import_task(id)`; connect it like any task. Imported tasks set no `t
 ## Feature subgraph modules
 
 A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(id, params, target)`. It builds its
-own `Graph.new()`, declares its port handles with `graph:port(name)`, and returns
+own `render_graph.new()`, declares its port handles with `graph:port(name)`, and returns
 `graph:as_subgraph(id, { name = parent_resource, ... }, imports?)`, a task the parent adds with `parent:add(...)` and
 connects like any task. The port map declares every port and binds it to a parent resource; owned resources stay scoped
 to the subgraph.

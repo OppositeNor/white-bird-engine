@@ -20,15 +20,15 @@
 -- TODO: Build the tree from the unique leaves.
 
 local type wbe = require("wbe")
-local Graph = require("render_graph_utils.render_graph_utils")
+local render_graph = require("render_graph_utils.render_graph_utils")
 local dedup_large = require("render_graph_utils.dedup_large")
 
 local record svo_3
     record LeafParams
         -- The SVO info buffer, whose max_deferred_task_count must equal max_leaf_count.
-        svo_info: Graph.Resource
+        svo_info: render_graph.Resource
         -- The mesh rasterized into the SVO.
-        mesh: Graph.Resource
+        mesh: render_graph.Resource
         -- The SVO's max_depth, which sets the rasterization extent to 2^max_depth.
         max_depth: integer
         -- The capacity of the deferred list.
@@ -40,14 +40,14 @@ local record svo_3
     record LeafDeduplication
         -- The unique leaves: their count in the metadata, followed by their Morton codes in ascending order, in the layout
         -- of a radix sort key buffer.
-        unique_leaves: Graph.Resource
+        unique_leaves: render_graph.Resource
         -- The task that writes the unique leaves; order their consumers after it on unique_leaves.
-        deduplicate: Graph.Task
+        deduplicate: render_graph.Task
     end
 end
 
 -- Adds to p_graph the tasks that gather the leaves of p_params.mesh and deduplicate them.
-function svo_3.add_leaf_deduplication(p_graph: Graph.Graph, p_params: svo_3.LeafParams): svo_3.LeafDeduplication
+function svo_3.add_leaf_deduplication(p_graph: render_graph.Graph, p_params: svo_3.LeafParams): svo_3.LeafDeduplication
     local buffers = dedup_large.buffers({ keys = "svo_3_deferred_list", unique_keys = "svo_3_unique_leaves" },
         p_params.max_leaf_count)
     local deferred_list = buffers.keys
@@ -65,7 +65,7 @@ function svo_3.add_leaf_deduplication(p_graph: Graph.Graph, p_params: svo_3.Leaf
         render_extent = { width = extent, height = extent },
     }, { bindings = { svo_info = p_params.svo_info, svo_deferred_list = deferred_list } })
     -- The clamping of the leaf count and the deduplication run as one task.
-    local dispatches: {Graph.RTParamsComputeDispatchVK} = {
+    local dispatches: {render_graph.RTParamsComputeDispatchVK} = {
         { pipeline = p_graph:add_compute_pipeline("svo_3_prepare_leaves_shader"),
             bindings = { svo_info = p_params.svo_info, svo_deferred_list = deferred_list } },
     }
