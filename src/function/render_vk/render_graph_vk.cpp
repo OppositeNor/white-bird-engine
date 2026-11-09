@@ -36,8 +36,17 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
+#include "function/render/rd_typed.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/rr_compute_pipeline_vk.hh"
+#include "function/render_vk/rr_graphics_pipeline_vk.hh"
+#include "function/render_vk/rr_image_vk.hh"
+#include "function/render_vk/rr_mesh_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -546,12 +555,82 @@ struct RenderGraphVK::RebuildState {
     Vector<RendSubgraphVK, RenderAllocator> subgraphs;
 };
 
+namespace {
+
+// Registered objects may still be referenced by submitted frames; release them once those frames completed.
+RenderGraphResourceRegistry::ReleaseCallback make_registry_release(const RenderContextVK* p_render_data) {
+    return [p_render_data](Ref<IRenderObject> p_object) {
+        RendererVK* renderer = RendererVK::get_singleton();
+        if (renderer == nullptr) {
+            return;
+        }
+        renderer->register_delay_call(
+            [object = std::move(p_object)] mutable {
+                object = MEM_NULL;
+            },
+            p_render_data->frames_in_flight);
+    };
+}
+
+} // namespace
+
 RenderGraphVK::RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key)
-    : render_data(p_render_data), resource_key(p_resource_key), nodes(p_render_data->allocator), resource_edges(p_render_data->allocator),
-      all_resources(p_render_data->allocator),
+    : render_data(p_render_data), resource_key(p_resource_key),
+      registry(p_render_data->allocator, this, make_registry_release(p_render_data)), nodes(p_render_data->allocator),
+      resource_edges(p_render_data->allocator), all_resources(p_render_data->allocator),
       rebuild_state(make_unique<RebuildState>(p_render_data->allocator, p_render_data->allocator)),
       command_buffers(p_render_data->allocator), command_buffer_pools(p_render_data->allocator),
       terminal_semaphores(p_render_data->allocator) {
+    registry.add_registrator(make_unique<RRMeshVK>(p_render_data->allocator));
+    registry.add_registrator(make_unique<RRImageVK>(p_render_data->allocator));
+    registry.add_registrator(make_unique<RRGraphicsPipelineVK>(p_render_data->allocator));
+    registry.add_registrator(make_unique<RRComputePipelineVK>(p_render_data->allocator));
+}
+
+void RenderGraphVK::add_resource_registrator(Unique<IResourceRegistrator> p_registrator) {
+    registry.add_registrator(std::move(p_registrator));
+}
+
+bool RenderGraphVK::has_resource_registrator(TypeID p_description_type) const {
+    return registry.has_registrator(p_description_type);
+}
+
+Ref<IRenderObject> RenderGraphVK::register_resource(std::string_view p_key, const IResourceDescription& p_description) {
+    return registry.register_resource(p_key, p_description);
+}
+
+Ref<IRenderObject> RenderGraphVK::register_resource(std::string_view p_key, TypeID p_description_type, const DataValue& p_description) {
+    return registry.register_resource(p_key, p_description_type, p_description);
+}
+
+void RenderGraphVK::unregister_resource(std::string_view p_key) {
+    registry.unregister_resource(p_key);
+}
+
+bool RenderGraphVK::contains_registered_resource(std::string_view p_key) const {
+    return registry.contains(p_key);
+}
+
+Ref<IRenderObject> RenderGraphVK::try_acquire_registered_resource(std::string_view p_key) const {
+    return registry.try_get(p_key);
+}
+
+Ref<MeshResourcesVK> RenderGraphVK::register_mesh(std::string_view p_key, RDParamsMeshVK p_params) {
+    return register_resource(p_key, RDTyped<RDParamsMeshVK>(std::move(p_params))).dynamic_cast_ref<MeshResourcesVK>();
+}
+
+Ref<ROImageViewVK> RenderGraphVK::register_image(std::string_view p_key, RDParamsImageVK p_params) {
+    return register_resource(p_key, RDTyped<RDParamsImageVK>(std::move(p_params))).dynamic_cast_ref<ROImageViewVK>();
+}
+
+Ref<ROGraphicsPipelineVK> RenderGraphVK::register_graphics_pipeline(std::string_view p_key, RDParamsGraphicsPipelineVK p_params) {
+    return register_resource(p_key, RDTyped<RDParamsGraphicsPipelineVK>(std::move(p_params)))
+        .dynamic_cast_ref<ROGraphicsPipelineVK>();
+}
+
+Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(std::string_view p_key, RDParamsComputePipelineVK p_params) {
+    return register_resource(p_key, RDTyped<RDParamsComputePipelineVK>(std::move(p_params)))
+        .dynamic_cast_ref<ROComputePipelineVK>();
 }
 
 RenderGraphVK::~RenderGraphVK() {
@@ -831,7 +910,7 @@ void RenderGraphVK::build_from_callback(RendGraphRebuildCallbackVK p_rebuild) {
     rebuild_state->callback = std::move(p_rebuild);
 
     context = RendGraphContextVK::from_render_data(*render_data);
-    apply_descriptor(rebuild_state->callback(context));
+    apply_descriptor(rebuild_state->callback(context, *this));
 
     // Allocate one terminal binary semaphore per swap-chain image. Presentation
     // may retain the wait semaphore until that exact image is acquired again.
@@ -878,7 +957,7 @@ Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources
     return resources_by_id;
 }
 
-void RenderGraphVK::register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container) {
+void RenderGraphVK::bind_owned_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container) {
     if (all_resources.contains(p_resource_id)) {
         throw std::runtime_error(std::format("RenderGraphVK: duplicate resource id: {}.", p_resource_id));
     }
@@ -892,13 +971,13 @@ void RenderGraphVK::register_resource(std::string_view p_resource_id, Ref<Render
 Ref<RenderObjectContainerVK> RenderGraphVK::create_container(
     std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const {
     RenderObjectContainerVK::Factory factory = std::move(p_factory);
-    if (!resource_key.empty() && render_data->render_database != nullptr) {
+    if (!resource_key.empty() && render_data->render_cache != nullptr) {
         // Register every object the container creates, including ones recreated after the context changes, as
         // `<graph key>.<id>`, or `<graph key>.<id>[<slot>]` for each frame's copy; registering names the object.
         factory = [this, inner = std::move(factory), key = std::format("{}.{}", resource_key, p_resource_id), p_per_frame](uint32_t p_slot) {
             Ref<IRenderObjectVK> result = inner(p_slot);
             if (result != MEM_NULL) {
-                render_data->render_database->register_compiled_render_resource(p_per_frame ? std::format("{}[{}]", key, p_slot) : key, result);
+                render_data->render_cache->insert(p_per_frame ? std::format("{}[{}]", key, p_slot) : key, result);
             }
             return result;
         };
@@ -971,7 +1050,7 @@ void RenderGraphVK::apply_owned_resource(std::string_view p_resource_id, RendRes
             container->recreate();
         }
     }
-    register_resource(p_resource_id, std::move(container));
+    bind_owned_resource(p_resource_id, std::move(container));
 }
 
 Ref<IRenderObjectVK> RenderGraphVK::create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const {
@@ -1010,7 +1089,7 @@ void RenderGraphVK::rebuild() {
     if (rebuild_state->callback == nullptr) {
         throw std::runtime_error("RenderGraphVK: cannot rebuild a graph that was not built from a callback.");
     }
-    apply_descriptor(rebuild_state->callback(context));
+    apply_descriptor(rebuild_state->callback(context, *this));
 }
 
 Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_resource_id) const {

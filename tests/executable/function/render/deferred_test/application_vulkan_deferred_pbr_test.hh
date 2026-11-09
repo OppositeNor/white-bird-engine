@@ -249,18 +249,20 @@ private:
     void setup_bloom_acquisition();
     void setup_light_billboard_overlay_resources();
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const;
-    ComputePipelineCompilerVKContext make_compute_pipeline_context() const;
-    GraphicsPipelineCompilerVKContext make_present_graphics_pipeline_context() const;
     static SpotLightGraphIds make_spot_light_graph_ids(uint32_t p_light_index);
     // Advance the spot light the light controls move, as the T key does.
     void select_next_controlled_spot_light();
-    void compile_shadow_moments_summed_area_table_pipelines();
-    void compile_lighting_pipelines();
+    void add_shadow_moments_summed_area_table_pipelines();
+    void add_lighting_pipelines();
+    // Register the meshes, pipelines, and images the application and its features draw with on p_graph, and compile the
+    // static mesh's acceleration structure once. Called by every rebuild; repeated registrations are free.
+    void register_graph_resources(RenderGraphVK& p_graph);
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
     void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table);
     // Run the deferred recipe for a graph context, then add the mesh and voxel parts that stay in C++.
-    RendGraphDescVK make_deferred_render_graph_desc(bool p_use_summed_area_table, const RendGraphContextVK& p_context);
+    RendGraphDescVK make_deferred_render_graph_desc(
+        bool p_use_summed_area_table, const RendGraphContextVK& p_context, RenderGraphVK& p_graph);
     // The recipe context, without the voxel structure and post-processing parameters.
     DeferredRecipeContext make_deferred_recipe_context(bool p_use_summed_area_table, const RendGraphContextVK& p_context) const;
     // The application-owned resources the recipe imports, and the tasks built in C++ that it imports.
@@ -307,51 +309,19 @@ private:
     const RenderContextVK* render_context = nullptr;
     RenderAllocator* render_allocator = nullptr;
     RefRes<RUMesh3D> sponza_mesh;
-    RefRes<RUGraphicsPipeline> shadow_opaque_pipeline_resource;
-    RefRes<RUGraphicsPipeline> shadow_double_sided_pipeline_resource;
-    RefRes<RUGraphicsPipeline> gbuffer_opaque_pipeline_resource;
-    RefRes<RUGraphicsPipeline> gbuffer_double_sided_pipeline_resource;
-    RefRes<RUGraphicsPipeline> shadow_dynamic_pipeline_resource;
-    RefRes<RUGraphicsPipeline> gbuffer_dynamic_pipeline_resource;
-    RefRes<RUShader> shadow_moments_summed_area_table_horizontal_shader_resource;
-    RefRes<RUShader> shadow_moments_summed_area_table_vertical_shader_resource;
-    RefRes<RUShader> direct_lighting_shader_resource;
-    RefRes<RUShader> direct_lighting_summed_area_table_shader_resource;
-    RefRes<RUShader> indirect_lighting_rsm_shader_resource;
-    RefRes<RUShader> indirect_lighting_rsm_debug_view_shader_resource;
-    RefRes<RUShader> combine_lighting_shader_resource;
-    RefRes<RUShader> bloom_extract_shader_resource;
-    RefRes<RUShader> kawase_blur_pong_write_shader_resource;
-    RefRes<RUShader> kawase_blur_ping_write_shader_resource;
-    RefRes<RUGraphicsPipeline> present_post_processing_pipeline_resource;
-
+    // The static scene mesh, registered on both graphs under STATIC_MESH_KEY; the voxel features and the acceleration
+    // structure share the same compiled mesh, which MeshCompilerVK caches for this description.
+    RDParamsMeshVK static_mesh_params;
     Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;
     Ref<MeshAccelerationStructureVK> mesh_acceleration_structure = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> shadow_double_sided_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> gbuffer_opaque_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> gbuffer_double_sided_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> shadow_dynamic_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> gbuffer_dynamic_graphics_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> shadow_moments_summed_area_table_horizontal_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> shadow_moments_summed_area_table_vertical_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> direct_lighting_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> direct_lighting_summed_area_table_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> indirect_lighting_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> indirect_lighting_debug_view_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> combine_lighting_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> bloom_extract_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> kawase_blur_pong_write_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> kawase_blur_ping_write_compute_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> present_post_processing_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> light_billboard_pipeline = MEM_NULL;
+    // The pipelines the application's own passes use, registered on both graphs.
+    RenderTestRegistrations scene_registrations;
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
     Ref<ROCMultislotsVK> spot_light_info_buffers;
     // One light camera per spot light, read by that light's shadow passes as shadow_light_info.
     std::array<Ref<ROCMultislotsVK>, SPOT_LIGHT_COUNT> shadow_light_info_buffers;
     std::array<Ref<ROBufferVK>, SPOT_LIGHT_COUNT> light_billboard_ubos;
-    Ref<ROImageViewVK> light_billboard_texture_view;
 
     std::array<ComponentSpotLight, SPOT_LIGHT_COUNT> spot_light_components{};
     std::array<float, SPOT_LIGHT_COUNT> spot_light_yaws{};

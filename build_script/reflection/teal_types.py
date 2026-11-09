@@ -159,9 +159,10 @@ class _RenderTaskDescriber:
     def constructor(self, p_task: ClassMetadata, p_method: str) -> dict[str, Any]:
         """Describe the constructor of a render task."""
         creates = [method for method in p_task.methods if method.method_name == "create" and method.is_static]
-        if len(creates) != 1 or len(creates[0].type) != 3:
-            raise ValueError(f"The render task {p_task.name} needs one reflected static create(render data, params, graph context).")
-        params = _strip(creates[0].type[1])
+        # create(render data, params, graph context), or create(render data, render graph, params, graph context).
+        if len(creates) != 1 or len(creates[0].type) not in (3, 4):
+            raise ValueError(f"The render task {p_task.name} needs one reflected static create(render data, [render graph,] params, graph context).")
+        params = _strip(creates[0].type[len(creates[0].type) - 2])
         if params not in self._scope["classes"]:
             raise ValueError(f"The params '{params}' of the render task {p_task.name} are not WBE_REFLECT_SCRIPT.")
         fields = self._resource_fields_of(params)
@@ -189,14 +190,14 @@ class _RenderTaskDescriber:
         parameters = p_field.attribute_parameters.get(_RECIPE_RESOURCE, [])
         if len(parameters) == 1 and parameters[0] in _RECIPE_RESOURCE_SCOPES:
             return parameters[0], ""
-        if len(parameters) == 2 and parameters[0] == "database":
+        if len(parameters) == 2 and parameters[0] == "registered":
             target = _strip(parameters[1])
             render_object = next((cpp_class for cpp_class in self._classes.values()
                                   if _strip(cpp_class.name) == target), None)
             if render_object is None or _RENDER_OBJECT not in render_object.attribute:
-                raise ValueError(f"The database resource field '{p_field.name}' names '{parameters[1]}', which is not a reflected WBE_RENDER_OBJECT class.")
-            return "database", target
-        raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE}(graph), {_RECIPE_RESOURCE}(task_local), or {_RECIPE_RESOURCE}(database, RenderObjectType).")
+                raise ValueError(f"The registered resource field '{p_field.name}' names '{parameters[1]}', which is not a reflected WBE_RENDER_OBJECT class.")
+            return "registered", target
+        raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE}(graph), {_RECIPE_RESOURCE}(task_local), or {_RECIPE_RESOURCE}(registered, RenderObjectType).")
 
     def _value(self, p_type: str, p_scope: tuple[str, str] | None, p_field: str) -> tuple[dict[str, Any] | None, str]:
         """Describe the resource ids a field value holds, with its authoring Teal type; None and its declared type for a
@@ -214,7 +215,7 @@ class _RenderTaskDescriber:
             scope, target = p_scope
             resource = {"kind": "resource", "scope": scope}
             resource_type = "Resource | string"
-            if scope == "database":
+            if scope == "registered":
                 resource["expected_type"] = "WhiteBirdEngine::" + target
                 resource_type = "Resource"
             if stripped == "std::string":
@@ -259,7 +260,7 @@ def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect
 
     A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated
     WBE_RECIPE_RESOURCE(graph) hold graph resource ids, and those annotated WBE_RECIPE_RESOURCE(task_local) hold ids the
-    task's aliases map. WBE_RECIPE_RESOURCE(database, T) requires a resource handle for a reflected render object T,
+    task's aliases map. WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T,
     whose canonical type is recorded for runtime validation.
     These are std::string fields, optional or in a vector, or a DataValue map of them. Params that hold such fields,
     directly or in nested params, get an authoring interface, which also accepts resource handles in their place.

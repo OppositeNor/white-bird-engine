@@ -16,14 +16,12 @@
 #define WBE_FILE_RENDER_TEST_HH
 
 #include "core/allocator/i_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/ecs/components.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/material_texture_contract.hh"
 #include "function/render/material_texture_contract_resolver.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
@@ -32,8 +30,10 @@
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/mesh_buffer_compiler_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rd_params_compute_pipeline_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -46,10 +46,10 @@
 #include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_params_clear_value_vk.hh"
 #include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/window/i_window.hh"
 #include "platform/file_system/path.hh"
 #include "platform/os/os.hh"
@@ -82,7 +82,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -280,48 +279,6 @@ inline void on_exec_test_start() {
     }
 }
 
-inline std::optional<MaterialTextureContract> load_mesh_material_contract(RefRes<RUGraphicsPipeline> p_pipeline) {
-    if (p_pipeline == MEM_NULL || p_pipeline->vertex_stage == MEM_NULL || p_pipeline->fragment_stage == MEM_NULL) {
-        throw std::runtime_error("Failed to load mesh material contract: graphics pipeline stages are missing.");
-    }
-    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline->vertex_stage);
-    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline->fragment_stage);
-    std::optional<ShaderMetadata> geometry_metadata;
-    if (p_pipeline->geometry_stage != MEM_NULL) {
-        geometry_metadata = ShaderMetadataLoader().load(p_pipeline->geometry_stage);
-    }
-    return MaterialTextureContractResolver().resolve(
-        vertex_metadata, geometry_metadata.has_value() ? &*geometry_metadata : nullptr, fragment_metadata, "material_textures", REND_RES_MESH_MATERIAL_PARAMS);
-}
-
-/**
- * @brief Index of the material table create_mesh_resources() builds for its material pipeline.
- */
-inline constexpr size_t RENDER_TEST_MATERIAL_TABLE_INDEX = 0;
-
-/**
- * @brief Compile p_mesh into static-mesh resources, with the material table of p_material_pipeline's contract, and register
- * them in the render database under p_graph_key, the id graphics_draw_mesh tasks name and import them under.
- * @details The table is material table RENDER_TEST_MATERIAL_TABLE_INDEX, which make_mesh_resource_keys() names. A null
- * material pipeline builds no table.
- * @throws std::runtime_error If the mesh already has material tables, so the table would get another index.
- */
-inline Ref<MeshResourcesVK> create_mesh_resources(RendererVK* p_renderer,
-    std::string_view p_graph_key,
-    RefRes<RUMesh3D> p_mesh,
-    RefRes<RUGraphicsPipeline> p_material_pipeline,
-    const MeshCompilerVK::Config& p_config = {}) {
-    Ref<MeshResourcesVK> result = MeshCompilerVK(p_renderer).compile(p_mesh, p_config);
-    // graphics_draw_mesh tasks look the mesh up, and import it, under the key they name.
-    p_renderer->get_render_database()->register_compiled_render_resource(p_graph_key, result);
-    const std::optional<MaterialTextureContract> material_contract =
-        p_material_pipeline != MEM_NULL ? load_mesh_material_contract(p_material_pipeline) : std::nullopt;
-    if (material_contract.has_value() && result->acquire_material_table(*material_contract) != RENDER_TEST_MATERIAL_TABLE_INDEX) {
-        throw std::runtime_error("Failed to create render test mesh resources: the material table has an unexpected index.");
-    }
-    return result;
-}
-
 /**
  * @brief Copy a trivially copyable value into bytes used as initial graph-buffer data.
  * @param p_value The value to copy.
@@ -363,76 +320,6 @@ inline constexpr std::string_view DYNAMIC_MESH_KEY = "dynamic_mesh";
  * @brief Graph key under which the deferred test imports the entity placing its moving mesh.
  */
 inline constexpr std::string_view DYNAMIC_MESH_ENTITY_KEY = "dynamic_mesh_entity";
-
-/**
- * @brief Graph resource ids of one drawn entity's mesh and transform that back the shader-side mesh resource ids.
- */
-struct MeshResourceKeys {
-    /** Graph id bound to REND_RES_MESH_SUBMESHES. */
-    std::string submeshes;
-    /** Graph id bound to REND_RES_MESH_NODES. */
-    std::string nodes;
-    /** Graph id bound to REND_RES_MESH_INSTANCES. */
-    std::string instances;
-    /** Graph id bound to REND_RES_MESH_TRANSFORM; empty for static meshes, whose shaders do not declare it. */
-    std::string transform;
-    /** Graph id bound to REND_RES_MESH_MATERIAL_PARAMS. */
-    std::string material_params;
-    /** Graph id bound to REND_RES_MESH_MATERIAL_SAMPLER. */
-    std::string material_sampler;
-};
-
-/**
- * @brief Resource ids of a mesh imported under p_mesh_key, drawn with the whole-mesh transform imported as p_transform_id.
- * @details Leave p_transform_id empty for static meshes drawn with shader variants that do not declare a mesh transform.
- */
-inline MeshResourceKeys make_mesh_resource_keys(std::string_view p_mesh_key, std::string_view p_transform_id = {}) {
-    return MeshResourceKeys{
-        .submeshes = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::SUBMESHES),
-        .nodes = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::NODES),
-        .instances = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::INSTANCES),
-        .transform = std::string(p_transform_id),
-        .material_params = IBindableRenderResourceVK::make_member_resource_id(
-            p_mesh_key, MeshResourcesVK::get_material_params_member(RENDER_TEST_MATERIAL_TABLE_INDEX)),
-        .material_sampler = IBindableRenderResourceVK::make_member_resource_id(p_mesh_key, MeshResourcesVK::MATERIAL_SAMPLER),
-    };
-}
-
-/**
- * @brief Map the shader-side mesh resource ids a pipeline reflects to one mesh's graph resources.
- * @details Ids the pipeline does not declare are skipped because every alias must be used by the task.
- * @throws std::runtime_error If the pipeline declares an id that p_keys leaves empty.
- * @param p_task Task drawing the mesh with p_pipeline.
- * @param p_pipeline Pipeline whose reflected descriptor layout selects the aliased ids.
- * @param p_keys Graph keys of the drawn mesh.
- * @return p_task.
- */
-inline RendTaskDescVK& alias_mesh_resources(RendTaskDescVK& p_task, const ROPipelineVK& p_pipeline, const MeshResourceKeys& p_keys) {
-    const std::array<std::pair<std::string_view, std::string_view>, 6> mappings{
-        {
-            {REND_RES_MESH_SUBMESHES, p_keys.submeshes},
-            {REND_RES_MESH_NODES, p_keys.nodes},
-            {REND_RES_MESH_INSTANCES, p_keys.instances},
-            {REND_RES_MESH_TRANSFORM, p_keys.transform},
-            {REND_RES_MESH_MATERIAL_PARAMS, p_keys.material_params},
-            {REND_RES_MESH_MATERIAL_SAMPLER, p_keys.material_sampler},
-        },
-    };
-    const auto& fields = p_pipeline.get_descriptor_layout().fields;
-    for (const auto& [shader_id, graph_id] : mappings) {
-        if (!std::ranges::any_of(fields, [shader_id](const auto& p_field) {
-                return p_field.resource_id == shader_id;
-            })) {
-            continue;
-        }
-        if (graph_id.empty()) {
-            throw std::runtime_error(
-                std::format("Pipeline declares mesh resource \"{}\" but no graph resource is provided for it.", shader_id));
-        }
-        p_task.alias(shader_id, graph_id);
-    }
-    return p_task;
-}
 
 /**
  * @brief Connect consecutive uses of one resource with resource edges.
@@ -493,7 +380,7 @@ inline RendExtent2DParamsVK make_fixed_extent_params(VkExtent2D p_extent) {
 struct RenderTestMeshDraw {
     /** The task id. */
     std::string task_id;
-    /** The task parameters; the mesh must be registered in the render database under params.mesh. */
+    /** The task parameters; params.mesh and the pipelines name resources registered on the graph. */
     RTParamsGraphicsDrawMeshVK params;
     /** Graph resources of the color render targets, in pipeline order. */
     std::vector<std::string> color_attachment_ids;
@@ -514,22 +401,75 @@ struct RenderTestMeshDraw {
     }
 };
 
-inline Ref<ROGraphicsPipelineVK> compile_render_test_graphics_pipeline(RendererVK* p_renderer,
-    std::string_view p_key,
-    RefRes<RUGraphicsPipeline> p_pipeline,
-    std::span<const VkFormat> p_color_formats,
-    VkFormat p_depth_format = VK_FORMAT_UNDEFINED) {
-    const RenderContextVK* render_data = p_renderer->get_render_context();
-    GraphicsPipelineCompilerVKContext context{
-        .allocator = render_data->allocator,
-        .render_data = render_data,
-        .render_database = p_renderer->get_render_database(),
-        .renderer = p_renderer,
-        .color_attachment_formats = std::vector<VkFormat>(p_color_formats.begin(), p_color_formats.end()),
-        .depth_attachment_format = p_depth_format,
-    };
-    return GraphicsPipelineCompilerVK(context).compile(p_key, p_pipeline).graphics_pipeline;
-}
+/**
+ * @class RenderTestRegistrations
+ * @brief The pipelines a render test, or one of its features, registers on its render graphs. Copyable and movable.
+ *
+ * Collected once, at setup, and registered on the graph a rebuild callback receives with register_on(); registering again
+ * with an equal description is free, so the callback registers them on every rebuild.
+ */
+class RenderTestRegistrations {
+public:
+    /**
+     * @brief Add a graphics pipeline compiled from the RUGraphicsPipeline p_pipeline for the given attachments.
+     * @return This object.
+     */
+    RenderTestRegistrations& add_graphics_pipeline(std::string_view p_key,
+        std::string_view p_pipeline,
+        std::span<const VkFormat> p_color_formats,
+        VkFormat p_depth_format = VK_FORMAT_UNDEFINED,
+        PrimitiveTopologyVK p_primitive_topology = PrimitiveTopologyVK::TRIANGLE_LIST) {
+        RDParamsGraphicsPipelineVK params{
+            .pipeline = std::string(p_pipeline),
+            .depth_format = static_cast<ImageFormatVK>(p_depth_format),
+            .primitive_topology = p_primitive_topology,
+        };
+        for (VkFormat format : p_color_formats) {
+            params.color_formats.push_back(static_cast<ImageFormatVK>(format));
+        }
+        graphics_pipelines.emplace_back(std::string(p_key), std::move(params));
+        return *this;
+    }
+
+    /**
+     * @brief Add a graphics pipeline with one color attachment; see add_graphics_pipeline().
+     * @return This object.
+     */
+    RenderTestRegistrations& add_graphics_pipeline(std::string_view p_key,
+        std::string_view p_pipeline,
+        VkFormat p_color_format,
+        VkFormat p_depth_format = VK_FORMAT_UNDEFINED,
+        PrimitiveTopologyVK p_primitive_topology = PrimitiveTopologyVK::TRIANGLE_LIST) {
+        const std::array color_formats{p_color_format};
+        return add_graphics_pipeline(p_key, p_pipeline, color_formats, p_depth_format, p_primitive_topology);
+    }
+
+    /**
+     * @brief Add a compute pipeline compiled from the RUShader of the same key.
+     * @return This object.
+     */
+    RenderTestRegistrations& add_compute_pipeline(std::string_view p_key) {
+        compute_pipelines.emplace_back(std::string(p_key), RDParamsComputePipelineVK{.shader = std::string(p_key)});
+        return *this;
+    }
+
+    /**
+     * @brief Register every added pipeline on p_graph.
+     * @throws std::runtime_error Under the conditions of IRenderGraph::register_resource().
+     */
+    void register_on(RenderGraphVK& p_graph) const {
+        for (const auto& [key, params] : graphics_pipelines) {
+            p_graph.register_graphics_pipeline(key, params);
+        }
+        for (const auto& [key, params] : compute_pipelines) {
+            p_graph.register_compute_pipeline(key, params);
+        }
+    }
+
+private:
+    std::vector<std::pair<std::string, RDParamsGraphicsPipelineVK>> graphics_pipelines;
+    std::vector<std::pair<std::string, RDParamsComputePipelineVK>> compute_pipelines;
+};
 
 /**
  * @brief Extent of a render test pass, evaluated against the render graph context whenever its task is created.
@@ -582,7 +522,7 @@ struct SubmeshDrawBuffersVK {
 /**
  * @brief Import the compiled vertex and index buffers of a mesh into a graph and wire one of its submeshes to a vertex entry.
  *
- * The mesh binaries are compiled, or reused from the render database, by MeshBufferCompilerVK and imported without copying:
+ * The mesh binaries are compiled, or reused from the global render cache, by MeshBufferCompilerVK and imported without copying:
  * vertex buffer i as `<p_key>.vertices.<i>` and the index buffer as `<p_key>.indices`. Only the vertex bindings the entry
  * reads are bound.
  *

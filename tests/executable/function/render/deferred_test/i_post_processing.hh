@@ -18,6 +18,7 @@
 #include "core/data/data_value.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
 #include <string>
 #include <string_view>
@@ -66,6 +67,13 @@ public:
      * @param p_imports The imports of the recipe, to supply the effect's application-owned resources to.
      */
     virtual void configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const = 0;
+
+    /**
+     * @brief Register the pipelines the effect's tasks name on a graph the recipe is built for.
+     *
+     * Called by every rebuild before the recipe runs; repeated registrations are free.
+     */
+    virtual void register_resources(RenderGraphVK& p_graph) const = 0;
 
     /**
      * @brief Whether the effect's tasks record their commands.

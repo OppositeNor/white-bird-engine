@@ -46,12 +46,12 @@
 namespace WhiteBirdEngine {
 
 Unique<IRenderTaskVK> RTRunGraphicsPipelineIndirectVK::create(
-    const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context) {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTRunGraphicsPipelineIndirectVK: render data is unavailable.");
     }
     Ref<ROGraphicsPipelineVK> pipeline =
-        acquire_task_graphics_pipeline_vk(p_render_data, "RTRunGraphicsPipelineIndirectVK", p_params.pipeline);
+        acquire_task_graphics_pipeline_vk(p_render_graph, "RTRunGraphicsPipelineIndirectVK", p_params.pipeline);
     std::vector<VkClearValue> clear_values;
     clear_values.reserve(p_params.clear_values.size());
     for (const RTParamsClearValueVK& clear_value : p_params.clear_values) {

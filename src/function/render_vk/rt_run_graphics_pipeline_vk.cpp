@@ -223,8 +223,8 @@ void RTRunGraphicsPipelineVK::record(VkCommandBuffer p_command_buffer, double /*
 }
 
 Unique<IRenderTaskVK> RTRunGraphicsPipelineVK::create(
-    const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context) {
-    Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, "RTRunGraphicsPipelineVK", p_params.pipeline);
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context) {
+    Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_graph, "RTRunGraphicsPipelineVK", p_params.pipeline);
     std::vector<VkClearValue> clear_values;
     clear_values.reserve(p_params.clear_values.size());
     for (const RTParamsClearValueVK& clear_value : p_params.clear_values) {

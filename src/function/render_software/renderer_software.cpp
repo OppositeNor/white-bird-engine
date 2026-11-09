@@ -17,7 +17,7 @@
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include <cstddef>
 #include <functional>
@@ -41,7 +41,7 @@ void RendererSoftware::tick(double p_delta) {
     (void)p_delta;
     // TODO
 }
-Ref<RenderDatabase> RendererSoftware::get_render_database() {
+Ref<GlobalRenderCache> RendererSoftware::get_global_render_cache() {
     return MEM_NULL; // TODO
 }
 void RendererSoftware::register_render_graph(std::string_view p_resource_key) {

@@ -29,27 +29,27 @@
 
 namespace WhiteBirdEngine {
 
-/**
- * @brief Get a compiled compute pipeline for a render task's create().
- * @param p_render_data Render data whose RenderDatabase holds the pipeline.
- * @param p_task_name Task class name used in error messages.
- * @param p_pipeline_key Resource key the pipeline is compiled under.
- * @throws std::runtime_error If the render data, its allocator, or its RenderDatabase is unavailable, or no compute pipeline
- * is compiled under p_pipeline_key.
- */
-Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
-    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
+class IRenderGraph;
 
 /**
- * @brief Get a compiled graphics pipeline for a render task's create().
- * @param p_render_data Render data whose RenderDatabase holds the pipeline.
+ * @brief Get a compute pipeline registered on a render task's graph, for its create() or prepare_graph().
+ * @param p_render_graph The graph the task's descriptor is bound to.
  * @param p_task_name Task class name used in error messages.
- * @param p_pipeline_key Resource key the pipeline is compiled under.
- * @throws std::runtime_error If the render data, its allocator, or its RenderDatabase is unavailable, or no graphics
- * pipeline is compiled under p_pipeline_key.
+ * @param p_pipeline_key Registration key of the pipeline (IRenderGraph::register_resource()).
+ * @throws std::runtime_error If p_render_graph is null, or no compute pipeline is registered under p_pipeline_key.
+ */
+Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
+    const IRenderGraph* p_render_graph, std::string_view p_task_name, std::string_view p_pipeline_key);
+
+/**
+ * @brief Get a graphics pipeline registered on a render task's graph, for its create() or prepare_graph().
+ * @param p_render_graph The graph the task's descriptor is bound to.
+ * @param p_task_name Task class name used in error messages.
+ * @param p_pipeline_key Registration key of the pipeline (IRenderGraph::register_resource()).
+ * @throws std::runtime_error If p_render_graph is null, or no graphics pipeline is registered under p_pipeline_key.
  */
 Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
-    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key);
+    const IRenderGraph* p_render_graph, std::string_view p_task_name, std::string_view p_pipeline_key);
 
 /**
  * @brief One custom push-constant value resolved from recipe parameters.

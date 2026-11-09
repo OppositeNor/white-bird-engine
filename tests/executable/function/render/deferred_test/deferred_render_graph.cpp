@@ -101,15 +101,17 @@ void ApplicationVulkanDeferredPBRTest::register_deferred_render_graph(std::strin
     // The graph calls this for its first build and again whenever it rebuilds: after a swap chain resize, or when
     // draw_pixel_sort_options() rebuilds it for new post-processing pipelines.
     Ref<RenderGraphVK> graph =
-        renderer_vk->register_render_graph(p_graph_id, [this, p_use_summed_area_table](const RendGraphContextVK& p_context) {
-            return make_deferred_render_graph_desc(p_use_summed_area_table, p_context);
-        });
+        renderer_vk->register_render_graph(
+            p_graph_id, [this, p_use_summed_area_table](const RendGraphContextVK& p_context, RenderGraphVK& p_graph) {
+                return make_deferred_render_graph_desc(p_use_summed_area_table, p_context, p_graph);
+            });
     write_descriptor_debug_output(std::format("{}_graph_descriptors", p_graph_id), graph->list_descriptors());
     deferred_render_graphs[p_use_summed_area_table ? 1U : 0U] = graph;
 }
 
 RendGraphDescVK ApplicationVulkanDeferredPBRTest::make_deferred_render_graph_desc(
-    bool p_use_summed_area_table, const RendGraphContextVK& p_context) {
+    bool p_use_summed_area_table, const RendGraphContextVK& p_context, RenderGraphVK& p_graph) {
+    register_graph_resources(p_graph);
     RendGraphRecipeImportsVK imports = make_deferred_recipe_imports(p_use_summed_area_table);
     DeferredRecipeContext context = make_deferred_recipe_context(p_use_summed_area_table, p_context);
     context.post_processing = DataValue::make_map();
@@ -121,12 +123,13 @@ RendGraphDescVK ApplicationVulkanDeferredPBRTest::make_deferred_render_graph_des
             .dynamic_mesh = dynamic_mesh.get(),
             .static_build_event = VOXEL_STATIC_BUILD_EVENT_ID,
             .static_build_pending = voxel_static_build_pending,
+            .render_graph = &p_graph,
         });
     const DataValue recipe = RendGraphScriptVK::run(DEFERRED_RECIPE_SCRIPT, RendGraphScriptVK::serialize_context(context));
-    RendGraphDescVK pipeline_desc = RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
+    RendGraphDescVK pipeline_desc = RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &p_graph);
 
-    // The recipe's mesh draws import the static and dynamic meshes. The acceleration structure and the dynamic entities stay
-    // in C++.
+    // The recipe's mesh draws import the static and dynamic meshes registered on the graph. The acceleration structure and the
+    // dynamic entities stay in C++.
     if (mesh_acceleration_structure != MEM_NULL) {
         pipeline_desc.add_resource(MESH_ACCELERATION_STRUCTURE_KEY, *mesh_acceleration_structure);
     }
@@ -192,8 +195,7 @@ RendGraphRecipeImportsVK ApplicationVulkanDeferredPBRTest::make_deferred_recipe_
     imports.add(REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
         .add(GBUFFER_CAMERA_INFO_BUFFER, *gbuffer_camera_info_ubos)
         .add(COMPOSITION_CAMERA_INFO_BUFFER, *composition_camera_info_ubos)
-        .add(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_buffers)
-        .add(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view);
+        .add(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_buffers);
     for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
         const SpotLightGraphIds ids = make_spot_light_graph_ids(light_index);
         imports.add(ids.shadow_light_info, *shadow_light_info_buffers[light_index]).add(ids.light_billboard_info, *light_billboard_ubos[light_index]);

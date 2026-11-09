@@ -37,6 +37,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
@@ -87,7 +88,7 @@ TEST(WBERendGraphScriptVKTest, RunsBuildAndTheRecipeBuilds) {
     render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_UNORM;
     const DataValue recipe = RendGraphScriptVK::run(
         "test_recipe", TEST_RECIPE_SCRIPT, RendGraphScriptVK::make_context(render_data, RendGraphContextVK{}));
-    RendGraphDescVK graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data);
+    RendGraphDescVK graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data, nullptr);
     ASSERT_EQ(graph.tasks.size(), 2U);
     EXPECT_EQ(graph.get_task("probe_1").next.size(), 1U);
     EXPECT_EQ(graph.samplers.size(), 1U);
@@ -236,7 +237,7 @@ end }
     EXPECT_FALSE(tasks[1].contains("uses"));
     RenderAllocator allocator(WBE_KI_B(64));
     RenderContextVK render_context(&allocator);
-    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context);
+    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context, nullptr);
     EXPECT_EQ(graph.images.size(), 1U);
     EXPECT_EQ(graph.image_views.size(), 1U);
     EXPECT_EQ(graph.samplers.size(), 1U);
@@ -583,7 +584,7 @@ return { build = function()
     local graph = Graph.new()
     local resource = graph:add_storage_buffer("resource", 16)
     local other = graph:add_storage_buffer("other", 32)
-    local database = graph:add_mesh("mesh")
+    local registered = graph:add_mesh("mesh")
     local producer = graph:import_task("producer")
     local consumer = graph:import_task("consumer")
     local third = graph:import_task("third")
@@ -607,7 +608,7 @@ return { build = function()
         { [1] = resource, [3] = other },
         { resource, extra = other },
         { resource, "invalid" },
-        { resource, database },
+        { resource, registered },
         { resource, graph:resource_bundle({ other }) },
         "invalid",
     }
@@ -924,8 +925,8 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsLowerResourceParameter
     EXPECT_FALSE(tasks[5].contains("connect"));
 }
 
-TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesLowerWithoutGraphResourcesAndSnapshotTheirValues) {
-    const DataValue recipe = RendGraphScriptVK::run("database_keys", R"(
+TEST_F(WBERendGraphScriptVKResourceTest, RegisteredResourcesLowerWithoutGraphResourcesAndSnapshotTheirValues) {
+    const DataValue recipe = RendGraphScriptVK::run("registered_keys", R"(
 local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
@@ -943,7 +944,7 @@ return { build = function()
     mesh.id = "changed_mesh"
     graphics.id = "changed_graphics"
     compute.id = "changed_compute"
-    -- A database key does not reserve a task-local graph alias with the same name.
+    -- A registered key does not reserve a task-local graph alias with the same name.
     draw:alias("static_mesh", graph_utils.storage_buffer("buffer", 16))
     return graph:build()
 end }
@@ -972,8 +973,50 @@ end }
     EXPECT_EQ(recipe.get_entry("resources").as_list()[0].get_value<std::string>("id"), "buffer");
 }
 
-TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectWrongTypesBeforeAddingTasks) {
-    const DataValue recipe = RendGraphScriptVK::run("invalid_database_keys", R"(
+TEST_F(WBERendGraphScriptVKResourceTest, RegistrationsAreEmittedInOrderAndReturnHandles) {
+    const DataValue recipe = RendGraphScriptVK::run("registrations", R"(
+local graph_utils = require("render_graph_utils.render_graph_utils")
+return { build = function()
+    local graph = graph_utils.graph()
+    local params = { pipeline = "source_pipeline", color_formats = { "r8g8b8a8_unorm" } }
+    local graphics = graph:register_graphics_pipeline("graphics", params)
+    params.pipeline = "changed"
+    local compute = graph:register_compute_pipeline("compute", { shader = "compute_shader" })
+    local mesh = graph:register_mesh("mesh", { mesh = "mesh_resource" })
+    local image = graph:register_image("image", { texture = "texture_resource" })
+    graph:register_resource("unused", "CustomParams", { value = 3 }, "WhiteBirdEngine::MeshResourcesVK")
+    assert(not pcall(function() graph:register_mesh("mesh", { mesh = "other" }) end))
+    graph:draw_mesh("draw", { mesh = mesh, pipeline = { default = graphics }, parts = { "opaque" } })
+    graph:compute("compute", { pipeline = compute }):alias("input", image)
+    return graph:build()
+end }
+)", DataValue::make_map());
+    const auto& registrations = recipe.get_entry("registrations").as_list();
+    ASSERT_EQ(registrations.size(), 5U);
+    const std::vector<std::pair<std::string, std::string>> expected{{"graphics", "RDParamsGraphicsPipelineVK"},
+        {"compute", "RDParamsComputePipelineVK"},
+        {"mesh", "RDParamsMeshVK"},
+        {"image", "RDParamsImageVK"},
+        {"unused", "CustomParams"}};
+    for (size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_EQ(registrations[i].get_value<std::string>("key"), expected[i].first);
+        EXPECT_EQ(registrations[i].get_value<std::string>("type"), expected[i].second);
+    }
+    // Descriptions are snapshots.
+    EXPECT_EQ(registrations[0].get_entry("description").get_value<std::string>("pipeline"), "source_pipeline");
+    EXPECT_EQ(registrations[4].get_entry("description").get_value<int64_t>("value"), 3);
+    const auto& tasks = recipe.get_entry("tasks").as_list();
+    ASSERT_EQ(tasks.size(), 2U);
+    EXPECT_EQ(tasks[0].get_entry("params").get_value<std::string>("mesh"), "mesh");
+    EXPECT_EQ(tasks[0].get_entry("params").get_entry("pipeline").get_value<std::string>("default"), "graphics");
+    EXPECT_EQ(tasks[1].get_entry("params").get_value<std::string>("pipeline"), "compute");
+    // A registered image is bound like an import.
+    ASSERT_EQ(recipe.get_entry("imports").as_list().size(), 1U);
+    EXPECT_EQ(recipe.get_entry("imports").as_list()[0].as_string(), "image");
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RegisteredResourcesRejectWrongTypesBeforeAddingTasks) {
+    const DataValue recipe = RendGraphScriptVK::run("invalid_registered_keys", R"(
 local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
@@ -990,19 +1033,19 @@ return { build = function()
         function() graph:draw_mesh("invalid", { mesh = graphics, pipeline = { default = graphics }, parts = { "opaque" } }) end,
         function() graph:draw_mesh("invalid", { mesh = mesh, pipeline = { default = mesh }, parts = { "opaque" } }) end,
         function() graph:compute("invalid", { pipeline = graph_utils.import_resource("compute") }) end,
-        function() graph:compute("invalid", { pipeline = { id = "", kind = "database", dependencies = {},
+        function() graph:compute("invalid", { pipeline = { id = "", kind = "registered", dependencies = {},
             resource_type = compute.resource_type } }) end,
-        function() graph:compute("invalid", { pipeline = { id = 42, kind = "database", dependencies = {},
+        function() graph:compute("invalid", { pipeline = { id = 42, kind = "registered", dependencies = {},
             resource_type = compute.resource_type } }) end,
         function() graph:compute("invalid", { pipeline = { id = "compute", dependencies = {},
             resource_type = compute.resource_type } }) end,
-        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database",
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "registered",
             resource_type = compute.resource_type } }) end,
         function() graph:compute("invalid", { pipeline = { id = "compute", kind = "import", dependencies = {},
             resource_type = compute.resource_type } }) end,
-        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database", dependencies = {},
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "registered", dependencies = {},
             resource_type = graphics.resource_type } }) end,
-        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "database", dependencies = {} } }) end,
+        function() graph:compute("invalid", { pipeline = { id = "compute", kind = "registered", dependencies = {} } }) end,
         function() graph:compute_sequential("invalid", { dispatches = { { pipeline = graphics } } }) end,
         function() graph:ping_pong("invalid", { ping_pipeline = compute, pong_pipeline = compute, iterations = 1,
             ping_prefix_pipeline = graphics, pong_prefix_pipeline = compute }) end,
@@ -1022,7 +1065,7 @@ end }
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectGraphBindingsBeforeChangingTasks) {
-    const DataValue recipe = RendGraphScriptVK::run("database_graph_bindings", R"(
+    const DataValue recipe = RendGraphScriptVK::run("registered_graph_bindings", R"(
 local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = Graph.new()
@@ -1079,7 +1122,7 @@ end }
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, BuildRejectsDatabaseResourcesInRawGraphBindings) {
-    EXPECT_NO_THROW((void)RendGraphScriptVK::run("raw_database_graph_bindings", R"(
+    EXPECT_NO_THROW((void)RendGraphScriptVK::run("raw_registered_graph_bindings", R"(
 local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local invalid_bindings = {
@@ -1159,7 +1202,7 @@ end }
     EXPECT_EQ(description.get_value<int64_t>("mip_level_count"), 3);
     RenderAllocator allocator(WBE_KI_B(64));
     RenderContextVK render_context(&allocator);
-    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context);
+    const auto graph = RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_context, nullptr);
     ASSERT_EQ(graph.image_views.size(), 2U);
     // The no-argument method preserves the graph's existing default range of one mip and one layer.
     const auto default_description = std::ranges::find_if(graph.image_views, [](const auto& p_view) {

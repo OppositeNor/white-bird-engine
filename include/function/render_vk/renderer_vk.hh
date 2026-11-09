@@ -21,7 +21,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
@@ -109,8 +109,8 @@ public:
 
     virtual void activate_render_graph(std::string_view p_resource_key) override;
 
-    virtual Ref<RenderDatabase> get_render_database() override {
-        return render_database;
+    virtual Ref<GlobalRenderCache> get_global_render_cache() override {
+        return render_cache;
     }
 
 
@@ -237,7 +237,7 @@ private:
     inline static RendererVK* singleton = nullptr;
 
     AllocType* allocator = nullptr;
-    Ref<RenderDatabase> render_database;
+    Ref<GlobalRenderCache> render_cache;
 
     Ref<IWindow> window;
 

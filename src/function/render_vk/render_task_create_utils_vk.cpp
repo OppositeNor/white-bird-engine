@@ -13,10 +13,11 @@
    limitations under the License.
 */
 #include "function/render_vk/render_task_create_utils_vk.hh"
+#include "function/render/i_render_graph.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render_vk/pipeline_descriptor_bindings_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -36,17 +37,20 @@ namespace {
 
 template <typename TPipeline>
 Ref<TPipeline> acquire_task_pipeline(
-    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key, std::string_view p_kind) {
-    if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
-        throw std::runtime_error(std::format("{}: render data is unavailable.", p_task_name));
+    const IRenderGraph* p_render_graph, std::string_view p_task_name, std::string_view p_pipeline_key, std::string_view p_kind) {
+    if (p_render_graph == nullptr) {
+        throw std::runtime_error(std::format(
+            "{}: the task is not on a render graph, so its {} pipeline '{}' cannot be resolved.", p_task_name, p_kind, p_pipeline_key));
     }
-    if (p_render_data->render_database == nullptr) {
-        throw std::runtime_error(std::format("{}: the render database is unavailable.", p_task_name));
+    Ref<IRenderObject> object = p_render_graph->try_acquire_registered_resource(p_pipeline_key);
+    if (object == MEM_NULL) {
+        throw std::runtime_error(
+            std::format("{}: no {} pipeline is registered on the render graph under '{}'.", p_task_name, p_kind, p_pipeline_key));
     }
-    Ref<TPipeline> pipeline =
-        p_render_data->render_database->get_compiled_render_resource(p_pipeline_key, TypeUUID<TPipeline>::UUID).template dynamic_cast_ref<TPipeline>();
+    Ref<TPipeline> pipeline = object.template dynamic_cast_ref<TPipeline>();
     if (pipeline == MEM_NULL) {
-        throw std::runtime_error(std::format("{}: no {} pipeline is compiled under '{}'.", p_task_name, p_kind, p_pipeline_key));
+        throw std::runtime_error(
+            std::format("{}: the resource registered on the render graph under '{}' is not a {} pipeline.", p_task_name, p_pipeline_key, p_kind));
     }
     return pipeline;
 }
@@ -54,13 +58,13 @@ Ref<TPipeline> acquire_task_pipeline(
 } // namespace
 
 Ref<ROComputePipelineVK> acquire_task_compute_pipeline_vk(
-    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
-    return acquire_task_pipeline<ROComputePipelineVK>(p_render_data, p_task_name, p_pipeline_key, "compute");
+    const IRenderGraph* p_render_graph, std::string_view p_task_name, std::string_view p_pipeline_key) {
+    return acquire_task_pipeline<ROComputePipelineVK>(p_render_graph, p_task_name, p_pipeline_key, "compute");
 }
 
 Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
-    const RenderContextVK* p_render_data, std::string_view p_task_name, std::string_view p_pipeline_key) {
-    return acquire_task_pipeline<ROGraphicsPipelineVK>(p_render_data, p_task_name, p_pipeline_key, "graphics");
+    const IRenderGraph* p_render_graph, std::string_view p_task_name, std::string_view p_pipeline_key) {
+    return acquire_task_pipeline<ROGraphicsPipelineVK>(p_render_graph, p_task_name, p_pipeline_key, "graphics");
 }
 
 std::vector<TaskPushConstantVK> resolve_task_push_constants_vk(

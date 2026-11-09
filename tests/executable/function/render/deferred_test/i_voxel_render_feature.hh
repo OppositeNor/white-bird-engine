@@ -18,6 +18,7 @@
 #include "core/data/data_value.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "glm/ext/vector_float3.hpp"
 #include <array>
 #include <cstdint>
@@ -113,6 +114,8 @@ struct VoxelRecipeInputs {
     std::string_view static_build_event;
     /** Whether the static construction has yet to record; a rebuild after it recorded creates the tasks disabled. */
     bool static_build_pending = true;
+    /** The graph the recipe is built for, whose registered meshes and pipelines C++ tasks resolve. */
+    RenderGraphVK* render_graph = nullptr;
 };
 
 /**
@@ -224,6 +227,13 @@ public:
      */
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const = 0;
+
+    /**
+     * @brief Register the pipelines the structure's tasks name on a graph the recipe is built for.
+     *
+     * Called by every rebuild before the recipe runs; repeated registrations are free.
+     */
+    virtual void register_resources(RenderGraphVK& p_graph) const = 0;
 };
 
 } // namespace WhiteBirdEngine

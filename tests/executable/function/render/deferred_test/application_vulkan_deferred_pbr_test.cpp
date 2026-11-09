@@ -112,7 +112,7 @@ void update_spot_light_view(ComponentSpotLight& p_spot_light_component) {
         glm::lookAt(p_spot_light_component.position, p_spot_light_component.position + p_spot_light_component.direction, light_up);
 }
 
-// Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
+// Each frame's buffer is registered in the global render cache as `<p_key>[<slot>]`, which names it.
 Ref<ROCMultislotsVK> create_per_frame_buffers(
     RenderAllocator* p_allocator, const RenderContextVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
     return make_ref<ROCMultislotsVK>(p_allocator,
@@ -120,7 +120,7 @@ Ref<ROCMultislotsVK> create_per_frame_buffers(
         p_render_data->frames_in_flight,
         [p_render_data, key = std::string(p_key), p_buffer_size, p_usage](uint32_t p_frame_slot) -> Ref<IRenderObjectVK> {
             Ref<ROBufferVK> buffer = p_render_data->create_buffer(ROBufferVK::Builder().set_properties(p_buffer_size, p_usage));
-            p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
+            p_render_data->render_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
             return buffer;
         });
 }
@@ -458,11 +458,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     setup_render_context();
     load_resources();
     setup_static_scene_resources();
-    dynamic_mesh = make_unique<DynamicMeshRenderFeature>(render_allocator,
-        renderer_vk,
-        ResourceManager::get_singleton()->get_resource<RUMesh3D>("model_cube.mesh"),
-        gbuffer_dynamic_pipeline_resource,
-        2);
+    dynamic_mesh = make_unique<DynamicMeshRenderFeature>(render_allocator, renderer_vk, "model_cube.mesh", 2);
     setup_spot_light();
     setup_bloom_acquisition();
     std::string_view voxel_structure_selection = "2";
@@ -496,8 +492,8 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     stdout_log(WBE_CHANNEL_DEBUG)
         ->message(rebuild_static_every_frame ? "Voxel static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
                                              : "Voxel static scene: built once.");
-    compile_shadow_moments_summed_area_table_pipelines();
-    compile_lighting_pipelines();
+    add_shadow_moments_summed_area_table_pipelines();
+    add_lighting_pipelines();
     post_processing = make_unique<PixelSort>(render_allocator,
         render_allocator,
         renderer_vk,
@@ -668,75 +664,35 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
-    shadow_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_opaque_double_sided");
-    gbuffer_double_sided_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_opaque_double_sided");
-    shadow_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot");
-    gbuffer_opaque_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer");
-    // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
-    shadow_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("rsm_spot_dynamic");
-    gbuffer_dynamic_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("deferred_gbuffer_dynamic");
-    shadow_moments_summed_area_table_horizontal_shader_resource =
-        resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_horizontal_shader");
-    shadow_moments_summed_area_table_vertical_shader_resource =
-        resource_manager->get_resource<RUShader>("shadow_moments_summed_area_table_vertical_shader");
-    direct_lighting_shader_resource = resource_manager->get_resource<RUShader>("direct_lighting_shader");
-    direct_lighting_summed_area_table_shader_resource =
-        resource_manager->get_resource<RUShader>("direct_lighting_summed_area_table_shader");
-    indirect_lighting_rsm_shader_resource = resource_manager->get_resource<RUShader>("indirect_lighting_rsm_shader");
-    indirect_lighting_rsm_debug_view_shader_resource =
-        resource_manager->get_resource<RUShader>("indirect_lighting_rsm_debug_view_shader");
-    combine_lighting_shader_resource = resource_manager->get_resource<RUShader>("combine_lighting_shader");
-    bloom_extract_shader_resource = resource_manager->get_resource<RUShader>("bloom_shader_extract");
-    kawase_blur_pong_write_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_pong_write_shader");
-    kawase_blur_ping_write_shader_resource = resource_manager->get_resource<RUShader>("kawase_blur_ping_write_shader");
-
-    present_post_processing_pipeline_resource = resource_manager->get_resource<RUGraphicsPipeline>("present_post_processing");
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     RayTracingPluginVK* ray_tracing = RayTracingPluginVK::get_singleton();
     const bool build_acceleration_structure = ray_tracing != nullptr && ray_tracing->is_enabled();
-    MeshCompilerVK::Config static_mesh_config;
+    static_mesh_params = RDParamsMeshVK{.mesh = "intel_sponza_with_curtains.mesh"};
     if (build_acceleration_structure) {
-        static_mesh_config.vertex_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
-        static_mesh_config.index_buffer_usage = MeshAccelerationStructureVK::GEOMETRY_BUFFER_USAGE;
+        static_mesh_params.vertex_buffer_usage = {BufferUsageFlagVK::SHADER_DEVICE_ADDRESS, BufferUsageFlagVK::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY};
+        static_mesh_params.index_buffer_usage = static_mesh_params.vertex_buffer_usage;
     }
-    static_mesh_resources =
-        create_mesh_resources(renderer_vk, STATIC_MESH_KEY, sponza_mesh, gbuffer_opaque_pipeline_resource, static_mesh_config);
+    // The voxel features need the mesh before the graphs exist. MeshCompilerVK caches the compiled mesh for this
+    // configuration, so registering static_mesh_params on the graphs yields the same object.
+    MeshCompilerVK::Config static_mesh_config;
+    static_mesh_config.vertex_buffer_usage = to_vk_buffer_usage_flags(static_mesh_params.vertex_buffer_usage);
+    static_mesh_config.index_buffer_usage = to_vk_buffer_usage_flags(static_mesh_params.index_buffer_usage);
+    static_mesh_resources = MeshCompilerVK(renderer_vk).acquire(static_mesh_params.mesh, static_mesh_config);
     if (build_acceleration_structure) {
         mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(render_context, ray_tracing->get_base_ray_tracing_data())
                                           .compile(static_mesh_resources, glm::mat4(1.0F));
     }
-    GraphicsPipelineCompilerVKContext shadow_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {RSM_FLUX_FORMAT, RSM_NORMAL_FORMAT, SHADOW_MOMENTS_FORMAT},
-        .depth_attachment_format = SHADOWMAP_DEPTH_FORMAT,
-    };
-    shadow_opaque_graphics_pipeline =
-        GraphicsPipelineCompilerVK(shadow_context).compile("deferred_shadow_opaque", shadow_opaque_pipeline_resource).graphics_pipeline;
-    shadow_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(shadow_context)
-                                                .compile("deferred_shadow_double_sided", shadow_double_sided_pipeline_resource)
-                                                .graphics_pipeline;
-    shadow_dynamic_graphics_pipeline =
-        GraphicsPipelineCompilerVK(shadow_context).compile("deferred_shadow_dynamic", shadow_dynamic_pipeline_resource).graphics_pipeline;
-    GraphicsPipelineCompilerVKContext gbuffer_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT},
-        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-    };
-    gbuffer_opaque_graphics_pipeline =
-        GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_opaque", gbuffer_opaque_pipeline_resource).graphics_pipeline;
-    gbuffer_double_sided_graphics_pipeline = GraphicsPipelineCompilerVK(gbuffer_context)
-                                                 .compile("deferred_gbuffer_double_sided", gbuffer_double_sided_pipeline_resource)
-                                                 .graphics_pipeline;
-    gbuffer_dynamic_graphics_pipeline =
-        GraphicsPipelineCompilerVK(gbuffer_context).compile("deferred_gbuffer_dynamic", gbuffer_dynamic_pipeline_resource).graphics_pipeline;
+    const std::array shadow_formats{RSM_FLUX_FORMAT, RSM_NORMAL_FORMAT, SHADOW_MOMENTS_FORMAT};
+    scene_registrations.add_graphics_pipeline("deferred_shadow_opaque", "rsm_spot", shadow_formats, SHADOWMAP_DEPTH_FORMAT)
+        .add_graphics_pipeline("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats, SHADOWMAP_DEPTH_FORMAT)
+        // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
+        .add_graphics_pipeline("deferred_shadow_dynamic", "rsm_spot_dynamic", shadow_formats, SHADOWMAP_DEPTH_FORMAT);
+    const std::array gbuffer_formats{GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT};
+    scene_registrations.add_graphics_pipeline("deferred_gbuffer_opaque", "deferred_gbuffer", gbuffer_formats, GBUFFER_DEPTH_FORMAT)
+        .add_graphics_pipeline("deferred_gbuffer_double_sided", "deferred_gbuffer_opaque_double_sided", gbuffer_formats, GBUFFER_DEPTH_FORMAT)
+        .add_graphics_pipeline("deferred_gbuffer_dynamic", "deferred_gbuffer_dynamic", gbuffer_formats, GBUFFER_DEPTH_FORMAT);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -765,17 +721,6 @@ void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources() {
-    auto* resource_manager = ResourceManager::get_singleton();
-    RefRes<RUGraphicsPipeline> pipeline_resource =
-        resource_manager->get_resource<RUGraphicsPipeline>("billboard_face_camera_depth_tested_pipeline");
-    if (pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred light billboard overlay: graphics pipeline resource was not found.");
-    }
-    RefRes<RUTexture> texture_resource = resource_manager->get_resource<RUTexture>("spot_light_billboard");
-    if (texture_resource == nullptr) {
-        throw std::runtime_error("Failed to setup deferred light billboard overlay: texture resource was not found.");
-    }
-
     for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
         BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_components[i]);
         light_billboard_ubos[i] = render_context->create_buffer(ROBufferVK::Builder()
@@ -783,18 +728,11 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
                                       .initial_data(&light_billboard_info, sizeof(light_billboard_info)));
     }
 
-    GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {render_context->swap_chain_format},
-        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-    };
-    GraphicsPipelineCompilerVK compiler(compiler_context);
-    light_billboard_texture_view = compiler.compile_texture_view("spot_light_billboard", texture_resource);
-    auto compiled = compiler.compile("deferred_light_billboard_pipeline", pipeline_resource);
-    light_billboard_pipeline = compiled.graphics_pipeline;
+    // The billboard texture is registered on the graphs, which the recipe's light_billboard_texture import resolves to.
+    scene_registrations.add_graphics_pipeline("deferred_light_billboard_pipeline",
+        "billboard_face_camera_depth_tested_pipeline",
+        render_context->swap_chain_format,
+        GBUFFER_DEPTH_FORMAT);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
@@ -841,20 +779,9 @@ ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBR
     };
 }
 
-void ApplicationVulkanDeferredPBRTest::compile_shadow_moments_summed_area_table_pipelines() {
-    ComputePipelineCompilerVKContext compute_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-    };
-
-    auto horizontal_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("shadow_moments_summed_area_table_horizontal_shader", shadow_moments_summed_area_table_horizontal_shader_resource);
-    shadow_moments_summed_area_table_horizontal_compute_pipeline = horizontal_compiled.compute_pipeline;
-
-    auto vertical_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("shadow_moments_summed_area_table_vertical_shader", shadow_moments_summed_area_table_vertical_shader_resource);
-    shadow_moments_summed_area_table_vertical_compute_pipeline = vertical_compiled.compute_pipeline;
+void ApplicationVulkanDeferredPBRTest::add_shadow_moments_summed_area_table_pipelines() {
+    scene_registrations.add_compute_pipeline("shadow_moments_summed_area_table_horizontal_shader")
+        .add_compute_pipeline("shadow_moments_summed_area_table_vertical_shader");
 }
 
 Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(
@@ -862,25 +789,7 @@ Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(
     return render_context->create_buffer(ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size));
 }
 
-ComputePipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_compute_pipeline_context() const {
-    return ComputePipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-    };
-}
-
-GraphicsPipelineCompilerVKContext ApplicationVulkanDeferredPBRTest::make_present_graphics_pipeline_context() const {
-    return GraphicsPipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {render_context->swap_chain_format},
-    };
-}
-
-void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
+void ApplicationVulkanDeferredPBRTest::add_lighting_pipelines() {
     composition_camera_info_ubos = create_per_frame_buffers(
         render_allocator, render_context, "composition_camera_info", sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(
@@ -889,33 +798,29 @@ void ApplicationVulkanDeferredPBRTest::compile_lighting_pipelines() {
         shadow_light_info_buffers[light_index] = create_per_frame_buffers(
             render_allocator, render_context, std::format("shadow_light_info.{}", light_index), sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
-    ComputePipelineCompilerVKContext compute_context = make_compute_pipeline_context();
-    auto direct_compiled = ComputePipelineCompilerVK(compute_context).compile("direct_lighting_shader", direct_lighting_shader_resource);
-    direct_lighting_compute_pipeline = direct_compiled.compute_pipeline;
-    auto direct_summed_area_table_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("direct_lighting_summed_area_table_shader", direct_lighting_summed_area_table_shader_resource);
-    direct_lighting_summed_area_table_compute_pipeline = direct_summed_area_table_compiled.compute_pipeline;
-    auto indirect_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("indirect_lighting_rsm_shader", indirect_lighting_rsm_shader_resource);
-    indirect_lighting_compute_pipeline = indirect_compiled.compute_pipeline;
-    auto indirect_debug_view_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("indirect_lighting_rsm_debug_view_shader", indirect_lighting_rsm_debug_view_shader_resource);
-    indirect_lighting_debug_view_compute_pipeline = indirect_debug_view_compiled.compute_pipeline;
-    auto combine_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("combine_lighting_shader", combine_lighting_shader_resource);
-    combine_lighting_compute_pipeline = combine_compiled.compute_pipeline;
-    auto bloom_extract_compiled =
-        ComputePipelineCompilerVK(compute_context).compile("bloom_shader_extract", bloom_extract_shader_resource);
-    bloom_extract_compute_pipeline = bloom_extract_compiled.compute_pipeline;
-    kawase_blur_pong_write_compute_pipeline = ComputePipelineCompilerVK(compute_context)
-                                                  .compile("kawase_blur_pong_write_shader", kawase_blur_pong_write_shader_resource)
-                                                  .compute_pipeline;
-    kawase_blur_ping_write_compute_pipeline = ComputePipelineCompilerVK(compute_context)
-                                                  .compile("kawase_blur_ping_write_shader", kawase_blur_ping_write_shader_resource)
-                                                  .compute_pipeline;
-    auto present_compiled =
-        GraphicsPipelineCompilerVK(make_present_graphics_pipeline_context()).compile("present_post_processing", present_post_processing_pipeline_resource);
-    present_post_processing_graphics_pipeline = present_compiled.graphics_pipeline;
+    for (std::string_view shader : {"direct_lighting_shader",
+             "direct_lighting_summed_area_table_shader",
+             "indirect_lighting_rsm_shader",
+             "indirect_lighting_rsm_debug_view_shader",
+             "combine_lighting_shader",
+             "bloom_shader_extract",
+             "kawase_blur_pong_write_shader",
+             "kawase_blur_ping_write_shader"}) {
+        scene_registrations.add_compute_pipeline(shader);
+    }
+    scene_registrations.add_graphics_pipeline("present_post_processing", "present_post_processing", render_context->swap_chain_format);
+}
+
+void ApplicationVulkanDeferredPBRTest::register_graph_resources(RenderGraphVK& p_graph) {
+    const Ref<MeshResourcesVK> static_mesh = p_graph.register_mesh(STATIC_MESH_KEY, static_mesh_params);
+    if (static_mesh != static_mesh_resources) {
+        throw std::runtime_error("Failed to register the deferred static mesh: the graph compiled another mesh than the voxel features use.");
+    }
+    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, RDParamsImageVK{.texture = "spot_light_billboard"});
+    scene_registrations.register_on(p_graph);
+    dynamic_mesh->register_mesh(p_graph);
+    voxel_structure->register_resources(p_graph);
+    post_processing->register_resources(p_graph);
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {

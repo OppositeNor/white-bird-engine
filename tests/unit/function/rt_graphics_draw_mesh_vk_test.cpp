@@ -46,7 +46,7 @@ RTParamsGraphicsDrawMeshVK parse_draw_mesh_params(std::string_view p_json) {
 
 std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
     try {
-        (void)RTGraphicsDrawMeshVK::create(p_render_data, p_params, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
+        (void)RTGraphicsDrawMeshVK::create(p_render_data, nullptr, p_params, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
     } catch (const std::runtime_error& p_error) {
         return p_error.what();
     }
@@ -81,7 +81,7 @@ TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPartsBeforeLookingUpResources) 
     params.parts = {MeshPartVK::OPAQUE, MeshPartVK::MASKED, MeshPartVK::OPAQUE};
     EXPECT_NE(create_error(params, &render_data).find("'OPAQUE' is listed more than once"), std::string::npos);
     params.parts = {MeshPartVK::MASKED};
-    EXPECT_NE(create_error(params, &render_data).find("render database is unavailable"), std::string::npos);
+    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
 }
 
 TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPipelineVariantsBeforeLookingUpResources) {
@@ -93,10 +93,10 @@ TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPipelineVariantsBeforeLookingUp
     ASSERT_EQ(params.pipeline.as_map().size(), 2U);
     EXPECT_EQ(params.pipeline.get_value<std::string>("default"), "p");
     EXPECT_EQ(params.pipeline.get_value<std::string>("tinted"), "p_tinted");
-    EXPECT_NE(create_error(params, &render_data).find("render database is unavailable"), std::string::npos);
+    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
     // A task may draw only materials of other variants.
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"tinted": "p_tinted"}, "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("render database is unavailable"), std::string::npos);
+    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
 
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": "p", "parts": ["opaque"]})");
     EXPECT_NE(create_error(params, &render_data).find("must map pipeline variants to pipeline keys"), std::string::npos);

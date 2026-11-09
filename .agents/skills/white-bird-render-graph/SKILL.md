@@ -13,13 +13,13 @@ build and every rebuild. The descriptor usually comes from a Teal **recipe**; C+
 
 ```cpp
 Ref<RenderGraphVK> graph = renderer->register_render_graph("my_graph",
-    [this, renderer](const RendGraphContextVK& p_context) {
+    [this, renderer](const RendGraphContextVK& p_context, RenderGraphVK& p_graph) {
         RendGraphRecipeImportsVK imports;
         imports.add(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
             .add("camera_info", *camera_info_ubo);
         const DataValue recipe = RendGraphScriptVK::run("render_graphs.my_graph",
             RendGraphScriptVK::make_context(*render_context, p_context));
-        return RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
+        return RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &p_graph);
     });
 renderer->activate_render_graph("my_graph");
 ```
@@ -59,7 +59,8 @@ return exports
 ```
 
 - **Handles, not strings.** Resource methods (`graph:add_image()`, `image:view()`, `graph:import_resource()`, ...) and
-  database declarations (`graph:add_mesh()`, `graph:add_compute_pipeline()`, `graph:add_graphics_pipeline()`) return
+  registered-resource declarations (`graph:register_mesh()`, `graph:register_graphics_pipeline()`, ...,
+  `graph:add_mesh()`, `graph:add_compute_pipeline()`, `graph:add_graphics_pipeline()`) return
   `Graph.Resource` handles. Pass them to task params, `:alias()`, `:color_target()`, `:depth_target()`, edges, and subgraph
   ports. `graph:build()` emits only the resources reachable from tasks, so there is no resource list to maintain.
 - **Typed constructors.** `graph:compute()`, `:draw()`, `:draw_mesh()`, ... are generated from the task classes and
@@ -74,6 +75,28 @@ return exports
 Read [references/recipes-and-scripts.md](references/recipes-and-scripts.md) before writing or changing a recipe, a feature
 module, a context struct, a trigger or toggle, an imported task, or a new task type.
 
+## Register named resources on the graph
+
+Meshes, pipelines, and images that tasks name by key are registered on the graph, in the callback or the recipe, never
+kept alive by the application or looked up globally:
+
+```cpp
+p_graph.register_mesh("static_mesh", RDParamsMeshVK{.mesh = "sponza.mesh"});
+p_graph.register_graphics_pipeline("main", RDParamsGraphicsPipelineVK{
+    .pipeline = "forward_cook_torrance_pbr", .color_formats = {ImageFormatVK::B8G8R8A8_SRGB}, .depth_format = ImageFormatVK::D32_SFLOAT});
+```
+
+```lua
+graph:register_compute_pipeline("blur", { shader = "blur_shader" })
+local texture = graph:register_image("noise", { texture = "noise_texture" }) -- bound like an import
+```
+
+Registrations persist across rebuilds and equal re-registrations compile nothing. The description's type selects its
+registrator. A custom description type gets an `IResourceRegistrator` (usually `RRTyped<TParams>`), installed with
+`add_resource_registrator(registrator)`, and is used from Teal with
+`graph:register_resource(key, "<TParams name>", description, resource_type)`. `GlobalRenderCache` only dedupes compiled
+objects between graphs.
+
 ## Core rules
 
 - **Edges are the only ordering.** Each edge carries one resource, and both tasks must access it; stages and accesses are
@@ -87,7 +110,7 @@ module, a context struct, a trigger or toggle, an imported task, or a new task t
   `<id>.<member>`, which recipes name with `graph:reference()`. Buffers that need initial data are application-owned imports.
   Keep the description structs' `operator==` complete, because diffing relies on it.
 - **Meshes** are drawn with `graph:draw_mesh()` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), which imports the mesh
-  under its render-database key. Do not hand-assemble mesh draws.
+  under its registration key on the graph. Do not hand-assemble mesh draws.
 - **Per-material pipelines.** `pipeline` maps material pipeline variants to pipelines:
   `pipeline = { default = ..., foliage = ... }`; a material without `pipeline_variant` is `default`. Draws batch per variant;
   an unmapped variant throws, and the pipelines must share render targets and one material texture contract.

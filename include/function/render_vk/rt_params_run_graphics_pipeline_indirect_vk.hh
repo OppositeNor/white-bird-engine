@@ -35,9 +35,9 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsRunGraphicsPipelineIndirectVK {
     /**
-     * @brief Resource key of the compiled graphics pipeline in the renderer's RenderDatabase; it must take no vertex input.
+     * @brief Registration key of the graphics pipeline on the task's render graph (IRenderGraph::register_resource()); it must take no vertex input.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROGraphicsPipelineVK))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, ROGraphicsPipelineVK))
     std::string pipeline;
     /**
      * @brief Graph resource id of the index buffer (32-bit indices).

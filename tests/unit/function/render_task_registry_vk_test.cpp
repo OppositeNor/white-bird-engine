@@ -15,7 +15,7 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/render_database.hh"
+#include "fake_render_graph.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -138,14 +139,22 @@ TEST(WBERenderTaskRegistryVKTest, ComputePipelineTaskRequiresACompiledPipeline) 
     params.set_entry("pipeline", DataValue::make_string("pipelines/missing"));
     params.set_entry("group_count_x", DataValue::make_integer(8));
 
-    // Without a render database the pipeline cannot be looked up.
+    // Without a render graph the pipeline cannot be looked up.
     const RendTaskFactoryVK factory = RenderTaskRegistryVK::create_factory("run_compute_pipeline", params, &render_data);
     EXPECT_THROW(factory(RendGraphContextVK{}), std::runtime_error);
 
-    Ref<RenderDatabase> render_database = make_ref<RenderDatabase>(&allocator, &allocator);
-    render_data.render_database = render_database.get();
-    EXPECT_THROW(factory(RendGraphContextVK{}), std::runtime_error);
-    render_data.render_database = nullptr;
+    // A graph that registered no pipeline under the key fails the lookup too.
+    FakeRenderGraph render_graph(&allocator);
+    const RendTaskFactoryVK graph_factory =
+        RenderTaskRegistryVK::create_factory("run_compute_pipeline", params, &render_data, &render_graph);
+    try {
+        (void)graph_factory(RendGraphContextVK{});
+        ADD_FAILURE() << "created a task whose pipeline is not registered.";
+    } catch (const std::runtime_error& p_error) {
+        EXPECT_NE(std::string(p_error.what()).find("no compute pipeline is registered on the render graph under 'pipelines/missing'"),
+            std::string::npos)
+            << p_error.what();
+    }
 
     // The pipeline key is required.
     EXPECT_THROW(RenderTaskRegistryVK::create_factory("run_compute_pipeline", DataValue::make_map(), &render_data), std::runtime_error);

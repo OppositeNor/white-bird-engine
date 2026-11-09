@@ -23,7 +23,7 @@
 #include "function/engine_function.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_debug.hh"
@@ -151,7 +151,7 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
 } // namespace
 
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
-    : job_buffer(p_job_buffer), allocator(p_allocator), render_database(make_ref<RenderDatabase>(p_allocator, p_allocator)),
+    : job_buffer(p_job_buffer), allocator(p_allocator), render_cache(make_ref<GlobalRenderCache>(p_allocator, p_allocator)),
       window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator),
       image_available_semaphores(p_allocator), render_graphs(p_allocator), render_context(p_allocator),
       registered_plugins(p_allocator), running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
@@ -292,7 +292,7 @@ void RendererVK::terminate() {
     // resources outlive vkDestroyDevice() and trigger validation leaks.
     active_graph = MEM_NULL;
     render_graphs.clear();
-    render_database->clear_compiled_render_resources();
+    render_cache->clear();
     image_available_semaphores.clear();
     swap_chain_image_view_container = MEM_NULL;
     shader_debug_buffer = MEM_NULL;
@@ -342,7 +342,7 @@ void RendererVK::recreate_swap_chain() {
 
 void RendererVK::setup_render_context() {
     render_context.allocator = allocator;
-    render_context.render_database = render_database.get();
+    render_context.render_cache = render_cache.get();
     render_context.logic_device = logical_device;
     render_context.physical_device = physical_device;
     render_context.vma_allocator = vma_allocator;
@@ -606,7 +606,7 @@ void RendererVK::create_swap_chain_images() {
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
             make_ref<ROImageVK>(allocator, &render_context, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
-        render_database->register_compiled_render_resource(
+        render_cache->insert(
             std::format("{}.image[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_images.size() - 1), render_objects->swap_chain_images.back());
         ROImageVK::ExposedFields& fields = render_objects->swap_chain_images.back()->exposed_fields;
         fields.format = swap_chain_image_format;
@@ -661,7 +661,7 @@ void RendererVK::init_swap_chain_image_views() {
             .set_subresource_range(subresource_range);
 
         render_objects->swap_chain_image_views.emplace_back(render_context.create_image_view(builder));
-        render_database->register_compiled_render_resource(
+        render_cache->insert(
             std::format("{}[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_image_views.size() - 1), render_objects->swap_chain_image_views.back());
     }
 }
@@ -824,7 +824,7 @@ void RendererVK::create_shader_debug_buffer() {
     shader_debug_buffer = render_context.create_buffer(ROBufferVK::Builder()
                               .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
                               .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
-    render_database->register_compiled_render_resource("shader_debug", shader_debug_buffer);
+    render_cache->insert("shader_debug", shader_debug_buffer);
     const uint32_t descriptor_index = shader_debug_buffer->get_storage_view_index();
     if (descriptor_index != SHADER_DEBUG_DESCRIPTOR_INDEX) {
         throw std::runtime_error(std::format(

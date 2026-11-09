@@ -19,6 +19,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task_resource_map.hh"
@@ -405,10 +406,25 @@ struct RendSubgraphDescVK;
  * by id through their reflected shader, attachment, and fixed-function accesses, resolved through each task's resource map.
  */
 struct RendGraphDescVK {
-    explicit RendGraphDescVK(RenderAllocator* p_allocator)
-        : allocator(p_allocator), tasks(p_allocator), resources(p_allocator), buffers(p_allocator), images(p_allocator),
-          image_views(p_allocator), samplers(p_allocator), subgraphs(p_allocator) {
+    /**
+     * @brief Construct an empty descriptor.
+     *
+     * @param p_allocator The allocator of the descriptor.
+     * @param p_render_graph The graph the descriptor is built for, whose registered resources (IRenderGraph) task types
+     * resolve while they are added and created; it must outlive the descriptor and the tasks created from it. Null only
+     * for descriptors whose tasks name no registered resource.
+     */
+    explicit RendGraphDescVK(RenderAllocator* p_allocator, IRenderGraph* p_render_graph = nullptr)
+        : allocator(p_allocator), render_graph(p_render_graph), tasks(p_allocator), resources(p_allocator), buffers(p_allocator),
+          images(p_allocator), image_views(p_allocator), samplers(p_allocator), subgraphs(p_allocator) {
     }
+
+    /**
+     * @brief Get the graph the descriptor is built for.
+     *
+     * @throws std::runtime_error If the descriptor is not bound to a graph.
+     */
+    IRenderGraph& get_render_graph() const;
 
     /**
      * @brief Append a task descriptor to the graph.
@@ -548,6 +564,8 @@ struct RendGraphDescVK {
     bool contains_resource(std::string_view p_resource_id) const;
 
     RenderAllocator* allocator = nullptr;
+    // The graph the descriptor is built for; null when it is not bound to one. Non-owning.
+    IRenderGraph* render_graph = nullptr;
     // The set of tasks in the pipeline. Order is irrelevant; the graph topo-
     // sorts them based on their resource dependency edges.
     Vector<RendTaskDescVK, RenderAllocator> tasks;
@@ -571,8 +589,14 @@ struct RendGraphDescVK {
  * added. Copyable and movable; copies share the task factories' captured state.
  */
 struct RendSubgraphDescVK {
-    /** @brief Construct an empty subgraph backed by the supplied allocator. */
-    explicit RendSubgraphDescVK(RenderAllocator* p_allocator) : graph(p_allocator), ports(p_allocator) {
+    /**
+     * @brief Construct an empty subgraph backed by the supplied allocator.
+     *
+     * @param p_allocator The allocator of the subgraph.
+     * @param p_render_graph The graph the enclosing descriptor is built for; see RendGraphDescVK().
+     */
+    explicit RendSubgraphDescVK(RenderAllocator* p_allocator, IRenderGraph* p_render_graph = nullptr)
+        : graph(p_allocator, p_render_graph), ports(p_allocator) {
     }
 
     /**

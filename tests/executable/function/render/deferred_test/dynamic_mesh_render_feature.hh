@@ -27,6 +27,7 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
+#include "function/render_vk/render_graph_vk.hh"
 #include <optional>
 #include <span>
 #include <string>
@@ -41,20 +42,18 @@ class RendererVK;
  * @class DynamicMeshRenderFeature
  * @brief Draws several moving entities of one mesh compiled once by MeshCompilerVK. Neither copyable nor movable.
  *
- * The mesh is registered in the render database under DYNAMIC_MESH_KEY, which its graphics_draw_mesh tasks import it
- * under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` and needs its own draw task per pass. All methods run
+ * The mesh is registered on each render graph under DYNAMIC_MESH_KEY (register_mesh()), which its graphics_draw_mesh tasks
+ * import it under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` and needs its own draw task per pass. All methods run
  * on the rendering thread. Geometry requires reconstruction to change.
  */
 class DynamicMeshRenderFeature {
 public:
     DynamicMeshRenderFeature() = delete;
     /**
-     * @brief Compile p_mesh against p_material_pipeline's vertex input and material contract, placing p_entity_count
-     * entities at identity.
+     * @brief Compile the mesh resource p_mesh_key, placing p_entity_count entities at identity.
      * @throws std::runtime_error If p_entity_count is zero or compilation fails.
      */
-    DynamicMeshRenderFeature(
-        RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, size_t p_entity_count);
+    DynamicMeshRenderFeature(RendererVK* p_renderer, std::string_view p_mesh_key, size_t p_entity_count);
     ~DynamicMeshRenderFeature() = default;
     DynamicMeshRenderFeature(const DynamicMeshRenderFeature&) = delete;
     DynamicMeshRenderFeature(DynamicMeshRenderFeature&&) = delete;
@@ -65,6 +64,12 @@ public:
     size_t get_entity_count() const {
         return entities.size();
     }
+
+    /**
+     * @brief Register the mesh on p_graph under DYNAMIC_MESH_KEY, which the draw tasks name; repeated registrations are free.
+     * @throws std::runtime_error If the graph registers another compiled mesh than the entities draw.
+     */
+    void register_mesh(RenderGraphVK& p_graph) const;
 
     /**
      * @brief Import every entity into p_graph before graph construction; the draw tasks import the mesh.
@@ -87,7 +92,7 @@ public:
      * @brief Make the parameters of a graphics_draw_mesh task drawing one entity's opaque part; existing attachments are
      * loaded.
      * @param p_entity_index The entity.
-     * @param p_pipeline_key Render database key of the compiled graphics pipeline.
+     * @param p_pipeline_key Registration key of the graphics pipeline on the render graph.
      * @param p_extent The render area.
      * @throws std::runtime_error If p_entity_index is out of range.
      */
@@ -111,6 +116,7 @@ public:
 
 private:
     const RenderContextVK* render_data;
+    std::string mesh_key;
     Ref<MeshResourcesVK> resources;
     std::vector<Unique<EntityDrawData>> entities;
     std::vector<std::string> entity_keys;

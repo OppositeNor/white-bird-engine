@@ -33,6 +33,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTRunComputePipelineVK
  * @brief Render task that binds a compute pipeline and dispatches workgroups.
@@ -61,16 +63,17 @@ struct WBE_META(WBE_RENDER_TASK(compute), WBE_SERIALIZATION_ALIASES(run_compute_
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipeline.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, or no compute pipeline is compiled
+     * @throws std::runtime_error If the render graph is null, or no compute pipeline is registered
      * under p_params.pipeline.
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
 
     /**
      * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.

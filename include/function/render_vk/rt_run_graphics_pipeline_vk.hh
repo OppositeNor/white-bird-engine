@@ -40,6 +40,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 struct IndexedDrawRegionVK {
     uint32_t first_index = 0;
     uint32_t index_count = 0;
@@ -164,16 +166,17 @@ struct WBE_META(WBE_RENDER_TASK(draw), WBE_SERIALIZATION_ALIASES(run_graphics_pi
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, no graphics pipeline is compiled under p_params.pipeline, or the render extent or a clear value is invalid. The constructor's own
+     * @throws std::runtime_error If the render graph is null, no graphics pipeline is registered under p_params.pipeline, or the render extent or a clear value is invalid. The constructor's own
      * validation also applies.
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunGraphicsPipelineVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

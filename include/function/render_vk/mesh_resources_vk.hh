@@ -81,7 +81,7 @@ enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) MeshPartVK : uint8_t {
  * ordered material rows and a sampled view of every material texture; the material parameter table a pipeline reads depends
  * on its material texture contract, so acquire_material_table() builds one table per distinct contract on first request.
  *
- * MeshCompilerVK registers compiled meshes in the RenderDatabase under the mesh resource key. The object owns no pipeline or
+ * MeshCompilerVK registers compiled meshes in the GlobalRenderCache under the mesh resource key. The object owns no pipeline or
  * render-task state. It is neither copyable nor movable and is shared through Ref. It and every contained render object are
  * rendering-thread-confined. bind() imports each present member under `<key>.<member>`, using the member names below, with
  * every material table built so far; absent optional categories are not declared.
@@ -129,7 +129,7 @@ public:
     /**
      * @brief Register the members only these resources own as `<p_name>.<member>`, using the member names below.
      *
-     * Vertex and index buffers are shared through the RenderDatabase and keep the keys of their binaries. Material tables
+     * Vertex and index buffers are shared through the GlobalRenderCache and keep the keys of their binaries. Material tables
      * built later by acquire_material_table() are registered too.
      */
     virtual void apply_debug_name(std::string_view p_name) override;

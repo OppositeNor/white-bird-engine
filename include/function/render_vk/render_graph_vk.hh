@@ -18,7 +18,9 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render/i_render_task.hh"
+#include "function/render/render_graph_resource_registry.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/debug_data_vk.hh"
@@ -28,6 +30,10 @@
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
+#include "function/render_vk/rd_params_compute_pipeline_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/rd_params_image_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include <cstddef>
@@ -42,6 +48,10 @@
 namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
+class MeshResourcesVK;
+class ROImageViewVK;
+class ROGraphicsPipelineVK;
+class ROComputePipelineVK;
 struct RendTaskDescVK;
 struct RendSubgraphVK;
 enum class RendResRebuildActionVK : uint8_t;
@@ -66,14 +76,19 @@ struct RendResVK {
     Ref<RenderResourceListVK> resource_list;
 };
 
+class RenderGraphVK;
+
 /**
  * @brief Produces the complete descriptor of a render graph for a context.
  *
- * Called by the graph when it is built and whenever it rebuilds, on the rendering thread. It must return every task and
- * resource of the graph, and must be a function of the context and of state its owner controls; everything it captures
- * must outlive the graph. A throw is not caught and crashes the program.
+ * Called by the graph when it is built and whenever it rebuilds, on the rendering thread, with the graph being built. It
+ * must return every task and resource of the graph, and must be a function of the context and of state its owner
+ * controls; everything it captures must outlive the graph. It registers the named resources its tasks use on the graph
+ * (IRenderGraph::register_resource()); registering again with an equal description is free, so it may register on every
+ * rebuild. Build the descriptor bound to the graph (RendGraphDescVK(RenderAllocator*, IRenderGraph*)) so that task types
+ * can resolve those resources. A throw is not caught and crashes the program.
  */
-using RendGraphRebuildCallbackVK = std::function<RendGraphDescVK(const RendGraphContextVK&)>;
+using RendGraphRebuildCallbackVK = std::function<RendGraphDescVK(const RendGraphContextVK&, RenderGraphVK&)>;
 
 /**
  * @class RendResViewVK
@@ -231,11 +246,16 @@ struct RGNode {
  * may be called every frame. The graph-owned resources follow the
  * RendGraphContextVK: execute() calls update_context() whenever the context of
  * the render data differs from the one the resources were built for.
+ *
+ * As an IRenderGraph, the graph also owns the named resources its tasks use. It installs the default registrators RRMeshVK
+ * (RDParamsMeshVK), RRImageVK (RDParamsImageVK), RRGraphicsPipelineVK (RDParamsGraphicsPipelineVK), and RRComputePipelineVK
+ * (RDParamsComputePipelineVK); registered objects that are replaced or unregistered are released frames_in_flight frames
+ * later.
  */
-class RenderGraphVK {
+class RenderGraphVK final : public IRenderGraph {
 public:
     RenderGraphVK() = delete;
-    ~RenderGraphVK();
+    virtual ~RenderGraphVK() override;
     RenderGraphVK(const RenderGraphVK&) = delete;
     RenderGraphVK(RenderGraphVK&&) noexcept = delete;
     RenderGraphVK& operator=(const RenderGraphVK&) = delete;
@@ -245,7 +265,7 @@ public:
      * @brief Construct an empty graph bound to the given Vulkan render data.
      *
      * @param p_render_data The base render data.
-     * @param p_resource_key The key the graph is registered under. When it is set and the render data has a RenderDatabase,
+     * @param p_resource_key The key the graph is registered under. When it is set and the render data has a GlobalRenderCache,
      * every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with `[<slot>]` appended for
      * each per-frame copy, which also names it.
      */
@@ -296,7 +316,42 @@ public:
      * @throws std::runtime_error If a re-evaluated resource configuration is invalid, or if the recreated tasks do not form
      * a valid graph.
      */
-    void rebuild();
+    virtual void rebuild() override;
+
+    virtual void add_resource_registrator(Unique<IResourceRegistrator> p_registrator) override;
+    virtual bool has_resource_registrator(TypeID p_description_type) const override;
+    virtual Ref<IRenderObject> register_resource(std::string_view p_key, const IResourceDescription& p_description) override;
+    virtual Ref<IRenderObject> register_resource(
+        std::string_view p_key, TypeID p_description_type, const DataValue& p_description) override;
+    virtual void unregister_resource(std::string_view p_key) override;
+    virtual bool contains_registered_resource(std::string_view p_key) const override;
+    virtual Ref<IRenderObject> try_acquire_registered_resource(std::string_view p_key) const override;
+
+    /**
+     * @brief Register a mesh with RRMeshVK; see IRenderGraph::register_resource().
+     * @return The registered mesh.
+     */
+    Ref<MeshResourcesVK> register_mesh(std::string_view p_key, RDParamsMeshVK p_params);
+
+    /**
+     * @brief Register a texture with RRImageVK; see IRenderGraph::register_resource().
+     * @return The registered view of the uploaded image.
+     */
+    Ref<ROImageViewVK> register_image(std::string_view p_key, RDParamsImageVK p_params);
+
+    /**
+     * @brief Register a graphics pipeline with RRGraphicsPipelineVK; see
+     * IRenderGraph::register_resource().
+     * @return The registered pipeline.
+     */
+    Ref<ROGraphicsPipelineVK> register_graphics_pipeline(std::string_view p_key, RDParamsGraphicsPipelineVK p_params);
+
+    /**
+     * @brief Register a compute pipeline with RRComputePipelineVK; see
+     * IRenderGraph::register_resource().
+     * @return The registered pipeline.
+     */
+    Ref<ROComputePipelineVK> register_compute_pipeline(std::string_view p_key, RDParamsComputePipelineVK p_params);
 
     /**
      * @brief Get the context the graph-owned resources were last built for.
@@ -377,6 +432,8 @@ private:
     const RenderContextVK* render_data;
     // The key the graph is registered under; empty when its resources are not registered.
     std::string resource_key;
+    // The named resources registered on the graph; see IRenderGraph.
+    RenderGraphResourceRegistry registry;
 
     Vector<Ref<RGNode>, RenderAllocator> nodes;
     Vector<Ref<RGResEdge>, RenderAllocator> resource_edges;
@@ -410,7 +467,7 @@ private:
     void apply_descriptor(const RendGraphDescVK& p_desc);
     void apply_owned_resource(std::string_view p_resource_id, RendResRebuildActionVK p_action);
     Ref<IRenderObjectVK> create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const;
-    void register_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
+    void bind_owned_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
     // Objects the container creates are registered as `<resource_key>.<p_resource_id>`; see RenderGraphVK().
     Ref<RenderObjectContainerVK> create_container(
         std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;

@@ -165,6 +165,13 @@ RendSubgraphVK& RendSubgraphVK::connect(std::string_view p_next_task_id, std::st
     return *this;
 }
 
+IRenderGraph& RendGraphDescVK::get_render_graph() const {
+    if (render_graph == nullptr) {
+        throw std::runtime_error("The render graph descriptor is not bound to a render graph; construct it with the graph its rebuild callback receives.");
+    }
+    return *render_graph;
+}
+
 RendSubgraphDescVK& RendSubgraphDescVK::add_port(std::string_view p_port) {
     if (p_port.empty()) {
         throw std::runtime_error("Failed to add render graph subgraph port: the port is empty.");

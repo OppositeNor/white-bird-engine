@@ -33,6 +33,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTRunComputePipelineIndirectVK
  * @brief Render task that binds a compute pipeline and dispatches the workgroup counts a buffer holds.
@@ -79,16 +81,17 @@ struct WBE_META(WBE_RENDER_TASK(compute_indirect), WBE_SERIALIZATION_ALIASES(run
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, or no compute pipeline is compiled
+     * @throws std::runtime_error If the render graph is null, or no compute pipeline is registered
      * under p_params.pipeline. The constructor's own validation also applies.
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

@@ -20,12 +20,17 @@ local Graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
-function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local graph = Graph.new()
     local swap_chain = graph:import_resource("swap_chain")
     local camera_info = graph:import_resource("camera_info")
-    local static_mesh = graph:add_mesh("model_cube_static.mesh")
-    local pipeline = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline")
+    -- The mesh and the pipeline are registered on the render graph from their resources; rebuilds keep them unless the
+    -- swap chain format, and so the pipeline's description, changes.
+    local static_mesh = graph:register_mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" })
+    local pipeline = graph:register_graphics_pipeline("draw_cube_unshaded_pipeline", {
+        pipeline = "draw_cube_unshaded_pipeline",
+        color_formats = { context.swap_chain_format },
+    })
     graph:draw_mesh("run_static_mesh", {
         mesh = static_mesh,
         pipeline = { default = pipeline },

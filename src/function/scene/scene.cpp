@@ -18,7 +18,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/systems.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/scene/world.hh"
 #include "resource/resource_unit/resource_unit.hh"

@@ -85,9 +85,9 @@ void RTRunComputePipelineIndirectVK::set_push_constant(std::string_view p_name, 
 }
 
 Unique<IRenderTaskVK> RTRunComputePipelineIndirectVK::create(
-    const RenderContextVK* p_render_data, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunComputePipelineIndirectVK& p_params, const RendGraphContextVK& /*p_context*/) {
     Ref<ROComputePipelineVK> pipeline =
-        acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineIndirectVK", p_params.pipeline);
+        acquire_task_compute_pipeline_vk(p_render_graph, "RTRunComputePipelineIndirectVK", p_params.pipeline);
     const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};
     const std::vector<TaskPushConstantVK> push_constants =
         resolve_task_push_constants_vk(p_params.push_constants, layouts, "RTRunComputePipelineIndirectVK");

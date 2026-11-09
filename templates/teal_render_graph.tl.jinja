@@ -24,7 +24,7 @@
 local type wbe = require("wbe")
 
 local record render_graph
-    -- A graph-owned description, an external import, a subgraph port, or a database entry. Image views retain their source.
+    -- A graph-owned description, an external import, a subgraph port, or a registered entry. Image views retain their source.
     record Resource
         id: string
         kind: string
@@ -102,6 +102,15 @@ local record render_graph
         -- Snapshot a non-empty list of graph resource handles without assigning a graph resource id.
         resource_bundle: function(self: Graph, p_resources: {Resource}): ResourceBundle
         add_mesh: function(self: Graph, p_key: string): Resource
+        -- Register a resource on the render graph under p_key; p_description is a reflected parameters struct, p_type its
+        -- reflected name, which selects the registrator, and p_resource_type the C++ type of the registered object.
+        register_resource: function(self: Graph, p_key: string, p_type: string, p_description: any,
+            p_resource_type: string): Resource
+        register_mesh: function(self: Graph, p_key: string, p_params: wbe.RDParamsMeshVK): Resource
+        register_graphics_pipeline: function(self: Graph, p_key: string, p_params: wbe.RDParamsGraphicsPipelineVK): Resource
+        register_compute_pipeline: function(self: Graph, p_key: string, p_params: wbe.RDParamsComputePipelineVK): Resource
+        -- A registered image is bound like an import.
+        register_image: function(self: Graph, p_key: string, p_params: wbe.RDParamsImageVK): Resource
         add_compute_pipeline: function(self: Graph, p_key: string): Resource
         add_graphics_pipeline: function(self: Graph, p_key: string): Resource
         add_buffer: function(self: Graph, p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): Resource

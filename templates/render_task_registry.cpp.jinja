@@ -25,6 +25,7 @@
 {% endfor %}
 #include "core/memory/unique.hh"
 #include "core/data/data_value.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -60,7 +61,8 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-// Extracts the parameter type of a render task's create() and rejects any other signature.
+// Extracts the parameter type of a render task's create() and rejects any other signature. A task type that resolves
+// resources registered on its render graph declares the overload that also takes the graph.
 template <typename TCreate>
 struct RenderTaskCreateTraits {
     static constexpr bool IS_VALID = false;
@@ -69,29 +71,52 @@ struct RenderTaskCreateTraits {
 template <typename TParams>
 struct RenderTaskCreateTraits<Unique<IRenderTaskVK> (*)(const RenderContextVK*, const TParams&, const RendGraphContextVK&)> {
     static constexpr bool IS_VALID = true;
+    static constexpr bool TAKES_GRAPH = false;
+    using Params = TParams;
+};
+
+template <typename TParams>
+struct RenderTaskCreateTraits<Unique<IRenderTaskVK> (*)(const RenderContextVK*, IRenderGraph*, const TParams&, const RendGraphContextVK&)> {
+    static constexpr bool IS_VALID = true;
+    static constexpr bool TAKES_GRAPH = true;
     using Params = TParams;
 };
 
 template <typename TTask>
-RendTaskFactoryVK make_render_task_factory(const DataValue& p_params, const RenderContextVK* p_render_data) {
-    using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
-    static_assert(Traits::IS_VALID,
-        "A WBE_RENDER_TASK must declare static Unique<IRenderTaskVK> create(const RenderContextVK*, const TParams&, const RendGraphContextVK&).");
-    typename Traits::Params params{};
-    SerializableSD<typename Traits::Params>::deserialize(p_params, params);
-    return [p_render_data, params = std::move(params)](const RendGraphContextVK& p_context) {
-        return TTask::create(p_render_data, params, p_context);
+using RenderTaskTraits = RenderTaskCreateTraits<decltype(&TTask::create)>;
+
+template <typename TTask>
+RendTaskFactoryVK make_create_factory(const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, typename RenderTaskTraits<TTask>::Params p_params) {
+    static_assert(RenderTaskTraits<TTask>::IS_VALID,
+        "A WBE_RENDER_TASK must declare static Unique<IRenderTaskVK> create(const RenderContextVK*, [IRenderGraph*,] const TParams&, const RendGraphContextVK&).");
+    return [p_render_data, p_render_graph, params = std::move(p_params)](const RendGraphContextVK& p_context) {
+        if constexpr (RenderTaskTraits<TTask>::TAKES_GRAPH) {
+            return TTask::create(p_render_data, p_render_graph, params, p_context);
+        } else {
+            static_cast<void>(p_render_graph);
+            return TTask::create(p_render_data, params, p_context);
+        }
     };
 }
 
 template <typename TTask>
+typename RenderTaskTraits<TTask>::Params deserialize_render_task_params(const DataValue& p_params) {
+    static_assert(RenderTaskTraits<TTask>::IS_VALID,
+        "A WBE_RENDER_TASK must declare static Unique<IRenderTaskVK> create(const RenderContextVK*, [IRenderGraph*,] const TParams&, const RendGraphContextVK&).");
+    typename RenderTaskTraits<TTask>::Params params{};
+    SerializableSD<typename RenderTaskTraits<TTask>::Params>::deserialize(p_params, params);
+    return params;
+}
+
+template <typename TTask>
+RendTaskFactoryVK make_render_task_factory(const DataValue& p_params, const RenderContextVK* p_render_data, IRenderGraph* p_render_graph) {
+    return make_create_factory<TTask>(p_render_data, p_render_graph, deserialize_render_task_params<TTask>(p_params));
+}
+
+template <typename TTask>
 RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_task_id, const DataValue& p_params, const RenderContextVK* p_render_data) {
-    using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
-    typename Traits::Params params{};
-    SerializableSD<typename Traits::Params>::deserialize(p_params, params);
-    RendTaskDescVK task(p_graph.allocator, p_task_id, [p_render_data, params](const RendGraphContextVK& p_context) {
-        return TTask::create(p_render_data, params, p_context);
-    });
+    auto params = deserialize_render_task_params<TTask>(p_params);
+    RendTaskDescVK task(p_graph.allocator, p_task_id, make_create_factory<TTask>(p_render_data, p_graph.render_graph, params));
     if constexpr (requires { TTask::prepare_graph(p_graph, task, params, p_render_data); }) {
         TTask::prepare_graph(p_graph, task, params, p_render_data);
     }
@@ -101,20 +126,16 @@ RendTaskDescVK& add_render_task(RendGraphDescVK& p_graph, std::string_view p_tas
 
 template <typename TTask>
 RendTaskFactoryVK prepare_render_task(RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const DataValue& p_params, const RenderContextVK* p_render_data) {
-    using Traits = RenderTaskCreateTraits<decltype(&TTask::create)>;
-    typename Traits::Params params{};
-    SerializableSD<typename Traits::Params>::deserialize(p_params, params);
+    auto params = deserialize_render_task_params<TTask>(p_params);
     if constexpr (requires { TTask::prepare_graph(p_graph, p_task, params, p_render_data); }) {
         TTask::prepare_graph(p_graph, p_task, params, p_render_data);
     }
-    return [p_render_data, params = std::move(params)](const RendGraphContextVK& p_context) {
-        return TTask::create(p_render_data, params, p_context);
-    };
+    return make_create_factory<TTask>(p_render_data, p_graph.render_graph, std::move(params));
 }
 
 struct RenderTaskTypeEntry {
     std::string_view name;
-    RendTaskFactoryVK (*make_factory)(const DataValue&, const RenderContextVK*);
+    RendTaskFactoryVK (*make_factory)(const DataValue&, const RenderContextVK*, IRenderGraph*);
     RendTaskDescVK& (*add_task)(RendGraphDescVK&, std::string_view, const DataValue&, const RenderContextVK*);
     RendTaskFactoryVK (*prepare_task)(RendGraphDescVK&, RendTaskDescVK&, const DataValue&, const RenderContextVK*);
 };
@@ -148,7 +169,8 @@ const RenderTaskTypeEntry* find_render_task_type(std::string_view p_task_type) {
 
 } // namespace
 
-RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data) {
+RendTaskFactoryVK RenderTaskRegistryVK::create_factory(
+    std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data, IRenderGraph* p_render_graph) {
     const RenderTaskTypeEntry* entry = find_render_task_type(p_task_type);
     if (entry == nullptr) {
         throw std::runtime_error(std::format("Failed to create render task factory: unknown render task type '{}'.", p_task_type));
@@ -156,7 +178,7 @@ RendTaskFactoryVK RenderTaskRegistryVK::create_factory(std::string_view p_task_t
     if (p_render_data == nullptr) {
         throw std::runtime_error(std::format("Failed to create render task factory for '{}': render data is null.", p_task_type));
     }
-    return entry->make_factory(p_params, p_render_data);
+    return entry->make_factory(p_params, p_render_data, p_render_graph);
 }
 
 RendTaskDescVK& RenderTaskRegistryVK::add_task(RendGraphDescVK& p_graph,

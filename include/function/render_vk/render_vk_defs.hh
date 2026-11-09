@@ -15,14 +15,6 @@
 #ifndef WBE_FILE_RENDER_VK_DEFS_HH
 #define WBE_FILE_RENDER_VK_DEFS_HH
 
-#include "core/allocator/stl_allocator.hh"
-#include "core/memory/reference_strong.hh"
-#include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
-#include "function/render_vk/vma_vk.hh"
-
 #include <cstdint>
 #include <functional>
 #include <vulkan/vulkan_core.h>

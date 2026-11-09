@@ -15,7 +15,17 @@
 #ifndef WBE_FILE_RENDER_CONTEXT_VK_HH
 #define WBE_FILE_RENDER_CONTEXT_VK_HH
 
+#include "core/allocator/stl_allocator.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/global_render_cache.hh"
+#include "function/render/i_renderer.hh"
+#include "function/render/render_defs.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
+#include "function/render_vk/vma_vk.hh"
+#include <cstdint>
+#include <functional>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -148,8 +158,8 @@ public:
      * @brief Non-owning render allocator used by resource factories.
      */
     RenderAllocator* allocator = nullptr;
-    // The render database.
-    RenderDatabase* render_database = nullptr;
+    // The global render cache.
+    GlobalRenderCache* render_cache = nullptr;
     /** Capabilities negotiated when the renderer was constructed. */
     RendererCapabilities renderer_capabilities{};
 

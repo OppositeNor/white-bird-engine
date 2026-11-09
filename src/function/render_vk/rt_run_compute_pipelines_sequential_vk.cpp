@@ -210,7 +210,7 @@ void RTRunComputePipelinesSequentialVK::set_push_constant(size_t p_entry_index, 
     descriptor_bindings[p_entry_index]->set_push_constant(p_name, p_value);
 }
 
-Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderContextVK* p_render_data,
+Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderContextVK* p_render_data, IRenderGraph* p_render_graph,
     const RTParamsRunComputePipelinesSequentialVK& p_params,
     const RendGraphContextVK& /*p_context*/) {
     if (p_params.dispatches.empty()) {
@@ -218,7 +218,7 @@ Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderCont
     }
     // Validates the render data before its allocator is used.
     Ref<ROComputePipelineVK> first_pipeline =
-        acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", p_params.dispatches.front().pipeline);
+        acquire_task_compute_pipeline_vk(p_render_graph, "RTRunComputePipelinesSequentialVK", p_params.dispatches.front().pipeline);
     Dispatch dispatch(p_render_data->allocator);
     // Each dispatch's push constants are typed by its own pipeline.
     std::vector<std::vector<TaskPushConstantVK>> push_constants;
@@ -227,7 +227,7 @@ Unique<IRenderTaskVK> RTRunComputePipelinesSequentialVK::create(const RenderCont
         const RTParamsComputeDispatchVK& entry = p_params.dispatches[i];
         Ref<ROComputePipelineVK> pipeline =
             i == 0 ? first_pipeline
-                   : acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelinesSequentialVK", entry.pipeline);
+                   : acquire_task_compute_pipeline_vk(p_render_graph, "RTRunComputePipelinesSequentialVK", entry.pipeline);
         const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};
         push_constants.push_back(resolve_task_push_constants_vk(entry.push_constants, layouts, "RTRunComputePipelinesSequentialVK"));
         Entry dispatch_entry(p_render_data->allocator);

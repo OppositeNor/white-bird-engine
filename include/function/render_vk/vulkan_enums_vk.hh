@@ -96,6 +96,29 @@ enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) ImageViewTypeVK : std:
 };
 
 /**
+ * @enum PrimitiveTopologyVK
+ * @brief Reflected mirror of the VkPrimitiveTopology values graphics pipelines use.
+ */
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) PrimitiveTopologyVK : std::underlying_type_t<VkPrimitiveTopology> {
+    POINT_LIST WBE_META(WBE_SERIALIZATION_ALIASES(point_list)) = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
+    LINE_LIST WBE_META(WBE_SERIALIZATION_ALIASES(line_list)) = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+    LINE_STRIP WBE_META(WBE_SERIALIZATION_ALIASES(line_strip)) = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+    TRIANGLE_LIST WBE_META(WBE_SERIALIZATION_ALIASES(triangle_list)) = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+    TRIANGLE_STRIP WBE_META(WBE_SERIALIZATION_ALIASES(triangle_strip)) = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+    TRIANGLE_FAN WBE_META(WBE_SERIALIZATION_ALIASES(triangle_fan)) = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
+};
+
+/**
+ * @enum PolygonModeVK
+ * @brief Reflected mirror of VkPolygonMode.
+ */
+enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) PolygonModeVK : std::underlying_type_t<VkPolygonMode> {
+    FILL WBE_META(WBE_SERIALIZATION_ALIASES(fill)) = VK_POLYGON_MODE_FILL,
+    LINE WBE_META(WBE_SERIALIZATION_ALIASES(line)) = VK_POLYGON_MODE_LINE,
+    POINT WBE_META(WBE_SERIALIZATION_ALIASES(point)) = VK_POLYGON_MODE_POINT,
+};
+
+/**
  * @enum FilterVK
  * @brief Reflected mirror of VkFilter.
  */
@@ -225,6 +248,20 @@ constexpr VkImageType to_vk_image_type(ImageTypeVK p_value) {
  */
 constexpr VkImageViewType to_vk_image_view_type(ImageViewTypeVK p_value) {
     return static_cast<VkImageViewType>(p_value);
+}
+
+/**
+ * @brief Convert to the VkPrimitiveTopology with the same value.
+ */
+constexpr VkPrimitiveTopology to_vk_primitive_topology(PrimitiveTopologyVK p_value) {
+    return static_cast<VkPrimitiveTopology>(p_value);
+}
+
+/**
+ * @brief Convert to the VkPolygonMode with the same value.
+ */
+constexpr VkPolygonMode to_vk_polygon_mode(PolygonModeVK p_value) {
+    return static_cast<VkPolygonMode>(p_value);
 }
 
 /**

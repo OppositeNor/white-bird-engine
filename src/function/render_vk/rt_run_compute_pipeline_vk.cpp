@@ -48,8 +48,8 @@ RTRunComputePipelineVK::RTRunComputePipelineVK(
 }
 
 Unique<IRenderTaskVK> RTRunComputePipelineVK::create(
-    const RenderContextVK* p_render_data, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& /*p_context*/) {
-    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTRunComputePipelineVK", p_params.pipeline);
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTRunComputePipelineVK", p_params.pipeline);
     const std::array<const ShaderDescriptorHeapLayoutVK*, 1> layouts{&pipeline->get_descriptor_layout()};
     const std::vector<TaskPushConstantVK> push_constants =
         resolve_task_push_constants_vk(p_params.push_constants, layouts, "RTRunComputePipelineVK");

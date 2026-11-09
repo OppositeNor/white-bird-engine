@@ -76,11 +76,11 @@ struct WBE_META(WBE_RENDER_TASK(generate_mipmaps), WBE_SERIALIZATION_ALIASES(gen
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_render_data Base render data.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, or the base extent cannot be
+     * @throws std::runtime_error If the render data is unavailable, or the base extent cannot be
      * resolved. The constructor's own validation also applies.
      */
     WBE_META(WBE_REFLECT)

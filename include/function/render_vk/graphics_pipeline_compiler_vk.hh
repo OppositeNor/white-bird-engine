@@ -17,7 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
@@ -58,7 +58,7 @@ struct GraphicsPipelineCompilerVKContext {
     /**
      * @brief Registry used to reuse compiled render objects by resource key.
      */
-    Ref<RenderDatabase> render_database = MEM_NULL;
+    Ref<GlobalRenderCache> render_cache = MEM_NULL;
     /**
      * @brief Renderer used to execute the generated task's render graph.
      */
@@ -98,7 +98,7 @@ struct GraphicsPipelineCompilerVKContext {
  * @brief Compiles a graphics pipeline resource unit into render graph objects.
  *
  * The compiler reuses registered shaders, textures, and graphics pipelines
- * when matching entries already exist in the render database.
+ * when matching entries already exist in the global render cache.
  */
 class GraphicsPipelineCompilerVK : public PipelineCompilerVK {
 public:
@@ -123,7 +123,7 @@ public:
     CompileResult compile(std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource);
 
     /**
-     * @brief Compile a texture resource view for descriptor-heap use.
+     * @brief Compile a texture resource view for descriptor-heap use; see TextureCompilerVK::compile_texture_view().
      *
      * @param p_resource_key Cache key for the texture render objects: the image is registered under it and the view under
      * `<p_resource_key>#image_view`, which also name them.
@@ -143,7 +143,6 @@ private:
         std::string_view p_vertex_stage_entry,
         std::string_view p_geometry_stage_entry,
         std::string_view p_fragment_stage_entry);
-    Ref<ROImageVK> compile_texture(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource);
 };
 
 } // namespace WhiteBirdEngine

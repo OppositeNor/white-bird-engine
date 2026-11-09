@@ -17,9 +17,8 @@
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <future>
@@ -36,7 +35,7 @@ namespace WhiteBirdEngine {
 class RendererDummy final : public IRenderer {
 public:
     RendererDummy(RenderAllocator* p_allocator, RendererCapabilities& p_capabilities)
-        : dummy_database(make_ref<RenderDatabase>(p_allocator, p_allocator)) {
+        : dummy_render_cache(make_ref<GlobalRenderCache>(p_allocator, p_allocator)) {
         p_capabilities.conservative_rasterization = false;
         p_capabilities.ray_tracing = false;
         p_capabilities.ray_query = false;
@@ -58,10 +57,10 @@ public:
         (void)p_delta;
     }
 
-    virtual Ref<RenderDatabase> get_render_database() override {
+    virtual Ref<GlobalRenderCache> get_global_render_cache() override {
         // Because of RAII, we have to return a valid database since the caller
         // is going to assume this is valid.
-        return dummy_database;
+        return dummy_render_cache;
     }
 
     virtual void register_render_graph(std::string_view p_resource_key) override {
@@ -82,7 +81,7 @@ public:
     }
 
 private:
-    Ref<RenderDatabase> dummy_database;
+    Ref<GlobalRenderCache> dummy_render_cache;
 };
 
 } // namespace WhiteBirdEngine

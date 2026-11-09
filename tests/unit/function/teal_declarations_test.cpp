@@ -82,11 +82,11 @@ TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks
     EXPECT_NE(declarations.find("        parts: {wbe.MeshPartVK | integer}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        dispatches: {RTParamsComputeDispatchVK}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        aliases: {string:Resource | string}\n"), std::string::npos);
-    EXPECT_NE(constructors.find("{ name = \"mesh\", kind = \"resource\", scope = \"database\", expected_type = \"WhiteBirdEngine::MeshResourcesVK\" }"),
+    EXPECT_NE(constructors.find("{ name = \"mesh\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::MeshResourcesVK\" }"),
         std::string::npos);
-    EXPECT_NE(constructors.find("{ name = \"pipeline\", kind = \"resource\", scope = \"database\", expected_type = \"WhiteBirdEngine::ROGraphicsPipelineVK\" }"),
+    EXPECT_NE(constructors.find("{ name = \"pipeline\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::ROGraphicsPipelineVK\" }"),
         std::string::npos);
-    EXPECT_NE(constructors.find("{ name = \"pipeline\", kind = \"resource\", scope = \"database\", expected_type = \"WhiteBirdEngine::ROComputePipelineVK\" }"),
+    EXPECT_NE(constructors.find("{ name = \"pipeline\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::ROComputePipelineVK\" }"),
         std::string::npos);
     EXPECT_NE(constructors.find("{ name = \"indirect_buffer\", kind = \"resource\", scope = \"task_local\" }"), std::string::npos);
     // A bare WBE_RENDER_TASK registers its task type without a constructor.

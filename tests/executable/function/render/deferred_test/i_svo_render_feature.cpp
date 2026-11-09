@@ -56,88 +56,42 @@ ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     }
     render_context = renderer_vk->get_render_context();
     render_allocator = render_context->allocator;
-    compile_pipelines(p_shader_prefix, p_dynamic_shader_prefix);
+    add_pipelines(p_shader_prefix, p_dynamic_shader_prefix);
     create_resources();
 }
 
-Ref<ROComputePipelineVK> ISVORenderFeature::compile_compute_pipeline(std::string_view p_resource_id) const {
-    ComputePipelineCompilerVK compiler(ComputePipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-    });
-    return compiler.compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id)).compute_pipeline;
+void ISVORenderFeature::register_resources(RenderGraphVK& p_graph) const {
+    registrations.register_on(p_graph);
 }
 
-void ISVORenderFeature::compile_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix) {
-    auto* resource_manager = ResourceManager::get_singleton();
-    GraphicsPipelineCompilerVK svo_compiler(GraphicsPipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-    });
+void ISVORenderFeature::add_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix) {
+    // The voxelizing builds render without attachments.
     const std::string build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_shader_prefix);
-    svo_build_graphics_pipeline =
-        svo_compiler.compile(build_pipeline_id, resource_manager->get_resource<RUGraphicsPipeline>(build_pipeline_id)).graphics_pipeline;
     const std::string dynamic_build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_dynamic_shader_prefix);
-    dynamic_build_pipeline =
-        svo_compiler
-            .compile(dynamic_build_pipeline_id, resource_manager->get_resource<RUGraphicsPipeline>(dynamic_build_pipeline_id))
-            .graphics_pipeline;
-    dynamic_clear_pipeline = compile_compute_pipeline(std::format("{}_clear_shader", p_dynamic_shader_prefix));
-    dynamic_ping_pipeline =
-        compile_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_dynamic_shader_prefix));
-    dynamic_pong_pipeline =
-        compile_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_dynamic_shader_prefix));
-    svo_reset_compute_pipeline = compile_compute_pipeline(std::format("{}_reset_shader", p_shader_prefix));
-    svo_deferred_count_reset_ping_compute_pipeline = compile_compute_pipeline("svo_deferred_count_reset_ping_shader");
-    svo_deferred_count_reset_pong_compute_pipeline = compile_compute_pipeline("svo_deferred_count_reset_pong_shader");
-    svo_deferred_propagation_ping_write_compute_pipeline =
-        compile_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_shader_prefix));
-    svo_deferred_propagation_pong_write_compute_pipeline =
-        compile_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_shader_prefix));
-    svo_pre_deferred_debug_capture_compute_pipeline = compile_compute_pipeline("svo_pre_deferred_debug_capture_shader");
-    svo_debug_draw_setup_compute_pipeline = compile_compute_pipeline("svo_debug_draw_setup_shader");
-    svo_debug_draw_find_nodes_compute_pipeline = compile_compute_pipeline("svo_debug_draw_find_nodes_shader");
-    svogi_occupancy_injection_compute_pipeline = compile_compute_pipeline("svogi_occupancy_injection");
-    svogi_occupancy_propagation_compute_pipeline = compile_compute_pipeline("svogi_occupancy_propagation");
-    svogi_radiance_injection_compute_pipeline = compile_compute_pipeline("svogi_radiance_injection");
-    GraphicsPipelineCompilerVKContext svo_debug_draw_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {render_context->swap_chain_format},
-        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-        .primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-    };
-    svo_debug_draw_graphics_pipeline =
-        GraphicsPipelineCompilerVK(svo_debug_draw_context)
-            .compile("svo_debug_draw_pipeline", resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_pipeline"))
-            .graphics_pipeline;
-    svo_pre_deferred_debug_draw_graphics_pipeline =
-        GraphicsPipelineCompilerVK(svo_debug_draw_context)
-            .compile("svo_pre_deferred_debug_draw_pipeline",
-                resource_manager->get_resource<RUGraphicsPipeline>("svo_pre_deferred_debug_draw_pipeline"))
-            .graphics_pipeline;
-    svo_debug_draw_occupancy_graphics_pipeline =
-        GraphicsPipelineCompilerVK(svo_debug_draw_context)
-            .compile("svo_debug_draw_occupancy_pipeline",
-                resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_occupancy_pipeline"))
-            .graphics_pipeline;
-    // The solid styles draw the cubes' faces.
-    GraphicsPipelineCompilerVKContext svo_debug_draw_solid_context = svo_debug_draw_context;
-    svo_debug_draw_solid_context.primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    svo_debug_draw_solid_graphics_pipeline =
-        GraphicsPipelineCompilerVK(svo_debug_draw_solid_context)
-            .compile("svo_debug_draw_solid_pipeline", resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_solid_pipeline"))
-            .graphics_pipeline;
-    svo_debug_draw_solid_occupancy_graphics_pipeline =
-        GraphicsPipelineCompilerVK(svo_debug_draw_solid_context)
-            .compile("svo_debug_draw_solid_occupancy_pipeline",
-                resource_manager->get_resource<RUGraphicsPipeline>("svo_debug_draw_solid_occupancy_pipeline"))
-            .graphics_pipeline;
+    registrations.add_graphics_pipeline(build_pipeline_id, build_pipeline_id, std::span<const VkFormat>{})
+        .add_graphics_pipeline(dynamic_build_pipeline_id, dynamic_build_pipeline_id, std::span<const VkFormat>{})
+        .add_compute_pipeline(std::format("{}_clear_shader", p_dynamic_shader_prefix))
+        .add_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_dynamic_shader_prefix))
+        .add_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_dynamic_shader_prefix))
+        .add_compute_pipeline(std::format("{}_reset_shader", p_shader_prefix))
+        .add_compute_pipeline("svo_deferred_count_reset_ping_shader")
+        .add_compute_pipeline("svo_deferred_count_reset_pong_shader")
+        .add_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_shader_prefix))
+        .add_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_shader_prefix))
+        .add_compute_pipeline("svo_pre_deferred_debug_capture_shader")
+        .add_compute_pipeline("svo_debug_draw_setup_shader")
+        .add_compute_pipeline("svo_debug_draw_find_nodes_shader")
+        .add_compute_pipeline("svogi_occupancy_injection")
+        .add_compute_pipeline("svogi_occupancy_propagation")
+        .add_compute_pipeline("svogi_radiance_injection");
+    // The wireframe styles draw the cubes' edges; the solid styles draw their faces.
+    for (std::string_view pipeline : {"svo_debug_draw_pipeline", "svo_pre_deferred_debug_draw_pipeline", "svo_debug_draw_occupancy_pipeline"}) {
+        registrations.add_graphics_pipeline(
+            pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT, PrimitiveTopologyVK::LINE_LIST);
+    }
+    for (std::string_view pipeline : {"svo_debug_draw_solid_pipeline", "svo_debug_draw_solid_occupancy_pipeline"}) {
+        registrations.add_graphics_pipeline(pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT);
+    }
 }
 
 void ISVORenderFeature::create_resources() {

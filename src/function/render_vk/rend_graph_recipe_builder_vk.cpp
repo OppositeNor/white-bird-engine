@@ -15,6 +15,9 @@
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -25,6 +28,7 @@
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
 #include "generated/serializables_sd.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include <algorithm>
 #include <cstddef>
 #include <format>
@@ -44,6 +48,8 @@ namespace {
 struct BuildState {
     const RendGraphRecipeImportsVK& imports;
     const RenderContextVK* render_data;
+    // The graph the recipe is built for; null when it is not built for one.
+    IRenderGraph* render_graph;
     // The supplied imports and tasks some level of the recipe declares.
     std::set<std::string, std::less<>> declared_imports;
     std::set<std::string, std::less<>> imported_tasks;
@@ -66,12 +72,46 @@ void bind_imports(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, B
                 std::format("Failed to build render graph recipe: {}imports[{}] '{}' is listed more than once.", p_scope, i, name));
         }
         const IBindableRenderResourceVK* resource = p_state.imports.find(name);
-        if (resource == nullptr) {
-            throw std::runtime_error(
-                std::format("Failed to build render graph recipe: {}imports[{}] '{}' is not supplied.", p_scope, i, name));
+        if (resource != nullptr) {
+            p_graph.add_resource(name, *resource);
+            p_state.declared_imports.insert(name);
+            continue;
         }
-        p_graph.add_resource(name, *resource);
-        p_state.declared_imports.insert(name);
+        // An import nobody supplies may name a bindable resource registered on the graph, such as a registered image.
+        Ref<IRenderObject> registered =
+            p_state.render_graph != nullptr ? p_state.render_graph->try_acquire_registered_resource(name) : Ref<IRenderObject>();
+        if (registered == MEM_NULL) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: {}imports[{}] '{}' is neither supplied nor registered on the render graph.", p_scope, i, name));
+        }
+        const auto* bindable = dynamic_cast<const IBindableRenderResourceVK*>(registered.get());
+        if (bindable == nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: {}imports[{}] '{}' is registered on the render graph, but cannot be bound.", p_scope, i, name));
+        }
+        p_graph.add_resource(name, *bindable);
+    }
+}
+
+void apply_registrations(const RendGraphRecipeVK& p_recipe, BuildState& p_state, std::string_view p_scope) {
+    for (size_t i = 0; i < p_recipe.registrations.size(); ++i) {
+        const RendRecipeRegistrationVK& registration = p_recipe.registrations[i];
+        if (p_state.render_graph == nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: {}registrations[{}] '{}' needs a render graph, but the recipe is built for none.",
+                p_scope,
+                i,
+                registration.key));
+        }
+        const TypeUUIDManager* type_uuids = TypeUUIDManager::get_singleton();
+        if (type_uuids == nullptr) {
+            throw std::runtime_error(std::format(
+                "Failed to build render graph recipe: {}registrations[{}] '{}' names its description type, but the type registry is unavailable.",
+                p_scope,
+                i,
+                registration.key));
+        }
+        p_state.render_graph->register_resource(registration.key, type_uuids->get_type_uuid(registration.type), registration.description);
     }
 }
 
@@ -244,7 +284,7 @@ void add_subgraph_task(RendGraphDescVK& p_graph, const RendRecipeTaskVK& p_recip
     }
     RendGraphRecipeVK recipe;
     SerializableSD<RendGraphRecipeVK>::deserialize(p_recipe_task.subgraph, recipe);
-    RendSubgraphDescVK subgraph(p_graph.allocator);
+    RendSubgraphDescVK subgraph(p_graph.allocator, p_graph.render_graph);
     for (const std::string& port : recipe.ports) {
         subgraph.add_port(port);
     }
@@ -333,6 +373,7 @@ void add_tasks(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, Buil
 }
 
 void build_level(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, BuildState& p_state, std::string_view p_scope) {
+    apply_registrations(p_recipe, p_state, p_scope);
     bind_imports(p_graph, p_recipe, p_state, p_scope);
     declare_resources(p_graph, p_recipe, p_scope);
     add_tasks(p_graph, p_recipe, p_state, p_scope);
@@ -391,8 +432,10 @@ std::vector<std::string> RendGraphRecipeImportsVK::get_names() const {
     return names;
 }
 
-RendGraphDescVK RendGraphRecipeBuilderVK::build(
-    const DataValue& p_recipe, const RendGraphRecipeImportsVK& p_imports, const RenderContextVK* p_render_data) const {
+RendGraphDescVK RendGraphRecipeBuilderVK::build(const DataValue& p_recipe,
+    const RendGraphRecipeImportsVK& p_imports,
+    const RenderContextVK* p_render_data,
+    IRenderGraph* p_render_graph) const {
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("Failed to build render graph recipe: render data is unavailable.");
     }
@@ -401,8 +444,9 @@ RendGraphDescVK RendGraphRecipeBuilderVK::build(
     if (!recipe.ports.empty()) {
         throw std::runtime_error("Failed to build render graph recipe: only a subgraph's nested recipe declares ports.");
     }
-    RendGraphDescVK graph(p_render_data->allocator);
-    BuildState state{.imports = p_imports, .render_data = p_render_data, .declared_imports = {}, .imported_tasks = {}};
+    RendGraphDescVK graph(p_render_data->allocator, p_render_graph);
+    BuildState state{
+        .imports = p_imports, .render_data = p_render_data, .render_graph = p_render_graph, .declared_imports = {}, .imported_tasks = {}};
     build_level(graph, recipe, state, "");
     for (const std::string& name : p_imports.get_names()) {
         if (!state.declared_imports.contains(name)) {

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/ro_acceleration_structure_vk.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render_vk/debug_utils_vk.hh"
 #include <string_view>
 #include "core/core_utils.hh"
@@ -130,8 +130,8 @@ void ROAccelerationStructureVK::bind(RendGraphDescVK& p_graph, std::string_view 
 
 void ROAccelerationStructureVK::apply_debug_name(std::string_view p_name) {
     set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, acceleration_structure, p_name);
-    if (storage_buffer != MEM_NULL && render_data->render_database != nullptr) {
-        render_data->render_database->register_compiled_render_resource(std::format("{}.storage", p_name), storage_buffer);
+    if (storage_buffer != MEM_NULL && render_data->render_cache != nullptr) {
+        render_data->render_cache->insert(std::format("{}.storage", p_name), storage_buffer);
     }
 }
 

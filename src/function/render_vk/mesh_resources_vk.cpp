@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/material_texture_contract.hh"
@@ -203,8 +203,8 @@ size_t MeshResourcesVK::acquire_material_table(const MaterialTextureContract& p_
         .contract = p_contract,
         .buffer = create_material_params_buffer(render_data, material_resources.material_params_data),
     });
-    if (!get_debug_name().empty() && render_data->render_database != nullptr) {
-        render_data->render_database->register_compiled_render_resource(
+    if (!get_debug_name().empty() && render_data->render_cache != nullptr) {
+        render_data->render_cache->insert(
             make_member_resource_id(get_debug_name(), get_material_params_member(material_tables.size() - 1)), material_tables.back().buffer);
     }
     return material_tables.size() - 1;
@@ -218,12 +218,12 @@ Ref<ROBufferVK> MeshResourcesVK::acquire_material_params(size_t p_index) const {
 }
 
 void MeshResourcesVK::apply_debug_name(std::string_view p_name) {
-    if (render_data->render_database == nullptr) {
+    if (render_data->render_cache == nullptr) {
         return;
     }
     const auto name_member = [this, p_name](const auto& p_object, std::string_view p_member) {
         if (p_object != MEM_NULL) {
-            render_data->render_database->register_compiled_render_resource(make_member_resource_id(p_name, p_member), p_object);
+            render_data->render_cache->insert(make_member_resource_id(p_name, p_member), p_object);
         }
     };
     name_member(submeshes, SUBMESHES);

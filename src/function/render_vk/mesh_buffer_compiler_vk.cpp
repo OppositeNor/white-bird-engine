@@ -17,7 +17,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_render_object.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -118,8 +118,8 @@ std::string build_buffer_cache_key(RefRes<RUBinary> p_binary, VkBufferUsageFlags
 
 Ref<ROBufferVK> build_binary_buffer(
     const RenderContextVK* p_render_data, RefRes<RUBinary> p_binary, VkBufferUsageFlags p_usage, std::string_view p_resource_kind) {
-    if (p_render_data == nullptr || p_render_data->render_database == nullptr) {
-        throw std::runtime_error("Failed to compile mesh buffer: render database is missing.");
+    if (p_render_data == nullptr || p_render_data->render_cache == nullptr) {
+        throw std::runtime_error("Failed to compile mesh buffer: global render cache is missing.");
     }
     if (p_binary == nullptr || p_binary->data == nullptr || p_binary->size == 0) {
         throw std::runtime_error(std::format("Failed to compile mesh buffer: {} binary data is missing.", p_resource_kind));
@@ -127,7 +127,7 @@ Ref<ROBufferVK> build_binary_buffer(
 
     const std::string cache_key = build_buffer_cache_key(p_binary, p_usage);
     Ref<IRenderObject> registered_buffer =
-        p_render_data->render_database->get_compiled_render_resource(cache_key, TypeUUID<ROBufferVK>::UUID);
+        p_render_data->render_cache->try_get(cache_key, TypeUUID<ROBufferVK>::UUID);
     if (registered_buffer != MEM_NULL) {
         Ref<ROBufferVK> result = registered_buffer.dynamic_cast_ref<ROBufferVK>();
         if (result == MEM_NULL) {
@@ -143,7 +143,7 @@ Ref<ROBufferVK> build_binary_buffer(
     Ref<ROBufferVK> result =
         p_render_data->create_buffer(ROBufferVK::Builder().set_domain(DeviceDomain::HOST_DEVICE).set_size(p_binary->size).set_usage(p_usage));
     result->update_buffer(p_binary->data.get(), p_binary->size);
-    p_render_data->render_database->register_compiled_render_resource(cache_key, result);
+    p_render_data->render_cache->insert(cache_key, result);
     return result;
 }
 
@@ -166,7 +166,7 @@ MeshBufferCompilerVK::BuildResult build_shared_buffers(const RenderContextVK* p_
 } // namespace
 
 MeshBufferCompilerVK::MeshBufferCompilerVK(const RenderContextVK* p_render_data) : render_data(p_render_data) {
-    if (render_data == nullptr || render_data->allocator == nullptr || render_data->render_database == nullptr) {
+    if (render_data == nullptr || render_data->allocator == nullptr || render_data->render_cache == nullptr) {
         throw std::runtime_error("Failed to create mesh buffer compiler: renderer state is missing.");
     }
 }

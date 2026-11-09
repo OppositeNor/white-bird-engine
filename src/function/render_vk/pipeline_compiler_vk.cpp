@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
 
 PipelineCompilerVK::PipelineCompilerVK(const PipelineCompilerVKContext& p_context, std::string_view p_compiler_name)
     : base_context(p_context) {
-    if (base_context.allocator == nullptr || base_context.render_data == nullptr || base_context.render_database == MEM_NULL) {
+    if (base_context.allocator == nullptr || base_context.render_data == nullptr || base_context.render_cache == MEM_NULL) {
         throw std::runtime_error(std::format("Failed to create {} compiler: invalid context.", p_compiler_name));
     }
 }
@@ -40,12 +40,12 @@ Ref<ROShaderVK> PipelineCompilerVK::compile_shader(RefRes<RUShader> p_shader) {
     }
     std::string shader_key = p_shader->resource_key;
     auto registered_shader =
-        get_registered_render_object<ROShaderVK>(base_context.render_database, shader_key, TypeUUID<ROShaderVK>::UUID);
+        get_registered_render_object<ROShaderVK>(base_context.render_cache, shader_key, TypeUUID<ROShaderVK>::UUID);
     if (registered_shader != MEM_NULL) {
         return registered_shader;
     }
     auto shader = base_context.render_data->create_shader(ROShaderVK::Builder().set_code(p_shader));
-    base_context.render_database->register_compiled_render_resource(shader_key, shader);
+    base_context.render_cache->insert(shader_key, shader);
     return shader;
 }
 

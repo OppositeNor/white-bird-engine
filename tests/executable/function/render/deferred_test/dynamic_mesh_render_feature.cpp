@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "dynamic_mesh_render_feature.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
 #include "../render_test.hh"
 #include "/home/oppositenormal/Documents/programming/white-bird-engine/tests/executable/function/render/entity_draw_data.hh"
 #include "core/allocator/i_allocator.hh"
@@ -46,18 +47,24 @@
 
 namespace WhiteBirdEngine {
 
-DynamicMeshRenderFeature::DynamicMeshRenderFeature(
-    RendererVK* p_renderer, RefRes<RUMesh3D> p_mesh, RefRes<RUGraphicsPipeline> p_material_pipeline, size_t p_entity_count)
-    : render_data(p_renderer->get_render_context()) {
+DynamicMeshRenderFeature::DynamicMeshRenderFeature(RendererVK* p_renderer, std::string_view p_mesh_key, size_t p_entity_count)
+    : render_data(p_renderer->get_render_context()), mesh_key(p_mesh_key) {
     if (p_entity_count == 0) {
         throw std::runtime_error("Dynamic mesh feature requires at least one entity.");
     }
-    resources = create_mesh_resources(p_renderer, DYNAMIC_MESH_KEY, p_mesh, p_material_pipeline);
+    // The entities need the mesh before the graphs exist; register_mesh() registers the same cached compilation.
+    resources = MeshCompilerVK(p_renderer).acquire(mesh_key);
     entities.reserve(p_entity_count);
     entity_keys.reserve(p_entity_count);
     for (size_t i = 0; i < p_entity_count; ++i) {
         entities.push_back(make_unique<EntityDrawData>(render_data->allocator, render_data, resources));
         entity_keys.push_back(std::format("{}_{}", DYNAMIC_MESH_ENTITY_KEY, i));
+    }
+}
+
+void DynamicMeshRenderFeature::register_mesh(RenderGraphVK& p_graph) const {
+    if (p_graph.register_mesh(DYNAMIC_MESH_KEY, RDParamsMeshVK{.mesh = mesh_key}) != resources) {
+        throw std::runtime_error("Failed to register the dynamic mesh: the graph compiled another mesh than the entities draw.");
     }
 }
 

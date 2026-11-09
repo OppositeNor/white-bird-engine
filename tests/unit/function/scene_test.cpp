@@ -22,7 +22,7 @@
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/scene/scene.hh"
@@ -110,7 +110,7 @@ void scene_driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
 class RecordingRenderer final : public WBE::IRenderer {
 public:
     explicit RecordingRenderer(WBE::RenderAllocator* p_allocator)
-        : render_database(WBE::make_ref<WBE::RenderDatabase>(p_allocator, p_allocator)) {
+        : render_cache(WBE::make_ref<WBE::GlobalRenderCache>(p_allocator, p_allocator)) {
     }
 
     virtual uint32_t get_worker_nums() override {
@@ -121,8 +121,8 @@ public:
         (void)p_delta;
     }
 
-    virtual WBE::Ref<WBE::RenderDatabase> get_render_database() override {
-        return render_database;
+    virtual WBE::Ref<WBE::GlobalRenderCache> get_global_render_cache() override {
+        return render_cache;
     }
 
     virtual void register_render_graph(std::string_view p_resource_key) override {
@@ -147,7 +147,7 @@ public:
     std::vector<std::string> activated_graphs;
 
 private:
-    WBE::Ref<WBE::RenderDatabase> render_database;
+    WBE::Ref<WBE::GlobalRenderCache> render_cache;
 };
 
 class WBEWorldTest : public ::testing::Test {

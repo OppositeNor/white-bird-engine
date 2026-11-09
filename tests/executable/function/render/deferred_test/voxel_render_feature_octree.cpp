@@ -61,7 +61,7 @@
 namespace WhiteBirdEngine {
 namespace {
 
-// Render database keys of the construction pipelines, which the graphics_draw_mesh construction tasks name.
+// Global render cache keys of the construction pipelines, which the graphics_draw_mesh construction tasks name.
 constexpr std::string_view BUILD_PIPELINE = "octree_build_static_mesh_pipeline";
 constexpr std::string_view DYNAMIC_BUILD_PIPELINE = "octree_dynamic_build_static_mesh_pipeline";
 
@@ -171,7 +171,7 @@ VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
     }
     render_context = renderer_vk->get_render_context();
     render_allocator = render_context->allocator;
-    compile_pipelines();
+    add_pipelines();
     create_resources();
 }
 
@@ -201,48 +201,20 @@ std::string VoxelRenderFeatureOctree::get_dynamic_level_resource_id(uint32_t p_l
     return std::format("octree_dynamic_levels[{}]", p_level);
 }
 
-Ref<ROComputePipelineVK> VoxelRenderFeatureOctree::compile_compute_pipeline(std::string_view p_resource_id) const {
-    ComputePipelineCompilerVK compiler(ComputePipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-    });
-    return compiler.compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUShader>(p_resource_id)).compute_pipeline;
+void VoxelRenderFeatureOctree::register_resources(RenderGraphVK& p_graph) const {
+    registrations.register_on(p_graph);
 }
 
-Ref<ROGraphicsPipelineVK> VoxelRenderFeatureOctree::compile_debug_draw_pipeline(std::string_view p_resource_id) const {
-    GraphicsPipelineCompilerVKContext context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {render_context->swap_chain_format},
-        .depth_attachment_format = GBUFFER_DEPTH_FORMAT,
-        .primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-    };
-    return GraphicsPipelineCompilerVK(context)
-        .compile(p_resource_id, ResourceManager::get_singleton()->get_resource<RUGraphicsPipeline>(p_resource_id))
-        .graphics_pipeline;
-}
-
-void VoxelRenderFeatureOctree::compile_pipelines() {
-    auto* resource_manager = ResourceManager::get_singleton();
-    GraphicsPipelineCompilerVK build_compiler(GraphicsPipelineCompilerVKContext{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-    });
-    build_pipeline =
-        build_compiler.compile(BUILD_PIPELINE, resource_manager->get_resource<RUGraphicsPipeline>(BUILD_PIPELINE)).graphics_pipeline;
-    dynamic_build_pipeline =
-        build_compiler
-            .compile(DYNAMIC_BUILD_PIPELINE, resource_manager->get_resource<RUGraphicsPipeline>(DYNAMIC_BUILD_PIPELINE))
-            .graphics_pipeline;
-    debug_gather_leaves_pipeline = compile_compute_pipeline("octree_debug_gather_leaves_shader");
-    debug_gather_nodes_pipeline = compile_compute_pipeline("octree_debug_gather_nodes_shader");
-    debug_draw_pipeline = compile_debug_draw_pipeline("octree_debug_draw_pipeline");
-    debug_node_draw_pipeline = compile_debug_draw_pipeline("octree_debug_node_draw_pipeline");
+void VoxelRenderFeatureOctree::add_pipelines() {
+    // The voxelizing builds render without attachments; the debug draws draw the cells' edges.
+    registrations.add_graphics_pipeline(BUILD_PIPELINE, BUILD_PIPELINE, std::span<const VkFormat>{})
+        .add_graphics_pipeline(DYNAMIC_BUILD_PIPELINE, DYNAMIC_BUILD_PIPELINE, std::span<const VkFormat>{})
+        .add_compute_pipeline("octree_debug_gather_leaves_shader")
+        .add_compute_pipeline("octree_debug_gather_nodes_shader");
+    for (std::string_view pipeline : {"octree_debug_draw_pipeline", "octree_debug_node_draw_pipeline"}) {
+        registrations.add_graphics_pipeline(
+            pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT, PrimitiveTopologyVK::LINE_LIST);
+    }
 }
 
 Ref<ROImageVK> VoxelRenderFeatureOctree::create_octree_image() const {
@@ -422,7 +394,7 @@ void VoxelRenderFeatureOctree::configure_recipe(
         .add_task(get_clear_render_task_desc(RT_CLEAR_DYNAMIC_OCTREE, false));
     // The construction draws are prepared on a descriptor of their own, which must hold nothing but the mesh imports the
     // recipe's own mesh draws provide.
-    RendGraphDescVK construction(render_allocator);
+    RendGraphDescVK construction(render_allocator, p_inputs.render_graph);
     add_construction_render_task(construction, RT_RUN_BUILD_OCTREE, false, nullptr, 0);
     add_construction_render_task(construction, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true, nullptr, 0);
     add_construction_render_task(construction, RT_RUN_BUILD_DYNAMIC_OCTREE, false, p_inputs.dynamic_mesh, 0);

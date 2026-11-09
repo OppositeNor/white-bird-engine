@@ -18,17 +18,18 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/material_texture_contract.hh"
-#include "function/render/render_database.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/rd_typed.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/render_task_create_utils_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
+#include "generated/serializables_sd.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include <algorithm>
@@ -103,10 +104,10 @@ Vector<std::pair<std::string, std::string>, RenderAllocator> read_variant_pipeli
 }
 
 Vector<VariantPipelineVK, RenderAllocator> acquire_variant_pipelines(
-    const RenderContextVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params) {
+    const RenderContextVK* p_render_data, const IRenderGraph* p_render_graph, const RTParamsGraphicsDrawMeshVK& p_params) {
     Vector<VariantPipelineVK, RenderAllocator> result(p_render_data->allocator);
     for (auto& [variant, pipeline_key] : read_variant_pipeline_keys(p_render_data->allocator, p_params)) {
-        Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_data, TASK_NAME, pipeline_key);
+        Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_render_graph, TASK_NAME, pipeline_key);
         result.push_back({.variant = std::move(variant), .pipeline_key = std::move(pipeline_key), .pipeline = std::move(pipeline)});
     }
     return result;
@@ -160,12 +161,14 @@ const MaterialTextureContract& resolve_shared_material_contract(const Vector<Var
     return *first->pipeline->get_material_texture_contract();
 }
 
-Ref<MeshResourcesVK> acquire_registered_mesh(const RenderContextVK* p_render_data, std::string_view p_mesh_key) {
-    Ref<MeshResourcesVK> mesh = p_render_data->render_database->get_compiled_render_resource(p_mesh_key, TypeUUID<MeshResourcesVK>::UUID)
-                                    .dynamic_cast_ref<MeshResourcesVK>();
+Ref<MeshResourcesVK> acquire_registered_mesh(const IRenderGraph* p_render_graph, std::string_view p_mesh_key) {
+    if (p_render_graph == nullptr) {
+        throw std::runtime_error(std::format("{}: the task is not on a render graph, so mesh '{}' cannot be resolved.", TASK_NAME, p_mesh_key));
+    }
+    Ref<MeshResourcesVK> mesh = p_render_graph->try_acquire_registered<MeshResourcesVK>(p_mesh_key);
     if (mesh == MEM_NULL) {
         throw std::runtime_error(std::format(
-            "{}: no compiled mesh is registered under '{}'; add the task with add_to_graph() or RenderTaskRegistryVK::add_task().",
+            "{}: no mesh is registered on the render graph under '{}'; add the task with add_to_graph() or RenderTaskRegistryVK::add_task().",
             TASK_NAME,
             p_mesh_key));
     }
@@ -181,10 +184,10 @@ RTGraphicsDrawMeshVK::RTGraphicsDrawMeshVK(Unique<RTRunGraphicsPipelineIndirectV
 }
 
 Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(
-    const RenderContextVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context) {
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context) {
     validate_parts(p_params);
-    const Vector<VariantPipelineVK, RenderAllocator> pipelines = acquire_variant_pipelines(p_render_data, p_params);
-    Ref<MeshResourcesVK> mesh = acquire_registered_mesh(p_render_data, p_params.mesh);
+    const Vector<VariantPipelineVK, RenderAllocator> pipelines = acquire_variant_pipelines(p_render_data, p_render_graph, p_params);
+    Ref<MeshResourcesVK> mesh = acquire_registered_mesh(p_render_graph, p_params.mesh);
     for (const VariantPipelineVK& pipeline : pipelines) {
         if (pipeline.pipeline->get_mesh_node_contract().has_value()) {
             MeshResourcesVK::validate_node_contract(*pipeline.pipeline->get_mesh_node_contract());
@@ -230,12 +233,13 @@ Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(
 void RTGraphicsDrawMeshVK::prepare_graph(
     RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
     validate_parts(p_params);
-    Vector<VariantPipelineVK, RenderAllocator> pipelines = acquire_variant_pipelines(p_render_data, p_params);
-    RendererVK* renderer = RendererVK::get_singleton();
-    if (renderer == nullptr) {
-        throw std::runtime_error(std::format("{}: the Vulkan renderer is unavailable to compile mesh '{}'.", TASK_NAME, p_params.mesh));
+    IRenderGraph& render_graph = p_graph.get_render_graph();
+    Vector<VariantPipelineVK, RenderAllocator> pipelines = acquire_variant_pipelines(p_render_data, &render_graph, p_params);
+    // A mesh nobody registered is registered from the mesh resource of the same key, with the default compile options.
+    if (!render_graph.contains_registered_resource(p_params.mesh)) {
+        render_graph.register_resource(p_params.mesh, RDTyped<RDParamsMeshVK>(RDParamsMeshVK{.mesh = p_params.mesh}));
     }
-    Ref<MeshResourcesVK> mesh = MeshCompilerVK(renderer).acquire(p_params.mesh);
+    Ref<MeshResourcesVK> mesh = acquire_registered_mesh(&render_graph, p_params.mesh);
     if (!p_graph.contains_resource(mesh_member(p_params, MeshResourcesVK::INDICES))) {
         p_graph.add_resource(p_params.mesh, *mesh);
     }
@@ -268,7 +272,7 @@ void RTGraphicsDrawMeshVK::prepare_graph(
     if (p_task.factory == nullptr) {
         throw std::runtime_error(std::format("{}: task '{}' has no factory to prepare.", TASK_NAME, p_task.task_id));
     }
-    // The RenderDatabase holds compiled objects weakly; the task descriptor keeps the ones create() looks up alive.
+    // The GlobalRenderCache holds compiled objects weakly; the task descriptor keeps the ones create() looks up alive.
     p_task.factory = [factory = std::move(p_task.factory), pipelines = std::move(pipelines), mesh](const RendGraphContextVK& p_context) {
         return factory(p_context);
     };
@@ -281,9 +285,10 @@ RendTaskDescVK& RTGraphicsDrawMeshVK::add_to_graph(
         })) {
         throw std::runtime_error(std::format("{}: the graph already has a task with id '{}'.", TASK_NAME, p_task_id));
     }
-    RendTaskDescVK task(p_graph.allocator, p_task_id, [p_render_data, p_params](const RendGraphContextVK& p_context) {
-        return create(p_render_data, p_params, p_context);
-    });
+    RendTaskDescVK task(
+        p_graph.allocator, p_task_id, [p_render_data, render_graph = p_graph.render_graph, p_params](const RendGraphContextVK& p_context) {
+            return create(p_render_data, render_graph, p_params, p_context);
+        });
     prepare_graph(p_graph, task, p_params, p_render_data);
     p_graph.add_task(std::move(task));
     return p_graph.get_task(p_task_id);

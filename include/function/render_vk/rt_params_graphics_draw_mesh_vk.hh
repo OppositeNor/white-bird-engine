@@ -37,20 +37,21 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsGraphicsDrawMeshVK {
     /**
-     * @brief Resource key of the compiled mesh to draw. The compiled mesh is imported into the graph under this key.
+     * @brief Registration key of the mesh to draw on the task's render graph (RRMeshVK); an unregistered key is registered from
+     * the mesh resource of the same key. The compiled mesh is imported into the graph under this key.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, MeshResourcesVK))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, MeshResourcesVK))
     std::string mesh;
     /**
-     * @brief Map from material pipeline variants to the resource keys of the compiled graphics pipelines in the renderer's
-     * RenderDatabase that draw them; materials without a pipeline_variant use MATERIAL_PIPELINE_VARIANT_DEFAULT.
+     * @brief Map from material pipeline variants to the registration keys of the graphics pipelines on the task's render
+     * graph that draw them; materials without a pipeline_variant use MATERIAL_PIPELINE_VARIANT_DEFAULT.
      *
      * The map needs at least one entry. Every pipeline must render to the same targets, and the pipelines that read the
      * material table must share one material texture contract. Drawing a material whose variant has no pipeline throws; a
      * variant no material uses is allowed. make_default_pipeline() builds the map of a task that draws every material with
      * one pipeline.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROGraphicsPipelineVK))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, ROGraphicsPipelineVK))
     DataValue pipeline;
     /**
      * @brief Parts of the mesh the task draws, in draw order; at least one, each at most once.

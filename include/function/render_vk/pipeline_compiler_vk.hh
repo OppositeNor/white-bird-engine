@@ -17,12 +17,11 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <string_view>
@@ -34,7 +33,7 @@ class ROPipelineVK;
 struct PipelineCompilerVKContext {
     RenderAllocator* allocator = nullptr;
     const RenderContextVK* render_data = nullptr;
-    Ref<RenderDatabase> render_database = MEM_NULL;
+    Ref<GlobalRenderCache> render_cache = MEM_NULL;
 };
 
 class PipelineCompilerVK {
@@ -44,8 +43,8 @@ protected:
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
     template <typename RenderObjectType>
     static Ref<RenderObjectType> get_registered_render_object(
-        Ref<RenderDatabase> p_render_database, std::string_view p_resource_key, HashCode p_render_object_type_id) {
-        auto render_object = p_render_database->get_compiled_render_resource(p_resource_key, p_render_object_type_id);
+        Ref<GlobalRenderCache> p_render_cache, std::string_view p_resource_key, HashCode p_render_object_type_id) {
+        auto render_object = p_render_cache->try_get(p_resource_key, p_render_object_type_id);
         if (render_object == MEM_NULL) {
             return MEM_NULL;
         }

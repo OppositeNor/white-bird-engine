@@ -32,6 +32,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTPingPongVK
  * @brief Render task that alternates between two compute pipelines for a fixed number of iterations.
@@ -96,16 +98,17 @@ struct WBE_META(WBE_RENDER_TASK(ping_pong), WBE_SERIALIZATION_ALIASES(ping_pong)
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, only one prefix pipeline is set,
-     * or no compute pipeline is compiled under a pipeline key. The constructor's own validation also applies.
+     * @throws std::runtime_error If the render graph is null, only one prefix pipeline is set,
+     * or no compute pipeline is registered under a pipeline key. The constructor's own validation also applies.
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsPingPongVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return queue_family_id;

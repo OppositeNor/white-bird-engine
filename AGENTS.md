@@ -78,9 +78,26 @@ For non-trivial implementation tasks:
   and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
   the task's `RenderTaskResourceMap`; tasks do not take resource maps.
 - Every graph is registered with `RendererVK::register_render_graph(key, RendGraphRebuildCallbackVK)`; there is no
-  descriptor registration. The callback builds the complete descriptor and runs for the first build and on every
-  rebuild (context change or `rebuild()`), so keep one-time setup (pipeline compiles, application-owned buffers,
-  initial-data snapshots) outside it and only assemble the descriptor inside.
+  descriptor registration. The callback receives the context and the `RenderGraphVK` being built, builds the complete
+  descriptor bound to that graph (`RendGraphDescVK(allocator, &graph)`, or `RendGraphRecipeBuilderVK::build(..., &graph)`),
+  and runs for the first build and on every rebuild (context change or `rebuild()`), so keep one-time setup
+  (application-owned buffers, initial-data snapshots) outside it and only register resources and assemble the
+  descriptor inside.
+- Named resources that tasks use (meshes, pipelines, images) are registered on their graph (`IRenderGraph`, in
+  `function/render/i_render_graph.hh`) in two steps: load the source resources into the `ResourceManager`, then
+  `register_resource(key, description)`. The description's type (`IResourceDescription::get_type_uuid()`) selects the
+  `IResourceRegistrator` that compiles it, as a resource schema's type selects its loader; there is no separate kind.
+  `RenderGraphVK` installs `RRMeshVK`, `RRImageVK`, `RRGraphicsPipelineVK`, and `RRComputePipelineVK`, whose descriptions
+  are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>` (C++ uses
+  `RenderGraphVK::register_mesh()` and the like), and `add_resource_registrator()` installs one registrator per further
+  description type. The graph holds registered objects strongly, keys are graph-local, registrations survive rebuilds, and
+  re-registering a key with an equal description compiles nothing, so callbacks and recipes register on every rebuild. Do
+  not keep `Ref`s to registered objects just to keep them alive; acquire them with `acquire_registered<T>(key)`. Task
+  types resolve registered resources through `RendGraphDescVK::get_render_graph()` in `prepare_graph()`, or by declaring
+  `create(const RenderContextVK*, IRenderGraph*, const TParams&, const RendGraphContextVK&)`.
+- `GlobalRenderCache` (`function/render/global_render_cache.hh`, built on `core/cache/weak_cache.hh`'s `WeakCache`) is the
+  renderer's weak cache of compiled objects, keyed by source resource and object type, which compilers use to share
+  compiled objects between graphs. Applications do not look up named resources there.
 - Rebuilds diff the new descriptor against the current graph (`RendGraphResourceDiffVK`): a graph-owned resource is kept,
   with its content, only when its id, kind, per-frame layout, and evaluated description match and, for a view, its image
   is kept; changed configurations are recreated in place in their containers, while kind or per-frame changes get a new
@@ -103,8 +120,14 @@ For non-trivial implementation tasks:
 - For a recipe graph, the application's rebuild callback runs the script, builds the descriptor, and adds its C++ tasks.
   Never pass script keys to the graph.
 - Every resource owned outside the graph must be declared with `graph:import_resource()` and supplied through `RendGraphRecipeImportsVK`; a
-  declared-but-missing or supplied-but-undeclared import is an error. Recipes cannot set initial data, so buffers that need
-  it are application-owned imports, registered in the render database under their import name.
+  declared-but-missing or supplied-but-undeclared import is an error, except that an unsupplied import resolves to a
+  bindable object registered on the graph under its name (such as a registered image). Recipes cannot set initial data, so
+  buffers that need it are application-owned imports.
+- Recipes register resources with `graph:register_mesh()`, `register_graphics_pipeline()`, `register_compute_pipeline()`,
+  `register_image()` (which returns an import handle), or `register_resource(key, type, description, resource_type)` for
+  custom description types, emitted in order as `registrations` (`{ key, type, description }`, where `type` is the
+  reflected name of the description struct, resolved through `TypeUUIDManager`) and applied before that level's imports and
+  tasks. `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`; `graph:build()` emits only those
   reachable from tasks. Tasks name a registered task type and pass `params` to it; aliases (`task:alias()`,
   `color_target()`, `depth_target()`) map task-local ids to graph resources, and `uses` only keeps resources reachable.
@@ -116,10 +139,11 @@ For non-trivial implementation tasks:
   constructors on a scratch `Graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
   It is one graph node reporting every branch's accesses; the branches share its aliases and one queue family, and
   `RTMultiplexerVK::Command` events select the branch. Pass the current branch through the context, as for a toggle.
-- Task `pipeline` params are render-database keys; the application compiles those pipelines and keeps them alive.
+- Task `pipeline` params are registration keys of pipelines on the task's graph, registered by the callback or the recipe.
 - Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
-  assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each compiled mesh in the render database under
-  the graph id its draws name (`mesh`), which they import it under, so shared meshes are compiled and imported once.
+  assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each mesh on the graph under the key its draws
+  name (`mesh`), which they import it under; a key nobody registered is registered from the mesh resource of that key with
+  the default options.
   `pipeline` maps material pipeline variants to pipelines (`pipeline = { default = ..., foliage = ... }`); draws batch per
   variant, and the task's pipelines must share render targets and one material texture contract.
 - A rebuild callback may add to the descriptor `RendGraphRecipeBuilderVK::build()` returns, for parts not yet expressed
@@ -164,8 +188,9 @@ For non-trivial implementation tasks:
 - The typed graph constructors (`graph:compute()`, `graph:draw_mesh()`, ...) are generated into `render_graph_utils.render_graph_tasks`
   (`templates/teal_render_graph_tasks.tl.jinja`) from the task classes annotated `WBE_RENDER_TASK(<method>)`; each creates
   the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare `WBE_RENDER_TASK` only registers the
-  type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)` or `WBE_RECIPE_RESOURCE(task_local)` so the
-  constructor accepts resource handles there; do not hand-write constructors or handle-bearing params records.
+  type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)`, `WBE_RECIPE_RESOURCE(task_local)`, or
+  `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor accepts resource
+  handles there; do not hand-write constructors or handle-bearing params records.
 
 ### Scripts
 

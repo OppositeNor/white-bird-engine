@@ -29,6 +29,7 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
+#include "function/render_vk/texture_compiler_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "ktxvulkan.h"
 #include "resource/resource_unit/resource_unit.hh"
@@ -64,11 +65,11 @@ GraphicsPipelineCompilerVK::GraphicsPipelineCompilerVK(const GraphicsPipelineCom
           PipelineCompilerVKContext{
               .allocator = p_context.allocator,
               .render_data = p_context.render_data,
-              .render_database = p_context.render_database,
+              .render_cache = p_context.render_cache,
           },
           "graphics pipeline"),
       context(p_context) {
-    if (context.allocator == nullptr || context.render_data == nullptr || context.render_database == MEM_NULL ||
+    if (context.allocator == nullptr || context.render_data == nullptr || context.render_cache == MEM_NULL ||
         context.renderer == nullptr) {
         throw std::runtime_error("Failed to create graphics pipeline compiler: invalid context.");
     }
@@ -145,44 +146,12 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
         .set_cull_mode(p_pipeline_resource.cull_backfaces ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE)
         .set_conservative_rasterization(p_pipeline_resource.conservative_rasterization);
     Ref<ROGraphicsPipelineVK> graphics_pipeline = context.render_data->create_graphics_pipeline(pipeline_builder);
-    context.render_database->register_compiled_render_resource(p_resource_key, graphics_pipeline);
+    context.render_cache->insert(p_resource_key, graphics_pipeline);
     return graphics_pipeline;
 }
 
 Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
-    std::string formatted_resource_key = std::format("{}#image_view", p_resource_key);
-    auto image_view = get_registered_render_object<ROImageViewVK>(
-        context.render_database, formatted_resource_key, TypeUUID<ROImageViewVK>::UUID);
-    if (image_view != MEM_NULL) {
-        return image_view;
-    }
-    Ref<ROImageVK> image = compile_texture(p_resource_key, p_texture_resource);
-    const ROImageVK::ExposedFields& image_fields = image->fields();
-    image_view = context.render_data->create_image_view(ROImageViewVK::Builder()
-                     .set_image(image)
-                     .set_view_type(image_fields.view_type)
-                     .set_format(image_fields.format)
-                     .set_subresource_range(VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                         .baseMipLevel = 0,
-                         .levelCount = image_fields.mipmap_levels,
-                         .baseArrayLayer = 0,
-                         .layerCount = image_fields.layers_count}));
-    context.render_database->register_compiled_render_resource(formatted_resource_key, image_view);
-    return image_view;
-}
-
-Ref<ROImageVK> GraphicsPipelineCompilerVK::compile_texture(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
-    auto image = get_registered_render_object<ROImageVK>(context.render_database, p_resource_key, TypeUUID<ROImageVK>::UUID);
-    if (image != MEM_NULL) {
-        return image;
-    }
-    if (context.render_data->ktx_vulkan_device_info == nullptr) {
-        throw std::runtime_error("Failed to compile texture: libktx Vulkan device info is unavailable.");
-    }
-    ktxVulkanTexture uploaded_texture = context.render_data->ktx_vulkan_device_info->upload(p_texture_resource->texture.get());
-    image = make_ref<ROImageVK>(context.render_data->allocator, context.render_data, uploaded_texture);
-    context.render_database->register_compiled_render_resource(p_resource_key, image);
-    return image;
+    return TextureCompilerVK(context.render_data, context.render_cache.get()).compile_texture_view(p_resource_key, p_texture_resource);
 }
 
 } // namespace WhiteBirdEngine

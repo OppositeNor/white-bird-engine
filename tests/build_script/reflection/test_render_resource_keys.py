@@ -82,23 +82,23 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
         self.assertNotIn("interface ROGraphicsPipelineVK", declarations)
         self.assertNotIn("private_cpp_state", declarations)
 
-    def test_database_fields_are_handle_only_and_recurse_through_params_and_containers(self) -> None:
+    def test_registered_fields_are_handle_only_and_recurse_through_params_and_containers(self) -> None:
         metadata = _metadata([
-            _field("mesh", "std::optional<std::string>", ["database", "MeshResourcesVK"]),
-            _field("pipelines", "std::vector<std::string>", ["database", "WhiteBirdEngine::ROGraphicsPipelineVK"]),
-            _field("resources", "DataValue", ["database", "MeshResourcesVK"]),
+            _field("mesh", "std::optional<std::string>", ["registered", "MeshResourcesVK"]),
+            _field("pipelines", "std::vector<std::string>", ["registered", "WhiteBirdEngine::ROGraphicsPipelineVK"]),
+            _field("resources", "DataValue", ["registered", "MeshResourcesVK"]),
             _field("nested", "std::vector<NestedParams>"),
         ])
         metadata.classes.append(_params("NestedParams", [
-            _field("pipeline", "std::string", ["database", "ROComputePipelineVK"]),
+            _field("pipeline", "std::string", ["registered", "ROComputePipelineVK"]),
             _field("buffer", "std::string", ["graph"]),
         ]))
         api = _describe(metadata)
-        mesh = {"kind": "resource", "scope": "database", "expected_type": "WhiteBirdEngine::MeshResourcesVK"}
+        mesh = {"kind": "resource", "scope": "registered", "expected_type": "WhiteBirdEngine::MeshResourcesVK"}
         fields = api["constructors"][0]["fields"]
         self.assertEqual(fields[0], {"name": "mesh", **mesh})
         self.assertEqual(fields[1], {"name": "pipelines", "kind": "list", "element": {
-            "kind": "resource", "scope": "database", "expected_type": "WhiteBirdEngine::ROGraphicsPipelineVK"}})
+            "kind": "resource", "scope": "registered", "expected_type": "WhiteBirdEngine::ROGraphicsPipelineVK"}})
         self.assertEqual(fields[2], {"name": "resources", "kind": "map", "element": mesh})
         self.assertEqual(fields[3]["element"]["fields"][0]["expected_type"], "WhiteBirdEngine::ROComputePipelineVK")
         interfaces = {interface["name"]: interface["fields"] for interface in api["interfaces"]}
@@ -108,17 +108,17 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
         self.assertEqual(interfaces["NestedParams"][1]["type"], "Resource | string")
 
     def test_invalid_annotations_and_non_render_object_targets_fail_generation(self) -> None:
-        for parameters in [["database"], ["database", "MeshResourcesVK", "extra"], ["graph", "MeshResourcesVK"]]:
+        for parameters in [["registered"], ["registered", "MeshResourcesVK", "extra"], ["graph", "MeshResourcesVK"]]:
             with self.subTest(parameters=parameters), self.assertRaisesRegex(ValueError, "RenderObjectType"):
                 _describe(_metadata([_field("mesh", "std::string", parameters)]))
         for target in ["MissingMeshVK", "RTParamsDrawVK", '"MeshResourcesVK"']:
             with self.subTest(target=target), self.assertRaisesRegex(ValueError, "WBE_RENDER_OBJECT"):
-                _describe(_metadata([_field("mesh", "std::string", ["database", target])]))
+                _describe(_metadata([_field("mesh", "std::string", ["registered", target])]))
         with self.assertRaisesRegex(ValueError, "std::string ids"):
-            _describe(_metadata([_field("mesh", "uint32_t", ["database", "MeshResourcesVK"])]))
+            _describe(_metadata([_field("mesh", "uint32_t", ["registered", "MeshResourcesVK"])]))
 
     def test_generated_params_accept_common_resources_and_reject_string_keys(self) -> None:
-        metadata = _metadata([_field("mesh", "std::string", ["database", "MeshResourcesVK"])])
+        metadata = _metadata([_field("mesh", "std::string", ["registered", "MeshResourcesVK"])])
         with TemporaryDirectory() as temporary:
             generated = Path(temporary)
             compiler = _write_modules(generated, metadata)
@@ -127,8 +127,8 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
             self.assertNotIn("render_resources", tasks)
             consumer = generated / "consumer.tl"
             prefix = '''local type Graph = require("render_graph_utils.render_graph")
-local mesh: Graph.Resource = { id = "static_mesh", kind = "database", resource_type = "WhiteBirdEngine::MeshResourcesVK" }
-local pipeline: Graph.Resource = { id = "pipeline", kind = "database", resource_type = "WhiteBirdEngine::ROGraphicsPipelineVK" }
+local mesh: Graph.Resource = { id = "static_mesh", kind = "registered", resource_type = "WhiteBirdEngine::MeshResourcesVK" }
+local pipeline: Graph.Resource = { id = "pipeline", kind = "registered", resource_type = "WhiteBirdEngine::ROGraphicsPipelineVK" }
 '''
             # The common Resource type keeps the public authoring API uniform. The expected type is checked at runtime.
             for value in ["mesh", "pipeline"]:
@@ -140,7 +140,7 @@ local pipeline: Graph.Resource = { id = "pipeline", kind = "database", resource_
                     compiler._compile_teal(consumer)
 
     def test_generated_task_module_packages_without_a_separate_resource_module(self) -> None:
-        metadata = _metadata([_field("mesh", "std::string", ["database", "MeshResourcesVK"])])
+        metadata = _metadata([_field("mesh", "std::string", ["registered", "MeshResourcesVK"])])
         with TemporaryDirectory() as temporary:
             directory = Path(temporary)
             generated = directory / "generated"

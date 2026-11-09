@@ -40,6 +40,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTRunGraphicsPipelineIndirectVK
  * @brief Render task that submits indexed draw commands from a GPU buffer in one Vulkan call.
@@ -194,12 +196,12 @@ struct WBE_META(WBE_RENDER_TASK(draw_indirect), WBE_SERIALIZATION_ALIASES(run_gr
     /**
      * @brief Create the task from recipe parameters, as one batch of the pipeline without vertex buffers; used by
      * RenderTaskRegistryVK.
-     * @throws std::runtime_error If the pipeline is not in the RenderDatabase, or the parameters do not make a valid
+     * @throws std::runtime_error If the pipeline is not registered on the render graph, or the parameters do not make a valid
      * builder (see Builder::create_unique()).
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunGraphicsPipelineIndirectVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;

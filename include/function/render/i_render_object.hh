@@ -45,7 +45,7 @@ public:
     /**
      * @brief Name the backend objects the render object owns, for debuggers and validation messages.
      *
-     * RenderDatabase calls this with the key an object is registered under, so registered objects are named after their
+     * GlobalRenderCache calls this with the key an object is registered under, so registered objects are named after their
      * database key; importing an unnamed object into a render graph names it after its import id. Backends without object
      * naming, and render objects that own no backend objects, ignore the name but still record it. Composites register
      * their parts as `<p_name>.<part>`, which names them too. Call on the rendering thread.

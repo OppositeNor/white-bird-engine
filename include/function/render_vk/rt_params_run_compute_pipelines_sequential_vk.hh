@@ -32,9 +32,9 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsComputeDispatchVK {
     /**
-     * @brief Resource key of the compiled compute pipeline in the renderer's RenderDatabase.
+     * @brief Registration key of the compute pipeline on the task's render graph (IRenderGraph::register_resource()).
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROComputePipelineVK))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, ROComputePipelineVK))
     std::string pipeline;
     /**
      * @brief Task-local resource id of the buffer holding the dispatch's VkDispatchIndirectCommand; empty for a direct

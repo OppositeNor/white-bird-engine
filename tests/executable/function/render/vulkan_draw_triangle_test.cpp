@@ -15,23 +15,19 @@
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
-#include "function/function_utils.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata_loader.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
 #include "function/render_vk/vertex_input_description_vk.hh"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
@@ -40,7 +36,6 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
-#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/vector_float4.hpp>
@@ -81,26 +76,18 @@ public:
         }
         const WBE::RUSubmesh3D& triangle_submesh = triangle_mesh->opaque_instances.submeshes.get()[0];
 
-        auto pipeline_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUGraphicsPipeline>("draw_triangle_pipeline");
-        if (pipeline_resource == nullptr) {
-            throw std::runtime_error("Failed to setup draw triangle test: graphics pipeline resource was not found.");
-        }
-        WBE::GraphicsPipelineCompilerVKContext compiler_context{
-            .allocator = render_allocator,
-            .render_data = render_context,
-            .render_database = renderer->get_render_database(),
-            .renderer = renderer,
-            .color_attachment_formats = {render_context->swap_chain_format},
-        };
-        auto compiled = WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_triangle_pipeline", pipeline_resource);
-        auto graphics_pipeline = compiled.graphics_pipeline;
         auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
         // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
         const WBE::RUSubmesh3D* triangle_submesh_pointer = &triangle_submesh;
         WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
-            [render_allocator, renderer, render_context, triangle_mesh, triangle_submesh = triangle_submesh_pointer, graphics_pipeline, shader_resource](
-                const WBE::RendGraphContextVK& /*p_graph_context*/) {
-                WBE::RendGraphDescVK pipeline_desc(render_allocator);
+            [render_allocator, renderer, render_context, triangle_mesh, triangle_submesh = triangle_submesh_pointer, shader_resource](
+                const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
+                WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline = p_graph.register_graphics_pipeline("draw_triangle_pipeline",
+                    WBE::RDParamsGraphicsPipelineVK{
+                        .pipeline = "draw_triangle_pipeline",
+                        .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
+                    });
+                WBE::RendGraphDescVK pipeline_desc(render_allocator, &p_graph);
                 pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
                 const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
                     pipeline_desc,

@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_PIXEL_SORT_HH
 #define WBE_FILE_PIXEL_SORT_HH
 
+#include "../render_test.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -77,7 +78,7 @@ struct PixelSortSettings {
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
  * Lua module render_graph_utils.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
- * graph the effect is added to allocates its own; the effect compiles the pipelines they reference and owns the contrast
+ * graph the effect is added to allocates its own; the effect registers the pipelines they reference and owns the contrast
  * buffer every graph imports. Neither copyable nor movable.
  */
 class PixelSort final : public IPostProcessing {
@@ -89,7 +90,7 @@ public:
 
     PixelSort() = delete;
     /**
-     * @brief Compile the effect's compute pipelines.
+     * @brief Collect the effect's compute pipelines, which register_resources() registers on each graph.
      * @param p_allocator Allocator of the effect's pipelines and tasks; must outlive the effect.
      * @param p_renderer The renderer; must outlive the effect.
      * @param p_extent Factory of the extent of the color images the effect is applied to. Every graph the effect is added to
@@ -120,6 +121,8 @@ public:
      * Writes the current direction, scope, color format, queue family, toggle event, and enabled state.
      */
     virtual void configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const override;
+
+    virtual void register_resources(RenderGraphVK& p_graph) const override;
 
     /**
      * @brief Get the configuration of the effect.
@@ -153,14 +156,10 @@ private:
     // Each pass sorts by one 8-bit digit of the 32-bit keys.
     static constexpr uint32_t RADIX_SORT_PASS_COUNT = 4;
 
-    // One pipeline per PixelSortDirection value, indexed by the direction.
-    using DirectionPipelines = std::array<Ref<ROComputePipelineVK>, 2>;
-
     // Validates that an extent can be sorted in a direction.
     static void validate_layout(VkExtent2D p_extent, PixelSortDirection p_direction);
     static void validate_settings(const PixelSortSettings& p_settings);
-    Ref<ROComputePipelineVK> compile(std::string_view p_shader_id) const;
-    DirectionPipelines compile_direction_variants(std::string_view p_shader_name) const;
+    void add_direction_variants(std::string_view p_shader_name);
 
     RendererVK* renderer = nullptr;
     std::function<VkExtent2D(const RendGraphContextVK&)> extent;
@@ -168,17 +167,8 @@ private:
     PixelSortSettings settings;
     // The contrast uniform buffer every graph imports as REND_RES_PIXEL_SORT_CONTRAST; upload_settings() writes it.
     Ref<ROBufferVK> contrast_buffer;
-    Ref<ROComputePipelineVK> copy_source_pipeline;
-    DirectionPipelines count_mask_pipelines;
-    Ref<ROComputePipelineVK> prefix_sum_columns_pipeline;
-    DirectionPipelines register_keys_pipelines;
-    DirectionPipelines write_sorted_pixels_pipelines;
-    Ref<ROComputePipelineVK> radix_sort_prepare_dispatch_pipeline;
-    Ref<ROComputePipelineVK> histogram_prefix_sum_pipeline;
-    Ref<ROComputePipelineVK> histogram_overflow_prefix_sum_pipeline;
-    Ref<ROComputePipelineVK> histogram_add_overflow_pipeline;
-    std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> histogram_pipelines;
-    std::array<Ref<ROComputePipelineVK>, RADIX_SORT_PASS_COUNT> scatter_pipelines;
+    // The compute pipelines of every direction and scope, registered on every graph by register_resources().
+    RenderTestRegistrations registrations;
 };
 
 } // namespace WhiteBirdEngine

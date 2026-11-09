@@ -33,8 +33,8 @@ class RendererVK;
  * @brief Compiles a mesh's categories into shader-independent Vulkan resources. Neither copyable nor movable.
  *
  * Runs on the rendering thread. The same compiled resources serve meshes that never move and meshes moved every frame;
- * the whole-mesh transform is supplied per draw (see REND_RES_MESH_TRANSFORM). Compiled meshes are registered in the
- * renderer's RenderDatabase under their mesh resource key, so draw tasks can find them; see acquire().
+ * the whole-mesh transform is supplied per draw (see REND_RES_MESH_TRANSFORM). Draw tasks find meshes registered on their
+ * render graph (RRMeshVK); see acquire() for the shared cache.
  */
 class MeshCompilerVK final {
 public:
@@ -76,9 +76,8 @@ public:
      *
      * Every non-empty category is compiled; at least one must contain a drawable submesh. No shader is involved: batches
      * group draws by the mesh's vertex layout, and every material texture is compiled to a sampled view so that material
-     * tables can be built later for any pipeline (MeshResourcesVK::acquire_material_table()). A mesh with a resource key is
-     * registered in the RenderDatabase under that key, replacing an earlier registration. The returned object is neither
-     * copyable nor movable and must be shared through Ref.
+     * tables can be built later for any pipeline (MeshResourcesVK::acquire_material_table()). The result is not cached; see
+     * acquire(). The returned object is neither copyable nor movable and must be shared through Ref.
      *
      * @throws std::runtime_error If the mesh is null, or its resource data is invalid.
      */
@@ -90,10 +89,10 @@ public:
     Ref<MeshResourcesVK> compile(RefRes<RUMesh3D> p_mesh) const;
 
     /**
-     * @brief Get the compiled mesh registered under a mesh resource key, compiling and registering it on first request.
+     * @brief Get the compiled mesh of a mesh resource and configuration, compiling it when no live one is cached.
      *
-     * The mesh resource is loaded from the ResourceManager. p_config applies only when the mesh is compiled by this call; a
-     * mesh registered earlier is returned as compiled.
+     * The mesh resource is loaded from the ResourceManager. Compiled meshes are cached weakly in the GlobalRenderCache under
+     * the resource key and the configuration, so every render graph registering the same mesh and configuration shares one.
      *
      * @throws std::runtime_error If p_mesh_resource_key is empty, no RUMesh3D resource has the key, or compilation fails.
      */

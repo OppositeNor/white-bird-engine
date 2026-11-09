@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/render_vk/mesh_compiler_vk.hh"
+#include "function/render_vk/texture_compiler_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_raw.hh"
@@ -41,7 +42,6 @@
 #include <vulkan/vulkan_core.h>
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -157,7 +157,7 @@ DrawPlan plan_draws(
     return result;
 }
 
-void append_texture_views(GraphicsPipelineCompilerVK& p_texture_compiler,
+void append_texture_views(const TextureCompilerVK& p_texture_compiler,
     std::vector<std::pair<RefRes<RUTexture>, Ref<ROImageViewVK>>>& p_texture_views,
     RefRes<RUMaterial> p_material) {
     if (p_material == nullptr) {
@@ -192,13 +192,7 @@ struct MaterialBuild {
 MaterialBuild compile_materials(
     RendererVK* p_renderer, const MeshCompilerVK::Config& p_config, std::span<const RefRes<RUMaterial>> p_materials) {
     const RenderContextVK* render_data = p_renderer->get_render_context();
-    GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = render_data->allocator,
-        .render_data = render_data,
-        .render_database = p_renderer->get_render_database(),
-        .renderer = p_renderer,
-    };
-    GraphicsPipelineCompilerVK texture_compiler(compiler_context);
+    const TextureCompilerVK texture_compiler(render_data, p_renderer->get_global_render_cache().get());
     MaterialBuild result;
     result.default_material = get_default_material(p_config.default_material_resource_key);
     append_texture_views(texture_compiler, result.texture_views, result.default_material);
@@ -438,9 +432,6 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh, const Conf
         static_cast<void>(texture);
         result->textures->add_resource(image_view);
     }
-    if (p_mesh->resource_key != nullptr && p_mesh->resource_key[0] != '\0') {
-        renderer->get_render_database()->register_compiled_render_resource(p_mesh->resource_key, result);
-    }
     return result;
 }
 
@@ -456,26 +447,23 @@ Ref<MeshResourcesVK> MeshCompilerVK::acquire(std::string_view p_mesh_resource_ke
     if (p_mesh_resource_key.empty()) {
         throw std::runtime_error("Failed to acquire compiled mesh: the mesh resource key is empty.");
     }
-    Ref<MeshResourcesVK> registered = renderer->get_render_database()
-                                          ->get_compiled_render_resource(p_mesh_resource_key, TypeUUID<MeshResourcesVK>::UUID)
-                                          .dynamic_cast_ref<MeshResourcesVK>();
-    if (registered != MEM_NULL) {
-        return registered;
-    }
-    ResourceManager* resource_manager = ResourceManager::get_singleton();
-    if (resource_manager == nullptr) {
-        throw std::runtime_error(std::format("Failed to acquire compiled mesh '{}': the resource manager is unavailable.", p_mesh_resource_key));
-    }
-    RefRes<RUMesh3D> mesh = resource_manager->get_resource<RUMesh3D>(std::string(p_mesh_resource_key));
-    if (mesh == MEM_NULL) {
-        throw std::runtime_error(std::format("Failed to acquire compiled mesh '{}': no mesh resource has this key.", p_mesh_resource_key));
-    }
-    Ref<MeshResourcesVK> result = compile(mesh, p_config);
-    if (mesh->resource_key == nullptr || std::string_view(mesh->resource_key) != p_mesh_resource_key) {
-        // Register under the requested key too, so later requests find the compiled mesh.
-        renderer->get_render_database()->register_compiled_render_resource(p_mesh_resource_key, result);
-    }
-    return result;
+    const std::string cache_key = std::format("{}#vk_mesh_v{}_i{}_{}",
+        p_mesh_resource_key,
+        p_config.vertex_buffer_usage,
+        p_config.index_buffer_usage,
+        p_config.default_material_resource_key);
+    return renderer->get_global_render_cache()->acquire<MeshResourcesVK>(cache_key, [this, p_mesh_resource_key, &p_config] {
+        ResourceManager* resource_manager = ResourceManager::get_singleton();
+        if (resource_manager == nullptr) {
+            throw std::runtime_error(
+                std::format("Failed to acquire compiled mesh '{}': the resource manager is unavailable.", p_mesh_resource_key));
+        }
+        RefRes<RUMesh3D> mesh = resource_manager->get_resource<RUMesh3D>(std::string(p_mesh_resource_key));
+        if (mesh == MEM_NULL) {
+            throw std::runtime_error(std::format("Failed to acquire compiled mesh '{}': no mesh resource has this key.", p_mesh_resource_key));
+        }
+        return compile(mesh, p_config);
+    });
 }
 
 } // namespace WhiteBirdEngine

@@ -25,6 +25,7 @@
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
@@ -221,7 +222,7 @@ RendTaskDescVK make_probe_desc(RenderAllocator* p_allocator,
 
 // Build p_graph from a callback that returns a copy of p_descriptor.
 void build_graph(RenderGraphVK& p_graph, const RendGraphDescVK& p_descriptor) {
-    p_graph.build_from_callback([p_descriptor](const RendGraphContextVK& /*p_context*/) {
+    p_graph.build_from_callback([p_descriptor](const RendGraphContextVK& /*p_context*/, RenderGraphVK& /*p_graph*/) {
         return p_descriptor;
     });
 }
@@ -470,11 +471,13 @@ TEST(WBERenderGraphVKTest, RebuildCallbacksReceiveTheContextOfTheRenderData) {
     Ref<RenderObjectContainerVK> container = make_test_container(&allocator, &render_data);
     VkExtent2D received_extent{};
     uint32_t call_count = 0;
+    const RenderGraphVK* received_graph = nullptr;
     RenderGraphVK graph(&render_data);
     std::string error;
     try {
-        graph.build_from_callback([&](const RendGraphContextVK& p_context) {
+        graph.build_from_callback([&](const RendGraphContextVK& p_context, RenderGraphVK& p_graph) {
             received_extent = p_context.swap_chain_extent;
+            received_graph = &p_graph;
             ++call_count;
             RendGraphDescVK descriptor(&allocator);
             descriptor.add_resource(TEST_LOGICAL_RESOURCE, *container);
@@ -492,6 +495,23 @@ TEST(WBERenderGraphVKTest, RebuildCallbacksReceiveTheContextOfTheRenderData) {
     EXPECT_EQ(call_count, 1U);
     EXPECT_EQ(received_extent.width, 800U);
     EXPECT_EQ(received_extent.height, 600U);
+    EXPECT_EQ(received_graph, &graph);
+}
+
+TEST(WBERenderGraphVKTest, InstallsTheDefaultResourceRegistrators) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    RenderContextVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+    for (TypeID description_type : {TypeUUID<RDParamsMeshVK>::UUID,
+             TypeUUID<RDParamsImageVK>::UUID,
+             TypeUUID<RDParamsGraphicsPipelineVK>::UUID,
+             TypeUUID<RDParamsComputePipelineVK>::UUID}) {
+        EXPECT_TRUE(graph.has_resource_registrator(description_type)) << description_type;
+    }
+    EXPECT_FALSE(graph.contains_registered_resource("mesh"));
+    // Without a renderer, the default registrators cannot compile.
+    EXPECT_THROW((void)graph.register_mesh("mesh", RDParamsMeshVK{.mesh = "missing"}), std::runtime_error);
+    EXPECT_FALSE(graph.contains_registered_resource("mesh"));
 }
 
 TEST(WBERenderGraphVKTest, RejectsNullRebuildCallbacks) {

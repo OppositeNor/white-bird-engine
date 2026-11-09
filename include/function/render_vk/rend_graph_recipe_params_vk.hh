@@ -245,6 +245,30 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
 };
 
 /**
+ * @class RendRecipeRegistrationVK
+ * @brief A resource a recipe registers on its render graph (IRenderGraph::register_resource()). Copyable and movable;
+ * strict.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeRegistrationVK {
+    /**
+     * @brief The registration key, which tasks name the resource by.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string key;
+    /**
+     * @brief The reflected name of the description's parameters struct, such as "RDParamsMeshVK"; its type selects the
+     * graph's registrator.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string type;
+    /**
+     * @brief The description, deserialized by the registrator of its type into its parameters struct.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    DataValue description;
+};
+
+/**
  * @class RendGraphRecipeVK
  * @brief A render graph recipe: what a recipe script returns. Copyable and movable; strict.
  *
@@ -252,10 +276,16 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendGraphRecipeVK {
     /**
-     * @brief Names of the resources the caller must supply; every supplied resource must be listed.
+     * @brief Names of the resources the recipe imports: each is supplied by the caller or registered on the render graph
+     * with a bindable object, and every supplied resource must be listed.
      */
     WBE_META(WBE_REFLECT)
     std::vector<std::string> imports;
+    /**
+     * @brief Resources to register on the render graph, in order, before any task is added.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<RendRecipeRegistrationVK> registrations;
     /**
      * @brief Graph-owned resources.
      */

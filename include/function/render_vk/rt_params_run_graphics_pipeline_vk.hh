@@ -35,9 +35,9 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsRunGraphicsPipelineVK {
     /**
-     * @brief Resource key of the compiled graphics pipeline in the renderer's RenderDatabase.
+     * @brief Registration key of the graphics pipeline on the task's render graph (IRenderGraph::register_resource()).
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(database, ROGraphicsPipelineVK))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, ROGraphicsPipelineVK))
     std::string pipeline;
     /**
      * @brief Render area; the swap chain extent by default.

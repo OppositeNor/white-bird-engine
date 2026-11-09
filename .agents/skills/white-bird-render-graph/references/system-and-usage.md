@@ -15,7 +15,7 @@
    records and submits nodes in topological order to their queues, and presents.
 5. Unregistration defers destroying the graph for the configured frames in flight.
 
-When the graph has a key and a render database, graph-owned objects are registered there as `<graph key>.<resource id>`,
+When the graph has a key and a global render cache, graph-owned objects are cached there as `<graph key>.<resource id>`,
 with `[slot]` appended for per-frame copies.
 
 ## Core APIs
@@ -40,7 +40,8 @@ movable; copies share the factory's captures. The graph keeps the descriptors an
 throws when a factory is missing or returns null.
 
 ```cpp
-RendGraphDescVK graph_desc(render_allocator);
+// Inside the rebuild callback, bound to the graph it receives.
+RendGraphDescVK graph_desc(render_allocator, &p_graph);
 graph_desc.add_resource(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
     .add_image("shadow_depth_image",
         [=](const RendGraphContextVK& /*p_context*/) {

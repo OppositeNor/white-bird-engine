@@ -35,7 +35,7 @@ ComputePipelineCompilerVK::ComputePipelineCompilerVK(const ComputePipelineCompil
           PipelineCompilerVKContext{
               .allocator = p_context.allocator,
               .render_data = p_context.render_data,
-              .render_database = p_context.render_database,
+              .render_cache = p_context.render_cache,
           },
           "compute pipeline"),
       context(p_context) {
@@ -61,7 +61,7 @@ Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
     ROComputePipelineVK::Builder pipeline_builder;
     pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry);
     Ref<ROComputePipelineVK> compute_pipeline = context.render_data->create_compute_pipeline(pipeline_builder);
-    context.render_database->register_compiled_render_resource(p_resource_key, compute_pipeline);
+    context.render_cache->insert(p_resource_key, compute_pipeline);
     return compute_pipeline;
 }
 

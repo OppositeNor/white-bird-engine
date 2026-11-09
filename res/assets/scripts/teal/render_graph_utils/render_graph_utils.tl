@@ -46,8 +46,8 @@ end
 
 local function validate_graph_resource(p_resource: render_graph.Resource)
     validate_resource(p_resource)
-    if p_resource.kind == "database" then
-        error("render_graph: database resources cannot be used as graph bindings or dependencies.", 3)
+    if p_resource.kind == "registered" then
+        error("render_graph: registered resources cannot be used as graph bindings or dependencies.", 3)
     end
 end
 
@@ -227,9 +227,9 @@ local function owned_resource(p_description: wbe.RendRecipeResourceVK, p_kind: s
     return attach_resource({ id = p_description.id, kind = p_kind, description = p_description, dependencies = p_dependencies or {} })
 end
 
-local function database_resource(p_key: string, p_type: string): render_graph.Resource
+local function registered_resource(p_key: string, p_type: string): render_graph.Resource
     validate_id(p_key)
-    return attach_resource({ id = p_key, kind = "database", resource_type = p_type, dependencies = {} })
+    return attach_resource({ id = p_key, kind = "registered", resource_type = p_type, dependencies = {} })
 end
 
 -- The canonical name of a reflected enum value the application passes. C++ serializes an enum as its enumerator name,
@@ -287,13 +287,13 @@ function render_graph.clamp_to_edge_sampler(p_id: string, p_params?: wbe.RendSam
     return owned_resource({ id = p_id, sampler = params }, "sampler")
 end
 
--- Pipelines are render-database resources the application compiles under p_key.
+-- Pipelines are resources registered on the render graph under p_key.
 function render_graph.compute_pipeline(p_key: string): render_graph.Resource
-    return database_resource(p_key, "WhiteBirdEngine::ROComputePipelineVK")
+    return registered_resource(p_key, "WhiteBirdEngine::ROComputePipelineVK")
 end
 
 function render_graph.graphics_pipeline(p_key: string): render_graph.Resource
-    return database_resource(p_key, "WhiteBirdEngine::ROGraphicsPipelineVK")
+    return registered_resource(p_key, "WhiteBirdEngine::ROGraphicsPipelineVK")
 end
 
 -- External resources are supplied by C++; a repeated import handle with the same id denotes the same import.
@@ -359,11 +359,11 @@ local function resource_id(p_value: render_graph.Resource | string, p_uses: {ren
     return p_value.id
 end
 
-local function database_key(p_value: any, p_expected_type: string): string
+local function registered_key(p_value: any, p_expected_type: string): string
     local resource = p_value as render_graph.Resource
     validate_resource(resource)
-    if resource.kind ~= "database" or resource.resource_type ~= p_expected_type then
-        error("render_graph: expected a database resource of type '" .. p_expected_type .. "'.", 3)
+    if resource.kind ~= "registered" or resource.resource_type ~= p_expected_type then
+        error("render_graph: expected a registered resource of type '" .. p_expected_type .. "'.", 3)
     end
     return resource.id
 end
@@ -374,7 +374,51 @@ function render_graph.graph(): render_graph.Graph
     local registered_ids: {render_graph.Task:string} = {}
     local parameter_ids: {render_graph.Task:{string:boolean}} = {}
     local registered_count = 0
+    local registrations: {wbe.RendRecipeRegistrationVK} = {}
+    local registered_keys: {string:boolean} = {}
     local graph: render_graph.Graph = { tasks = tasks }
+
+    -- Register a resource on the render graph when the recipe is built. The description's reflected type name selects the
+    -- registrator. Registrations are emitted in order, before any task, whether or not a task uses them; registering the
+    -- same key twice in one graph fails.
+    local function add_registration(p_key: string, p_type: string, p_description: any)
+        validate_id(p_key)
+        validate_id(p_type)
+        if registered_keys[p_key] then
+            error("render_graph: resource '" .. p_key .. "' is registered more than once.", 3)
+        end
+        registered_keys[p_key] = true
+        registrations[#registrations + 1] = { key = p_key, type = p_type, description = copy_data(p_description) }
+    end
+
+    function graph:register_resource(p_key: string, p_type: string, p_description: any,
+        p_resource_type: string): render_graph.Resource
+        add_registration(p_key, p_type, p_description)
+        return registered_resource(p_key, p_resource_type)
+    end
+
+    function graph:register_mesh(p_key: string, p_params: wbe.RDParamsMeshVK): render_graph.Resource
+        add_registration(p_key, "RDParamsMeshVK", p_params)
+        return registered_resource(p_key, "WhiteBirdEngine::MeshResourcesVK")
+    end
+
+    function graph:register_graphics_pipeline(p_key: string,
+        p_params: wbe.RDParamsGraphicsPipelineVK): render_graph.Resource
+        add_registration(p_key, "RDParamsGraphicsPipelineVK", p_params)
+        return render_graph.graphics_pipeline(p_key)
+    end
+
+    function graph:register_compute_pipeline(p_key: string,
+        p_params: wbe.RDParamsComputePipelineVK): render_graph.Resource
+        add_registration(p_key, "RDParamsComputePipelineVK", p_params)
+        return render_graph.compute_pipeline(p_key)
+    end
+
+    -- A registered image is bound like an import: C++ resolves an unsupplied import to the registered view.
+    function graph:register_image(p_key: string, p_params: wbe.RDParamsImageVK): render_graph.Resource
+        add_registration(p_key, "RDParamsImageVK", p_params)
+        return render_graph.import_resource(p_key)
+    end
 
     function graph:resource_bundle(p_resources: {render_graph.Resource}): render_graph.ResourceBundle
         validate_graph_resource_list(p_resources)
@@ -385,9 +429,9 @@ function render_graph.graph(): render_graph.Graph
         return { resources = resources }
     end
 
-    -- Declare application-owned database entries as resources. Their task factories resolve the live objects in C++.
+    -- Declare entries registered on the render graph as resources. Their task factories resolve the live objects in C++.
     function graph:add_mesh(p_key: string): render_graph.Resource
-        return database_resource(p_key, "WhiteBirdEngine::MeshResourcesVK")
+        return registered_resource(p_key, "WhiteBirdEngine::MeshResourcesVK")
     end
 
     function graph:add_compute_pipeline(p_key: string): render_graph.Resource
@@ -544,7 +588,7 @@ function render_graph.graph(): render_graph.Graph
         return graph:add(task)
     end
 
-    -- The typed constructors lower database keys to strings and graph resource handles to IDs, retaining only the latter.
+    -- The typed constructors lower registered keys to strings and graph resource handles to IDs, retaining only the latter.
     -- A task-local handle also binds its graph ID as an identity alias, which cannot shadow an unrelated shader binding.
     -- Every handle stays reachable, so collection still rejects distinct owned descriptions of the same graph ID.
     local function make_typed_task(p_id: string, p_type: string, p_params: any, p_options: render_graph.TaskOptions,
@@ -555,8 +599,8 @@ function render_graph.graph(): render_graph.Graph
             if p_value == nil then
                 return nil
             elseif p_field.kind == "resource" then
-                if p_field.scope == "database" then
-                    return database_key(p_value, p_field.expected_type)
+                if p_field.scope == "registered" then
+                    return registered_key(p_value, p_field.expected_type)
                 end
                 local resource = p_value as render_graph.Resource | string
                 if not (resource is string) and p_field.scope == "task_local" then
@@ -829,7 +873,12 @@ function render_graph.graph(): render_graph.Graph
             end
             wire_tasks[#wire_tasks + 1] = wire_task
         end
-        return { imports = imports, resources = resources, tasks = wire_tasks, ports = ports }
+        local wire_registrations: {wbe.RendRecipeRegistrationVK} = {}
+        for _, registration in ipairs(registrations) do
+            wire_registrations[#wire_registrations + 1] = registration
+        end
+        return { imports = imports, registrations = wire_registrations, resources = resources, tasks = wire_tasks,
+            ports = ports }
     end
     return graph
 end

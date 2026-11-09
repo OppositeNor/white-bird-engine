@@ -18,7 +18,7 @@
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
 #include <functional>
@@ -127,11 +127,11 @@ public:
     virtual uint32_t get_worker_nums() = 0;
 
     /**
-     * @brief Get the instance of the render database.
+     * @brief Get the instance of the global render cache.
      *
-     * @return The renderer's render database.
+     * @return The renderer's global render cache.
      */
-    virtual Ref<RenderDatabase> get_render_database() = 0;
+    virtual Ref<GlobalRenderCache> get_global_render_cache() = 0;
 
     /**
      * @brief Acquire a registered render graph by resource key.

@@ -25,7 +25,10 @@
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/rd_params_compute_pipeline_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/texture_compiler_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
@@ -63,7 +66,6 @@
 #include <filesystem>
 #include <format>
 #include <future>
-#include <initializer_list>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -320,7 +322,6 @@ public:
      * @throws std::runtime_error If a resource is missing, the image is too large to sort, or the graph cannot be built.
      */
     void setup_render_graph() {
-        auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* render_context = renderer->get_render_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
@@ -330,21 +331,9 @@ public:
         if (texture_resource == nullptr) {
             throw std::runtime_error("Failed to setup pixel sorting test: source texture resource was not found.");
         }
-        auto present_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("present_pixel_sort_pipeline");
-        if (present_pipeline_resource == nullptr) {
-            throw std::runtime_error("Failed to setup pixel sorting test: present pipeline resource was not found.");
-        }
-
-        WBE::GraphicsPipelineCompilerVKContext graphics_compiler_context{
-            .allocator = render_allocator,
-            .render_data = render_context,
-            .render_database = renderer->get_render_database(),
-            .renderer = renderer,
-            .color_attachment_formats = {render_context->swap_chain_format},
-        };
-        WBE::GraphicsPipelineCompilerVK graphics_compiler(graphics_compiler_context);
-        source_view = graphics_compiler.compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
-        present_pipeline = graphics_compiler.compile("present_pixel_sort_pipeline", present_pipeline_resource).graphics_pipeline;
+        // The recipe imports the source image; its extent sizes the graph, so the view is compiled before the graph exists.
+        source_view = WBE::TextureCompilerVK(render_context, renderer->get_global_render_cache().get())
+                          .compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
 
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
@@ -360,16 +349,6 @@ public:
         ui_contrast = contrast;
         ui_post_processing_params = post_processing_params;
         ui_orientation = orientation;
-        // The recipe's tasks look their pipelines up by key in the render database, which holds them weakly; compile every
-        // pipeline either orientation uses once and keep them alive for every graph.
-        for (const std::string_view shader_id : PIXEL_SORT_COMPUTE_SHADERS) {
-            compute_pipelines.push_back(compile_compute_pipeline(shader_id));
-        }
-        for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
-            const std::string bit_region = std::format("{}_{}", pass * 8, (pass + 1) * 8);
-            compute_pipelines.push_back(compile_compute_pipeline(std::format("radix_sort_histogram_workgroup_process_{}", bit_region)));
-            compute_pipelines.push_back(compile_compute_pipeline(std::format("radix_sort_scatter_{}", bit_region)));
-        }
         // Recipes cannot set initial data, so the application owns the parameter buffers and every graph imports them.
         contrast_buffer = create_uniform_buffer(REND_RES_PIXEL_SORT_CONTRAST, &ui_contrast, sizeof(PixelSortContrastGPU));
         post_processing_params_buffer = create_uniform_buffer(
@@ -414,9 +393,10 @@ private:
         }
         // The graph re-runs the recipe whenever it rebuilds, such as after the first-frame swap chain resize.
         WBE::Ref<WBE::RenderGraphVK> graph =
-            renderer->register_render_graph(PIXEL_SORTING_GRAPH_ID, [this, vertical](const WBE::RendGraphContextVK& p_context) {
-                return make_render_graph_desc(vertical, p_context);
-            });
+            renderer->register_render_graph(
+                PIXEL_SORTING_GRAPH_ID, [this, vertical](const WBE::RendGraphContextVK& p_context, WBE::RenderGraphVK& p_graph) {
+                    return make_render_graph_desc(vertical, p_context, p_graph);
+                });
         result_image = graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE);
         WBE::write_descriptor_debug_output("pixel_sorting_graph_descriptors", graph->list_descriptors());
         renderer->activate_render_graph(PIXEL_SORTING_GRAPH_ID);
@@ -428,11 +408,8 @@ private:
     PixelSortOrientation orientation = PixelSortOrientation::VERTICAL;
     // Whether setup_render_graph() has run; afterwards the configuration is forwarded to the rendering thread.
     bool render_graph_built = false;
-    // The source image and the present pipeline, shared by every graph built for an orientation.
+    // The source image, shared by every graph built for an orientation.
     WBE::Ref<WBE::ROImageViewVK> source_view;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> present_pipeline;
-    // Every compute pipeline the recipe's tasks use, for both orientations.
-    std::vector<WBE::Ref<WBE::ROComputePipelineVK>> compute_pipelines;
     // The orientation selected in the parameter window, and the one the current graph sorts; owned by the rendering
     // thread.
     PixelSortOrientation ui_orientation = PixelSortOrientation::VERTICAL;
@@ -645,9 +622,11 @@ private:
      * @brief Run the recipe for the orientation and the graph context, supplying the ImGui overlay task it imports.
      * @param p_vertical Whether the columns, rather than the rows, are sorted.
      * @param p_context The context the graph is being built for.
+     * @param p_graph The graph being built, which the recipe's pipelines are registered on.
      * @return The graph descriptor.
      */
-    WBE::RendGraphDescVK make_render_graph_desc(bool p_vertical, const WBE::RendGraphContextVK& p_context) {
+    WBE::RendGraphDescVK make_render_graph_desc(bool p_vertical, const WBE::RendGraphContextVK& p_context, WBE::RenderGraphVK& p_graph) {
+        register_pipelines(p_graph);
         auto* render_allocator = get_renderer_allocator().get();
         auto* renderer = WBE::RendererVK::get_singleton();
         const auto* render_context = renderer->get_render_context();
@@ -674,16 +653,16 @@ private:
             .add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer)
             .add(REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS, *post_processing_params_buffer)
             .add_task(std::move(imgui_task_desc));
-        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
+        WBE::RendGraphDescVK pipeline_desc = WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &p_graph);
         return pipeline_desc;
     }
 
     /**
-     * @brief Create a host-visible uniform buffer holding p_data and register it in the render database under p_key.
-     * @param p_key The render database key, which is also the name the recipe imports the buffer under.
+     * @brief Create a host-visible uniform buffer holding p_data and register it in the global render cache under p_key.
+     * @param p_key The global render cache key, which is also the name the recipe imports the buffer under.
      * @param p_data The initial content.
      * @param p_size The size of the buffer, in bytes.
-     * @return The buffer; the render database holds it weakly.
+     * @return The buffer; the global render cache holds it weakly.
      */
     static WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(std::string_view p_key, const void* p_data, size_t p_size) {
         auto* renderer = WBE::RendererVK::get_singleton();
@@ -692,28 +671,35 @@ private:
                                                .set_size(p_size)
                                                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                                                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-        renderer->get_render_database()->register_compiled_render_resource(p_key, buffer);
+        renderer->get_global_render_cache()->insert(p_key, buffer);
         return buffer;
     }
 
     /**
-     * @brief Compile a compute shader resource.
-     * @param p_shader_id The resource id of the compute shader.
-     * @return The compiled compute pipeline.
-     * @throws std::runtime_error If the shader resource is not found.
+     * @brief Register every pipeline the recipe's tasks use, for both orientations, under its resource id.
+     *
+     * Registering again with an equal description is free, so the rebuild callback registers them on every rebuild.
+     *
+     * @param p_graph The graph the pipelines are registered on.
      */
-    WBE::Ref<WBE::ROComputePipelineVK> compile_compute_pipeline(std::string_view p_shader_id) {
-        auto* renderer = WBE::RendererVK::get_singleton();
-        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>(p_shader_id);
-        if (shader_resource == nullptr) {
-            throw std::runtime_error(std::format("Failed to setup pixel sorting test: shader resource {} was not found.", p_shader_id));
-        }
-        WBE::ComputePipelineCompilerVKContext compute_compiler_context{
-            .allocator = get_renderer_allocator().get(),
-            .render_data = renderer->get_render_context(),
-            .render_database = renderer->get_render_database(),
+    static void register_pipelines(WBE::RenderGraphVK& p_graph) {
+        const auto* render_context = WBE::RendererVK::get_singleton()->get_render_context();
+        p_graph.register_graphics_pipeline("present_pixel_sort_pipeline",
+            WBE::RDParamsGraphicsPipelineVK{
+                .pipeline = "present_pixel_sort_pipeline",
+                .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
+            });
+        const auto register_compute = [&p_graph](std::string_view p_shader_id) {
+            p_graph.register_compute_pipeline(p_shader_id, WBE::RDParamsComputePipelineVK{.shader = std::string(p_shader_id)});
         };
-        return WBE::ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;
+        for (const std::string_view shader_id : PIXEL_SORT_COMPUTE_SHADERS) {
+            register_compute(shader_id);
+        }
+        for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
+            const std::string bit_region = std::format("{}_{}", pass * 8, (pass + 1) * 8);
+            register_compute(std::format("radix_sort_histogram_workgroup_process_{}", bit_region));
+            register_compute(std::format("radix_sort_scatter_{}", bit_region));
+        }
     }
 };
 

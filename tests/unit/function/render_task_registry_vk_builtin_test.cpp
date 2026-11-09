@@ -84,7 +84,7 @@ struct BuiltinTaskCase {
     std::string_view params;
 };
 
-// Valid parameters of every built-in task type, each with a pipeline key the render database does not hold.
+// Valid parameters of every built-in task type, each with a pipeline key the global render cache does not hold.
 constexpr BuiltinTaskCase BUILTIN_TASK_CASES[] = {
     {.type = "run_compute_pipeline", .params = R"({"pipeline": "p", "queue_family": "compute_1"})"},
     {.type = "run_compute_pipeline_indirect", .params = R"({"pipeline": "p", "indirect_buffer": "args", "indirect_offset": 16})"},
@@ -141,15 +141,15 @@ TEST(WBERenderTaskRegistryVKBuiltinTest, ValidParametersReachPipelineLookup) {
     RenderAllocator allocator(WBE_KI_B(64));
     RenderContextVK render_data(&allocator);
     for (const BuiltinTaskCase& task_case : BUILTIN_TASK_CASES) {
-        // Deserialization succeeds; creating the task fails only because no render database holds the pipelines.
+        // Deserialization succeeds; creating the task fails only because no render graph holds the pipelines.
         RendTaskFactoryVK factory;
         ASSERT_NO_THROW(factory = RenderTaskRegistryVK::create_factory(task_case.type, parse_task_params(task_case.params), &render_data))
             << task_case.type;
         try {
             (void)factory(RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
-            ADD_FAILURE() << task_case.type << " created a task without a render database.";
+            ADD_FAILURE() << task_case.type << " created a task without a render graph.";
         } catch (const std::runtime_error& p_error) {
-            EXPECT_NE(std::string(p_error.what()).find("render database is unavailable"), std::string::npos)
+            EXPECT_NE(std::string(p_error.what()).find("is not on a render graph"), std::string::npos)
                 << task_case.type << ": " << p_error.what();
         }
     }

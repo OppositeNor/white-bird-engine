@@ -6,7 +6,8 @@
    (`add_task(RendTaskDescVK)`) owned outside the graph.
 2. `RendGraphScriptVK::run(key_or_source, context)` runs the recipe in a fresh sandboxed `SBLua` and returns its table as a
    `DataValue`. `require` resolves other script resources through `SMRResourceManager`.
-3. `RendGraphRecipeBuilderVK().build(recipe, imports, render_context)` returns a `RendGraphDescVK`. It adds tasks through
+3. `RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &graph)` returns a `RendGraphDescVK` bound to the
+   graph. It first applies the recipe's `registrations` to the graph, then adds tasks through
    `RenderTaskRegistryVK::add_task()` (which runs the type's `prepare_graph`), wraps a `trigger` first and a `toggle`
    outermost, copies imported tasks, and builds subgraphs. A declared-but-missing or supplied-but-undeclared import or task
    is an error.
@@ -34,7 +35,10 @@ handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, imp
 | `:import_resource(id)` | A resource C++ supplies through `RendGraphRecipeImportsVK` |
 | `:reference(id)` | An existing enclosing resource or composite member (`<id>.<member>`), without declaring another import |
 | `:port(id)` | A port of this graph, bound when it becomes a subgraph |
-| `:add_mesh(key)`, `:add_compute_pipeline(key)`, `:add_graphics_pipeline(key)` | Render-database entry the application registered; usable only in task params, never as an edge or binding |
+| `:add_mesh(key)`, `:add_compute_pipeline(key)`, `:add_graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
+| `:register_mesh(key, params)`, `:register_graphics_pipeline(key, params)`, `:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
+| `:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
+| `:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
 
 `graph:build()` collects every resource reachable from task params, aliases, edges, `uses`, and ports (views pull in their
@@ -150,11 +154,13 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
    fields `WBE_REFLECT_REQUIRED`. Mark fields that hold ids so the constructor accepts handles there:
    `WBE_RECIPE_RESOURCE(graph)` for graph resource ids, `WBE_RECIPE_RESOURCE(task_local)` for ids the task's aliases map,
-   and `WBE_RECIPE_RESOURCE(database, <RenderObjectType>)` for render-database keys such as pipelines and meshes (the type
+   and `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` for keys registered on the graph such as pipelines and meshes (the type
    must be a `WBE_RENDER_OBJECT` class). Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.
 2. Mark the task `WBE_META(WBE_RENDER_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))`, or with a bare
    `WBE_RENDER_TASK` to register it without a recipe constructor, and declare
-   `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`.
+   `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`,
+   or `create(const RenderContextVK*, IRenderGraph*, const RTParams<Name>VK&, const RendGraphContextVK&)` when it resolves
+   registered resources such as pipelines.
    Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const RenderContextVK*)` if
    the task must add imports or aliases.
 3. Use `render_task_create_utils_vk.hh` (`acquire_task_compute_pipeline_vk`, `acquire_task_graphics_pipeline_vk`,

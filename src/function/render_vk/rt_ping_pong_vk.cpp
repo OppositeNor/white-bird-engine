@@ -175,17 +175,17 @@ void RTPingPongVK::set_push_constant(std::string_view p_name, PushConstantValueV
 }
 
 Unique<IRenderTaskVK> RTPingPongVK::create(
-    const RenderContextVK* p_render_data, const RTParamsPingPongVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsPingPongVK& p_params, const RendGraphContextVK& /*p_context*/) {
     if (p_params.ping_prefix_pipeline.has_value() != p_params.pong_prefix_pipeline.has_value()) {
         throw std::runtime_error("RTPingPongVK: ping_prefix_pipeline and pong_prefix_pipeline must be set together.");
     }
-    Ref<ROComputePipelineVK> ping_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", p_params.ping_pipeline);
-    Ref<ROComputePipelineVK> pong_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", p_params.pong_pipeline);
+    Ref<ROComputePipelineVK> ping_pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTPingPongVK", p_params.ping_pipeline);
+    Ref<ROComputePipelineVK> pong_pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTPingPongVK", p_params.pong_pipeline);
     Ref<ROComputePipelineVK> ping_prefix_pipeline = MEM_NULL;
     Ref<ROComputePipelineVK> pong_prefix_pipeline = MEM_NULL;
     if (p_params.ping_prefix_pipeline.has_value()) {
-        ping_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.ping_prefix_pipeline);
-        pong_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTPingPongVK", *p_params.pong_prefix_pipeline);
+        ping_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTPingPongVK", *p_params.ping_prefix_pipeline);
+        pong_prefix_pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTPingPongVK", *p_params.pong_prefix_pipeline);
     }
     // set_push_constant() applies a value to every pipeline of the task that declares its identifier.
     const auto layout_of = [](const Ref<ROComputePipelineVK>& p_pipeline) {

@@ -23,7 +23,9 @@
 #include "function/input_manager/i_input_manager.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_metadata_loader.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -263,23 +265,10 @@ public:
         evaluate_skinning_transforms();
         skinned_blend = blend;
 
-        auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("draw_skinned_mesh_pipeline");
-        if (pipeline_resource == nullptr) {
-            throw std::runtime_error("Failed to setup skinned mesh test: graphics pipeline resource was not found.");
-        }
         auto shader_resource = resource_manager->get_resource<WBE::RUShader>("draw_skinned_mesh_shader");
         if (shader_resource == nullptr) {
             throw std::runtime_error("Failed to setup skinned mesh test: shader resource was not found.");
         }
-        WBE::GraphicsPipelineCompilerVKContext compiler_context{
-            .allocator = render_allocator,
-            .render_data = render_context,
-            .render_database = renderer->get_render_database(),
-            .renderer = renderer,
-            .color_attachment_formats = {render_context->swap_chain_format},
-        };
-        auto graphics_pipeline =
-            WBE::GraphicsPipelineCompilerVK(compiler_context).compile("draw_skinned_mesh_pipeline", pipeline_resource).graphics_pipeline;
         CameraInfoGPU camera_info{
             .view = glm::lookAt(glm::vec3(0.0F, 1.0F, 4.5F), glm::vec3(0.0F, 1.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
             .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), render_context->swap_chain_aspect_ratio, 10.0F, 0.1F),
@@ -301,10 +290,14 @@ public:
                 mesh,
                 submesh = &submesh,
                 shader_resource,
-                graphics_pipeline,
                 camera_info_data,
-                skinning_transforms_data](const WBE::RendGraphContextVK& /*p_graph_context*/) {
-            WBE::RendGraphDescVK graph_desc(render_allocator);
+                skinning_transforms_data](const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
+            WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline = p_graph.register_graphics_pipeline("draw_skinned_mesh_pipeline",
+                WBE::RDParamsGraphicsPipelineVK{
+                    .pipeline = "draw_skinned_mesh_pipeline",
+                    .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
+                });
+            WBE::RendGraphDescVK graph_desc(render_allocator, &p_graph);
             // The shader reads position from the geometry binding and the joint ids and weights from the joint-binding
             // binding, so the draw binds the buffers compiled from both binaries.
             const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,

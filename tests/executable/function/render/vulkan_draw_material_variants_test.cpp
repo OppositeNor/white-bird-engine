@@ -26,7 +26,9 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -94,36 +96,33 @@ public:
         };
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
-        const std::array color_formats{render_context->swap_chain_format};
-        // The render database holds the pipelines weakly; they must stay alive until the draw task retains them.
-        for (std::string_view pipeline_key : {MATERIAL_VARIANTS_DEFAULT_PIPELINE, MATERIAL_VARIANTS_TINTED_PIPELINE}) {
-            auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>(pipeline_key);
-            if (pipeline_resource == nullptr) {
-                throw std::runtime_error(
-                    std::format("Failed to setup draw material variants test: graphics pipeline resource '{}' was not found.", pipeline_key));
-            }
-            graphics_pipelines.push_back(
-                WBE::compile_render_test_graphics_pipeline(renderer, pipeline_key, pipeline_resource, color_formats));
-        }
         // Recipes cannot set initial data, so the application owns the camera buffer and the recipe imports it.
         camera_info_ubo = render_context->create_buffer(WBE::ROBufferVK::Builder()
                               .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
                               .set_size(sizeof(CameraInfoGPU))
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-        renderer->get_render_database()->register_compiled_render_resource(
+        renderer->get_global_render_cache()->insert(
             REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER, camera_info_ubo);
         // The graph re-runs the recipe whenever it rebuilds, such as after a swap chain resize.
         WBE::Ref<WBE::RenderGraphVK> graph =
-            renderer->register_render_graph("test_render_graph", [this, renderer](const WBE::RendGraphContextVK& p_context) {
+            renderer->register_render_graph("test_render_graph", [this, renderer](const WBE::RendGraphContextVK& p_context, WBE::RenderGraphVK& p_graph) {
                 const auto* render_context = renderer->get_render_context();
+                // Registering again with an equal description is free, so the pipelines are registered on every rebuild.
+                for (std::string_view pipeline_key : {MATERIAL_VARIANTS_DEFAULT_PIPELINE, MATERIAL_VARIANTS_TINTED_PIPELINE}) {
+                    p_graph.register_graphics_pipeline(pipeline_key,
+                        WBE::RDParamsGraphicsPipelineVK{
+                            .pipeline = std::string(pipeline_key),
+                            .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
+                        });
+                }
                 const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
                 WBE::RendGraphRecipeImportsVK imports;
                 imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER, *camera_info_ubo);
                 // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
                 const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(
                     "render_graphs.draw_material_variants", WBE::RendGraphScriptVK::make_context(*render_context, p_context));
-                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
+                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &p_graph);
             });
         WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
         WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
@@ -131,7 +130,6 @@ public:
 
 private:
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
-    std::vector<WBE::Ref<WBE::ROGraphicsPipelineVK>> graphics_pipelines;
     CameraInfoGPU camera_info{};
     float aspect_ratio = 1.0F;
 };

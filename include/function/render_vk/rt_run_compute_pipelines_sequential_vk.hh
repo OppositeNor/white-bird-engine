@@ -37,6 +37,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTRunComputePipelinesSequentialVK
  * @brief Render task that dispatches an ordered sequence of synchronized compute passes in one command buffer.
@@ -154,15 +156,16 @@ struct WBE_META(WBE_RENDER_TASK(compute_sequential), WBE_SERIALIZATION_ALIASES(r
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the compiled pipelines.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the render data or its RenderDatabase is unavailable, p_params.dispatches is empty, or
-     * no compute pipeline is compiled under a dispatch pipeline key. The constructor's own validation also applies.
+     * @throws std::runtime_error If the render graph is null, p_params.dispatches is empty, or
+     * no compute pipeline is registered under a dispatch pipeline key. The constructor's own validation also applies.
      */
     WBE_META(WBE_REFLECT)
-    static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data,
+    static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data, IRenderGraph* p_render_graph,
         const RTParamsRunComputePipelinesSequentialVK& p_params,
         const RendGraphContextVK& p_context);
 

@@ -59,9 +59,6 @@ private:
     virtual uint32_t get_reset_group_count() const override;
     virtual SVORecipeVariant get_recipe_variant() const override;
 
-    // The publication pipelines, which the render database holds weakly and the recipe names.
-    Ref<ROComputePipelineVK> update_states_pipeline;
-    Ref<ROComputePipelineVK> dynamic_publication_pipeline;
 };
 
 } // namespace WhiteBirdEngine

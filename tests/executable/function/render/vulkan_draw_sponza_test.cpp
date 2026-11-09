@@ -36,7 +36,11 @@
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/rd_params_image_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
@@ -138,7 +142,7 @@ BillboardInfoGPU make_light_billboard_info(const WBE::ComponentSpotLight& p_spot
     };
 }
 
-// Each frame's buffer is registered in the render database as `<p_key>[<slot>]`, which names it.
+// Each frame's buffer is registered in the global render cache as `<p_key>[<slot>]`, which names it.
 WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
     WBE::RenderAllocator* p_allocator, const WBE::RenderContextVK* p_render_data, std::string_view p_key, VkDeviceSize p_buffer_size) {
     return WBE::make_ref<WBE::ROCMultislotsVK>(p_allocator,
@@ -148,7 +152,7 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
                                           uint32_t p_frame_slot) -> WBE::Ref<WBE::IRenderObjectVK> {
             WBE::Ref<WBE::ROBufferVK> buffer =
                 p_render_data->create_buffer(WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-            p_render_data->render_database->register_compiled_render_resource(std::format("{}[{}]", key, p_frame_slot), buffer);
+            p_render_data->render_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
             return buffer;
         }});
 }
@@ -170,7 +174,7 @@ public:
 private:
     void setup_render_context();
     void load_resources();
-    void setup_static_scene_resources();
+    void register_scene_resources(WBE::RenderGraphVK& p_graph);
     void setup_spot_light();
     void setup_light_billboard_overlay_resources();
     void write_shadow_dynamic_descriptors();
@@ -183,16 +187,6 @@ private:
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
-    WBE::RefRes<WBE::RUMesh3D> sponza_mesh;
-    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_opaque_pipeline;
-    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_masked_pipeline;
-    WBE::RefRes<WBE::RUGraphicsPipeline> main_opaque_pipeline;
-    WBE::RefRes<WBE::RUGraphicsPipeline> main_masked_pipeline;
-    WBE::Ref<WBE::MeshResourcesVK> static_mesh_resources;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_opaque_graphics_pipeline;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> shadow_masked_graphics_pipeline;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> main_opaque_graphics_pipeline;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> main_masked_graphics_pipeline;
     WBE::Ref<WBE::ROCMultislotsVK> camera_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_count_ubos;
@@ -201,8 +195,6 @@ private:
     float spot_light_pitch = 0.0F;
     VkExtent2D shadow_extent{};
     WBE::Ref<WBE::ROBufferVK> light_billboard_ubo;
-    WBE::Ref<WBE::ROImageViewVK> light_billboard_texture_view;
-    WBE::Ref<WBE::ROGraphicsPipelineVK> light_billboard_pipeline;
     WBE::ComponentCamera camera_component{};
     glm::vec3 camera_position = glm::vec3(0.0F);
     float camera_yaw = 0.0F;
@@ -380,7 +372,6 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
     camera_pitch = p_view_config.camera_pitch;
     setup_render_context();
     load_resources();
-    setup_static_scene_resources();
     setup_spot_light();
     spot_light_component.position = p_view_config.light_position;
     spot_light_yaw = p_view_config.light_yaw;
@@ -393,7 +384,7 @@ void ApplicationVulkanDrawSponzaTest::setup_draw_task(const ForwardSceneViewConf
             glm::lookAt(spot_light_component.position, spot_light_component.position + spot_light_component.direction, light_up);
     }
 
-    // The render database holds the pipelines weakly; the members keep them alive for the draw tasks, which look them up
+    // The global render cache holds the pipelines weakly; the members keep them alive for the draw tasks, which look them up
     // by key.
     auto create_task = [](std::string_view p_task_id,
                            std::string_view p_pipeline_key,
@@ -469,40 +460,30 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
     auto resource_chunk = make_ref<WBE::ResourceChunkLoadFile>(
         WBE::global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
-    sponza_mesh = resource_manager->get_resource<WBE::RUMesh3D>("sponza.mesh");
-    if (sponza_mesh == nullptr) {
-        throw std::runtime_error("Failed to setup draw sponza test: static mesh resource was not found.");
-    }
-    shadow_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
-    if (shadow_opaque_pipeline == nullptr) {
-        throw std::runtime_error("Failed to setup draw sponza test: shadow opaque graphics pipeline resource was not found.");
-    }
-    shadow_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_masked");
-    if (shadow_masked_pipeline == nullptr) {
-        throw std::runtime_error("Failed to setup draw sponza test: shadow masked graphics pipeline resource was not found.");
-    }
-    main_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
-    if (main_opaque_pipeline == nullptr) {
-        throw std::runtime_error("Failed to setup draw sponza test: main opaque graphics pipeline resource was not found.");
-    }
-    main_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_masked");
-    if (main_masked_pipeline == nullptr) {
-        throw std::runtime_error("Failed to setup draw sponza test: main masked graphics pipeline resource was not found.");
-    }
 }
 
-void ApplicationVulkanDrawSponzaTest::setup_static_scene_resources() {
-    static_mesh_resources = WBE::create_mesh_resources(renderer_vk, WBE::STATIC_MESH_KEY, sponza_mesh, main_opaque_pipeline);
-    const std::array shadow_formats{SHADOWMAP_COLOR_FORMAT};
-    shadow_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
-        renderer_vk, "forward_sponza_shadow_opaque", shadow_opaque_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
-    shadow_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
-        renderer_vk, "forward_sponza_shadow_masked", shadow_masked_pipeline, shadow_formats, SHADOWMAP_DEPTH_FORMAT);
-    const std::array main_formats{render_context->swap_chain_format};
-    main_opaque_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
-        renderer_vk, "forward_sponza_main_opaque", main_opaque_pipeline, main_formats, MAIN_DEPTH_FORMAT);
-    main_masked_graphics_pipeline = WBE::compile_render_test_graphics_pipeline(
-        renderer_vk, "forward_sponza_main_masked", main_masked_pipeline, main_formats, MAIN_DEPTH_FORMAT);
+// The draw tasks name these by key. Registering again with an equal description is free, so the rebuild callback registers
+// them on every rebuild.
+void ApplicationVulkanDrawSponzaTest::register_scene_resources(WBE::RenderGraphVK& p_graph) {
+    const auto format = [](VkFormat p_format) {
+        return static_cast<WBE::ImageFormatVK>(p_format);
+    };
+    p_graph.register_mesh(WBE::STATIC_MESH_KEY, WBE::RDParamsMeshVK{.mesh = "sponza.mesh"});
+    const auto register_pipeline = [&p_graph, &format](std::string_view p_key, std::string p_pipeline, VkFormat p_color_format, VkFormat p_depth_format) {
+        p_graph.register_graphics_pipeline(p_key,
+            WBE::RDParamsGraphicsPipelineVK{
+                .pipeline = std::move(p_pipeline),
+                .color_formats = {format(p_color_format)},
+                .depth_format = format(p_depth_format),
+            });
+    };
+    register_pipeline("forward_sponza_shadow_opaque", "shadowmap_spot", SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_shadow_masked", "shadowmap_spot_masked", SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_main_opaque", "forward_cook_torrance_pbr", render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
+    register_pipeline(
+        "forward_sponza_main_masked", "forward_cook_torrance_pbr_masked", render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
+    register_pipeline("light_billboard_pipeline", "billboard_face_camera_pipeline", render_context->swap_chain_format, VK_FORMAT_UNDEFINED);
+    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, WBE::RDParamsImageVK{.texture = "spot_light_billboard"});
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
@@ -516,31 +497,9 @@ void ApplicationVulkanDrawSponzaTest::setup_spot_light() {
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_light_billboard_overlay_resources() {
-    auto* resource_manager = WBE::ResourceManager::get_singleton();
-    auto pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("billboard_face_camera_pipeline");
-    if (pipeline_resource == nullptr) {
-        throw std::runtime_error("Failed to setup light billboard overlay: graphics pipeline resource was not found.");
-    }
-    auto texture_resource = resource_manager->get_resource<WBE::RUTexture>("spot_light_billboard");
-    if (texture_resource == nullptr) {
-        throw std::runtime_error("Failed to setup light billboard overlay: texture resource was not found.");
-    }
-
     if (camera_info_ubos == WBE::MEM_NULL) {
         camera_info_ubos = create_per_frame_uniform_buffers(render_allocator, render_context, "camera_info", sizeof(CameraInfoGPU));
     }
-
-    WBE::GraphicsPipelineCompilerVKContext compiler_context{
-        .allocator = render_allocator,
-        .render_data = render_context,
-        .render_database = renderer_vk->get_render_database(),
-        .renderer = renderer_vk,
-        .color_attachment_formats = {render_context->swap_chain_format},
-    };
-    WBE::GraphicsPipelineCompilerVK compiler(compiler_context);
-    light_billboard_texture_view = compiler.compile_texture_view("spot_light_billboard", texture_resource);
-    auto compiled = compiler.compile("light_billboard_pipeline", pipeline_resource);
-    light_billboard_pipeline = compiled.graphics_pipeline;
 }
 
 void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descriptors() {
@@ -603,8 +562,11 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
             main_masked_task = std::move(p_main_masked_task),
             shadow_image_extent,
             clamped_linear_sampler,
-            light_billboard_info_data](const WBE::RendGraphContextVK& /*p_graph_context*/) {
-            WBE::RendGraphDescVK pipeline_desc(render_allocator);
+            light_billboard_info_data](const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
+            register_scene_resources(p_graph);
+            const WBE::Ref<WBE::ROGraphicsPipelineVK> light_billboard_pipeline =
+                p_graph.acquire_registered<WBE::ROGraphicsPipelineVK>("light_billboard_pipeline");
+            WBE::RendGraphDescVK pipeline_desc(render_allocator, &p_graph);
             // The draw tasks below import the mesh themselves.
             pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
                 .add_image(SHADOWMAP_DEPTH_IMAGE,
@@ -651,7 +613,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
                             .initial_data = initial_data,
                         };
                     })
-                .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *light_billboard_texture_view)
+                .add_resource(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, *p_graph.acquire_registered<WBE::ROImageViewVK>(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW))
                 .add_sampler(LIGHT_BILLBOARD_SAMPLER, [=](const WBE::RendGraphContextVK& /*p_context*/) {
                     return clamped_linear_sampler;
                 });
@@ -674,7 +636,7 @@ void ApplicationVulkanDrawSponzaTest::register_draw_sponza_render_graph(WBE::Ren
             WBE::RendTaskDescVK light_billboard_task_desc(render_allocator);
             light_billboard_task_desc.task_id = RT_RUN_LIGHT_BILLBOARD;
             light_billboard_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-            light_billboard_task_desc.factory = [this](const WBE::RendGraphContextVK& p_context) {
+            light_billboard_task_desc.factory = [this, light_billboard_pipeline](const WBE::RendGraphContextVK& p_context) {
                 return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
                     .set_pipeline(light_billboard_pipeline)
                     .set_render_extent(p_context.swap_chain_extent)

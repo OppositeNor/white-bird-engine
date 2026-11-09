@@ -38,8 +38,17 @@ namespace WhiteBirdEngine {
  *     const RendGraphContextVK& p_context);
  * @endcode
  *
- * where TParams is a copyable reflected struct (for example WBE_SERIALIZABLE_STATIC). A missing create() or a different
- * signature fails the build. A task type that needs graph resources or aliases besides its own may also declare
+ * where TParams is a copyable reflected struct (for example WBE_SERIALIZABLE_STATIC). A task type that resolves resources
+ * registered on its render graph (IRenderGraph), such as pipelines named by key, declares instead
+ *
+ * @code
+ * WBE_META(WBE_REFLECT)
+ * static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data, IRenderGraph* p_render_graph,
+ *     const TParams& p_params, const RendGraphContextVK& p_context);
+ * @endcode
+ *
+ * which receives the graph the task's descriptor is bound to (RendGraphDescVK::render_graph), or null when it is unbound.
+ * A missing create() or a different signature fails the build. A task type that needs graph resources or aliases besides its own may also declare
  *
  * @code
  * static void prepare_graph(RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const TParams& p_params,
@@ -68,17 +77,21 @@ public:
      * @param p_task_type A registered task type name.
      * @param p_params The task parameters, deserialized through SerializableSD into the task type's TParams.
      * @param p_render_data Render data passed to create(); it must outlive the factory.
+     * @param p_render_graph The graph passed to create() of task types that take one; it must outlive the factory.
      * @return The factory, suitable for RendTaskDescVK::factory.
      * @throws std::runtime_error If the task type is unknown, p_render_data is null, or the parameters cannot be
      * deserialized.
      */
-    static RendTaskFactoryVK create_factory(std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data);
+    static RendTaskFactoryVK create_factory(std::string_view p_task_type,
+        const DataValue& p_params,
+        const RenderContextVK* p_render_data,
+        IRenderGraph* p_render_graph = nullptr);
 
     /**
      * @brief Add one render task to a graph descriptor.
      *
      * Deserializes the parameters as create_factory() does, calls the task type's prepare_graph() on the new task descriptor
-     * if it declares one, and adds the descriptor to p_graph.
+     * if it declares one, and adds the descriptor to p_graph. Task types that take a graph receive p_graph.render_graph.
      *
      * @param p_graph The graph descriptor to add the task to.
      * @param p_task_id The task id; unique in p_graph.

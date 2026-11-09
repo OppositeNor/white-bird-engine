@@ -29,6 +29,8 @@
 
 namespace WhiteBirdEngine {
 
+class IRenderGraph;
+
 /**
  * @class RTGraphicsDrawMeshVK
  * @brief Render task that draws parts of a compiled mesh, named by its mesh resource key, with one graphics pipeline.
@@ -60,30 +62,33 @@ struct WBE_META(WBE_RENDER_TASK(draw_mesh), WBE_SERIALIZATION_ALIASES(graphics_d
 
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
-     * @param p_render_data Base render data whose RenderDatabase holds the pipeline and the compiled mesh.
+     * @param p_render_data Base render data.
+     * @param p_render_graph The graph the task is on, whose registered pipelines and mesh it uses.
      * @param p_params The recipe parameters.
      * @param p_context The graph context the task is created for.
      * @return The task.
-     * @throws std::runtime_error If the pipeline or the compiled mesh is not in the RenderDatabase, parts is empty or repeats a
+     * @throws std::runtime_error If a pipeline or the mesh is not registered on the render graph, parts is empty or repeats a
      * part, the mesh has no submeshes in a requested part, the pipeline's vertex input or mesh node layout does not match the
      * mesh, or the render extent or a clear value is invalid.
      */
     WBE_META(WBE_REFLECT)
     static Unique<IRenderTaskVK> create(
-        const RenderContextVK* p_render_data, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context);
+        const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context);
 
     /**
      * @brief Prepare a graph descriptor for the task: compile and import the mesh, and alias the pipeline's mesh resources.
      *
-     * Compiles the mesh through MeshCompilerVK::acquire() if it is not registered yet, imports it under
-     * RTParamsGraphicsDrawMeshVK::mesh unless already imported, builds and imports the material table for the pipeline's
+     * Resolves the mesh and the pipelines registered on the descriptor's render graph (RendGraphDescVK::get_render_graph());
+     * a mesh key nobody registered is registered with RRMeshVK from the mesh resource of the same key and the default
+     * compile options. Imports the mesh under RTParamsGraphicsDrawMeshVK::mesh unless already imported, builds and imports the material table for the pipeline's
      * material texture contract if the pipeline reads one, and aliases each mesh resource id the pipeline declares
      * (REND_RES_MESH_SUBMESHES, REND_RES_MESH_NODES, REND_RES_MESH_INSTANCES, REND_RES_MESH_TRANSFORM,
-     * REND_RES_MESH_MATERIAL_PARAMS, REND_RES_MESH_MATERIAL_SAMPLER) on p_task. The RenderDatabase holds compiled objects
-     * weakly, so p_task's factory is wrapped to keep the pipeline and the compiled mesh alive for as long as the descriptor
-     * exists. Call on the rendering thread, after p_task's factory is set.
+     * REND_RES_MESH_MATERIAL_PARAMS, REND_RES_MESH_MATERIAL_SAMPLER) on p_task. p_task's factory is wrapped to keep the
+     * pipelines and the mesh alive for as long as the descriptor exists. Call on the rendering thread, after p_task's
+     * factory is set.
      *
-     * @throws std::runtime_error If p_task has no factory, the pipeline is not compiled, the mesh cannot be compiled, the
+     * @throws std::runtime_error If the descriptor is not bound to a render graph, p_task has no factory, a pipeline is not
+     * registered, the mesh cannot be registered, the
      * pipeline reads a material table without declaring a material texture contract, or the pipeline declares
      * REND_RES_MESH_TRANSFORM and p_params.transform is unset.
      */

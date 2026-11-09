@@ -231,8 +231,8 @@ void RTMaxDownsampleVK::push_level_descriptors(
 }
 
 Unique<IRenderTaskVK> RTMaxDownsampleVK::create(
-    const RenderContextVK* p_render_data, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& /*p_context*/) {
-    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_data, "RTMaxDownsampleVK", p_params.pipeline);
+    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsMaxDownsampleVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    Ref<ROComputePipelineVK> pipeline = acquire_task_compute_pipeline_vk(p_render_graph, "RTMaxDownsampleVK", p_params.pipeline);
     return make_unique<RTMaxDownsampleVK>(
         p_render_data->allocator, p_render_data, std::move(pipeline), p_params.mip_views, p_params.queue_family);
 }

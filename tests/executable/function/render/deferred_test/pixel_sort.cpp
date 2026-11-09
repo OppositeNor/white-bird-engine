@@ -49,7 +49,7 @@ namespace {
 
 // The Lua module that adds the effect's resources and tasks to a recipe.
 constexpr std::string_view PIXEL_SORT_RECIPE_MODULE = "render_graph_utils.features.pixel_sort";
-// The import name, and render database key, of the contrast buffer.
+// The import name, and global render cache key, of the contrast buffer.
 constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 
 // GPU layout of PixelSortContrast in pixel_sort_utils.slang.
@@ -67,10 +67,6 @@ PixelSortContrastGPU make_contrast(const PixelSortSettings& p_settings) {
         .sort_metric = static_cast<uint32_t>(p_settings.metric),
         .sort_scope = static_cast<uint32_t>(p_settings.scope),
     };
-}
-
-size_t direction_index(PixelSortDirection p_direction) {
-    return p_direction == PixelSortDirection::VERTICAL ? 0 : 1;
 }
 
 std::string_view direction_name(PixelSortDirection p_direction) {
@@ -128,20 +124,20 @@ PixelSort::PixelSort(
                           .set_size(sizeof(contrast))
                           .set_domain(DeviceDomain::HOST_DEVICE)
                           .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-    renderer->get_render_database()->register_compiled_render_resource(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
-    copy_source_pipeline = compile("copy_pixel_sort_source_shader");
-    count_mask_pipelines = compile_direction_variants("count_pixel_sort_mask");
-    prefix_sum_columns_pipeline = compile("prefix_sum_pixel_sort_columns_shader");
-    register_keys_pipelines = compile_direction_variants("register_pixel_sort_keys");
-    write_sorted_pixels_pipelines = compile_direction_variants("write_sorted_pixels");
-    radix_sort_prepare_dispatch_pipeline = compile("radix_sort_prepare_dispatch");
-    histogram_prefix_sum_pipeline = compile("radix_sort_histogram_prefix_sum");
-    histogram_overflow_prefix_sum_pipeline = compile("radix_sort_histogram_overflow_prefix_sum");
-    histogram_add_overflow_pipeline = compile("radix_sort_histogram_add_overflow");
+    renderer->get_global_render_cache()->insert(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
+    registrations.add_compute_pipeline("copy_pixel_sort_source_shader");
+    add_direction_variants("count_pixel_sort_mask");
+    registrations.add_compute_pipeline("prefix_sum_pixel_sort_columns_shader");
+    add_direction_variants("register_pixel_sort_keys");
+    add_direction_variants("write_sorted_pixels");
+    registrations.add_compute_pipeline("radix_sort_prepare_dispatch")
+        .add_compute_pipeline("radix_sort_histogram_prefix_sum")
+        .add_compute_pipeline("radix_sort_histogram_overflow_prefix_sum")
+        .add_compute_pipeline("radix_sort_histogram_add_overflow");
     for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
         const std::string bit_region = make_bit_region_name(pass);
-        histogram_pipelines[pass] = compile(std::format("radix_sort_histogram_workgroup_process_{}", bit_region));
-        scatter_pipelines[pass] = compile(std::format("radix_sort_scatter_{}", bit_region));
+        registrations.add_compute_pipeline(std::format("radix_sort_histogram_workgroup_process_{}", bit_region))
+            .add_compute_pipeline(std::format("radix_sort_scatter_{}", bit_region));
     }
 }
 
@@ -197,27 +193,13 @@ void PixelSort::configure_recipe(DataValue& p_parameters, RendGraphRecipeImports
     p_imports.add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer);
 }
 
-Ref<ROComputePipelineVK> PixelSort::compile(std::string_view p_shader_id) const {
-    auto shader_resource = ResourceManager::get_singleton()->get_resource<RUShader>(p_shader_id);
-    if (shader_resource == nullptr) {
-        throw std::runtime_error(
-            std::format("Failed to create the pixel sort post-processing: shader resource {} was not found.", p_shader_id));
-    }
-    ComputePipelineCompilerVKContext compute_compiler_context{
-        .allocator = get_allocator(),
-        .render_data = renderer->get_render_context(),
-        .render_database = renderer->get_render_database(),
-    };
-    return ComputePipelineCompilerVK(compute_compiler_context).compile(p_shader_id, shader_resource).compute_pipeline;
+void PixelSort::register_resources(RenderGraphVK& p_graph) const {
+    registrations.register_on(p_graph);
 }
 
-PixelSort::DirectionPipelines PixelSort::compile_direction_variants(std::string_view p_shader_name) const {
-    DirectionPipelines pipelines;
-    pipelines[direction_index(PixelSortDirection::VERTICAL)] =
-        compile(make_direction_shader_id(p_shader_name, PixelSortDirection::VERTICAL));
-    pipelines[direction_index(PixelSortDirection::HORIZONTAL)] =
-        compile(make_direction_shader_id(p_shader_name, PixelSortDirection::HORIZONTAL));
-    return pipelines;
+void PixelSort::add_direction_variants(std::string_view p_shader_name) {
+    registrations.add_compute_pipeline(make_direction_shader_id(p_shader_name, PixelSortDirection::VERTICAL))
+        .add_compute_pipeline(make_direction_shader_id(p_shader_name, PixelSortDirection::HORIZONTAL));
 }
 
 } // namespace WhiteBirdEngine

@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_I_SVO_RENDER_FEATURE_HH
 #define WBE_FILE_I_SVO_RENDER_FEATURE_HH
 
+#include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
@@ -103,6 +104,8 @@ public:
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
+    virtual void register_resources(RenderGraphVK& p_graph) const override;
+
     static constexpr std::string_view RT_RUN_BUILD_SVO_DOUBLE_SIDED = "run_build_svo_double_sided";
     static constexpr std::string_view RT_RESET_SVO = "reset_svo";
     static constexpr std::string_view RT_RUN_BUILD_SVO = "run_build_svo";
@@ -154,9 +157,10 @@ protected:
     virtual SVORecipeVariant get_recipe_variant() const = 0;
 
     /**
-     * @brief Compiles a compute pipeline from its shader resource key.
+     * @brief The pipelines of the construction, registered on every graph by register_resources(); implementations add
+     * their own in their constructors.
      */
-    Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_id) const;
+    RenderTestRegistrations registrations;
     static constexpr size_t SVO_MAX_DEPTH = 9;
     static constexpr size_t SVO_VOXEL_COUNT = (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH);
     // Shared by the static nodes and the dynamic nodes that follow them in the node buffer.
@@ -181,30 +185,6 @@ protected:
      * @brief Borrowed allocator of render objects and tasks.
      */
     RenderAllocator* render_allocator;
-    /**
-     * @brief Resets the ping deferred count before an iteration that writes the ping list.
-     */
-    Ref<ROComputePipelineVK> svo_deferred_count_reset_ping_compute_pipeline = MEM_NULL;
-    /**
-     * @brief Resets the pong deferred count before an iteration that writes the pong list.
-     */
-    Ref<ROComputePipelineVK> svo_deferred_count_reset_pong_compute_pipeline = MEM_NULL;
-    /**
-     * @brief Static deferred retries that read pong and write ping.
-     */
-    Ref<ROComputePipelineVK> svo_deferred_propagation_ping_write_compute_pipeline = MEM_NULL;
-    /**
-     * @brief Static deferred retries that read ping and write pong.
-     */
-    Ref<ROComputePipelineVK> svo_deferred_propagation_pong_write_compute_pipeline = MEM_NULL;
-    /**
-     * @brief Dynamic deferred retries that read ping and write pong.
-     */
-    Ref<ROComputePipelineVK> dynamic_ping_pipeline;
-    /**
-     * @brief Dynamic deferred retries that read pong and write ping.
-     */
-    Ref<ROComputePipelineVK> dynamic_pong_pipeline;
 
 private:
     static constexpr std::string_view RT_SVO_FRAME_BEGIN = "svo_frame_begin";
@@ -314,7 +294,7 @@ private:
 
     void create_resources();
     void initialize();
-    void compile_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix);
+    void add_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix);
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
 
     Ref<MeshResourcesVK> static_mesh_resources;
@@ -322,23 +302,8 @@ private:
     VoxelVolume svo_volume;
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
-    Ref<ROGraphicsPipelineVK> dynamic_build_pipeline;
     std::string shader_prefix;
     std::string dynamic_shader_prefix;
-    Ref<ROComputePipelineVK> dynamic_clear_pipeline;
-    Ref<ROGraphicsPipelineVK> svo_build_graphics_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svo_reset_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svo_pre_deferred_debug_capture_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svo_debug_draw_setup_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svo_debug_draw_find_nodes_compute_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> svo_debug_draw_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> svo_pre_deferred_debug_draw_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> svo_debug_draw_solid_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> svo_debug_draw_occupancy_graphics_pipeline = MEM_NULL;
-    Ref<ROGraphicsPipelineVK> svo_debug_draw_solid_occupancy_graphics_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svogi_occupancy_injection_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svogi_occupancy_propagation_compute_pipeline = MEM_NULL;
-    Ref<ROComputePipelineVK> svogi_radiance_injection_compute_pipeline = MEM_NULL;
     Ref<ROBufferVK> svo_info;
     Ref<ROBufferVK> svo_nodes;
     Ref<ROBufferVK> svo_leaves;

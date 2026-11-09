@@ -18,7 +18,7 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_database.hh"
+#include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_software/render_software_defs.hh"
 #include "utils/defs.hh"
@@ -52,7 +52,7 @@ public:
         return std::max(std::thread::hardware_concurrency() - 2, 1U);
     }
     virtual void tick(double p_delta) override;
-    virtual Ref<RenderDatabase> get_render_database() override;
+    virtual Ref<GlobalRenderCache> get_global_render_cache() override;
     virtual void register_render_graph(std::string_view p_resource_key) override;
     virtual void unregister_render_graph(std::string_view p_resource_key) override;
     virtual void activate_render_graph(std::string_view p_resource_key) override;
