@@ -68,12 +68,6 @@ public:
      */
     virtual void configure_recipe(DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports) const = 0;
 
-    /**
-     * @brief Register the pipelines the effect's tasks name on a graph the recipe is built for.
-     *
-     * Called by every rebuild before the recipe runs; repeated registrations are free.
-     */
-    virtual void register_resources(RenderGraphVK& p_graph) const = 0;
 
     /**
      * @brief Whether the effect's tasks record their commands.

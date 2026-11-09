@@ -92,6 +92,7 @@ p_graph.register_graphics_pipeline("main", pbr, RDParamsGraphicsPipelineVK{
 
 ```lua
 graph:register_compute_pipeline("blur", { shader = "blur_shader" })
+local scan = Graph.shader_compute_pipeline("prefix_scan_shader") -- registered when a task names it
 local texture = graph:register_image("noise", { texture = "noise_texture" }) -- bound like an import
 ```
 

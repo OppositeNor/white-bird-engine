@@ -15,8 +15,6 @@
 #ifndef WBE_FILE_I_SVO_RENDER_FEATURE_HH
 #define WBE_FILE_I_SVO_RENDER_FEATURE_HH
 
-#include "../render_test.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
@@ -26,8 +24,6 @@
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "glm/ext/vector_float3.hpp"
 #include "i_voxel_render_feature.hh"
 #include "svo_recipe_params.hh"
@@ -104,7 +100,6 @@ public:
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
-    virtual void register_resources(RenderGraphVK& p_graph) const override;
 
     static constexpr std::string_view RT_RUN_BUILD_SVO_DOUBLE_SIDED = "run_build_svo_double_sided";
     static constexpr std::string_view RT_RESET_SVO = "reset_svo";
@@ -156,11 +151,6 @@ protected:
     // The construction the voxel_svo module builds.
     virtual SVORecipeVariant get_recipe_variant() const = 0;
 
-    /**
-     * @brief The pipelines of the construction, registered on every graph by register_resources(); implementations add
-     * their own in their constructors.
-     */
-    RenderTestRegistrations registrations;
     static constexpr size_t SVO_MAX_DEPTH = 9;
     static constexpr size_t SVO_VOXEL_COUNT = (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH) * (size_t{1} << SVO_MAX_DEPTH);
     // Shared by the static nodes and the dynamic nodes that follow them in the node buffer.
@@ -294,7 +284,6 @@ private:
 
     void create_resources();
     void initialize();
-    void add_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix);
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
 
     Ref<MeshResourcesVK> static_mesh_resources;

@@ -39,7 +39,6 @@ SVORenderFeaturePassPublished::SVORenderFeaturePassPublished(RendererVK* p_rende
     const RUAABB3D& p_scene_bounds,
     bool p_rebuild_static_every_frame)
     : ISVORenderFeature(p_renderer, std::move(p_static_mesh_resources), p_scene_bounds, "svo_2", "svo_2_dynamic", p_rebuild_static_every_frame) {
-    registrations.add_compute_pipeline("svo_2_update_states_shader").add_compute_pipeline("svo_2_dynamic_update_states_shader");
 }
 
 std::string_view SVORenderFeaturePassPublished::get_name() const {

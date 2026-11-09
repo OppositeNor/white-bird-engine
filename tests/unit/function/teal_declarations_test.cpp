@@ -39,7 +39,7 @@ TEST(WBETealDeclarationsTest, DeclaresOnlyScriptTypesOfTheEngine) {
     EXPECT_NE(declarations.find("    enum MeshPartVK\n        \"OPAQUE\"\n        \"opaque\"\n"), std::string::npos);
     // Every script class is an interface; enum fields also accept the integer value.
     EXPECT_NE(declarations.find("    interface RTParamsGraphicsDrawMeshVK\n"), std::string::npos);
-    EXPECT_NE(declarations.find("        parts: {MeshPartVK | integer}\n"), std::string::npos);
+    EXPECT_NE(declarations.find("        parts: {MeshPartVK}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        [\"type\"]: string\n"), std::string::npos);
     EXPECT_NE(declarations.find("    interface RendRecipeContextVK\n"), std::string::npos);
     // Other reflected types that are not WBE_REFLECT_SCRIPT stay out.
@@ -56,7 +56,7 @@ TEST(WBETealDeclarationsTest, DeclaresTheScriptTypesOfTheTestExecutablesInTestTa
     EXPECT_NE(declarations.find("    interface DeferredRecipeContext is RendRecipeContextVK\n"), std::string::npos);
     EXPECT_NE(declarations.find("    interface SVORecipeParams is RecipeFeatureParams\n"), std::string::npos);
     EXPECT_NE(declarations.find("        static_build: RendRecipeTriggerVK\n"), std::string::npos);
-    EXPECT_NE(declarations.find("        variant: SVORecipeVariant | integer\n"), std::string::npos);
+    EXPECT_NE(declarations.find("        variant: SVORecipeVariant\n"), std::string::npos);
 }
 
 TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks) {
@@ -78,8 +78,8 @@ TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks
     EXPECT_NE(declarations.find("    interface RTParamsGraphicsDrawMeshVK\n"), std::string::npos);
     EXPECT_NE(declarations.find("        mesh: Resource\n"), std::string::npos);
     EXPECT_NE(declarations.find("        pipeline: Resource\n"), std::string::npos);
-    EXPECT_NE(declarations.find("        transform: Resource | string\n"), std::string::npos);
-    EXPECT_NE(declarations.find("        parts: {wbe.MeshPartVK | integer}\n"), std::string::npos);
+    EXPECT_NE(declarations.find("        transform: Resource\n"), std::string::npos);
+    EXPECT_NE(declarations.find("        parts: {wbe.MeshPartVK}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        dispatches: {RTParamsComputeDispatchVK}\n"), std::string::npos);
     EXPECT_NE(declarations.find("        aliases: {string:Resource | string}\n"), std::string::npos);
     EXPECT_NE(constructors.find("{ name = \"mesh\", kind = \"resource\", scope = \"registered\", expected_type = \"WhiteBirdEngine::MeshResourcesVK\" }"),

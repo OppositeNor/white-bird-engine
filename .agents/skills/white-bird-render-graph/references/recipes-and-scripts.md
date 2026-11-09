@@ -37,6 +37,7 @@ handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, imp
 | `:port(id)` | A port of this graph, bound when it becomes a subgraph |
 | `:add_mesh(key)`, `:add_compute_pipeline(key)`, `:add_graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
 | `:register_mesh(key, params)`, `:register_graphics_pipeline(key, params)`, `:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
+| `Graph.compute_pipeline(key, description)`, `Graph.graphics_pipeline(key, description)`, `Graph.shader_compute_pipeline(shader)` | A handle that carries its registration; a task naming it emits the registration, merging equal ones per key. Needs no graph, so shared helpers use it |
 | `:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
 | `:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |

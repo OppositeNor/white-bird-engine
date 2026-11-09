@@ -30,6 +30,8 @@ local record render_graph
         kind: string
         resource_type: string
         description: wbe.RendRecipeResourceVK
+        -- The registration a registered handle carries; a task whose params name the handle emits it.
+        registration: wbe.RendRecipeRegistrationVK
         dependencies: {Resource}
         view: function(self: Resource, p_id?: string, p_view?: wbe.RendImageViewParamsVK): Resource
     end
@@ -87,6 +89,8 @@ local record render_graph
         select: wbe.RendRecipeSelectVK
         -- Collect resources without declaring an access or adding an ordering edge.
         uses: {Resource}
+        -- The registrations of the registered handles the task's params name.
+        registrations: {wbe.RendRecipeRegistrationVK}
     end
 {% for interface in api.interfaces %}
 
@@ -116,10 +120,10 @@ local record render_graph
         add_buffer: function(self: Graph, p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): Resource
         add_storage_buffer: function(self: Graph, p_id: string, p_size: integer): Resource
         add_image: function(self: Graph, p_id: string, p_usage: wbe.RendResPrimaryUsageVK,
-            p_format: wbe.ImageFormatVK | integer, p_extent?: wbe.RendExtent2DParamsVK,
-            p_additional_usage?: {wbe.ImageUsageFlagVK | integer}, p_mip_levels?: integer): Resource
-        add_storage_image: function(self: Graph, p_id: string, p_format: wbe.ImageFormatVK | integer,
-            p_width: integer, p_height: integer, p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): Resource
+            p_format: wbe.ImageFormatVK, p_extent?: wbe.RendExtent2DParamsVK,
+            p_additional_usage?: {wbe.ImageUsageFlagVK}, p_mip_levels?: integer): Resource
+        add_storage_image: function(self: Graph, p_id: string, p_format: wbe.ImageFormatVK,
+            p_width: integer, p_height: integer, p_additional_usage?: {wbe.ImageUsageFlagVK}): Resource
         add_image_view: function(self: Graph, p_id: string, p_image: Resource, p_view?: wbe.RendImageViewParamsVK): Resource
         add_clamp_to_edge_sampler: function(self: Graph, p_id: string, p_params?: wbe.RendSamplerParamsVK): Resource
         import_resource: function(self: Graph, p_id: string): Resource
@@ -146,18 +150,22 @@ local record render_graph
 {% endfor %}
     end
 
-    enum_name: function(p_value: string | integer): string
+    enum_name: function(p_value: string): string
     buffer: function(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): Resource
     storage_buffer: function(p_id: string, p_size: integer): Resource
-    image: function(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
-        p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK | integer},
+    image: function(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK,
+        p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK},
         p_mip_levels?: integer): Resource
-    storage_image: function(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
-        p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): Resource
+    storage_image: function(p_id: string, p_format: wbe.ImageFormatVK, p_width: integer, p_height: integer,
+        p_additional_usage?: {wbe.ImageUsageFlagVK}): Resource
     image_view: function(p_id: string, p_image: Resource, p_view?: wbe.RendImageViewParamsVK): Resource
     clamp_to_edge_sampler: function(p_id: string, p_params?: wbe.RendSamplerParamsVK): Resource
-    compute_pipeline: function(p_key: string): Resource
-    graphics_pipeline: function(p_key: string): Resource
+    -- A pipeline registered on the render graph under p_key. With a description, the handle registers it: the graph emits
+    -- the registration when a task names the handle, merging equal registrations of a key.
+    compute_pipeline: function(p_key: string, p_description?: wbe.RDParamsComputePipelineVK): Resource
+    graphics_pipeline: function(p_key: string, p_description?: wbe.RDParamsGraphicsPipelineVK): Resource
+    -- A compute pipeline compiled from the shader p_shader and registered under the same key.
+    shader_compute_pipeline: function(p_shader: string): Resource
     import_resource: function(p_id: string): Resource
     port: function(p_id: string): Resource
     reference: function(p_id: string): Resource

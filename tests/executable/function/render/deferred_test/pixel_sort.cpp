@@ -69,19 +69,6 @@ PixelSortContrastGPU make_contrast(const PixelSortSettings& p_settings) {
     };
 }
 
-std::string_view direction_name(PixelSortDirection p_direction) {
-    return p_direction == PixelSortDirection::VERTICAL ? "vertical" : "horizontal";
-}
-
-std::string make_bit_region_name(uint32_t p_pass) {
-    return std::format("{}_{}", p_pass * 8, (p_pass + 1) * 8);
-}
-
-// The id of the variant of a direction-dependent pixel sort shader, e.g. count_pixel_sort_mask_vertical_shader.
-std::string make_direction_shader_id(std::string_view p_shader_name, PixelSortDirection p_direction) {
-    return std::format("{}_{}_shader", p_shader_name, direction_name(p_direction));
-}
-
 } // namespace
 
 void PixelSort::validate_layout(VkExtent2D p_extent, PixelSortDirection p_direction) {
@@ -125,20 +112,6 @@ PixelSort::PixelSort(
                           .set_domain(DeviceDomain::HOST_DEVICE)
                           .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
     renderer->get_global_render_cache()->insert(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
-    registrations.add_compute_pipeline("copy_pixel_sort_source_shader");
-    add_direction_variants("count_pixel_sort_mask");
-    registrations.add_compute_pipeline("prefix_sum_pixel_sort_columns_shader");
-    add_direction_variants("register_pixel_sort_keys");
-    add_direction_variants("write_sorted_pixels");
-    registrations.add_compute_pipeline("radix_sort_prepare_dispatch")
-        .add_compute_pipeline("radix_sort_histogram_prefix_sum")
-        .add_compute_pipeline("radix_sort_histogram_overflow_prefix_sum")
-        .add_compute_pipeline("radix_sort_histogram_add_overflow");
-    for (uint32_t pass = 0; pass < RADIX_SORT_PASS_COUNT; ++pass) {
-        const std::string bit_region = make_bit_region_name(pass);
-        registrations.add_compute_pipeline(std::format("radix_sort_histogram_workgroup_process_{}", bit_region))
-            .add_compute_pipeline(std::format("radix_sort_scatter_{}", bit_region));
-    }
 }
 
 void PixelSort::validate_settings(const PixelSortSettings& p_settings) {
@@ -191,15 +164,6 @@ void PixelSort::configure_recipe(DataValue& p_parameters, RendGraphRecipeImports
     params.enabled = is_enabled();
     SerializableSD<PixelSortRecipeParams>::serialize(p_parameters, params);
     p_imports.add(REND_RES_PIXEL_SORT_CONTRAST, *contrast_buffer);
-}
-
-void PixelSort::register_resources(RenderGraphVK& p_graph) const {
-    registrations.register_on(p_graph);
-}
-
-void PixelSort::add_direction_variants(std::string_view p_shader_name) {
-    registrations.add_compute_pipeline(make_direction_shader_id(p_shader_name, PixelSortDirection::VERTICAL))
-        .add_compute_pipeline(make_direction_shader_id(p_shader_name, PixelSortDirection::HORIZONTAL));
 }
 
 } // namespace WhiteBirdEngine

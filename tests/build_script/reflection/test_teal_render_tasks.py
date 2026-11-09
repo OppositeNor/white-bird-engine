@@ -87,8 +87,8 @@ class TealRenderTasksTest(unittest.TestCase):
         self.assertEqual(list(interfaces), ["RTParamsDispatchVK", "RTParamsSequentialVK"])
         self.assertEqual(interfaces["RTParamsSequentialVK"], [
             {"name": "dispatches", "type": "{RTParamsDispatchVK}"},
-            {"name": "views", "type": "{Resource | string}"},
-            {"name": "transform", "type": "Resource | string"},
+            {"name": "views", "type": "{Resource}"},
+            {"name": "transform", "type": "Resource"},
             {"name": "counts", "type": "{integer}"},
         ])
         self.assertEqual(interfaces["RTParamsDispatchVK"][2], {"name": "aliases", "type": "{string:Resource | string}"})

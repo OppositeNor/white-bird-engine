@@ -171,7 +171,6 @@ VoxelRenderFeatureOctree::VoxelRenderFeatureOctree(RendererVK* p_renderer,
     }
     render_context = renderer_vk->get_render_context();
     render_allocator = render_context->allocator;
-    add_pipelines();
     create_resources();
 }
 
@@ -199,22 +198,6 @@ std::string VoxelRenderFeatureOctree::get_static_level_resource_id(uint32_t p_le
 
 std::string VoxelRenderFeatureOctree::get_dynamic_level_resource_id(uint32_t p_level) {
     return std::format("octree_dynamic_levels[{}]", p_level);
-}
-
-void VoxelRenderFeatureOctree::register_resources(RenderGraphVK& p_graph) const {
-    registrations.register_on(p_graph);
-}
-
-void VoxelRenderFeatureOctree::add_pipelines() {
-    // The voxelizing builds render without attachments; the debug draws draw the cells' edges.
-    registrations.add_graphics_pipeline(BUILD_PIPELINE, BUILD_PIPELINE, std::span<const VkFormat>{})
-        .add_graphics_pipeline(DYNAMIC_BUILD_PIPELINE, DYNAMIC_BUILD_PIPELINE, std::span<const VkFormat>{})
-        .add_compute_pipeline("octree_debug_gather_leaves_shader")
-        .add_compute_pipeline("octree_debug_gather_nodes_shader");
-    for (std::string_view pipeline : {"octree_debug_draw_pipeline", "octree_debug_node_draw_pipeline"}) {
-        registrations.add_graphics_pipeline(
-            pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT, PrimitiveTopologyVK::LINE_LIST);
-    }
 }
 
 Ref<ROImageVK> VoxelRenderFeatureOctree::create_octree_image() const {
@@ -394,6 +377,13 @@ void VoxelRenderFeatureOctree::configure_recipe(
         .add_task(get_clear_render_task_desc(RT_CLEAR_DYNAMIC_OCTREE, false));
     // The construction draws are prepared on a descriptor of their own, which must hold nothing but the mesh imports the
     // recipe's own mesh draws provide.
+    if (p_inputs.render_graph == nullptr) {
+        throw std::runtime_error("VoxelRenderFeatureOctree: the render graph is required to configure a recipe.");
+    }
+    // The construction passes are C++ tasks, so their pipelines, which rasterize without attachments, are registered here.
+    for (std::string_view pipeline : {BUILD_PIPELINE, DYNAMIC_BUILD_PIPELINE}) {
+        p_inputs.render_graph->register_graphics_pipeline(pipeline, RDParamsGraphicsPipelineVK{.pipeline = std::string(pipeline)});
+    }
     RendGraphDescVK construction(render_allocator, p_inputs.render_graph);
     add_construction_render_task(construction, RT_RUN_BUILD_OCTREE, false, nullptr, 0);
     add_construction_render_task(construction, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true, nullptr, 0);

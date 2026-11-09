@@ -18,18 +18,15 @@
 #include "core/memory/reference_strong.hh"
 #include "dynamic_mesh_render_feature.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rend_graph_recipe_params_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "i_voxel_render_feature.hh"
 #include "svo_recipe_params.hh"
-#include "resource/resource_manager/resource_manager.hh"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -56,42 +53,7 @@ ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     }
     render_context = renderer_vk->get_render_context();
     render_allocator = render_context->allocator;
-    add_pipelines(p_shader_prefix, p_dynamic_shader_prefix);
     create_resources();
-}
-
-void ISVORenderFeature::register_resources(RenderGraphVK& p_graph) const {
-    registrations.register_on(p_graph);
-}
-
-void ISVORenderFeature::add_pipelines(std::string_view p_shader_prefix, std::string_view p_dynamic_shader_prefix) {
-    // The voxelizing builds render without attachments.
-    const std::string build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_shader_prefix);
-    const std::string dynamic_build_pipeline_id = std::format("{}_build_static_mesh_pipeline", p_dynamic_shader_prefix);
-    registrations.add_graphics_pipeline(build_pipeline_id, build_pipeline_id, std::span<const VkFormat>{})
-        .add_graphics_pipeline(dynamic_build_pipeline_id, dynamic_build_pipeline_id, std::span<const VkFormat>{})
-        .add_compute_pipeline(std::format("{}_clear_shader", p_dynamic_shader_prefix))
-        .add_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_dynamic_shader_prefix))
-        .add_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_dynamic_shader_prefix))
-        .add_compute_pipeline(std::format("{}_reset_shader", p_shader_prefix))
-        .add_compute_pipeline("svo_deferred_count_reset_ping_shader")
-        .add_compute_pipeline("svo_deferred_count_reset_pong_shader")
-        .add_compute_pipeline(std::format("{}_build_deferred_propagation_ping_write_shader", p_shader_prefix))
-        .add_compute_pipeline(std::format("{}_build_deferred_propagation_pong_write_shader", p_shader_prefix))
-        .add_compute_pipeline("svo_pre_deferred_debug_capture_shader")
-        .add_compute_pipeline("svo_debug_draw_setup_shader")
-        .add_compute_pipeline("svo_debug_draw_find_nodes_shader")
-        .add_compute_pipeline("svogi_occupancy_injection")
-        .add_compute_pipeline("svogi_occupancy_propagation")
-        .add_compute_pipeline("svogi_radiance_injection");
-    // The wireframe styles draw the cubes' edges; the solid styles draw their faces.
-    for (std::string_view pipeline : {"svo_debug_draw_pipeline", "svo_pre_deferred_debug_draw_pipeline", "svo_debug_draw_occupancy_pipeline"}) {
-        registrations.add_graphics_pipeline(
-            pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT, PrimitiveTopologyVK::LINE_LIST);
-    }
-    for (std::string_view pipeline : {"svo_debug_draw_solid_pipeline", "svo_debug_draw_solid_occupancy_pipeline"}) {
-        registrations.add_graphics_pipeline(pipeline, pipeline, render_context->swap_chain_format, GBUFFER_DEPTH_FORMAT);
-    }
 }
 
 void ISVORenderFeature::create_resources() {
@@ -204,11 +166,11 @@ void ISVORenderFeature::configure_recipe(
     params.static_publication_group_count = (SVO_MAX_NODE_COUNT + 63) / 64;
     params.dynamic_publication_group_count = (SVO_MAX_NODE_COUNT + 127) / 128;
     // The occupancy injection runs one invocation per leaf, and each propagation level one per block of eight nodes.
-    constexpr size_t occupancy_injection_group_count =
+    constexpr size_t OCCUPANCY_INJECTION_GROUP_COUNT =
         (SVO_MAX_LEAVES_COUNT + SVOGI_OCCUPANCY_INJECTION_THREADS_PER_GROUP - 1) / SVOGI_OCCUPANCY_INJECTION_THREADS_PER_GROUP;
     params.occupancy_injection_group_count_x = SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X;
     params.occupancy_injection_group_count_y = static_cast<uint32_t>(
-        (occupancy_injection_group_count + SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X - 1) / SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X);
+        (OCCUPANCY_INJECTION_GROUP_COUNT + SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X - 1) / SVOGI_OCCUPANCY_INJECTION_GROUP_COUNT_X);
     params.occupancy_propagation_group_count = static_cast<uint32_t>(
         (SVO_MAX_NODE_COUNT / 8 + SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP - 1) / SVOGI_OCCUPANCY_PROPAGATION_THREADS_PER_GROUP);
     params.radiance_injection_group_count = SVOGI_RADIANCE_SAMPLE_EXTENT / SVOGI_RADIANCE_TILE_SIZE;

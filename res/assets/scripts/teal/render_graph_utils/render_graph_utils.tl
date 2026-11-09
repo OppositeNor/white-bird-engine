@@ -227,18 +227,67 @@ local function owned_resource(p_description: wbe.RendRecipeResourceVK, p_kind: s
     return attach_resource({ id = p_description.id, kind = p_kind, description = p_description, dependencies = p_dependencies or {} })
 end
 
-local function registered_resource(p_key: string, p_type: string): render_graph.Resource
-    validate_id(p_key)
-    return attach_resource({ id = p_key, kind = "registered", resource_type = p_type, dependencies = {} })
+-- Snapshot plain task parameters after the adapters have replaced their documented resource fields.
+local function copy_data(p_value: any): any
+    if type(p_value) ~= "table" then
+        return p_value
+    end
+    local result: {any:any} = {}
+    for key, value in pairs(p_value as {any:any}) do
+        result[key] = copy_data(value)
+    end
+    return result
 end
 
--- The canonical name of a reflected enum value the application passes. C++ serializes an enum as its enumerator name,
--- and lowercase aliases recipes may also write name the same enumerator.
-function render_graph.enum_name(p_value: string | integer): string
-    if p_value is integer then
-        error("enum_name: expected an enumerator name, got the integer " .. tostring(p_value) .. ".", 2)
+local function registered_resource(p_key: string, p_type: string,
+    p_registration?: wbe.RendRecipeRegistrationVK): render_graph.Resource
+    validate_id(p_key)
+    return attach_resource({ id = p_key, kind = "registered", resource_type = p_type, registration = p_registration,
+        dependencies = {} })
+end
+
+local function deep_equal(p_left: any, p_right: any): boolean
+    if type(p_left) ~= "table" or type(p_right) ~= "table" then
+        return p_left == p_right
     end
-    return string.upper(p_value as string)
+    local left = p_left as {any:any}
+    local right = p_right as {any:any}
+    for key, value in pairs(left) do
+        if not deep_equal(value, right[key]) then
+            return false
+        end
+    end
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+-- Add a registration to an ordered list unless an equal registration of its key is already there; a different
+-- registration of the same key fails.
+local function merge_registration(p_registrations: {wbe.RendRecipeRegistrationVK},
+    p_by_key: {string:wbe.RendRecipeRegistrationVK}, p_registration: wbe.RendRecipeRegistrationVK, p_level: integer)
+    local previous = p_by_key[p_registration.key]
+    if previous == nil then
+        p_by_key[p_registration.key] = p_registration
+        p_registrations[#p_registrations + 1] = p_registration
+    elseif previous.type ~= p_registration.type or not deep_equal(previous.description, p_registration.description) then
+        error("render_graph: resource '" .. p_registration.key .. "' is registered with different descriptions.", p_level)
+    end
+end
+
+local function make_registration(p_key: string, p_type: string, p_description: any): wbe.RendRecipeRegistrationVK
+    validate_id(p_key)
+    validate_id(p_type)
+    return { key = p_key, type = p_type, description = copy_data(p_description) }
+end
+
+-- The canonical name of a reflected enum value. C++ serializes an enum as its enumerator name, and lowercase aliases
+-- recipes may also write name the same enumerator.
+function render_graph.enum_name(p_value: string): string
+    return string.upper(p_value)
 end
 
 function render_graph.buffer(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_size: integer): render_graph.Resource
@@ -250,8 +299,8 @@ function render_graph.storage_buffer(p_id: string, p_size: integer): render_grap
 end
 
 -- A graph-owned 2D image. Omitted extent keeps the default of wbe.RendImageParamsVK.
-function render_graph.image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
-    p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK | integer},
+function render_graph.image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK,
+    p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK},
     p_mip_levels?: integer): render_graph.Resource
     return owned_resource({
         id = p_id,
@@ -265,8 +314,8 @@ function render_graph.image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_
     }, "image")
 end
 
-function render_graph.storage_image(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
-    p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): render_graph.Resource
+function render_graph.storage_image(p_id: string, p_format: wbe.ImageFormatVK, p_width: integer, p_height: integer,
+    p_additional_usage?: {wbe.ImageUsageFlagVK}): render_graph.Resource
     return render_graph.image(p_id, "image_read_write", p_format, { width = p_width, height = p_height }, p_additional_usage)
 end
 
@@ -288,12 +337,21 @@ function render_graph.clamp_to_edge_sampler(p_id: string, p_params?: wbe.RendSam
 end
 
 -- Pipelines are resources registered on the render graph under p_key.
-function render_graph.compute_pipeline(p_key: string): render_graph.Resource
-    return registered_resource(p_key, "WhiteBirdEngine::ROComputePipelineVK")
+-- With a description, the handle registers the pipeline: a graph emits the registration when one of its tasks names the
+-- handle.
+function render_graph.compute_pipeline(p_key: string, p_description?: wbe.RDParamsComputePipelineVK): render_graph.Resource
+    local registration = p_description ~= nil and make_registration(p_key, "RDParamsComputePipelineVK", p_description) or nil
+    return registered_resource(p_key, "WhiteBirdEngine::ROComputePipelineVK", registration)
 end
 
-function render_graph.graphics_pipeline(p_key: string): render_graph.Resource
-    return registered_resource(p_key, "WhiteBirdEngine::ROGraphicsPipelineVK")
+function render_graph.graphics_pipeline(p_key: string, p_description?: wbe.RDParamsGraphicsPipelineVK): render_graph.Resource
+    local registration = p_description ~= nil and make_registration(p_key, "RDParamsGraphicsPipelineVK", p_description) or nil
+    return registered_resource(p_key, "WhiteBirdEngine::ROGraphicsPipelineVK", registration)
+end
+
+-- A compute pipeline compiled from the shader p_shader and registered under the same key.
+function render_graph.shader_compute_pipeline(p_shader: string): render_graph.Resource
+    return render_graph.compute_pipeline(p_shader, { shader = p_shader })
 end
 
 -- External resources are supplied by C++; a repeated import handle with the same id denotes the same import.
@@ -327,18 +385,6 @@ function render_graph.subgraph(p_id: string, p_recipe: wbe.RendGraphRecipeVK,
     return attach_task({ id = p_id, subgraph = p_recipe, ports = p_ports })
 end
 
--- Snapshot plain task parameters after the adapters have replaced their documented resource fields.
-local function copy_data(p_value: any): any
-    if type(p_value) ~= "table" then
-        return p_value
-    end
-    local result: {any:any} = {}
-    for key, value in pairs(p_value as {any:any}) do
-        result[key] = copy_data(value)
-    end
-    return result
-end
-
 local function copy_fields<T>(p_value: T): {string:any}
     local result: {string:any} = {}
     for key, value in pairs(p_value as {string:any}) do
@@ -359,11 +405,15 @@ local function resource_id(p_value: render_graph.Resource | string, p_uses: {ren
     return p_value.id
 end
 
-local function registered_key(p_value: any, p_expected_type: string): string
+-- Lower a registered handle to its key, collecting the registration it carries into p_registrations.
+local function registered_key(p_value: any, p_expected_type: string, p_registrations: {wbe.RendRecipeRegistrationVK}): string
     local resource = p_value as render_graph.Resource
     validate_resource(resource)
     if resource.kind ~= "registered" or resource.resource_type ~= p_expected_type then
         error("render_graph: expected a registered resource of type '" .. p_expected_type .. "'.", 3)
+    end
+    if resource.registration ~= nil then
+        p_registrations[#p_registrations + 1] = resource.registration
     end
     return resource.id
 end
@@ -375,48 +425,46 @@ function render_graph.graph(): render_graph.Graph
     local parameter_ids: {render_graph.Task:{string:boolean}} = {}
     local registered_count = 0
     local registrations: {wbe.RendRecipeRegistrationVK} = {}
-    local registered_keys: {string:boolean} = {}
+    local registrations_by_key: {string:wbe.RendRecipeRegistrationVK} = {}
     local graph: render_graph.Graph = { tasks = tasks }
 
     -- Register a resource on the render graph when the recipe is built. The description's reflected type name selects the
-    -- registrator. Registrations are emitted in order, before any task, whether or not a task uses them; registering the
-    -- same key twice in one graph fails.
-    local function add_registration(p_key: string, p_type: string, p_description: any)
-        validate_id(p_key)
-        validate_id(p_type)
-        if registered_keys[p_key] then
-            error("render_graph: resource '" .. p_key .. "' is registered more than once.", 3)
-        end
-        registered_keys[p_key] = true
-        registrations[#registrations + 1] = { key = p_key, type = p_type, description = copy_data(p_description) }
+    -- registrator. Explicit registrations are emitted in order, before any task, whether or not a task uses them; an equal
+    -- registration of a key again is merged, and a different one fails.
+    local function add_registration(p_registration: wbe.RendRecipeRegistrationVK)
+        merge_registration(registrations, registrations_by_key, p_registration, 4)
     end
 
     function graph:register_resource(p_key: string, p_type: string, p_description: any,
         p_resource_type: string): render_graph.Resource
-        add_registration(p_key, p_type, p_description)
-        return registered_resource(p_key, p_resource_type)
+        local registration = make_registration(p_key, p_type, p_description)
+        add_registration(registration)
+        return registered_resource(p_key, p_resource_type, registration)
     end
 
     function graph:register_mesh(p_key: string, p_params: wbe.RDParamsMeshVK): render_graph.Resource
-        add_registration(p_key, "RDParamsMeshVK", p_params)
-        return registered_resource(p_key, "WhiteBirdEngine::MeshResourcesVK")
+        local registration = make_registration(p_key, "RDParamsMeshVK", p_params)
+        add_registration(registration)
+        return registered_resource(p_key, "WhiteBirdEngine::MeshResourcesVK", registration)
     end
 
     function graph:register_graphics_pipeline(p_key: string,
         p_params: wbe.RDParamsGraphicsPipelineVK): render_graph.Resource
-        add_registration(p_key, "RDParamsGraphicsPipelineVK", p_params)
-        return render_graph.graphics_pipeline(p_key)
+        local pipeline = render_graph.graphics_pipeline(p_key, p_params)
+        add_registration(pipeline.registration)
+        return pipeline
     end
 
     function graph:register_compute_pipeline(p_key: string,
         p_params: wbe.RDParamsComputePipelineVK): render_graph.Resource
-        add_registration(p_key, "RDParamsComputePipelineVK", p_params)
-        return render_graph.compute_pipeline(p_key)
+        local pipeline = render_graph.compute_pipeline(p_key, p_params)
+        add_registration(pipeline.registration)
+        return pipeline
     end
 
     -- A registered image is bound like an import: C++ resolves an unsupplied import to the registered view.
     function graph:register_image(p_key: string, p_params: wbe.RDParamsImageVK): render_graph.Resource
-        add_registration(p_key, "RDParamsImageVK", p_params)
+        add_registration(make_registration(p_key, "RDParamsImageVK", p_params))
         return render_graph.import_resource(p_key)
     end
 
@@ -451,14 +499,14 @@ function render_graph.graph(): render_graph.Graph
         return render_graph.storage_buffer(p_id, p_size)
     end
 
-    function graph:add_image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK | integer,
-        p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK | integer},
+    function graph:add_image(p_id: string, p_usage: wbe.RendResPrimaryUsageVK, p_format: wbe.ImageFormatVK,
+        p_extent?: wbe.RendExtent2DParamsVK, p_additional_usage?: {wbe.ImageUsageFlagVK},
         p_mip_levels?: integer): render_graph.Resource
         return render_graph.image(p_id, p_usage, p_format, p_extent, p_additional_usage, p_mip_levels)
     end
 
-    function graph:add_storage_image(p_id: string, p_format: wbe.ImageFormatVK | integer, p_width: integer, p_height: integer,
-        p_additional_usage?: {wbe.ImageUsageFlagVK | integer}): render_graph.Resource
+    function graph:add_storage_image(p_id: string, p_format: wbe.ImageFormatVK, p_width: integer, p_height: integer,
+        p_additional_usage?: {wbe.ImageUsageFlagVK}): render_graph.Resource
         return render_graph.storage_image(p_id, p_format, p_width, p_height, p_additional_usage)
     end
 
@@ -561,7 +609,8 @@ function render_graph.graph(): render_graph.Graph
     end
 
     local function make_task(p_id: string, p_type: string, p_params: any,
-        p_options?: render_graph.TaskOptions, p_uses?: {render_graph.Resource}): render_graph.Task
+        p_options?: render_graph.TaskOptions, p_uses?: {render_graph.Resource},
+        p_registrations?: {wbe.RendRecipeRegistrationVK}): render_graph.Task
         local options: render_graph.TaskOptions = p_options or {}
         local uses: {render_graph.Resource} = {}
         for _, resource in ipairs(options.uses or {}) do
@@ -578,6 +627,7 @@ function render_graph.graph(): render_graph.Graph
             uses = uses,
             trigger = copy_data(options.trigger) as wbe.RendRecipeTriggerVK,
             toggle = copy_data(options.toggle) as wbe.RendRecipeToggleVK,
+            registrations = p_registrations,
         }
         local ids: {string:boolean} = {}
         for _, resource in ipairs(p_uses or {}) do
@@ -595,14 +645,19 @@ function render_graph.graph(): render_graph.Graph
         p_fields: {render_graph_tasks.ResourceField}): render_graph.Task
         local uses: {render_graph.Resource} = {}
         local task_local_uses: {render_graph.Resource} = {}
+        local task_registrations: {wbe.RendRecipeRegistrationVK} = {}
         local function lower(p_value: any, p_field: render_graph_tasks.ResourceField): any
             if p_value == nil then
                 return nil
             elseif p_field.kind == "resource" then
                 if p_field.scope == "registered" then
-                    return registered_key(p_value, p_field.expected_type)
+                    return registered_key(p_value, p_field.expected_type, task_registrations)
                 end
                 local resource = p_value as render_graph.Resource | string
+                if resource is string and p_field.scope == "graph" then
+                    error("render_graph: graph resource fields take handles; name '" .. resource ..
+                        "' with graph:reference().", 4)
+                end
                 if not (resource is string) and p_field.scope == "task_local" then
                     task_local_uses[#task_local_uses + 1] = resource
                 end
@@ -648,7 +703,7 @@ function render_graph.graph(): render_graph.Graph
             uses = options.uses,
             trigger = options.trigger,
             toggle = options.toggle,
-        }, uses)
+        }, uses, task_registrations)
     end
     render_graph_tasks.install(graph, make_typed_task)
 
@@ -681,6 +736,8 @@ function render_graph.graph(): render_graph.Graph
         -- The branches' parameter handles keep their identity aliases from being redirected.
         local ids: {string:boolean} = {}
         local branches: {wbe.RendRecipeBranchVK} = {}
+        -- The branches were built on another graph, so the multiplexer carries their registrations into this one.
+        local branch_registrations: {wbe.RendRecipeRegistrationVK} = {}
         for index, branch in ipairs(p_branches) do
             if branch.graph == self then
                 error("render_graph: multiplexer '" .. p_id .. "' branch " .. index ..
@@ -701,6 +758,9 @@ function render_graph.graph(): render_graph.Graph
                 uses[#uses + 1] = resource
                 ids[resource.id] = true
             end
+            for _, registration in ipairs(branch.registrations or {}) do
+                branch_registrations[#branch_registrations + 1] = registration
+            end
         end
         local task: render_graph.Task = {
             id = p_id,
@@ -710,6 +770,7 @@ function render_graph.graph(): render_graph.Graph
             uses = uses,
             trigger = copy_data(p_options.trigger) as wbe.RendRecipeTriggerVK,
             toggle = copy_data(p_options.toggle) as wbe.RendRecipeToggleVK,
+            registrations = branch_registrations,
         }
         parameter_ids[task] = ids
         validate_parameter_aliases(task)
@@ -873,9 +934,16 @@ function render_graph.graph(): render_graph.Graph
             end
             wire_tasks[#wire_tasks + 1] = wire_task
         end
+        -- The explicit registrations, then those of the registered handles the tasks name, each key once.
         local wire_registrations: {wbe.RendRecipeRegistrationVK} = {}
+        local wire_registrations_by_key: {string:wbe.RendRecipeRegistrationVK} = {}
         for _, registration in ipairs(registrations) do
-            wire_registrations[#wire_registrations + 1] = registration
+            merge_registration(wire_registrations, wire_registrations_by_key, registration, 2)
+        end
+        for _, task in ipairs(self.tasks) do
+            for _, registration in ipairs(task.registrations or {}) do
+                merge_registration(wire_registrations, wire_registrations_by_key, registration, 2)
+            end
         end
         return { imports = imports, registrations = wire_registrations, resources = resources, tasks = wire_tasks,
             ports = ports }

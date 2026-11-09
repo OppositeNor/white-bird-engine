@@ -30,6 +30,9 @@ local record voxel
         color_target: Graph.Resource
         -- The depth target the overlays test against.
         depth_target: Graph.Resource
+        -- The formats of the color and depth targets, which the overlay pipelines render to.
+        color_format: wbe.ImageFormatVK
+        depth_format: wbe.ImageFormatVK
         -- The graph resource ids of the lights' reflective-shadow-map slots, by the task-local ids of the lights[] array of
         -- the lighting shaders (for example "shadowmap_color[0]"); the structures that inject radiance bind them.
         rsm_slot_ids: {string:string}

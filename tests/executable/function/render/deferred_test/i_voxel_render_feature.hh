@@ -228,12 +228,6 @@ public:
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const = 0;
 
-    /**
-     * @brief Register the pipelines the structure's tasks name on a graph the recipe is built for.
-     *
-     * Called by every rebuild before the recipe runs; repeated registrations are free.
-     */
-    virtual void register_resources(RenderGraphVK& p_graph) const = 0;
 };
 
 } // namespace WhiteBirdEngine

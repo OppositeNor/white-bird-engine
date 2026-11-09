@@ -62,7 +62,8 @@ def teal_field_name(p_name: str) -> str:
 def teal_type(p_type: str, p_scope: dict[str, Any], p_qualifier: str = "") -> str:
     """The Teal type of a reflected C++ field type.
 
-    Reflected enums accept their names and aliases, or their integer values, as deserialization does.
+    Reflected enums are their Teal enum of canonical names and aliases: C++ hands scripts enum values by name, and scripts
+    write them by name, although deserialization also accepts integer values.
 
     Args:
         p_type: The C++ type as reflection spells it.
@@ -99,7 +100,7 @@ def teal_type(p_type: str, p_scope: dict[str, Any], p_qualifier: str = "") -> st
     if stripped == "DataValue":
         return "any"
     if stripped in p_scope["enums"]:
-        return f"{p_qualifier}{teal_name(stripped)} | integer"
+        return f"{p_qualifier}{teal_name(stripped)}"
     if stripped in p_scope["classes"]:
         return p_qualifier + teal_name(stripped)
     if stripped in p_scope["reflected"]:
@@ -214,7 +215,9 @@ class _RenderTaskDescriber:
         if p_scope is not None:
             scope, target = p_scope
             resource = {"kind": "resource", "scope": scope}
-            resource_type = "Resource | string"
+            # A task-local field may name a binding of the task's own namespace, which its aliases map; graph and
+            # registered fields take handles only (graph:reference() names a graph resource by id).
+            resource_type = "Resource | string" if scope == "task_local" else "Resource"
             if scope == "registered":
                 resource["expected_type"] = "WhiteBirdEngine::" + target
                 resource_type = "Resource"
@@ -259,11 +262,11 @@ def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect
     """Describe the Graph constructors of render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
 
     A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated
-    WBE_RECIPE_RESOURCE(graph) hold graph resource ids, and those annotated WBE_RECIPE_RESOURCE(task_local) hold ids the
-    task's aliases map. WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T,
+    WBE_RECIPE_RESOURCE(graph) hold graph resource ids and accept only handles, and those annotated
+    WBE_RECIPE_RESOURCE(task_local) hold ids the task's aliases map and also accept those ids as strings. WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T,
     whose canonical type is recorded for runtime validation.
     These are std::string fields, optional or in a vector, or a DataValue map of them. Params that hold such fields,
-    directly or in nested params, get an authoring interface, which also accepts resource handles in their place.
+    directly or in nested params, get an authoring interface, which accepts resource handles in their place.
 
     Args:
         p_metadata: The reflection metadata.

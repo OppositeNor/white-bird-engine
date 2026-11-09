@@ -34,7 +34,7 @@ local record svo_3
         -- The capacity of the deferred list.
         max_leaf_count: integer
         -- The queue family of the compute tasks; graphics by default.
-        queue_family: wbe.QueueFamilyVK | integer
+        queue_family: wbe.QueueFamilyVK
     end
 
     record LeafDeduplication

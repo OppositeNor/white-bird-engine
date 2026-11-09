@@ -252,10 +252,9 @@ private:
     static SpotLightGraphIds make_spot_light_graph_ids(uint32_t p_light_index);
     // Advance the spot light the light controls move, as the T key does.
     void select_next_controlled_spot_light();
-    void add_shadow_moments_summed_area_table_pipelines();
-    void add_lighting_pipelines();
-    // Register the meshes, pipelines, and images the application and its features draw with on p_graph, and compile the
-    // static mesh's acceleration structure once. Called by every rebuild; repeated registrations are free.
+    void create_lighting_buffers();
+    // Register the meshes the recipe draws on p_graph; the recipe registers its pipelines and textures itself. Called by
+    // every rebuild; repeated registrations are free.
     void register_graph_resources(RenderGraphVK& p_graph);
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
@@ -310,14 +309,11 @@ private:
     RenderAllocator* render_allocator = nullptr;
     // The source resources the graphs register; the ResourceManager owns them.
     RefRes<RUMesh3D> sponza_mesh;
-    RefRes<RUTexture> light_billboard_texture;
     // The static scene mesh's compile options, registered with sponza_mesh on both graphs under STATIC_MESH_KEY; the voxel
     // features and the acceleration structure share the same compiled mesh, which MeshCompilerVK caches for them.
     RDParamsMeshVK static_mesh_params;
     Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;
     Ref<MeshAccelerationStructureVK> mesh_acceleration_structure = MEM_NULL;
-    // The pipelines the application's own passes use, registered on both graphs.
-    RenderTestRegistrations scene_registrations;
     Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
     Ref<ROCMultislotsVK> composition_camera_info_ubos;
     Ref<ROCMultislotsVK> spot_light_info_buffers;

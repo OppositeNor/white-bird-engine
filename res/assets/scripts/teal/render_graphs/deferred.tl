@@ -18,7 +18,8 @@
 --
 -- The application imports every pass it builds in C++ as a task (the acceleration structure build, the frame sequence
 -- acquisition, and ImGui), and adds its acceleration structure and dynamic mesh entities to the built descriptor. The
--- mesh draws import the meshes the application registered in the render database as "static_mesh" and "dynamic_mesh".
+-- mesh draws import the meshes the application registered on the render graph as "static_mesh" and "dynamic_mesh"; the
+-- recipe registers its own pipelines and the billboard texture.
 -- It supplies a wbe.DeferredRecipeContext, whose voxel and post_processing entries are the RecipeFeatureParams-derived
 -- parameters of the feature modules it selects: a VoxelFeature and a PostProcessingFeature.
 
@@ -124,26 +125,45 @@ local record Pipelines
     light_billboard: Graph.Resource
 end
 
-local function make_pipelines(): Pipelines
+-- The pipelines the passes draw and dispatch with, each registered on the render graph from its pipeline or shader
+-- resource when a task names it.
+local function make_pipelines(p_context: wbe.DeferredRecipeContext): Pipelines
+    local formats = p_context.formats
+    local function graphics(p_key: string, p_pipeline: string, p_color_formats: {wbe.ImageFormatVK},
+        p_depth_format?: wbe.ImageFormatVK): Graph.Resource
+        return Graph.graphics_pipeline(p_key, {
+            pipeline = p_pipeline,
+            color_formats = p_color_formats,
+            depth_format = p_depth_format,
+        })
+    end
+    local shadow_formats = { formats.rsm_flux, formats.rsm_normal, formats.shadow_moments }
+    local gbuffer_formats = { formats.gbuffer_albedo, formats.gbuffer_normal, formats.gbuffer_rma }
+    local compute = Graph.shader_compute_pipeline
     return {
-        shadow_opaque = Graph.graphics_pipeline("deferred_shadow_opaque"),
-        shadow_double_sided = Graph.graphics_pipeline("deferred_shadow_double_sided"),
-        shadow_dynamic = Graph.graphics_pipeline("deferred_shadow_dynamic"),
-        gbuffer_opaque = Graph.graphics_pipeline("deferred_gbuffer_opaque"),
-        gbuffer_double_sided = Graph.graphics_pipeline("deferred_gbuffer_double_sided"),
-        gbuffer_dynamic = Graph.graphics_pipeline("deferred_gbuffer_dynamic"),
-        shadow_sat_horizontal = Graph.compute_pipeline("shadow_moments_summed_area_table_horizontal_shader"),
-        shadow_sat_vertical = Graph.compute_pipeline("shadow_moments_summed_area_table_vertical_shader"),
-        direct_lighting = Graph.compute_pipeline("direct_lighting_shader"),
-        direct_lighting_sat = Graph.compute_pipeline("direct_lighting_summed_area_table_shader"),
-        indirect_lighting = Graph.compute_pipeline("indirect_lighting_rsm_shader"),
-        indirect_lighting_debug_view = Graph.compute_pipeline("indirect_lighting_rsm_debug_view_shader"),
-        combine_lighting = Graph.compute_pipeline("combine_lighting_shader"),
-        extract_bloom = Graph.compute_pipeline("bloom_shader_extract"),
-        blur_ping = Graph.compute_pipeline("kawase_blur_pong_write_shader"),
-        blur_pong = Graph.compute_pipeline("kawase_blur_ping_write_shader"),
-        present = Graph.graphics_pipeline("present_post_processing"),
-        light_billboard = Graph.graphics_pipeline("deferred_light_billboard_pipeline"),
+        shadow_opaque = graphics("deferred_shadow_opaque", "rsm_spot", shadow_formats, formats.shadowmap_depth),
+        shadow_double_sided = graphics("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats,
+            formats.shadowmap_depth),
+        -- Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
+        shadow_dynamic = graphics("deferred_shadow_dynamic", "rsm_spot_dynamic", shadow_formats, formats.shadowmap_depth),
+        gbuffer_opaque = graphics("deferred_gbuffer_opaque", "deferred_gbuffer", gbuffer_formats, formats.gbuffer_depth),
+        gbuffer_double_sided = graphics("deferred_gbuffer_double_sided", "deferred_gbuffer_opaque_double_sided",
+            gbuffer_formats, formats.gbuffer_depth),
+        gbuffer_dynamic = graphics("deferred_gbuffer_dynamic", "deferred_gbuffer_dynamic", gbuffer_formats,
+            formats.gbuffer_depth),
+        shadow_sat_horizontal = compute("shadow_moments_summed_area_table_horizontal_shader"),
+        shadow_sat_vertical = compute("shadow_moments_summed_area_table_vertical_shader"),
+        direct_lighting = compute("direct_lighting_shader"),
+        direct_lighting_sat = compute("direct_lighting_summed_area_table_shader"),
+        indirect_lighting = compute("indirect_lighting_rsm_shader"),
+        indirect_lighting_debug_view = compute("indirect_lighting_rsm_debug_view_shader"),
+        combine_lighting = compute("combine_lighting_shader"),
+        extract_bloom = compute("bloom_shader_extract"),
+        blur_ping = compute("kawase_blur_pong_write_shader"),
+        blur_pong = compute("kawase_blur_ping_write_shader"),
+        present = graphics("present_post_processing", "present_post_processing", { p_context.swap_chain_format }),
+        light_billboard = graphics("deferred_light_billboard_pipeline", "billboard_face_camera_depth_tested_pipeline",
+            { p_context.swap_chain_format }, formats.gbuffer_depth),
     }
 end
 
@@ -277,6 +297,8 @@ local function add_voxel(p_builder: Builder)
         debug_view_toggles = context.voxel_debug_view_toggles,
         color_target = resources.swap_chain,
         depth_target = resources.gbuffer_depth,
+        color_format = p_builder.context.swap_chain_format,
+        depth_format = p_builder.context.formats.gbuffer_depth,
         rsm_slot_ids = rsm_slot_ids,
     }))
 end
@@ -691,11 +713,13 @@ function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeV
         resources = {},
         static_mesh = graph:add_mesh("static_mesh"),
         dynamic_mesh = graph:add_mesh("dynamic_mesh"),
-        pipelines = make_pipelines(),
+        pipelines = make_pipelines(context),
         graph = graph,
         tasks = {},
         light_tasks = {},
     }
+    -- The billboard texture is registered on the graph, which binds the registered view for its import.
+    graph:register_image("light_billboard_texture", { texture = "spot_light_billboard" })
     for _, id in ipairs(builder.imports) do
         builder.resources[id] = graph:import_resource(id)
     end

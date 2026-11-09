@@ -128,7 +128,12 @@ For non-trivial implementation tasks:
   `register_image()` (which returns an import handle), or `register_resource(key, type, description, resource_type)` for
   custom description types, emitted in order as `registrations` (`{ key, type, description }`, where `type` is the
   reflected name of the description struct, resolved through `TypeUUIDManager`) and applied before that level's imports and
-  tasks. `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
+  tasks. A handle can also carry its registration: `Graph.compute_pipeline(key, description)`,
+  `Graph.graphics_pipeline(key, description)`, and `Graph.shader_compute_pipeline(shader)` (registered from the shader of
+  the same key) need no graph, so shared helpers use them; a typed task (or a multiplexer's branches) naming such a handle
+  emits its registration, and equal registrations of a key merge while different ones fail. Recipes and feature modules
+  register the pipelines they name this way; C++ registers only what C++ tasks use or what needs a loaded handle.
+  `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`; `graph:build()` emits only those
   reachable from tasks. Tasks name a registered task type and pass `params` to it; aliases (`task:alias()`,
   `color_target()`, `depth_target()`) map task-local ids to graph resources, and `uses` only keeps resources reachable.
@@ -180,7 +185,8 @@ For non-trivial implementation tasks:
   interface, a derived one `is` its bases, and a script type naming a reflected type that is not `WBE_REFLECT_SCRIPT`
   fails generation. Declare data C++ hands a recipe as `WBE_REFLECT_SCRIPT` structs rather than Teal records, import the
   declarations as types only (`local type wbe = require("wbe")`), and annotate `build(context: <context type>):
-  wbe.RendGraphRecipeVK`. Enums serialize as their canonical names; compare `render_graph_utils.render_graph_utils.enum_name(value)` with the
+  wbe.RendGraphRecipeVK`. Reflected enum fields are declared as their Teal enum of names and aliases, without integers:
+  enums serialize as their canonical names; compare `render_graph_utils.render_graph_utils.enum_name(value)` with the
   canonical upper-case name, which also accepts the lowercase aliases.
   The typed constructors check params against the generated `Graph.RTParams<Name>VK` interfaces; when adding a raw task
   with `graph:add()`, type its `params` with the reflected struct (`local params: wbe.RTParamsRunComputePipelineVK = { ... }`),

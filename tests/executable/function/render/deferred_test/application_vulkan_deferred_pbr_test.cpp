@@ -492,8 +492,7 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     stdout_log(WBE_CHANNEL_DEBUG)
         ->message(rebuild_static_every_frame ? "Voxel static scene: rebuilt every frame (WBE_REAL_TIME_FULL_SCENE_RECONSTRUCT=1)."
                                              : "Voxel static scene: built once.");
-    add_shadow_moments_summed_area_table_pipelines();
-    add_lighting_pipelines();
+    create_lighting_buffers();
     post_processing = make_unique<PixelSort>(render_allocator,
         render_allocator,
         renderer_vk,
@@ -664,7 +663,6 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
-    light_billboard_texture = resource_manager->get_resource<RUTexture>("spot_light_billboard");
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
@@ -685,15 +683,6 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
         mesh_acceleration_structure = MeshAccelerationStructureCompilerVK(render_context, ray_tracing->get_base_ray_tracing_data())
                                           .compile(static_mesh_resources, glm::mat4(1.0F));
     }
-    const std::array shadow_formats{RSM_FLUX_FORMAT, RSM_NORMAL_FORMAT, SHADOW_MOMENTS_FORMAT};
-    scene_registrations.add_graphics_pipeline("deferred_shadow_opaque", "rsm_spot", shadow_formats, SHADOWMAP_DEPTH_FORMAT)
-        .add_graphics_pipeline("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats, SHADOWMAP_DEPTH_FORMAT)
-        // Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
-        .add_graphics_pipeline("deferred_shadow_dynamic", "rsm_spot_dynamic", shadow_formats, SHADOWMAP_DEPTH_FORMAT);
-    const std::array gbuffer_formats{GBUFFER_ALBEDO_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_RMA_FORMAT};
-    scene_registrations.add_graphics_pipeline("deferred_gbuffer_opaque", "deferred_gbuffer", gbuffer_formats, GBUFFER_DEPTH_FORMAT)
-        .add_graphics_pipeline("deferred_gbuffer_double_sided", "deferred_gbuffer_opaque_double_sided", gbuffer_formats, GBUFFER_DEPTH_FORMAT)
-        .add_graphics_pipeline("deferred_gbuffer_dynamic", "deferred_gbuffer_dynamic", gbuffer_formats, GBUFFER_DEPTH_FORMAT);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
@@ -728,12 +717,6 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
                                       .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
                                       .initial_data(&light_billboard_info, sizeof(light_billboard_info)));
     }
-
-    // The billboard texture is registered on the graphs, which the recipe's light_billboard_texture import resolves to.
-    scene_registrations.add_graphics_pipeline("deferred_light_billboard_pipeline",
-        "billboard_face_camera_depth_tested_pipeline",
-        render_context->swap_chain_format,
-        GBUFFER_DEPTH_FORMAT);
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
@@ -780,17 +763,12 @@ ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBR
     };
 }
 
-void ApplicationVulkanDeferredPBRTest::add_shadow_moments_summed_area_table_pipelines() {
-    scene_registrations.add_compute_pipeline("shadow_moments_summed_area_table_horizontal_shader")
-        .add_compute_pipeline("shadow_moments_summed_area_table_vertical_shader");
-}
-
 Ref<ROBufferVK> ApplicationVulkanDeferredPBRTest::create_initialized_buffer(
     VkBufferUsageFlags p_buffer_usage, const void* p_data, size_t p_size) const {
     return render_context->create_buffer(ROBufferVK::Builder().set_usage(p_buffer_usage).initial_data(p_data, p_size));
 }
 
-void ApplicationVulkanDeferredPBRTest::add_lighting_pipelines() {
+void ApplicationVulkanDeferredPBRTest::create_lighting_buffers() {
     composition_camera_info_ubos = create_per_frame_buffers(
         render_allocator, render_context, "composition_camera_info", sizeof(CompositionCameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     spot_light_info_buffers = create_per_frame_buffers(
@@ -799,17 +777,6 @@ void ApplicationVulkanDeferredPBRTest::add_lighting_pipelines() {
         shadow_light_info_buffers[light_index] = create_per_frame_buffers(
             render_allocator, render_context, std::format("shadow_light_info.{}", light_index), sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
-    for (std::string_view shader : {"direct_lighting_shader",
-             "direct_lighting_summed_area_table_shader",
-             "indirect_lighting_rsm_shader",
-             "indirect_lighting_rsm_debug_view_shader",
-             "combine_lighting_shader",
-             "bloom_shader_extract",
-             "kawase_blur_pong_write_shader",
-             "kawase_blur_ping_write_shader"}) {
-        scene_registrations.add_compute_pipeline(shader);
-    }
-    scene_registrations.add_graphics_pipeline("present_post_processing", "present_post_processing", render_context->swap_chain_format);
 }
 
 void ApplicationVulkanDeferredPBRTest::register_graph_resources(RenderGraphVK& p_graph) {
@@ -817,11 +784,7 @@ void ApplicationVulkanDeferredPBRTest::register_graph_resources(RenderGraphVK& p
     if (static_mesh != static_mesh_resources) {
         throw std::runtime_error("Failed to register the deferred static mesh: the graph compiled another mesh than the voxel features use.");
     }
-    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture);
-    scene_registrations.register_on(p_graph);
     dynamic_mesh->register_mesh(p_graph);
-    voxel_structure->register_resources(p_graph);
-    post_processing->register_resources(p_graph);
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {

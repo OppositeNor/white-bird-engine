@@ -33,10 +33,19 @@ function voxel_octree.subgraph(p_id: string, p_params: wbe.OctreeRecipeParams, p
     end
     local color = graph:port("color")
     local depth = graph:port("depth")
-    local gather_leaves_pipeline = graph:add_compute_pipeline("octree_debug_gather_leaves_shader")
-    local gather_nodes_pipeline = graph:add_compute_pipeline("octree_debug_gather_nodes_shader")
-    local debug_draw_pipeline = graph:add_graphics_pipeline("octree_debug_draw_pipeline")
-    local debug_node_draw_pipeline = graph:add_graphics_pipeline("octree_debug_node_draw_pipeline")
+    local gather_leaves_pipeline = Graph.shader_compute_pipeline("octree_debug_gather_leaves_shader")
+    local gather_nodes_pipeline = Graph.shader_compute_pipeline("octree_debug_gather_nodes_shader")
+    -- The debug draws draw the cells' edges onto the target.
+    local function debug_draw(p_key: string): Graph.Resource
+        return Graph.graphics_pipeline(p_key, {
+            pipeline = p_key,
+            color_formats = { p_target.color_format },
+            depth_format = p_target.depth_format,
+            primitive_topology = "LINE_LIST",
+        })
+    end
+    local debug_draw_pipeline = debug_draw("octree_debug_draw_pipeline")
+    local debug_node_draw_pipeline = debug_draw("octree_debug_node_draw_pipeline")
     local toggles = p_target.debug_view_toggles
 
     -- The frame-begin barrier orders this frame's mutation after the previous frame's consumers.

@@ -105,7 +105,7 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
         self.assertEqual(interfaces["RTParamsDrawVK"][0]["type"], "Resource")
         self.assertEqual(interfaces["RTParamsDrawVK"][1]["type"], "{Resource}")
         self.assertEqual(interfaces["RTParamsDrawVK"][2]["type"], "{string:Resource}")
-        self.assertEqual(interfaces["NestedParams"][1]["type"], "Resource | string")
+        self.assertEqual(interfaces["NestedParams"][1]["type"], "Resource")
 
     def test_invalid_annotations_and_non_render_object_targets_fail_generation(self) -> None:
         for parameters in [["registered"], ["registered", "MeshResourcesVK", "extra"], ["graph", "MeshResourcesVK"]]:

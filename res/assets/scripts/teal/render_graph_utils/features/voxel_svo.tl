@@ -69,33 +69,46 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local static_mesh = graph:add_mesh("static_mesh")
     local dynamic_mesh = graph:add_mesh("dynamic_mesh")
     local compute_pipelines: {string:Graph.Resource} = {
-        reset = graph:add_compute_pipeline(prefix .. "_reset_shader"),
-        clear_dynamic = graph:add_compute_pipeline(dynamic_prefix .. "_clear_shader"),
-        static_ping = graph:add_compute_pipeline(prefix .. "_build_deferred_propagation_pong_write_shader"),
-        static_pong = graph:add_compute_pipeline(prefix .. "_build_deferred_propagation_ping_write_shader"),
-        dynamic_ping = graph:add_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_pong_write_shader"),
-        dynamic_pong = graph:add_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_ping_write_shader"),
-        static_publication = graph:add_compute_pipeline("svo_2_update_states_shader"),
-        dynamic_publication = graph:add_compute_pipeline("svo_2_dynamic_update_states_shader"),
-        reset_ping = graph:add_compute_pipeline("svo_deferred_count_reset_pong_shader"),
-        reset_pong = graph:add_compute_pipeline("svo_deferred_count_reset_ping_shader"),
-        capture_pre_deferred_debug = graph:add_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
-        setup_debug_draw = graph:add_compute_pipeline("svo_debug_draw_setup_shader"),
-        find_debug_draw_nodes = graph:add_compute_pipeline("svo_debug_draw_find_nodes_shader"),
-        occupancy_injection = graph:add_compute_pipeline("svogi_occupancy_injection"),
-        occupancy_propagation = graph:add_compute_pipeline("svogi_occupancy_propagation"),
-        radiance_injection = graph:add_compute_pipeline("svogi_radiance_injection"),
+        reset = Graph.shader_compute_pipeline(prefix .. "_reset_shader"),
+        clear_dynamic = Graph.shader_compute_pipeline(dynamic_prefix .. "_clear_shader"),
+        static_ping = Graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_pong_write_shader"),
+        static_pong = Graph.shader_compute_pipeline(prefix .. "_build_deferred_propagation_ping_write_shader"),
+        dynamic_ping = Graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_pong_write_shader"),
+        dynamic_pong = Graph.shader_compute_pipeline(dynamic_prefix .. "_build_deferred_propagation_ping_write_shader"),
+        static_publication = Graph.shader_compute_pipeline("svo_2_update_states_shader"),
+        dynamic_publication = Graph.shader_compute_pipeline("svo_2_dynamic_update_states_shader"),
+        reset_ping = Graph.shader_compute_pipeline("svo_deferred_count_reset_pong_shader"),
+        reset_pong = Graph.shader_compute_pipeline("svo_deferred_count_reset_ping_shader"),
+        capture_pre_deferred_debug = Graph.shader_compute_pipeline("svo_pre_deferred_debug_capture_shader"),
+        setup_debug_draw = Graph.shader_compute_pipeline("svo_debug_draw_setup_shader"),
+        find_debug_draw_nodes = Graph.shader_compute_pipeline("svo_debug_draw_find_nodes_shader"),
+        occupancy_injection = Graph.shader_compute_pipeline("svogi_occupancy_injection"),
+        occupancy_propagation = Graph.shader_compute_pipeline("svogi_occupancy_propagation"),
+        radiance_injection = Graph.shader_compute_pipeline("svogi_radiance_injection"),
     }
+    -- The constructions rasterize without attachments; the tree draws draw the cubes' edges, or their faces in the solid
+    -- styles, onto the target.
+    local function construction_pipeline(p_key: string): Graph.Resource
+        return Graph.graphics_pipeline(p_key, { pipeline = p_key })
+    end
+    local function overlay_pipeline(p_key: string, p_topology: wbe.PrimitiveTopologyVK): Graph.Resource
+        return Graph.graphics_pipeline(p_key, {
+            pipeline = p_key,
+            color_formats = { p_target.color_format },
+            depth_format = p_target.depth_format,
+            primitive_topology = p_topology,
+        })
+    end
     local graphics_pipelines: {string:Graph.Resource} = {
-        static_construction = graph:add_graphics_pipeline(prefix .. "_build_static_mesh_pipeline"),
-        dynamic_construction = graph:add_graphics_pipeline(dynamic_prefix .. "_build_static_mesh_pipeline"),
+        static_construction = construction_pipeline(prefix .. "_build_static_mesh_pipeline"),
+        dynamic_construction = construction_pipeline(dynamic_prefix .. "_build_static_mesh_pipeline"),
         -- The tree draw's branches, in the order the application selects them: the VoxelDebugDrawStyle, plus two in the
         -- occupancy view.
-        tree_draw_wireframe = graph:add_graphics_pipeline("svo_debug_draw_pipeline"),
-        tree_draw_solid = graph:add_graphics_pipeline("svo_debug_draw_solid_pipeline"),
-        tree_draw_wireframe_occupancy = graph:add_graphics_pipeline("svo_debug_draw_occupancy_pipeline"),
-        tree_draw_solid_occupancy = graph:add_graphics_pipeline("svo_debug_draw_solid_occupancy_pipeline"),
-        pre_deferred_debug_draw = graph:add_graphics_pipeline("svo_pre_deferred_debug_draw_pipeline"),
+        tree_draw_wireframe = overlay_pipeline("svo_debug_draw_pipeline", "LINE_LIST"),
+        tree_draw_solid = overlay_pipeline("svo_debug_draw_solid_pipeline", "TRIANGLE_LIST"),
+        tree_draw_wireframe_occupancy = overlay_pipeline("svo_debug_draw_occupancy_pipeline", "LINE_LIST"),
+        tree_draw_solid_occupancy = overlay_pipeline("svo_debug_draw_solid_occupancy_pipeline", "TRIANGLE_LIST"),
+        pre_deferred_debug_draw = overlay_pipeline("svo_pre_deferred_debug_draw_pipeline", "LINE_LIST"),
     }
     local toggles = p_target.debug_view_toggles
     local static_build = p_params.static_build

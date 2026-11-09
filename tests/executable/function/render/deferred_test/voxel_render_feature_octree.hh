@@ -15,7 +15,6 @@
 #ifndef WBE_FILE_VOXEL_RENDER_FEATURE_OCTREE_HH
 #define WBE_FILE_VOXEL_RENDER_FEATURE_OCTREE_HH
 
-#include "../render_test.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
@@ -94,7 +93,6 @@ public:
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
-    virtual void register_resources(RenderGraphVK& p_graph) const override;
 
     /**
      * @brief Graph id of the single-level storage view of one mip level of the static texture.
@@ -173,7 +171,6 @@ private:
     static_assert(sizeof(OctreeInfo) == 32);
     static_assert(offsetof(OctreeInfo, max_depth) == 16);
 
-    void add_pipelines();
     void create_resources();
     Ref<ROImageVK> create_octree_image() const;
     Ref<ROImageViewVK> create_octree_image_view(const Ref<ROImageVK>& p_image, uint32_t p_base_level, uint32_t p_level_count) const;
@@ -199,8 +196,6 @@ private:
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
 
-    // The pipelines the octree's tasks name, registered on every graph by register_resources().
-    RenderTestRegistrations registrations;
 
     Ref<ROImageVK> static_image;
     Ref<ROImageVK> dynamic_image;

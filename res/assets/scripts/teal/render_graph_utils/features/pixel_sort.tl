@@ -101,11 +101,11 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
 
     local direction_suffix = "_" .. string.lower(direction) .. "_shader"
-    local copy_source_pipeline = graph:add_compute_pipeline("copy_pixel_sort_source_shader")
-    local count_mask_pipeline = graph:add_compute_pipeline("count_pixel_sort_mask" .. direction_suffix)
-    local prefix_sum_pipeline = graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
-    local register_keys_pipeline = graph:add_compute_pipeline("register_pixel_sort_keys" .. direction_suffix)
-    local write_pixels_pipeline = graph:add_compute_pipeline("write_sorted_pixels" .. direction_suffix)
+    local copy_source_pipeline = Graph.shader_compute_pipeline("copy_pixel_sort_source_shader")
+    local count_mask_pipeline = Graph.shader_compute_pipeline("count_pixel_sort_mask" .. direction_suffix)
+    local prefix_sum_pipeline = Graph.shader_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = Graph.shader_compute_pipeline("register_pixel_sort_keys" .. direction_suffix)
+    local write_pixels_pipeline = Graph.shader_compute_pipeline("write_sorted_pixels" .. direction_suffix)
 
     local copy_source = graph:compute("copy_pixel_sort_source", {
         pipeline = copy_source_pipeline,
