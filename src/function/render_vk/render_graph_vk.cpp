@@ -40,14 +40,15 @@
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rr_compute_pipeline_vk.hh"
 #include "function/render_vk/rr_graphics_pipeline_vk.hh"
 #include "function/render_vk/rr_image_vk.hh"
 #include "function/render_vk/rr_mesh_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
-#include "generated/serializables_sd.gen.hh"
 #include "generated/type_uuid.gen.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -615,6 +616,22 @@ Ref<IRenderObject> RenderGraphVK::try_acquire_registered_resource(std::string_vi
     return registry.try_get(p_key);
 }
 
+namespace {
+
+// The key a registration names a loaded resource by; handles of anonymous resources cannot be registered.
+std::string require_resource_key(const ResourceUnit* p_resource, std::string_view p_resource_kind, std::string_view p_key) {
+    if (p_resource == nullptr) {
+        throw std::runtime_error(std::format("Failed to register resource '{}': the {} handle is null.", p_key, p_resource_kind));
+    }
+    if (p_resource->resource_key == nullptr || p_resource->resource_key[0] == '\0') {
+        throw std::runtime_error(
+            std::format("Failed to register resource '{}': the {} has no resource key; register resources the ResourceManager loaded.", p_key, p_resource_kind));
+    }
+    return std::string(p_resource->resource_key);
+}
+
+} // namespace
+
 Ref<MeshResourcesVK> RenderGraphVK::register_mesh(std::string_view p_key, RDParamsMeshVK p_params) {
     return register_resource(p_key, RDTyped<RDParamsMeshVK>(std::move(p_params))).dynamic_cast_ref<MeshResourcesVK>();
 }
@@ -631,6 +648,25 @@ Ref<ROGraphicsPipelineVK> RenderGraphVK::register_graphics_pipeline(std::string_
 Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(std::string_view p_key, RDParamsComputePipelineVK p_params) {
     return register_resource(p_key, RDTyped<RDParamsComputePipelineVK>(std::move(p_params)))
         .dynamic_cast_ref<ROComputePipelineVK>();
+}
+
+Ref<MeshResourcesVK> RenderGraphVK::register_mesh(std::string_view p_key, RefRes<RUMesh3D> p_mesh, RDParamsMeshVK p_options) {
+    p_options.mesh = require_resource_key(p_mesh.get(), "mesh", p_key);
+    return register_mesh(p_key, std::move(p_options));
+}
+
+Ref<ROImageViewVK> RenderGraphVK::register_image(std::string_view p_key, RefRes<RUTexture> p_texture) {
+    return register_image(p_key, RDParamsImageVK{.texture = require_resource_key(p_texture.get(), "texture", p_key)});
+}
+
+Ref<ROGraphicsPipelineVK> RenderGraphVK::register_graphics_pipeline(
+    std::string_view p_key, RefRes<RUGraphicsPipeline> p_pipeline, RDParamsGraphicsPipelineVK p_options) {
+    p_options.pipeline = require_resource_key(p_pipeline.get(), "graphics pipeline", p_key);
+    return register_graphics_pipeline(p_key, std::move(p_options));
+}
+
+Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(std::string_view p_key, RefRes<RUShader> p_shader) {
+    return register_compute_pipeline(p_key, RDParamsComputePipelineVK{.shader = require_resource_key(p_shader.get(), "shader", p_key)});
 }
 
 RenderGraphVK::~RenderGraphVK() {

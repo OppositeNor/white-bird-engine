@@ -88,8 +88,9 @@ For non-trivial implementation tasks:
   `register_resource(key, description)`. The description's type (`IResourceDescription::get_type_uuid()`) selects the
   `IResourceRegistrator` that compiles it, as a resource schema's type selects its loader; there is no separate kind.
   `RenderGraphVK` installs `RRMeshVK`, `RRImageVK`, `RRGraphicsPipelineVK`, and `RRComputePipelineVK`, whose descriptions
-  are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>` (C++ uses
-  `RenderGraphVK::register_mesh()` and the like), and `add_resource_registrator()` installs one registrator per further
+  are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>`, and C++ usually registers the
+  `RefRes` handle it loaded (`RenderGraphVK::register_mesh(key, mesh_handle, options)` and the like, which name the
+  handle's resource key, so they equal the key-based and Teal registrations; anonymous resources cannot be registered), and `add_resource_registrator()` installs one registrator per further
   description type. The graph holds registered objects strongly, keys are graph-local, registrations survive rebuilds, and
   re-registering a key with an equal description compiles nothing, so callbacks and recipes register on every rebuild. Do
   not keep `Ref`s to registered objects just to keep them alive; acquire them with `acquire_registered<T>(key)`. Task

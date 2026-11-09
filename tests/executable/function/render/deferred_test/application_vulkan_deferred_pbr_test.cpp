@@ -664,12 +664,13 @@ void ApplicationVulkanDeferredPBRTest::load_resources() {
     stdout_log(WBE_CHANNEL_DEBUG)->message("Finished loading render resources.");
     resource_manager->register_chunk(resource_chunk);
     sponza_mesh = resource_manager->get_resource<RUMesh3D>("intel_sponza_with_curtains.mesh");
+    light_billboard_texture = resource_manager->get_resource<RUTexture>("spot_light_billboard");
 }
 
 void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     RayTracingPluginVK* ray_tracing = RayTracingPluginVK::get_singleton();
     const bool build_acceleration_structure = ray_tracing != nullptr && ray_tracing->is_enabled();
-    static_mesh_params = RDParamsMeshVK{.mesh = "intel_sponza_with_curtains.mesh"};
+    static_mesh_params = RDParamsMeshVK{.mesh = sponza_mesh->resource_key};
     if (build_acceleration_structure) {
         static_mesh_params.vertex_buffer_usage = {BufferUsageFlagVK::SHADER_DEVICE_ADDRESS, BufferUsageFlagVK::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY};
         static_mesh_params.index_buffer_usage = static_mesh_params.vertex_buffer_usage;
@@ -812,11 +813,11 @@ void ApplicationVulkanDeferredPBRTest::add_lighting_pipelines() {
 }
 
 void ApplicationVulkanDeferredPBRTest::register_graph_resources(RenderGraphVK& p_graph) {
-    const Ref<MeshResourcesVK> static_mesh = p_graph.register_mesh(STATIC_MESH_KEY, static_mesh_params);
+    const Ref<MeshResourcesVK> static_mesh = p_graph.register_mesh(STATIC_MESH_KEY, sponza_mesh, static_mesh_params);
     if (static_mesh != static_mesh_resources) {
         throw std::runtime_error("Failed to register the deferred static mesh: the graph compiled another mesh than the voxel features use.");
     }
-    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, RDParamsImageVK{.texture = "spot_light_billboard"});
+    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture);
     scene_registrations.register_on(p_graph);
     dynamic_mesh->register_mesh(p_graph);
     voxel_structure->register_resources(p_graph);

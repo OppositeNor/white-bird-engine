@@ -24,6 +24,7 @@
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "function/render_vk/render_context_vk.hh"
@@ -512,6 +513,42 @@ TEST(WBERenderGraphVKTest, InstallsTheDefaultResourceRegistrators) {
     // Without a renderer, the default registrators cannot compile.
     EXPECT_THROW((void)graph.register_mesh("mesh", RDParamsMeshVK{.mesh = "missing"}), std::runtime_error);
     EXPECT_FALSE(graph.contains_registered_resource("mesh"));
+}
+
+TEST(WBERenderGraphVKTest, HandleRegistrationsRequireLoadedResources) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderContextVK render_data(&allocator);
+    RenderGraphVK graph(&render_data);
+    const auto error = [](const auto& p_register) {
+        try {
+            p_register();
+        } catch (const std::runtime_error& p_error) {
+            return std::string(p_error.what());
+        }
+        return std::string();
+    };
+    EXPECT_NE(error([&graph] {
+        (void)graph.register_mesh("mesh", RefRes<RUMesh3D>());
+    }).find("the mesh handle is null"),
+        std::string::npos);
+    EXPECT_NE(error([&graph] {
+        (void)graph.register_compute_pipeline("compute", RefRes<RUShader>());
+    }).find("the shader handle is null"),
+        std::string::npos);
+    // An anonymous resource has no key a description could name.
+    const MemID pipeline_id = create_obj<RUGraphicsPipeline>(allocator);
+    EXPECT_NE(error([&graph] {
+        (void)graph.register_image("texture", RefRes<RUTexture>());
+    }).find("the texture handle is null"),
+        std::string::npos);
+    EXPECT_NE(error([&graph, &allocator, pipeline_id] {
+        (void)graph.register_graphics_pipeline(
+            "pipeline", RefRes<RUGraphicsPipeline>(pipeline_id, &allocator), RDParamsGraphicsPipelineVK{});
+    }).find("has no resource key"),
+        std::string::npos);
+    destroy_obj<RUGraphicsPipeline>(allocator, pipeline_id);
+    EXPECT_FALSE(graph.contains_registered_resource("texture"));
+    EXPECT_FALSE(graph.contains_registered_resource("pipeline"));
 }
 
 TEST(WBERenderGraphVKTest, RejectsNullRebuildCallbacks) {

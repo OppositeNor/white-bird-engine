@@ -37,8 +37,6 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
-#include "function/render_vk/rd_params_image_vk.hh"
-#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -187,6 +185,14 @@ private:
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
+    // The source resources the graph registers; the ResourceManager owns them.
+    WBE::RefRes<WBE::RUMesh3D> sponza_mesh;
+    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_opaque_pipeline;
+    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_masked_pipeline;
+    WBE::RefRes<WBE::RUGraphicsPipeline> main_opaque_pipeline;
+    WBE::RefRes<WBE::RUGraphicsPipeline> main_masked_pipeline;
+    WBE::RefRes<WBE::RUGraphicsPipeline> light_billboard_pipeline_resource;
+    WBE::RefRes<WBE::RUTexture> light_billboard_texture;
     WBE::Ref<WBE::ROCMultislotsVK> camera_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_info_ubos;
     WBE::Ref<WBE::ROCMultislotsVK> spot_light_count_ubos;
@@ -460,6 +466,13 @@ void ApplicationVulkanDrawSponzaTest::load_resources() {
     auto resource_chunk = make_ref<WBE::ResourceChunkLoadFile>(
         WBE::global_allocator(), "res_chunks/rendering_test_resources.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
+    sponza_mesh = resource_manager->get_resource<WBE::RUMesh3D>("sponza.mesh");
+    shadow_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
+    shadow_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot_masked");
+    main_opaque_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
+    main_masked_pipeline = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr_masked");
+    light_billboard_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("billboard_face_camera_pipeline");
+    light_billboard_texture = resource_manager->get_resource<WBE::RUTexture>("spot_light_billboard");
 }
 
 // The draw tasks name these by key. Registering again with an equal description is free, so the rebuild callback registers
@@ -468,22 +481,25 @@ void ApplicationVulkanDrawSponzaTest::register_scene_resources(WBE::RenderGraphV
     const auto format = [](VkFormat p_format) {
         return static_cast<WBE::ImageFormatVK>(p_format);
     };
-    p_graph.register_mesh(WBE::STATIC_MESH_KEY, WBE::RDParamsMeshVK{.mesh = "sponza.mesh"});
-    const auto register_pipeline = [&p_graph, &format](std::string_view p_key, std::string p_pipeline, VkFormat p_color_format, VkFormat p_depth_format) {
+    p_graph.register_mesh(WBE::STATIC_MESH_KEY, sponza_mesh);
+    const auto register_pipeline = [&p_graph, &format](std::string_view p_key,
+                                       WBE::RefRes<WBE::RUGraphicsPipeline> p_pipeline,
+                                       VkFormat p_color_format,
+                                       VkFormat p_depth_format) {
         p_graph.register_graphics_pipeline(p_key,
+            p_pipeline,
             WBE::RDParamsGraphicsPipelineVK{
-                .pipeline = std::move(p_pipeline),
                 .color_formats = {format(p_color_format)},
                 .depth_format = format(p_depth_format),
             });
     };
-    register_pipeline("forward_sponza_shadow_opaque", "shadowmap_spot", SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
-    register_pipeline("forward_sponza_shadow_masked", "shadowmap_spot_masked", SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
-    register_pipeline("forward_sponza_main_opaque", "forward_cook_torrance_pbr", render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_shadow_opaque", shadow_opaque_pipeline, SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_shadow_masked", shadow_masked_pipeline, SHADOWMAP_COLOR_FORMAT, SHADOWMAP_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_main_opaque", main_opaque_pipeline, render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
+    register_pipeline("forward_sponza_main_masked", main_masked_pipeline, render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
     register_pipeline(
-        "forward_sponza_main_masked", "forward_cook_torrance_pbr_masked", render_context->swap_chain_format, MAIN_DEPTH_FORMAT);
-    register_pipeline("light_billboard_pipeline", "billboard_face_camera_pipeline", render_context->swap_chain_format, VK_FORMAT_UNDEFINED);
-    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, WBE::RDParamsImageVK{.texture = "spot_light_billboard"});
+        "light_billboard_pipeline", light_billboard_pipeline_resource, render_context->swap_chain_format, VK_FORMAT_UNDEFINED);
+    p_graph.register_image(LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW, light_billboard_texture);
 }
 
 void ApplicationVulkanDrawSponzaTest::setup_spot_light() {

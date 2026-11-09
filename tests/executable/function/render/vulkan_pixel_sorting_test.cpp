@@ -331,6 +331,7 @@ public:
         if (texture_resource == nullptr) {
             throw std::runtime_error("Failed to setup pixel sorting test: source texture resource was not found.");
         }
+        present_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("present_pixel_sort_pipeline");
         // The recipe imports the source image; its extent sizes the graph, so the view is compiled before the graph exists.
         source_view = WBE::TextureCompilerVK(render_context, renderer->get_global_render_cache().get())
                           .compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
@@ -410,6 +411,8 @@ private:
     bool render_graph_built = false;
     // The source image, shared by every graph built for an orientation.
     WBE::Ref<WBE::ROImageViewVK> source_view;
+    // The present pipeline's source resource, registered on every graph; the ResourceManager owns it.
+    WBE::RefRes<WBE::RUGraphicsPipeline> present_pipeline_resource;
     // The orientation selected in the parameter window, and the one the current graph sorts; owned by the rendering
     // thread.
     PixelSortOrientation ui_orientation = PixelSortOrientation::VERTICAL;
@@ -682,11 +685,11 @@ private:
      *
      * @param p_graph The graph the pipelines are registered on.
      */
-    static void register_pipelines(WBE::RenderGraphVK& p_graph) {
+    void register_pipelines(WBE::RenderGraphVK& p_graph) const {
         const auto* render_context = WBE::RendererVK::get_singleton()->get_render_context();
         p_graph.register_graphics_pipeline("present_pixel_sort_pipeline",
+            present_pipeline_resource,
             WBE::RDParamsGraphicsPipelineVK{
-                .pipeline = "present_pixel_sort_pipeline",
                 .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
             });
         const auto register_compute = [&p_graph](std::string_view p_shader_id) {

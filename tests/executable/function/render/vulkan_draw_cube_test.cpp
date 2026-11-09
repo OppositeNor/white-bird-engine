@@ -31,7 +31,6 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
-#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -99,6 +98,10 @@ private:
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
+    // The source resources the graph registers; the ResourceManager owns them.
+    WBE::RefRes<WBE::RUMesh3D> cube_mesh;
+    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
+    WBE::RefRes<WBE::RUGraphicsPipeline> main_pipeline_resource;
     // Graph-owned camera buffer, updated from the logic thread through render jobs.
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::ComponentSpotLight spot_light_component{};
@@ -241,6 +244,9 @@ void ApplicationVulkanDrawCubeTest::load_resources() {
     auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
         WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
+    cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh");
+    shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
+    main_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
 }
 
 void ApplicationVulkanDrawCubeTest::setup_spot_light() {
@@ -281,16 +287,16 @@ void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
             camera_info_data,
             spot_light_count_data](const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
             // The draw tasks name these by key; registering again with an equal description is free.
-            p_graph.register_mesh(WBE::STATIC_MESH_KEY, WBE::RDParamsMeshVK{.mesh = "model_cube_static.mesh"});
+            p_graph.register_mesh(WBE::STATIC_MESH_KEY, cube_mesh);
             p_graph.register_graphics_pipeline("draw_cube_shadow_pipeline",
+                shadow_pipeline_resource,
                 WBE::RDParamsGraphicsPipelineVK{
-                    .pipeline = "shadowmap_spot",
                     .color_formats = {static_cast<WBE::ImageFormatVK>(SHADOWMAP_COLOR_FORMAT)},
                     .depth_format = static_cast<WBE::ImageFormatVK>(SHADOWMAP_DEPTH_FORMAT),
                 });
             p_graph.register_graphics_pipeline("draw_cube_main_pipeline",
+                main_pipeline_resource,
                 WBE::RDParamsGraphicsPipelineVK{
-                    .pipeline = "forward_cook_torrance_pbr",
                     .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
                 });
             WBE::RendGraphDescVK pipeline_desc(render_allocator, &p_graph);

@@ -308,9 +308,11 @@ private:
     RendererVK* renderer_vk = nullptr;
     const RenderContextVK* render_context = nullptr;
     RenderAllocator* render_allocator = nullptr;
+    // The source resources the graphs register; the ResourceManager owns them.
     RefRes<RUMesh3D> sponza_mesh;
-    // The static scene mesh, registered on both graphs under STATIC_MESH_KEY; the voxel features and the acceleration
-    // structure share the same compiled mesh, which MeshCompilerVK caches for this description.
+    RefRes<RUTexture> light_billboard_texture;
+    // The static scene mesh's compile options, registered with sponza_mesh on both graphs under STATIC_MESH_KEY; the voxel
+    // features and the acceleration structure share the same compiled mesh, which MeshCompilerVK caches for them.
     RDParamsMeshVK static_mesh_params;
     Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;
     Ref<MeshAccelerationStructureVK> mesh_acceleration_structure = MEM_NULL;

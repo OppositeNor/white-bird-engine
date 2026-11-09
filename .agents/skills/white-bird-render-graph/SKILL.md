@@ -81,9 +81,13 @@ Meshes, pipelines, and images that tasks name by key are registered on the graph
 kept alive by the application or looked up globally:
 
 ```cpp
-p_graph.register_mesh("static_mesh", RDParamsMeshVK{.mesh = "sponza.mesh"});
-p_graph.register_graphics_pipeline("main", RDParamsGraphicsPipelineVK{
-    .pipeline = "forward_cook_torrance_pbr", .color_formats = {ImageFormatVK::B8G8R8A8_SRGB}, .depth_format = ImageFormatVK::D32_SFLOAT});
+// Load once, outside the callback; the ResourceManager owns the resources.
+RefRes<RUMesh3D> sponza = resource_manager->get_resource<RUMesh3D>("sponza.mesh");
+RefRes<RUGraphicsPipeline> pbr = resource_manager->get_resource<RUGraphicsPipeline>("forward_cook_torrance_pbr");
+// Inside the callback:
+p_graph.register_mesh("static_mesh", sponza);
+p_graph.register_graphics_pipeline("main", pbr, RDParamsGraphicsPipelineVK{
+    .color_formats = {ImageFormatVK::B8G8R8A8_SRGB}, .depth_format = ImageFormatVK::D32_SFLOAT});
 ```
 
 ```lua

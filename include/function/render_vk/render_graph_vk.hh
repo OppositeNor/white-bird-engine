@@ -36,6 +36,7 @@
 #include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -52,6 +53,10 @@ class MeshResourcesVK;
 class ROImageViewVK;
 class ROGraphicsPipelineVK;
 class ROComputePipelineVK;
+struct RUMesh3D;
+struct RUTexture;
+struct RUGraphicsPipeline;
+struct RUShader;
 struct RendTaskDescVK;
 struct RendSubgraphVK;
 enum class RendResRebuildActionVK : uint8_t;
@@ -352,6 +357,43 @@ public:
      * @return The registered pipeline.
      */
     Ref<ROComputePipelineVK> register_compute_pipeline(std::string_view p_key, RDParamsComputePipelineVK p_params);
+
+    /**
+     * @brief Register a mesh the ResourceManager loaded; see register_mesh(std::string_view, RDParamsMeshVK).
+     *
+     * The description names the handle's resource key, so this registers exactly what the key-based call, or a recipe's
+     * graph:register_mesh(), registers for the same resource.
+     *
+     * @param p_key The registration key.
+     * @param p_mesh The mesh; its resource key replaces p_options.mesh.
+     * @param p_options The compile options.
+     * @return The registered mesh.
+     * @throws std::runtime_error If p_mesh is null or has no resource key, or under the conditions of the key-based call.
+     */
+    Ref<MeshResourcesVK> register_mesh(std::string_view p_key, RefRes<RUMesh3D> p_mesh, RDParamsMeshVK p_options = {});
+
+    /**
+     * @brief Register a texture the ResourceManager loaded; see register_mesh(std::string_view, RefRes<RUMesh3D>,
+     * RDParamsMeshVK).
+     * @return The registered view of the uploaded image.
+     */
+    Ref<ROImageViewVK> register_image(std::string_view p_key, RefRes<RUTexture> p_texture);
+
+    /**
+     * @brief Register a graphics pipeline the ResourceManager loaded, compiled with p_options' attachments, topology, and
+     * polygon mode; the handle's resource key replaces p_options.pipeline. See register_mesh(std::string_view,
+     * RefRes<RUMesh3D>, RDParamsMeshVK).
+     * @return The registered pipeline.
+     */
+    Ref<ROGraphicsPipelineVK> register_graphics_pipeline(
+        std::string_view p_key, RefRes<RUGraphicsPipeline> p_pipeline, RDParamsGraphicsPipelineVK p_options);
+
+    /**
+     * @brief Register a compute pipeline from a shader the ResourceManager loaded; see register_mesh(std::string_view,
+     * RefRes<RUMesh3D>, RDParamsMeshVK).
+     * @return The registered pipeline.
+     */
+    Ref<ROComputePipelineVK> register_compute_pipeline(std::string_view p_key, RefRes<RUShader> p_shader);
 
     /**
      * @brief Get the context the graph-owned resources were last built for.
