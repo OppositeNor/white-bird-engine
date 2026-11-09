@@ -41,15 +41,6 @@ protected:
     explicit PipelineCompilerVK(const PipelineCompilerVKContext& p_context, std::string_view p_compiler_name);
 
     Ref<ROShaderVK> compile_shader(RefRes<RUShader> p_shader);
-    template <typename RenderObjectType>
-    static Ref<RenderObjectType> get_registered_render_object(
-        Ref<GlobalRenderCache> p_render_cache, std::string_view p_resource_key, HashCode p_render_object_type_id) {
-        auto render_object = p_render_cache->try_get(p_resource_key, p_render_object_type_id);
-        if (render_object == MEM_NULL) {
-            return MEM_NULL;
-        }
-        return render_object.dynamic_cast_ref<RenderObjectType>();
-    }
 
     PipelineCompilerVKContext base_context;
 };

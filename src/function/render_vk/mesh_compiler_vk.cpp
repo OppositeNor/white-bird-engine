@@ -435,10 +435,6 @@ Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh, const Conf
     return result;
 }
 
-Ref<MeshResourcesVK> MeshCompilerVK::compile(RefRes<RUMesh3D> p_mesh) const {
-    return compile(p_mesh, Config{});
-}
-
 Ref<MeshResourcesVK> MeshCompilerVK::acquire(std::string_view p_mesh_resource_key) const {
     return acquire(p_mesh_resource_key, Config{});
 }

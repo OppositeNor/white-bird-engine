@@ -72,23 +72,6 @@ public:
     explicit MeshCompilerVK(RendererVK* p_renderer);
 
     /**
-     * @brief Compile a mesh's shared geometry with opaque, masked, and opaque double-sided draw batches.
-     *
-     * Every non-empty category is compiled; at least one must contain a drawable submesh. No shader is involved: batches
-     * group draws by the mesh's vertex layout, and every material texture is compiled to a sampled view so that material
-     * tables can be built later for any pipeline (MeshResourcesVK::acquire_material_table()). The result is not cached; see
-     * acquire(). The returned object is neither copyable nor movable and must be shared through Ref.
-     *
-     * @throws std::runtime_error If the mesh is null, or its resource data is invalid.
-     */
-    Ref<MeshResourcesVK> compile(RefRes<RUMesh3D> p_mesh, const Config& p_config) const;
-
-    /**
-     * @brief Compile a mesh with the default Config; see compile(RefRes<RUMesh3D>, const Config&).
-     */
-    Ref<MeshResourcesVK> compile(RefRes<RUMesh3D> p_mesh) const;
-
-    /**
      * @brief Get the compiled mesh of a mesh resource and configuration, compiling it when no live one is cached.
      *
      * The mesh resource is loaded from the ResourceManager. Compiled meshes are cached weakly in the GlobalRenderCache under
@@ -105,6 +88,8 @@ public:
 
 private:
     RendererVK* renderer = nullptr;
+
+    Ref<MeshResourcesVK> compile(RefRes<RUMesh3D> p_mesh, const Config& p_config) const;
 };
 
 } // namespace WhiteBirdEngine

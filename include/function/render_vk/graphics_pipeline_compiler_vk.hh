@@ -122,16 +122,6 @@ public:
      */
     CompileResult compile(std::string_view p_resource_key, RefRes<RUGraphicsPipeline> p_pipeline_resource);
 
-    /**
-     * @brief Compile a texture resource view for descriptor-heap use; see TextureCompilerVK::compile_texture_view().
-     *
-     * @param p_resource_key Cache key for the texture render objects: the image is registered under it and the view under
-     * `<p_resource_key>#image_view`, which also name them.
-     * @param p_texture_resource Texture resource to upload.
-     * @return The cached or newly compiled image view.
-     */
-    Ref<ROImageViewVK> compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource);
-
 private:
     GraphicsPipelineCompilerVKContext context;
 

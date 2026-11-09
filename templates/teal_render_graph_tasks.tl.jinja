@@ -21,7 +21,7 @@ local type render_graph = require("render_graph_utils.render_graph")
 
 local record render_graph_tasks
     -- A params field that holds resource ids: an id ("resource"), or a list, a map, or a record of nested fields that
-    -- hold them. A "graph" id names a graph resource, a "task_local" id names one through the task's aliases, and a
+    -- hold them. A "graph" id names a graph resource, a "task_local" id names one through the task's bindings, and a
     -- "registered" key identifies an entry of expected_type registered on the render graph.
     enum ResourceFieldKind
         "resource"

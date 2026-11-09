@@ -110,18 +110,18 @@ end
 local function attach_task(p_task: render_graph.Task,
     p_validate_task?: function(p_task: render_graph.Task, p_local_name?: string,
         p_resource?: render_graph.Resource)): render_graph.Task
-    function p_task:alias(p_local_name: string, p_resource: render_graph.Resource): render_graph.Task
+    function p_task:bind(p_local_name: string, p_resource: render_graph.Resource): render_graph.Task
         if p_validate_task == nil then
-            error("render_graph: add the task to a graph before assigning an alias.", 2)
+            error("render_graph: add the task to a graph before binding a resource.", 2)
         end
         validate_id(p_local_name)
         validate_graph_resource(p_resource)
         p_validate_task(self, p_local_name, p_resource)
-        self.aliases = self.aliases or {}
-        if self.aliases[p_local_name] ~= nil then
+        self.bindings = self.bindings or {}
+        if self.bindings[p_local_name] ~= nil then
             error("render_graph: task-local resource '" .. p_local_name .. "' is mapped more than once.", 2)
         end
-        self.aliases[p_local_name] = p_resource
+        self.bindings[p_local_name] = p_resource
         return self
     end
 
@@ -171,15 +171,15 @@ local function attach_task(p_task: render_graph.Task,
             validate_id(local_name)
             validate_graph_resource(resource)
             p_validate_task(self, local_name, resource)
-            if self.aliases ~= nil and self.aliases[local_name] ~= nil then
+            if self.bindings ~= nil and self.bindings[local_name] ~= nil then
                 error("render_graph: task-local resource '" .. local_name .. "' is mapped more than once.", 2)
             end
         end
-        self.aliases = self.aliases or {}
+        self.bindings = self.bindings or {}
         local connected: {render_graph.Resource:boolean} = {}
         for _, local_name in ipairs(sorted_keys(p_bindings)) do
             local resource = p_bindings[local_name]
-            self.aliases[local_name] = resource
+            self.bindings[local_name] = resource
             if not connected[resource] then
                 append_edge(p_producer, self, resource)
                 connected[resource] = true
@@ -192,11 +192,11 @@ local function attach_task(p_task: render_graph.Task,
         if type(p_index) ~= "number" or p_index < 0 or p_index % 1 ~= 0 then
             error("render_graph: color attachment indices must be non-negative integers.", 2)
         end
-        return self:alias(string.format("render_target_colors[%d]", p_index), p_resource)
+        return self:bind(string.format("render_target_colors[%d]", p_index), p_resource)
     end
 
     function p_task:depth_target(p_resource: render_graph.Resource): render_graph.Task
-        return self:alias("render_target_depth", p_resource)
+        return self:bind("render_target_depth", p_resource)
     end
     return p_task
 end
@@ -539,17 +539,17 @@ function render_graph.graph(): render_graph.Graph
         return render_graph.subgraph(p_id, self:build(p_imports, sorted_keys(p_ports)), p_ports)
     end
 
-    local function validate_parameter_alias(p_task: render_graph.Task, p_local_name: string,
+    local function validate_parameter_binding(p_task: render_graph.Task, p_local_name: string,
         p_resource: render_graph.Resource)
         local ids = parameter_ids[p_task]
         if ids ~= nil and ids[p_local_name] and p_resource.id ~= p_local_name then
-            error("render_graph: task parameter resource '" .. p_local_name .. "' conflicts with a task-local alias.", 3)
+            error("render_graph: task parameter resource '" .. p_local_name .. "' conflicts with a task binding.", 3)
         end
     end
 
-    local function validate_parameter_aliases(p_task: render_graph.Task)
-        for local_name, resource in pairs(p_task.aliases or {}) do
-            validate_parameter_alias(p_task, local_name, resource)
+    local function validate_parameter_bindings(p_task: render_graph.Task)
+        for local_name, resource in pairs(p_task.bindings or {}) do
+            validate_parameter_binding(p_task, local_name, resource)
         end
     end
 
@@ -565,9 +565,9 @@ function render_graph.graph(): render_graph.Graph
         if p_task.id ~= id then
             error("render_graph: the registered task id '" .. id .. "' was changed.", 3)
         end
-        validate_parameter_aliases(p_task)
+        validate_parameter_bindings(p_task)
         if p_local_name ~= nil then
-            validate_parameter_alias(p_task, p_local_name, p_resource)
+            validate_parameter_binding(p_task, p_local_name, p_resource)
         end
     end
 
@@ -582,12 +582,12 @@ function render_graph.graph(): render_graph.Graph
         if registered_ids[p_task] ~= nil then
             error("render_graph: the registered task id was changed before adding it again.", 2)
         end
-        if p_task.aliases ~= nil then
-            local aliases: {string:render_graph.Resource} = {}
-            for local_name, resource in pairs(p_task.aliases) do
-                aliases[local_name] = resource
+        if p_task.bindings ~= nil then
+            local bindings: {string:render_graph.Resource} = {}
+            for local_name, resource in pairs(p_task.bindings) do
+                bindings[local_name] = resource
             end
-            p_task.aliases = aliases
+            p_task.bindings = bindings
         end
         if p_task.edges ~= nil then
             local edges: {render_graph.Edge} = {}
@@ -620,7 +620,7 @@ function render_graph.graph(): render_graph.Graph
             id = p_id,
             type = p_type,
             params = copy_data(p_params),
-            aliases = options.aliases,
+            bindings = options.bindings,
             uses = uses,
             trigger = copy_data(options.trigger) as wbe.RendRecipeTriggerVK,
             toggle = copy_data(options.toggle) as wbe.RendRecipeToggleVK,
@@ -631,12 +631,12 @@ function render_graph.graph(): render_graph.Graph
             ids[resource.id] = true
         end
         parameter_ids[task] = ids
-        validate_parameter_aliases(task)
+        validate_parameter_bindings(task)
         return graph:add(task)
     end
 
     -- The typed constructors lower registered keys to strings and graph resource handles to IDs, retaining only the latter.
-    -- A task-local handle also binds its graph ID as an identity alias, which cannot shadow an unrelated shader binding.
+    -- A task-local handle also binds its graph ID as an identity binding, which cannot shadow an unrelated shader binding.
     -- Every handle stays reachable, so collection still rejects distinct owned descriptions of the same graph ID.
     local function make_typed_task(p_id: string, p_type: string, p_params: any, p_options: render_graph.TaskOptions,
         p_fields: {render_graph_tasks.ResourceField}): render_graph.Task
@@ -683,20 +683,20 @@ function render_graph.graph(): render_graph.Graph
         local params = lower(p_params, { kind = "record", fields = p_fields })
 
         local options: render_graph.TaskOptions = p_options or {}
-        local aliases: {string:render_graph.Resource} = {}
-        for local_name, resource in pairs(options.aliases or {}) do
-            aliases[local_name] = resource
+        local bindings: {string:render_graph.Resource} = {}
+        for local_name, resource in pairs(options.bindings or {}) do
+            bindings[local_name] = resource
         end
         for _, resource in ipairs(task_local_uses) do
-            local previous = aliases[resource.id]
+            local previous = bindings[resource.id]
             if previous ~= nil and previous.id ~= resource.id then
                 error("render_graph: task-local resource '" .. resource.id ..
-                    "' conflicts with an explicit task-local alias.", 3)
+                    "' conflicts with an explicit task binding.", 3)
             end
-            aliases[resource.id] = previous or resource
+            bindings[resource.id] = previous or resource
         end
         return make_task(p_id, p_type, params, {
-            aliases = next(aliases) ~= nil and aliases or options.aliases,
+            bindings = next(bindings) ~= nil and bindings or options.bindings,
             uses = options.uses,
             trigger = options.trigger,
             toggle = options.toggle,
@@ -714,23 +714,23 @@ function render_graph.graph(): render_graph.Graph
         if p_options == nil or p_options.select == nil then
             error("render_graph: multiplexer '" .. tostring(p_id) .. "' sets no select.", 2)
         end
-        local aliases: {string:render_graph.Resource} = {}
-        local function add_alias(p_local_name: string, p_resource: render_graph.Resource)
-            local previous = aliases[p_local_name]
+        local bindings: {string:render_graph.Resource} = {}
+        local function add_binding(p_local_name: string, p_resource: render_graph.Resource)
+            local previous = bindings[p_local_name]
             if previous ~= nil and previous.id ~= p_resource.id then
                 error("render_graph: multiplexer '" .. p_id .. "' maps task-local resource '" .. p_local_name ..
                     "' to more than one graph resource.", 3)
             end
-            aliases[p_local_name] = previous or p_resource
+            bindings[p_local_name] = previous or p_resource
         end
-        for local_name, resource in pairs(p_options.aliases or {}) do
-            add_alias(local_name, resource)
+        for local_name, resource in pairs(p_options.bindings or {}) do
+            add_binding(local_name, resource)
         end
         local uses: {render_graph.Resource} = {}
         for _, resource in ipairs(p_options.uses or {}) do
             uses[#uses + 1] = resource
         end
-        -- The branches' parameter handles keep their identity aliases from being redirected.
+        -- The branches' parameter handles keep their identity bindings from being redirected.
         local ids: {string:boolean} = {}
         local branches: {wbe.RendRecipeBranchVK} = {}
         -- The branches were built on another graph, so the multiplexer carries their registrations into this one.
@@ -748,8 +748,8 @@ function render_graph.graph(): render_graph.Graph
                     " connects, triggers, or toggles; set those on the multiplexer.", 2)
             end
             branches[#branches + 1] = { type = branch.type, params = copy_data(branch.params) }
-            for local_name, resource in pairs(branch.aliases or {}) do
-                add_alias(local_name, resource)
+            for local_name, resource in pairs(branch.bindings or {}) do
+                add_binding(local_name, resource)
             end
             for _, resource in ipairs(branch.uses or {}) do
                 uses[#uses + 1] = resource
@@ -763,14 +763,14 @@ function render_graph.graph(): render_graph.Graph
             id = p_id,
             branches = branches,
             select = copy_data(p_options.select) as wbe.RendRecipeSelectVK,
-            aliases = next(aliases) ~= nil and aliases or nil,
+            bindings = next(bindings) ~= nil and bindings or nil,
             uses = uses,
             trigger = copy_data(p_options.trigger) as wbe.RendRecipeTriggerVK,
             toggle = copy_data(p_options.toggle) as wbe.RendRecipeToggleVK,
             registrations = branch_registrations,
         }
         parameter_ids[task] = ids
-        validate_parameter_aliases(task)
+        validate_parameter_bindings(task)
         return graph:add(task)
     end
 
@@ -889,7 +889,7 @@ function render_graph.graph(): render_graph.Graph
             collected[p_resource] = true
         end
 
-        local function bindings(p_bindings: {string:render_graph.Resource}): {string:string}
+        local function resource_ids(p_bindings: {string:render_graph.Resource}): {string:string}
             local result: {string:string} = {}
             for _, key in ipairs(sorted_keys(p_bindings)) do
                 local resource = p_bindings[key]
@@ -911,8 +911,8 @@ function render_graph.graph(): render_graph.Graph
                 branches = task.branches,
                 select = task.select,
             }
-            if task.aliases ~= nil then
-                wire_task.aliases = bindings(task.aliases)
+            if task.bindings ~= nil then
+                wire_task.aliases = resource_ids(task.bindings)
             end
             if task.edges ~= nil then
                 local edges: {wbe.RendRecipeEdgeVK} = {}
@@ -924,7 +924,7 @@ function render_graph.graph(): render_graph.Graph
                 wire_task.connect = edges
             end
             if task.ports ~= nil then
-                wire_task.ports = bindings(task.ports)
+                wire_task.ports = resource_ids(task.ports)
             end
             for _, resource in ipairs(task.uses or {}) do
                 collect(resource)

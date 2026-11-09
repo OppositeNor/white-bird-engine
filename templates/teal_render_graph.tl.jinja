@@ -42,7 +42,7 @@ local record render_graph
     end
 
     record TaskOptions
-        aliases: {string:Resource}
+        bindings: {string:Resource}
         uses: {Resource}
         trigger: wbe.RendRecipeTriggerVK
         toggle: wbe.RendRecipeToggleVK
@@ -51,7 +51,7 @@ local record render_graph
     -- Options of Graph:multiplex(): the branch selection, and what applies to the multiplexer as a whole.
     record MultiplexOptions
         select: wbe.RendRecipeSelectVK
-        aliases: {string:Resource}
+        bindings: {string:Resource}
         uses: {Resource}
         trigger: wbe.RendRecipeTriggerVK
         toggle: wbe.RendRecipeToggleVK
@@ -68,10 +68,10 @@ local record render_graph
         ["type"]: string
         import: boolean
         params: any
-        aliases: {string:Resource}
+        bindings: {string:Resource}
         edges: {Edge}
         graph: Graph
-        alias: function(self: Task, p_local_name: string, p_resource: Resource): Task
+        bind: function(self: Task, p_local_name: string, p_resource: Resource): Task
         connect: function(self: Task, p_next_task: Task, p_resource: Resource): Task
         connect: function(self: Task, p_next_task: Task, p_resources: {Resource}): Task
         connect: function(self: Task, p_next_task: Task, p_bundle: ResourceBundle): Task
@@ -137,8 +137,8 @@ local record render_graph
         get: function(self: Graph, p_id: string): Task
         import_task: function(self: Graph, p_id: string): Task
         -- A multiplexer task that records the selected one of p_branches: typed tasks built on another graph, such as a
-        -- scratch Graph.new(), without edges, triggers, or toggles. It takes their types, params, aliases, and uses; the
-        -- branches share its aliases, and must run on one queue family.
+        -- scratch Graph.new(), without edges, triggers, or toggles. It takes their types, params, bindings, and uses; the
+        -- branches share its bindings, and must run on one queue family.
         multiplex: function(self: Graph, p_id: string, p_branches: {Task}, p_options: MultiplexOptions): Task
         chain: function(self: Graph, p_resource: Resource, p_tasks: {Task})
         chain: function(self: Graph, p_resources: {Resource}, p_tasks: {Task})

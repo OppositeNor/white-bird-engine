@@ -29,7 +29,6 @@
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/texture_compiler_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "ktxvulkan.h"
 #include "resource/resource_unit/resource_unit.hh"
@@ -148,10 +147,6 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     Ref<ROGraphicsPipelineVK> graphics_pipeline = context.render_data->create_graphics_pipeline(pipeline_builder);
     context.render_cache->insert(p_resource_key, graphics_pipeline);
     return graphics_pipeline;
-}
-
-Ref<ROImageViewVK> GraphicsPipelineCompilerVK::compile_texture_view(std::string_view p_resource_key, RefRes<RUTexture> p_texture_resource) {
-    return TextureCompilerVK(context.render_data, context.render_cache.get()).compile_texture_view(p_resource_key, p_texture_resource);
 }
 
 } // namespace WhiteBirdEngine

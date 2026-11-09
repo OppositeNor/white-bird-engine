@@ -39,7 +39,7 @@ function exports.build(): wbe.RendGraphRecipeVK
     local ping_pipeline = graph:add_compute_pipeline("ping_pipeline")
     local pong_pipeline = graph:add_compute_pipeline("pong_pipeline")
     local prepare = graph:compute("prepare", { pipeline = prepare_pipeline, group_count_x = 2 }, {
-        aliases = { shader_input = input },
+        bindings = { shader_input = input },
         trigger = { event = "prepare_event", activate = true },
         toggle = { event = "prepare_toggle", enabled = true },
     })
@@ -63,11 +63,11 @@ function exports.build(): wbe.RendGraphRecipeVK
     graph:cpu_acquire_image("readback", { image_view = color })
     graph:full_memory_barrier("barrier", { resource = buffer })
     graph:ping_pong("ping_pong", { ping_pipeline = ping_pipeline, pong_pipeline = pong_pipeline, iterations = 2 })
-    -- Branches built on a scratch graph become one multiplexer task, which takes their params and shares their aliases.
+    -- Branches built on a scratch graph become one multiplexer task, which takes their params and shares their bindings.
     local branch_graph = Graph.new()
     graph:multiplex("select", {
-        branch_graph:compute("lit", { pipeline = direct_pipeline, group_count_x = 4 }, { aliases = { shader_input = input } }),
-        branch_graph:compute("debug", { pipeline = indirect_pipeline }, { aliases = { shader_input = input } }),
+        branch_graph:compute("lit", { pipeline = direct_pipeline, group_count_x = 4 }, { bindings = { shader_input = input } }),
+        branch_graph:compute("debug", { pipeline = indirect_pipeline }, { bindings = { shader_input = input } }),
     }, { select = { event = "select_event", branch = 1 }, toggle = { event = "select_toggle", enabled = true } })
     local overlay = graph:import_task("overlay")
     local outputs: render_graph.ResourceBundle = graph:resource_bundle({ color, buffer })

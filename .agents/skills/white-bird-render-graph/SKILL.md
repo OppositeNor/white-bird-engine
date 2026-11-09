@@ -61,12 +61,12 @@ return exports
 - **Handles, not strings.** Resource methods (`graph:add_image()`, `image:view()`, `graph:import_resource()`, ...) and
   registered-resource declarations (`graph:register_mesh()`, `graph:register_graphics_pipeline()`, ...,
   `graph:add_mesh()`, `graph:add_compute_pipeline()`, `graph:add_graphics_pipeline()`) return
-  `Graph.Resource` handles. Pass them to task params, `:alias()`, `:color_target()`, `:depth_target()`, edges, and subgraph
+  `Graph.Resource` handles. Pass them to task params, `:bind()`, `:color_target()`, `:depth_target()`, edges, and subgraph
   ports. `graph:build()` emits only the resources reachable from tasks, so there is no resource list to maintain.
 - **Typed constructors.** `graph:compute()`, `:draw()`, `:draw_mesh()`, ... are generated from the task classes and
-  type-check their params. Each takes `(id, params, { aliases?, uses?, trigger?, toggle? })` and returns a task handle.
+  type-check their params. Each takes `(id, params, { bindings?, uses?, trigger?, toggle? })` and returns a task handle.
 - **Explicit edges.** Order tasks with `graph:chain(resource, { a, b, c })`, `a:connect(b, resource)`,
-  `a:connect_all({ b, c }, resource)`, or `b:inputs_from(a, { local_name = resource })`. `uses` and aliases never add edges.
+  `a:connect_all({ b, c }, resource)`, or `b:inputs_from(a, { local_name = resource })`. `uses` and bindings never add edges.
 - **C++ pieces.** Tasks that need application objects (ImGui, acceleration-structure builds) are supplied with
   `RendGraphRecipeImportsVK::add_task()` and referenced with `graph:import_task(id)`. The callback may also add to the
   descriptor the builder returns, for parts not yet expressible in Lua.

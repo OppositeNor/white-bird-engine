@@ -39,14 +39,9 @@ Ref<ROShaderVK> PipelineCompilerVK::compile_shader(RefRes<RUShader> p_shader) {
         throw std::runtime_error("Failed to compile shader: shader resource key was not propagated.");
     }
     std::string shader_key = p_shader->resource_key;
-    auto registered_shader =
-        get_registered_render_object<ROShaderVK>(base_context.render_cache, shader_key, TypeUUID<ROShaderVK>::UUID);
-    if (registered_shader != MEM_NULL) {
-        return registered_shader;
-    }
-    auto shader = base_context.render_data->create_shader(ROShaderVK::Builder().set_code(p_shader));
-    base_context.render_cache->insert(shader_key, shader);
-    return shader;
+    return base_context.render_cache->acquire<ROShaderVK>(shader_key, [this, p_shader] {
+        return base_context.render_data->create_shader(ROShaderVK::Builder().set_code(p_shader));
+    });
 }
 
 } // namespace WhiteBirdEngine

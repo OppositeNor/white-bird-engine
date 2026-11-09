@@ -227,7 +227,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         queue_family = "compute_1",
     }
     local occupancy_injection = graph:compute("inject_svogi_occupancy", occupancy_injection_params, {
-        aliases = { atlas = buffers.svogi_occupancy_buffer },
+        bindings = { atlas = buffers.svogi_occupancy_buffer },
     })
     local propagation_dispatches: {Graph.RTParamsComputeDispatchVK} = {}
     for child_depth = p_params.max_depth - 1, 2, -1 do
@@ -240,21 +240,21 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
     local propagation_params: Graph.RTParamsRunComputePipelinesSequentialVK =
         { dispatches = propagation_dispatches, queue_family = "compute_1" }
     local occupancy_propagation = graph:compute_sequential("propagate_svogi_occupancy", propagation_params, {
-        aliases = { atlas = buffers.svogi_occupancy_buffer },
+        bindings = { atlas = buffers.svogi_occupancy_buffer },
     })
     -- The radiance index buffer is a counted buffer, whose element byte size shares the deferred lists' count element; the
     -- pong list's count reset clears it.
     local reset_radiance_index_params: Graph.RTParamsRunComputePipelineVK =
         { pipeline = compute_pipelines.reset_ping, queue_family = "compute_1" }
     local reset_radiance_index = graph:compute("reset_svogi_radiance_index", reset_radiance_index_params, {
-        aliases = { svo_deferred_list_pong = buffers.svogi_radiance_index_buffer },
+        bindings = { svo_deferred_list_pong = buffers.svogi_radiance_index_buffer },
     })
-    local radiance_aliases: {string:Graph.Resource} = {
+    local radiance_bindings: {string:Graph.Resource} = {
         index_buffer = buffers.svogi_radiance_index_buffer,
         staged_buffer = buffers.svogi_radiance_staged_buffer,
     }
     for slot, id in pairs(p_target.rsm_slot_ids) do
-        radiance_aliases[slot] = graph:reference(id)
+        radiance_bindings[slot] = graph:reference(id)
     end
     local radiance_injection_params: Graph.RTParamsRunComputePipelineVK = {
         pipeline = compute_pipelines.radiance_injection,
@@ -262,7 +262,7 @@ function voxel_svo.subgraph(p_id: string, p_params: wbe.SVORecipeParams, p_targe
         group_count_y = p_params.radiance_injection_group_count,
         queue_family = "compute_1",
     }
-    local radiance_injection = graph:compute("inject_svogi_radiance", radiance_injection_params, { aliases = radiance_aliases })
+    local radiance_injection = graph:compute("inject_svogi_radiance", radiance_injection_params, { bindings = radiance_bindings })
     local setup_debug_draw = compute("setup_svo_debug_draw", compute_pipelines.setup_debug_draw, 1)
     -- The post-construction view's nodes at the depth svo_debug_draw_settings selects; the setup writes the root's sectors.
     local find_debug_draw_nodes = compute("find_svo_debug_draw_nodes", compute_pipelines.find_debug_draw_nodes,

@@ -42,7 +42,7 @@ handle-accepting params interfaces `Graph.RTParams<Name>VK`. For types only, imp
 | `:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
 
-`graph:build()` collects every resource reachable from task params, aliases, edges, `uses`, and ports (views pull in their
+`graph:build()` collects every resource reachable from task params, bindings, edges, `uses`, and ports (views pull in their
 image), emits each once, and omits unused handles. Two different owned handles with the same id fail. The handle methods
 do not touch the graph; the module exposes them as functions too (`Graph.storage_buffer()`, `Graph.compute_pipeline()`,
 `Graph.graphics_pipeline()`, `Graph.import_resource()`, `Graph.indirect_dispatch()`, ...), so helpers that only build
@@ -53,18 +53,18 @@ taken of an import, reference, or port; C++ validates the actual kind.
 
 The typed constructors are generated from task classes annotated `WBE_RENDER_TASK(<method>)` (see the table in
 [system-and-usage.md](system-and-usage.md#built-in-task-types)). Each is `graph:<method>(id, params, options?)`, where
-`options` is `{ aliases?, uses?, trigger?, toggle? }`, and returns a `Graph.Task`. Params type-check against
+`options` is `{ bindings?, uses?, trigger?, toggle? }`, and returns a `Graph.Task`. Params type-check against
 `Graph.RTParams<Name>VK`, which accepts handles in the fields marked `WBE_RECIPE_RESOURCE`. Params and option tables are
 copied, so a table can be reused for several tasks.
 
-- `task:alias(local_name, resource)` maps a task-local id. A name maps once per task; different tasks may reuse it. A
-  handle passed in params cannot be redirected by an alias of the same name.
-- `task:color_target(index, resource)` and `task:depth_target(resource)` alias `render_target_colors[<index>]` and
+- `task:bind(local_name, resource)` maps a task-local id. A name maps once per task; different tasks may reuse it. A
+  handle passed in params cannot be redirected by a binding of the same name.
+- `task:color_target(index, resource)` and `task:depth_target(resource)` bind `render_target_colors[<index>]` and
   `render_target_depth`.
 - A `compute_sequential` dispatch's `bindings` (and `indirect_dispatch()`'s last argument) map the shader resource ids
   of that dispatch's pipeline to graph resource handles, so dispatches of one task can bind the same shader id
-  differently (the radix sort's passes alternate between its key buffers). Bindings belong to one dispatch; aliases
-  belong to the task. Resource fields of typed params take handles only, never id strings: name a resource by id with
+  differently (the radix sort's passes alternate between its key buffers). Dispatch bindings belong to one dispatch;
+  task bindings (`task:bind()`, the `bindings` option) belong to the task. Resource fields of typed params take handles only, never id strings: name a resource by id with
   `graph:reference(id)`.
 - `uses = { handle, ... }` keeps resources reachable that the task accesses only through same-name reflected shader
   bindings (for example a camera buffer or a single-task scratch buffer). It declares no access and adds no edge.
@@ -83,7 +83,7 @@ non-empty list, or a bundle.
 - `graph:chain(resources, { a, b, c })` orders adjacent tasks: `a -> b -> c`. Every adjacent pair must access every resource.
 - `a:connect(b, resources)` is a two-task chain.
 - `a:connect_all({ b, c }, resources)` fans out, leaving `b` and `c` unordered with each other.
-- `b:inputs_from(a, { local_name = resource, ... })` aliases each name on `b` and adds one `a -> b` edge per distinct
+- `b:inputs_from(a, { local_name = resource, ... })` binds each name on `b` and adds one `a -> b` edge per distinct
   resource.
 
 ### Emitted schema
@@ -94,7 +94,8 @@ non-empty list, or a bundle.
 - `imports`: every import id. Pass the full list to `graph:build(imports)` when C++ supplies imports that only an imported
   task binds, so supplied-import matching stays strict.
 - `resources`: each declares exactly one of `buffer`, `image`, `image_view` (`{ image, view }`), or `sampler`.
-- `tasks`: `{ id, type, params, aliases, connect = { { to, resource } }, trigger, toggle, subgraph, ports }`. Imported
+- `tasks`: `{ id, type, params, aliases, connect = { { to, resource } }, trigger, toggle, subgraph, ports }`, where
+  `aliases` is the task's bindings (the C++ `RendTaskDescVK::alias()` map). Imported
   tasks carry only `id`, `import = true`, and `connect`.
 
 Params are strictly deserialized: unknown keys fail. Pipeline keys name pipelines the application compiled outside the
@@ -123,10 +124,10 @@ Examples: `tests/executable/function/render/pixel_sorting_recipe_context.hh`,
 - A trigger or toggle on a subgraph task wraps every member; set it on the task `as_subgraph()` returns
   (`subgraph.toggle = { ... }`).
 - A multiplexer records one of several branch tasks: build them with the typed constructors on a scratch graph and pass them
-  to `graph:multiplex(id, branches, { select = { event, branch }, aliases?, uses?, trigger?, toggle? })`, emitted as
+  to `graph:multiplex(id, branches, { select = { event, branch }, bindings?, uses?, trigger?, toggle? })`, emitted as
   `branches = { { type, params } }` and `select`. `RTMultiplexerVK` is one graph node: it reports and binds every branch,
   records the selected one, and switches on `RTMultiplexerVK::Command { branch }`; an out-of-range branch throws. Branches
-  share one resource map (identical aliases merge, conflicting ones throw) and must run on one queue family, and they set
+  share one resource map (identical bindings merge, conflicting ones throw) and must run on one queue family, and they set
   no edges, triggers, or toggles of their own. Pass the current branch through the context.
 
 `EventManager` lives in `function/event/event_manager.hh`; CPU readback tasks also emit their results through it under the
@@ -135,7 +136,7 @@ source resource id.
 ## Imported C++ tasks
 
 Build a `RendTaskDescVK` with its factory and aliases, supply it with `imports.add_task()`, and reference it in the recipe
-with `graph:import_task(id)`; connect it like any task. Imported tasks set no `type`, `params`, `aliases`, `trigger`, or
+with `graph:import_task(id)`; connect it like any task. Imported tasks set no `type`, `params`, `bindings`, `trigger`, or
 `toggle` in the recipe. Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_render_graph.cpp`,
 `vulkan_pixel_sorting_test.cpp`.
 

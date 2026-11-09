@@ -112,7 +112,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
         queue_family = p_params.queue_family,
-    }, { uses = { source } }):alias("pixel_sort_input", color)
+    }, { uses = { source } }):bind("pixel_sort_input", color)
     local count_mask = graph:compute("count_pixel_sort_mask", {
         pipeline = count_mask_pipeline,
         group_count_x = column_group_count,
@@ -139,7 +139,7 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
         queue_family = p_params.queue_family,
-    }, { uses = { source, sort_buffers.keys, mask, contrast, column_offsets } }):alias("pixel_sort_destination", color)
+    }, { uses = { source, sort_buffers.keys, mask, contrast, column_offsets } }):bind("pixel_sort_destination", color)
 
     graph:chain(color, { copy_source, write_pixels })
     graph:chain(source, { copy_source, count_mask, register_keys, write_pixels })

@@ -207,7 +207,7 @@ return { build = function()
     assert(Graph.enum_name("image_read_write") == "IMAGE_READ_WRITE")
     local write = graph:add({ id = "write", type = "registry_probe", params = { label = "write" }, uses = { scratch } })
     local read = graph:add({ id = "read", type = "registry_probe", params = { label = "read" } })
-    read:alias("input", view):alias("sampler", sampler)
+    read:bind("input", view):bind("sampler", sampler)
     write:connect(read, view)
     return graph:build()
 end }
@@ -255,7 +255,7 @@ return { build = function()
     local member = graph:reference("input.member")
     local nested = Graph.new()
     local color = nested:port("color")
-    nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, aliases = { output = color } })
+    nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, bindings = { output = color } })
     local prepare = graph:add({ id = "prepare", type = "registry_probe", params = { label = "prepare" }, uses = { input, member } })
     local effect = graph:add(nested:as_subgraph("effect", { unused = target, color = target }, { "nested_only" }))
     graph:chain(target, { prepare, effect })
@@ -316,7 +316,7 @@ local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local first = Graph.new()
     local shared = first:add_storage_buffer("shared", 16)
-    first:add({ id = "first", type = "registry_probe", aliases = { input = shared }, uses = { shared, shared } })
+    first:add({ id = "first", type = "registry_probe", bindings = { input = shared }, uses = { shared, shared } })
     local second = Graph.new()
     second:add({ id = "second", type = "registry_probe" })
     local third = Graph.new()
@@ -338,8 +338,8 @@ return { build = function()
     local graph = graph_utils.graph()
     local first = graph:add({ id = "first", type = "registry_probe" })
     local second = graph:add({ id = "second", type = "registry_probe" })
-    assert(first:alias("input", first_resource) == first)
-    assert(second:alias("input", second_resource) == second)
+    assert(first:bind("input", first_resource) == first)
+    assert(second:bind("input", second_resource) == second)
     assert(first:connect(second, first_resource) == first)
     return graph:build()
 end }
@@ -364,12 +364,12 @@ local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local shared = graph_utils.storage_buffer("shared", 16)
     local extra = graph_utils.storage_buffer("extra", 32)
-    local aliases = { input = shared }
+    local bindings = { input = shared }
     local graph = graph_utils.graph()
-    local first = graph:add({ id = "first", type = "registry_probe", aliases = aliases })
-    graph:add({ id = "second", type = "registry_probe", aliases = aliases })
-    first:alias("extra", extra)
-    assert(aliases.extra == nil)
+    local first = graph:add({ id = "first", type = "registry_probe", bindings = bindings })
+    graph:add({ id = "second", type = "registry_probe", bindings = bindings })
+    first:bind("extra", extra)
+    assert(bindings.extra == nil)
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -709,7 +709,7 @@ return { build = function()
     local producer = graph:compute("producer", { pipeline = compute_pipeline("producer") })
     local consumer = graph:compute_indirect("consumer", { pipeline = compute_pipeline("consumer"), indirect_buffer = resource })
     local foreign = graph_utils.graph():compute("foreign", { pipeline = compute_pipeline("foreign") })
-    consumer:alias("z_existing", other)
+    consumer:bind("z_existing", other)
     local invalid_calls = {
         function() producer:connect_all({ consumer, foreign }, resource) end,
         function() producer:connect(consumer, { resource, "invalid" }) end,
@@ -731,9 +731,9 @@ return { build = function()
         local succeeded = pcall(call)
         assert(not succeeded)
         assert(producer.edges == nil)
-        assert(consumer.aliases.a_input == nil)
-        assert(consumer.aliases.resource == nil)
-        assert(consumer.aliases.z_existing == other)
+        assert(consumer.bindings.a_input == nil)
+        assert(consumer.bindings.resource == nil)
+        assert(consumer.bindings.z_existing == other)
     end
     return graph:build()
 end }
@@ -819,8 +819,8 @@ local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local resource = graph_utils.storage_buffer("shared", 16)
     local graph = graph_utils.graph()
-    local task = graph:add({ id = "first", type = "registry_probe", aliases = { input = resource } })
-    task:alias("input", resource)
+    local task = graph:add({ id = "first", type = "registry_probe", bindings = { input = resource } })
+    task:bind("input", resource)
     return graph:build()
 end }
 )", DataValue::make_map()), std::runtime_error);
@@ -845,8 +845,8 @@ end }}
         std::runtime_error);
     // Branches share one resource map, so a task-local id cannot name two resources.
     EXPECT_THROW((void)run(R"(graph:multiplex("m", {
-        branches:add({ id = "a", type = "registry_probe", aliases = { input = first } }),
-        branches:add({ id = "b", type = "registry_probe", aliases = { input = second } }),
+        branches:add({ id = "a", type = "registry_probe", bindings = { input = first } }),
+        branches:add({ id = "b", type = "registry_probe", bindings = { input = second } }),
     }, { select = { event = "e" } }))"),
         std::runtime_error);
     // Ordering and gating belong to the multiplexer, not to a branch.
@@ -855,8 +855,8 @@ end }}
         std::runtime_error);
     EXPECT_THROW((void)run(R"(graph:multiplex("m", { branches:add({ id = "a", type = "registry_probe" }) }, {}))"), std::runtime_error);
     EXPECT_NO_THROW((void)run(R"(graph:multiplex("m", {
-        branches:add({ id = "a", type = "registry_probe", aliases = { input = first } }),
-        branches:add({ id = "b", type = "registry_probe", aliases = { input = first } }),
+        branches:add({ id = "a", type = "registry_probe", bindings = { input = first } }),
+        branches:add({ id = "b", type = "registry_probe", bindings = { input = first } }),
     }, { select = { event = "e" } }))"));
 }
 
@@ -945,8 +945,8 @@ return { build = function()
     mesh.id = "changed_mesh"
     graphics.id = "changed_graphics"
     compute.id = "changed_compute"
-    -- A registered key does not reserve a task-local graph alias with the same name.
-    draw:alias("static_mesh", graph_utils.storage_buffer("buffer", 16))
+    -- A registered key does not reserve a task-local binding with the same name.
+    draw:bind("static_mesh", graph_utils.storage_buffer("buffer", 16))
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -988,7 +988,7 @@ return { build = function()
     graph:register_resource("unused", "CustomParams", { value = 3 }, "WhiteBirdEngine::MeshResourcesVK")
     assert(not pcall(function() graph:register_mesh("mesh", { mesh = "other" }) end))
     graph:draw_mesh("draw", { mesh = mesh, pipeline = { default = graphics }, parts = { "opaque" } })
-    graph:compute("compute", { pipeline = compute }):alias("input", image)
+    graph:compute("compute", { pipeline = compute }):bind("input", image)
     return graph:build()
 end }
 )", DataValue::make_map());
@@ -1075,9 +1075,9 @@ return { build = function()
     local buffer = graph:add_storage_buffer("buffer", 16)
     local producer = graph:compute("producer", { pipeline = compute })
     local consumer = graph:draw("consumer", { pipeline = graphics })
-    consumer:alias("valid", buffer)
+    consumer:bind("valid", buffer)
     producer:connect(consumer, buffer)
-    local aliases = consumer.aliases
+    local bindings = consumer.bindings
     local edges = producer.edges
     for _, resource in ipairs({ graph:add_mesh("mesh"), compute, graphics }) do
         local invalid_calls = {
@@ -1086,7 +1086,7 @@ return { build = function()
                 { pipeline = compute, indirect_buffer = resource } } }) end,
             function() graph:compute_sequential("invalid", { dispatches = {
                 { pipeline = compute, bindings = { invalid = resource } } } }) end,
-            function() consumer:alias("invalid", resource) end,
+            function() consumer:bind("invalid", resource) end,
             function() producer:connect(consumer, resource) end,
             function() producer:connect(consumer, { buffer, resource }) end,
             function() producer:connect_all({ consumer }, { buffer, resource }) end,
@@ -1100,12 +1100,12 @@ return { build = function()
         for _, call in ipairs(invalid_calls) do
             assert(not pcall(call))
             assert(#graph.tasks == 2)
-            assert(consumer.aliases == aliases and aliases.valid == buffer)
-            local alias_count = 0
-            for _ in pairs(aliases) do
-                alias_count = alias_count + 1
+            assert(consumer.bindings == bindings and bindings.valid == buffer)
+            local binding_count = 0
+            for _ in pairs(bindings) do
+                binding_count = binding_count + 1
             end
-            assert(alias_count == 1)
+            assert(binding_count == 1)
             assert(producer.edges == edges and #edges == 1)
         end
     end
@@ -1128,7 +1128,7 @@ local Graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local invalid_bindings = {
         function(graph, producer, consumer, buffer, resource)
-            graph:add({ id = "invalid", type = "registry_probe", aliases = { input = resource } })
+            graph:add({ id = "invalid", type = "registry_probe", bindings = { input = resource } })
         end,
         function(graph, producer, consumer, buffer, resource)
             graph:add({ id = "invalid", type = "registry_probe", uses = { resource } })
@@ -1140,17 +1140,17 @@ return { build = function()
             graph:add({ id = "invalid", type = "registry_probe", edges = { { to = consumer, resource = resource } } })
         end,
         function(graph, producer, consumer, buffer, resource)
-            consumer.aliases = { input = resource }
+            consumer.bindings = { input = resource }
         end,
         function(graph, producer, consumer, buffer, resource)
             producer.edges = { { to = consumer, resource = resource } }
         end,
         function(graph, producer, consumer, buffer, resource)
             buffer.dependencies = { resource }
-            consumer:alias("input", buffer)
+            consumer:bind("input", buffer)
         end,
         function(graph, producer, consumer, buffer, resource)
-            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { aliases = { input = resource } })
+            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { bindings = { input = resource } })
         end,
         function(graph, producer, consumer, buffer, resource)
             graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { uses = { resource } })
@@ -1225,14 +1225,14 @@ end
 return { build = function()
     local buffer = graph_utils.storage_buffer("commands", 64)
     local other = graph_utils.storage_buffer("other", 64)
-    local options = { aliases = { input = buffer } }
+    local options = { bindings = { input = buffer } }
     local params = { pipeline = compute_pipeline("pipeline"), indirect_buffer = buffer }
     local graph = graph_utils.graph()
     graph:compute_indirect("first", params, options)
     assert(params.indirect_buffer == buffer)
-    assert(options.aliases.input == buffer)
+    assert(options.bindings.input == buffer)
     params.indirect_buffer = other
-    options.aliases.input = other
+    options.bindings.input = other
     graph:compute_indirect("second", params, options)
     local dispatch = { pipeline = compute_pipeline("nested"), indirect_buffer = buffer, bindings = { shader_buffer = buffer } }
     graph:compute_sequential("sequence", { dispatches = { dispatch } })
@@ -1356,7 +1356,7 @@ return { build = function()
     local graph = graph_utils.graph()
     graph:compute_sequential("sequence", { dispatches = {
         { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands },
-    } }, { aliases = { commands = other } })
+    } }, { bindings = { commands = other } })
     return graph:build()
 end }
 )", DataValue::make_map()), std::runtime_error);
@@ -1401,15 +1401,15 @@ return { build = function(context)
     local graph = graph_utils.graph()
     if context.mode == "options" then
         graph:compute_indirect("dispatch", { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands },
-            { aliases = { commands = other } })
+            { bindings = { commands = other } })
     else
         local dispatch = graph:compute_indirect("dispatch", { pipeline = compute_pipeline("pipeline"), indirect_buffer = commands })
         if context.mode == "method" then
-            dispatch:alias("commands", other)
+            dispatch:bind("commands", other)
         elseif context.mode == "mutation" then
-            dispatch.aliases = { commands = other }
+            dispatch.bindings = { commands = other }
         else
-            dispatch:alias("commands", commands)
+            dispatch:bind("commands", commands)
         end
     end
     return graph:build()

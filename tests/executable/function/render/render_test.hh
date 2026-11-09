@@ -472,18 +472,6 @@ private:
 using RenderTestExtentFactory = std::function<VkExtent2D(const RendGraphContextVK&)>;
 
 /**
- * @brief Make a render test extent factory that ignores the render graph context.
- *
- * @param p_extent The extent the factory returns.
- * @return The factory.
- */
-inline RenderTestExtentFactory make_fixed_extent_factory(VkExtent2D p_extent) {
-    return [p_extent](const RendGraphContextVK& /*p_context*/) {
-        return p_extent;
-    };
-}
-
-/**
  * @struct SubmeshDrawBuffersVK
  * @brief The graph resources and vertex input that draw one submesh with RTRunGraphicsPipelineVK. Copyable and movable.
  */

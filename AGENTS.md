@@ -135,7 +135,7 @@ For non-trivial implementation tasks:
   register the pipelines they name this way; C++ registers only what C++ tasks use or what needs a loaded handle.
   `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`; `graph:build()` emits only those
-  reachable from tasks. Tasks name a registered task type and pass `params` to it; aliases (`task:alias()`,
+  reachable from tasks. Tasks name a registered task type and pass `params` to it; bindings (`task:bind()`,
   `color_target()`, `depth_target()`) map task-local ids to graph resources, and `uses` only keeps resources reachable.
   Edges come only from explicit connections (`graph:chain()`, `task:connect()`, `connect_all()`, `inputs_from()`),
   emitted as `connect` entries (`{ to = <task id>, resource = <resource id> }`). An optional `trigger` wraps the task with `RTTriggeredVK`, and an
@@ -143,7 +143,7 @@ For non-trivial implementation tasks:
   pass a toggle's current state through the context.
 - A task that records one of several alternatives is a multiplexer (`RTMultiplexerVK`): build the branches with the typed
   constructors on a scratch `Graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
-  It is one graph node reporting every branch's accesses; the branches share its aliases and one queue family, and
+  It is one graph node reporting every branch's accesses; the branches share its bindings and one queue family, and
   `RTMultiplexerVK::Command` events select the branch. Pass the current branch through the context, as for a toggle.
 - Task `pipeline` params are registration keys of pipelines on the task's graph, registered by the callback or the recipe.
 - Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
@@ -175,7 +175,7 @@ For non-trivial implementation tasks:
   frame's consumers, and `run_graphics_pipeline_indirect` for non-mesh indexed indirect draws.
 - Tasks that need application objects (for example the ImGui overlay) are built in C++ and supplied with
   `RendGraphRecipeImportsVK::add_task()`; the recipe references each with `graph:import_task(id)` (emitted as
-  `{ id = <task id>, import = true }`) and connects it like any task. Imported tasks set no `type`, `params`, `aliases`, `trigger`, or `toggle`, and supplied and imported
+  `{ id = <task id>, import = true }`) and connects it like any task. Imported tasks set no `type`, `params`, `bindings`, `trigger`, or `toggle`, and supplied and imported
   tasks must match, like resource imports.
 - Recipes and their feature modules are Teal. `templates/teal_types.d.tl.jinja` generates the Teal declarations of the
   `WBE_REFLECT_SCRIPT` classes and enums (the `reflect_script` attribute group; such a class is also a static serializable
@@ -198,7 +198,7 @@ For non-trivial implementation tasks:
   type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)`, `WBE_RECIPE_RESOURCE(task_local)`, or
   `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor takes resource
   handles there, and only handles: a script names a resource by id with `graph:reference(id)`, never a string, and a
-  task-local field lowers its handle to the graph id with an identity alias. Do not hand-write constructors or
+  task-local field lowers its handle to the graph id with an identity binding. Do not hand-write constructors or
   handle-bearing params records.
 
 ### Scripts
