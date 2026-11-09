@@ -18,35 +18,36 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
+#include "function/render/rd_typed.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/debug_data_vk.hh"
-#include "function/render_vk/rend_graph_resource_diff_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_graph_resource_diff_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render_vk/ro_compute_pipeline_vk.hh"
+#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/ro_sampler_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render/rd_typed.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "function/render_vk/rr_compute_pipeline_vk.hh"
 #include "function/render_vk/rr_graphics_pipeline_vk.hh"
 #include "function/render_vk/rr_image_vk.hh"
 #include "function/render_vk/rr_mesh_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
+#include "generated/serializables_sd.gen.hh" // IWYU pragma: keep (RDTyped<TParams>::serialize() instantiations)
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
@@ -57,13 +58,13 @@
 #include <format>
 #include <functional>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <utility>
-#include <variant>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
@@ -355,15 +356,12 @@ ROSamplerVK::Builder make_sampler_builder(const RendSamplerDescVK& p_desc) {
     return builder;
 }
 
-Ref<ROImageViewVK> make_image_view(Ref<ROImageVK> p_image,
-    std::string_view p_view_id,
-    std::string_view p_image_id,
-    const RendImageViewDescVK& p_desc) {
+Ref<ROImageViewVK> make_image_view(
+    Ref<ROImageVK> p_image, std::string_view p_view_id, std::string_view p_image_id, const RendImageViewDescVK& p_desc) {
     const RendImageViewDescVK& desc = p_desc;
     const ROImageVK::ExposedFields& image = p_image->fields();
     if (desc.base_mip_level >= image.mipmap_levels || desc.base_array_layer >= image.layers_count) {
-        throw std::runtime_error(
-            std::format("RenderGraphVK: image view '{}' starts outside image '{}'.", p_view_id, p_image_id));
+        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' starts outside image '{}'.", p_view_id, p_image_id));
     }
     const uint32_t mip_level_count =
         desc.mip_level_count == VK_REMAINING_MIP_LEVELS ? image.mipmap_levels - desc.base_mip_level : desc.mip_level_count;
@@ -371,8 +369,7 @@ Ref<ROImageViewVK> make_image_view(Ref<ROImageVK> p_image,
         desc.layer_count == VK_REMAINING_ARRAY_LAYERS ? image.layers_count - desc.base_array_layer : desc.layer_count;
     if (mip_level_count == 0 || layer_count == 0 || mip_level_count > image.mipmap_levels - desc.base_mip_level ||
         layer_count > image.layers_count - desc.base_array_layer) {
-        throw std::runtime_error(
-            std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_id, p_image_id));
+        throw std::runtime_error(std::format("RenderGraphVK: image view '{}' exceeds image '{}'.", p_view_id, p_image_id));
     }
     return p_image->get_image_view_ref(desc.view_type.value_or(image.view_type),
         desc.format.value_or(image.format),
@@ -497,13 +494,14 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
         RendBufferDescVK desc = buffer_decl.factory(p_context);
         validate_buffer_desc(buffer_decl.res_id, desc);
         const bool per_frame = desc.per_frame;
-        signatures.emplace(
-            buffer_decl.res_id, RendResSignatureVK{.kind = RendResKindVK::BUFFER, .desc = std::move(desc), .per_frame = per_frame});
+        signatures.emplace(buffer_decl.res_id,
+            RendResSignatureVK{.kind = RendResKindVK::BUFFER, .desc = std::move(desc), .per_frame = per_frame});
     }
     for (const RendImageDeclVK& image_decl : p_desc.images) {
         const RendImageDescVK desc = image_decl.factory(p_context);
         validate_image_desc(image_decl.res_id, desc);
-        signatures.emplace(image_decl.res_id, RendResSignatureVK{.kind = RendResKindVK::IMAGE, .desc = desc, .per_frame = desc.per_frame});
+        signatures.emplace(
+            image_decl.res_id, RendResSignatureVK{.kind = RendResKindVK::IMAGE, .desc = desc, .per_frame = desc.per_frame});
     }
     for (const RendImageViewDeclVK& view_decl : p_desc.image_views) {
         // A view views a graph-owned image or an imported one, and has one object per object of the image.
@@ -513,8 +511,8 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
             image_per_frame = owned_image->second.per_frame;
         }
         const auto imported_image = p_imports.find(view_decl.image_id);
-        if (!image_per_frame.has_value() && imported_image != p_imports.end() && imported_image->second->container != MEM_NULL &&
-            imported_image->second->res_type_id == TypeUUID<ROImageVK>::UUID) {
+        if (!image_per_frame.has_value() && imported_image != p_imports.end() &&
+            imported_image->second->container != MEM_NULL && imported_image->second->res_type_id == TypeUUID<ROImageVK>::UUID) {
             image_per_frame = imported_image->second->container.dynamic_cast_ref<ROCMultislotsVK>() != MEM_NULL;
         }
         if (!image_per_frame.has_value()) {
@@ -531,7 +529,8 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
             });
     }
     for (const RendSamplerDeclVK& sampler_decl : p_desc.samplers) {
-        signatures.emplace(sampler_decl.res_id, RendResSignatureVK{.kind = RendResKindVK::SAMPLER, .desc = sampler_decl.factory(p_context)});
+        signatures.emplace(
+            sampler_decl.res_id, RendResSignatureVK{.kind = RendResKindVK::SAMPLER, .desc = sampler_decl.factory(p_context)});
     }
     return signatures;
 }
@@ -624,8 +623,8 @@ std::string require_resource_key(const ResourceUnit* p_resource, std::string_vie
         throw std::runtime_error(std::format("Failed to register resource '{}': the {} handle is null.", p_key, p_resource_kind));
     }
     if (p_resource->resource_key == nullptr || p_resource->resource_key[0] == '\0') {
-        throw std::runtime_error(
-            std::format("Failed to register resource '{}': the {} has no resource key; register resources the ResourceManager loaded.", p_key, p_resource_kind));
+        throw std::runtime_error(std::format(
+            "Failed to register resource '{}': the {} has no resource key; register resources the ResourceManager loaded.", p_key, p_resource_kind));
     }
     return std::string(p_resource->resource_key);
 }
@@ -641,13 +640,11 @@ Ref<ROImageViewVK> RenderGraphVK::register_image(std::string_view p_key, RDParam
 }
 
 Ref<ROGraphicsPipelineVK> RenderGraphVK::register_graphics_pipeline(std::string_view p_key, RDParamsGraphicsPipelineVK p_params) {
-    return register_resource(p_key, RDTyped<RDParamsGraphicsPipelineVK>(std::move(p_params)))
-        .dynamic_cast_ref<ROGraphicsPipelineVK>();
+    return register_resource(p_key, RDTyped<RDParamsGraphicsPipelineVK>(std::move(p_params))).dynamic_cast_ref<ROGraphicsPipelineVK>();
 }
 
 Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(std::string_view p_key, RDParamsComputePipelineVK p_params) {
-    return register_resource(p_key, RDTyped<RDParamsComputePipelineVK>(std::move(p_params)))
-        .dynamic_cast_ref<ROComputePipelineVK>();
+    return register_resource(p_key, RDTyped<RDParamsComputePipelineVK>(std::move(p_params))).dynamic_cast_ref<ROComputePipelineVK>();
 }
 
 Ref<MeshResourcesVK> RenderGraphVK::register_mesh(std::string_view p_key, RefRes<RUMesh3D> p_mesh, RDParamsMeshVK p_options) {
@@ -908,11 +905,11 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
     }
     // A subgraph is added after the subgraphs nested in it, so walking the records backwards lists every parent first.
     metadata.subgraphs.reserve(subgraphs.size());
-    for (auto subgraph = subgraphs.rbegin(); subgraph != subgraphs.rend(); ++subgraph) {
+    for (const auto& subgraph : subgraphs | std::views::reverse) {
         const RendTaskID parent_id = innermost([&subgraph](const RendSubgraphVK& p_candidate) {
-            return subgraph->subgraph_id.starts_with(std::format("{}.", p_candidate.subgraph_id));
+            return subgraph.subgraph_id.starts_with(std::format("{}.", p_candidate.subgraph_id));
         });
-        metadata.subgraphs.push_back({.subgraph_id = subgraph->subgraph_id, .parent_subgraph_id = parent_id});
+        metadata.subgraphs.push_back({.subgraph_id = subgraph.subgraph_id, .parent_subgraph_id = parent_id});
     }
     metadata.edges.reserve(resource_edges.size());
     for (const auto& edge : resource_edges) {
@@ -1029,7 +1026,8 @@ void RenderGraphVK::apply_descriptor(const RendGraphDescVK& p_desc) {
     Map<std::string, Ref<RendResVK>, RenderAllocator> imports = index_resources(p_desc);
     validate_graph_resource_ids(p_desc, imports);
     RendGraphResourceDiffVK::Signatures next = evaluate_signatures(p_desc, imports, context, render_data->allocator);
-    const RendGraphResourceDiffVK::Actions actions = RendGraphResourceDiffVK::plan(rebuild_state->signatures, next, render_data->allocator);
+    const RendGraphResourceDiffVK::Actions actions =
+        RendGraphResourceDiffVK::plan(rebuild_state->signatures, next, render_data->allocator);
 
     // The new configuration is valid; switch to it. Containers create their objects from these signatures.
     rebuild_state->signatures = std::move(next);
@@ -1222,6 +1220,206 @@ Vector<std::string, RenderAllocator> RenderGraphVK::expand_resource_id(std::stri
     return result;
 }
 
+namespace {
+
+using TaskIDs = Vector<RendTaskID, RenderAllocator>;
+
+// Replaces every edge to or from a subgraph with edges between its members; see RendSubgraphVK. An incoming edge on a
+// resource reaches the subgraph's entries on it (the members that access it with no edge on it from another member), and an
+// outgoing edge leaves its exits (the members that access it with no edge on it to another member). Nested subgraphs are
+// resolved the same way. Neither copyable nor movable; it views the task and subgraph lists, which must outlive it.
+class SubgraphEdgeResolver final {
+public:
+    // Whether a task accesses a resource, or an element of the resource list it names.
+    using AccessQuery = std::function<bool(std::string_view p_task_id, std::string_view p_resource_id)>;
+
+    SubgraphEdgeResolver() = delete;
+    ~SubgraphEdgeResolver() = default;
+    SubgraphEdgeResolver(const SubgraphEdgeResolver&) = delete;
+    SubgraphEdgeResolver(SubgraphEdgeResolver&&) noexcept = delete;
+    SubgraphEdgeResolver& operator=(const SubgraphEdgeResolver&) = delete;
+    SubgraphEdgeResolver& operator=(SubgraphEdgeResolver&&) noexcept = delete;
+
+    SubgraphEdgeResolver(RenderAllocator* p_allocator,
+        const Vector<RendTaskDescVK, RenderAllocator>& p_tasks,
+        const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs,
+        AccessQuery p_accesses)
+        : allocator(p_allocator), tasks(p_tasks), subgraphs(p_subgraphs), accesses(std::move(p_accesses)), resolving(p_allocator) {
+    }
+
+    // The tasks with their own edges and the subgraphs' edges resolved to edges between tasks.
+    Vector<RendTaskDescVK, RenderAllocator> resolve() {
+        Vector<RendTaskDescVK, RenderAllocator> result = tasks;
+        for (RendTaskDescVK& task : result) {
+            task.next.clear();
+        }
+        resolve_task_edges(result);
+        resolve_subgraph_exit_edges(result);
+        return result;
+    }
+
+private:
+    RenderAllocator* allocator;
+    const Vector<RendTaskDescVK, RenderAllocator>& tasks;
+    const Vector<RendSubgraphVK, RenderAllocator>& subgraphs;
+    AccessQuery accesses;
+    // The boundaries being resolved; resolving one again means the subgraph edges form a cycle.
+    Vector<std::string, RenderAllocator> resolving;
+
+    const RendSubgraphVK* find_subgraph(std::string_view p_id) const {
+        const auto subgraph = std::ranges::find_if(subgraphs, [p_id](const RendSubgraphVK& p_subgraph) {
+            return p_subgraph.subgraph_id == p_id;
+        });
+        return subgraph == subgraphs.end() ? nullptr : &*subgraph;
+    }
+
+    const RendTaskDescVK& get_task(std::string_view p_id) const {
+        const auto task = std::ranges::find_if(tasks, [p_id](const RendTaskDescVK& p_task) {
+            return p_task.task_id == p_id;
+        });
+        WBE_DEBUG_ASSERT(task != tasks.end());
+        return *task;
+    }
+
+    static RendTaskDescVK& get_result_task(Vector<RendTaskDescVK, RenderAllocator>& p_result, std::string_view p_id) {
+        const auto task = std::ranges::find_if(p_result, [p_id](const RendTaskDescVK& p_task) {
+            return p_task.task_id == p_id;
+        });
+        WBE_DEBUG_ASSERT(task != p_result.end());
+        return *task;
+    }
+
+    static void add_edge(RendTaskDescVK& p_task, const RendTaskID& p_next_task_id, const std::string& p_resource_id) {
+        const bool exists = std::ranges::any_of(p_task.next, [&](const RendResEdgeDescVK& p_edge) {
+            return p_edge.next_task_id == p_next_task_id && p_edge.res_id == p_resource_id;
+        });
+        if (!exists) {
+            p_task.next.push_back({.next_task_id = p_next_task_id, .res_id = p_resource_id});
+        }
+    }
+
+    static bool is_member(const RendSubgraphVK& p_subgraph, std::string_view p_id) {
+        return std::ranges::find(p_subgraph.members, p_id) != p_subgraph.members.end();
+    }
+
+    // The tasks an edge to p_id on the resource reaches: the task itself, or a subgraph's entries.
+    TaskIDs edge_targets(std::string_view p_id, std::string_view p_resource_id) {
+        if (const RendSubgraphVK* subgraph = find_subgraph(p_id)) {
+            return boundary(*subgraph, p_resource_id, true);
+        }
+        TaskIDs result(allocator);
+        result.emplace_back(p_id);
+        return result;
+    }
+
+    // The members at the boundary of a subgraph on a resource: the entries without an edge from another member, or the
+    // exits without an edge to another member.
+    TaskIDs boundary(const RendSubgraphVK& p_subgraph, std::string_view p_resource_id, bool p_entries) {
+        const std::string key = std::format("{} {} {}", p_subgraph.subgraph_id, p_resource_id, p_entries ? "entries" : "exits");
+        if (std::ranges::find(resolving, key) != resolving.end()) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: the edges of subgraph '{}' on resource '{}' form a cycle.", p_subgraph.subgraph_id, p_resource_id));
+        }
+        resolving.push_back(key);
+        const TaskIDs linked = collect_linked_members(p_subgraph, p_resource_id, p_entries);
+        TaskIDs result = select_unlinked_accessors(p_subgraph, p_resource_id, linked);
+        resolving.pop_back();
+        return result;
+    }
+
+    // The members that an internal edge on the resource reaches (for entries) or leaves (for exits), through the members'
+    // own edges and through the exits of nested subgraphs.
+    TaskIDs collect_linked_members(const RendSubgraphVK& p_subgraph, std::string_view p_resource_id, bool p_entries) {
+        TaskIDs linked(allocator);
+        for (const RendTaskID& member : p_subgraph.members) {
+            TaskIDs source(allocator);
+            source.push_back(member);
+            add_internal_links(p_subgraph, p_resource_id, p_entries, source, get_task(member).next, linked);
+        }
+        const std::string nested_prefix = std::format("{}.", p_subgraph.subgraph_id);
+        for (const RendSubgraphVK& nested : subgraphs) {
+            if (!nested.subgraph_id.starts_with(nested_prefix)) {
+                continue;
+            }
+            const bool uses_resource = std::ranges::any_of(nested.next, [p_resource_id](const RendResEdgeDescVK& p_edge) {
+                return p_edge.res_id == p_resource_id;
+            });
+            if (uses_resource) {
+                add_internal_links(p_subgraph, p_resource_id, p_entries, boundary(nested, p_resource_id, false), nested.next, linked);
+            }
+        }
+        return linked;
+    }
+
+    // Record the members p_edges on the resource link: the members they reach, for entries, or p_sources, for exits.
+    void add_internal_links(const RendSubgraphVK& p_subgraph,
+        std::string_view p_resource_id,
+        bool p_entries,
+        const TaskIDs& p_sources,
+        const Vector<RendResEdgeDescVK, RenderAllocator>& p_edges,
+        TaskIDs& p_linked) {
+        for (const RendResEdgeDescVK& edge : p_edges) {
+            if (edge.res_id != p_resource_id) {
+                continue;
+            }
+            for (const RendTaskID& target : edge_targets(edge.next_task_id, p_resource_id)) {
+                if (!is_member(p_subgraph, target)) {
+                    continue;
+                }
+                if (p_entries) {
+                    p_linked.push_back(target);
+                } else {
+                    p_linked.insert(p_linked.end(), p_sources.begin(), p_sources.end());
+                }
+            }
+        }
+    }
+
+    // The members that access the resource and are not linked internally.
+    TaskIDs select_unlinked_accessors(const RendSubgraphVK& p_subgraph, std::string_view p_resource_id, const TaskIDs& p_linked) const {
+        TaskIDs result(allocator);
+        for (const RendTaskID& member : p_subgraph.members) {
+            if (accesses(member, p_resource_id) && std::ranges::find(p_linked, member) == p_linked.end()) {
+                result.push_back(member);
+            }
+        }
+        if (result.empty()) {
+            throw std::runtime_error(std::format("RenderGraphVK: subgraph '{}' is connected on resource '{}', but none of its tasks accesses it.",
+                p_subgraph.subgraph_id,
+                p_resource_id));
+        }
+        return result;
+    }
+
+    // Each task's own edges, with edges to a subgraph redirected to its entries.
+    void resolve_task_edges(Vector<RendTaskDescVK, RenderAllocator>& p_result) {
+        for (const RendTaskDescVK& task : tasks) {
+            RendTaskDescVK& resolved = get_result_task(p_result, task.task_id);
+            for (const RendResEdgeDescVK& edge : task.next) {
+                for (const RendTaskID& target : edge_targets(edge.next_task_id, edge.res_id)) {
+                    add_edge(resolved, target, edge.res_id);
+                }
+            }
+        }
+    }
+
+    // Each subgraph's own edges, leaving from its exits.
+    void resolve_subgraph_exit_edges(Vector<RendTaskDescVK, RenderAllocator>& p_result) {
+        for (const RendSubgraphVK& subgraph : subgraphs) {
+            for (const RendResEdgeDescVK& edge : subgraph.next) {
+                const TaskIDs targets = edge_targets(edge.next_task_id, edge.res_id);
+                for (const RendTaskID& source : boundary(subgraph, edge.res_id, false)) {
+                    for (const RendTaskID& target : targets) {
+                        add_edge(get_result_task(p_result, source), target, edge.res_id);
+                    }
+                }
+            }
+        }
+    }
+};
+
+} // namespace
+
 Vector<RendTaskDescVK, RenderAllocator> RenderGraphVK::resolve_subgraph_edges(
     const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) const {
     for (const RendSubgraphVK& subgraph : p_subgraphs) {
@@ -1229,23 +1427,6 @@ Vector<RendTaskDescVK, RenderAllocator> RenderGraphVK::resolve_subgraph_edges(
             throw std::runtime_error(std::format("RenderGraphVK: subgraph '{}' has the id of a task.", subgraph.subgraph_id));
         }
     }
-    const auto find_subgraph = [&p_subgraphs](std::string_view p_id) -> const RendSubgraphVK* {
-        for (const RendSubgraphVK& subgraph : p_subgraphs) {
-            if (subgraph.subgraph_id == p_id) {
-                return &subgraph;
-            }
-        }
-        return nullptr;
-    };
-    const auto find_task = [&p_tasks](std::string_view p_id) -> const RendTaskDescVK* {
-        for (const RendTaskDescVK& task : p_tasks) {
-            if (task.task_id == p_id) {
-                return &task;
-            }
-        }
-        return nullptr;
-    };
-    // Whether a task accesses a resource, or an element of the resource list it names.
     const auto accesses = [this](std::string_view p_task_id, std::string_view p_resource_id) {
         const Ref<RGNode> node = find_node(p_task_id);
         WBE_DEBUG_ASSERT(node != MEM_NULL);
@@ -1255,119 +1436,7 @@ Vector<RendTaskDescVK, RenderAllocator> RenderGraphVK::resolve_subgraph_edges(
         };
         return std::ranges::any_of(node->reads, matches) || std::ranges::any_of(node->writes, matches);
     };
-    using TaskIDs = Vector<RendTaskID, RenderAllocator>;
-    // The members at the boundary of a subgraph on a resource: the entries without an edge from another member, or the exits
-    // without an edge to another member.
-    std::function<TaskIDs(const RendSubgraphVK&, std::string_view, bool)> boundary;
-    // The tasks an edge to p_id on the resource reaches.
-    const auto edge_targets = [&](std::string_view p_id, std::string_view p_resource_id) {
-        if (const RendSubgraphVK* subgraph = find_subgraph(p_id)) {
-            return boundary(*subgraph, p_resource_id, true);
-        }
-        TaskIDs result(render_data->allocator);
-        result.emplace_back(p_id);
-        return result;
-    };
-    // The boundaries being resolved; resolving one again means the subgraph edges form a cycle.
-    Vector<std::string, RenderAllocator> resolving(render_data->allocator);
-    boundary = [&](const RendSubgraphVK& p_subgraph, std::string_view p_resource_id, bool p_entries) {
-        const std::string key = std::format("{} {} {}", p_subgraph.subgraph_id, p_resource_id, p_entries ? "entries" : "exits");
-        if (std::ranges::find(resolving, key) != resolving.end()) {
-            throw std::runtime_error(std::format(
-                "RenderGraphVK: the edges of subgraph '{}' on resource '{}' form a cycle.", p_subgraph.subgraph_id, p_resource_id));
-        }
-        resolving.push_back(key);
-        const auto is_member = [&p_subgraph](std::string_view p_id) {
-            return std::ranges::find(p_subgraph.members, p_id) != p_subgraph.members.end();
-        };
-        TaskIDs linked(render_data->allocator);
-        const auto add_internal_edges = [&](const TaskIDs& p_sources, const Vector<RendResEdgeDescVK, RenderAllocator>& p_edges) {
-            for (const RendResEdgeDescVK& edge : p_edges) {
-                if (edge.res_id != p_resource_id) {
-                    continue;
-                }
-                for (const RendTaskID& target : edge_targets(edge.next_task_id, p_resource_id)) {
-                    if (!is_member(target)) {
-                        continue;
-                    }
-                    if (p_entries) {
-                        linked.push_back(target);
-                    } else {
-                        linked.insert(linked.end(), p_sources.begin(), p_sources.end());
-                    }
-                }
-            }
-        };
-        for (const RendTaskID& member : p_subgraph.members) {
-            const RendTaskDescVK* task = find_task(member);
-            WBE_DEBUG_ASSERT(task != nullptr);
-            TaskIDs source(render_data->allocator);
-            source.push_back(member);
-            add_internal_edges(source, task->next);
-        }
-        const std::string nested_prefix = std::format("{}.", p_subgraph.subgraph_id);
-        for (const RendSubgraphVK& nested : p_subgraphs) {
-            if (nested.subgraph_id.starts_with(nested_prefix)) {
-                bool uses_resource = std::ranges::any_of(nested.next, [p_resource_id](const RendResEdgeDescVK& p_edge) {
-                    return p_edge.res_id == p_resource_id;
-                });
-                if (uses_resource) {
-                    add_internal_edges(boundary(nested, p_resource_id, false), nested.next);
-                }
-            }
-        }
-        TaskIDs result(render_data->allocator);
-        for (const RendTaskID& member : p_subgraph.members) {
-            if (accesses(member, p_resource_id) && std::ranges::find(linked, member) == linked.end()) {
-                result.push_back(member);
-            }
-        }
-        if (result.empty()) {
-            throw std::runtime_error(std::format(
-                "RenderGraphVK: subgraph '{}' is connected on resource '{}', but none of its tasks accesses it.", p_subgraph.subgraph_id, p_resource_id));
-        }
-        resolving.pop_back();
-        return result;
-    };
-
-    Vector<RendTaskDescVK, RenderAllocator> result = p_tasks;
-    const auto add_edge = [](RendTaskDescVK& p_task, const RendTaskID& p_next_task_id, const std::string& p_resource_id) {
-        const bool exists = std::ranges::any_of(p_task.next, [&](const RendResEdgeDescVK& p_edge) {
-            return p_edge.next_task_id == p_next_task_id && p_edge.res_id == p_resource_id;
-        });
-        if (!exists) {
-            p_task.next.push_back({.next_task_id = p_next_task_id, .res_id = p_resource_id});
-        }
-    };
-    const auto find_result_task = [&result](std::string_view p_id) -> RendTaskDescVK& {
-        const auto task = std::ranges::find_if(result, [p_id](const RendTaskDescVK& p_task) {
-            return p_task.task_id == p_id;
-        });
-        WBE_DEBUG_ASSERT(task != result.end());
-        return *task;
-    };
-    for (RendTaskDescVK& task : result) {
-        task.next.clear();
-    }
-    for (const RendTaskDescVK& task : p_tasks) {
-        RendTaskDescVK& resolved = find_result_task(task.task_id);
-        for (const RendResEdgeDescVK& edge : task.next) {
-            for (const RendTaskID& target : edge_targets(edge.next_task_id, edge.res_id)) {
-                add_edge(resolved, target, edge.res_id);
-            }
-        }
-    }
-    for (const RendSubgraphVK& subgraph : p_subgraphs) {
-        for (const RendResEdgeDescVK& edge : subgraph.next) {
-            const TaskIDs targets = edge_targets(edge.next_task_id, edge.res_id);
-            for (const RendTaskID& source : boundary(subgraph, edge.res_id, false)) {
-                for (const RendTaskID& target : targets) {
-                    add_edge(find_result_task(source), target, edge.res_id);
-                }
-            }
-        }
-    }
-    return result;
+    return SubgraphEdgeResolver(render_data->allocator, p_tasks, p_subgraphs, accesses).resolve();
 }
 
 void RenderGraphVK::add_resource_edges(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks) {

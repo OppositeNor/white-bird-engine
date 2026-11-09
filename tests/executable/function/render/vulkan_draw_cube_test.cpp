@@ -14,7 +14,6 @@
 */
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
-#include "core/memory/reference_raw.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
@@ -34,7 +33,6 @@
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/geometric.hpp"
@@ -46,7 +44,6 @@
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -56,7 +53,6 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
