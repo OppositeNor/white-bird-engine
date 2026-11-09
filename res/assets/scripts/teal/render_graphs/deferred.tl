@@ -139,7 +139,7 @@ local function make_pipelines(p_context: wbe.DeferredRecipeContext): Pipelines
     end
     local shadow_formats = { formats.rsm_flux, formats.rsm_normal, formats.shadow_moments }
     local gbuffer_formats = { formats.gbuffer_albedo, formats.gbuffer_normal, formats.gbuffer_rma }
-    local compute = Graph.shader_compute_pipeline
+    local shader_pipeline = Graph.shader_compute_pipeline
     return {
         shadow_opaque = graphics("deferred_shadow_opaque", "rsm_spot", shadow_formats, formats.shadowmap_depth),
         shadow_double_sided = graphics("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats,
@@ -151,16 +151,16 @@ local function make_pipelines(p_context: wbe.DeferredRecipeContext): Pipelines
             gbuffer_formats, formats.gbuffer_depth),
         gbuffer_dynamic = graphics("deferred_gbuffer_dynamic", "deferred_gbuffer_dynamic", gbuffer_formats,
             formats.gbuffer_depth),
-        shadow_sat_horizontal = compute("shadow_moments_summed_area_table_horizontal_shader"),
-        shadow_sat_vertical = compute("shadow_moments_summed_area_table_vertical_shader"),
-        direct_lighting = compute("direct_lighting_shader"),
-        direct_lighting_sat = compute("direct_lighting_summed_area_table_shader"),
-        indirect_lighting = compute("indirect_lighting_rsm_shader"),
-        indirect_lighting_debug_view = compute("indirect_lighting_rsm_debug_view_shader"),
-        combine_lighting = compute("combine_lighting_shader"),
-        extract_bloom = compute("bloom_shader_extract"),
-        blur_ping = compute("kawase_blur_pong_write_shader"),
-        blur_pong = compute("kawase_blur_ping_write_shader"),
+        shadow_sat_horizontal = shader_pipeline("shadow_moments_summed_area_table_horizontal_shader"),
+        shadow_sat_vertical = shader_pipeline("shadow_moments_summed_area_table_vertical_shader"),
+        direct_lighting = shader_pipeline("direct_lighting_shader"),
+        direct_lighting_sat = shader_pipeline("direct_lighting_summed_area_table_shader"),
+        indirect_lighting = shader_pipeline("indirect_lighting_rsm_shader"),
+        indirect_lighting_debug_view = shader_pipeline("indirect_lighting_rsm_debug_view_shader"),
+        combine_lighting = shader_pipeline("combine_lighting_shader"),
+        extract_bloom = shader_pipeline("bloom_shader_extract"),
+        blur_ping = shader_pipeline("kawase_blur_pong_write_shader"),
+        blur_pong = shader_pipeline("kawase_blur_ping_write_shader"),
         present = graphics("present_post_processing", "present_post_processing", { p_context.swap_chain_format }),
         light_billboard = graphics("deferred_light_billboard_pipeline", "billboard_face_camera_depth_tested_pipeline",
             { p_context.swap_chain_format }, formats.gbuffer_depth),
