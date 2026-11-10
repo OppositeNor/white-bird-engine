@@ -62,13 +62,13 @@ local {{ constructor.method }}_fields: {render_graph_tasks.ResourceField} = {
 {% endfor %}
 
 -- Install the constructors on a graph. Each passes its id, task type, params, options, and resource fields to make_task.
-function render_graph_tasks.install(p_graph: render_graph.Graph,
-    p_make_task: function(p_id: string, p_type: string, p_params: any, p_options: render_graph.TaskOptions,
-        p_fields: {render_graph_tasks.ResourceField}): render_graph.Task)
+function render_graph_tasks.install(graph: render_graph.Graph,
+    make_task: function(id: string, type_name: string, params: any, options: render_graph.TaskOptions,
+        fields: {render_graph_tasks.ResourceField}): render_graph.Task)
 {% for constructor in api.constructors %}
-    p_graph.{{ constructor.method }} = function(_self: render_graph.Graph, p_id: string, p_params: any,
-        p_options?: render_graph.TaskOptions): render_graph.Task
-        return p_make_task(p_id, "{{ constructor.type }}", p_params, p_options, {{ constructor.method }}_fields)
+    graph.{{ constructor.method }} = function(_self: render_graph.Graph, id: string, params: any,
+        options?: render_graph.TaskOptions): render_graph.Task
+        return make_task(id, "{{ constructor.type }}", params, options, {{ constructor.method }}_fields)
     end
 {% endfor %}
 end

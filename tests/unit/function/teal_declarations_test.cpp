@@ -70,11 +70,11 @@ TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks
     EXPECT_NE(constructors.find("local type render_graph = require(\"render_graph_utils.render_graph\")"), std::string::npos);
     EXPECT_EQ(constructors.find("require(\"render_graph_utils.render_graph_utils\")"), std::string::npos);
     // WBE_RENDER_TASK(<method>) names a constructor, which creates the task type of the class's first serialization alias.
-    EXPECT_NE(declarations.find("        compute: function(self: Graph, p_id: string, p_params: RTParamsRunComputePipelineVK,\n"),
+    EXPECT_NE(declarations.find("        compute: function(self: Graph, id: string, params: RTParamsRunComputePipelineVK,\n"),
         std::string::npos);
-    EXPECT_NE(constructors.find("p_make_task(p_id, \"run_compute_pipeline\", p_params, p_options, compute_fields)"), std::string::npos);
+    EXPECT_NE(constructors.find("make_task(id, \"run_compute_pipeline\", params, options, compute_fields)"), std::string::npos);
     // Resource-bearing params are generated directly in the shared API without per-task aliases or generic bindings.
-    EXPECT_NE(declarations.find("p_params: RTParamsGraphicsDrawMeshVK,\n"), std::string::npos);
+    EXPECT_NE(declarations.find("params: RTParamsGraphicsDrawMeshVK,\n"), std::string::npos);
     EXPECT_NE(declarations.find("    interface RTParamsGraphicsDrawMeshVK\n"), std::string::npos);
     EXPECT_NE(declarations.find("        mesh: Resource\n"), std::string::npos);
     EXPECT_NE(declarations.find("        pipeline: Resource\n"), std::string::npos);

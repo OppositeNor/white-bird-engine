@@ -59,10 +59,10 @@ local RADIX_SORT_BUFFER_NAMES: sort.RadixSortBufferNames = {
     dispatch = "radix_sort_dispatch",
 }
 
-local function make_layout(p_context: wbe.PixelSortingRecipeContext): Layout
-    local width = p_context.source_width
-    local height = p_context.source_height
-    local orientation_name = render_graph.enum_name(p_context.orientation)
+local function make_layout(context: wbe.PixelSortingRecipeContext): Layout
+    local width = context.source_width
+    local height = context.source_height
+    local orientation_name = render_graph.enum_name(context.orientation)
     if orientation_name ~= "VERTICAL" and orientation_name ~= "HORIZONTAL" then
         error("pixel_sorting: unknown orientation '" .. orientation_name .. "'.")
     end
@@ -94,11 +94,11 @@ local record Resources
     post_processing_params: render_graph.Resource
 end
 
-local function make_resources(p_layout: Layout): Resources
-    local width = p_layout.width
-    local height = p_layout.height
+local function make_resources(image_layout: Layout): Resources
+    local width = image_layout.width
+    local height = image_layout.height
     return {
-        column_offsets = render_graph.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + p_layout.line_count) * UINT32_SIZE),
+        column_offsets = render_graph.storage_buffer("pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + image_layout.line_count) * UINT32_SIZE),
         destination = render_graph.storage_image("pixel_sort_destination_image", "r16g16b16a16_sfloat", width, height)
             :view("pixel_sort_destination"),
         -- The screenshot reads the result back through a transfer.
@@ -108,7 +108,7 @@ local function make_resources(p_layout: Layout): Resources
         mask = render_graph.storage_image("pixel_sort_mask_image", "r16_uint", width, height):view("pixel_sort_mask"),
         sampler = render_graph.clamp_to_edge_sampler("pixel_sort_sampler"),
         -- The register pass writes and the write pass reads the keys; size the sort for every masked pixel.
-        sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, p_layout.element_count),
+        sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, image_layout.element_count),
         swap_chain = render_graph.import_resource("swap_chain"),
         source = render_graph.import_resource("pixel_sort_source"),
         contrast = render_graph.import_resource("pixel_sort_contrast"),
@@ -123,27 +123,27 @@ local record KeyRegistrationTasks
 end
 
 -- Count the masked pixels of every line, sum them into the column offsets, and register their sort keys.
-local function add_key_registration(p_graph: render_graph.Graph, p_layout: Layout,
-    p_resources: Resources): KeyRegistrationTasks
-    local orientation = p_layout.orientation
-    local count_mask_pipeline = p_graph:add_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
-    local prefix_sum_pipeline = p_graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
-    local register_keys_pipeline = p_graph:add_compute_pipeline("register_pixel_sort_keys_" .. orientation .. "_shader")
-    local count_mask = p_graph:compute("count_pixel_sort_mask", {
+local function add_key_registration(target_graph: render_graph.Graph, image_layout: Layout,
+    resource_handles: Resources): KeyRegistrationTasks
+    local orientation = image_layout.orientation
+    local count_mask_pipeline = target_graph:add_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
+    local prefix_sum_pipeline = target_graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = target_graph:add_compute_pipeline("register_pixel_sort_keys_" .. orientation .. "_shader")
+    local count_mask = target_graph:compute("count_pixel_sort_mask", {
         pipeline = count_mask_pipeline,
-        group_count_x = p_layout.column_group_count,
+        group_count_x = image_layout.column_group_count,
         group_count_y = 1,
-    }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets } })
+    }, { uses = { resource_handles.source, resource_handles.contrast, resource_handles.column_offsets } })
     -- The prefix sum runs in a single workgroup.
-    local prefix_sum = p_graph:compute("prefix_sum_pixel_sort_columns", {
+    local prefix_sum = target_graph:compute("prefix_sum_pixel_sort_columns", {
         pipeline = prefix_sum_pipeline, group_count_x = 1, group_count_y = 1,
-    }, { uses = { p_resources.column_offsets } })
-    local register_keys = p_graph:compute("register_pixel_sort_keys", {
+    }, { uses = { resource_handles.column_offsets } })
+    local register_keys = target_graph:compute("register_pixel_sort_keys", {
         pipeline = register_keys_pipeline,
-        group_count_x = p_layout.column_group_count,
+        group_count_x = image_layout.column_group_count,
         group_count_y = 1,
-    }, { uses = { p_resources.source, p_resources.contrast, p_resources.column_offsets,
-        p_resources.sort_buffers.keys, p_resources.mask } })
+    }, { uses = { resource_handles.source, resource_handles.contrast, resource_handles.column_offsets,
+        resource_handles.sort_buffers.keys, resource_handles.mask } })
     return { count_mask = count_mask, prefix_sum = prefix_sum, register_keys = register_keys }
 end
 
@@ -155,47 +155,47 @@ local record OutputTasks
 end
 
 -- Write the sorted pixels, post-process them, and present the result under the application's ImGui overlay.
-local function add_output(p_graph: render_graph.Graph, p_layout: Layout, p_resources: Resources): OutputTasks
-    local tile_group_count_x = p_layout.tile_group_count_x
-    local tile_group_count_y = p_layout.tile_group_count_y
-    local write_pixels_pipeline = p_graph:add_compute_pipeline("write_sorted_pixels_" .. p_layout.orientation .. "_shader")
-    local post_processing_pipeline = p_graph:add_compute_pipeline("pixel_sorting_post_processing_shader")
-    local present_pipeline = p_graph:add_graphics_pipeline("present_pixel_sort_pipeline")
-    local write_pixels = p_graph:compute("write_sorted_pixels", {
+local function add_output(target_graph: render_graph.Graph, image_layout: Layout, resource_handles: Resources): OutputTasks
+    local tile_group_count_x = image_layout.tile_group_count_x
+    local tile_group_count_y = image_layout.tile_group_count_y
+    local write_pixels_pipeline = target_graph:add_compute_pipeline("write_sorted_pixels_" .. image_layout.orientation .. "_shader")
+    local post_processing_pipeline = target_graph:add_compute_pipeline("pixel_sorting_post_processing_shader")
+    local present_pipeline = target_graph:add_graphics_pipeline("present_pixel_sort_pipeline")
+    local write_pixels = target_graph:compute("write_sorted_pixels", {
         pipeline = write_pixels_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
-    }, { uses = { p_resources.source, p_resources.sort_buffers.keys, p_resources.mask, p_resources.contrast,
-        p_resources.column_offsets, p_resources.destination } })
-    local post_processing = p_graph:compute("pixel_sorting_post_processing", {
+    }, { uses = { resource_handles.source, resource_handles.sort_buffers.keys, resource_handles.mask, resource_handles.contrast,
+        resource_handles.column_offsets, resource_handles.destination } })
+    local post_processing = target_graph:compute("pixel_sorting_post_processing", {
         pipeline = post_processing_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
-    }, { uses = { p_resources.destination, p_resources.sampler, p_resources.post_processing_params,
-        p_resources.post_processing_output } })
-    local present = p_graph:draw("present_sorted_pixels", {
+    }, { uses = { resource_handles.destination, resource_handles.sampler, resource_handles.post_processing_params,
+        resource_handles.post_processing_output } })
+    local present = target_graph:draw("present_sorted_pixels", {
         pipeline = present_pipeline,
         clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
         draw_vertex_count = 3,
     }, {
-        uses = { p_resources.post_processing_output, p_resources.sampler },
+        uses = { resource_handles.post_processing_output, resource_handles.sampler },
     })
-    present:color_target(0, p_resources.swap_chain)
-    local draw_imgui = p_graph:import_task("draw_imgui")
+    present:color_target(0, resource_handles.swap_chain)
+    local draw_imgui = target_graph:import_task("draw_imgui")
     return { write_pixels = write_pixels, post_processing = post_processing, present = present, draw_imgui = draw_imgui }
 end
 
 -- Order the line bookkeeping and the keys before the write, and the output images through post-processing and
 -- presentation.
-local function connect_tasks(p_graph: render_graph.Graph, p_resources: Resources, p_registration: KeyRegistrationTasks,
-    p_radix_sort: render_graph.Task, p_output: OutputTasks)
-    p_graph:chain(p_resources.column_offsets,
-        { p_registration.count_mask, p_registration.prefix_sum, p_registration.register_keys, p_output.write_pixels })
-    p_graph:chain(p_resources.mask, { p_registration.register_keys, p_output.write_pixels })
-    p_graph:chain(p_resources.sort_buffers.keys, { p_registration.register_keys, p_radix_sort, p_output.write_pixels })
-    p_graph:chain(p_resources.destination, { p_output.write_pixels, p_output.post_processing })
-    p_graph:chain(p_resources.post_processing_output, { p_output.post_processing, p_output.present })
-    p_graph:chain(p_resources.swap_chain, { p_output.present, p_output.draw_imgui })
+local function connect_tasks(target_graph: render_graph.Graph, resource_handles: Resources, resource_registration: KeyRegistrationTasks,
+    sort_task: render_graph.Task, output_tasks: OutputTasks)
+    target_graph:chain(resource_handles.column_offsets,
+        { resource_registration.count_mask, resource_registration.prefix_sum, resource_registration.register_keys, output_tasks.write_pixels })
+    target_graph:chain(resource_handles.mask, { resource_registration.register_keys, output_tasks.write_pixels })
+    target_graph:chain(resource_handles.sort_buffers.keys, { resource_registration.register_keys, sort_task, output_tasks.write_pixels })
+    target_graph:chain(resource_handles.destination, { output_tasks.write_pixels, output_tasks.post_processing })
+    target_graph:chain(resource_handles.post_processing_output, { output_tasks.post_processing, output_tasks.present })
+    target_graph:chain(resource_handles.swap_chain, { output_tasks.present, output_tasks.draw_imgui })
 end
 
 local exports = {}

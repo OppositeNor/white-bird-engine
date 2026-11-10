@@ -415,7 +415,7 @@ Rules:
 ## Naming
 
 - `snake_case` for files, variables, functions, members. `PascalCase` for types. `UPPER_SNAKE` for macros and constants of macro-like nature.
-- Function parameters: prefix `p_` (e.g. `p_allocator`, `p_buffer_size`). Local variables: no prefix. Member fields: no prefix.
+- C++ function parameters: prefix `p_` (e.g. `p_allocator`, `p_buffer_size`). Teal, Lua, and Python function parameters: no `p_` prefix. Local variables: no prefix. Member fields: no prefix.
 - **No abbreviations** unless they are universally well-known. Examples:
   - Forbidden: `ci` (use `create_info`), `mgr` (use `manager`), `tex` (use `texture`), `cfg` (use `config` only if widely understood, else `configuration`).
   - Allowed well-known: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer), `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan), `rma` (roughness, metallic, and ambient-occlusion texture channel pack).

@@ -19,13 +19,13 @@ local record Exports
         width: integer
         height: integer
     end
-    tile_count: function(p_extent: Extent, p_tile_size: integer): integer
+    tile_count: function(extent: Extent, tile_size: integer): integer
 end
 
 local exports: Exports = {}
 
-function exports.tile_count(p_extent: Exports.Extent, p_tile_size: integer): integer
-    return ((p_extent.width + p_tile_size - 1) // p_tile_size) * ((p_extent.height + p_tile_size - 1) // p_tile_size)
+function exports.tile_count(extent: Exports.Extent, tile_size: integer): integer
+    return ((extent.width + tile_size - 1) // tile_size) * ((extent.height + tile_size - 1) // tile_size)
 end
 
 return exports

@@ -54,20 +54,20 @@ local record pixel_sort
     end
 end
 
--- The effect as a subgraph task with id p_id, which sorts the target's color view in place through its `color` port. The
+-- The effect as a subgraph task with id id, which sorts the target's color view in place through its `color` port. The
 -- params' toggle gates all of its tasks.
-function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, p_target: pixel_sort.Target): render_graph.Task
-    local direction = render_graph.enum_name(p_params.direction)
+function pixel_sort.subgraph(id: string, params: wbe.PixelSortRecipeParams, target: pixel_sort.Target): render_graph.Task
+    local direction = render_graph.enum_name(params.direction)
     local vertical = direction == "VERTICAL"
     if not vertical and direction ~= "HORIZONTAL" then
         error("pixel_sort: unknown direction '" .. direction .. "'.")
     end
-    local scope = render_graph.enum_name(p_params.scope)
+    local scope = render_graph.enum_name(params.scope)
     if scope ~= "LINE" and scope ~= "SPAN" then
         error("pixel_sort: unknown scope '" .. scope .. "'.")
     end
-    local width = p_target.width
-    local height = p_target.height
+    local width = target.width
+    local height = target.height
     local line_length = vertical and height or width
     local element_count = width * height
     -- The mask image stores each masked pixel's rank within its line, and with the span scope its span offset and span
@@ -90,8 +90,8 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
 
     local graph = render_graph.new()
     local color = graph:port("color")
-    local contrast = graph:import_resource(p_params.contrast_import)
-    local source = graph:add_storage_image("pixel_sort_source_image", p_params.color_format, width, height)
+    local contrast = graph:import_resource(params.contrast_import)
+    local source = graph:add_storage_image("pixel_sort_source_image", params.color_format, width, height)
         :view("pixel_sort_source")
     local mask = graph:add_storage_image(
         "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height):view("pixel_sort_mask")
@@ -111,34 +111,34 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
         pipeline = copy_source_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
-        queue_family = p_params.queue_family,
+        queue_family = params.queue_family,
     }, { uses = { source } }):bind("pixel_sort_input", color)
     local count_mask = graph:compute("count_pixel_sort_mask", {
         pipeline = count_mask_pipeline,
         group_count_x = column_group_count,
         group_count_y = 1,
-        queue_family = p_params.queue_family,
+        queue_family = params.queue_family,
     }, { uses = { source, contrast, column_offsets } })
     -- The prefix sums run in a single workgroup.
     local prefix_sum = graph:compute("prefix_sum_pixel_sort_columns", {
         pipeline = prefix_sum_pipeline,
         group_count_x = 1,
         group_count_y = 1,
-        queue_family = p_params.queue_family,
+        queue_family = params.queue_family,
     }, { uses = { column_offsets } })
     local register_keys = graph:compute("register_pixel_sort_keys", {
         pipeline = register_keys_pipeline,
         group_count_x = column_group_count,
         group_count_y = 1,
-        queue_family = p_params.queue_family,
+        queue_family = params.queue_family,
     }, { uses = { source, contrast, column_offsets, sort_buffers.keys, mask } })
 
-    local radix_sort = sort.add_radix_sort_task(graph, "pixel_sort_radix_sort", sort_buffers, p_params.queue_family)
+    local radix_sort = sort.add_radix_sort_task(graph, "pixel_sort_radix_sort", sort_buffers, params.queue_family)
     local write_pixels = graph:compute("write_sorted_pixels", {
         pipeline = write_pixels_pipeline,
         group_count_x = tile_group_count_x,
         group_count_y = tile_group_count_y,
-        queue_family = p_params.queue_family,
+        queue_family = params.queue_family,
     }, { uses = { source, sort_buffers.keys, mask, contrast, column_offsets } }):bind("pixel_sort_destination", color)
 
     graph:chain(color, { copy_source, write_pixels })
@@ -146,8 +146,8 @@ function pixel_sort.subgraph(p_id: string, p_params: wbe.PixelSortRecipeParams, 
     graph:chain(column_offsets, { count_mask, prefix_sum, register_keys, write_pixels })
     graph:chain(mask, { register_keys, write_pixels })
     graph:chain(sort_buffers.keys, { register_keys, radix_sort, write_pixels })
-    local subgraph = graph:as_subgraph(p_id, { color = p_target.color_view })
-    subgraph.toggle = { event = p_params.toggle_event, enabled = p_params.enabled }
+    local subgraph = graph:as_subgraph(id, { color = target.color_view })
+    subgraph.toggle = { event = params.toggle_event, enabled = params.enabled }
     return subgraph
 end
 

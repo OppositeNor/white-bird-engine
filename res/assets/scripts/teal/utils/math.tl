@@ -16,17 +16,17 @@
 
 local record math_utils
     -- Divide two non-negative integers, rounding up.
-    ceil_div: function(p_value: integer, p_divisor: integer): integer
-    -- Clamp p_value to [p_min, p_max].
-    clamp: function(p_value: integer, p_min: integer, p_max: integer): integer
+    ceil_div: function(value: integer, divisor: integer): integer
+    -- Clamp value to [min, max].
+    clamp: function(value: integer, min: integer, max: integer): integer
 end
 
-function math_utils.ceil_div(p_value: integer, p_divisor: integer): integer
-    return (p_value + p_divisor - 1) // p_divisor
+function math_utils.ceil_div(value: integer, divisor: integer): integer
+    return (value + divisor - 1) // divisor
 end
 
-function math_utils.clamp(p_value: integer, p_min: integer, p_max: integer): integer
-    return math.min(math.max(p_value, p_min), p_max)
+function math_utils.clamp(value: integer, min: integer, max: integer): integer
+    return math.min(math.max(value, min), max)
 end
 
 return math_utils
