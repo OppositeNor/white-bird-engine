@@ -14,22 +14,26 @@
 
 -- Draws a mesh whose submeshes use materials of two pipeline variants with one draw task: the default variant with
 -- `draw_cube_unshaded_pipeline` and the "tinted" variant with `draw_cube_unshaded_tinted_pipeline`.
--- Imports: `swap_chain` (the swap chain image views) and `camera_info` (the application's camera uniform buffer).
+-- Imports: `swap_chain` (the swap chain image views, which the renderer supplies) and `camera_info` (the application's
+-- camera uniform buffer).
 
 local type wbe = require("wbe")
 local render_graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
-function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
     local swap_chain = graph:import_resource("swap_chain")
     local camera_info = graph:import_resource("camera_info")
+    local function pipeline(key: string): render_graph.Resource
+        return render_graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
+    end
     graph:draw_mesh("run_material_variants", {
         mesh = graph:add_mesh("material_variants.cube"),
         pipeline = {
-            default = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline"),
-            tinted = graph:add_graphics_pipeline("draw_cube_unshaded_tinted_pipeline"),
+            default = pipeline("draw_cube_unshaded_pipeline"),
+            tinted = pipeline("draw_cube_unshaded_tinted_pipeline"),
         },
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },

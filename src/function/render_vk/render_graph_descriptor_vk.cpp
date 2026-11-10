@@ -167,7 +167,7 @@ RendSubgraphVK& RendSubgraphVK::connect(std::string_view p_next_task_id, std::st
 
 IRenderGraph& RendGraphDescVK::get_render_graph() const {
     if (render_graph == nullptr) {
-        throw std::runtime_error("The render graph descriptor is not bound to a render graph; construct it with the graph its rebuild callback receives.");
+        throw std::runtime_error("The render graph descriptor is not bound to a render graph; construct it with the graph it is built for.");
     }
     return *render_graph;
 }

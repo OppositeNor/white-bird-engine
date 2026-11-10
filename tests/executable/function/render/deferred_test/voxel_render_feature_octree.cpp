@@ -19,26 +19,19 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "dynamic_mesh_render_feature.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/compute_pipeline_compiler_vk.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/rend_extent_2d_params_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
-#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "function/render_vk/rt_run_compute_pipeline_vk.hh"
 #include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
@@ -60,10 +53,6 @@
 
 namespace WhiteBirdEngine {
 namespace {
-
-// Global render cache keys of the construction pipelines, which the graphics_draw_mesh construction tasks name.
-constexpr std::string_view BUILD_PIPELINE = "octree_build_static_mesh_pipeline";
-constexpr std::string_view DYNAMIC_BUILD_PIPELINE = "octree_dynamic_build_static_mesh_pipeline";
 
 /**
  * @brief Clears octree textures to OCTREE_EMPTY in every mip level; neither copyable nor movable.
@@ -111,47 +100,6 @@ public:
 private:
     Vector<Ref<ROImageVK>, RenderAllocator> images;
     Vector<std::string, RenderAllocator> written_resource_ids;
-};
-
-/**
- * @brief Reports a texture written through its per-level views as also written through its full view; neither copyable nor
- * movable.
- * @details The traversal reads the full view, so its resource edges order the reads after this task's writes. The full view
- * is reported first, so a first write moves every mip level into the unified layout.
- */
-class RTOctreeTextureWriteVK final : public IRenderTaskVK {
-public:
-    RTOctreeTextureWriteVK() = delete;
-    RTOctreeTextureWriteVK(Unique<IRenderTaskVK> p_task, std::string_view p_texture_view_id)
-        : task(std::move(p_task)), texture_view_id(p_texture_view_id) {
-        WBE_DEBUG_ASSERT(task != MEM_NULL);
-    }
-    virtual ~RTOctreeTextureWriteVK() override = default;
-    RTOctreeTextureWriteVK(const RTOctreeTextureWriteVK&) = delete;
-    RTOctreeTextureWriteVK(RTOctreeTextureWriteVK&&) = delete;
-    RTOctreeTextureWriteVK& operator=(const RTOctreeTextureWriteVK&) = delete;
-    RTOctreeTextureWriteVK& operator=(RTOctreeTextureWriteVK&&) = delete;
-
-    virtual QueueFamilyVK queue_family() const override {
-        return task->queue_family();
-    }
-
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
-        p_writes.push_back({.res_id = texture_view_id, .usage = RendResUsageVK::STORAGE_IMAGE});
-        task->append_accesses(p_reads, p_writes);
-    }
-
-    virtual void bind_resources(const RendResViewVK& p_resources) override {
-        task->bind_resources(p_resources);
-    }
-
-    virtual void record(VkCommandBuffer p_command_buffer, double p_delta) override {
-        task->record(p_command_buffer, p_delta);
-    }
-
-private:
-    Unique<IRenderTaskVK> task;
-    std::string texture_view_id;
 };
 
 } // namespace
@@ -269,14 +217,6 @@ void VoxelRenderFeatureOctree::create_resources() {
                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
 }
 
-RendTaskDescVK VoxelRenderFeatureOctree::make_texture_write(RendTaskDescVK p_task, std::string_view p_texture_view_id) const {
-    p_task.factory = [this, task_factory = p_task.factory, texture_view_id = std::string(p_texture_view_id)](
-                         const RendGraphContextVK& p_context) {
-        return make_unique<RTOctreeTextureWriteVK>(render_allocator, task_factory(p_context), texture_view_id);
-    };
-    return p_task;
-}
-
 RendTaskDescVK VoxelRenderFeatureOctree::get_clear_render_task_desc(std::string_view p_task_id, bool p_clear_static) const {
     RendTaskDescVK task_desc(render_allocator);
     task_desc.task_id = p_task_id;
@@ -301,31 +241,6 @@ RendTaskDescVK VoxelRenderFeatureOctree::get_clear_render_task_desc(std::string_
     return task_desc;
 }
 
-RendTaskDescVK& VoxelRenderFeatureOctree::add_construction_render_task(RendGraphDescVK& p_graph,
-    std::string_view p_task_id,
-    bool p_double_sided,
-    const DynamicMeshRenderFeature* p_dynamic_mesh,
-    size_t p_dynamic_entity_index) const {
-    const RendExtent2DParamsVK extent{.width = OCTREE_EXTENT, .height = OCTREE_EXTENT};
-    if (p_dynamic_mesh != nullptr) {
-        RendTaskDescVK& task = p_dynamic_mesh->add_task(p_graph, p_task_id, p_dynamic_entity_index, DYNAMIC_BUILD_PIPELINE, extent);
-        task = make_texture_write(task, OCTREE_DYNAMIC);
-        return task;
-    }
-    // The construction pass rasterizes without attachments.
-    RendTaskDescVK& task = RTGraphicsDrawMeshVK::add_to_graph(p_graph,
-        p_task_id,
-        RTParamsGraphicsDrawMeshVK{
-            .mesh = std::string(STATIC_MESH_KEY),
-            .pipeline = RTParamsGraphicsDrawMeshVK::make_default_pipeline(BUILD_PIPELINE),
-            .parts = {p_double_sided ? MeshPartVK::DOUBLE_SIDED : MeshPartVK::OPAQUE},
-            .render_extent = extent,
-        },
-        render_context);
-    task = make_texture_write(task, OCTREE_STATIC);
-    return task;
-}
-
 RendTaskDescVK VoxelRenderFeatureOctree::make_static_build(RendTaskDescVK p_task, const VoxelRecipeInputs& p_inputs) const {
     if (rebuild_static_every_frame) {
         // The reset stage empties both textures, so every frame rebuilds from an empty octree.
@@ -338,9 +253,6 @@ RendTaskDescVK VoxelRenderFeatureOctree::make_static_build(RendTaskDescVK p_task
 
 void VoxelRenderFeatureOctree::configure_recipe(
     DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const {
-    if (p_inputs.dynamic_mesh == nullptr) {
-        throw std::runtime_error("VoxelRenderFeatureOctree: the dynamic mesh is required to configure a recipe.");
-    }
     OctreeRecipeParams params;
     params.module = "render_graph_utils.features.voxel_octree";
     params.level_count = OCTREE_LEVEL_COUNT;
@@ -351,6 +263,10 @@ void VoxelRenderFeatureOctree::configure_recipe(
     };
     params.node_gather_group_count = OCTREE_DEBUG_GATHER_GROUP_COUNT;
     params.leaf_draw_count = OCTREE_DEBUG_LEAF_DRAW_COUNT;
+    params.extent = OCTREE_EXTENT;
+    if (!rebuild_static_every_frame) {
+        params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
+    }
 
     // Textures and buffers.
     const auto import = [&p_imports, &params](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
@@ -371,42 +287,11 @@ void VoxelRenderFeatureOctree::configure_recipe(
     }
     SerializableSD<OctreeRecipeParams>::serialize(p_parameters, params);
 
-    // The clears record vkCmdClearColorImage, and the construction passes report the full texture view they write through
-    // the per-level views; both are C++ tasks the recipe imports. The static ones record once.
+    // The clears record vkCmdClearColorImage, so they are C++ tasks the recipe imports; the static one records once. The
+    // module draws the construction passes, whose shaders report the full texture view they write through the per-level
+    // views.
     p_imports.add_task(make_static_build(get_clear_render_task_desc(RT_RESET_OCTREE, true), p_inputs))
         .add_task(get_clear_render_task_desc(RT_CLEAR_DYNAMIC_OCTREE, false));
-    // The construction draws are prepared on a descriptor of their own, which must hold nothing but the mesh imports the
-    // recipe's own mesh draws provide.
-    if (p_inputs.render_graph == nullptr) {
-        throw std::runtime_error("VoxelRenderFeatureOctree: the render graph is required to configure a recipe.");
-    }
-    // The construction passes are C++ tasks, so their pipelines, which rasterize without attachments, are registered here.
-    for (std::string_view pipeline : {BUILD_PIPELINE, DYNAMIC_BUILD_PIPELINE}) {
-        p_inputs.render_graph->register_graphics_pipeline(pipeline, RDParamsGraphicsPipelineVK{.pipeline = std::string(pipeline)});
-    }
-    RendGraphDescVK construction(render_allocator, p_inputs.render_graph);
-    add_construction_render_task(construction, RT_RUN_BUILD_OCTREE, false, nullptr, 0);
-    add_construction_render_task(construction, RT_RUN_BUILD_OCTREE_DOUBLE_SIDED, true, nullptr, 0);
-    add_construction_render_task(construction, RT_RUN_BUILD_DYNAMIC_OCTREE, false, p_inputs.dynamic_mesh, 0);
-    add_construction_render_task(construction, RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND, false, p_inputs.dynamic_mesh, 1);
-    if (!construction.buffers.empty() || !construction.images.empty() || !construction.image_views.empty() ||
-        !construction.samplers.empty()) {
-        throw std::runtime_error("VoxelRenderFeatureOctree: the construction passes declared graph-owned resources.");
-    }
-    for (const RendResVK& resource : construction.resources) {
-        const std::string_view id = resource.res_id;
-        const auto is_mesh_import = [id](std::string_view p_mesh_key) {
-            return id == p_mesh_key || id.starts_with(std::format("{}.", p_mesh_key));
-        };
-        if (!is_mesh_import(STATIC_MESH_KEY) && !is_mesh_import(DYNAMIC_MESH_KEY)) {
-            throw std::runtime_error(std::format(
-                "VoxelRenderFeatureOctree: the construction passes import '{}', which the recipe does not provide.", id));
-        }
-    }
-    for (RendTaskDescVK& task : construction.tasks) {
-        const bool is_static = task.task_id == RT_RUN_BUILD_OCTREE || task.task_id == RT_RUN_BUILD_OCTREE_DOUBLE_SIDED;
-        p_imports.add_task(is_static ? make_static_build(std::move(task), p_inputs) : std::move(task));
-    }
 }
 
 } // namespace WhiteBirdEngine

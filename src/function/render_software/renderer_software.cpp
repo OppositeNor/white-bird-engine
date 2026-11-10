@@ -16,10 +16,13 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include <cstddef>
+#include <format>
 #include <functional>
 #include <future>
 #include <stdexcept>
@@ -44,20 +47,14 @@ void RendererSoftware::tick(double p_delta) {
 Ref<GlobalRenderCache> RendererSoftware::get_global_render_cache() {
     return MEM_NULL; // TODO
 }
-void RendererSoftware::register_render_graph(std::string_view p_resource_key) {
-    (void)p_resource_key;
-    // TODO
-    throw std::runtime_error("Not implemented.");
+Ref<IRenderGraph> RendererSoftware::acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) {
+    static_cast<void>(p_bindings);
+    throw std::runtime_error(std::format("RendererSoftware does not support render graphs: {}.", p_resource_key));
 }
-void RendererSoftware::unregister_render_graph(std::string_view p_resource_key) {
-    (void)p_resource_key;
-    // TODO
-    throw std::runtime_error("Not implemented.");
-}
-void RendererSoftware::activate_render_graph(std::string_view p_resource_key) {
-    (void)p_resource_key;
-    // TODO
-    throw std::runtime_error("Not implemented.");
+void RendererSoftware::activate_render_graph(Ref<IRenderGraph> p_graph) {
+    if (p_graph != MEM_NULL) {
+        throw std::runtime_error("RendererSoftware does not support render graph activation.");
+    }
 }
 std::future<void> RendererSoftware::add_job(std::function<void()> p_job) {
     (void)p_job;

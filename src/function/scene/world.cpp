@@ -26,7 +26,8 @@
 namespace WhiteBirdEngine {
 
 World::World(HeapAllocatorDefault* p_allocator)
-    : allocator(p_allocator), component_lists(p_allocator), scene_nodes(p_allocator), render_graph_resource_key(p_allocator) {
+    : allocator(p_allocator), component_lists(p_allocator), scene_nodes(p_allocator), render_graph_resource_key(p_allocator),
+      render_graph_instance_key(p_allocator) {
 }
 
 World::~World() = default;
@@ -72,6 +73,17 @@ Ref<SceneNode> World::get_scene_node(EntityID p_entity) {
 
 void World::set_render_graph_resource_key(std::string_view p_resource_key) {
     render_graph_resource_key.assign(p_resource_key);
+}
+
+void World::set_render_graph_instance_key(std::string_view p_instance_key) {
+    render_graph_instance_key.assign(p_instance_key);
+}
+
+std::string_view World::get_render_graph_instance_key() const {
+    if (render_graph_instance_key.empty()) {
+        return render_graph_resource_key;
+    }
+    return render_graph_instance_key;
 }
 
 void World::cache_component_lists() {

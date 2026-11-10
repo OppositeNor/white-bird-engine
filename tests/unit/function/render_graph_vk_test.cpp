@@ -12,7 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/stack_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
@@ -20,6 +22,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/debug_data_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -30,14 +33,21 @@
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "global/global.hh"
+#include "resource/resource_unit/resource_unit.hh"
+#include "test_global.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
+#include <new>
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
@@ -221,11 +231,9 @@ RendTaskDescVK make_probe_desc(RenderAllocator* p_allocator,
         });
 }
 
-// Build p_graph from a callback that returns a copy of p_descriptor.
+// Build p_graph from a copy of p_descriptor.
 void build_graph(RenderGraphVK& p_graph, const RendGraphDescVK& p_descriptor) {
-    p_graph.build_from_callback([p_descriptor](const RendGraphContextVK& /*p_context*/, RenderGraphVK& /*p_graph*/) {
-        return p_descriptor;
-    });
+    p_graph.build_from_descriptor(p_descriptor);
 }
 
 std::string build_error(RenderGraphVK& p_graph, RendGraphDescVK& p_descriptor) {
@@ -465,38 +473,119 @@ TEST(WBERenderGraphVKTest, TaskFactoriesReceiveTheContextOfTheRenderData) {
     EXPECT_TRUE(graph.get_context() == expected_context);
 }
 
-TEST(WBERenderGraphVKTest, RebuildCallbacksReceiveTheContextOfTheRenderData) {
-    RenderAllocator allocator(WBE_KI_B(128));
+namespace {
+
+// Bindings that record the renderer facts they receive and supply one resource, one native task, and a context entry.
+class RecordingBindingsVK final : public IRenderGraphBindingsVK {
+public:
+    RecordingBindingsVK(RenderAllocator* p_allocator, Ref<RenderObjectContainerVK> p_container)
+        : IRenderGraphBindingsVK("recording"), allocator(p_allocator), container(std::move(p_container)) {
+    }
+
+    virtual RendGraphPreparedBindingsVK prepare(const RenderContextVK& p_render_context, const RendRecipeContextVK& p_recipe_context) override {
+        received_render_context = &p_render_context;
+        received_facts = p_recipe_context;
+        ++prepare_count;
+        RendGraphPreparedBindingsVK result;
+        result.context = DataValue::make_map();
+        result.context.set_value("label", std::string("bound"));
+        // The graph replaces the renderer facts with its own.
+        result.context.set_value("frames_in_flight", int64_t{99});
+        result.imports.add(TEST_LOGICAL_RESOURCE, *container);
+        result.imports.add_task(RendTaskDescVK(allocator, "native", [this](const RendGraphContextVK& /*p_context*/) {
+            return make_unique<RTGraphEdgeProbeVK>(
+                allocator, allocator, QueueFamilyVK::GRAPHICS, std::vector<std::string>{}, std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
+        }));
+        return result;
+    }
+
+    const RenderContextVK* received_render_context = nullptr;
+    RendRecipeContextVK received_facts;
+    uint32_t prepare_count = 0;
+
+private:
+    RenderAllocator* allocator;
+    Ref<RenderObjectContainerVK> container;
+};
+
+// Imports the bindings' resource and task, and fails unless the context and parameters reached build(context, parameters).
+constexpr std::string_view TEST_RECIPE_SOURCE = R"(
+local exports = {}
+function exports.build(context, parameters)
+    if context.label ~= "bound" then error("context.label is " .. tostring(context.label)) end
+    if context.frames_in_flight ~= 2 then error("context.frames_in_flight is " .. tostring(context.frames_in_flight)) end
+    if context.swap_chain_extent.width ~= 800 then error("context.swap_chain_extent.width is wrong") end
+    if parameters.task ~= "native" then error("parameters.task is " .. tostring(parameters.task)) end
+    return { imports = { "logical" }, tasks = { { id = parameters.task, import = true } } }
+end
+return exports
+)";
+
+class WBERenderGraphVKRecipeTest : public ::testing::Test {
+protected:
+    virtual void SetUp() override {
+        global = make_test_global();
+    }
+
+    virtual void TearDown() override {
+        global.reset();
+    }
+
+    std::unique_ptr<Global> global;
+};
+
+} // namespace
+
+TEST_F(WBERenderGraphVKRecipeTest, RecipeSourcesPrepareTheBindingsAndRunTheRecipeWithTheParameters) {
+    RenderAllocator allocator(WBE_KI_B(256));
     RenderContextVK render_data(&allocator);
     render_data.swap_chain_extent = {.width = 800, .height = 600};
-    Ref<RenderObjectContainerVK> container = make_test_container(&allocator, &render_data);
-    VkExtent2D received_extent{};
-    uint32_t call_count = 0;
-    const RenderGraphVK* received_graph = nullptr;
-    RenderGraphVK graph(&render_data);
+    render_data.frames_in_flight = 2;
+    StackAllocator storage(WBE_KI_B(4));
+    RefRes<char> source(storage.allocate(TEST_RECIPE_SOURCE.size() + 1), &storage);
+    std::memcpy(source.get(), TEST_RECIPE_SOURCE.data(), TEST_RECIPE_SOURCE.size());
+    source.get()[TEST_RECIPE_SOURCE.size()] = '\0';
+    RefRes<RUScript> script(storage.allocate(sizeof(RUScript)), &storage);
+    new (script.get()) RUScript{};
+    script->resource_key = "tests.recording_recipe";
+    script->source = source;
+    script->size = TEST_RECIPE_SOURCE.size() + 1;
+    auto bindings = make_ref<RecordingBindingsVK>(&allocator, &allocator, make_test_container(&allocator, &render_data));
+    DataValue parameters = DataValue::make_map();
+    parameters.set_value("task", std::string("native"));
+    RenderGraphVK graph(&render_data, "recording_graph");
+
     std::string error;
     try {
-        graph.build_from_callback([&](const RendGraphContextVK& p_context, RenderGraphVK& p_graph) {
-            received_extent = p_context.swap_chain_extent;
-            received_graph = &p_graph;
-            ++call_count;
-            RendGraphDescVK descriptor(&allocator);
-            descriptor.add_resource(TEST_LOGICAL_RESOURCE, *container);
-            descriptor.add_task("task", [&allocator](const RendGraphContextVK& /*p_context*/) {
-                return make_unique<RTGraphEdgeProbeVK>(
-                    &allocator, &allocator, QueueFamilyVK::GRAPHICS, std::vector<std::string>{}, std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
-            });
-            return descriptor;
-        });
+        graph.build_from_recipe(RendGraphRecipeSourceVK{.recipe = script, .parameters = parameters, .bindings = bindings});
     } catch (const std::runtime_error& p_error) {
         error = p_error.what();
     }
-    // The descriptor validated; the build stops at command pool creation without a device.
+    // The recipe's descriptor validated; the build stops at command pool creation without a device.
     EXPECT_NE(error.find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos) << error;
-    EXPECT_EQ(call_count, 1U);
-    EXPECT_EQ(received_extent.width, 800U);
-    EXPECT_EQ(received_extent.height, 600U);
-    EXPECT_EQ(received_graph, &graph);
+    EXPECT_EQ(bindings->prepare_count, 1U);
+    EXPECT_EQ(bindings->received_render_context, &render_data);
+    EXPECT_EQ(bindings->received_facts.frames_in_flight, 2U);
+    EXPECT_EQ(bindings->received_facts.swap_chain_extent.width, 800U);
+    EXPECT_EQ(bindings->received_facts.swap_chain_extent.height, 600U);
+    EXPECT_TRUE(graph.get_bindings() == bindings);
+    EXPECT_EQ(graph.get_type_uuid(), TypeUUID<RenderGraphVK>::UUID);
+}
+
+TEST_F(WBERenderGraphVKRecipeTest, RecipeSourcesRequireARecipeBindingsAndMapParameters) {
+    RenderAllocator allocator(WBE_KI_B(64));
+    RenderContextVK render_data(&allocator);
+    StackAllocator storage(WBE_KI_B(1));
+    RefRes<RUScript> script(storage.allocate(sizeof(RUScript)), &storage);
+    new (script.get()) RUScript{};
+    auto bindings = make_ref<RecordingBindingsVK>(&allocator, &allocator, make_test_container(&allocator, &render_data));
+    RenderGraphVK graph(&render_data);
+    EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.bindings = bindings}), std::runtime_error);
+    EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.recipe = script}), std::runtime_error);
+    EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.recipe = script, .parameters = DataValue::make_list(), .bindings = bindings}),
+        std::runtime_error);
+    EXPECT_EQ(bindings->prepare_count, 0U);
+    EXPECT_TRUE(graph.get_bindings() == MEM_NULL);
 }
 
 TEST(WBERenderGraphVKTest, InstallsTheDefaultResourceRegistrators) {
@@ -551,11 +640,22 @@ TEST(WBERenderGraphVKTest, HandleRegistrationsRequireLoadedResources) {
     EXPECT_FALSE(graph.contains_registered_resource("pipeline"));
 }
 
-TEST(WBERenderGraphVKTest, RejectsNullRebuildCallbacks) {
+TEST(WBERenderGraphVKTest, RejectsRebuildsOfGraphsThatWereNotBuilt) {
     RenderAllocator allocator(WBE_KI_B(16));
     RenderContextVK render_data(&allocator);
     RenderGraphVK graph(&render_data);
-    EXPECT_THROW(graph.build_from_callback(nullptr), std::runtime_error);
+    EXPECT_THROW(graph.rebuild(), std::runtime_error);
+}
+
+TEST(WBERenderGraphVKTest, IsARenderObjectWithItsConcreteTypeUUID) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    RenderContextVK render_data(&allocator);
+    Ref<RenderGraphVK> graph = make_ref<RenderGraphVK>(&allocator, &render_data);
+    Ref<IRenderObject> object = graph;
+    EXPECT_EQ(object->get_type_uuid(), TypeUUID<RenderGraphVK>::UUID);
+    EXPECT_TRUE(object.dynamic_cast_ref<IRenderGraph>() == graph);
+    EXPECT_EQ(graph->get_render_context(), &render_data);
+    EXPECT_TRUE(graph->get_bindings() == MEM_NULL);
 }
 
 TEST(WBERenderGraphVKTest, RejectsTaskFactoriesThatReturnNull) {

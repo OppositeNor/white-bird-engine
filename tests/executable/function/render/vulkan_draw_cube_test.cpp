@@ -23,27 +23,26 @@
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/rend_graph_script_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
+#include "shadowed_mesh_recipe_context.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -53,10 +52,8 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
-#include <string>
+#include <stdexcept>
 #include <string_view>
-#include <utility>
-#include <vector>
 #include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
@@ -69,8 +66,8 @@ constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
 constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
 constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
 constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
-constexpr std::string_view SHADOWMAP_SAMPLED_IMAGE_VIEW = "shadowmap";
-constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
+// The render graph definition, whose recipe is render_graphs.draw_cube.
+constexpr std::string_view DRAW_CUBE_RENDER_GRAPH = "draw_cube_graph";
 
 } // namespace
 
@@ -84,22 +81,25 @@ public:
     virtual void render_update(double p_delta) override;
 
     void setup_draw_task();
+    void release_draw_task();
 
 private:
     void setup_render_context();
     void load_resources();
     void setup_spot_light();
-    void register_draw_cube_render_graph(WBE::RenderTestMeshDraw p_shadow_task, WBE::RenderTestMeshDraw p_main_task);
+    void create_buffers();
+    WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(const void* p_data, size_t p_size) const;
+    void acquire_draw_cube_render_graph();
 
     WBE::RendererVK* renderer_vk = nullptr;
     const WBE::RenderContextVK* render_context = nullptr;
     WBE::RenderAllocator* render_allocator = nullptr;
-    // The source resources the graph registers; the ResourceManager owns them.
-    WBE::RefRes<WBE::RUMesh3D> cube_mesh;
-    WBE::RefRes<WBE::RUGraphicsPipeline> shadow_pipeline_resource;
-    WBE::RefRes<WBE::RUGraphicsPipeline> main_pipeline_resource;
-    // Graph-owned camera buffer, updated from the logic thread through render jobs.
+    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    // The uniform buffers the recipe imports. The camera buffer is updated from the logic thread through render jobs.
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
+    WBE::Ref<WBE::ROBufferVK> spot_light_info_ubo;
+    WBE::Ref<WBE::ROBufferVK> shadow_light_info_ubo;
+    WBE::Ref<WBE::ROBufferVK> spot_light_count_ubo;
     WBE::ComponentSpotLight spot_light_component{};
     VkExtent2D shadow_extent{};
     WBE::ComponentCamera camera_component{};
@@ -117,6 +117,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_draw_task();
             game_application.run();
+            game_application.release_draw_task();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
@@ -198,34 +199,12 @@ void ApplicationVulkanDrawCubeTest::setup_draw_task() {
     setup_render_context();
     load_resources();
     setup_spot_light();
+    create_buffers();
+    acquire_draw_cube_render_graph();
+}
 
-    WBE::RenderTestMeshDraw shadow_task{
-        .task_id = std::string(RT_RUN_PIPELINE_SHADOWMAP),
-        .params =
-            WBE::RTParamsGraphicsDrawMeshVK{
-                .mesh = std::string(WBE::STATIC_MESH_KEY),
-                .pipeline = WBE::RTParamsGraphicsDrawMeshVK::make_default_pipeline("draw_cube_shadow_pipeline"),
-                .parts = {WBE::MeshPartVK::OPAQUE},
-                .render_extent = WBE::make_fixed_extent_params(shadow_extent),
-                .clear_values = {WBE::make_clear_color(0.0F, 0.0F, 0.0F, 0.0F), WBE::make_clear_depth(0.0F)},
-            },
-        .color_attachment_ids = {std::string(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW)},
-        .depth_attachment_id = std::string(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW),
-    };
-
-    WBE::RenderTestMeshDraw main_task{
-        .task_id = std::string(RT_RUN_PIPELINE),
-        .params =
-            WBE::RTParamsGraphicsDrawMeshVK{
-                .mesh = std::string(WBE::STATIC_MESH_KEY),
-                .pipeline = WBE::RTParamsGraphicsDrawMeshVK::make_default_pipeline("draw_cube_main_pipeline"),
-                .parts = {WBE::MeshPartVK::OPAQUE},
-                .clear_values = {WBE::make_clear_color(0.0F, 0.0F, 0.0F, 0.0F)},
-            },
-        .color_attachment_ids = {std::string(WBE::REND_RES_SWAP_CHAIN)},
-    };
-
-    register_draw_cube_render_graph(std::move(shadow_task), std::move(main_task));
+void ApplicationVulkanDrawCubeTest::release_draw_task() {
+    WBE::release_test_render_graph(*renderer_vk, render_graph);
 }
 
 void ApplicationVulkanDrawCubeTest::setup_render_context() {
@@ -240,9 +219,9 @@ void ApplicationVulkanDrawCubeTest::load_resources() {
     auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
         WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
-    cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh");
-    shadow_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("shadowmap_spot");
-    main_pipeline_resource = resource_manager->get_resource<WBE::RUGraphicsPipeline>("forward_cook_torrance_pbr");
+    if (resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh") == WBE::MEM_NULL) {
+        throw std::runtime_error("Failed to setup draw cube test: static mesh resource was not found.");
+    }
 }
 
 void ApplicationVulkanDrawCubeTest::setup_spot_light() {
@@ -253,100 +232,43 @@ void ApplicationVulkanDrawCubeTest::setup_spot_light() {
     };
 }
 
-void ApplicationVulkanDrawCubeTest::register_draw_cube_render_graph(
-    WBE::RenderTestMeshDraw p_shadow_task, WBE::RenderTestMeshDraw p_main_task) {
-    static constexpr std::string_view SHADOWMAP_DEPTH_IMAGE = "shadowmap_depth_image";
-    static constexpr std::string_view SHADOWMAP_COLOR_IMAGE = "shadowmap_color_image";
-    const VkExtent3D shadow_image_extent{.width = shadow_extent.width, .height = shadow_extent.height, .depth = 1};
-    const auto make_uniform_buffer = [](std::vector<uint8_t> p_initial_data) {
-        return WBE::RendBufferDescVK{
-            .usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-            .domain = WBE::DeviceDomain::HOST_DEVICE,
-            .initial_data = std::move(p_initial_data),
-        };
-    };
+WBE::Ref<WBE::ROBufferVK> ApplicationVulkanDrawCubeTest::create_uniform_buffer(const void* p_data, size_t p_size) const {
+    return render_context->create_buffer(WBE::ROBufferVK::Builder()
+            .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
+            .set_size(p_size)
+            .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+            .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+}
+
+void ApplicationVulkanDrawCubeTest::create_buffers() {
+    // Recipes cannot set initial data, so the application owns the buffers and the recipe imports them.
+    const SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
+    const CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
     const uint32_t spot_light_count = 1;
+    camera_info_ubo = create_uniform_buffer(&camera_info, sizeof(camera_info));
+    spot_light_info_ubo = create_uniform_buffer(&spot_light_info, sizeof(spot_light_info));
+    shadow_light_info_ubo = create_uniform_buffer(&spot_light_info, sizeof(spot_light_info));
+    spot_light_count_ubo = create_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
+}
 
-    // The buffers start with the state at registration; equal descriptions keep them, and their runtime updates, across
-    // rebuilds.
-    const std::vector<uint8_t> spot_light_info_data = WBE::to_initial_data(make_spot_light_info_gpu(spot_light_component));
-    const std::vector<uint8_t> camera_info_data = WBE::to_initial_data(make_camera_info_gpu(camera_component));
-    const std::vector<uint8_t> spot_light_count_data = WBE::to_initial_data(spot_light_count);
-    // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
-    WBE::Ref<WBE::RenderGraphVK> graph = renderer_vk->register_render_graph("draw_cube_pipeline",
-        [this,
-            shadow_task = std::move(p_shadow_task),
-            main_task = std::move(p_main_task),
-            shadow_image_extent,
-            make_uniform_buffer,
-            spot_light_info_data,
-            camera_info_data,
-            spot_light_count_data](const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
-            // The draw tasks name these by key; registering again with an equal description is free.
-            p_graph.register_mesh(WBE::STATIC_MESH_KEY, cube_mesh);
-            p_graph.register_graphics_pipeline("draw_cube_shadow_pipeline",
-                shadow_pipeline_resource,
-                WBE::RDParamsGraphicsPipelineVK{
-                    .color_formats = {static_cast<WBE::ImageFormatVK>(SHADOWMAP_COLOR_FORMAT)},
-                    .depth_format = static_cast<WBE::ImageFormatVK>(SHADOWMAP_DEPTH_FORMAT),
-                });
-            p_graph.register_graphics_pipeline("draw_cube_main_pipeline",
-                main_pipeline_resource,
-                WBE::RDParamsGraphicsPipelineVK{
-                    .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
-                });
-            WBE::RendGraphDescVK pipeline_desc(render_allocator, &p_graph);
-            pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer_vk->acquire_swap_chain_image_view_container())
-                .add_image(SHADOWMAP_DEPTH_IMAGE,
-                    [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendImageDescVK{
-                            .usage = WBE::RendResPrimaryUsageVK::IMAGE_DEPTH_TARGET,
-                            .format = SHADOWMAP_DEPTH_FORMAT,
-                            .extent = shadow_image_extent,
-                        };
-                    })
-                .add_image(SHADOWMAP_COLOR_IMAGE,
-                    [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendImageDescVK{
-                            .usage = WBE::RendResPrimaryUsageVK::IMAGE_RENDER_TARGET,
-                            .format = SHADOWMAP_COLOR_FORMAT,
-                            .extent = shadow_image_extent,
-                        };
-                    })
-                .add_image_view(REND_RES_TEST_SHADOWMAP_COLOR_IMAGE_VIEW, SHADOWMAP_COLOR_IMAGE)
-                .add_image_view(REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW, SHADOWMAP_DEPTH_IMAGE)
-                .add_sampler(SHADOW_SAMPLER,
-                    [=](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendSamplerDescVK{
-                            .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                            .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                            .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                        };
-                    })
-                .add_buffer(SHADOW_LIGHT_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = spot_light_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return make_uniform_buffer(initial_data);
-                    })
-                .add_buffer(SPOT_LIGHT_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = spot_light_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return make_uniform_buffer(initial_data);
-                    })
-                .add_buffer(CAMERA_INFO_BUFFER,
-                    [make_uniform_buffer, initial_data = camera_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return make_uniform_buffer(initial_data);
-                    })
-                .add_buffer(SPOT_LIGHT_COUNT_BUFFER,
-                    [make_uniform_buffer, initial_data = spot_light_count_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return make_uniform_buffer(initial_data);
-                    });
-
-            // The main pass samples the shadow depth written by the shadow pass through its reflected "shadowmap" resource.
-            // The draw tasks import the mesh themselves.
-            shadow_task.add_to(pipeline_desc, render_context).connect(RT_RUN_PIPELINE, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            main_task.add_to(pipeline_desc, render_context).alias(SHADOWMAP_SAMPLED_IMAGE_VIEW, REND_RES_TEST_SHADOWMAP_DEPTH_IMAGE_VIEW);
-            return pipeline_desc;
-        });
-    camera_info_ubo = graph->acquire_resource(CAMERA_INFO_BUFFER)->get().dynamic_cast_ref<WBE::ROBufferVK>();
-    WBE::write_descriptor_debug_output("draw_cube_pipeline_graph_descriptors", graph->list_descriptors());
-    renderer_vk->activate_render_graph("draw_cube_pipeline");
+void ApplicationVulkanDrawCubeTest::acquire_draw_cube_render_graph() {
+    // The recipe registers the mesh and the pipelines and declares the shadow map; the application supplies its buffers.
+    render_graph = WBE::acquire_test_render_graph(*renderer_vk,
+        DRAW_CUBE_RENDER_GRAPH,
+        WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
+            DRAW_CUBE_RENDER_GRAPH,
+            [this](const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& p_recipe_context) {
+                WBE::ShadowedMeshRecipeContext context;
+                static_cast<WBE::RendRecipeContextVK&>(context) = p_recipe_context;
+                context.shadow_extent = {.width = shadow_extent.width, .height = shadow_extent.height};
+                context.shadow_color_format = static_cast<WBE::ImageFormatVK>(SHADOWMAP_COLOR_FORMAT);
+                context.shadow_depth_format = static_cast<WBE::ImageFormatVK>(SHADOWMAP_DEPTH_FORMAT);
+                WBE::RendGraphPreparedBindingsVK result;
+                result.context = WBE::RendGraphScriptVK::serialize_context(context);
+                result.imports.add(CAMERA_INFO_BUFFER, *camera_info_ubo)
+                    .add(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_ubo)
+                    .add(SHADOW_LIGHT_INFO_BUFFER, *shadow_light_info_ubo)
+                    .add(SPOT_LIGHT_COUNT_BUFFER, *spot_light_count_ubo);
+                return result;
+            }));
 }

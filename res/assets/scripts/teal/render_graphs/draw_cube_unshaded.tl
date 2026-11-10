@@ -20,7 +20,7 @@ local render_graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
-function exports.build(context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
     local swap_chain = graph:import_resource("swap_chain")
     local camera_info = graph:import_resource("camera_info")

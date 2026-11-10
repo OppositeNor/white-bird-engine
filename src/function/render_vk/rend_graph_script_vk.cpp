@@ -48,16 +48,17 @@ RendRecipeContextVK RendGraphScriptVK::get_recipe_context(const RenderContextVK&
     };
 }
 
-DataValue RendGraphScriptVK::run(std::string_view p_module_name, std::string_view p_source, const DataValue& p_context) {
+DataValue RendGraphScriptVK::run(
+    std::string_view p_module_name, std::string_view p_source, const DataValue& p_context, const DataValue& p_parameters) {
     const SMRResourceManager module_resolver;
     SBLua backend;
     backend.set_module_resolver(&module_resolver);
     backend.load_module(p_module_name, p_source);
-    const std::array<DataValue, 1> arguments{p_context};
+    const std::array<DataValue, 2> arguments{p_context, p_parameters};
     return backend.call(p_module_name, "build", arguments);
 }
 
-DataValue RendGraphScriptVK::run(std::string_view p_script_key, const DataValue& p_context) {
+DataValue RendGraphScriptVK::run(std::string_view p_script_key, const DataValue& p_context, const DataValue& p_parameters) {
     ResourceManager* resource_manager = ResourceManager::get_singleton();
     if (resource_manager == nullptr) {
         throw std::runtime_error(std::format("Failed to run render graph script '{}': the resource manager is unavailable.", p_script_key));
@@ -66,7 +67,17 @@ DataValue RendGraphScriptVK::run(std::string_view p_script_key, const DataValue&
     if (script == MEM_NULL || script->source == MEM_NULL) {
         throw std::runtime_error(std::format("Failed to run render graph script '{}': no script resource has this key.", p_script_key));
     }
-    return run(p_script_key, std::string_view(script->source.get(), script->size - 1), p_context);
+    return run(*script, p_context, p_parameters);
+}
+
+DataValue RendGraphScriptVK::run(const RUScript& p_script, const DataValue& p_context, const DataValue& p_parameters) {
+    if (p_script.resource_key == nullptr || p_script.resource_key[0] == '\0') {
+        throw std::runtime_error("Failed to run a render graph script: the script has no resource key.");
+    }
+    if (p_script.source == MEM_NULL || p_script.size == 0) {
+        throw std::runtime_error(std::format("Failed to run render graph script '{}': the script has no source.", p_script.resource_key));
+    }
+    return run(p_script.resource_key, std::string_view(p_script.source.get(), p_script.size - 1), p_context, p_parameters);
 }
 
 } // namespace WhiteBirdEngine

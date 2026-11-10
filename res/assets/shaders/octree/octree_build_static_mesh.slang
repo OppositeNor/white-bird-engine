@@ -87,6 +87,17 @@ static const float VOXEL_COVERAGE_EPSILON = 0.0001;
  */
 struct OctreeBuildDescriptorIndices {
     /**
+     * @brief Descriptor-heap reference to the full view of the texture the pass writes through the per-level views.
+     * @details Unused by the shader; it declares that the pass writes every mip level, so render graphs order the
+     * readers of the full view after it. Declared first, so a first write moves every mip level into the unified layout.
+     */
+#ifdef WBE_DYNAMIC_BUILD
+    [WBE_DESCRIPTOR("storage_image", "octree_dynamic", "write")]
+#else
+    [WBE_DESCRIPTOR("storage_image", "octree_static", "write")]
+#endif
+    uint2 texture;
+    /**
      * @brief Descriptor-heap reference to octree_info.
      */
     [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]

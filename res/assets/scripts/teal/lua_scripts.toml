@@ -61,6 +61,26 @@ source_type = "script"
 source_file = "assets/scripts/teal/render_graph_utils/svo_3.tl"
 
 [[resources]]
+id = "render_graphs.draw_triangle"
+source_type = "script"
+source_file = "assets/scripts/teal/render_graphs/draw_triangle.tl"
+
+[[resources]]
+id = "render_graphs.draw_cube"
+source_type = "script"
+source_file = "assets/scripts/teal/render_graphs/draw_cube.tl"
+
+[[resources]]
+id = "render_graphs.draw_sponza"
+source_type = "script"
+source_file = "assets/scripts/teal/render_graphs/draw_sponza.tl"
+
+[[resources]]
+id = "render_graphs.draw_skinned_mesh"
+source_type = "script"
+source_file = "assets/scripts/teal/render_graphs/draw_skinned_mesh.tl"
+
+[[resources]]
 id = "render_graphs.draw_cube_unshaded"
 source_type = "script"
 source_file = "assets/scripts/teal/render_graphs/draw_cube_unshaded.tl"

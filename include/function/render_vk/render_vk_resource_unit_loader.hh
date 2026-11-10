@@ -106,6 +106,22 @@ public:
     virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
 };
 
+/**
+ * @class ResourceUnitLoaderRenderGraph
+ * @brief Loads render graph definitions (RURenderGraph), whose recipe references a `script` resource.
+ *
+ * The recipe reference resolves through the chunk's reference resolution after the chunk loads.
+ */
+class ResourceUnitLoaderRenderGraph final : public IResourceUnitLoader {
+public:
+    virtual std::span<const std::string> get_supported_resource_types() const override;
+    virtual void populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const override;
+    /**
+     * @throws std::runtime_error When recipe is empty or contains NUL, or parameters is present but not a map.
+     */
+    virtual std::any populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const override;
+};
+
 void register_renderer_vk_resource_unit_loaders();
 
 } // namespace WhiteBirdEngine

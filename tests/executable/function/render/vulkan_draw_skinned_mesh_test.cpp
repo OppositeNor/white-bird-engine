@@ -22,19 +22,15 @@
 #include "function/function_utils.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata_loader.hh"
-#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -72,11 +68,10 @@
 
 namespace WBE = WhiteBirdEngine;
 
-// Prefix of the imported skinned mesh buffers.
-inline constexpr std::string_view REND_RES_SKINNED_MESH = "skinned_mesh";
+// The render graph definition, whose recipe is render_graphs.draw_skinned_mesh.
+inline constexpr std::string_view DRAW_SKINNED_MESH_RENDER_GRAPH = "draw_skinned_mesh_graph";
 inline constexpr std::string_view REND_RES_SKINNED_MESH_CAMERA_INFO = "skinned_mesh_camera_info";
 inline constexpr std::string_view REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS = "skinned_mesh_skinning_transforms";
-inline constexpr std::string_view RT_DRAW_SKINNED_MESH = "draw_skinned_mesh";
 inline constexpr std::string_view RT_DRAW_SKINNED_MESH_IMGUI = "draw_skinned_mesh_imgui";
 
 // The number of joint influences stored per vertex in a joint binding.
@@ -265,10 +260,6 @@ public:
         evaluate_skinning_transforms();
         skinned_blend = blend;
 
-        auto shader_resource = resource_manager->get_resource<WBE::RUShader>("draw_skinned_mesh_shader");
-        if (shader_resource == nullptr) {
-            throw std::runtime_error("Failed to setup skinned mesh test: shader resource was not found.");
-        }
         CameraInfoGPU camera_info{
             .view = glm::lookAt(glm::vec3(0.0F, 1.0F, 4.5F), glm::vec3(0.0F, 1.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
             .proj = glm::perspectiveRH_ZO(glm::radians(45.0F), render_context->swap_chain_aspect_ratio, 10.0F, 0.1F),
@@ -277,83 +268,45 @@ public:
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
 
-        // The buffers start with the state at registration; equal descriptions keep them, and their runtime updates, across
-        // rebuilds.
-        const std::vector<uint8_t> camera_info_data = WBE::to_initial_data(camera_info);
-        const std::vector<uint8_t> skinning_transforms_data = to_byte_vector(skinning_transforms);
-        // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
-        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
-            [this,
-                render_allocator,
-                renderer,
-                render_context,
-                mesh,
-                submesh = &submesh,
-                shader_resource,
-                camera_info_data,
-                skinning_transforms_data](const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
-            WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline = p_graph.register_graphics_pipeline("draw_skinned_mesh_pipeline",
-                WBE::RDParamsGraphicsPipelineVK{
-                    .pipeline = "draw_skinned_mesh_pipeline",
-                    .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
-                });
-            WBE::RendGraphDescVK graph_desc(render_allocator, &p_graph);
-            // The shader reads position from the geometry binding and the joint ids and weights from the joint-binding
-            // binding, so the draw binds the buffers compiled from both binaries.
-            const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
-                graph_desc,
-                REND_RES_SKINNED_MESH,
-                mesh,
-                *submesh,
-                WBE::ShaderMetadataLoader().load(shader_resource),
-                "vertex_main");
-            graph_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-                .add_buffer(REND_RES_SKINNED_MESH_CAMERA_INFO,
-                    [initial_data = camera_info_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_UNIFORM,
-                            .domain = WBE::DeviceDomain::HOST_DEVICE,
-                            .initial_data = initial_data,
-                            };
-                    })
-                .add_buffer(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS,
-                    [initial_data = skinning_transforms_data](const WBE::RendGraphContextVK& /*p_context*/) {
-                        return WBE::RendBufferDescVK{.usage = WBE::RendResPrimaryUsageVK::BUFFER_STORAGE,
-                            .domain = WBE::DeviceDomain::HOST_DEVICE,
-                            .initial_data = initial_data,
-                            };
-                    });
+        // Recipes cannot set initial data, so the application owns the buffers and the recipe imports them.
+        camera_info_buffer = render_context->create_buffer(WBE::ROBufferVK::Builder()
+                .initial_data(&camera_info, sizeof(camera_info), WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(sizeof(camera_info))
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+        const size_t skinning_transforms_size = skinning_transforms.size() * sizeof(SkinningTransformGPU);
+        skinning_transforms_buffer = render_context->create_buffer(WBE::ROBufferVK::Builder()
+                .initial_data(skinning_transforms.data(), skinning_transforms_size, WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(skinning_transforms_size)
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+        // The recipe registers the mesh and the pipeline and draws the mesh; the ImGui overlay is a native task, created
+        // again for every build.
+        render_graph = WBE::acquire_test_render_graph(*renderer,
+            DRAW_SKINNED_MESH_RENDER_GRAPH,
+            WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
+                DRAW_SKINNED_MESH_RENDER_GRAPH,
+                [this, render_allocator](const WBE::RenderContextVK& p_render_context, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
+                    WBE::RendGraphPreparedBindingsVK result;
+                    result.imports.add(REND_RES_SKINNED_MESH_CAMERA_INFO, *camera_info_buffer)
+                        .add(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS, *skinning_transforms_buffer);
+                    WBE::RendTaskDescVK imgui_task_desc(render_allocator);
+                    imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
+                    imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+                    imgui_task_desc.factory = [this, render_allocator, render_context = &p_render_context](
+                                                  const WBE::RendGraphContextVK& /*p_context*/) {
+                        return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
+                    };
+                    result.imports.add_task(std::move(imgui_task_desc));
+                    return result;
+                }));
+    }
 
-            WBE::RendTaskDescVK draw_task_desc(render_allocator);
-            draw_task_desc.task_id = RT_DRAW_SKINNED_MESH;
-            draw_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-            const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.05F, 0.05F, 0.05F, 1.0F}}}};
-            draw_task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
-                return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                    .set_pipeline(graphics_pipeline)
-                    .set_render_extent(p_context.swap_chain_extent)
-                    .set_clear_values(clear_values)
-                    .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
-                        draw_buffers.index_buffer_id,
-                        draw_buffers.vertex_input,
-                        draw_buffers.indexed_draw_region)
-                    .create_unique(render_context);
-            };
-            graph_desc.add_task(std::move(draw_task_desc));
-
-            WBE::RendTaskDescVK imgui_task_desc(render_allocator);
-            imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
-            imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-            imgui_task_desc.factory = [this, render_allocator, render_context](const WBE::RendGraphContextVK& /*p_context*/) {
-                return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
-            };
-            graph_desc.add_task(std::move(imgui_task_desc));
-            WBE::connect_resource_chain(graph_desc, WBE::REND_RES_SWAP_CHAIN, {RT_DRAW_SKINNED_MESH, RT_DRAW_SKINNED_MESH_IMGUI});
-            return graph_desc;
-        });
-        skinning_transforms_buffer =
-            graph->acquire_resource(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS)->get().dynamic_cast_ref<WBE::ROBufferVK>();
-        WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
-        renderer->activate_render_graph("test_render_graph");
+    /**
+     * @brief Clear the activation and release the render graph; call after run().
+     */
+    void release_render_graph() {
+        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
     }
 
 private:
@@ -369,6 +322,8 @@ private:
     // The blend factor set by the slider, and the one the skinning transform buffer holds; owned by the rendering thread.
     float blend = 0.5F;
     float skinned_blend = -1.0F;
+    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    WBE::Ref<WBE::ROBufferVK> camera_info_buffer;
     WBE::Ref<WBE::ROBufferVK> skinning_transforms_buffer;
     // Destroyed before the renderer, after the rendering thread has stopped.
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
@@ -397,12 +352,6 @@ private:
         // The rotation keyframes of SimpleSkin.gltf at 1.0s and 4.0s, converted from glTF (x, y, z, w) order.
         first_frame_pose[ANIMATED_JOINT_INDEX].rotation = glm::normalize(glm::quat(0.707F, 0.0F, 0.0F, 0.707F));
         second_frame_pose[ANIMATED_JOINT_INDEX].rotation = glm::normalize(glm::quat(0.707F, 0.0F, 0.0F, -0.707F));
-    }
-
-    template <typename TElement>
-    static std::vector<uint8_t> to_byte_vector(const std::vector<TElement>& p_elements) {
-        const auto* bytes = reinterpret_cast<const uint8_t*>(p_elements.data());
-        return std::vector<uint8_t>(bytes, bytes + p_elements.size() * sizeof(TElement));
     }
 
     // Check that every joint binding references a skeleton joint, since the shader indexes the skinning transforms with
@@ -455,6 +404,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_render_graph();
             game_application.run();
+            game_application.release_render_graph();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {

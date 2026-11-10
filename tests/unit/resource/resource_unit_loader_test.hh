@@ -1464,6 +1464,126 @@ TEST_F(ResourcePopulatorTest, SDFLoadsTextureReference) {
     std::destroy_at(stored_texture.get());
 }
 
+TEST_F(ResourcePopulatorTest, RenderGraphLoadsRecipeReferenceAndParameters) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RURenderGraph> captured_graph = WBE::MEM_NULL;
+    void* registered_resource = nullptr;
+    void (*registered_destructor)(void*) = nullptr;
+    std::vector<std::string> created_ref_keys;
+    WBE::RefRes<WBE::RUScript> stored_script(stack_allocator.allocate(sizeof(WBE::RUScript)), &stack_allocator);
+    std::construct_at(stored_script.get());
+    auto resource_chunk =
+        MockResourceChunk::Builder()
+            .set_reserve_res_unit_storage_callback(
+                [&stack_allocator, &captured_graph](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
+                    if (p_id == "loaded_graph") {
+                        captured_graph = resource.force_cast<WBE::RURenderGraph>();
+                    }
+                    return resource;
+                })
+            .set_register_res_unit_destructor_callback(
+                [&registered_resource, &registered_destructor](void* p_resource, void (*p_destructor)(void*)) {
+                    registered_resource = p_resource;
+                    registered_destructor = p_destructor;
+                })
+            .set_create_ref_to_callback(
+                [&created_ref_keys, &stored_script](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                    created_ref_keys.emplace_back(p_key);
+                    if (p_key == "render_graphs.loaded") {
+                        p_assign_ref(stored_script.force_cast<char>());
+                    }
+                })
+            .build(stream);
+    constexpr std::string_view JSON_BUFFER = R"(
+    {
+        "id": "loaded_graph",
+        "type": "render_graph",
+        "recipe": "render_graphs.loaded",
+        "parameters": {"bloom_blur_pass_count": 8, "summed_area_table": true}
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(JSON_BUFFER);
+    WBE::ResourceUnitLoaderRenderGraph loader;
+
+    loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
+
+    ASSERT_NE(captured_graph, nullptr);
+    EXPECT_EQ(created_ref_keys, std::vector<std::string>{"render_graphs.loaded"});
+    EXPECT_EQ(captured_graph->recipe, stored_script);
+    EXPECT_EQ(captured_graph->parameters.get_value<int64_t>("bloom_blur_pass_count"), 8);
+    EXPECT_TRUE(captured_graph->parameters.get_value<bool>("summed_area_table"));
+    // The unit owns its parameters, so the chunk destroys it before releasing its storage.
+    ASSERT_NE(registered_destructor, nullptr);
+    EXPECT_EQ(registered_resource, captured_graph.get());
+    registered_destructor(registered_resource);
+}
+
+TEST_F(ResourcePopulatorTest, RenderGraphDefaultsToEmptyParameters) {
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    WBE::RefRes<WBE::RURenderGraph> captured_graph = WBE::MEM_NULL;
+    auto resource_chunk = MockResourceChunk::Builder()
+                              .set_reserve_res_unit_storage_callback([&stack_allocator, &captured_graph](std::string_view, size_t p_size) {
+                                  WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
+                                  captured_graph = resource.force_cast<WBE::RURenderGraph>();
+                                  return resource;
+                              })
+                              .build(stream);
+    WBE::RUSchemaRenderGraph scheme;
+    scheme.id = "loaded_graph";
+    scheme.type = "render_graph";
+    scheme.recipe = "render_graphs.loaded";
+    WBE::ResourceUnitLoaderRenderGraph loader;
+
+    loader.populate_scheme(*resource_chunk, scheme);
+
+    ASSERT_NE(captured_graph, nullptr);
+    EXPECT_EQ(captured_graph->parameters.get_kind(), WBE::DataValueKind::MAP);
+    EXPECT_TRUE(captured_graph->parameters.as_map().empty());
+    std::destroy_at(captured_graph.get());
+}
+
+TEST_F(ResourcePopulatorTest, RenderGraphRejectsInvalidDefinitions) {
+    WBE::ResourceUnitLoaderRenderGraph loader;
+    auto make_chunk = [](WBE::StackAllocator& p_stack_allocator, std::stringstream& p_stream) {
+        return MockResourceChunk::Builder()
+            .set_reserve_res_unit_storage_callback([&p_stack_allocator](std::string_view, size_t p_size) {
+                return WBE::RefRes<char>(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+            })
+            .build(p_stream);
+    };
+    auto expect_invalid = [&loader, &make_chunk](const WBE::RUSchemaRenderGraph& p_scheme) {
+        WBE::StackAllocator stack_allocator(8192);
+        std::stringstream stream;
+        auto resource_chunk = make_chunk(stack_allocator, stream);
+        EXPECT_THROW(loader.populate_scheme(*resource_chunk, p_scheme), std::runtime_error);
+    };
+    WBE::RUSchemaRenderGraph scheme;
+    scheme.id = "loaded_graph";
+    scheme.type = "render_graph";
+    expect_invalid(scheme);
+    scheme.recipe = std::string("render\0graphs", 13);
+    expect_invalid(scheme);
+    scheme.recipe = "render_graphs.loaded";
+    scheme.parameters = WBE::DataValue::make_list();
+    expect_invalid(scheme);
+    scheme.parameters = WBE::DataValue::make_integer(4);
+    expect_invalid(scheme);
+
+    // The recipe key is required.
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(R"({"id": "loaded_graph", "type": "render_graph"})");
+    WBE::StackAllocator stack_allocator(8192);
+    std::stringstream stream;
+    auto resource_chunk = make_chunk(stack_allocator, stream);
+    EXPECT_THROW(loader.populate_scheme_from_data(*resource_chunk, parser.get_data()), std::runtime_error);
+    EXPECT_EQ(loader.get_supported_resource_types().size(), 1U);
+    EXPECT_EQ(loader.get_supported_resource_types()[0], "render_graph");
+}
+
 TEST_F(ResourcePopulatorTest, SDFRejectsInvalidSchemes) {
     WBE::ResourceUnitLoaderSDF loader;
     auto expect_invalid = [&loader](const WBE::RUSchemaSDF& p_scheme) {

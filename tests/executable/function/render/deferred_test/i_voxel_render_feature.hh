@@ -114,8 +114,6 @@ struct VoxelRecipeInputs {
     std::string_view static_build_event;
     /** Whether the static construction has yet to record; a rebuild after it recorded creates the tasks disabled. */
     bool static_build_pending = true;
-    /** The graph the recipe is built for, whose registered meshes and pipelines C++ tasks resolve. */
-    RenderGraphVK* render_graph = nullptr;
 };
 
 /**

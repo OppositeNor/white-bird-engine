@@ -103,11 +103,24 @@ public:
 
     virtual void request_frame_capture(std::string_view p_path) override;
 
-    virtual void register_render_graph(std::string_view p_resource_key) override;
+    /**
+     * @brief Acquire an instance of a render graph definition; see IRenderer::acquire_render_graph().
+     *
+     * A miss loads the RURenderGraph from the ResourceManager, compiles a RenderGraphVK from its recipe, parameters, and
+     * p_bindings (RenderGraphVK::build_from_recipe()), notifies the plugins (RenderPluginVK::on_render_graph_registered()),
+     * and only then caches the graph weakly in the GlobalRenderCache, under RenderGraphInstanceCache::make_cache_key().
+     *
+     * @param p_resource_key The resource key of the definition.
+     * @param p_bindings The bindings, an IRenderGraphBindingsVK.
+     * @return The RenderGraphVK.
+     */
+    virtual Ref<IRenderGraph> acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) override;
 
-    virtual void unregister_render_graph(std::string_view p_resource_key) override;
-
-    virtual void activate_render_graph(std::string_view p_resource_key) override;
+    /**
+     * @brief Select the graph tick() executes; see IRenderer::activate_render_graph().
+     * @param p_graph A RenderGraphVK of this renderer, or null.
+     */
+    virtual void activate_render_graph(Ref<IRenderGraph> p_graph) override;
 
     virtual Ref<GlobalRenderCache> get_global_render_cache() override {
         return render_cache;
@@ -152,19 +165,6 @@ public:
      * the owner did not.
      */
     virtual void drain_job_buffer_tasks() override;
-
-    /**
-     * @brief Register a Vulkan render graph that a callback builds, under a resource key.
-     *
-     * The graph calls p_rebuild for its first build and again whenever it rebuilds, such as when the swap chain is
-     * resized; see RenderGraphVK::build_from_callback(). Call on the rendering thread.
-     *
-     * @param p_resource_key The resource key to register under.
-     * @param p_rebuild Produces the graph's descriptor for a context; everything it captures must outlive the graph.
-     * @return The newly built render graph.
-     * @throws std::runtime_error If the key is already registered, or the callback's descriptor does not build.
-     */
-    Ref<RenderGraphVK> register_render_graph(std::string_view p_resource_key, RendGraphRebuildCallbackVK p_rebuild);
 
     /**
      * @brief Run one renderer frame and, when a graph is given, render it to the swap chain.
@@ -287,14 +287,7 @@ private:
     // Per-frame-in-flight binary semaphore signaled by vkAcquireNextImageKHR.
     Vector<Ref<SemaphoreVK>, AllocType> image_available_semaphores;
 
-    struct RegisteredRenderGraph {
-        Ref<RenderGraphVK> graph;
-        uint32_t reference_count = 0;
-    };
-
-    // Registered compiled render graphs, keyed by resource key.
-    Map<std::string, RegisteredRenderGraph, AllocType> render_graphs;
-    // The currently active cached render graph.
+    // The graph tick() executes, retained until another graph is activated or the activation is cleared.
     Ref<RenderGraphVK> active_graph;
 
     std::vector<const char*> enabled_layers{ // NOLINT

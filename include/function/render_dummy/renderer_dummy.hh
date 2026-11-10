@@ -16,6 +16,8 @@
 #define WBE_FILE_RENDERER_DUMMY_H
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
@@ -63,16 +65,15 @@ public:
         return dummy_render_cache;
     }
 
-    virtual void register_render_graph(std::string_view p_resource_key) override {
-        throw std::runtime_error(std::string("RendererDummy does not support render graph registration: ") + std::string(p_resource_key));
+    virtual Ref<IRenderGraph> acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) override {
+        static_cast<void>(p_bindings);
+        throw std::runtime_error(std::string("RendererDummy does not support render graphs: ") + std::string(p_resource_key));
     }
 
-    virtual void unregister_render_graph(std::string_view p_resource_key) override {
-        throw std::runtime_error(std::string("RendererDummy does not support render graph unregistration: ") + std::string(p_resource_key));
-    }
-
-    virtual void activate_render_graph(std::string_view p_resource_key) override {
-        throw std::runtime_error(std::string("RendererDummy does not support render graph activation: ") + std::string(p_resource_key));
+    virtual void activate_render_graph(Ref<IRenderGraph> p_graph) override {
+        if (p_graph != MEM_NULL) {
+            throw std::runtime_error("RendererDummy does not support render graph activation.");
+        }
     }
 
     virtual std::future<void> add_job(std::function<void()> p_job) override {

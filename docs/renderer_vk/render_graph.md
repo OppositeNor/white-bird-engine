@@ -1,28 +1,57 @@
 # Render Graphs
 
-A render graph is a DAG of `IRenderTaskVK` nodes connected by resource dependency edges. The application does not build it
-directly: it registers a rebuild callback that returns a complete `RendGraphDescVK`, usually produced by a Lua/Teal recipe.
+A render graph is a DAG of `IRenderTaskVK` nodes connected by resource dependency edges. Applications compose complete
+graphs only in Teal: a manifest **definition** names a recipe and its static parameters, and the application acquires an
+**instance** of it with **bindings** that supply its runtime resources and native tasks.
 
-## Registration and Rebuilds
+## Definitions, Instances, and Rebuilds
 
-```cpp
-Ref<RenderGraphVK> graph = renderer->register_render_graph("scene",
-    [this, renderer](const RendGraphContextVK& p_context) {
-        RendGraphRecipeImportsVK imports;
-        imports.add(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
-            .add("camera_info", *camera_info_ubo);
-        const DataValue recipe = RendGraphScriptVK::run("render_graphs.scene",
-            RendGraphScriptVK::make_context(*render_context, p_context));
-        return RendGraphRecipeBuilderVK().build(recipe, imports, render_context);
-    });
-renderer->activate_render_graph("scene");
+A definition is a `render_graph` resource (`RURenderGraph`), declared in a manifest reachable from a root chunk; the
+engine's are in `res/assets/render_graphs/render_graphs.toml`. It is immutable and holds no renderer state:
+
+```toml
+[[resources]]
+id = "scene_graph"
+type = "render_graph"
+recipe = "render_graphs.scene"
+
+[resources.parameters]
+bloom_blur_pass_count = 8
 ```
 
-The callback runs for the first build (at registration), whenever the context changes (the swap-chain extent, checked when
-the graph executes), and on `RenderGraphVK::rebuild()`. Keep one-time setup outside it: pipeline compiles,
-application-owned buffers, and initial-data snapshots. Inside it, only assemble the descriptor. Import renderer-owned
-containers such as the swap chain inside the callback, since the renderer replaces them when the number of frames in flight
-changes. Unregistering defers destroying the graph until no frame in flight can use it.
+The application acquires and activates an instance on the rendering thread:
+
+```cpp
+auto bindings = make_ref<RenderGraphBindingsFunctionVK>(global_allocator(), "scene_graph",
+    [this](const RenderContextVK& /*p_render_context*/, const RendRecipeContextVK& p_facts) {
+        RendGraphPreparedBindingsVK result;
+        result.imports.add("camera_info", *camera_info_ubo);
+        return result;
+    });
+Ref<IRenderGraph> graph = renderer->acquire_render_graph("scene_graph", bindings);
+renderer->activate_render_graph(graph);
+// Before shutdown: renderer->activate_render_graph(MEM_NULL); graph = MEM_NULL;
+```
+
+Bindings (`IRenderGraphBindingsVK`) carry an immutable instance key and, for every build, prepare the serialized recipe
+context and the `RendGraphRecipeImportsVK`. They never see the descriptor or the graph, and must not retain the graph, which
+retains them. The graph replaces the context's renderer facts with authoritative ones, and supplies the swap-chain container
+when the recipe imports `swap_chain` and the bindings do not, acquiring it again for every build because the renderer
+replaces it when the number of frames in flight changes.
+
+Instances are cached weakly in `GlobalRenderCache` under `RenderGraphInstanceCache::make_cache_key(definition, instance)`.
+Acquiring the same definition with the same instance key and bindings object returns the live graph; another bindings
+object for a live identity throws; other instance keys compile independent graphs. A failed compilation caches nothing.
+Applications, scenes, and the renderer's activation hold instances strongly; an instance is recompiled after its last
+reference is released, and every reference must be released before the renderer shuts down. A `Scene` acquires one instance
+per distinct world definition and instance key (`World::set_render_graph_instance_key()`, defaulting to the definition key)
+with the bindings given to `Scene::add_render_graph_bindings()`, and queues acquisition, activation, and release through
+`add_job()`.
+
+The recipe runs for the first build, whenever the context changes (the swap-chain extent, checked when the graph executes),
+and on `RenderGraphVK::rebuild()`; a frame with an unchanged context runs no script and prepares no bindings. Keep one-time
+setup outside the bindings: pipeline compiles, application-owned buffers, and initial-data snapshots. Make nonstructural
+changes with buffer updates and trigger, toggle, or select events.
 
 A rebuild diffs the new descriptor against the current graph (`RendGraphResourceDiffVK`):
 
@@ -98,7 +127,8 @@ with no edge on R to another member. Order a subgraph's accesses to its ports wi
 
 ## Recipes
 
-A recipe is a Teal (or Lua) `script` resource whose module exports `build(context)` and returns a `RendGraphRecipeVK`
+A recipe is a Teal (or Lua) `script` resource whose module exports `build(context, parameters)` and returns a
+`RendGraphRecipeVK`
 (`rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK::run()` executes it in a fresh sandbox, and
 `RendGraphRecipeBuilderVK::build()` turns the result into a descriptor. Recipes only build descriptors; they never touch render
 objects.
@@ -214,13 +244,12 @@ Every adjacent pair of a chain must access every listed resource. A bundle is on
 ### Imports and C++ tasks
 
 - Every import is supplied through `RendGraphRecipeImportsVK`; a declared-but-missing or supplied-but-undeclared import is
-  an error. Recipes cannot set initial data, so buffers that need it are application-owned imports registered in the render
-  database under their import name. When C++ supplies imports that only an imported task binds, pass the full list to
+  an error. Recipes cannot set initial data, so buffers that need it are application-owned imports. When C++ supplies imports that only an imported task binds, pass the full list to
   `graph:build(imports)`.
 - Tasks that need application objects (for example the ImGui overlay) are built in C++, supplied with
   `RendGraphRecipeImportsVK::add_task()`, referenced with `graph:import_task(id)`, and connected like any task.
-- The callback may add to the descriptor the builder returns for parts not yet expressible in Lua. The deferred test adds
-  its acceleration structure and dynamic mesh entities this way.
+- Everything else the application owns that shaders name, such as the deferred test's acceleration structure and dynamic
+  mesh entities, is a declared import too; nothing is added to a built descriptor in C++.
 
 ### Triggers and toggles
 
@@ -257,8 +286,9 @@ pattern.
 
 `context` holds `RendRecipeContextVK` facts: `frames_in_flight`, `swap_chain_format`, and `swap_chain_extent`
 (`RendGraphScriptVK::make_context()`). An application that adds entries declares a `WBE_REFLECT_SCRIPT` struct deriving from
-`RendRecipeContextVK`, fills its base with `get_recipe_context()`, and passes `serialize_context()` to `run()`. Size
-swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
+`RendRecipeContextVK`, fills its base with the facts its bindings receive, and returns `serialize_context()` from
+`prepare()`. `parameters` holds the definition's static choices (the deferred definitions differ only in
+`DeferredRecipeParameters`). Size swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
 
 ### Task types
 
@@ -318,24 +348,11 @@ queue_family?)` does); `render_graph_utils.large_prefix_scan` and
 `render_graph_utils.dedup_large` provide dispatch sequences for a `run_compute_pipelines_sequential` task; and
 `render_graph_utils.svo_3` gathers and deduplicates the leaves of the third sparse voxel octree construction.
 
-## C++-only Graphs
+## C++ Descriptors
 
-Small tests may build the descriptor in C++ inside the callback; see
-`tests/executable/function/render/vulkan_draw_triangle_test.cpp`:
-
-```cpp
-RendTaskDescVK task_desc(render_allocator);
-task_desc.task_id = "run_pipeline";
-task_desc.alias(RenderTargetsVK::color_id(0), REND_RES_SWAP_CHAIN);
-task_desc.factory = [=](const RendGraphContextVK& p_context) {
-    return RTRunGraphicsPipelineVK::Builder(render_allocator)
-        .set_pipeline(graphics_pipeline)
-        .set_render_extent(p_context.swap_chain_extent)
-        .create_unique(render_context);
-};
-graph_desc.get_task("run_shadow").connect("run_pipeline", "shadow_moments");
-graph_desc.add_task(std::move(task_desc));
-```
+`RenderGraphVK::build_from_descriptor()` builds a fixed C++ `RendGraphDescVK`, which every rebuild applies again. It exists
+for focused tests of the compiler (`tests/unit/function/render_graph_vk_test.cpp`); applications build only the
+`RendTaskDescVK`s of the native tasks their bindings import.
 
 ## Debugging
 
@@ -347,9 +364,11 @@ graph_desc.add_task(std::move(task_desc));
 
 ## Examples
 
-- `tests/executable/function/render/vulkan_draw_cube_unshaded_test.cpp` with `render_graphs/draw_cube_unshaded.tl`: minimal
-  recipe.
-- `vulkan_pixel_sorting_test.cpp` with `pixel_sorting_recipe_context.hh` and `render_graphs/pixel_sorting.tl`: custom
-  context and an imported ImGui task.
-- `deferred_test/deferred_render_graph.cpp` with `render_graphs/deferred.tl` and `render_graph_utils/features/`: full deferred
-  pipeline with feature subgraphs, triggers, toggles, and C++ additions.
+- `tests/executable/function/render/vulkan_draw_triangle_test.cpp` with `render_graphs/draw_triangle.tl`: the minimal
+  definition, whose bindings supply nothing.
+- `vulkan_draw_cube_test.cpp` and `vulkan_draw_sponza_test.cpp` with `shadowed_mesh_recipe_context.hh`: application-owned
+  buffers, a derived context, and shadow maps.
+- `vulkan_pixel_sorting_test.cpp` with `pixel_sorting_recipe_context.hh` and `render_graphs/pixel_sorting.tl`: one
+  instance per orientation and an imported ImGui task.
+- `deferred_test/deferred_render_graph.cpp` with `render_graphs/deferred.tl` and `render_graph_utils/features/`: two
+  definitions of one recipe, feature subgraphs, triggers, toggles, native tasks, and rebuilds.

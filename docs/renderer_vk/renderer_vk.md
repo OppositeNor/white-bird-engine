@@ -258,8 +258,7 @@ local params: wbe.RTParamsGraphicsDrawMeshVK = {
 
 `GraphicsPipelineCompilerVK(context).compile(key, pipeline_resource)` compiles an `RUGraphicsPipeline` for the attachment
 formats in its context and registers it in the `RenderDatabase` under the key, which recipe params reference.
-`ComputePipelineCompilerVK(context).compile(key, shader)` does the same for compute shaders. Compile pipelines once, outside the
-graph's rebuild callback, and keep them alive. Ray-tracing pipelines are built with `ROPipelineRayTracingVK::Builder`.
+`ComputePipelineCompilerVK(context).compile(key, shader)` does the same for compute shaders. Recipes normally register the pipelines their tasks name on the graph instead. Ray-tracing pipelines are built with `ROPipelineRayTracingVK::Builder`.
 
 ## Render Targets
 

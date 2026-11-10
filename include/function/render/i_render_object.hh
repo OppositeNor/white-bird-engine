@@ -24,8 +24,13 @@ namespace WhiteBirdEngine {
 
 /**
  * @class IRenderObject
- * @brief Interface for all the render objects, such as pipelines, shaders, etc.
+ * @brief Interface of the runtime rendering objects, such as buffers, images, pipelines, and render graphs. Neither copyable
+ * nor movable.
  *
+ * Render objects are confined to the rendering thread: their methods provide no internal synchronization, and other threads
+ * submit work on them through IRenderer::add_job(). Their lifetime is bound to the renderer that created them; every
+ * reference must be released before that renderer shuts down. Composite objects, which own other render objects (such as
+ * a render graph and the resources it allocates), are render objects too.
  */
 class IRenderObject {
 public:

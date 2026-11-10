@@ -126,9 +126,9 @@ public:
     Ref<SceneNode> get_scene_node(EntityID p_entity);
 
     /**
-     * @brief Set the resource key of the world's render graph.
+     * @brief Set the resource key of the world's render graph definition (RURenderGraph).
      *
-     * @param p_resource_key The render graph resource key to associate with the world.
+     * @param p_resource_key The render graph definition key to associate with the world, or empty for no graph.
      */
     void set_render_graph_resource_key(std::string_view p_resource_key);
 
@@ -140,6 +140,21 @@ public:
     std::string_view get_render_graph_resource_key() const {
         return render_graph_resource_key;
     }
+
+    /**
+     * @brief Set the instance key of the world's render graph; worlds of a scene with the same definition and instance key
+     * share one graph instance.
+     *
+     * @param p_instance_key The instance key, or empty to use the definition key.
+     */
+    void set_render_graph_instance_key(std::string_view p_instance_key);
+
+    /**
+     * @brief Get the instance key of the world's render graph.
+     *
+     * @return The instance key, or the definition key when none was set.
+     */
+    std::string_view get_render_graph_instance_key() const;
 
     /**
      * @brief Set the non-owning static mesh resource rendered by the world.
@@ -167,6 +182,7 @@ private:
     HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
     HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
     String<HeapAllocatorDefault> render_graph_resource_key;
+    String<HeapAllocatorDefault> render_graph_instance_key;
     RefRes<RUMesh3D> static_mesh;
 };
 

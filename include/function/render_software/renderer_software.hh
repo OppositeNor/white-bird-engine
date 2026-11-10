@@ -53,9 +53,8 @@ public:
     }
     virtual void tick(double p_delta) override;
     virtual Ref<GlobalRenderCache> get_global_render_cache() override;
-    virtual void register_render_graph(std::string_view p_resource_key) override;
-    virtual void unregister_render_graph(std::string_view p_resource_key) override;
-    virtual void activate_render_graph(std::string_view p_resource_key) override;
+    virtual Ref<IRenderGraph> acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) override;
+    virtual void activate_render_graph(Ref<IRenderGraph> p_graph) override;
     virtual std::future<void> add_job(std::function<void()> p_job) override;
 
 private:

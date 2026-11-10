@@ -19,10 +19,15 @@
 #include "core/allocator/stl_allocator.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
 #include "function/render/render_resource_unit.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <future>
+#include <string>
 #include <string_view>
 
 namespace WhiteBirdEngine {
@@ -34,8 +39,18 @@ class World;
  * @class Scene
  * @brief Orchestrates the lifecycle and active render state of a set of worlds.
  *
- * The allocator must outlive the scene. The scene retains strong references to
- * its renderer and worlds and is neither copyable nor movable.
+ * Each world names a render graph definition and an instance key (World::get_render_graph_resource_key() and
+ * World::get_render_graph_instance_key()). Setup acquires one graph instance per distinct definition and instance key, with
+ * the bindings supplied for it (add_render_graph_bindings()), so the worlds sharing a pair share its instance; scenes share
+ * an instance only when they supply the same bindings object. The scene owns the graph handles in a rendering-thread state
+ * that it never touches directly: acquisitions, activations, and releases are queued through IRenderer::add_job() in
+ * order, and their futures are observed so that their failures are rethrown by the next update(), teardown(), or setup().
+ * Teardown releases the scene's graph handles and waits for the release, but leaves the renderer's activation, which keeps
+ * the active graph alive until the application activates another graph or clears it. When the renderer no longer accepts
+ * jobs (its rendering thread has stopped), the scene runs the operations itself.
+ *
+ * The allocator must outlive the scene. The scene retains strong references to its renderer, worlds, and bindings and is
+ * neither copyable nor movable.
  */
 class Scene {
 public:
@@ -101,7 +116,23 @@ public:
     }
 
     /**
-     * @brief Register world graphs and run every driver setup callback.
+     * @brief Supply the bindings of a render graph instance, before setup.
+     *
+     * The bindings serve every world whose definition key is p_resource_key and whose instance key is the bindings' instance
+     * key.
+     *
+     * @param p_resource_key The render graph definition key.
+     * @param p_bindings The bindings, of the renderer's bindings type.
+     * @throws std::runtime_error If the scene is set up, p_resource_key is empty, p_bindings is null, or the definition and
+     * instance key already have bindings.
+     */
+    void add_render_graph_bindings(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings);
+
+    /**
+     * @brief Queue the acquisition of every world's render graph instance and run every driver setup callback.
+     *
+     * @throws std::runtime_error If the scene is neither constructed nor torn down, a world's definition and instance key
+     * have no bindings, or an earlier queued render operation failed.
      */
     void setup();
 
@@ -113,12 +144,18 @@ public:
     /**
      * @brief Publish active-world render state and update all world drivers.
      *
+     * Queues the activation of the active world's graph instance when it changed since the last activation; a world without
+     * a graph activates nothing.
+     *
      * @param p_delta The elapsed time since the previous update, in seconds.
+     * @throws std::runtime_error If the scene is not ready, or a queued render operation failed.
      */
     void update(double p_delta);
 
     /**
-     * @brief Run driver teardown and release registered world graphs.
+     * @brief Run driver teardown, then release the scene's graph instances and wait for the release.
+     *
+     * @throws std::runtime_error If the scene is neither set up nor ready, or a queued render operation failed.
      */
     void teardown();
 
@@ -130,12 +167,35 @@ private:
         TORN_DOWN,
     };
 
-    bool is_first_graph_key(size_t p_world_index) const;
+    // The rendering-thread state of the scene; only queued render operations access it.
+    struct RenderState {
+        explicit RenderState(HeapAllocatorDefault* p_allocator) : graphs(p_allocator) {
+        }
+        // The acquired instances, keyed by RenderGraphInstanceCache::make_cache_key().
+        Map<std::string, Ref<IRenderGraph>, HeapAllocatorDefault> graphs;
+    };
+
+    // The definition key of a world's graph, or empty, and the cache key of its instance.
+    struct WorldGraph {
+        std::string resource_key;
+        std::string instance_cache_key;
+    };
+
+    WorldGraph get_world_graph(size_t p_world_index) const;
+    void queue_render_operation(std::function<void()> p_operation);
+    void observe_render_operations(bool p_wait);
 
     HeapAllocatorDefault* allocator;
     Ref<IRenderer> renderer;
     Vector<Ref<World>, HeapAllocatorDefault> worlds;
     String<HeapAllocatorDefault> resource_manifest_key;
+    // Bindings supplied with add_render_graph_bindings(), keyed by RenderGraphInstanceCache::make_cache_key().
+    Map<std::string, Ref<IRenderGraphBindings>, HeapAllocatorDefault> render_graph_bindings;
+    Ref<RenderState> render_state;
+    // Futures of the queued render operations that have not been observed yet.
+    Vector<std::future<void>, HeapAllocatorDefault> pending_render_operations;
+    // The cache key of the instance last queued for activation, or empty.
+    std::string activated_instance;
     size_t active_world_index = 0;
     LifecycleState lifecycle_state = LifecycleState::CONSTRUCTED;
 };

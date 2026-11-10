@@ -32,6 +32,7 @@ include = [
     "assets/shaders/dedup/dedup.toml",
     "assets/shaders/pixel_sort/pixel_sort_shader.toml",
     "assets/scripts/teal/lua_scripts.toml",
+    "assets/render_graphs/render_graphs.toml",
 ]
 resources = [
     { id = "test_text", source_type = "text", source_file = "test_text_files/test_file_utf8.txt" },

@@ -21,16 +21,13 @@
 #include "function/function_utils.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/rend_graph_script_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
@@ -54,8 +51,8 @@
 namespace WBE = WhiteBirdEngine;
 
 static constexpr std::string_view REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER = "camera_info";
-static constexpr std::string_view MATERIAL_VARIANTS_DEFAULT_PIPELINE = "draw_cube_unshaded_pipeline";
-static constexpr std::string_view MATERIAL_VARIANTS_TINTED_PIPELINE = "draw_cube_unshaded_tinted_pipeline";
+// The render graph definition, whose recipe is render_graphs.draw_material_variants.
+static constexpr std::string_view MATERIAL_VARIANTS_RENDER_GRAPH = "draw_material_variants_graph";
 
 class ApplicationVulkanDrawMaterialVariantsTest : public WBE::ApplicationGame {
 public:
@@ -102,33 +99,24 @@ public:
                               .set_size(sizeof(CameraInfoGPU))
                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-        renderer->get_global_render_cache()->insert(
-            REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER, camera_info_ubo);
-        // The graph re-runs the recipe whenever it rebuilds, such as after a swap chain resize.
-        WBE::Ref<WBE::RenderGraphVK> graph =
-            renderer->register_render_graph("test_render_graph", [this, renderer](const WBE::RendGraphContextVK& p_context, WBE::RenderGraphVK& p_graph) {
-                const auto* render_context = renderer->get_render_context();
-                // Registering again with an equal description is free, so the pipelines are registered on every rebuild.
-                for (std::string_view pipeline_key : {MATERIAL_VARIANTS_DEFAULT_PIPELINE, MATERIAL_VARIANTS_TINTED_PIPELINE}) {
-                    p_graph.register_graphics_pipeline(pipeline_key,
-                        WBE::RDParamsGraphicsPipelineVK{
-                            .pipeline = std::string(pipeline_key),
-                            .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
-                        });
-                }
-                const auto swap_chain = renderer->acquire_swap_chain_image_view_container();
-                WBE::RendGraphRecipeImportsVK imports;
-                imports.add(WBE::REND_RES_SWAP_CHAIN, *swap_chain).add(REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER, *camera_info_ubo);
-                // The recipe's draw task compiles the mesh by its resource key and imports its buffers into the graph itself.
-                const WBE::DataValue recipe = WBE::RendGraphScriptVK::run(
-                    "render_graphs.draw_material_variants", WBE::RendGraphScriptVK::make_context(*render_context, p_context));
-                return WBE::RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &p_graph);
-            });
-        WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
-        WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
+        // The recipe registers the pipelines; its draw task compiles the mesh by its resource key and imports its buffers.
+        render_graph = WBE::acquire_test_render_graph(*renderer,
+            MATERIAL_VARIANTS_RENDER_GRAPH,
+            WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
+                MATERIAL_VARIANTS_RENDER_GRAPH,
+                [camera_info_ubo = camera_info_ubo](const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
+                    WBE::RendGraphPreparedBindingsVK result;
+                    result.imports.add(REND_RES_TEST_MATERIAL_VARIANTS_CAMERA_INFO_BUFFER, *camera_info_ubo);
+                    return result;
+                }));
+    }
+
+    void release_graphics_pipeline() {
+        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
     }
 
 private:
+    WBE::Ref<WBE::RenderGraphVK> render_graph;
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     CameraInfoGPU camera_info{};
     float aspect_ratio = 1.0F;
@@ -143,6 +131,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_graphics_pipeline();
             game_application.run();
+            game_application.release_graphics_pipeline();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {

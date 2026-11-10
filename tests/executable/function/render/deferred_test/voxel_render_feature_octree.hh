@@ -21,7 +21,7 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh" // IWYU pragma: keep (RendTaskDescVK)
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
@@ -177,15 +177,7 @@ private:
     Ref<ROBufferVK> create_initialized_buffer(VkBufferUsageFlags p_usage, const void* p_data, size_t p_size) const;
     // Make a static construction task record once, through the static build trigger, unless the scene is rebuilt every frame.
     RendTaskDescVK make_static_build(RendTaskDescVK p_task, const VoxelRecipeInputs& p_inputs) const;
-    RendTaskDescVK make_texture_write(RendTaskDescVK p_task, std::string_view p_texture_view_id) const;
     RendTaskDescVK get_clear_render_task_desc(std::string_view p_task_id, bool p_clear_static) const;
-    // Adds a raster construction pass as a graphics_draw_mesh task that also reports its write of the full texture view;
-    // the returned reference is invalidated when another task is added.
-    RendTaskDescVK& add_construction_render_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        bool p_double_sided,
-        const DynamicMeshRenderFeature* p_dynamic_mesh,
-        size_t p_dynamic_entity_index) const;
 
     RendererVK* renderer_vk;
     const RenderContextVK* render_context;

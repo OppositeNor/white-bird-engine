@@ -32,7 +32,9 @@
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
@@ -54,6 +56,7 @@
 #include "resource/resource_unit/resource_unit.hh"
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -93,9 +96,14 @@ public:
     virtual void render_update(double p_delta) override;
 
     /**
-     * @brief Creates the deferred-rendering resources, pipelines, and render graphs.
+     * @brief Creates the deferred-rendering resources and acquires the render graphs.
      */
     void setup_draw_task();
+
+    /**
+     * @brief Clears the renderer's activation and releases the render graphs; call after run().
+     */
+    void release_draw_task();
 
 private:
     static constexpr VkFormat GBUFFER_ALBEDO_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
@@ -107,17 +115,17 @@ private:
     static constexpr VkFormat RSM_FLUX_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
     static constexpr VkFormat RSM_NORMAL_FORMAT = VK_FORMAT_R16G16_SNORM;
     static constexpr VkFormat LIGHTING_OUTPUT_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
-    static constexpr uint32_t BLOOM_BLUR_PASS_COUNT = 4;
-    static_assert(BLOOM_BLUR_PASS_COUNT % 2U == 0U);
     static constexpr double FRAME_SEQUENCE_FRAMES_PER_SECOND = 30.0;
     // Recorded frames not yet written before the rendering thread waits. The last recorded frame's readback is submitted
     // only by the next tick, so the bound must leave room for it and at least one submitted frame.
     static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
     static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
-    // The `script` resource of the graph recipe, res/assets/scripts/teal/render_graphs/deferred.tl.
-    static constexpr std::string_view DEFERRED_RECIPE_SCRIPT = "render_graphs.deferred";
-    static constexpr std::string_view DEFERRED_MIPMAP_RENDER_GRAPH = "deferred_pipeline_mipmap";
-    static constexpr std::string_view DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH = "deferred_pipeline_summed_area_table";
+    // The render graph definitions of res/assets/render_graphs/render_graphs.toml, whose recipe is render_graphs.deferred,
+    // indexed like deferred_render_graphs: the mipmap and the summed-area table graph.
+    static constexpr std::array<std::string_view, 2> DEFERRED_RENDER_GRAPHS = {
+        "deferred_mipmap_graph",
+        "deferred_summed_area_table_graph",
+    };
     static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
     static constexpr std::string_view GBUFFER_NORMAL_IMAGE_VIEW = "gbuffer_normal";
     static constexpr std::string_view GBUFFER_RMA_IMAGE_VIEW = "gbuffer_rma";
@@ -253,17 +261,20 @@ private:
     // Advance the spot light the light controls move, as the T key does.
     void select_next_controlled_spot_light();
     void create_lighting_buffers();
-    // Register the meshes the recipe draws on p_graph; the recipe registers its pipelines and textures itself. Called by
-    // every rebuild; repeated registrations are free.
-    void register_graph_resources(RenderGraphVK& p_graph);
     void write_dynamic_camera_descriptors();
     void write_dynamic_light_descriptors();
-    void register_deferred_render_graph(std::string_view p_graph_id, bool p_use_summed_area_table);
-    // Run the deferred recipe for a graph context, then add the mesh and voxel parts that stay in C++.
-    RendGraphDescVK make_deferred_render_graph_desc(
-        bool p_use_summed_area_table, const RendGraphContextVK& p_context, RenderGraphVK& p_graph);
+    // Acquire the instance of the mipmap or the summed-area table definition, with bindings that call
+    // prepare_deferred_bindings().
+    void acquire_deferred_render_graph(bool p_use_summed_area_table);
+    // Log the warm acquisition and explicit rebuild times of both graphs. Runs before the application runs.
+    void measure_render_graph_operations();
+    // Log the mean frame time between render updates of frames [120, 1120). Runs on the rendering thread.
+    void measure_frame_time();
+    // The context and imports of one build of a deferred graph, including the voxel and post-processing features' parts.
+    // Runs on the rendering thread.
+    RendGraphPreparedBindingsVK prepare_deferred_bindings(bool p_use_summed_area_table, const RendRecipeContextVK& p_recipe_context);
     // The recipe context, without the voxel structure and post-processing parameters.
-    DeferredRecipeContext make_deferred_recipe_context(bool p_use_summed_area_table, const RendGraphContextVK& p_context) const;
+    DeferredRecipeContext make_deferred_recipe_context(bool p_use_summed_area_table, const RendRecipeContextVK& p_recipe_context) const;
     // The application-owned resources the recipe imports, and the tasks built in C++ that it imports.
     RendGraphRecipeImportsVK make_deferred_recipe_imports(bool p_use_summed_area_table);
     RendTaskDescVK create_mesh_acceleration_structure_build_task_desc();
@@ -302,14 +313,22 @@ private:
     Unique<IVoxelRenderFeature> voxel_structure;
     // Applied in place to the result image after lighting composition; toggled with the 1 key.
     Unique<PixelSort> post_processing;
-    // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table.
+    // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table, and
+    // the bindings they were acquired with.
     std::array<Ref<RenderGraphVK>, 2> deferred_render_graphs;
+    std::array<Ref<IRenderGraphBindingsVK>, 2> deferred_render_graph_bindings;
+    // Whether WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS=1 asked to log the render graphs' creation, acquisition, rebuild, and
+    // steady-state frame times. The frame time state is owned by the rendering thread.
+    bool measure_render_graphs = exec_test_requested("WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS");
+    uint64_t measured_frame_count = 0;
+    double measured_frame_seconds = 0.0;
+    std::chrono::steady_clock::time_point last_render_update{};
     RendererVK* renderer_vk = nullptr;
     const RenderContextVK* render_context = nullptr;
     RenderAllocator* render_allocator = nullptr;
-    // The source resources the graphs register; the ResourceManager owns them.
+    // The static scene mesh; the ResourceManager owns it.
     RefRes<RUMesh3D> sponza_mesh;
-    // The static scene mesh's compile options, registered with sponza_mesh on both graphs under STATIC_MESH_KEY; the voxel
+    // The static scene mesh's description, which the recipe registers on both graphs under STATIC_MESH_KEY; the voxel
     // features and the acceleration structure share the same compiled mesh, which MeshCompilerVK caches for them.
     RDParamsMeshVK static_mesh_params;
     Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;

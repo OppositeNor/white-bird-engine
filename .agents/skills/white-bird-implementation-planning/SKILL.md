@@ -21,7 +21,7 @@ For a non-trivial change, trace the relevant path end to end:
 - generated artifacts and their order: reflection (`*.gen.*`, `wbe.d.tl`) runs before the ACP, which compiles shaders,
   models, and Teal scripts, before CMake;
 - for rendering work, whether the change belongs in a Teal recipe or feature module, a registered task type and its
-  `RTParams` struct, the rebuild callback, or code outside the callback;
+  `RTParams` struct, a render graph definition's parameters, the instance's bindings, or code outside them;
 - tests, fixtures, migrations, and validation entry points.
 
 Inspect declarations and definitions together. Check `git diff` when the request concerns work in progress, and preserve unrelated changes. Resolve repository facts through searches and file inspection; ask the user only about choices that materially change the result.

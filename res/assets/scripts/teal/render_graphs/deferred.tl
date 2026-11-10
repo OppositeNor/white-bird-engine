@@ -16,12 +16,13 @@
 -- lighting, post-processing, bloom, presentation, and overlays. See ApplicationVulkanDeferredPBRTest in
 -- tests/executable/function/render/deferred_test/.
 --
--- The application imports every pass it builds in C++ as a task (the acceleration structure build, the frame sequence
--- acquisition, and ImGui), and adds its acceleration structure and dynamic mesh entities to the built descriptor. The
--- mesh draws import the meshes the application registered on the render graph as "static_mesh" and "dynamic_mesh"; the
--- recipe registers its own pipelines and the billboard texture.
--- It supplies a wbe.DeferredRecipeContext, whose voxel and post_processing entries are the RecipeFeatureParams-derived
--- parameters of the feature modules it selects: a VoxelFeature and a PostProcessingFeature.
+-- The application's bindings import every pass it builds in C++ as a task (the acceleration structure build, the frame
+-- sequence acquisition, and ImGui), its buffers, its acceleration structure, and its dynamic mesh entities. The recipe
+-- registers the meshes its draws import ("static_mesh" and "dynamic_mesh", from the descriptions in the context), its own
+-- pipelines, and the billboard texture.
+-- The bindings supply a wbe.DeferredRecipeContext, whose voxel and post_processing entries are the RecipeFeatureParams-
+-- derived parameters of the feature modules it selects: a VoxelFeature and a PostProcessingFeature. Each render graph
+-- definition sets the wbe.DeferredRecipeParameters.
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
@@ -143,14 +144,14 @@ local function make_pipelines(recipe_context: wbe.DeferredRecipeContext): Pipeli
     return {
         shadow_opaque = graphics("deferred_shadow_opaque", "rsm_spot", shadow_formats, formats.shadowmap_depth),
         shadow_double_sided = graphics("deferred_shadow_double_sided", "rsm_spot_opaque_double_sided", shadow_formats,
-        formats.shadowmap_depth),
+            formats.shadowmap_depth),
         -- Placed meshes use the WBE_MESH_TRANSFORM shader variants, which also bind the entity's mesh transform.
         shadow_dynamic = graphics("deferred_shadow_dynamic", "rsm_spot_dynamic", shadow_formats, formats.shadowmap_depth),
         gbuffer_opaque = graphics("deferred_gbuffer_opaque", "deferred_gbuffer", gbuffer_formats, formats.gbuffer_depth),
         gbuffer_double_sided = graphics("deferred_gbuffer_double_sided", "deferred_gbuffer_opaque_double_sided",
-        gbuffer_formats, formats.gbuffer_depth),
+            gbuffer_formats, formats.gbuffer_depth),
         gbuffer_dynamic = graphics("deferred_gbuffer_dynamic", "deferred_gbuffer_dynamic", gbuffer_formats,
-        formats.gbuffer_depth),
+            formats.gbuffer_depth),
         shadow_sat_horizontal = shader_pipeline("shadow_moments_summed_area_table_horizontal_shader"),
         shadow_sat_vertical = shader_pipeline("shadow_moments_summed_area_table_vertical_shader"),
         direct_lighting = shader_pipeline("direct_lighting_shader"),
@@ -163,12 +164,13 @@ local function make_pipelines(recipe_context: wbe.DeferredRecipeContext): Pipeli
         blur_pong = shader_pipeline("kawase_blur_ping_write_shader"),
         present = graphics("present_post_processing", "present_post_processing", { recipe_context.swap_chain_format }),
         light_billboard = graphics("deferred_light_billboard_pipeline", "billboard_face_camera_depth_tested_pipeline",
-        { recipe_context.swap_chain_format }, formats.gbuffer_depth),
+            { recipe_context.swap_chain_format }, formats.gbuffer_depth),
     }
 end
 
 local record Builder
     context: wbe.DeferredRecipeContext
+    parameters: wbe.DeferredRecipeParameters
     shadow_extent: wbe.RendExtent2DParamsVK
     bloom_extent: wbe.RendExtent2DParamsVK
     imports: {string}
@@ -212,30 +214,27 @@ local function create_light_resources(graph_builder: Builder)
         graph_builder.imports[#graph_builder.imports + 1] = billboard_info
         resources[light_info] = graph:import_resource(light_info)
         resources[billboard_info] = graph:import_resource(billboard_info)
-        local depth = graph:add_image(light_id("shadowmap_depth_image", light), "image_depth_target", formats.shadowmap_depth,
-        shadow_extent)
-        local color = graph:add_image(light_id("shadowmap_color_image", light), "image_render_target", formats.rsm_flux,
-        shadow_extent)
-        local normal = graph:add_image(light_id("rsm_normal_image", light), "image_render_target", formats.rsm_normal,
-        shadow_extent)
+        local depth = graph:add_image(light_id("shadowmap_depth_image", light), "image_depth_target", formats.shadowmap_depth, shadow_extent)
+        local color = graph:add_image(light_id("shadowmap_color_image", light), "image_render_target", formats.rsm_flux, shadow_extent)
+        local normal = graph:add_image(light_id("rsm_normal_image", light), "image_render_target", formats.rsm_normal, shadow_extent)
         local moments = graph:add_image(light_id("shadow_moments_image", light), "image_render_target", formats.shadow_moments,
-        shadow_extent, { "transfer_src", "transfer_dst" }, context.shadow_mipmap_level_count)
+            shadow_extent, { "transfer_src", "transfer_dst" }, context.shadow_mipmap_level_count)
         local horizontal = graph:add_image(light_id("shadow_moments_sat_horizontal_image", light), "image_read_write",
-        formats.shadow_moments, shadow_extent)
+            formats.shadow_moments, shadow_extent)
         local summed = graph:add_image(light_id("shadow_moments_sat_image", light), "image_read_write", formats.shadow_moments,
-        shadow_extent)
+            shadow_extent)
         resources[light_id("shadowmap_depth", light)] = depth:view(light_id("shadowmap_depth", light))
         resources[light_id("shadowmap_color", light)] = color:view(light_id("shadowmap_color", light))
         resources[light_id("rsm_normal", light)] = normal:view(light_id("rsm_normal", light))
         resources[light_id("shadow_moments", light)] = moments:view(light_id("shadow_moments", light))
         -- Direct lighting samples the complete mip chain through a second view of the moments image.
         resources[light_id("shadow_moments_sampled", light)] = moments:view(light_id("shadow_moments_sampled", light),
-        { mip_level_count = REMAINING_MIP_LEVELS })
+            { mip_level_count = REMAINING_MIP_LEVELS })
         resources[light_id("shadow_sat_horizontal", light)] = horizontal:view(light_id("shadow_sat_horizontal", light))
         resources[light_id("shadow_sat", light)] = summed:view(light_id("shadow_sat", light))
     end
     resources.shadow_sampler = graph:add_clamp_to_edge_sampler("shadow_sampler",
-    { min_lod = 0.0, max_lod = context.shadow_mipmap_level_count - 1.0 })
+        { min_lod = 0.0, max_lod = context.shadow_mipmap_level_count - 1.0 })
 end
 
 -- The G-buffer targets and the lighting and post-processing outputs. Views retain their source image handles.
@@ -256,9 +255,9 @@ local function create_screen_resources(graph_builder: Builder)
     resources.indirect_lighting = graph:add_image("indirect_lighting_image", "image_read_write", formats.lighting_output):view("indirect_lighting")
     resources.result_image = graph:add_image("result_color_image", "image_read_write", formats.lighting_output):view("result_image")
     resources.bloom_ping = graph:add_image("bloom_ping_image", "image_read_write", formats.lighting_output,
-    bloom_extent, { "transfer_src" }):view("bloom_ping")
+        bloom_extent, { "transfer_src" }):view("bloom_ping")
     resources.bloom_pong = graph:add_image("bloom_pong_image", "image_read_write", formats.lighting_output,
-    bloom_extent):view("bloom_pong")
+        bloom_extent):view("bloom_pong")
     -- The present pipeline renders in the swap-chain format, so the sequence matches the presented image.
     resources.frame_sequence = graph:add_image("frame_sequence_image", "image_render_target", context.swap_chain_format):view("frame_sequence")
     resources.bloom_sampler = graph:add_clamp_to_edge_sampler("bloom_sampler")
@@ -436,7 +435,7 @@ local function add_shadow_filtering(graph_builder: Builder)
     local shadow = context.shadow_extent
     for light = 0, context.spot_light_count - 1 do
         local tasks = graph_builder.light_tasks[light + 1]
-        if context.summed_area_table then
+        if graph_builder.parameters.summed_area_table then
             tasks.build_shadow_sat = graph_builder.graph:compute_sequential(light_id("build_shadow_sat", light), {
                 queue_family = "compute_1",
                 dispatches = {
@@ -450,11 +449,11 @@ local function add_shadow_filtering(graph_builder: Builder)
                     },
                 },
             }, {
-                bindings = {
-                    shadow_sat_horizontal = resources[light_id("shadow_sat_horizontal", light)],
-                    shadow_sat = resources[light_id("shadow_sat", light)],
-                },
-            })
+                    bindings = {
+                        shadow_sat_horizontal = resources[light_id("shadow_sat_horizontal", light)],
+                        shadow_sat = resources[light_id("shadow_sat", light)],
+                    },
+                })
         else
             local params: render_graph.RTParamsGenerateMipmapsVK = {
                 source_view = resources[light_id("shadow_moments", light)],
@@ -473,7 +472,7 @@ end
 local function add_lighting(graph_builder: Builder)
     local resources = graph_builder.resources
     local context = graph_builder.context
-    local summed_area_table = context.summed_area_table
+    local summed_area_table = graph_builder.parameters.summed_area_table
     local light_count = context.spot_light_count
     local screen = context.swap_chain_extent
     local light_slots: {string:string}
@@ -535,7 +534,7 @@ local function add_post_processing(graph_builder: Builder): render_graph.Task
     local screen = graph_builder.context.swap_chain_extent
     local post_processing_feature = require(post_processing.module) as PostProcessingFeature
     graph_builder.tasks.post_processing = graph_builder.graph:add(post_processing_feature.subgraph(POST_PROCESSING, post_processing,
-    { color_view = resources.result_image, width = screen.width, height = screen.height }))
+        { color_view = resources.result_image, width = screen.width, height = screen.height }))
     graph_builder.graph:chain(resources.result_image, { graph_builder.tasks.combine_lighting, graph_builder.tasks.post_processing })
     return graph_builder.tasks.post_processing
 end
@@ -559,17 +558,17 @@ local function add_bloom_and_presentation(graph_builder: Builder)
     graph_builder.tasks.blur_bloom = graph:ping_pong("blur_bloom", {
         ping_pipeline = graph_builder.pipelines.blur_ping,
         pong_pipeline = graph_builder.pipelines.blur_pong,
-        iterations = context.bloom_blur_pass_count,
+        iterations = graph_builder.parameters.bloom_blur_pass_count,
         group_count_x = bloom_tiles_x,
         group_count_y = bloom_tiles_y,
         queue_family = "compute_1",
     }, {
-        bindings = {
-            kawase_blur_ping = resources.bloom_ping,
-            kawase_blur_pong = resources.bloom_pong,
-            kawase_blur_sampler = resources.bloom_sampler
-        },
-    })
+            bindings = {
+                kawase_blur_ping = resources.bloom_ping,
+                kawase_blur_pong = resources.bloom_pong,
+                kawase_blur_sampler = resources.bloom_sampler
+            },
+        })
     local acquire_params: render_graph.RTParamsCPUInFlightAcquireVK = { image_view = resources.bloom_ping }
     graph_builder.tasks.acquire_bloom = graph:cpu_acquire_image("acquire_bloom", acquire_params, {
         trigger = { event = context.bloom_acquire_event },
@@ -583,7 +582,7 @@ local function add_bloom_and_presentation(graph_builder: Builder)
         }
     }
     graph_builder.tasks.present_result_image = graph:draw("present_result_image", present_params,
-    { bindings = { bloom_sampler = resources.bloom_sampler } }):color_target(0, resources.swap_chain)
+        { bindings = { bloom_sampler = resources.bloom_sampler } }):color_target(0, resources.swap_chain)
     graph_builder.tasks.present_frame_sequence = graph:draw("present_frame_sequence", present_params, {
         bindings = { bloom_sampler = resources.bloom_sampler },
         trigger = { event = context.frame_sequence_event },
@@ -634,7 +633,7 @@ local function connect_shadow_passes(graph_builder: Builder)
         if graph_builder.voxel_injects_radiance then
             dynamic_second:connect(tasks.voxel, colors)
         end
-        if graph_builder.context.summed_area_table then
+        if graph_builder.parameters.summed_area_table then
             local build = light_tasks.build_shadow_sat
             build:inputs_from(dynamic_second, { shadow_moments = moments })
             graph_builder.graph:chain(moments, { dynamic_second, tasks.run_direct_lighting })
@@ -706,18 +705,19 @@ end
 
 local exports = {}
 
-function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.DeferredRecipeContext, parameters: wbe.DeferredRecipeParameters): wbe.RendGraphRecipeVK
     local shadow = context.shadow_extent
     local bloom = context.bloom_extent
     local graph = render_graph.new()
     local builder: Builder = {
         context = context,
+        parameters = parameters,
         shadow_extent = { width = shadow.width, height = shadow.height },
         bloom_extent = { width = bloom.width, height = bloom.height },
         imports = { "swap_chain", "gbuffer_camera_info", "composition_camera_info", "spot_light_infos", "light_billboard_texture" },
         resources = {},
-        static_mesh = graph:add_mesh("static_mesh"),
-        dynamic_mesh = graph:add_mesh("dynamic_mesh"),
+        static_mesh = graph:register_mesh("static_mesh", context.static_mesh),
+        dynamic_mesh = graph:register_mesh("dynamic_mesh", context.dynamic_mesh),
         pipelines = make_pipelines(context),
         graph = graph,
         tasks = {},
@@ -725,6 +725,13 @@ function exports.build(context: wbe.DeferredRecipeContext): wbe.RendGraphRecipeV
     }
     -- The billboard texture is registered on the graph, which binds the registered view for its import.
     graph:register_image("light_billboard_texture", { texture = "spot_light_billboard" })
+    -- The shaders name the acceleration structure and the entities' members by id, so they are declared imports.
+    if context.has_mesh_acceleration_structure then
+        builder.imports[#builder.imports + 1] = "mesh_acceleration_structure"
+    end
+    for _, id in ipairs(context.dynamic_mesh_entity_ids) do
+        builder.imports[#builder.imports + 1] = id
+    end
     for _, id in ipairs(builder.imports) do
         builder.resources[id] = graph:import_resource(id)
     end

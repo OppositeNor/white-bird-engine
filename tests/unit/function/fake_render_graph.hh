@@ -18,7 +18,9 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/i_resource_description.hh"
 #include "function/render/i_resource_registrator.hh"
@@ -37,14 +39,29 @@ namespace WhiteBirdEngine {
  * Neither copyable nor movable.
  *
  * Registrations go to a RenderGraphResourceRegistry without a release callback, so replaced objects are released at once.
- * rebuild() only counts its calls.
+ * rebuild() only counts its calls. A reflected render object, so GlobalRenderCache can cache it.
  */
-class FakeRenderGraph final : public IRenderGraph {
+class WBE_META(WBE_RENDER_OBJECT) FakeRenderGraph final : public IRenderGraph {
 public:
     /**
      * @brief Construct a graph with no registrators.
+     * @param p_allocator The allocator of the registry.
+     * @param p_bindings The bindings get_bindings() returns.
      */
-    explicit FakeRenderGraph(RenderAllocator* p_allocator) : registry(p_allocator, this) {
+    explicit FakeRenderGraph(RenderAllocator* p_allocator, Ref<IRenderGraphBindings> p_bindings = MEM_NULL)
+        : registry(p_allocator, this), bindings(std::move(p_bindings)) {
+    }
+
+    virtual TypeID get_type_uuid() const override {
+        // The generated TypeUUID<FakeRenderGraph> includes this header, so the UUID is computed as the generator does.
+        return static_hash("FakeRenderGraph");
+    }
+
+    /**
+     * @brief Get the bindings given at construction.
+     */
+    Ref<IRenderGraphBindings> get_bindings() const {
+        return bindings;
     }
 
     virtual void add_resource_registrator(Unique<IResourceRegistrator> p_registrator) override {
@@ -87,6 +104,7 @@ public:
 
 private:
     RenderGraphResourceRegistry registry;
+    Ref<IRenderGraphBindings> bindings;
 };
 
 } // namespace WhiteBirdEngine

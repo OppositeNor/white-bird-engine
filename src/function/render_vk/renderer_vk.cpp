@@ -24,12 +24,12 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
-#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render/render_graph_instance_cache.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -44,7 +44,9 @@
 #include "function/render_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/enum_reflection.gen.hh"
+#include "generated/type_uuid.gen.hh"
 #include "platform/file_system/path.hh"
+#include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
 #include "utils/defs.hh"
@@ -153,7 +155,7 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_cache(make_ref<GlobalRenderCache>(p_allocator, p_allocator)),
       window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), render_graphs(p_allocator), render_context(p_allocator),
+      image_available_semaphores(p_allocator), render_context(p_allocator),
       registered_plugins(p_allocator), running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
@@ -285,13 +287,11 @@ void RendererVK::terminate() {
     }
     render_objects.reset();
 
-    // Release the active render graph and every registered render graph.
-    // These hold Refs to render-object resources (buffers, images, etc.) whose
-    // destructors enqueue device-object cleanup via register_delayed_call.
-    // We must drop them before draining the delayed-call list, otherwise the
-    // resources outlive vkDestroyDevice() and trigger validation leaks.
+    // Release the active render graph. It holds Refs to render-object resources (buffers, images, etc.) whose destructors
+    // enqueue device-object cleanup via register_delayed_call. It must be dropped before draining the delayed-call list,
+    // otherwise the resources outlive vkDestroyDevice() and trigger validation leaks. Applications release their own graph
+    // references before the renderer shuts down.
     active_graph = MEM_NULL;
-    render_graphs.clear();
     render_cache->clear();
     image_available_semaphores.clear();
     swap_chain_image_view_container = MEM_NULL;
@@ -1744,64 +1744,54 @@ void RendererVK::present(uint32_t p_image_index, Ref<RenderGraphVK> p_graph) {
     }
 }
 
-Ref<RenderGraphVK> RendererVK::register_render_graph(std::string_view p_resource_key, RendGraphRebuildCallbackVK p_rebuild) {
-    if (render_graphs.contains(p_resource_key)) {
-        throw std::runtime_error(std::format("Render graph with resource key: {} was already registered.", p_resource_key));
+Ref<IRenderGraph> RendererVK::acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) {
+    if (p_bindings == MEM_NULL) {
+        throw std::runtime_error(std::format("Failed to acquire render graph '{}': the bindings are null.", p_resource_key));
     }
-
-    auto graph = make_ref<RenderGraphVK>(allocator, &render_context, p_resource_key);
-    graph->build_from_callback(std::move(p_rebuild));
-    for (auto& plugin : registered_plugins) {
-        plugin->on_render_graph_registered(p_resource_key, *graph);
+    Ref<IRenderGraphBindingsVK> bindings = p_bindings.dynamic_cast_ref<IRenderGraphBindingsVK>();
+    if (bindings == MEM_NULL) {
+        throw std::runtime_error(
+            std::format("Failed to acquire render graph '{}': the bindings are not Vulkan render graph bindings.", p_resource_key));
     }
-    Ref<RenderGraphVK> graph_ref = graph;
-
-    render_graphs.emplace(std::string(p_resource_key),
-        RegisteredRenderGraph{
-            .graph = std::move(graph),
-            .reference_count = 1,
+    return RenderGraphInstanceCache::acquire<RenderGraphVK>(*render_cache, p_resource_key, p_bindings, [&] {
+        ResourceManager* resource_manager = ResourceManager::get_singleton();
+        if (resource_manager == nullptr) {
+            throw std::runtime_error(std::format("Failed to acquire render graph '{}': the resource manager is unavailable.", p_resource_key));
+        }
+        RefRes<RURenderGraph> definition = resource_manager->get_resource<RURenderGraph>(p_resource_key);
+        if (definition == MEM_NULL) {
+            throw std::runtime_error(std::format("Failed to acquire render graph '{}': no render graph resource has this key.", p_resource_key));
+        }
+        const std::string_view instance_key = bindings->get_instance_key();
+        // Graph-owned resources are named after the graph; instances other than the definition's default one append their key.
+        const std::string graph_name =
+            instance_key == p_resource_key ? std::string(p_resource_key) : std::format("{}[{}]", p_resource_key, instance_key);
+        auto graph = make_ref<RenderGraphVK>(allocator, &render_context, graph_name);
+        graph->build_from_recipe(RendGraphRecipeSourceVK{
+            .recipe = definition->recipe,
+            .parameters = definition->parameters,
+            .bindings = bindings,
         });
-    return graph_ref;
+        for (auto& plugin : registered_plugins) {
+            plugin->on_render_graph_registered(graph_name, *graph);
+        }
+        return graph;
+    });
 }
 
-void RendererVK::register_render_graph(std::string_view p_resource_key) {
-    auto graph_entry = render_graphs.find(p_resource_key);
-    if (graph_entry == render_graphs.end()) {
-        throw std::runtime_error(std::format("Render graph resource key was not loaded: {}.", p_resource_key));
-    }
-    ++graph_entry->second.reference_count;
-}
-
-void RendererVK::unregister_render_graph(std::string_view p_resource_key) {
-    auto graph_entry = render_graphs.find(p_resource_key);
-    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
-        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
-    }
-
-    --graph_entry->second.reference_count;
-    if (graph_entry->second.reference_count > 0) {
+void RendererVK::activate_render_graph(Ref<IRenderGraph> p_graph) {
+    if (p_graph == MEM_NULL) {
+        active_graph = MEM_NULL;
         return;
     }
-
-    Ref<RenderGraphVK> released_graph = graph_entry->second.graph;
-    if (active_graph == released_graph) {
-        active_graph = MEM_NULL;
+    Ref<RenderGraphVK> graph = p_graph.dynamic_cast_ref<RenderGraphVK>();
+    if (graph == MEM_NULL) {
+        throw std::runtime_error("Failed to activate a render graph: it is not a Vulkan render graph.");
     }
-    render_graphs.erase(graph_entry);
-    register_delay_call(
-        [released_graph] mutable {
-            released_graph = MEM_NULL;
-        },
-        frames_in_flight);
-}
-
-void RendererVK::activate_render_graph(std::string_view p_resource_key) {
-    auto graph_entry = render_graphs.find(p_resource_key);
-    if (graph_entry == render_graphs.end() || graph_entry->second.reference_count == 0) {
-        throw std::runtime_error(std::format("Render graph with resource key: {} was not registered.", p_resource_key));
+    if (graph->get_render_context() != &render_context) {
+        throw std::runtime_error("Failed to activate a render graph: it belongs to another renderer.");
     }
-
-    active_graph = graph_entry->second.graph;
+    active_graph = std::move(graph);
 }
 
 } // namespace WhiteBirdEngine

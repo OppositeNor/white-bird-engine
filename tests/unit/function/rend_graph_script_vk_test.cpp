@@ -1465,6 +1465,68 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedMaterialVariantsRecipeAnd
     ASSERT_TRUE(pipelines.get_kind() == DataValueKind::MAP);
     EXPECT_EQ(pipelines.get_value<std::string>("default"), "draw_cube_unshaded_pipeline");
     EXPECT_EQ(pipelines.get_value<std::string>("tinted"), "draw_cube_unshaded_tinted_pipeline");
+    // The recipe registers both variant pipelines for the swap chain format.
+    const DataValue::List& registrations = recipe.get_entry("registrations").as_list();
+    ASSERT_EQ(registrations.size(), 2U);
+    for (const DataValue& registration : registrations) {
+        EXPECT_EQ(registration.get_value<std::string>("type"), "RDParamsGraphicsPipelineVK");
+        EXPECT_EQ(registration.get_entry("description").get_entry("color_formats").as_list().size(), 1U);
+    }
+}
+
+TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedForwardRecipes) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    RenderContextVK render_data(&allocator);
+    render_data.frames_in_flight = 2;
+    render_data.swap_chain_format = VK_FORMAT_B8G8R8A8_SRGB;
+    const DataValue base_context = RendGraphScriptVK::make_context(render_data, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 32}});
+    DataValue shadowed_context = base_context;
+    DataValue shadow_extent = DataValue::make_map();
+    shadow_extent.set_value("width", 128);
+    shadow_extent.set_value("height", 128);
+    shadowed_context.set_entry("shadow_extent", shadow_extent);
+    shadowed_context.set_value("shadow_color_format", std::string("r8_unorm"));
+    shadowed_context.set_value("shadow_depth_format", std::string("d32_sfloat"));
+    shadowed_context.set_value("depth_format", std::string("d32_sfloat"));
+    const auto task_ids = [](const DataValue& p_recipe) {
+        std::vector<std::string> result;
+        for (const DataValue& task : p_recipe.get_entry("tasks").as_list()) {
+            result.push_back(task.get_value<std::string>("id"));
+        }
+        return result;
+    };
+    const auto imports = [](const DataValue& p_recipe) {
+        std::vector<std::string> result;
+        for (const DataValue& import : p_recipe.get_entry("imports").as_list()) {
+            result.push_back(import.as_string());
+        }
+        std::ranges::sort(result);
+        return result;
+    };
+    // Every recipe registers the meshes and pipelines its draws name, and imports only the swap chain and the application's
+    // buffers and tasks.
+    const DataValue triangle = RendGraphScriptVK::run("render_graphs.draw_triangle", base_context);
+    EXPECT_EQ(task_ids(triangle), (std::vector<std::string>{"run_pipeline"}));
+    EXPECT_EQ(imports(triangle), (std::vector<std::string>{"swap_chain"}));
+    EXPECT_EQ(triangle.get_entry("registrations").as_list().size(), 2U);
+    const DataValue cube = RendGraphScriptVK::run("render_graphs.draw_cube", shadowed_context);
+    EXPECT_EQ(task_ids(cube), (std::vector<std::string>{"run_pipeline_shadowmap", "run_pipeline"}));
+    EXPECT_EQ(imports(cube),
+        (std::vector<std::string>{"camera_info", "shadow_light_info", "spot_light_count", "spot_light_info", "swap_chain"}));
+    EXPECT_EQ(cube.get_entry("registrations").as_list().size(), 3U);
+    const DataValue sponza = RendGraphScriptVK::run("render_graphs.draw_sponza", shadowed_context);
+    EXPECT_EQ(task_ids(sponza),
+        (std::vector<std::string>{"run_shadowmap_opaque", "run_shadowmap_masked", "run_main_opaque", "run_main_masked", "run_light_billboard"}));
+    EXPECT_EQ(imports(sponza),
+        (std::vector<std::string>{"camera_info", "gbuffer_camera_info", "light_billboard_info", "light_billboard_texture", "shadow_light_info",
+            "spot_light_count", "spot_light_info", "swap_chain"}));
+    // The mesh, five pipelines, and the billboard texture.
+    EXPECT_EQ(sponza.get_entry("registrations").as_list().size(), 7U);
+    const DataValue skinned = RendGraphScriptVK::run("render_graphs.draw_skinned_mesh", base_context);
+    EXPECT_EQ(task_ids(skinned), (std::vector<std::string>{"draw_skinned_mesh", "draw_skinned_mesh_imgui"}));
+    EXPECT_TRUE(skinned.get_entry("tasks").as_list()[1].get_value<bool>("import"));
+    EXPECT_EQ(imports(skinned),
+        (std::vector<std::string>{"skinned_mesh_camera_info", "skinned_mesh_skinning_transforms", "swap_chain"}));
 }
 
 TEST_F(WBERendGraphScriptVKResourceTest, BuildsTheSVO3LeafDeduplicationAsOneSequentialTask) {
@@ -1642,6 +1704,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         octree.set_entry("leaf_gather_group_count", leaf_groups);
         octree.set_value("node_gather_group_count", 8);
         octree.set_value("leaf_draw_count", 33);
+        octree.set_value("extent", 64);
+        DataValue static_build = DataValue::make_map();
+        static_build.set_value("event", std::string("test.voxel_static_build"));
+        static_build.set_value("activate", true);
+        octree.set_entry("static_build", static_build);
         return octree;
     };
     auto make_svo = [&] {
@@ -1687,13 +1754,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     auto run = [&](bool p_summed_area_table, bool p_post_processing, DataValue p_voxel) {
         DataValue context =
             RendGraphScriptVK::make_context(render_data, RendGraphContextVK{.swap_chain_extent = {.width = 640, .height = 360}});
-        context.set_value("summed_area_table", p_summed_area_table);
         context.set_value("spot_light_count", 2);
         context.set_value("max_spot_light_info_count", 4);
         context.set_entry("shadow_extent", make_extent(256, 256));
         context.set_value("shadow_mipmap_level_count", 9);
         context.set_entry("bloom_extent", make_extent(640, 360));
-        context.set_value("bloom_blur_pass_count", 4);
         DataValue formats = DataValue::make_map();
         for (const char* role : {
                  "gbuffer_albedo",
@@ -1712,7 +1777,17 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
         context.set_value("bloom_acquire_event", std::string("test.bloom"));
         context.set_value("frame_sequence_event", std::string("test.frames"));
         context.set_value("has_mesh_acceleration_structure", false);
+        DataValue static_mesh = DataValue::make_map();
+        static_mesh.set_value("mesh", std::string("sponza.mesh"));
+        context.set_entry("static_mesh", static_mesh);
+        DataValue dynamic_mesh = DataValue::make_map();
+        dynamic_mesh.set_value("mesh", std::string("model_cube.mesh"));
+        context.set_entry("dynamic_mesh", dynamic_mesh);
         context.set_entry("voxel", p_voxel);
+        DataValue entities = DataValue::make_list();
+        entities.push_back(DataValue::make_string("dynamic_mesh_entity_0"));
+        entities.push_back(DataValue::make_string("dynamic_mesh_entity_1"));
+        context.set_entry("dynamic_mesh_entity_ids", entities);
         DataValue transforms = DataValue::make_list();
         transforms.push_back(DataValue::make_string("dynamic_mesh_entity_0.transform"));
         transforms.push_back(DataValue::make_string("dynamic_mesh_entity_1.transform"));
@@ -1745,7 +1820,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
             post_processing.set_value("enabled", true);
             context.set_entry("post_processing", post_processing);
         }
-        return RendGraphScriptVK::run("render_graphs.deferred", context);
+        // The render graph definitions set the recipe's static parameters.
+        DataValue parameters = DataValue::make_map();
+        parameters.set_value("summed_area_table", p_summed_area_table);
+        parameters.set_value("bloom_blur_pass_count", 4);
+        return RendGraphScriptVK::run("render_graphs.deferred", context, parameters);
     };
     const auto count_tasks_with = [](const DataValue::List& p_tasks, std::string_view p_field) {
         size_t count = 0;
@@ -1785,13 +1864,18 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     EXPECT_EQ(indirect_lighting->get_entry("select").get_value<std::string>("event"), "test.voxel_debug_view.lighting");
     EXPECT_EQ(indirect_lighting->get_entry("aliases").get_value<std::string>("shadowmap_color[1]"), "shadowmap_color_1");
     EXPECT_EQ(count_tasks_with(mipmap_tasks, "trigger"), 2U);
-    // The octree subgraph holds its frame-begin barrier, 6 imported C++ tasks, and 2 gathers and 2 overlays, all toggled,
-    // and imports the application's textures and buffers.
+    // The octree subgraph holds its frame-begin barrier, 2 imported C++ clears, 4 construction draws, and 2 gathers and 2
+    // overlays, all toggled, and imports the application's textures and buffers.
     const DataValue* octree = find_by_id(mipmap_tasks, "voxel");
     ASSERT_NE(octree, nullptr);
     const DataValue& octree_recipe = octree->get_entry("subgraph");
     EXPECT_EQ(octree_recipe.get_entry("tasks").as_list().size(), 11U);
     EXPECT_EQ(count_tasks_with(octree_recipe.get_entry("tasks").as_list(), "toggle"), 4U);
+    // The static construction draws are triggered; the imported static clear carries its trigger in C++.
+    EXPECT_EQ(count_tasks_with(octree_recipe.get_entry("tasks").as_list(), "trigger"), 2U);
+    const DataValue* octree_build = find_by_id(octree_recipe.get_entry("tasks").as_list(), "run_build_octree");
+    ASSERT_NE(octree_build, nullptr);
+    EXPECT_EQ(octree_build->get_value<std::string>("type"), "graphics_draw_mesh");
     EXPECT_TRUE(contains_import(octree_recipe, "octree_dynamic"));
     EXPECT_EQ(octree->get_entry("ports").get_value<std::string>("depth"), "gbuffer_depth");
     // The pass-published SVO subgraph holds 20 tasks, 4 of them the SVOGI occupancy injection and propagation and the

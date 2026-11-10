@@ -20,16 +20,11 @@
 #include "core/memory/unique.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/rend_extent_2d_params_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
-#include "function/render_vk/render_graph_vk.hh"
-#include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -42,9 +37,10 @@ class RendererVK;
  * @class DynamicMeshRenderFeature
  * @brief Draws several moving entities of one mesh compiled once by MeshCompilerVK. Neither copyable nor movable.
  *
- * The mesh is registered on each render graph under DYNAMIC_MESH_KEY (register_mesh()), which its graphics_draw_mesh tasks
- * import it under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` and needs its own draw task per pass. All methods run
- * on the rendering thread. Geometry requires reconstruction to change.
+ * Recipes register the mesh, named by get_mesh_key(), on each render graph under DYNAMIC_MESH_KEY, which their
+ * graphics_draw_mesh tasks import it under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` (get_entity_key(), supplied by
+ * add_imports()) and needs its own draw task per pass. All methods run on the rendering thread. Geometry requires
+ * reconstruction to change.
  */
 class DynamicMeshRenderFeature {
 public:
@@ -65,16 +61,21 @@ public:
         return entities.size();
     }
 
-    /**
-     * @brief Register the mesh on p_graph under DYNAMIC_MESH_KEY, which the draw tasks name; repeated registrations are free.
-     * @throws std::runtime_error If the graph registers another compiled mesh than the entities draw.
-     */
-    void register_mesh(RenderGraphVK& p_graph) const;
+    /** @brief Return the resource key of the drawn mesh. */
+    std::string_view get_mesh_key() const {
+        return mesh_key;
+    }
 
     /**
-     * @brief Import every entity into p_graph before graph construction; the draw tasks import the mesh.
+     * @brief Supply every entity to a recipe, under its get_entity_key(); the draw tasks import the mesh.
      */
-    void register_resources(RendGraphDescVK& p_graph) const;
+    void add_imports(RendGraphRecipeImportsVK& p_imports) const;
+
+    /**
+     * @brief Get the import name of an entity.
+     * @throws std::runtime_error If p_entity_index is out of range.
+     */
+    std::string_view get_entity_key(size_t p_entity_index) const;
 
     /**
      * @brief Get the graph id of an entity's whole-mesh transform, for graphics_draw_mesh's transform parameter.
@@ -87,32 +88,6 @@ public:
      * @throws std::runtime_error If p_entity_index is out of range or the transform is invalid.
      */
     void set_transform(size_t p_entity_index, const glm::mat4& p_transform);
-
-    /**
-     * @brief Make the parameters of a graphics_draw_mesh task drawing one entity's opaque part; existing attachments are
-     * loaded.
-     * @param p_entity_index The entity.
-     * @param p_pipeline_key Registration key of the graphics pipeline on the render graph.
-     * @param p_extent The render area.
-     * @throws std::runtime_error If p_entity_index is out of range.
-     */
-    RTParamsGraphicsDrawMeshVK make_draw_params(
-        size_t p_entity_index, std::string_view p_pipeline_key, const RendExtent2DParamsVK& p_extent) const;
-
-    /**
-     * @brief Add a graphics_draw_mesh task drawing one entity (see make_draw_params()) and alias its render targets; the
-     * caller declares pass-specific shader reads and dependencies.
-     * @return The added task descriptor; invalidated when another task is added.
-     * @throws std::runtime_error If p_entity_index is out of range, or under the conditions of
-     * RTGraphicsDrawMeshVK::add_to_graph().
-     */
-    RendTaskDescVK& add_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        size_t p_entity_index,
-        std::string_view p_pipeline_key,
-        const RendExtent2DParamsVK& p_extent,
-        std::span<const std::string_view> p_colors = {},
-        std::optional<std::string_view> p_depth = std::nullopt) const;
 
 private:
     const RenderContextVK* render_data;

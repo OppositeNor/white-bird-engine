@@ -2,20 +2,27 @@
 
 ## Pipeline map
 
-1. The application calls `RendererVK::register_render_graph(key, RendGraphRebuildCallbackVK)`, which creates the
-   `RenderGraphVK`, builds it immediately through `build_from_callback()`, notifies plugins, and returns `Ref<RenderGraphVK>`.
-   `register_render_graph(key)` without a callback only adds a reference to an existing graph.
-2. A build calls the callback with the current `RendGraphContextVK` (`swap_chain_extent`) and applies the descriptor: it
-   diffs resources against the current graph, creates or keeps containers, flattens subgraphs, calls every task factory,
-   adds edges, topologically sorts and rejects cycles, validates that edges order every conflict, derives barriers and
-   semaphores, and allocates command buffers.
+1. The application calls `RendererVK::acquire_render_graph(definition_key, bindings)`. On a miss it loads the
+   `RURenderGraph` definition, creates a `RenderGraphVK`, compiles it immediately through `build_from_recipe()`,
+   notifies plugins, and only then caches it weakly in `GlobalRenderCache` under
+   `RenderGraphInstanceCache::make_cache_key(definition, instance)`; a live instance with the same identity and bindings
+   object is returned instead.
+2. A build prepares the bindings (`IRenderGraphBindingsVK::prepare()`) for the renderer facts of the current
+   `RendGraphContextVK` (`swap_chain_extent`), runs the recipe's `build(context, parameters)`, builds the descriptor with
+   `RendGraphRecipeBuilderVK` (supplying the swap chain when the recipe imports it), and applies it: it diffs resources
+   against the current graph, creates or keeps containers, flattens subgraphs, calls every task factory, adds edges,
+   topologically sorts and rejects cycles, validates that edges order every conflict, derives barriers and semaphores,
+   and allocates command buffers. Each build logs `Compiling render graph '<name>' from recipe '<key>'`.
 3. `execute()` first calls `update_context(RendGraphContextVK::from_render_data(...))`, which rebuilds when the context
-   changed. `rebuild()` forces a rebuild (for example after recompiling pipelines a recipe names).
+   changed and otherwise runs no script. `rebuild()` forces a rebuild (for example after state the bindings read changed
+   structurally).
 4. Each frame the renderer acquires the swap-chain image, updates the current slot of the swap-chain view container,
-   records and submits nodes in topological order to their queues, and presents.
-5. Unregistration defers destroying the graph for the configured frames in flight.
+   records and submits the active graph's nodes in topological order to their queues, presents, and waits for the frame.
+5. `activate_render_graph(graph)` retains the graph until another is activated or `MEM_NULL` clears it. A graph is
+   destroyed when its last reference is released; callers release theirs before the renderer shuts down.
 
-When the graph has a key and a global render cache, graph-owned objects are cached there as `<graph key>.<resource id>`,
+When the graph has a name and a global render cache, graph-owned objects are cached there as `<graph name>.<resource id>`
+(the definition key, followed by `[<instance key>]` for other instances),
 with `[slot]` appended for per-frame copies.
 
 ## Core APIs
@@ -23,7 +30,10 @@ with `[slot]` appended for per-frame copies.
 - `function/render_vk/render_graph_descriptor_vk.hh`: `RendGraphDescVK` (tasks, resources, `add_*`, `add_task`, `get_task`,
   `add_subgraph`, `get_subgraph`, `contains_resource`), `RendTaskDescVK` (`task_id`, `factory`, `connect()`, `alias()`),
   `RendSubgraphDescVK`, `RendSubgraphVK`, and the factory typedefs.
-- `function/render_vk/render_graph_vk.hh`: build, `update_context()`, `rebuild()`, `acquire_resource(id)`,
+- `function/render/render_resource_unit.hh` (`RURenderGraph`), `function/render/i_render_graph_bindings.hh`,
+  `function/render_vk/i_render_graph_bindings_vk.hh`, `function/render_vk/render_graph_bindings_function_vk.hh`, and
+  `function/render/render_graph_instance_cache.hh`: definitions, bindings, and instance identity.
+- `function/render_vk/render_graph_vk.hh`: `build_from_recipe()`, `build_from_descriptor()`, `update_context()`, `rebuild()`, `acquire_resource(id)`,
   `dump_graph_metadata()`, `list_descriptors()`.
 - `function/render_vk/rend_graph_resource_diff_vk.hh`: rebuild diff planning.
 - `function/render_vk/i_render_task_vk.hh`: `QueueFamilyVK`, `RendResUsageVK`, `ResAccessVK`, and the `IRenderTaskVK`
@@ -33,16 +43,17 @@ with `[slot]` appended for per-frame copies.
   registers `<key>[<index>]` entries, and accesses or edges on the aggregate expand to all entries
   (`MeshResourcesVK::acquire_textures()` uses it).
 
-## Descriptor pattern (C++)
+## Descriptor pattern (C++, compiler tests only)
 
 `RendTaskDescVK` holds a `RendTaskFactoryVK` (`Unique<IRenderTaskVK>(const RendGraphContextVK&)`). It is copyable and
 movable; copies share the factory's captures. The graph keeps the descriptors and calls each factory on every build, and
-throws when a factory is missing or returns null.
+throws when a factory is missing or returns null. Applications only build `RendTaskDescVK`s for native tasks their bindings
+import; complete C++ descriptors (`RenderGraphVK::build_from_descriptor()`) are for focused compiler tests.
 
 ```cpp
-// Inside the rebuild callback, bound to the graph it receives.
-RendGraphDescVK graph_desc(render_allocator, &p_graph);
-graph_desc.add_resource(REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container())
+// A compiler test's descriptor, bound to the graph it is built for.
+RendGraphDescVK graph_desc(render_allocator, &graph);
+graph_desc.add_resource(REND_RES_SWAP_CHAIN, *swap_chain_container)
     .add_image("shadow_depth_image",
         [=](const RendGraphContextVK& /*p_context*/) {
             return RendImageDescVK{
@@ -74,7 +85,7 @@ resources from the context. Ids are unique lower-snake-case strings across impor
 
 Every import is an `IBindableRenderResourceVK`; null containers are rejected. When an import varies by frame, bind one
 stable container (`ROCMultislotsVK`) and mutate the objects inside it. Swap-chain-style containers use `p_flush = false`. The
-renderer replaces the swap-chain container when `frames_in_flight` changes, so import it inside the callback.
+renderer replaces the swap-chain container when `frames_in_flight` changes, so the graph acquires it again on every build.
 
 Update graph-owned buffers through `acquire_resource(id)` on the rendering thread, and re-acquire after a rebuild that
 replaced the container.
@@ -173,19 +184,19 @@ tasks always run on graphics. Prefer an existing type before adding one.
 - Every conflict has a same-resource edge chain, and both ends of each edge access the resource.
 - Storage resources that are only read are annotated `read`; otherwise they count as writes.
 - Compute tasks on another queue reach a graphics task.
-- The rebuild callback does not compile pipelines or snapshot initial data, and re-imports renderer-owned containers.
+- The bindings do not compile pipelines or snapshot initial data; they recreate native task factories on every `prepare()`.
 - After a rebuild, re-acquire containers that were `REPLACE`d.
 - Concurrent sharing is preserved for resources crossing queue families.
 
 ## Canonical examples
 
-- `tests/executable/function/render/vulkan_draw_triangle_test.cpp`: compact C++ graph.
-- `vulkan_draw_cube_test.cpp`, `vulkan_draw_sponza_test.cpp`, `vulkan_draw_skinned_mesh_test.cpp`: larger C++ graphs with
-  factory resources and initial data.
-- `vulkan_draw_cube_unshaded_test.cpp`, `vulkan_pixel_sorting_test.cpp`, `deferred_test/deferred_render_graph.cpp`:
-  recipe-based graphs (see the recipes reference).
+- `tests/executable/function/render/vulkan_draw_triangle_test.cpp`: the smallest definition, with bindings that supply nothing.
+- `vulkan_draw_cube_test.cpp`, `vulkan_draw_sponza_test.cpp`: application-owned buffers with initial data, shadow maps, and a
+  derived context; `vulkan_draw_skinned_mesh_test.cpp`: an imported native ImGui task.
+- `vulkan_pixel_sorting_test.cpp`: one instance per orientation, switched by activation;
+  `deferred_test/deferred_render_graph.cpp`: two definitions differing in parameters, feature modules, and rebuilds.
 - `src/function/render_vk/render_graph_vk.cpp`: authoritative build, diff, validation, barrier, and submission behavior.
-- `src/function/render_vk/renderer_vk.cpp`: registration, swap-chain container, execution, presentation, delayed
+- `src/function/render_vk/renderer_vk.cpp`: acquisition, activation, swap-chain container, execution, presentation, delayed
   destruction.
-- `tests/unit/function/render_graph_vk_test.cpp`, `render_graph_descriptor_vk_test.cpp`,
+- `tests/unit/function/render_graph_vk_test.cpp`, `render_graph_instance_cache_test.cpp`, `render_graph_descriptor_vk_test.cpp`,
   `rend_graph_resource_diff_vk_test.cpp`, `render_resource_list_vk_test.cpp`.

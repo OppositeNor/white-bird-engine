@@ -317,6 +317,9 @@ void ApplicationVulkanDeferredPBRTest::update_descriptors() {
 }
 
 void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
+    if (measure_render_graphs) {
+        measure_frame_time();
+    }
     apply_voxel_debug_view_mode();
     finish_voxel_static_build();
     poll_frame_sequence();
@@ -341,7 +344,7 @@ void ApplicationVulkanDeferredPBRTest::render_update(double p_delta) {
     bool requested = summed_area_table_requested.load(std::memory_order_relaxed);
     // The frame sequence runs on the wrappers of the active graph, so switching waits until its frames are recorded.
     if (requested != summed_area_table_active && !frame_sequence_recording) {
-        renderer_vk->activate_render_graph(requested ? DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH : DEFERRED_MIPMAP_RENDER_GRAPH);
+        renderer_vk->activate_render_graph(deferred_render_graphs[requested ? 1U : 0U]);
         summed_area_table_active = requested;
         stdout_log(WBE_CHANNEL_DEBUG)->message(requested ? "Deferred shadow filtering: summed-area table." : "Deferred shadow filtering: mipmaps.");
     }
@@ -507,9 +510,22 @@ void ApplicationVulkanDeferredPBRTest::setup_draw_task() {
     write_dynamic_light_descriptors();
     setup_light_billboard_overlay_resources();
     voxel_static_build_registration_frame = render_context->current_frame;
-    register_deferred_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH, false);
-    register_deferred_render_graph(DEFERRED_SUMMED_AREA_TABLE_RENDER_GRAPH, true);
-    renderer_vk->activate_render_graph(DEFERRED_MIPMAP_RENDER_GRAPH);
+    acquire_deferred_render_graph(false);
+    acquire_deferred_render_graph(true);
+    if (measure_render_graphs) {
+        measure_render_graph_operations();
+    }
+    renderer_vk->activate_render_graph(deferred_render_graphs[0]);
+}
+
+void ApplicationVulkanDeferredPBRTest::release_draw_task() {
+    renderer_vk->activate_render_graph(MEM_NULL);
+    for (Ref<RenderGraphVK>& graph : deferred_render_graphs) {
+        graph = MEM_NULL;
+    }
+    for (Ref<IRenderGraphBindingsVK>& bindings : deferred_render_graph_bindings) {
+        bindings = MEM_NULL;
+    }
 }
 
 void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
@@ -777,14 +793,6 @@ void ApplicationVulkanDeferredPBRTest::create_lighting_buffers() {
         shadow_light_info_buffers[light_index] = create_per_frame_buffers(
             render_allocator, render_context, std::format("shadow_light_info.{}", light_index), sizeof(SpotLightInfoGPU), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
-}
-
-void ApplicationVulkanDeferredPBRTest::register_graph_resources(RenderGraphVK& p_graph) {
-    const Ref<MeshResourcesVK> static_mesh = p_graph.register_mesh(STATIC_MESH_KEY, sponza_mesh, static_mesh_params);
-    if (static_mesh != static_mesh_resources) {
-        throw std::runtime_error("Failed to register the deferred static mesh: the graph compiled another mesh than the voxel features use.");
-    }
-    dynamic_mesh->register_mesh(p_graph);
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descriptors() {

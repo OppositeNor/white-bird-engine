@@ -16,8 +16,10 @@
 #define WBE_FILE_OCTREE_RECIPE_PARAMS_HH
 
 #include "core/reflection/reflection_defs.hh"
+#include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "recipe_feature_params.hh"
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -76,6 +78,17 @@ struct WBE_META(WBE_REFLECT_SCRIPT) OctreeRecipeParams : public RecipeFeaturePar
      */
     WBE_META(WBE_REFLECT)
     uint32_t leaf_draw_count = 0;
+    /**
+     * @brief The edge length of the octree's leaf grid, which the construction passes rasterize at.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t extent = 0;
+    /**
+     * @brief The trigger of the static construction draws, which record once; absent when the static scene is rebuilt every
+     * frame.
+     */
+    WBE_META(WBE_REFLECT)
+    std::optional<RendRecipeTriggerVK> static_build;
 };
 
 } // namespace WhiteBirdEngine

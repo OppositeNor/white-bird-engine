@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_RESOURCE_UNIT_HH
 #define WBE_FILE_RENDER_RESOURCE_UNIT_HH
 
+#include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -378,6 +379,20 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaMesh3D : public RUSchema {
 enum class WBE_META(WBE_REFLECT_ENUM) RUSDFDataStructure : uint8_t {
     // A 3D KTX 2 texture with one VK_FORMAT_R16_SFLOAT texel per sample.
     TEXTURE_3D WBE_META(WBE_SERIALIZATION_ALIASES(texture_3d)),
+};
+
+/**
+ * @class RUSchemaRenderGraph
+ * @brief The scheme of RURenderGraph: a render graph definition, which names its recipe and the recipe's static parameters.
+ */
+struct WBE_META(WBE_SERIALIZABLE) RUSchemaRenderGraph : public RUSchema {
+    WBE_DECL_SERIALIZABLE(RUSchemaRenderGraph)
+    /** Resource ID of the recipe: a `script` resource whose module exports `build(context, parameters)`. */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string recipe;
+    /** The static parameters passed to the recipe as `parameters`: a map, or absent for an empty map. */
+    WBE_META(WBE_REFLECT)
+    DataValue parameters;
 };
 
 /**
@@ -888,6 +903,21 @@ struct RUMesh3D : public ResourceUnit {
      * @throws std::runtime_error When the mesh draws no submesh instance.
      */
     RUAABB3D compute_aabb() const;
+};
+
+/**
+ * @class RURenderGraph
+ * @brief Render graph definition resource unit: the recipe a render graph instance is compiled from, and its parameters.
+ *
+ * Immutable after loading. A definition holds no renderer state; renderers compile instances of it with the runtime bindings
+ * an application supplies (IRenderer::acquire_render_graph()). Copyable and movable: copies share the chunk-owned recipe
+ * reference and deep-copy the parameters, which the unit owns; the chunk destroys the unit before it releases its storage.
+ */
+struct RURenderGraph : public ResourceUnit {
+    /** The chunk-resolved recipe script; non-owning. */
+    RefRes<RUScript> recipe;
+    /** The recipe's static parameters, always a map; owned by the unit. */
+    DataValue parameters = DataValue::make_map();
 };
 
 } // namespace WhiteBirdEngine

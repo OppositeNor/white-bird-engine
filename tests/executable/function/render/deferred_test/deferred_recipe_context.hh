@@ -17,6 +17,7 @@
 
 #include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/rend_recipe_extent_2d_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
@@ -80,15 +81,28 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeFormats {
 };
 
 /**
- * @class DeferredRecipeContext
- * @brief The context of the render_graphs.deferred recipe; see ApplicationVulkanDeferredPBRTest. Copyable and movable.
+ * @class DeferredRecipeParameters
+ * @brief The static parameters of the render_graphs.deferred recipe, set by each deferred render graph definition in
+ * res/assets/render_graphs/render_graphs.toml. Copyable and movable.
  */
-struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeContextVK {
+struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeParameters {
     /**
      * @brief Whether shadows are filtered with summed-area tables instead of mipmaps.
      */
     WBE_META(WBE_REFLECT)
     bool summed_area_table = false;
+    /**
+     * @brief The blur passes of the bloom; even, so the last pass writes the ping image.
+     */
+    WBE_META(WBE_REFLECT)
+    uint32_t bloom_blur_pass_count = 0;
+};
+
+/**
+ * @class DeferredRecipeContext
+ * @brief The context of the render_graphs.deferred recipe; see ApplicationVulkanDeferredPBRTest. Copyable and movable.
+ */
+struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeContextVK {
     /**
      * @brief The lights in the scene.
      */
@@ -115,11 +129,6 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeCon
     WBE_META(WBE_REFLECT)
     RendRecipeExtent2DVK bloom_extent;
     /**
-     * @brief The blur passes of the bloom.
-     */
-    WBE_META(WBE_REFLECT)
-    uint32_t bloom_blur_pass_count = 0;
-    /**
      * @brief The image formats of the targets.
      */
     WBE_META(WBE_REFLECT)
@@ -135,10 +144,25 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeCon
     WBE_META(WBE_REFLECT)
     std::string frame_sequence_event;
     /**
-     * @brief Whether the acceleration structure build task is imported.
+     * @brief Whether the mesh acceleration structure, `mesh_acceleration_structure`, and its build task are imported.
      */
     WBE_META(WBE_REFLECT)
     bool has_mesh_acceleration_structure = false;
+    /**
+     * @brief The description of the static scene mesh, which the recipe registers as `static_mesh`.
+     */
+    WBE_META(WBE_REFLECT)
+    RDParamsMeshVK static_mesh;
+    /**
+     * @brief The description of the dynamic entities' mesh, which the recipe registers as `dynamic_mesh`.
+     */
+    WBE_META(WBE_REFLECT)
+    RDParamsMeshVK dynamic_mesh;
+    /**
+     * @brief The import names of the dynamic mesh entities, one per drawn entity.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<std::string> dynamic_mesh_entity_ids;
     /**
      * @brief The voxel structure: the RecipeFeatureParams-derived parameters of its module.
      */

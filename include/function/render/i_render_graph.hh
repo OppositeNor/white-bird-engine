@@ -33,18 +33,22 @@ namespace WhiteBirdEngine {
  * @class IRenderGraph
  * @brief A backend-neutral render graph, and the owner of the named resources its tasks use. Neither copyable nor movable.
  *
+ * A render graph is a composite render object (IRenderObject): it is confined to the rendering thread, and its lifetime is
+ * bound to the renderer that compiled it (IRenderer::acquire_render_graph()). Backends implement get_type_uuid() with the
+ * concrete graph type's UUID, so graphs can be cached in GlobalRenderCache like other render objects.
+ *
  * Applications register the resources a graph's tasks name (meshes, images, pipelines, ...) on the graph itself, in two
  * steps: load the source resources from the ResourceManager, then register_resource() with a description. The description's
  * type (IResourceDescription::get_type_uuid()) selects the IResourceRegistrator that compiles it, as a resource schema's type
  * selects its resource unit loader; backends install default registrators for the common description types, and
  * add_resource_registrator() adds custom ones. The graph holds every registered object strongly until it is unregistered,
  * replaced, or the graph is destroyed, and registrations survive rebuilds. Registering a key again with an equal
- * description returns the existing object without compiling, so a rebuild callback or recipe may register on every
- * rebuild. Registration keys are local to the graph. Confined to the rendering thread.
+ * description returns the existing object without compiling, so a recipe may register on every rebuild. Registration keys
+ * are local to the graph.
  */
-class IRenderGraph {
+class IRenderGraph : public IRenderObject {
 public:
-    virtual ~IRenderGraph() = default;
+    virtual ~IRenderGraph() override = default;
     IRenderGraph(const IRenderGraph&) = delete;
     IRenderGraph(IRenderGraph&&) noexcept = delete;
     IRenderGraph& operator=(const IRenderGraph&) = delete;
@@ -155,9 +159,10 @@ public:
     }
 
     /**
-     * @brief Rebuild the graph against its current context, running its rebuild callback again.
+     * @brief Rebuild the graph against its current context, compiling its definition again.
      *
-     * Must be called on the rendering thread while none of the graph's submitted work is pending.
+     * Use it after state that the graph's bindings or recipe read has changed structurally. Must be called on the rendering
+     * thread while none of the graph's submitted work is pending.
      */
     virtual void rebuild() = 0;
 

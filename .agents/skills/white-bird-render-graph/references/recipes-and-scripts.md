@@ -2,17 +2,20 @@
 
 ## Flow
 
-1. The rebuild callback builds a `RendGraphRecipeImportsVK` with every resource (`add(name, bindable)`) and C++ task
-   (`add_task(RendTaskDescVK)`) owned outside the graph.
-2. `RendGraphScriptVK::run(key_or_source, context)` runs the recipe in a fresh sandboxed `SBLua` and returns its table as a
-   `DataValue`. `require` resolves other script resources through `SMRResourceManager`.
+1. A `render_graph` resource (`RURenderGraph`) names the recipe and its static `parameters`. For each build of an instance,
+   its bindings' `prepare()` returns the serialized context and a `RendGraphRecipeImportsVK` with every resource
+   (`add(name, bindable)`) and native task (`add_task(RendTaskDescVK)`) owned outside the graph; the graph adds the swap
+   chain when the recipe imports it and the bindings do not.
+2. `RendGraphScriptVK::run(script, context, parameters)` runs the recipe in a fresh sandboxed `SBLua` and returns its table
+   as a `DataValue`. `require` resolves other script resources through `SMRResourceManager`.
 3. `RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &graph)` returns a `RendGraphDescVK` bound to the
    graph. It first applies the recipe's `registrations` to the graph, then adds tasks through
    `RenderTaskRegistryVK::add_task()` (which runs the type's `prepare_graph`), wraps a `trigger` first and a `toggle`
    outermost, copies imported tasks, and builds subgraphs. A declared-but-missing or supplied-but-undeclared import or task
    is an error.
-4. The callback may add to that descriptor for parts not yet expressed in Lua (the deferred test adds its acceleration
-   structure and dynamic mesh entities). Keep everything else in the recipe.
+4. `RenderGraphVK::build_from_recipe()` runs these steps for the first build and every rebuild. Nothing is added to the
+   descriptor in C++: whatever the application owns and a shader names (the deferred test's acceleration structure and
+   dynamic mesh entities) is a declared import.
 
 Recipes only build descriptors; they never touch render objects.
 
@@ -99,19 +102,20 @@ non-empty list, or a bundle.
   `aliases` is the task's bindings (the C++ `RendTaskDescVK::alias()` map). Imported
   tasks carry only `id`, `import = true`, and `connect`.
 
-Params are strictly deserialized: unknown keys fail. Pipeline keys name pipelines the application compiled outside the
-callback and keeps alive. Enums serialize as canonical names; compare `render_graph.enum_name(value) == "CANONICAL_NAME"`, which
+Params are strictly deserialized: unknown keys fail. Pipeline keys name pipelines registered on the graph, normally by the recipe itself. Enums serialize as canonical names; compare `render_graph.enum_name(value) == "CANONICAL_NAME"`, which
 also accepts the lowercase aliases.
 
 ## Context
 
-`RendRecipeContextVK` holds `frames_in_flight`, `swap_chain_format`, and `swap_chain_extent`. `make_context()` builds the
-plain one. An application that adds entries declares a `WBE_REFLECT_SCRIPT` struct deriving from it, assigns the base with
-`get_recipe_context()`, and passes `serialize_context(context)` to `run()`; the recipe annotates
-`build(context: wbe.<ContextType>)`. Size swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
+`RendRecipeContextVK` holds `frames_in_flight`, `swap_chain_format`, and `swap_chain_extent`; the graph fills these
+authoritative renderer facts itself. An application that adds entries declares a `WBE_REFLECT_SCRIPT` struct deriving
+from it, assigns the base from the facts its bindings receive, and returns `serialize_context(context)` from `prepare()`;
+the recipe annotates `build(context: wbe.<ContextType>, parameters: wbe.<ParametersType>)` (or `{string:any}` for
+unused parameters). Static choices that distinguish definitions of one recipe belong in the definition's `parameters`
+(`DeferredRecipeParameters`); runtime state in the context. Size swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
 Pass runtime state that rebuilds must preserve (toggle states, feature parameters) through the context.
 
-Examples: `tests/executable/function/render/pixel_sorting_recipe_context.hh`,
+Examples: `tests/executable/function/render/pixel_sorting_recipe_context.hh`, `shadowed_mesh_recipe_context.hh`,
 `deferred_test/deferred_recipe_context.hh`.
 
 ## Triggers and toggles

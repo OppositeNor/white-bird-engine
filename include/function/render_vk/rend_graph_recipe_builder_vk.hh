@@ -114,11 +114,11 @@ public:
      * @param p_recipe The recipe, deserialized strictly as RendGraphRecipeVK.
      * @param p_imports The resources the recipe imports.
      * @param p_render_data Render data whose allocator owns the descriptor; it must outlive the descriptor and its graph.
-     * @param p_render_graph The graph the descriptor is built for (the one the rebuild callback receives); the recipe's
-     * registrations are applied to it first, at every level before that level's imports and tasks, and the descriptor is
+     * @param p_render_graph The graph the descriptor is built for (RenderGraphVK::build_from_recipe() passes itself); the
+     * recipe's registrations are applied to it first, at every level before that level's imports and tasks, and the descriptor is
      * bound to it. An import nobody supplies resolves to a bindable resource registered on it. Null only for recipes that
      * register nothing and whose tasks name no registered resource.
-     * @return The descriptor, for a rebuild callback to return (see RendererVK::register_render_graph()).
+     * @return The descriptor, which the graph builds (see RenderGraphVK::build_from_recipe()).
      * @throws std::runtime_error If the recipe is malformed; a registration fails (see IRenderGraph::register_resource());
      * a declared import (resource or task) is neither supplied nor registered, or a
      * supplied one is not declared; a resource id is empty, repeated, or sets other than exactly one kind; a task id is

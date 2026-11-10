@@ -18,38 +18,25 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render/shader_metadata_loader.hh"
-#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
-#include <array>
 #include <cstdlib>
 #include <format>
-#include <glm/ext/vector_float4.hpp>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
-#include <utility>
-#include <vector>
-#include <vulkan/vulkan_core.h>
 
 namespace WBE = WhiteBirdEngine;
 
-// Prefix of the imported triangle mesh buffers.
-inline constexpr std::string_view REND_RES_TEST_DRAW_TRIANGLE_MESH = "draw_triangle_mesh";
+// The render graph definition, res/assets/render_graphs/render_graphs.toml, whose recipe is render_graphs.draw_triangle.
+inline constexpr std::string_view DRAW_TRIANGLE_RENDER_GRAPH = "draw_triangle_graph";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
@@ -66,59 +53,23 @@ public:
     }
 
     void setup_graphics_pipeline() {
-        auto* render_allocator = get_renderer_allocator().get();
-        auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* render_context = renderer->get_render_context();
         auto triangle_mesh = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUMesh3D>("triangle");
         if (triangle_mesh == nullptr || triangle_mesh->opaque_instances.submesh_count != 1 ||
             triangle_mesh->opaque_instances.submeshes == nullptr) {
             throw std::runtime_error("Failed to setup draw triangle test: expected exactly one opaque triangle submesh.");
         }
-        const WBE::RUSubmesh3D& triangle_submesh = triangle_mesh->opaque_instances.submeshes.get()[0];
+        // The recipe registers the mesh and the pipeline and imports only the swap chain, which the renderer supplies.
+        render_graph = WBE::acquire_test_render_graph(*WBE::RendererVK::get_singleton(),
+            DRAW_TRIANGLE_RENDER_GRAPH,
+            WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(), DRAW_TRIANGLE_RENDER_GRAPH));
+    }
 
-        auto shader_resource = WBE::ResourceManager::get_singleton()->get_resource<WBE::RUShader>("draw_triangle_shader");
-        // The graph calls this for its first build and again whenever it rebuilds, such as after a swap chain resize.
-        const WBE::RUSubmesh3D* triangle_submesh_pointer = &triangle_submesh;
-        WBE::Ref<WBE::RenderGraphVK> graph = renderer->register_render_graph("test_render_graph",
-            [render_allocator, renderer, render_context, triangle_mesh, triangle_submesh = triangle_submesh_pointer, shader_resource](
-                const WBE::RendGraphContextVK& /*p_graph_context*/, WBE::RenderGraphVK& p_graph) {
-                WBE::Ref<WBE::ROGraphicsPipelineVK> graphics_pipeline = p_graph.register_graphics_pipeline("draw_triangle_pipeline",
-                    WBE::RDParamsGraphicsPipelineVK{
-                        .pipeline = "draw_triangle_pipeline",
-                        .color_formats = {static_cast<WBE::ImageFormatVK>(render_context->swap_chain_format)},
-                    });
-                WBE::RendGraphDescVK pipeline_desc(render_allocator, &p_graph);
-                pipeline_desc.add_resource(WBE::REND_RES_SWAP_CHAIN, *renderer->acquire_swap_chain_image_view_container());
-                const WBE::SubmeshDrawBuffersVK draw_buffers = WBE::import_submesh_draw_buffers(renderer,
-                    pipeline_desc,
-                    REND_RES_TEST_DRAW_TRIANGLE_MESH,
-                    triangle_mesh,
-                    *triangle_submesh,
-                    WBE::ShaderMetadataLoader().load(shader_resource),
-                    "vertex_main");
-                WBE::RendTaskDescVK task_desc(render_allocator);
-                task_desc.task_id = RT_RUN_PIPELINE;
-                task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-                const std::array<VkClearValue, 1> clear_values{VkClearValue{.color = {.float32 = {0.0F, 0.0F, 0.0F, 1.0F}}}};
-                task_desc.factory = [=](const WBE::RendGraphContextVK& p_context) {
-                    return WBE::RTRunGraphicsPipelineVK::Builder(render_allocator)
-                        .set_pipeline(graphics_pipeline)
-                        .set_render_extent(p_context.swap_chain_extent)
-                        .set_clear_values(clear_values)
-                        .set_indexed_draw(draw_buffers.get_vertex_buffer_sources(),
-                            draw_buffers.index_buffer_id,
-                            draw_buffers.vertex_input,
-                            draw_buffers.indexed_draw_region)
-                        .create_unique(render_context);
-                };
-                pipeline_desc.tasks.emplace_back(std::move(task_desc));
-                return pipeline_desc;
-            });
-        WBE::write_descriptor_debug_output("test_render_graph_graph_descriptors", graph->list_descriptors());
-        WBE::RendererVK::get_singleton()->activate_render_graph("test_render_graph");
+    void release_graphics_pipeline() {
+        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
     }
 
 private:
+    WBE::Ref<WBE::RenderGraphVK> render_graph;
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -130,6 +81,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_graphics_pipeline();
             game_application.run();
+            game_application.release_graphics_pipeline();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {

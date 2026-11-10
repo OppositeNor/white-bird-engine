@@ -13,11 +13,9 @@
    limitations under the License.
 */
 #include "function/render_vk/render_vk_resource_unit_loader.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/vertex_attribute_format_info.hh"
 #include "generated/enum_reflection.gen.hh"
@@ -701,6 +699,38 @@ void ResourceUnitLoaderSDF::populate_scheme_from_data(IResourceChunk& p_res_chun
     populate_scheme_ptr(p_res_chunk, scheme);
 }
 
+std::span<const std::string> ResourceUnitLoaderRenderGraph::get_supported_resource_types() const {
+    static const std::array<std::string, 1> supported_resource_types = {"render_graph"};
+    return supported_resource_types;
+}
+
+std::any ResourceUnitLoaderRenderGraph::populate_scheme_ptr(IResourceChunk& p_res_chunk, const RUSchema& p_scheme) const {
+    const auto& typed_scheme = get_typed_scheme<RUSchemaRenderGraph>(p_scheme, "render_graph");
+    if (typed_scheme.recipe.empty()) {
+        throw std::runtime_error(std::format("Failed to populate render graph {}: recipe must be non-empty.", typed_scheme.id));
+    }
+    if (typed_scheme.recipe.contains('\0')) {
+        throw std::runtime_error(std::format("Failed to populate render graph {}: recipe must not contain NUL.", typed_scheme.id));
+    }
+    if (!typed_scheme.parameters.is_nil() && typed_scheme.parameters.get_kind() != DataValueKind::MAP) {
+        throw std::runtime_error(std::format("Failed to populate render graph {}: parameters must be a map, but is a {}.",
+            typed_scheme.id,
+            DataValue::get_kind_name(typed_scheme.parameters.get_kind())));
+    }
+    RefRes<RURenderGraph> saved_resource = p_res_chunk.emplace_res_unit<RURenderGraph>(typed_scheme.id);
+    if (!typed_scheme.parameters.is_nil()) {
+        saved_resource->parameters = typed_scheme.parameters;
+    }
+    p_res_chunk.create_ref_to(saved_resource->recipe, typed_scheme.recipe);
+    return saved_resource;
+}
+
+void ResourceUnitLoaderRenderGraph::populate_scheme_from_data(IResourceChunk& p_res_chunk, const DataValue& p_scheme_data) const {
+    RUSchemaRenderGraph scheme;
+    scheme.deserialize(p_scheme_data);
+    populate_scheme_ptr(p_res_chunk, scheme);
+}
+
 void register_renderer_vk_resource_unit_loaders() {
     auto* resource_manager = ResourceManager::get_singleton();
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderShader>(global_allocator()));
@@ -710,6 +740,7 @@ void register_renderer_vk_resource_unit_loaders() {
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderMesh>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSkeleton>(global_allocator()));
     resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderSDF>(global_allocator()));
+    resource_manager->add_resource_unit_loader(make_ref<ResourceUnitLoaderRenderGraph>(global_allocator()));
 }
 
 } // namespace WhiteBirdEngine

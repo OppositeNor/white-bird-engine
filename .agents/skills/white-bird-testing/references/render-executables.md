@@ -13,7 +13,7 @@ Every executable test that renders must:
 - Call `WBE::on_exec_test_render(renderer, current_frame)` from its render-thread `render_update()`, before any early return. Pass the renderer by reference and its monotonic frame counter, not the rotating frame slot or acquired swapchain image index. It reads the capture variables on every call and returns `true` when it requested a capture this frame (the deferred test hides its ImGui window on such frames).
 - Optionally call `WBE::on_exec_test_logic(window)` from the logic thread to support `WBE_EXEC_TEST_RESIZE`.
 
-`render_test.hh` is a header-only helper library; there is no `render_test.cpp` to link. Besides the hooks it provides mesh-resource and pipeline helpers, `alias_mesh_resources`, `alias_render_targets`, `connect_resource_chain`, camera and spot-light GPU structs, and descriptor debug output. Prefer a Teal recipe for new graphs (see the `white-bird-render-graph` skill); `vulkan_draw_cube_unshaded_test.cpp` is the minimal recipe-based executable. When adding a new rendering executable, add only that executable's source pattern to `tests/executable/function/render/generate.toml`. Do not edit `executable_test.gen.cmake`.
+`render_test.hh` is a header-only helper library; there is no `render_test.cpp` to link. Besides the hooks it provides `acquire_test_render_graph()` and `release_test_render_graph()`, the mesh registration keys, camera and spot-light GPU structs, and descriptor debug output. Every executable's graph is a definition in `res/assets/render_graphs/render_graphs.toml` whose Teal recipe it acquires with its bindings (see the `white-bird-render-graph` skill); `vulkan_draw_triangle_test.cpp` and `vulkan_draw_cube_unshaded_test.cpp` are the minimal ones. Each build logs `Compiling render graph ...`, so the log shows that only the first build, resizes, and explicit rebuilds run the recipe. When adding a new rendering executable, add only that executable's source pattern to `tests/executable/function/render/generate.toml`. Do not edit `executable_test.gen.cmake`.
 
 The shared test utility owns environment parsing and one-shot trigger state. Keep those policies out of the engine. Use `IRenderer::request_frame_capture()` for capture, never a hard-coded engine screenshot path or environment hook. Renderer access is render-thread confined; requests originating elsewhere must use `IRenderer::add_job()`.
 
@@ -57,6 +57,7 @@ WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/tmp/wbe-triangle-check.png WBE_CAPTUR
 - `WBE_CAPTURE_INTERVAL`: positive integer; captures every N frames from `WBE_CAPTURE_FRAME` on, to `<stem>_frame<N><ext>`. Unset captures once.
 - `WBE_WAIT_PROCESS_INJECT`: exactly `0` or `1` (anything else throws). `1` prints the PID and waits for Enter before renderer initialization; use it when attaching Nsight or another injector, and preserve stdin access. Use `0` for unattended captures.
 - `WBE_EXEC_TEST_RESIZE=<width>x<height>@<logic frame>`: resizes the window from the logic thread at that frame (tests that call `on_exec_test_logic`), exercising swap-chain rebuilds.
+- `WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS=1`: the deferred test logs `Render graph measurement:` lines with each instance's creation time, warm acquisition and explicit rebuild times (mean of 10, before the run), and the mean frame time of frames 120 to 1120. Measure on a release target.
 - `WBE_EXEC_TEST_RAY_TRACING` and `WBE_EXEC_TEST_TIMESTAMP_QUERY`: enable those renderer capabilities in the deferred and pixel-sorting tests. Timestamp queries write `gpu_timestamp_report.json`, which `python export_render_graph.py` turns into a Mermaid or SVG graph.
 
 The test continues after capture; it does not automatically exit. Observe the capture log and output file, then stop only the process you launched. `SIGTERM` is a clean shutdown on POSIX: SDL turns it into `SDL_QUIT`, the same path as closing the window. A timeout or `SIGKILL` is not a clean test exit. Respect GUI/GPU execution approvals.
@@ -75,7 +76,7 @@ Use [check_deferred.py](../scripts/check_deferred.py) for the deferred executabl
 
 The deferred executable's controls:
 
-- `R`: switches between the mipmap and summed-area-table graphs (`activate_render_graph`), logging `Deferred shadow filtering:`.
+- `R`: switches between the instances of the mipmap and summed-area-table definitions (`activate_render_graph`), logging `Deferred shadow filtering:`.
 - `V`: cycles the voxel debug view (disabled, post SVO build, pre deferred propagation, and, for the SVOs, occupancy) through `RTToggleVK` and `RTMultiplexerVK` events passed to the recipe as `VoxelDebugViewToggles`. While the post-build or occupancy view is shown, the configuration window's "Voxel draw style" combo (wireframe or solid) and "Voxel debug depth" slider select how and which tree depth it draws; they have no keys.
 - `1`: toggles pixel-sort post-processing (`pixel_sort.toggle`). `B`: triggers bloom acquisition (`RTTriggeredVK`).
 - `F1`: captures to `test_env/captures/deferred_<ms>_frame_<n>.png`. `T`: selects the next spot light.

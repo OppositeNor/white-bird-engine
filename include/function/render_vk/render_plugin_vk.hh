@@ -160,12 +160,13 @@ public:
     virtual void on_frame_begin(const RenderContextVK* p_render_data) = 0;
 
     /**
-     * @brief Observe a render graph that the renderer has built and registered under a resource key.
+     * @brief Observe a render graph instance that the renderer has compiled (RendererVK::acquire_render_graph()).
      *
-     * Called on the rendering thread after the graph is built and before it is first executed. The graph stays alive until it
-     * is unregistered; a later graph may be registered under the same key.
+     * Called on the rendering thread after the graph is built, before it is cached and first executed. The graph stays alive
+     * until its last reference is released; a later instance may be compiled under the same name.
      *
-     * @param p_graph_key The resource key the graph is registered under.
+     * @param p_graph_key The name of the instance: its definition's resource key, followed by `[<instance key>]` when the
+     * instance key differs from it.
      * @param p_graph The built graph.
      */
     virtual void on_render_graph_registered(std::string_view p_graph_key, const RenderGraphVK& p_graph) = 0;

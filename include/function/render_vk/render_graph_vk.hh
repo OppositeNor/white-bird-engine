@@ -16,6 +16,8 @@
 #define WBE_FILE_RENDER_GRAPH_VK_HH
 
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/i_render_graph.hh"
@@ -81,19 +83,22 @@ struct RendResVK {
     Ref<RenderResourceListVK> resource_list;
 };
 
-class RenderGraphVK;
+class IRenderGraphBindingsVK;
+struct RUScript;
 
 /**
- * @brief Produces the complete descriptor of a render graph for a context.
- *
- * Called by the graph when it is built and whenever it rebuilds, on the rendering thread, with the graph being built. It
- * must return every task and resource of the graph, and must be a function of the context and of state its owner
- * controls; everything it captures must outlive the graph. It registers the named resources its tasks use on the graph
- * (IRenderGraph::register_resource()); registering again with an equal description is free, so it may register on every
- * rebuild. Build the descriptor bound to the graph (RendGraphDescVK(RenderAllocator*, IRenderGraph*)) so that task types
- * can resolve those resources. A throw is not caught and crashes the program.
+ * @class RendGraphRecipeSourceVK
+ * @brief What a render graph instance is compiled from, and compiled from again on every rebuild: a definition's recipe and
+ * parameters (RURenderGraph), and the instance's bindings. Copyable and movable; copies share the recipe and the bindings.
  */
-using RendGraphRebuildCallbackVK = std::function<RendGraphDescVK(const RendGraphContextVK&, RenderGraphVK&)>;
+struct RendGraphRecipeSourceVK {
+    /** The recipe script; the resource chunk that holds it must outlive the graph. */
+    RefRes<RUScript> recipe;
+    /** The recipe's static parameters, a map passed to `build(context, parameters)`. */
+    DataValue parameters = DataValue::make_map();
+    /** The bindings, which prepare the recipe's context and imports for each build; the graph retains them. */
+    Ref<IRenderGraphBindingsVK> bindings;
+};
 
 /**
  * @class RendResViewVK
@@ -247,17 +252,19 @@ struct RGNode {
  * ordered by a chain of edges carrying that same resource; otherwise graph
  * construction fails.
  *
- * The graph is built once from a RendGraphDescVK; thereafter, execute()
- * may be called every frame. The graph-owned resources follow the
- * RendGraphContextVK: execute() calls update_context() whenever the context of
- * the render data differs from the one the resources were built for.
+ * An instance is compiled from a recipe source (build_from_recipe(), which RendererVK::acquire_render_graph() calls): every
+ * build runs the recipe and builds the RendGraphDescVK it describes; thereafter, execute() may be called every frame. The
+ * graph-owned resources follow the RendGraphContextVK: execute() calls update_context() whenever the context of the render
+ * data differs from the one the resources were built for, which compiles the source again. A frame whose context is
+ * unchanged runs no script and prepares no bindings. build_from_descriptor() builds a graph from a fixed descriptor instead,
+ * for focused tests of the compiler.
  *
  * As an IRenderGraph, the graph also owns the named resources its tasks use. It installs the default registrators RRMeshVK
  * (RDParamsMeshVK), RRImageVK (RDParamsImageVK), RRGraphicsPipelineVK (RDParamsGraphicsPipelineVK), and RRComputePipelineVK
  * (RDParamsComputePipelineVK); registered objects that are replaced or unregistered are released frames_in_flight frames
  * later.
  */
-class RenderGraphVK final : public IRenderGraph {
+class WBE_META(WBE_RENDER_OBJECT) RenderGraphVK final : public IRenderGraph {
 public:
     RenderGraphVK() = delete;
     virtual ~RenderGraphVK() override;
@@ -277,28 +284,43 @@ public:
     explicit RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key = {});
 
     /**
-     * @brief Build the graph from the descriptor a callback produces, and call it again on every rebuild.
+     * @brief Compile the graph from a recipe source, and compile the source again on every rebuild.
      *
-     * Calls p_rebuild for the current context, then builds its descriptor: takes ownership of every task, adds the resource
-     * dependency edges, rejects cycles, validates that every conflicting declared resource access is ordered by edges on
-     * that resource, derives barriers and semaphores, and allocates the command buffers. After this call, the graph is
-     * ready to execute(). The descriptor's resource and task factories are evaluated against the context of each build;
-     * the graph keeps none of them across rebuilds. Each rebuild calls p_rebuild again and diffs the new descriptor against the current graph (see RendGraphResourceDiffVK): a graph-owned
-     * resource whose id, kind, per-frame layout, and configuration are unchanged keeps its container, objects, and content;
-     * one whose configuration changed is recreated in place in its container, so RenderGraphVK::acquire_resource() callers
-     * observe it; one whose kind or per-frame layout changed, or that replaces an import, gets a new container, which
-     * callers must acquire again. Views of recreated images are recreated. Resources missing from the new descriptor are
-     * released, and every task is recreated.
+     * Each build prepares the bindings (IRenderGraphBindingsVK::prepare()) for the renderer facts of the current context,
+     * runs the recipe's `build(context, parameters)`, and builds the descriptor the recipe describes with
+     * RendGraphRecipeBuilderVK, bound to this graph. When the recipe declares the `REND_RES_SWAP_CHAIN` import and the
+     * bindings do not supply it, the renderer's swap-chain container is supplied, acquired again for every build. The
+     * descriptor is then built as build_from_descriptor() describes. Call on the rendering thread.
      *
-     * @param p_rebuild The callback.
-     * @throws std::runtime_error If a descriptor is invalid, cyclic, or leaves a resource conflict unordered.
+     * @param p_source The source; its recipe and bindings must not be null.
+     * @throws std::runtime_error If the source is incomplete, the bindings, the recipe, or the descriptor fail, or the
+     * descriptor is invalid, cyclic, or leaves a resource conflict unordered.
      */
-    void build_from_callback(RendGraphRebuildCallbackVK p_rebuild);
+    void build_from_recipe(RendGraphRecipeSourceVK p_source);
+
+    /**
+     * @brief Build the graph from a fixed descriptor, which every rebuild builds again; for focused tests of the compiler.
+     *
+     * Takes ownership of every task, adds the resource dependency edges, rejects cycles, validates that every conflicting
+     * declared resource access is ordered by edges on that resource, derives barriers and semaphores, and allocates the
+     * command buffers. After this call, the graph is ready to execute(). The descriptor's resource and task factories are
+     * evaluated against the context of each build. Each rebuild diffs the new descriptor against the current graph (see
+     * RendGraphResourceDiffVK): a graph-owned resource whose id, kind, per-frame layout, and configuration are unchanged
+     * keeps its container, objects, and content; one whose configuration changed is recreated in place in its container, so
+     * RenderGraphVK::acquire_resource() callers observe it; one whose kind or per-frame layout changed, or that replaces an
+     * import, gets a new container, which callers must acquire again. Views of recreated images are recreated. Resources
+     * missing from the new descriptor are released, and every task is recreated.
+     *
+     * @param p_descriptor The descriptor; the graph keeps it for rebuilds.
+     * @throws std::runtime_error If the descriptor is invalid, cyclic, or leaves a resource conflict unordered.
+     */
+    void build_from_descriptor(RendGraphDescVK p_descriptor);
 
     /**
      * @brief Rebuild the graph against a context.
      *
-     * Calls the rebuild callback for p_context and applies the result as build_from_callback() describes: unchanged resources are kept, changed ones are recreated,
+     * Compiles the graph's source for p_context and applies the result as build_from_descriptor() describes: unchanged
+     * resources are kept, changed ones are recreated,
      * and reallocated resources lose their content. Then every task is recreated from its factory, and the dependency
      * edges, synchronization, and command buffers are rebuilt for the new tasks. Does nothing when p_context equals the
      * current context. Must be called on the rendering thread while none of the graph's submitted work is pending;
@@ -313,15 +335,30 @@ public:
     /**
      * @brief Rebuild the graph against its current context.
      *
-     * Does what update_context() does when the context changes, without a context change: the rebuild callback runs
+     * Does what update_context() does when the context changes, without a context change: the source is compiled
      * again, every graph-owned resource whose configuration now differs is reallocated, and every task is recreated. Use
-     * it after state that the callback or the factories read has changed. Must be called on the rendering thread while
+     * it after state that the bindings or the factories read has changed structurally. Must be called on the rendering thread while
      * none of the graph's submitted work is pending.
      *
      * @throws std::runtime_error If a re-evaluated resource configuration is invalid, or if the recreated tasks do not form
      * a valid graph.
      */
     virtual void rebuild() override;
+
+    virtual TypeID get_type_uuid() const override;
+
+    /**
+     * @brief Get the bindings the graph was compiled with.
+     * @return The bindings of the recipe source, or null for a graph built from a fixed descriptor or not built yet.
+     */
+    Ref<IRenderGraphBindingsVK> get_bindings() const;
+
+    /**
+     * @brief Get the render data the graph was constructed for, which identifies its renderer.
+     */
+    const RenderContextVK* get_render_context() const {
+        return render_data;
+    }
 
     virtual void add_resource_registrator(Unique<IResourceRegistrator> p_registrator) override;
     virtual bool has_resource_registrator(TypeID p_description_type) const override;
@@ -452,7 +489,7 @@ public:
     /**
      * @brief Take a snapshot of the compiled graph's tasks and resource dependency edges.
      *
-     * Before build_from_callback(), the snapshot is empty. Must be called on the rendering thread.
+     * Before the graph is built, the snapshot is empty. Must be called on the rendering thread.
      *
      * @return The tasks in execution order and the edges with the stages and accesses the graph derived for them.
      */
@@ -483,8 +520,8 @@ private:
     Map<std::string, Ref<RendResVK>, RenderAllocator> all_resources;
     // The context the graph-owned resources were last built for.
     RendGraphContextVK context;
-    // The rebuild callback, the resource signatures and graph-owned containers of the current build, and its task
-    // descriptors; defined in the source file, because it holds descriptor types.
+    // The recipe source or fixed descriptor, the resource signatures and graph-owned containers of the current build, and
+    // its task descriptors; defined in the source file, because it holds descriptor types.
     struct RebuildState;
     Unique<RebuildState> rebuild_state;
 
@@ -497,6 +534,12 @@ private:
     // present. One per swap-chain image.
     Vector<Ref<SemaphoreVK>, RenderAllocator> terminal_semaphores;
 
+    // Release the current build and reset the context before a first build.
+    void reset_build();
+    // Build the descriptor of the stored source for the current context, then create the terminal semaphores.
+    void finish_first_build();
+    // The descriptor of the stored source (the recipe's, or a copy of the fixed descriptor) for the current context.
+    RendGraphDescVK make_descriptor();
     void allocate_command_buffers();
     void free_command_buffers();
     uint32_t terminal_semaphore_index() const;

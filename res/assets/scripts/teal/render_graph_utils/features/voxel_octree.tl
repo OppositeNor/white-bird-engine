@@ -12,11 +12,12 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Mipmapped 3D-texture octree construction and debug views, for recipes that include it as a feature. The application
--- compiles the pipelines and owns the octree textures and buffers, which every graph imports. It also supplies the texture
--- clears and the construction passes as imported tasks, since they record image clears and report the full texture views
--- they write through the per-level views; see VoxelRenderFeatureOctree in
--- tests/executable/function/render/deferred_test/voxel_render_feature_octree.hh.
+-- Mipmapped 3D-texture octree construction and debug views, for recipes that include it as a feature. The application owns
+-- the octree textures and buffers, which every graph imports, and supplies the texture clears as imported tasks, since
+-- they record image clears; see VoxelRenderFeatureOctree in
+-- tests/executable/function/render/deferred_test/voxel_render_feature_octree.hh. The module registers its pipelines and
+-- rasterizes the including recipe's "static_mesh" and "dynamic_mesh" into the textures; the construction shaders report the
+-- full texture view they write through the per-level views.
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
@@ -44,6 +45,11 @@ function voxel_octree.subgraph(identifier: string, parameters: wbe.OctreeRecipeP
             primitive_topology = "LINE_LIST",
         })
     end
+    -- The constructions rasterize without attachments.
+    local build_pipeline = render_graph.graphics_pipeline("octree_build_static_mesh_pipeline",
+        { pipeline = "octree_build_static_mesh_pipeline" })
+    local dynamic_build_pipeline = render_graph.graphics_pipeline("octree_dynamic_build_static_mesh_pipeline",
+        { pipeline = "octree_dynamic_build_static_mesh_pipeline" })
     local debug_draw_pipeline = debug_draw_pipeline_of("octree_debug_draw_pipeline")
     local debug_node_draw_pipeline = debug_draw_pipeline_of("octree_debug_node_draw_pipeline")
     local toggles = target.debug_view_toggles
@@ -53,12 +59,32 @@ function voxel_octree.subgraph(identifier: string, parameters: wbe.OctreeRecipeP
     local frame_begin = graph:full_memory_barrier("octree_frame_begin", barrier_params)
     -- Static scene: empty both textures, then occupy the rasterized leaves and their ancestors. Dynamic meshes: empty the
     -- dynamic texture, then rebuild it like the static scene.
+    local extent: wbe.RendExtent2DParamsVK = { width = parameters.extent, height = parameters.extent }
+    local function construction(task_id: string, mesh: render_graph.Resource, pipeline: render_graph.Resource,
+        mesh_part: wbe.MeshPartVK, transform?: render_graph.Resource): render_graph.Task
+        local params: render_graph.RTParamsGraphicsDrawMeshVK = {
+            mesh = mesh,
+            pipeline = { default = pipeline },
+            parts = { mesh_part },
+            transform = transform,
+            render_extent = extent,
+        }
+        return graph:draw_mesh(task_id, params)
+    end
+    local static_mesh = graph:add_mesh("static_mesh")
+    local dynamic_mesh = graph:add_mesh("dynamic_mesh")
     local reset = graph:import_task("reset_octree")
-    local build = graph:import_task("run_build_octree")
-    local build_double_sided = graph:import_task("run_build_octree_double_sided")
+    -- The static construction records once unless the application rebuilds it every frame (no trigger); the application
+    -- triggers the imported reset with the same event.
+    local build = construction("run_build_octree", static_mesh, build_pipeline, "opaque")
+    build.trigger = parameters.static_build
+    local build_double_sided = construction("run_build_octree_double_sided", static_mesh, build_pipeline, "double_sided")
+    build_double_sided.trigger = parameters.static_build
     local clear_dynamic = graph:import_task("clear_dynamic_octree")
-    local dynamic = graph:import_task("dynamic_octree")
-    local dynamic_second = graph:import_task("dynamic_octree_second")
+    local dynamic = construction("dynamic_octree", dynamic_mesh, dynamic_build_pipeline, "opaque",
+        graph:reference(target.dynamic_mesh_transform_ids[1]))
+    local dynamic_second = construction("dynamic_octree_second", dynamic_mesh, dynamic_build_pipeline, "opaque",
+        graph:reference(target.dynamic_mesh_transform_ids[2]))
     -- Debug views: the leaf gather serves both views, and the node gather only the node view.
     local leaf_groups = parameters.leaf_gather_group_count
     local leaf_gather_params: render_graph.RTParamsRunComputePipelineVK = {

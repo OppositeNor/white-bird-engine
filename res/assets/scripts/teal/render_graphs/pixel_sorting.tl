@@ -16,8 +16,9 @@
 -- See ApplicationVulkanPixelSortingTest in tests/executable/function/render/vulkan_pixel_sorting_test.cpp.
 --
 -- The application supplies a wbe.PixelSortingRecipeContext.
--- Imports: `swap_chain`, `pixel_sort_source` (the source image view), and the application-owned uniform buffers
--- `pixel_sort_contrast` and `pixel_sorting_post_processing_params`.
+-- Imports: `swap_chain`, which the renderer supplies, `pixel_sort_source` (the source image view), and the
+-- application-owned uniform buffers `pixel_sort_contrast` and `pixel_sorting_post_processing_params`.
+-- The recipe registers every pipeline it dispatches and draws with.
 -- Imported tasks: `draw_imgui`, the application's ImGui overlay, drawn after `present_sorted_pixels`.
 
 -- Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
@@ -126,9 +127,9 @@ end
 local function add_key_registration(target_graph: render_graph.Graph, image_layout: Layout,
     resource_handles: Resources): KeyRegistrationTasks
     local orientation = image_layout.orientation
-    local count_mask_pipeline = target_graph:add_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
-    local prefix_sum_pipeline = target_graph:add_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
-    local register_keys_pipeline = target_graph:add_compute_pipeline("register_pixel_sort_keys_" .. orientation .. "_shader")
+    local count_mask_pipeline = render_graph.shader_compute_pipeline("count_pixel_sort_mask_" .. orientation .. "_shader")
+    local prefix_sum_pipeline = render_graph.shader_compute_pipeline("prefix_sum_pixel_sort_columns_shader")
+    local register_keys_pipeline = render_graph.shader_compute_pipeline("register_pixel_sort_keys_" .. orientation .. "_shader")
     local count_mask = target_graph:compute("count_pixel_sort_mask", {
         pipeline = count_mask_pipeline,
         group_count_x = image_layout.column_group_count,
@@ -155,12 +156,16 @@ local record OutputTasks
 end
 
 -- Write the sorted pixels, post-process them, and present the result under the application's ImGui overlay.
-local function add_output(target_graph: render_graph.Graph, image_layout: Layout, resource_handles: Resources): OutputTasks
+local function add_output(target_graph: render_graph.Graph, image_layout: Layout, resource_handles: Resources,
+    swap_chain_format: wbe.ImageFormatVK): OutputTasks
     local tile_group_count_x = image_layout.tile_group_count_x
     local tile_group_count_y = image_layout.tile_group_count_y
-    local write_pixels_pipeline = target_graph:add_compute_pipeline("write_sorted_pixels_" .. image_layout.orientation .. "_shader")
-    local post_processing_pipeline = target_graph:add_compute_pipeline("pixel_sorting_post_processing_shader")
-    local present_pipeline = target_graph:add_graphics_pipeline("present_pixel_sort_pipeline")
+    local write_pixels_pipeline = render_graph.shader_compute_pipeline("write_sorted_pixels_" .. image_layout.orientation .. "_shader")
+    local post_processing_pipeline = render_graph.shader_compute_pipeline("pixel_sorting_post_processing_shader")
+    local present_pipeline = render_graph.graphics_pipeline("present_pixel_sort_pipeline", {
+        pipeline = "present_pixel_sort_pipeline",
+        color_formats = { swap_chain_format },
+    })
     local write_pixels = target_graph:compute("write_sorted_pixels", {
         pipeline = write_pixels_pipeline,
         group_count_x = tile_group_count_x,
@@ -200,13 +205,13 @@ end
 
 local exports = {}
 
-function exports.build(context: wbe.PixelSortingRecipeContext): wbe.RendGraphRecipeVK
+function exports.build(context: wbe.PixelSortingRecipeContext, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local layout = make_layout(context)
     local graph = render_graph.new()
     local resources = make_resources(layout)
     local registration = add_key_registration(graph, layout, resources)
     local radix_sort = sort.add_radix_sort_task(graph, "radix_sort", resources.sort_buffers)
-    local output = add_output(graph, layout, resources)
+    local output = add_output(graph, layout, resources, context.swap_chain_format)
     connect_tasks(graph, resources, registration, radix_sort, output)
     return graph:build()
 end

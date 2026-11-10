@@ -77,22 +77,37 @@ For non-trivial implementation tasks:
   fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
   and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
   the task's `RenderTaskResourceMap`; tasks do not take resource maps.
-- Every graph is registered with `RendererVK::register_render_graph(key, RendGraphRebuildCallbackVK)`; there is no
-  descriptor registration. The callback receives the context and the `RenderGraphVK` being built, builds the complete
-  descriptor bound to that graph (`RendGraphDescVK(allocator, &graph)`, or `RendGraphRecipeBuilderVK::build(..., &graph)`),
-  and runs for the first build and on every rebuild (context change or `rebuild()`), so keep one-time setup
-  (application-owned buffers, initial-data snapshots) outside it and only register resources and assemble the
-  descriptor inside.
+- Applications compose complete graphs only in Teal. A graph definition is a manifest `render_graph` resource
+  (`RURenderGraph`, `RUSchemaRenderGraph` in `function/render/render_resource_unit.hh`) naming its `recipe` script and
+  static `parameters`; definitions live in `res/assets/render_graphs/render_graphs.toml`. Acquire an instance with
+  `IRenderer::acquire_render_graph(definition_key, bindings)` and select what renders with
+  `activate_render_graph(graph)` (null clears it); both run on the rendering thread. There is no key-based registration
+  and no application rebuild callback.
+- Bindings (`IRenderGraphBindings`, Vulkan `IRenderGraphBindingsVK::prepare()`, or `RenderGraphBindingsFunctionVK`) carry
+  an immutable instance key and prepare, for every build, the serialized application context and the
+  `RendGraphRecipeImportsVK` (runtime resources and native task factories). They never see the descriptor or the graph,
+  and must not retain their graph; the graph retains them. The graph supplies the renderer facts of the context and the
+  `REND_RES_SWAP_CHAIN` import (when the recipe declares it and the bindings do not), acquired again on every build.
+- Instances are cached weakly in `GlobalRenderCache` under `RenderGraphInstanceCache::make_cache_key(definition,
+  instance)`: the same definition, instance key, and bindings object reuse the live graph, another bindings object for a
+  live identity throws, and different instance keys are independent graphs. Callers (applications, `Scene`, and the
+  renderer's activation) hold graphs strongly and must release them before the renderer shuts down. A `Scene` acquires one
+  instance per distinct world definition and instance key, with the bindings supplied by `add_render_graph_bindings()`,
+  and queues acquisitions, activations, and releases through `add_job()`; its teardown leaves the activation in place.
+- A compiled `RenderGraphVK` keeps its recipe source (`RendGraphRecipeSourceVK`) and re-runs it for the first build, on a
+  context change, and on `rebuild()`; an unchanged frame runs no script and prepares no bindings. Use buffer updates and
+  toggle/select/trigger events for nonstructural changes. `RenderGraphVK::build_from_descriptor()` builds a fixed C++
+  descriptor and exists only for focused compiler tests.
 - Named resources that tasks use (meshes, pipelines, images) are registered on their graph (`IRenderGraph`, in
   `function/render/i_render_graph.hh`) in two steps: load the source resources into the `ResourceManager`, then
   `register_resource(key, description)`. The description's type (`IResourceDescription::get_type_uuid()`) selects the
   `IResourceRegistrator` that compiles it, as a resource schema's type selects its loader; there is no separate kind.
   `RenderGraphVK` installs `RRMeshVK`, `RRImageVK`, `RRGraphicsPipelineVK`, and `RRComputePipelineVK`, whose descriptions
-  are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>`, and C++ usually registers the
-  `RefRes` handle it loaded (`RenderGraphVK::register_mesh(key, mesh_handle, options)` and the like, which name the
-  handle's resource key, so they equal the key-based and Teal registrations; anonymous resources cannot be registered), and `add_resource_registrator()` installs one registrator per further
+  are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>`. Recipes register them; the C++
+  `RenderGraphVK::register_mesh(key, mesh_handle, options)` and the like name the handle's resource key, so they equal
+  the key-based and Teal registrations (anonymous resources cannot be registered), and `add_resource_registrator()` installs one registrator per further
   description type. The graph holds registered objects strongly, keys are graph-local, registrations survive rebuilds, and
-  re-registering a key with an equal description compiles nothing, so callbacks and recipes register on every rebuild. Do
+  re-registering a key with an equal description compiles nothing, so recipes register on every rebuild. Do
   not keep `Ref`s to registered objects just to keep them alive; acquire them with `acquire_registered<T>(key)`. Task
   types resolve registered resources through `RendGraphDescVK::get_render_graph()` in `prepare_graph()`, or by declaring
   `create(const RenderContextVK*, IRenderGraph*, const TParams&, const RendGraphContextVK&)`.
@@ -109,17 +124,17 @@ For non-trivial implementation tasks:
 
 ### Render Graph Recipes
 
-- A recipe is a Teal `script` resource whose module exports `build(context)`. It creates a graph with
+- A recipe is a Teal `script` resource whose module exports `build(context, parameters)`, where `parameters` is its
+  definition's static map (type it with a `WBE_REFLECT_SCRIPT` struct when the recipe reads it). It creates a graph with
   `render_graph.new()` (`render_graph_utils.render_graph_utils`), declares resources as handles, adds tasks with the typed
   constructors, and returns `graph:build()`, which emits the plain `RendGraphRecipeVK` table (`imports`, `resources`,
   `tasks`; see `rend_graph_recipe_params_vk.hh`). `RendGraphScriptVK` runs it and
   `RendGraphRecipeBuilderVK` turns it into a `RendGraphDescVK`; recipes only build descriptors and never touch render objects.
 - `context` holds `RendGraphScriptVK::make_context()` facts (`RendRecipeContextVK`: `frames_in_flight`,
   `swap_chain_format`, `swap_chain_extent`). An application that adds entries declares a `WBE_REFLECT_SCRIPT` struct
-  deriving from `RendRecipeContextVK`, fills its base with `get_recipe_context()`, and passes `serialize_context()` to
-  `RendGraphScriptVK::run()`. Size swap-chain-dependent resources and dispatches in Lua from `swap_chain_extent`.
-- For a recipe graph, the application's rebuild callback runs the script, builds the descriptor, and adds its C++ tasks.
-  Never pass script keys to the graph.
+  deriving from `RendRecipeContextVK`, fills its base with the renderer facts its bindings receive, and returns
+  `RendGraphScriptVK::serialize_context()` as the prepared context. Size swap-chain-dependent resources and dispatches in
+  Lua from `swap_chain_extent`.
 - Every resource owned outside the graph must be declared with `graph:import_resource()` and supplied through `RendGraphRecipeImportsVK`; a
   declared-but-missing or supplied-but-undeclared import is an error, except that an unsupplied import resolves to a
   bindable object registered on the graph under its name (such as a registered image). Recipes cannot set initial data, so
@@ -132,7 +147,7 @@ For non-trivial implementation tasks:
   `render_graph.graphics_pipeline(key, description)`, and `render_graph.shader_compute_pipeline(shader)` (registered from the shader of
   the same key) need no graph, so shared helpers use them; a typed task (or a multiplexer's branches) naming such a handle
   emits its registration, and equal registrations of a key merge while different ones fail. Recipes and feature modules
-  register the pipelines they name this way; C++ registers only what C++ tasks use or what needs a loaded handle.
+  register the pipelines they name this way, and recipes register the meshes and images their tasks name.
   `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`; `graph:build()` emits only those
   reachable from tasks. Tasks name a registered task type and pass `params` to it; bindings (`task:bind()`,
@@ -145,16 +160,16 @@ For non-trivial implementation tasks:
   constructors on a scratch `render_graph.new()` and pass them to `graph:multiplex(id, branches, { select = { event, branch } })`.
   It is one graph node reporting every branch's accesses; the branches share its bindings and one queue family, and
   `RTMultiplexerVK::Command` events select the branch. Pass the current branch through the context, as for a toggle.
-- Task `pipeline` params are registration keys of pipelines on the task's graph, registered by the callback or the recipe.
+- Task `pipeline` params are registration keys of pipelines on the task's graph, registered by the recipe.
 - Draw meshes with `graphics_draw_mesh` (`RTGraphicsDrawMeshVK`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++); do not
   assemble `RTRunGraphicsPipelineIndirectVK` mesh draws by hand. Register each mesh on the graph under the key its draws
   name (`mesh`), which they import it under; a key nobody registered is registered from the mesh resource of that key with
   the default options.
   `pipeline` maps material pipeline variants to pipelines (`pipeline = { default = ..., foliage = ... }`); draws batch per
   variant, and the task's pipelines must share render targets and one material texture contract.
-- A rebuild callback may add to the descriptor `RendGraphRecipeBuilderVK::build()` returns, for parts not yet expressed
-  in Lua (the deferred test adds its acceleration structure and dynamic mesh entities that way); keep everything else in
-  the recipe.
+- Everything owned by the application that a recipe or shader names, such as an acceleration structure or composite
+  entities whose members shaders read, is an explicit import supplied by the bindings; nothing is added to a built
+  descriptor in C++.
 - A C++ feature that contributes to a recipe describes itself with a `configure_recipe()` that serializes the
   `WBE_REFLECT_SCRIPT` parameters struct of its Lua feature module (including the `module` name) into the context and supplies its resources and C++ tasks to the
   `RendGraphRecipeImportsVK`; the recipe calls `require(params.module).subgraph(id, params, target)`, which returns the

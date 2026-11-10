@@ -33,6 +33,7 @@ int main(int p_argc, char* p_argv[]) {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             game_application.setup_draw_task();
             game_application.run();
+            game_application.release_draw_task();
             size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
             auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {

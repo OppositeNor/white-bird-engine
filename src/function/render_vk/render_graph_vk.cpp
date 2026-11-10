@@ -15,6 +15,8 @@
 #include "function/render_vk/render_graph_vk.hh"
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
+#include "core/data/data_value.hh"
+#include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/render/i_render_task.hh"
@@ -24,9 +26,13 @@
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/rend_graph_resource_diff_vk.hh"
+#include "function/render_vk/rend_graph_script_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
@@ -535,6 +541,44 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
     return signatures;
 }
 
+// Whether a recipe, or a subgraph recipe nested in one of its tasks, declares an import.
+bool recipe_declares_import(const DataValue& p_recipe, std::string_view p_import) {
+    if (p_recipe.get_kind() != DataValueKind::MAP) {
+        return false;
+    }
+    if (const DataValue* imports = p_recipe.find("imports"); imports != nullptr) {
+        for (const DataValue& import : imports->as_list_or_empty()) {
+            if (import.is_string() && import.as_string() == p_import) {
+                return true;
+            }
+        }
+    }
+    if (const DataValue* tasks = p_recipe.find("tasks"); tasks != nullptr) {
+        for (const DataValue& task : tasks->as_list_or_empty()) {
+            if (task.get_kind() != DataValueKind::MAP) {
+                continue;
+            }
+            if (const DataValue* subgraph = task.find("subgraph"); subgraph != nullptr && recipe_declares_import(*subgraph, p_import)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// The context a recipe receives: the bindings' map, whose renderer facts are replaced with the authoritative ones.
+DataValue make_recipe_context(DataValue p_prepared, const RendRecipeContextVK& p_facts, std::string_view p_recipe_key) {
+    DataValue result = p_prepared.is_nil() ? DataValue::make_map() : std::move(p_prepared);
+    if (result.get_kind() != DataValueKind::MAP) {
+        throw std::runtime_error(std::format("RenderGraphVK: the bindings of recipe '{}' prepared a context that is not a map.", p_recipe_key));
+    }
+    const DataValue facts = RendGraphScriptVK::serialize_context(p_facts);
+    for (const auto& [key, value] : facts.as_map()) {
+        result.set_entry(key, value);
+    }
+    return result;
+}
+
 } // namespace
 
 struct RenderGraphVK::RebuildState {
@@ -548,7 +592,9 @@ struct RenderGraphVK::RebuildState {
     RebuildState& operator=(const RebuildState&) = delete;
     RebuildState& operator=(RebuildState&&) noexcept = delete;
 
-    RendGraphRebuildCallbackVK callback;
+    // Exactly one of the two is set once the graph is built.
+    std::optional<RendGraphRecipeSourceVK> recipe_source;
+    std::optional<RendGraphDescVK> fixed_descriptor;
     RendGraphResourceDiffVK::Signatures signatures;
     Map<std::string, Ref<RenderObjectContainerVK>, RenderAllocator> owned_containers;
     Vector<RendTaskDescVK, RenderAllocator> task_descs;
@@ -929,10 +975,7 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
     return metadata;
 }
 
-void RenderGraphVK::build_from_callback(RendGraphRebuildCallbackVK p_rebuild) {
-    if (p_rebuild == nullptr) {
-        throw std::runtime_error("RenderGraphVK: the rebuild callback is null.");
-    }
+void RenderGraphVK::reset_build() {
     free_command_buffers();
     nodes.clear();
     resource_edges.clear();
@@ -940,10 +983,34 @@ void RenderGraphVK::build_from_callback(RendGraphRebuildCallbackVK p_rebuild) {
     rebuild_state->signatures.clear();
     rebuild_state->owned_containers.clear();
     rebuild_state->task_descs.clear();
-    rebuild_state->callback = std::move(p_rebuild);
-
+    rebuild_state->recipe_source.reset();
+    rebuild_state->fixed_descriptor.reset();
     context = RendGraphContextVK::from_render_data(*render_data);
-    apply_descriptor(rebuild_state->callback(context, *this));
+}
+
+void RenderGraphVK::build_from_recipe(RendGraphRecipeSourceVK p_source) {
+    if (p_source.recipe == MEM_NULL) {
+        throw std::runtime_error("RenderGraphVK: the recipe of the recipe source is null.");
+    }
+    if (p_source.bindings == MEM_NULL) {
+        throw std::runtime_error("RenderGraphVK: the bindings of the recipe source are null.");
+    }
+    if (p_source.parameters.get_kind() != DataValueKind::MAP) {
+        throw std::runtime_error("RenderGraphVK: the parameters of the recipe source must be a map.");
+    }
+    reset_build();
+    rebuild_state->recipe_source = std::move(p_source);
+    finish_first_build();
+}
+
+void RenderGraphVK::build_from_descriptor(RendGraphDescVK p_descriptor) {
+    reset_build();
+    rebuild_state->fixed_descriptor.emplace(std::move(p_descriptor));
+    finish_first_build();
+}
+
+void RenderGraphVK::finish_first_build() {
+    apply_descriptor(make_descriptor());
 
     // Allocate one terminal binary semaphore per swap-chain image. Presentation
     // may retain the wait semaphore until that exact image is acquired again.
@@ -953,6 +1020,52 @@ void RenderGraphVK::build_from_callback(RendGraphRebuildCallbackVK p_rebuild) {
     for (uint32_t i = 0; i < swap_chain_images; ++i) {
         terminal_semaphores.emplace_back(make_ref<SemaphoreVK>(render_data->allocator, render_data, true));
     }
+}
+
+RendGraphDescVK RenderGraphVK::make_descriptor() {
+    if (rebuild_state->fixed_descriptor.has_value()) {
+        return *rebuild_state->fixed_descriptor;
+    }
+    if (!rebuild_state->recipe_source.has_value()) {
+        throw std::runtime_error("RenderGraphVK: the graph has not been built from a recipe or a descriptor.");
+    }
+    const RendGraphRecipeSourceVK& source = *rebuild_state->recipe_source;
+    const std::string_view recipe_key =
+        source.recipe->resource_key != nullptr ? std::string_view(source.recipe->resource_key) : std::string_view("<anonymous>");
+    const RendRecipeContextVK facts = RendGraphScriptVK::get_recipe_context(*render_data, context);
+    Ref<IRenderGraphBindingsVK> bindings = source.bindings;
+    RendGraphPreparedBindingsVK prepared = bindings->prepare(*render_data, facts);
+    const DataValue recipe_context = make_recipe_context(std::move(prepared.context), facts, recipe_key);
+    const DataValue recipe = RendGraphScriptVK::run(*source.recipe, recipe_context, source.parameters);
+    // Renderer-owned imports are acquired again for every build, so a rebuild sees the renderer's current objects.
+    Ref<ROCMultislotsVK> swap_chain;
+    if (recipe_declares_import(recipe, REND_RES_SWAP_CHAIN) && prepared.imports.find(REND_RES_SWAP_CHAIN) == nullptr) {
+        RendererVK* renderer = RendererVK::get_singleton();
+        if (renderer == nullptr || renderer->get_render_context() != render_data) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: recipe '{}' imports '{}', but the graph's renderer is unavailable.", recipe_key, REND_RES_SWAP_CHAIN));
+        }
+        swap_chain = renderer->acquire_swap_chain_image_view_container();
+        prepared.imports.add(REND_RES_SWAP_CHAIN, *swap_chain);
+    }
+    stdout_log(WBE_CHANNEL_DEBUG)
+        ->message(std::format("Compiling render graph '{}' from recipe '{}' for a {}x{} swap chain.",
+            resource_key,
+            recipe_key,
+            context.swap_chain_extent.width,
+            context.swap_chain_extent.height));
+    return RendGraphRecipeBuilderVK().build(recipe, prepared.imports, render_data, this);
+}
+
+TypeID RenderGraphVK::get_type_uuid() const {
+    return TypeUUID<RenderGraphVK>::UUID;
+}
+
+Ref<IRenderGraphBindingsVK> RenderGraphVK::get_bindings() const {
+    if (!rebuild_state->recipe_source.has_value()) {
+        return MEM_NULL;
+    }
+    return rebuild_state->recipe_source->bindings;
 }
 
 Map<std::string, Ref<RendResVK>, RenderAllocator> RenderGraphVK::index_resources(const RendGraphDescVK& p_desc) {
@@ -1120,10 +1233,7 @@ void RenderGraphVK::update_context(const RendGraphContextVK& p_context) {
 }
 
 void RenderGraphVK::rebuild() {
-    if (rebuild_state->callback == nullptr) {
-        throw std::runtime_error("RenderGraphVK: cannot rebuild a graph that was not built from a callback.");
-    }
-    apply_descriptor(rebuild_state->callback(context, *this));
+    apply_descriptor(make_descriptor());
 }
 
 Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_resource_id) const {

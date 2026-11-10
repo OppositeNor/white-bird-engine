@@ -19,6 +19,8 @@
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/global_render_cache.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
 #include <functional>
@@ -134,29 +136,36 @@ public:
     virtual Ref<GlobalRenderCache> get_global_render_cache() = 0;
 
     /**
-     * @brief Acquire a registered render graph by resource key.
+     * @brief Acquire an instance of a render graph definition, compiling it when no live instance matches.
      *
-     * The concrete graph descriptor must already be available to the backend.
-     * Repeated registrations acquire additional references to the same
-     * compiled graph.
+     * p_resource_key names an RURenderGraph resource, whose recipe the backend runs with the definition's parameters and the
+     * context and imports p_bindings prepare; the graph rebuilds itself from the same three when its context changes or it
+     * is rebuilt. Acquiring the same definition with bindings of the same instance key returns the live instance, which
+     * must have been acquired with the same bindings object; bindings with another instance key acquire an independent
+     * instance. The renderer holds instances weakly: the caller's references (and activate_render_graph()) keep an
+     * instance alive, and an instance whose references were all released is compiled again by the next acquisition. Release
+     * every reference before the renderer shuts down. Call on the rendering thread.
      *
-     * @param p_resource_key The render graph resource key.
+     * @param p_resource_key The resource key of the render graph definition.
+     * @param p_bindings The bindings of the instance, of the backend's bindings type; the graph retains them.
+     * @return The live or newly compiled graph.
+     * @throws std::runtime_error If the backend does not support render graphs, p_resource_key names no render graph
+     * definition, p_bindings is null or of another backend, a live instance of the same identity was acquired with another
+     * bindings object, or compiling the graph fails.
      */
-    virtual void register_render_graph(std::string_view p_resource_key) = 0;
+    virtual Ref<IRenderGraph> acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) = 0;
 
     /**
-     * @brief Release a registered render graph by resource key.
+     * @brief Select the render graph the renderer executes every frame, or clear the selection.
      *
-     * @param p_resource_key The render graph resource key.
-     */
-    virtual void unregister_render_graph(std::string_view p_resource_key) = 0;
-
-    /**
-     * @brief Activate a render graph.
+     * The renderer retains the active graph until another graph is activated or the activation is cleared; releasing
+     * other references to it does not stop it. Call on the rendering thread.
      *
-     * @param p_resource_key The resource key of the graph to activate.
+     * @param p_graph The graph to activate, acquired from this renderer, or null to stop executing a graph.
+     * @throws std::runtime_error If p_graph is not null and belongs to another backend or another renderer, or the backend
+     * does not support render graphs.
      */
-    virtual void activate_render_graph(std::string_view p_resource_key) = 0;
+    virtual void activate_render_graph(Ref<IRenderGraph> p_graph) = 0;
 };
 
 } // namespace WhiteBirdEngine
