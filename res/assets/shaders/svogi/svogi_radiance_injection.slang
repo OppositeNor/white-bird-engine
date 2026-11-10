@@ -92,7 +92,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         uint subvoxel_index;
         float3 subvoxel_position = svo_pos_to_subvoxel_pos(trace_info.svo_position, subvoxel_index);
         // We'll use the 3 most significant bit for recording the subvoxel index, and the rest are the data index.
-        uint key = (subvoxel_index << (32 - 3)) | data_index;
+        uint key = 27 * data_index + subvoxel_index;
         local_index_buffer[index] = uint2(key, index);
         float3x3 radiance_vector = float3x3(subvoxel_position * color.r,
                                             subvoxel_position * color.g,
