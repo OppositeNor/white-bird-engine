@@ -1435,12 +1435,14 @@ std::optional<uint32_t> RendererVK::acquire_swapchain_next_image(VkSemaphore p_i
     auto* image_available_semaphore = p_image_avialable_semaphore;
     VkResult result =
         vkAcquireNextImageKHR(logical_device, swap_chain, UINT64_MAX, image_available_semaphore, VK_NULL_HANDLE, &image_index);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        // Swapchian outdated, needs to recreate.
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        // No image was acquired and the semaphore was not signaled, so the frame is skipped.
         recreate_swap_chain();
         return std::nullopt;
     }
-    if (result != VK_SUCCESS) {
+    // A suboptimal acquire still acquired the image and signaled the semaphore, so the frame must render and present to
+    // consume it; present() then recreates the swap chain.
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image.");
     }
     return image_index;
