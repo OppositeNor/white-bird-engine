@@ -17,10 +17,10 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/systems.hh"
-#include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
 #include "function/render/i_render_graph.hh"
 #include "function/render/i_render_graph_bindings.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_graph_instance_cache.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/scene/world.hh"
@@ -31,8 +31,8 @@
 #include <functional>
 #include <future>
 #include <optional>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -156,13 +156,14 @@ void Scene::update(double p_delta) {
     if (!worlds.empty()) {
         const WorldGraph world_graph = get_world_graph(active_world_index);
         if (!world_graph.resource_key.empty() && world_graph.instance_cache_key != activated_instance) {
-            queue_render_operation([state = render_state, target_renderer = renderer.get(), instance_cache_key = world_graph.instance_cache_key] mutable {
-                auto graph = state->graphs.find(instance_cache_key);
-                if (graph == state->graphs.end()) {
-                    throw std::runtime_error("Failed to activate a scene render graph: it was not acquired.");
-                }
-                target_renderer->activate_render_graph(graph->second);
-            });
+            queue_render_operation(
+                [state = render_state, target_renderer = renderer.get(), instance_cache_key = world_graph.instance_cache_key] mutable {
+                    auto graph = state->graphs.find(instance_cache_key);
+                    if (graph == state->graphs.end()) {
+                        throw std::runtime_error("Failed to activate a scene render graph: it was not acquired.");
+                    }
+                    target_renderer->activate_render_graph(graph->second);
+                });
             activated_instance = world_graph.instance_cache_key;
         }
     }

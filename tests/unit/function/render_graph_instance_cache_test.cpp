@@ -21,6 +21,7 @@
 #include "function/render/render_graph_instance_cache.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string_view>
@@ -106,13 +107,19 @@ TEST_F(WBERenderGraphInstanceCacheTest, RecompilesExpiredInstances) {
 
 TEST_F(WBERenderGraphInstanceCacheTest, FailedCompilationsAreNotCached) {
     Ref<IRenderGraphBindings> bindings = make_ref<TestBindings>(&allocator, "main");
-    EXPECT_THROW((void)RenderGraphInstanceCache::acquire<FakeRenderGraph>(cache, "deferred", bindings, []() -> Ref<FakeRenderGraph> {
-        throw std::runtime_error("compilation failed");
-    }),
+    EXPECT_THROW((void)RenderGraphInstanceCache::acquire<FakeRenderGraph>(cache,
+                     "deferred",
+                     bindings,
+                     []() -> Ref<FakeRenderGraph> {
+                         throw std::runtime_error("compilation failed");
+                     }),
         std::runtime_error);
-    EXPECT_THROW((void)RenderGraphInstanceCache::acquire<FakeRenderGraph>(cache, "deferred", bindings, [] {
-        return Ref<FakeRenderGraph>();
-    }),
+    EXPECT_THROW((void)RenderGraphInstanceCache::acquire<FakeRenderGraph>(cache,
+                     "deferred",
+                     bindings,
+                     [] {
+                         return Ref<FakeRenderGraph>();
+                     }),
         std::runtime_error);
     EXPECT_FALSE(cache.contains(RenderGraphInstanceCache::make_cache_key("deferred", "main"), TypeUUID<FakeRenderGraph>::UUID));
     Ref<FakeRenderGraph> graph = acquire("deferred", bindings);
@@ -130,7 +137,8 @@ TEST_F(WBERenderGraphInstanceCacheTest, RejectsEmptyDefinitionsAndNullBindings) 
 TEST_F(WBERenderGraphInstanceCacheTest, GraphsAreCachedAsRenderObjects) {
     Ref<IRenderGraphBindings> bindings = make_ref<TestBindings>(&allocator, "main");
     Ref<FakeRenderGraph> graph = acquire("deferred", bindings);
-    Ref<IRenderObject> object = cache.try_get(RenderGraphInstanceCache::make_cache_key("deferred", "main"), TypeUUID<FakeRenderGraph>::UUID);
+    Ref<IRenderObject> object =
+        cache.try_get(RenderGraphInstanceCache::make_cache_key("deferred", "main"), TypeUUID<FakeRenderGraph>::UUID);
     EXPECT_TRUE(object == graph);
     EXPECT_EQ(object->get_type_uuid(), TypeUUID<FakeRenderGraph>::UUID);
 }

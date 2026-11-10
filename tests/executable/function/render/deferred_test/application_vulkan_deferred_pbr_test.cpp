@@ -32,14 +32,15 @@
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
 #include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/ray_tracing_plugin_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/vector_float2.hpp"
@@ -49,6 +50,7 @@
 #include "i_voxel_render_feature.hh"
 #include "imgui.h"
 #include "pixel_sort.hh"
+#include "pixel_sort_recipe_params.hh"
 #include "platform/file_system/path.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -165,8 +167,8 @@ void ApplicationVulkanDeferredPBRTest::control(double p_delta) { // NOLINT
 
     bool voxel_debug_view_key_down = input_manager->get_input_status(KEYCODE_V).is_down();
     if (voxel_debug_view_key_down && !voxel_debug_view_key_was_down) {
-        voxel_debug_view_mode.store(get_next_voxel_debug_view_mode(voxel_debug_view_mode.load(std::memory_order_relaxed)),
-            std::memory_order_relaxed);
+        voxel_debug_view_mode.store(
+            get_next_voxel_debug_view_mode(voxel_debug_view_mode.load(std::memory_order_relaxed)), std::memory_order_relaxed);
     }
     voxel_debug_view_key_was_down = voxel_debug_view_key_down;
 
@@ -573,15 +575,17 @@ void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
     if (draws_tree && voxel_structure->supports_debug_draw_styles()) {
         static constexpr std::array<const char*, 2> VOXEL_DEBUG_DRAW_STYLE_NAMES{"Wireframe", "Solid"};
         int style = static_cast<int>(voxel_debug_draw_style.load(std::memory_order_relaxed));
-        if (ImGui::Combo("Voxel draw style", &style, VOXEL_DEBUG_DRAW_STYLE_NAMES.data(), static_cast<int>(VOXEL_DEBUG_DRAW_STYLE_NAMES.size()))) {
+        if (ImGui::Combo("Voxel draw style",
+                &style,
+                VOXEL_DEBUG_DRAW_STYLE_NAMES.data(),
+                static_cast<int>(VOXEL_DEBUG_DRAW_STYLE_NAMES.size()))) {
             voxel_debug_draw_style.store(static_cast<VoxelDebugDrawStyle>(style), std::memory_order_relaxed);
         }
     }
     const uint32_t debug_depth_count = voxel_structure->get_debug_depth_count();
     if (draws_tree && debug_depth_count > 0) {
         int debug_depth = static_cast<int>(voxel_structure->get_debug_depth());
-        if (ImGui::SliderInt(
-                "Voxel debug depth", &debug_depth, 0, static_cast<int>(debug_depth_count) - 1, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+        if (ImGui::SliderInt("Voxel debug depth", &debug_depth, 0, static_cast<int>(debug_depth_count) - 1, "%d", ImGuiSliderFlags_AlwaysClamp)) {
             voxel_structure->set_debug_depth(static_cast<uint32_t>(debug_depth));
         }
     }
@@ -686,7 +690,8 @@ void ApplicationVulkanDeferredPBRTest::setup_static_scene_resources() {
     const bool build_acceleration_structure = ray_tracing != nullptr && ray_tracing->is_enabled();
     static_mesh_params = RDParamsMeshVK{.mesh = sponza_mesh->resource_key};
     if (build_acceleration_structure) {
-        static_mesh_params.vertex_buffer_usage = {BufferUsageFlagVK::SHADER_DEVICE_ADDRESS, BufferUsageFlagVK::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY};
+        static_mesh_params.vertex_buffer_usage = {
+            BufferUsageFlagVK::SHADER_DEVICE_ADDRESS, BufferUsageFlagVK::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY};
         static_mesh_params.index_buffer_usage = static_mesh_params.vertex_buffer_usage;
     }
     // The voxel features need the mesh before the graphs exist. MeshCompilerVK caches the compiled mesh for this
@@ -729,9 +734,8 @@ void ApplicationVulkanDeferredPBRTest::setup_spot_light() {
 void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources() {
     for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
         BillboardInfoGPU light_billboard_info = make_light_billboard_info(spot_light_components[i]);
-        light_billboard_ubos[i] = render_context->create_buffer(ROBufferVK::Builder()
-                                      .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
-                                      .initial_data(&light_billboard_info, sizeof(light_billboard_info)));
+        light_billboard_ubos[i] = render_context->create_buffer(
+            ROBufferVK::Builder().add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT).initial_data(&light_billboard_info, sizeof(light_billboard_info)));
     }
 }
 

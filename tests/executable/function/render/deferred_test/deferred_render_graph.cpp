@@ -17,21 +17,26 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
+#include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "deferred_recipe_context.hh"
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_acceleration_structure_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
-#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/rend_recipe_extent_2d_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
@@ -47,6 +52,7 @@
 #include "function/render_vk/rt_run_graphics_pipeline_vk.hh"
 #include "function/render_vk/rt_toggle_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "glm/matrix.hpp"
 #include "i_voxel_render_feature.hh"
@@ -63,6 +69,7 @@
 #include <filesystem>
 #include <format>
 #include <optional>
+#include <ratio>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -250,8 +257,7 @@ RendGraphRecipeImportsVK ApplicationVulkanDeferredPBRTest::make_deferred_recipe_
     }
     imports.add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table)).add_task(create_imgui_task_desc());
     if (mesh_acceleration_structure != MEM_NULL) {
-        imports.add(MESH_ACCELERATION_STRUCTURE_KEY, *mesh_acceleration_structure)
-            .add_task(create_mesh_acceleration_structure_build_task_desc());
+        imports.add(MESH_ACCELERATION_STRUCTURE_KEY, *mesh_acceleration_structure).add_task(create_mesh_acceleration_structure_build_task_desc());
     }
     dynamic_mesh->add_imports(imports);
     return imports;
@@ -346,7 +352,7 @@ VoxelDebugViewMode ApplicationVulkanDeferredPBRTest::get_next_voxel_debug_view_m
         VoxelDebugViewMode::PRE_DEFERRED_PROPAGATION,
         VoxelDebugViewMode::OCCUPANCY,
     };
-    const auto current = std::ranges::find(CYCLE, p_mode);
+    const auto* const current = std::ranges::find(CYCLE, p_mode);
     if (current == CYCLE.end()) {
         throw std::runtime_error("Unknown voxel debug view mode.");
     }
@@ -371,8 +377,10 @@ void ApplicationVulkanDeferredPBRTest::apply_voxel_debug_view_mode() {
     // Emitted between frames, so every toggled and multiplexed task of both graphs records the new mode from the same frame
     // on.
     EventManager* event_manager = EventManager::get_singleton();
-    event_manager->emit(VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_view_lighting_branch(mode)});
-    event_manager->emit(VOXEL_DEBUG_TREE_DRAW_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_tree_draw_branch(mode, style)});
+    event_manager->emit(
+        VOXEL_DEBUG_VIEW_LIGHTING_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_view_lighting_branch(mode)});
+    event_manager->emit(
+        VOXEL_DEBUG_TREE_DRAW_EVENT_ID, RTMultiplexerVK::Command{.branch = get_voxel_debug_tree_draw_branch(mode, style)});
     for (size_t group = 0; group < VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS.size(); ++group) {
         event_manager->emit(VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS[group],
             RTToggleVK::Command{.enabled = is_voxel_debug_view_toggle_enabled(group, mode)});

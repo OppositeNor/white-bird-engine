@@ -22,13 +22,13 @@ namespace WhiteBirdEngine {
 
 /**
  * @class IRenderGraphBindings
- * @brief The runtime half of a render graph instance: what an application supplies to a render graph definition (RURenderGraph)
- * when it acquires a graph from it (IRenderer::acquire_render_graph()). Neither copyable nor movable.
+ * @brief The runtime half of a render graph instance: what an application supplies to a render graph definition
+ * (RURenderGraph) when it acquires a graph from it (IRenderer::acquire_render_graph()). Neither copyable nor movable.
  *
- * A definition names a recipe and its static parameters; its bindings supply the runtime resources the recipe imports and the
- * native tasks it imports, and the recipe owns everything else (topology, registrations, task bindings, triggers, and toggles).
- * Bindings never see or return the graph's descriptor and never receive the graph itself. Each backend declares the
- * operations its bindings implement (see IRenderGraphBindingsVK).
+ * A definition names a recipe and its static parameters; its bindings supply the runtime resources the recipe imports and
+ * the native tasks it imports, and the recipe owns everything else (topology, registrations, task bindings, triggers, and
+ * toggles). Bindings never see or return the graph's descriptor and never receive the graph itself. Each backend declares
+ * the operations its bindings implement (see IRenderGraphBindingsVK).
  *
  * The instance key identifies the instance among the instances of a definition: acquiring a definition again with the same
  * instance key and the same bindings object returns the same live graph, while different instance keys compile independent

@@ -181,10 +181,8 @@ public:
      * @param p_task_id The render-graph task identifier.
      * @param p_queue_family The queue family the command buffer is submitted to.
      */
-    virtual void on_before_task_recorded(VkCommandBuffer p_command_buffer,
-        const RenderGraphVK& p_graph,
-        const RendTaskID& p_task_id,
-        QueueFamilyVK p_queue_family) = 0;
+    virtual void on_before_task_recorded(
+        VkCommandBuffer p_command_buffer, const RenderGraphVK& p_graph, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
 
     /**
      * @brief Record plugin commands at the end of a render-graph task's command buffer.
@@ -197,10 +195,8 @@ public:
      * @param p_task_id The render-graph task identifier.
      * @param p_queue_family The queue family the command buffer is submitted to.
      */
-    virtual void on_after_task_recorded(VkCommandBuffer p_command_buffer,
-        const RenderGraphVK& p_graph,
-        const RendTaskID& p_task_id,
-        QueueFamilyVK p_queue_family) = 0;
+    virtual void on_after_task_recorded(
+        VkCommandBuffer p_command_buffer, const RenderGraphVK& p_graph, const RendTaskID& p_task_id, QueueFamilyVK p_queue_family) = 0;
 
     /**
      * @brief Finish plugin work while the renderer terminates.

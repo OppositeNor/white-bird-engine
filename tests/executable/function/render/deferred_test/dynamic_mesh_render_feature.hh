@@ -38,9 +38,9 @@ class RendererVK;
  * @brief Draws several moving entities of one mesh compiled once by MeshCompilerVK. Neither copyable nor movable.
  *
  * Recipes register the mesh, named by get_mesh_key(), on each render graph under DYNAMIC_MESH_KEY, which their
- * graphics_draw_mesh tasks import it under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` (get_entity_key(), supplied by
- * add_imports()) and needs its own draw task per pass. All methods run on the rendering thread. Geometry requires
- * reconstruction to change.
+ * graphics_draw_mesh tasks import it under; entity i is imported under `<DYNAMIC_MESH_ENTITY_KEY>_<i>` (get_entity_key(),
+ * supplied by add_imports()) and needs its own draw task per pass. All methods run on the rendering thread. Geometry
+ * requires reconstruction to change.
  */
 class DynamicMeshRenderFeature {
 public:

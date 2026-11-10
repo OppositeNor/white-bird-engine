@@ -19,10 +19,11 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh" // IWYU pragma: keep (RendTaskDescVK)
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh" // IWYU pragma: keep (RendTaskDescVK)
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
@@ -85,14 +86,13 @@ public:
     virtual const char* get_debug_view_name(VoxelDebugViewMode p_mode) const override;
 
     /**
-     * @brief Describe the octree to the render_graph_utils.features.voxel_octree module, and supply its textures, buffers, and
-     * the clear and construction tasks only C++ can build.
+     * @brief Describe the octree to the render_graph_utils.features.voxel_octree module, and supply its textures, buffers,
+     * and the clear and construction tasks only C++ can build.
      * @throws std::runtime_error If the construction tasks declare graph resources other than the mesh imports the recipe's
      * mesh draws provide.
      */
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
-
 
     /**
      * @brief Graph id of the single-level storage view of one mip level of the static texture.
@@ -187,7 +187,6 @@ private:
     VoxelVolume octree_volume;
     // Leaves the static construction untriggered, so the static scene is reset and rebuilt every frame.
     bool rebuild_static_every_frame;
-
 
     Ref<ROImageVK> static_image;
     Ref<ROImageVK> dynamic_image;

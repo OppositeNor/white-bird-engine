@@ -12,29 +12,38 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "core/allocator/heap_allocator.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render/i_render_object.hh"
 #include "function/render/render_defs.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
+#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/rd_params_compute_pipeline_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/rd_params_image_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
+#include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
-#include "function/render/render_resource_unit.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "generated/type_uuid.gen.hh"
-#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
+#include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "test_global.hh"
@@ -46,9 +55,9 @@
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <initializer_list>
 #include <memory>
 #include <new>
-#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -131,7 +140,8 @@ public:
         }
     }
 
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(
+        Vector<ResAccessVK, RenderAllocator>& /*p_reads*/, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
         if (write_resource) {
             p_writes.push_back({.res_id = std::string(TEST_LOGICAL_RESOURCE), .usage = RendResUsageVK::STORAGE_BUFFER});
         }
@@ -493,8 +503,11 @@ public:
         result.context.set_value("frames_in_flight", int64_t{99});
         result.imports.add(TEST_LOGICAL_RESOURCE, *container);
         result.imports.add_task(RendTaskDescVK(allocator, "native", [this](const RendGraphContextVK& /*p_context*/) {
-            return make_unique<RTGraphEdgeProbeVK>(
-                allocator, allocator, QueueFamilyVK::GRAPHICS, std::vector<std::string>{}, std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
+            return make_unique<RTGraphEdgeProbeVK>(allocator,
+                allocator,
+                QueueFamilyVK::GRAPHICS,
+                std::vector<std::string>{},
+                std::vector<std::string>{std::string(TEST_LOGICAL_RESOURCE)});
         }));
         return result;
     }
@@ -582,7 +595,8 @@ TEST_F(WBERenderGraphVKRecipeTest, RecipeSourcesRequireARecipeBindingsAndMapPara
     RenderGraphVK graph(&render_data);
     EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.bindings = bindings}), std::runtime_error);
     EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.recipe = script}), std::runtime_error);
-    EXPECT_THROW(graph.build_from_recipe(RendGraphRecipeSourceVK{.recipe = script, .parameters = DataValue::make_list(), .bindings = bindings}),
+    EXPECT_THROW(graph.build_from_recipe(
+                     RendGraphRecipeSourceVK{.recipe = script, .parameters = DataValue::make_list(), .bindings = bindings}),
         std::runtime_error);
     EXPECT_EQ(bindings->prepare_count, 0U);
     EXPECT_TRUE(graph.get_bindings() == MEM_NULL);
@@ -791,7 +805,7 @@ TEST(WBERenderGraphVKTest, RejectsCyclicResourceEdges) {
 TEST(WBERenderGraphVKTest, RejectsSelfEdgesUnknownTasksAndUndeclaredResources) {
     RenderAllocator allocator(WBE_KI_B(128));
     RenderContextVK render_data(&allocator);
-    auto make_descriptor = [&]() {
+    auto make_descriptor = [&] {
         RendGraphDescVK descriptor(&allocator);
         descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
         descriptor.add_task(make_probe_desc(&allocator, "task", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
@@ -816,7 +830,7 @@ TEST(WBERenderGraphVKTest, RejectsSelfEdgesUnknownTasksAndUndeclaredResources) {
 TEST(WBERenderGraphVKTest, RejectsEdgesWhoseTasksDoNotAccessTheResource) {
     RenderAllocator allocator(WBE_KI_B(128));
     RenderContextVK render_data(&allocator);
-    auto make_descriptor = [&]() {
+    auto make_descriptor = [&] {
         RendGraphDescVK descriptor(&allocator);
         descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data));
         descriptor.add_task(make_probe_desc(&allocator, "accessor", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));

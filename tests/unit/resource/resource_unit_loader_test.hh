@@ -17,6 +17,7 @@
 
 #include "core/allocator/i_allocator.hh"
 #include "core/allocator/stack_allocator.hh"
+#include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/render_resource_unit.hh"
@@ -24,7 +25,7 @@
 #include "function/scene/scene_resource_unit.hh"
 #include "function/scene/scene_resource_unit_loader.hh"
 #include "glm/ext/matrix_transform.hpp"
-#include "glm/gtc/packing.hpp"
+#include "glm/ext/vector_float3.hpp"
 #include "glm/ext/vector_float4.hpp"
 #include "glm/ext/vector_int2.hpp"
 #include "glm/ext/vector_int3.hpp"
@@ -32,7 +33,9 @@
 #include "glm/ext/vector_uint2.hpp"
 #include "glm/ext/vector_uint3.hpp"
 #include "glm/ext/vector_uint4.hpp"
+#include "glm/gtc/packing.hpp"
 #include "global/global.hh"
+#include "platform/file_system/path.hh"
 #include "resource/ktx_texture.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -43,6 +46,7 @@
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 
+#include "core/script/sb_lua.hh"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -51,7 +55,6 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
-#include "core/script/sb_lua.hh"
 #include <gtest/gtest.h>
 #include <ktx.h>
 #include <memory>
@@ -363,7 +366,7 @@ protected:
                     const float value = static_cast<float>(x + (10 * y) + (100 * z));
                     const uint16_t half_value = glm::packHalf1x16(value);
                     const char* texel = p_vk_format == KTX_VK_FORMAT_R16_SFLOAT ? reinterpret_cast<const char*>(&half_value)
-                                                                                 : reinterpret_cast<const char*>(&value);
+                                                                                : reinterpret_cast<const char*>(&value);
                     const size_t texel_size = p_vk_format == KTX_VK_FORMAT_R16_SFLOAT ? sizeof(half_value) : sizeof(value);
                     slice.insert(slice.end(), texel, texel + texel_size);
                 }
@@ -1236,6 +1239,7 @@ TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
     auto expect_invalid = [this](std::vector<int32_t> p_parent_indices, size_t p_invalid_joint_index) {
         WBE::StackAllocator stack_allocator(8192);
         std::vector<WBE::RUSkeleton::Joint> joints;
+        joints.reserve(p_parent_indices.size());
         for (int32_t parent_index : p_parent_indices) {
             joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
         }
@@ -1525,13 +1529,14 @@ TEST_F(ResourcePopulatorTest, RenderGraphDefaultsToEmptyParameters) {
     WBE::StackAllocator stack_allocator(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RURenderGraph> captured_graph = WBE::MEM_NULL;
-    auto resource_chunk = MockResourceChunk::Builder()
-                              .set_reserve_res_unit_storage_callback([&stack_allocator, &captured_graph](std::string_view, size_t p_size) {
-                                  WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
-                                  captured_graph = resource.force_cast<WBE::RURenderGraph>();
-                                  return resource;
-                              })
-                              .build(stream);
+    auto resource_chunk =
+        MockResourceChunk::Builder()
+            .set_reserve_res_unit_storage_callback([&stack_allocator, &captured_graph](std::string_view, size_t p_size) {
+                WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
+                captured_graph = resource.force_cast<WBE::RURenderGraph>();
+                return resource;
+            })
+            .build(stream);
     WBE::RUSchemaRenderGraph scheme;
     scheme.id = "loaded_graph";
     scheme.type = "render_graph";

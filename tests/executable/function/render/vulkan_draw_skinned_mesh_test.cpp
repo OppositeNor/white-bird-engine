@@ -21,17 +21,25 @@
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/input_manager/i_input_manager.hh"
+#include "function/input_manager/key_codes.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_bindings_function_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
+#include "glm/common.hpp"
+#include "glm/detail/qualifier.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
+#include "glm/ext/quaternion_geometric.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/ext/vector_float4.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "imgui.h"
@@ -45,9 +53,9 @@
 #include "rt_imgui_vk.hh"
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <cstddef>
 #include <cstring>
 #include <format>
 #include <glm/ext/matrix_float3x3.hpp>
@@ -288,8 +296,7 @@ public:
                 DRAW_SKINNED_MESH_RENDER_GRAPH,
                 [this, render_allocator](const WBE::RenderContextVK& p_render_context, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
                     WBE::RendGraphPreparedBindingsVK result;
-                    result.imports.add(REND_RES_SKINNED_MESH_CAMERA_INFO, *camera_info_buffer)
-                        .add(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS, *skinning_transforms_buffer);
+                    result.imports.add(REND_RES_SKINNED_MESH_CAMERA_INFO, *camera_info_buffer).add(REND_RES_SKINNED_MESH_SKINNING_TRANSFORMS, *skinning_transforms_buffer);
                     WBE::RendTaskDescVK imgui_task_desc(render_allocator);
                     imgui_task_desc.task_id = RT_DRAW_SKINNED_MESH_IMGUI;
                     imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);

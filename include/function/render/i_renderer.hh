@@ -62,8 +62,8 @@ struct RendererCapabilities {
     /**
      * @brief Whether classic Vulkan descriptor sets are requested and were enabled.
      *
-     * When enabled, the renderer provides a descriptor pool for code that cannot use the renderer's descriptor heaps, such as
-     * third-party libraries.
+     * When enabled, the renderer provides a descriptor pool for code that cannot use the renderer's descriptor heaps, such
+     * as third-party libraries.
      */
     bool descriptor_set = false;
 };

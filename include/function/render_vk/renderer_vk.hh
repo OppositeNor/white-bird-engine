@@ -20,14 +20,17 @@
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
+#include "function/render/i_renderer.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/ktx_vulkan_device_info_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_vk_defs.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_fense_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
@@ -125,7 +128,6 @@ public:
     virtual Ref<GlobalRenderCache> get_global_render_cache() override {
         return render_cache;
     }
-
 
     /**
      * @brief Register one-shot Vulkan work to be recorded and submitted before graph execution.
@@ -290,7 +292,7 @@ private:
     // The graph tick() executes, retained until another graph is activated or the activation is cleared.
     Ref<RenderGraphVK> active_graph;
 
-    std::vector<const char*> enabled_layers{ // NOLINT
+    std::vector<const char*> enabled_layers{// NOLINT
 #ifdef WBE_VK_ENABLE_VALIDATION
         "VK_LAYER_KHRONOS_validation"
 #endif

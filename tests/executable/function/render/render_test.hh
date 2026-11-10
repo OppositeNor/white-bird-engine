@@ -23,10 +23,10 @@
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
-#include "function/render_vk/render_graph_bindings_function_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_bindings_function_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
@@ -289,7 +289,8 @@ using RenderTestExtentFactory = std::function<VkExtent2D(const RendGraphContextV
 inline Ref<RenderGraphVK> acquire_test_render_graph(
     RendererVK& p_renderer, std::string_view p_resource_key, Ref<IRenderGraphBindingsVK> p_bindings, bool p_activate = true) {
     Ref<RenderGraphVK> graph = p_renderer.acquire_render_graph(p_resource_key, p_bindings).dynamic_cast_ref<RenderGraphVK>();
-    write_descriptor_debug_output(std::format("{}_{}_descriptors", p_resource_key, p_bindings->get_instance_key()), graph->list_descriptors());
+    write_descriptor_debug_output(
+        std::format("{}_{}_descriptors", p_resource_key, p_bindings->get_instance_key()), graph->list_descriptors());
     if (p_activate) {
         p_renderer.activate_render_graph(graph);
     }

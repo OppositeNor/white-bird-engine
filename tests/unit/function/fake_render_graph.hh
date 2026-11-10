@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_FAKE_RENDER_GRAPH_HH
 #define WBE_FILE_FAKE_RENDER_GRAPH_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -76,8 +77,7 @@ public:
         return registry.register_resource(p_key, p_description);
     }
 
-    virtual Ref<IRenderObject> register_resource(
-        std::string_view p_key, TypeID p_description_type, const DataValue& p_description) override {
+    virtual Ref<IRenderObject> register_resource(std::string_view p_key, TypeID p_description_type, const DataValue& p_description) override {
         return registry.register_resource(p_key, p_description_type, p_description);
     }
 

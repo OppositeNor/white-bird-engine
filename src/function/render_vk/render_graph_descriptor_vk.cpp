@@ -16,6 +16,7 @@
 #include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render/i_render_task.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_task_resource_map.hh"
@@ -26,6 +27,7 @@
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <span>
 #include <stdexcept>
@@ -63,9 +65,7 @@ public:
     std::string task_id(std::string_view p_id, std::string_view p_subgraph_id) const {
         if (std::ranges::find(local_ids, p_id) == local_ids.end()) {
             throw std::runtime_error(std::format(
-                "Failed to add render graph subgraph '{}': an edge inside it connects to '{}', which is not in the subgraph.",
-                p_subgraph_id,
-                p_id));
+                "Failed to add render graph subgraph '{}': an edge inside it connects to '{}', which is not in the subgraph.", p_subgraph_id, p_id));
         }
         return prefixed(p_id);
     }
@@ -195,7 +195,8 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
         return p_record.subgraph_id == p_subgraph_id;
     });
     if (has_task || has_subgraph) {
-        throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': a task or subgraph already has the id.", p_subgraph_id));
+        throw std::runtime_error(
+            std::format("Failed to add render graph subgraph '{}': a task or subgraph already has the id.", p_subgraph_id));
     }
     const RendGraphDescVK& inner = p_subgraph.graph;
     SubgraphScope scope(allocator, p_subgraph_id);
@@ -203,11 +204,13 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
     // Ports name resources of this graph; they must not shadow what the subgraph declares or imports.
     for (const RendSubgraphPortBindingVK& binding : p_ports) {
         if (std::ranges::find(p_subgraph.ports, binding.port) == p_subgraph.ports.end()) {
-            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it has no port '{}'.", p_subgraph_id, binding.port));
+            throw std::runtime_error(
+                std::format("Failed to add render graph subgraph '{}': it has no port '{}'.", p_subgraph_id, binding.port));
         }
         if (binding.resource.empty()) {
-            throw std::runtime_error(
-                std::format("Failed to add render graph subgraph '{}': port '{}' is bound to an empty resource id.", p_subgraph_id, binding.port));
+            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': port '{}' is bound to an empty resource id.",
+                p_subgraph_id,
+                binding.port));
         }
     }
     for (const std::string& port : p_subgraph.ports) {
@@ -215,10 +218,8 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
             return p_binding.port == port;
         });
         if (count != 1) {
-            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': port '{}' is bound {} times instead of once.",
-                p_subgraph_id,
-                port,
-                count));
+            throw std::runtime_error(std::format(
+                "Failed to add render graph subgraph '{}': port '{}' is bound {} times instead of once.", p_subgraph_id, port, count));
         }
         if (inner.contains_resource(port)) {
             throw std::runtime_error(std::format(
@@ -257,15 +258,17 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
         });
         if (existing == resources.end()) {
             if (contains_resource(resource.res_id)) {
-                throw std::runtime_error(std::format(
-                    "Failed to add render graph subgraph '{}': it imports '{}', which the graph declares.", p_subgraph_id, resource.res_id));
+                throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph declares.",
+                    p_subgraph_id,
+                    resource.res_id));
             }
             resources.push_back(resource);
             continue;
         }
         if (!is_same_import(*existing, resource)) {
-            throw std::runtime_error(std::format(
-                "Failed to add render graph subgraph '{}': it imports '{}', which the graph imports as another resource.", p_subgraph_id, resource.res_id));
+            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph imports as another resource.",
+                p_subgraph_id,
+                resource.res_id));
         }
     }
     for (const RendBufferDeclVK& buffer : inner.buffers) {
@@ -275,7 +278,8 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
         images.push_back({.res_id = scope.prefixed(image.res_id), .factory = image.factory});
     }
     for (const RendImageViewDeclVK& view : inner.image_views) {
-        image_views.push_back({.res_id = scope.prefixed(view.res_id), .image_id = scope.resource_id(view.image_id), .factory = view.factory});
+        image_views.push_back(
+            {.res_id = scope.prefixed(view.res_id), .image_id = scope.resource_id(view.image_id), .factory = view.factory});
     }
     for (const RendSamplerDeclVK& sampler : inner.samplers) {
         samplers.push_back({.res_id = scope.prefixed(sampler.res_id), .factory = sampler.factory});

@@ -22,14 +22,16 @@
 #include "core/memory/unique.hh"
 #include "function/engine_function.hh"
 #include "function/function_utils.hh"
-#include "function/render/i_renderer.hh"
 #include "function/render/global_render_cache.hh"
+#include "function/render/i_render_graph.hh"
+#include "function/render/i_render_graph_bindings.hh"
+#include "function/render/i_renderer.hh"
+#include "function/render/render_graph_instance_cache.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render/shader_debug.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
-#include "function/render/render_graph_instance_cache.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
+#include "function/render_vk/ktx_vulkan_device_info_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_plugin_vk.hh"
 #include "function/render_vk/render_vk_defs.hh"
@@ -155,8 +157,8 @@ ExtensionSupportQueryResult collect_unsupported_extensions(std::span<const char*
 RendererVK::RendererVK(AllocType* p_allocator, Ref<IWindow> p_window, Ref<JobBufferRingMPSC> p_job_buffer, RendererCapabilities& p_capabilities)
     : job_buffer(p_job_buffer), allocator(p_allocator), render_cache(make_ref<GlobalRenderCache>(p_allocator, p_allocator)),
       window(p_window), capture_png_path(p_allocator), in_flight_fences(p_allocator),
-      image_available_semaphores(p_allocator), render_context(p_allocator),
-      registered_plugins(p_allocator), running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
+      image_available_semaphores(p_allocator), render_context(p_allocator), registered_plugins(p_allocator),
+      running_gpu_jobs(p_allocator), running_gpu_job_fenses(p_allocator) {
     WBE_DEBUG_ASSERT(p_job_buffer != MEM_NULL);
     WBE_DEBUG_ASSERT(p_window != MEM_NULL);
     WBE_DEBUG_ASSERT(p_allocator != nullptr);
@@ -606,8 +608,8 @@ void RendererVK::create_swap_chain_images() {
     for (auto& swap_chain_image : swap_chain_images) {
         render_objects->swap_chain_images.emplace_back(
             make_ref<ROImageVK>(allocator, &render_context, swap_chain_image, VK_IMAGE_LAYOUT_UNDEFINED));
-        render_cache->insert(
-            std::format("{}.image[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_images.size() - 1), render_objects->swap_chain_images.back());
+        render_cache->insert(std::format("{}.image[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_images.size() - 1),
+            render_objects->swap_chain_images.back());
         ROImageVK::ExposedFields& fields = render_objects->swap_chain_images.back()->exposed_fields;
         fields.format = swap_chain_image_format;
         fields.extent = VkExtent3D{.width = swap_chain_extent.width, .height = swap_chain_extent.height, .depth = 1};
@@ -661,8 +663,8 @@ void RendererVK::init_swap_chain_image_views() {
             .set_subresource_range(subresource_range);
 
         render_objects->swap_chain_image_views.emplace_back(render_context.create_image_view(builder));
-        render_cache->insert(
-            std::format("{}[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_image_views.size() - 1), render_objects->swap_chain_image_views.back());
+        render_cache->insert(std::format("{}[{}]", REND_RES_SWAP_CHAIN, render_objects->swap_chain_image_views.size() - 1),
+            render_objects->swap_chain_image_views.back());
     }
 }
 
@@ -822,8 +824,8 @@ void RendererVK::create_shader_debug_buffer() {
         initial_data[frame_slot * SHADER_DEBUG_FRAME_WORD_COUNT + 1] = SHADER_DEBUG_FRAME_ENTRY_CAPACITY;
     }
     shader_debug_buffer = render_context.create_buffer(ROBufferVK::Builder()
-                              .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
-                              .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
+            .initial_data(initial_data.data(), initial_data.size() * sizeof(uint32_t), DeviceDomain::HOST_DEVICE)
+            .add_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT));
     render_cache->insert("shader_debug", shader_debug_buffer);
     const uint32_t descriptor_index = shader_debug_buffer->get_storage_view_index();
     if (descriptor_index != SHADER_DEBUG_DESCRIPTOR_INDEX) {
@@ -1031,8 +1033,7 @@ void RendererVK::create_logical_device() { // NOLINT
         reinterpret_cast<PFN_vkCmdBindResourceHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindResourceHeapEXT"));
     render_context.command_bind_sampler_heap =
         reinterpret_cast<PFN_vkCmdBindSamplerHeapEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdBindSamplerHeapEXT"));
-    render_context.command_push_data =
-        reinterpret_cast<PFN_vkCmdPushDataEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdPushDataEXT"));
+    render_context.command_push_data = reinterpret_cast<PFN_vkCmdPushDataEXT>(vkGetDeviceProcAddr(logical_device, "vkCmdPushDataEXT"));
     if (render_context.write_resource_descriptors == nullptr || render_context.write_sampler_descriptors == nullptr ||
         render_context.command_bind_resource_heap == nullptr || render_context.command_bind_sampler_heap == nullptr ||
         render_context.command_push_data == nullptr) {
@@ -1752,22 +1753,24 @@ Ref<IRenderGraph> RendererVK::acquire_render_graph(std::string_view p_resource_k
     }
     Ref<IRenderGraphBindingsVK> bindings = p_bindings.dynamic_cast_ref<IRenderGraphBindingsVK>();
     if (bindings == MEM_NULL) {
-        throw std::runtime_error(
-            std::format("Failed to acquire render graph '{}': the bindings are not Vulkan render graph bindings.", p_resource_key));
+        throw std::runtime_error(std::format(
+            "Failed to acquire render graph '{}': the bindings are not Vulkan render graph bindings.", p_resource_key));
     }
     return RenderGraphInstanceCache::acquire<RenderGraphVK>(*render_cache, p_resource_key, p_bindings, [&] {
         ResourceManager* resource_manager = ResourceManager::get_singleton();
         if (resource_manager == nullptr) {
-            throw std::runtime_error(std::format("Failed to acquire render graph '{}': the resource manager is unavailable.", p_resource_key));
+            throw std::runtime_error(
+                std::format("Failed to acquire render graph '{}': the resource manager is unavailable.", p_resource_key));
         }
         RefRes<RURenderGraph> definition = resource_manager->get_resource<RURenderGraph>(p_resource_key);
         if (definition == MEM_NULL) {
-            throw std::runtime_error(std::format("Failed to acquire render graph '{}': no render graph resource has this key.", p_resource_key));
+            throw std::runtime_error(
+                std::format("Failed to acquire render graph '{}': no render graph resource has this key.", p_resource_key));
         }
         const std::string_view instance_key = bindings->get_instance_key();
         // Graph-owned resources are named after the graph; instances other than the definition's default one append their key.
-        const std::string graph_name =
-            instance_key == p_resource_key ? std::string(p_resource_key) : std::format("{}[{}]", p_resource_key, instance_key);
+        const std::string graph_name = instance_key == p_resource_key ? std::string(p_resource_key)
+                                                                      : std::format("{}[{}]", p_resource_key, instance_key);
         auto graph = make_ref<RenderGraphVK>(allocator, &render_context, graph_name);
         graph->build_from_recipe(RendGraphRecipeSourceVK{
             .recipe = definition->recipe,

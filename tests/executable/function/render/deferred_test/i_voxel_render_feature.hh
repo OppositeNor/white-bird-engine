@@ -95,12 +95,42 @@ inline constexpr std::array<uint32_t, 24> VOXEL_DEBUG_CUBE_INDICES{
  * corner and the face's normal from it.
  */
 inline constexpr std::array<uint32_t, 36> VOXEL_DEBUG_CUBE_SOLID_INDICES{
-    0, 1, 3, 0, 3, 2,
-    8 + 4, 8 + 5, 8 + 7, 8 + 4, 8 + 7, 8 + 6,
-    16 + 0, 16 + 1, 16 + 5, 16 + 0, 16 + 5, 16 + 4,
-    24 + 2, 24 + 3, 24 + 7, 24 + 2, 24 + 7, 24 + 6,
-    32 + 0, 32 + 2, 32 + 6, 32 + 0, 32 + 6, 32 + 4,
-    40 + 1, 40 + 3, 40 + 7, 40 + 1, 40 + 7, 40 + 5,
+    0,
+    1,
+    3,
+    0,
+    3,
+    2,
+    8 + 4,
+    8 + 5,
+    8 + 7,
+    8 + 4,
+    8 + 7,
+    8 + 6,
+    16 + 0,
+    16 + 1,
+    16 + 5,
+    16 + 0,
+    16 + 5,
+    16 + 4,
+    24 + 2,
+    24 + 3,
+    24 + 7,
+    24 + 2,
+    24 + 7,
+    24 + 6,
+    32 + 0,
+    32 + 2,
+    32 + 6,
+    32 + 0,
+    32 + 6,
+    32 + 4,
+    40 + 1,
+    40 + 3,
+    40 + 7,
+    40 + 1,
+    40 + 7,
+    40 + 5,
 };
 
 /**
@@ -225,7 +255,6 @@ public:
      */
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const = 0;
-
 };
 
 } // namespace WhiteBirdEngine

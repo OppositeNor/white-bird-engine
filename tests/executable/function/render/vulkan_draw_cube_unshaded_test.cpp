@@ -20,12 +20,12 @@
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
+#include "function/render_vk/mesh_compiler_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -94,16 +94,17 @@ public:
         camera_info.proj[1][1] *= -1;
         // Recipes cannot set initial data, so the application owns the camera buffer and the recipe imports it.
         camera_info_ubo = render_context->create_buffer(WBE::ROBufferVK::Builder()
-                              .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
-                              .set_size(sizeof(CameraInfoGPU))
-                              .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                              .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+                .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(sizeof(CameraInfoGPU))
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
         // The recipe registers the mesh and the pipeline on the graph; its draw task imports the mesh buffers itself.
         render_graph = WBE::acquire_test_render_graph(*renderer,
             DRAW_CUBE_UNSHADED_RENDER_GRAPH,
             WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
                 DRAW_CUBE_UNSHADED_RENDER_GRAPH,
-                [camera_info_ubo = camera_info_ubo](const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
+                [camera_info_ubo = camera_info_ubo](
+                    const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
                     WBE::RendGraphPreparedBindingsVK result;
                     result.imports.add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
                     return result;

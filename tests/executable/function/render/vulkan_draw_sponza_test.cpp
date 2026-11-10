@@ -24,12 +24,13 @@
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_bindings_function_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
@@ -39,10 +40,10 @@
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
 #include "render_test.hh"
-#include "shadowed_mesh_recipe_context.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "shadowed_mesh_recipe_context.hh"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -128,13 +129,13 @@ WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
     return WBE::make_ref<WBE::ROCMultislotsVK>(p_allocator,
         p_allocator,
         p_render_data->frames_in_flight,
-        WBE::ROCMultislotsVK::Factory{[p_render_data, key = std::string(p_key), p_buffer_size](
-                                          uint32_t p_frame_slot) -> WBE::Ref<WBE::IRenderObjectVK> {
-            WBE::Ref<WBE::ROBufferVK> buffer =
-                p_render_data->create_buffer(WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-            p_render_data->render_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
-            return buffer;
-        }});
+        WBE::ROCMultislotsVK::Factory{
+            [p_render_data, key = std::string(p_key), p_buffer_size](uint32_t p_frame_slot) -> WBE::Ref<WBE::IRenderObjectVK> {
+                WBE::Ref<WBE::ROBufferVK> buffer = p_render_data->create_buffer(
+                    WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+                p_render_data->render_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
+                return buffer;
+            }});
 }
 
 } // namespace

@@ -438,8 +438,8 @@ RefRes<RUMaterial> resolve_material(IResourceChunk& p_res_chunk, const RUSchemaM
 
 RUAABB3D resolve_aabb(const RUSchemaAABB3D& p_scheme, std::string_view p_context) {
     if (p_scheme.center.size() != 3) {
-        throw std::runtime_error(std::format(
-            "Failed to populate {}: aabb center must contain 3 values, got {}.", p_context, p_scheme.center.size()));
+        throw std::runtime_error(
+            std::format("Failed to populate {}: aabb center must contain 3 values, got {}.", p_context, p_scheme.center.size()));
     }
     return RUAABB3D{
         .center = glm::vec3(p_scheme.center[0], p_scheme.center[1], p_scheme.center[2]),

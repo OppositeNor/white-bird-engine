@@ -24,21 +24,22 @@
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/texture_compiler_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_bindings_function_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
 #include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/texture_compiler_vk.hh"
+#include "function/render_vk/vulkan_enums_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "global/global.hh"
 #include "imgui.h"
@@ -309,8 +310,8 @@ public:
             throw std::runtime_error("Failed to setup pixel sorting test: source texture resource was not found.");
         }
         // The recipe imports the source image; its extent sizes the graph, so the view is compiled before the graph exists.
-        source_view = WBE::TextureCompilerVK(render_context, renderer->get_global_render_cache().get())
-                          .compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
+        source_view =
+            WBE::TextureCompilerVK(render_context, renderer->get_global_render_cache().get()).compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
 
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
@@ -619,7 +620,8 @@ private:
                 WBE::RendTaskDescVK imgui_task_desc(render_allocator);
                 imgui_task_desc.task_id = RT_DRAW_IMGUI;
                 imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-                imgui_task_desc.factory = [this, render_allocator, render_context = &p_render_context](const WBE::RendGraphContextVK& /*p_context*/) {
+                imgui_task_desc.factory = [this, render_allocator, render_context = &p_render_context](
+                                              const WBE::RendGraphContextVK& /*p_context*/) {
                     return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
                 };
                 WBE::RendGraphPreparedBindingsVK result;
@@ -642,10 +644,10 @@ private:
     static WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(std::string_view p_key, const void* p_data, size_t p_size) {
         auto* renderer = WBE::RendererVK::get_singleton();
         WBE::Ref<WBE::ROBufferVK> buffer = renderer->get_render_context()->create_buffer(WBE::ROBufferVK::Builder()
-                                               .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
-                                               .set_size(p_size)
-                                               .set_domain(WBE::DeviceDomain::HOST_DEVICE)
-                                               .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+                .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
+                .set_size(p_size)
+                .set_domain(WBE::DeviceDomain::HOST_DEVICE)
+                .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
         renderer->get_global_render_cache()->insert(p_key, buffer);
         return buffer;
     }

@@ -17,9 +17,10 @@
 
 #include "core/data/data_value.hh"
 #include "core/reflection/enum_reflection.hh"
+#include "core/reflection/serializable_sd.hh"
 #include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
@@ -114,7 +115,8 @@ public:
      * @brief Run the recipe script stored as the `script` resource p_script_key; see run().
      * @throws std::runtime_error If no script resource has the key, or under the conditions of run().
      */
-    static DataValue run(std::string_view p_script_key, const DataValue& p_context, const DataValue& p_parameters = DataValue::make_map());
+    static DataValue run(
+        std::string_view p_script_key, const DataValue& p_context, const DataValue& p_parameters = DataValue::make_map());
 
     /**
      * @brief Run a loaded recipe script, loaded under its resource key; see run().

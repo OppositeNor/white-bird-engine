@@ -19,16 +19,24 @@
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/i_render_task.hh"
+#include "function/render/i_resource_description.hh"
+#include "function/render/i_resource_registrator.hh"
 #include "function/render/rd_typed.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_graph_resource_registry.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
-#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_graph_bindings_vk.hh"
+#include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/rd_params_compute_pipeline_vk.hh"
+#include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
+#include "function/render_vk/rd_params_image_vk.hh"
+#include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/rend_graph_resource_diff_vk.hh"
 #include "function/render_vk/rend_graph_script_vk.hh"
@@ -570,7 +578,8 @@ bool recipe_declares_import(const DataValue& p_recipe, std::string_view p_import
 DataValue make_recipe_context(DataValue p_prepared, const RendRecipeContextVK& p_facts, std::string_view p_recipe_key) {
     DataValue result = p_prepared.is_nil() ? DataValue::make_map() : std::move(p_prepared);
     if (result.get_kind() != DataValueKind::MAP) {
-        throw std::runtime_error(std::format("RenderGraphVK: the bindings of recipe '{}' prepared a context that is not a map.", p_recipe_key));
+        throw std::runtime_error(
+            std::format("RenderGraphVK: the bindings of recipe '{}' prepared a context that is not a map.", p_recipe_key));
     }
     const DataValue facts = RendGraphScriptVK::serialize_context(p_facts);
     for (const auto& [key, value] : facts.as_map()) {
@@ -1030,8 +1039,8 @@ RendGraphDescVK RenderGraphVK::make_descriptor() {
         throw std::runtime_error("RenderGraphVK: the graph has not been built from a recipe or a descriptor.");
     }
     const RendGraphRecipeSourceVK& source = *rebuild_state->recipe_source;
-    const std::string_view recipe_key =
-        source.recipe->resource_key != nullptr ? std::string_view(source.recipe->resource_key) : std::string_view("<anonymous>");
+    const std::string_view recipe_key = source.recipe->resource_key != nullptr ? std::string_view(source.recipe->resource_key)
+                                                                               : std::string_view("<anonymous>");
     const RendRecipeContextVK facts = RendGraphScriptVK::get_recipe_context(*render_data, context);
     Ref<IRenderGraphBindingsVK> bindings = source.bindings;
     RendGraphPreparedBindingsVK prepared = bindings->prepare(*render_data, facts);

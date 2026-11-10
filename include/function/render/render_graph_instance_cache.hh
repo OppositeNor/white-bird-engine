@@ -15,6 +15,7 @@
 #ifndef WBE_FILE_RENDER_GRAPH_INSTANCE_CACHE_HH
 #define WBE_FILE_RENDER_GRAPH_INSTANCE_CACHE_HH
 
+#include "core/allocator/i_allocator.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/global_render_cache.hh"
 #include "function/render/i_render_graph.hh"
@@ -76,10 +77,8 @@ public:
      */
     template <typename TGraph, typename TFactory>
         requires std::derived_from<TGraph, IRenderGraph>
-    static Ref<TGraph> acquire(GlobalRenderCache& p_cache,
-        std::string_view p_definition_key,
-        const Ref<IRenderGraphBindings>& p_bindings,
-        TFactory&& p_factory) {
+    static Ref<TGraph> acquire(
+        GlobalRenderCache& p_cache, std::string_view p_definition_key, const Ref<IRenderGraphBindings>& p_bindings, TFactory&& p_factory) {
         if (p_definition_key.empty()) {
             throw std::runtime_error("Failed to acquire a render graph: the definition key is empty.");
         }
@@ -90,8 +89,7 @@ public:
         Ref<TGraph> live = p_cache.try_get<TGraph>(cache_key);
         if (live != MEM_NULL) {
             if (live->get_bindings() != p_bindings) {
-                throw std::runtime_error(std::format(
-                    "Failed to acquire render graph '{}' instance '{}': the live instance was acquired with another bindings object.",
+                throw std::runtime_error(std::format("Failed to acquire render graph '{}' instance '{}': the live instance was acquired with another bindings object.",
                     p_definition_key,
                     p_bindings->get_instance_key()));
             }

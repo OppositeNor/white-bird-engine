@@ -39,12 +39,11 @@ namespace WhiteBirdEngine {
  *
  * Applications register the resources a graph's tasks name (meshes, images, pipelines, ...) on the graph itself, in two
  * steps: load the source resources from the ResourceManager, then register_resource() with a description. The description's
- * type (IResourceDescription::get_type_uuid()) selects the IResourceRegistrator that compiles it, as a resource schema's type
- * selects its resource unit loader; backends install default registrators for the common description types, and
- * add_resource_registrator() adds custom ones. The graph holds every registered object strongly until it is unregistered,
- * replaced, or the graph is destroyed, and registrations survive rebuilds. Registering a key again with an equal
- * description returns the existing object without compiling, so a recipe may register on every rebuild. Registration keys
- * are local to the graph.
+ * type (IResourceDescription::get_type_uuid()) selects the IResourceRegistrator that compiles it, as a resource schema's
+ * type selects its resource unit loader; backends install default registrators for the common description types, and add_resource_registrator()
+ * adds custom ones. The graph holds every registered object strongly until it is unregistered, replaced, or the graph is
+ * destroyed, and registrations survive rebuilds. Registering a key again with an equal description returns the existing
+ * object without compiling, so a recipe may register on every rebuild. Registration keys are local to the graph.
  */
 class IRenderGraph : public IRenderObject {
 public:
@@ -90,8 +89,7 @@ public:
      * @param p_description The serialized description.
      * @throws std::runtime_error Under the same conditions, or if the registrator rejects the serialized description.
      */
-    virtual Ref<IRenderObject> register_resource(
-        std::string_view p_key, TypeID p_description_type, const DataValue& p_description) = 0;
+    virtual Ref<IRenderObject> register_resource(std::string_view p_key, TypeID p_description_type, const DataValue& p_description) = 0;
 
     /**
      * @brief Remove a registration; its object is released once the frames that may use it have completed.

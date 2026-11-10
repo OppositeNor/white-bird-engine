@@ -17,28 +17,32 @@
 
 #include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
-#include "core/reflection/reflection_defs.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
+#include "core/reflection/reflection_defs.hh"
 #include "function/render/i_render_graph.hh"
+#include "function/render/i_render_object.hh"
 #include "function/render/i_render_task.hh"
-#include "function/render/render_graph_resource_registry.hh"
+#include "function/render/i_resource_description.hh"
+#include "function/render/i_resource_registrator.hh"
 #include "function/render/render_defs.hh"
+#include "function/render/render_graph_resource_registry.hh"
 #include "function/render/render_task_resource_map.hh"
 #include "function/render_vk/debug_data_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_metadata_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/rd_params_compute_pipeline_vk.hh"
 #include "function/render_vk/rd_params_graphics_pipeline_vk.hh"
 #include "function/render_vk/rd_params_image_vk.hh"
 #include "function/render_vk/rd_params_mesh_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_metadata_vk.hh"
+#include "function/render_vk/render_object_container_vk.hh"
+#include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/semaphore_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
+#include "utils/utils.hh"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -277,9 +281,9 @@ public:
      * @brief Construct an empty graph bound to the given Vulkan render data.
      *
      * @param p_render_data The base render data.
-     * @param p_resource_key The key the graph is registered under. When it is set and the render data has a GlobalRenderCache,
-     * every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with `[<slot>]` appended for
-     * each per-frame copy, which also names it.
+     * @param p_resource_key The key the graph is registered under. When it is set and the render data has a
+     * GlobalRenderCache, every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with
+     * `[<slot>]` appended for each per-frame copy, which also names it.
      */
     explicit RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key = {});
 
@@ -337,8 +341,8 @@ public:
      *
      * Does what update_context() does when the context changes, without a context change: the source is compiled
      * again, every graph-owned resource whose configuration now differs is reallocated, and every task is recreated. Use
-     * it after state that the bindings or the factories read has changed structurally. Must be called on the rendering thread while
-     * none of the graph's submitted work is pending.
+     * it after state that the bindings or the factories read has changed structurally. Must be called on the rendering
+     * thread while none of the graph's submitted work is pending.
      *
      * @throws std::runtime_error If a re-evaluated resource configuration is invalid, or if the recreated tasks do not form
      * a valid graph.
@@ -363,8 +367,7 @@ public:
     virtual void add_resource_registrator(Unique<IResourceRegistrator> p_registrator) override;
     virtual bool has_resource_registrator(TypeID p_description_type) const override;
     virtual Ref<IRenderObject> register_resource(std::string_view p_key, const IResourceDescription& p_description) override;
-    virtual Ref<IRenderObject> register_resource(
-        std::string_view p_key, TypeID p_description_type, const DataValue& p_description) override;
+    virtual Ref<IRenderObject> register_resource(std::string_view p_key, TypeID p_description_type, const DataValue& p_description) override;
     virtual void unregister_resource(std::string_view p_key) override;
     virtual bool contains_registered_resource(std::string_view p_key) const override;
     virtual Ref<IRenderObject> try_acquire_registered_resource(std::string_view p_key) const override;
@@ -561,8 +564,8 @@ private:
     void normalize_task_accesses(Ref<RGNode> p_node) const;
     Vector<std::string, RenderAllocator> expand_resource_id(std::string_view p_resource_id) const;
     // The tasks with every edge to or from a subgraph replaced by edges between its members; see RendSubgraphVK.
-    Vector<RendTaskDescVK, RenderAllocator> resolve_subgraph_edges(
-        const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) const;
+    Vector<RendTaskDescVK, RenderAllocator> resolve_subgraph_edges(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks,
+        const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs) const;
     void add_resource_edges(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks);
     void validate_resource_conflicts() const;
     void validate_queue_completion() const;
