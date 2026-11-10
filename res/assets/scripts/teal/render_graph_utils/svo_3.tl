@@ -54,19 +54,19 @@ function svo_3.add_leaf_deduplication(graph: render_graph.Graph, params: svo_3.L
     local queue_family = params.queue_family
 
     local reset = graph:compute("svo_3_reset_deferred_list", {
-        pipeline = graph:add_compute_pipeline("svo_deferred_count_reset_pong_shader"),
+        pipeline = render_graph.compute_pipeline("svo_deferred_count_reset_pong_shader"),
         queue_family = queue_family,
     }, { bindings = { svo_deferred_list_pong = deferred_list } })
     local extent = 1 << params.max_depth
     local gather = graph:draw_mesh("svo_3_gather_leaves", {
         mesh = params.mesh,
-        pipeline = { default = graph:add_graphics_pipeline("svo_3_gather_leaves_pipeline") },
+        pipeline = { default = render_graph.graphics_pipeline("svo_3_gather_leaves_pipeline") },
         parts = { "opaque", "double_sided" },
         render_extent = { width = extent, height = extent },
     }, { bindings = { svo_info = params.svo_info, svo_deferred_list = deferred_list } })
     -- The clamping of the leaf count and the deduplication run as one task.
     local dispatches: {render_graph.RTParamsComputeDispatchVK} = {
-        { pipeline = graph:add_compute_pipeline("svo_3_prepare_leaves_shader"),
+        { pipeline = render_graph.compute_pipeline("svo_3_prepare_leaves_shader"),
             bindings = { svo_info = params.svo_info, svo_deferred_list = deferred_list } },
     }
     for _, dispatch in ipairs(dedup_large.dispatches(buffers)) do

@@ -25,13 +25,13 @@ local exports = {}
 
 function exports.build(context: wbe.ShadowedMeshRecipeContext, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("camera_info")
-    local gbuffer_camera_info = graph:import_resource("gbuffer_camera_info")
-    local spot_light_info = graph:import_resource("spot_light_info")
-    local shadow_light_info = graph:import_resource("shadow_light_info")
-    local spot_light_count = graph:import_resource("spot_light_count")
-    local light_billboard_info = graph:import_resource("light_billboard_info")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("camera_info")
+    local gbuffer_camera_info = render_graph.import_resource("gbuffer_camera_info")
+    local spot_light_info = render_graph.import_resource("spot_light_info")
+    local shadow_light_info = render_graph.import_resource("shadow_light_info")
+    local spot_light_count = render_graph.import_resource("spot_light_count")
+    local light_billboard_info = render_graph.import_resource("light_billboard_info")
     -- The billboard texture is registered on the graph, which binds the registered view for its import.
     local light_billboard_texture = graph:register_image("light_billboard_texture", { texture = "spot_light_billboard" })
     local shadow_extent: wbe.RendExtent2DParamsVK = { width = context.shadow_extent.width, height = context.shadow_extent.height }
@@ -56,13 +56,13 @@ function exports.build(context: wbe.ShadowedMeshRecipeContext, _parameters: {str
     local light_billboard_pipeline = pipeline("light_billboard_pipeline", "billboard_face_camera_pipeline",
         context.swap_chain_format)
 
-    local shadow_depth = graph:add_image("shadowmap_depth_image", "image_depth_target", context.shadow_depth_format,
+    local shadow_depth = render_graph.image("shadowmap_depth_image", "image_depth_target", context.shadow_depth_format,
         shadow_extent):view("shadowmap_depth")
-    local shadow_color = graph:add_image("shadowmap_color_image", "image_render_target", context.shadow_color_format,
+    local shadow_color = render_graph.image("shadowmap_color_image", "image_render_target", context.shadow_color_format,
         shadow_extent):view("shadowmap_color")
-    local depth = graph:add_image("draw_sponza_depth_image", "image_depth_target", context.depth_format):view("sponza_depth")
-    local shadow_sampler = graph:add_clamp_to_edge_sampler("shadow_sampler")
-    local light_billboard_sampler = graph:add_clamp_to_edge_sampler("light_billboard_sampler")
+    local depth = render_graph.image("draw_sponza_depth_image", "image_depth_target", context.depth_format):view("sponza_depth")
+    local shadow_sampler = render_graph.clamp_to_edge_sampler("shadow_sampler")
+    local light_billboard_sampler = render_graph.clamp_to_edge_sampler("light_billboard_sampler")
 
     -- The masked passes load what the opaque pass of their targets wrote.
     local function draw(identifier: string, pipeline_handle: render_graph.Resource, part: wbe.MeshPartVK, load: boolean,

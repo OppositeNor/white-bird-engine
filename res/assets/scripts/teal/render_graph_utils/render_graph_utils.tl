@@ -336,6 +336,12 @@ function render_graph.clamp_to_edge_sampler(identifier: string, parameters?: wbe
     return owned_resource({ id = identifier, sampler = params }, "sampler")
 end
 
+-- A mesh registered on the render graph under resource_key, by the recipe or elsewhere; a draw naming a key nobody
+-- registered registers the mesh resource of that key with the default options.
+function render_graph.mesh(resource_key: string): render_graph.Resource
+    return registered_resource(resource_key, "WhiteBirdEngine::MeshResourcesVK")
+end
+
 -- Pipelines are resources registered on the render graph under resource_key.
 -- With a description, the handle registers the pipeline: a graph emits the registration when one of its tasks names the
 -- handle.
@@ -474,66 +480,6 @@ function render_graph.graph(): render_graph.Graph
         return { resources = resources }
     end
 
-    -- Declare entries registered on the render graph as resources. Their task factories resolve the live objects in C++.
-    function graph:add_mesh(resource_key: string): render_graph.Resource
-        return registered_resource(resource_key, "WhiteBirdEngine::MeshResourcesVK")
-    end
-
-    function graph:add_compute_pipeline(resource_key: string): render_graph.Resource
-        return render_graph.compute_pipeline(resource_key)
-    end
-
-    function graph:add_graphics_pipeline(resource_key: string): render_graph.Resource
-        return render_graph.graphics_pipeline(resource_key)
-    end
-
-    -- Graph handles describe resources lazily and may be shared with other graph descriptions.
-    function graph:add_buffer(identifier: string, usage: wbe.RendResPrimaryUsageVK, size: integer): render_graph.Resource
-        return render_graph.buffer(identifier, usage, size)
-    end
-
-    function graph:add_storage_buffer(identifier: string, size: integer): render_graph.Resource
-        return render_graph.storage_buffer(identifier, size)
-    end
-
-    function graph:add_image(identifier: string, usage: wbe.RendResPrimaryUsageVK, format: wbe.ImageFormatVK,
-        extent?: wbe.RendExtent2DParamsVK, additional_usage?: {wbe.ImageUsageFlagVK},
-        mip_levels?: integer): render_graph.Resource
-        return render_graph.image(identifier, usage, format, extent, additional_usage, mip_levels)
-    end
-
-    function graph:add_storage_image(identifier: string, format: wbe.ImageFormatVK, width: integer, height: integer,
-        additional_usage?: {wbe.ImageUsageFlagVK}): render_graph.Resource
-        return render_graph.storage_image(identifier, format, width, height, additional_usage)
-    end
-
-    function graph:add_image_view(identifier: string, image: render_graph.Resource,
-        view?: wbe.RendImageViewParamsVK): render_graph.Resource
-        return render_graph.image_view(identifier, image, view)
-    end
-
-    function graph:add_clamp_to_edge_sampler(identifier: string, parameters?: wbe.RendSamplerParamsVK): render_graph.Resource
-        return render_graph.clamp_to_edge_sampler(identifier, parameters)
-    end
-
-    function graph:import_resource(identifier: string): render_graph.Resource
-        return render_graph.import_resource(identifier)
-    end
-
-    function graph:port(identifier: string): render_graph.Resource
-        return render_graph.port(identifier)
-    end
-
-    function graph:reference(identifier: string): render_graph.Resource
-        return render_graph.reference(identifier)
-    end
-
-    function graph:indirect_dispatch(pipeline_handle: render_graph.Resource,
-        indirect_buffer: render_graph.Resource, offset: integer,
-        resource_bindings?: {string:render_graph.Resource}): render_graph.RTParamsComputeDispatchVK
-        return render_graph.indirect_dispatch(pipeline_handle, indirect_buffer, offset, resource_bindings)
-    end
-
     function graph:as_subgraph(identifier: string, explicit_ports: {string:render_graph.Resource},
         explicit_imports?: {string}): render_graph.Task
         return render_graph.subgraph(identifier, self:build(explicit_imports, sorted_keys(explicit_ports)), explicit_ports)
@@ -652,7 +598,7 @@ function render_graph.graph(): render_graph.Graph
                 end
                 if input_value is string then
                     error("render_graph: resource fields take handles; name '" .. input_value ..
-                        "' with graph:reference().", 4)
+                        "' with render_graph.reference().", 4)
                 end
                 local resource = input_value as render_graph.Resource
                 if resource_field.scope == "task_local" then

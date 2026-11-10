@@ -24,8 +24,8 @@ local exports = {}
 function exports.build(): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
     svo_3.add_leaf_deduplication(graph, {
-        svo_info = graph:import_resource("svo_info"),
-        mesh = graph:add_mesh("static_mesh"),
+        svo_info = render_graph.import_resource("svo_info"),
+        mesh = render_graph.mesh("static_mesh"),
         max_depth = 6,
         max_leaf_count = 100000,
         queue_family = "compute_1",

@@ -20,23 +20,23 @@ local exports = {}
 
 function exports.build(): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local image = graph:add_image("color_image", "image_read_write", "r16g16b16a16_sfloat",
+    local image = render_graph.image("color_image", "image_read_write", "r16g16b16a16_sfloat",
         { width = 16, height = 8 }, nil, 4)
     local color = image:view()
     local mip_chain = image:view("color_mips", { mip_level_count = 4 })
-    local buffer = graph:add_storage_buffer("commands", 64)
-    local input = graph:import_resource("input")
-    local mesh: render_graph.Resource = graph:add_mesh("mesh_key")
-    local prepare_pipeline: render_graph.Resource = graph:add_compute_pipeline("prepare_pipeline")
-    local draw_pipeline: render_graph.Resource = graph:add_graphics_pipeline("draw_pipeline")
-    local mesh_pipeline = graph:add_graphics_pipeline("mesh_pipeline")
-    local draw_indirect_pipeline = graph:add_graphics_pipeline("draw_indirect_pipeline")
-    local compute_indirect_pipeline = graph:add_compute_pipeline("compute_indirect_pipeline")
-    local direct_pipeline = graph:add_compute_pipeline("direct_pipeline")
-    local indirect_pipeline = graph:add_compute_pipeline("indirect_pipeline")
-    local local_pipeline = graph:add_compute_pipeline("local_pipeline")
-    local ping_pipeline = graph:add_compute_pipeline("ping_pipeline")
-    local pong_pipeline = graph:add_compute_pipeline("pong_pipeline")
+    local buffer = render_graph.storage_buffer("commands", 64)
+    local input = render_graph.import_resource("input")
+    local mesh: render_graph.Resource = render_graph.mesh("mesh_key")
+    local prepare_pipeline: render_graph.Resource = render_graph.compute_pipeline("prepare_pipeline")
+    local draw_pipeline: render_graph.Resource = render_graph.graphics_pipeline("draw_pipeline")
+    local mesh_pipeline = render_graph.graphics_pipeline("mesh_pipeline")
+    local draw_indirect_pipeline = render_graph.graphics_pipeline("draw_indirect_pipeline")
+    local compute_indirect_pipeline = render_graph.compute_pipeline("compute_indirect_pipeline")
+    local direct_pipeline = render_graph.compute_pipeline("direct_pipeline")
+    local indirect_pipeline = render_graph.compute_pipeline("indirect_pipeline")
+    local local_pipeline = render_graph.compute_pipeline("local_pipeline")
+    local ping_pipeline = render_graph.compute_pipeline("ping_pipeline")
+    local pong_pipeline = render_graph.compute_pipeline("pong_pipeline")
     local prepare = graph:compute("prepare", { pipeline = prepare_pipeline, group_count_x = 2 }, {
         bindings = { shader_input = input },
         trigger = { event = "prepare_event", activate = true },
@@ -54,7 +54,7 @@ function exports.build(): wbe.RendGraphRecipeVK
         dispatches = {
             { pipeline = direct_pipeline, group_count_x = 2 },
             { pipeline = indirect_pipeline, indirect_buffer = buffer, bindings = { shader_buffer = buffer } },
-            graph:indirect_dispatch(local_pipeline, buffer, 0, { shader_buffer = buffer }),
+            render_graph.indirect_dispatch(local_pipeline, buffer, 0, { shader_buffer = buffer }),
         },
     }
     graph:compute_sequential("sequence", sequential_params)

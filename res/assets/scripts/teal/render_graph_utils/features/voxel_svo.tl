@@ -88,25 +88,25 @@ end
 -- The application's buffers, and the scratch buffers. Each frame's dynamic clear (and the static reset) empties the
 -- dynamic nodes' range and the deferred lists before the construction fills them, and the pre-deferred capture rewrites
 -- its copies before the debug draw reads them.
-local function create_buffers(graph: render_graph.Graph, parameters: wbe.SVORecipeParams): {string:render_graph.Resource}
+local function create_buffers(parameters: wbe.SVORecipeParams): {string:render_graph.Resource}
     local buffers: {string:render_graph.Resource} = {}
     for _, id in ipairs(parameters.imports) do
-        buffers[id] = graph:import_resource(id)
+        buffers[id] = render_graph.import_resource(id)
     end
     local sizes = parameters.buffer_sizes
-    buffers.svo_deferred_list_ping = graph:add_storage_buffer("svo_deferred_list_ping", sizes.deferred_list)
-    buffers.svo_deferred_list_pong = graph:add_storage_buffer("svo_deferred_list_pong", sizes.deferred_list)
+    buffers.svo_deferred_list_ping = render_graph.storage_buffer("svo_deferred_list_ping", sizes.deferred_list)
+    buffers.svo_deferred_list_pong = render_graph.storage_buffer("svo_deferred_list_pong", sizes.deferred_list)
     buffers.svo_pre_deferred_debug_info_buffer =
-        graph:add_storage_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
+        render_graph.storage_buffer("svo_pre_deferred_debug_info_buffer", sizes.pre_deferred_debug_info)
     buffers.svo_pre_deferred_debug_list_buffer =
-        graph:add_storage_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
+        render_graph.storage_buffer("svo_pre_deferred_debug_list_buffer", sizes.pre_deferred_debug_list)
     -- The SVOGI injection rewrites these every frame: the occupancy of every occupied leaf and every node with children,
     -- and the radiance entries after the count reset.
-    buffers.svogi_occupancy_buffer = graph:add_storage_buffer("svogi_occupancy_buffer", sizes.occupancy)
-    buffers.svogi_radiance_index_buffer = graph:add_storage_buffer("svogi_radiance_index_buffer", sizes.radiance_index)
-    buffers.svogi_radiance_staged_buffer = graph:add_storage_buffer("svogi_radiance_staged_buffer", sizes.radiance_staged)
+    buffers.svogi_occupancy_buffer = render_graph.storage_buffer("svogi_occupancy_buffer", sizes.occupancy)
+    buffers.svogi_radiance_index_buffer = render_graph.storage_buffer("svogi_radiance_index_buffer", sizes.radiance_index)
+    buffers.svogi_radiance_staged_buffer = render_graph.storage_buffer("svogi_radiance_staged_buffer", sizes.radiance_staged)
     -- The post-construction view's node list, rewritten each frame at a node depth before the draw reads it.
-    buffers.svo_debug_draw_node_list = graph:add_storage_buffer("svo_debug_draw_node_list", sizes.debug_draw_node_list)
+    buffers.svo_debug_draw_node_list = render_graph.storage_buffer("svo_debug_draw_node_list", sizes.debug_draw_node_list)
     return buffers
 end
 
@@ -276,7 +276,7 @@ local function add_dynamic_construction(builder: Builder)
     tasks.dynamic = {}
     for index, id in ipairs({ "dynamic_svo", "dynamic_svo_second" }) do
         tasks.dynamic[index] = construction(builder, id, builder.dynamic_mesh, builder.graphics_pipelines.dynamic_construction,
-            "opaque", builder.graph:reference(builder.target.dynamic_mesh_transform_ids[index]), true)
+            "opaque", render_graph.reference(builder.target.dynamic_mesh_transform_ids[index]), true)
     end
     tasks.dynamic_publication = {}
     if builder.pass_published then
@@ -332,7 +332,7 @@ local function add_svogi_injection(builder: Builder)
         staged_buffer = buffers.svogi_radiance_staged_buffer,
     }
     for slot, id in pairs(builder.target.rsm_slot_ids) do
-        radiance_bindings[slot] = graph:reference(id)
+        radiance_bindings[slot] = render_graph.reference(id)
     end
     local radiance_injection_params: render_graph.RTParamsRunComputePipelineVK = {
         pipeline = pipelines.radiance_injection,
@@ -448,11 +448,11 @@ end
 function voxel_svo.subgraph(identifier: string, parameters: wbe.SVORecipeParams, target: voxel.Target): render_graph.Task
     local pass_published = is_pass_published(parameters)
     local graph = render_graph.new()
-    local buffers = create_buffers(graph, parameters)
-    local color = graph:port("color")
-    local depth = graph:port("depth")
-    local static_mesh = graph:add_mesh("static_mesh")
-    local dynamic_mesh = graph:add_mesh("dynamic_mesh")
+    local buffers = create_buffers(parameters)
+    local color = render_graph.port("color")
+    local depth = render_graph.port("depth")
+    local static_mesh = render_graph.mesh("static_mesh")
+    local dynamic_mesh = render_graph.mesh("dynamic_mesh")
     local builder: Builder = {
         graph = graph,
         parameters = parameters,

@@ -29,21 +29,21 @@ Recipes only build descriptors; they never touch render objects.
 
 ### Resources
 
-| Method | Returns |
+| Call | Returns |
 | --- | --- |
-| `:add_buffer(id, usage, size)`, `:add_storage_buffer(id, size)` | Graph-owned buffer |
-| `:add_image(id, usage, format, extent?, additional_usage?, mip_levels?)` | Graph-owned 2D image; an omitted extent follows the swap chain |
-| `:add_storage_image(id, format, width, height, additional_usage?)` | `image_read_write` image |
-| `image:view()`, `image:view(id, view_params?)`, `:add_image_view(id, image, view_params?)` | View; `:view()` caches a default view with id `<image id>.view`, and a customized view needs an explicit id |
-| `:add_clamp_to_edge_sampler(id, sampler_params?)` | Graph-owned sampler |
-| `:import_resource(id)` | A resource C++ supplies through `RendGraphRecipeImportsVK` |
-| `:reference(id)` | An existing enclosing resource or composite member (`<id>.<member>`), without declaring another import |
-| `:port(id)` | A port of this graph, bound when it becomes a subgraph |
-| `:add_mesh(key)`, `:add_compute_pipeline(key)`, `:add_graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
-| `:register_mesh(key, params)`, `:register_graphics_pipeline(key, params)`, `:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
+| `render_graph.buffer(id, usage, size)`, `render_graph.storage_buffer(id, size)` | Graph-owned buffer |
+| `render_graph.image(id, usage, format, extent?, additional_usage?, mip_levels?)` | Graph-owned 2D image; an omitted extent follows the swap chain |
+| `render_graph.storage_image(id, format, width, height, additional_usage?)` | `image_read_write` image |
+| `image:view()`, `image:view(id, view_params?)`, `render_graph.image_view(id, image, view_params?)` | View; `:view()` caches a default view with id `<image id>.view`, and a customized view needs an explicit id |
+| `render_graph.clamp_to_edge_sampler(id, sampler_params?)` | Graph-owned sampler |
+| `render_graph.import_resource(id)` | A resource C++ supplies through `RendGraphRecipeImportsVK` |
+| `render_graph.reference(id)` | An existing enclosing resource or composite member (`<id>.<member>`), without declaring another import |
+| `render_graph.port(id)` | A port of this graph, bound when it becomes a subgraph |
+| `render_graph.mesh(key)`, `render_graph.compute_pipeline(key)`, `render_graph.graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
+| `graph:register_mesh(key, params)`, `graph:register_graphics_pipeline(key, params)`, `graph:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
 | `render_graph.compute_pipeline(key, description)`, `render_graph.graphics_pipeline(key, description)`, `render_graph.shader_compute_pipeline(shader)` | A handle that carries its registration; a task naming it emits the registration, merging equal ones per key. Needs no graph, so shared helpers use it |
-| `:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
-| `:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
+| `graph:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
+| `graph:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 | `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
 
 `graph:build()` collects every resource reachable from task params, bindings, edges, `uses`, and ports (views pull in their
@@ -69,7 +69,7 @@ copied, so a table can be reused for several tasks.
   of that dispatch's pipeline to graph resource handles, so dispatches of one task can bind the same shader id
   differently (the radix sort's passes alternate between its key buffers). Dispatch bindings belong to one dispatch;
   task bindings (`task:bind()`, the `bindings` option) belong to the task. Resource fields of typed params take handles only, never id strings: name a resource by id with
-  `graph:reference(id)`.
+  `render_graph.reference(id)`.
 - `uses = { handle, ... }` keeps resources reachable that the task accesses only through same-name reflected shader
   bindings (for example a camera buffer or a single-task scratch buffer). It declares no access and adds no edge.
 - `graph:import_task(id)` references a C++ task supplied with `imports.add_task()`.
@@ -148,7 +148,7 @@ with `graph:import_task(id)`; connect it like any task. Imported tasks set no `t
 ## Feature subgraph modules
 
 A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(id, params, target)`. It builds its
-own `render_graph.new()`, declares its port handles with `graph:port(name)`, and returns
+own `render_graph.new()`, declares its port handles with `render_graph.port(name)`, and returns
 `graph:as_subgraph(id, { name = parent_resource, ... }, imports?)`, a task the parent adds with `parent:add(...)` and
 connects like any task. The port map declares every port and binds it to a parent resource; owned resources stay scoped
 to the subgraph.

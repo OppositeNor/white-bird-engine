@@ -22,7 +22,7 @@ local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
+    local swap_chain = render_graph.import_resource("swap_chain")
     local triangle = graph:register_mesh("triangle", { mesh = "triangle" })
     local pipeline = graph:register_graphics_pipeline("draw_triangle_pipeline", {
         pipeline = "draw_triangle_pipeline",

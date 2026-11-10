@@ -22,8 +22,8 @@ local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("camera_info")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("camera_info")
     -- The mesh and the pipeline are registered on the render graph from their resources; rebuilds keep them unless the
     -- swap chain format, and so the pipeline's description, changes.
     local static_mesh = graph:register_mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" })

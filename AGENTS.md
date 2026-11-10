@@ -135,7 +135,7 @@ For non-trivial implementation tasks:
   deriving from `RendRecipeContextVK`, fills its base with the renderer facts its bindings receive, and returns
   `RendGraphScriptVK::serialize_context()` as the prepared context. Size swap-chain-dependent resources and dispatches in
   Lua from `swap_chain_extent`.
-- Every resource owned outside the graph must be declared with `graph:import_resource()` and supplied through `RendGraphRecipeImportsVK`; a
+- Every resource owned outside the graph must be declared with `render_graph.import_resource()` and supplied through `RendGraphRecipeImportsVK`; a
   declared-but-missing or supplied-but-undeclared import is an error, except that an unsupplied import resolves to a
   bindable object registered on the graph under its name (such as a registered image). Recipes cannot set initial data, so
   buffers that need it are application-owned imports.
@@ -148,7 +148,9 @@ For non-trivial implementation tasks:
   the same key) need no graph, so shared helpers use them; a typed task (or a multiplexer's branches) naming such a handle
   emits its registration, and equal registrations of a key merge while different ones fail. Recipes and feature modules
   register the pipelines they name this way, and recipes register the meshes and images their tasks name.
-  `graph:add_mesh()` and `add_*_pipeline()` name entries registered elsewhere.
+  `render_graph.mesh(key)` and `render_graph.compute_pipeline(key)`/`graphics_pipeline(key)` without a description name
+  entries registered elsewhere. Resource handles come from these `render_graph` module functions, never from `graph`
+  methods; a graph has methods only for what it records (registrations, tasks, edges, and its build).
 - Each resource declares exactly one of `buffer`, `image`, `image_view`, or `sampler`; `graph:build()` emits only those
   reachable from tasks. Tasks name a registered task type and pass `params` to it; bindings (`task:bind()`,
   `color_target()`, `depth_target()`) map task-local ids to graph resources, and `uses` only keeps resources reachable.
@@ -212,7 +214,7 @@ For non-trivial implementation tasks:
   the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare `WBE_RENDER_TASK` only registers the
   type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)`, `WBE_RECIPE_RESOURCE(task_local)`, or
   `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor takes resource
-  handles there, and only handles: a script names a resource by id with `graph:reference(id)`, never a string, and a
+  handles there, and only handles: a script names a resource by id with `render_graph.reference(id)`, never a string, and a
   task-local field lowers its handle to the graph id with an identity binding. Do not hand-write constructors or
   handle-bearing params records.
 

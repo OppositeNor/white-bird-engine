@@ -30,10 +30,10 @@ function voxel_octree.subgraph(identifier: string, parameters: wbe.OctreeRecipeP
     local graph = render_graph.new()
     local resources: {string:render_graph.Resource} = {}
     for _, id in ipairs(parameters.imports) do
-        resources[id] = graph:import_resource(id)
+        resources[id] = render_graph.import_resource(id)
     end
-    local color = graph:port("color")
-    local depth = graph:port("depth")
+    local color = render_graph.port("color")
+    local depth = render_graph.port("depth")
     local gather_leaves_pipeline = render_graph.shader_compute_pipeline("octree_debug_gather_leaves_shader")
     local gather_nodes_pipeline = render_graph.shader_compute_pipeline("octree_debug_gather_nodes_shader")
     -- The debug draws draw the cells' edges onto the target.
@@ -71,8 +71,8 @@ function voxel_octree.subgraph(identifier: string, parameters: wbe.OctreeRecipeP
         }
         return graph:draw_mesh(task_id, params)
     end
-    local static_mesh = graph:add_mesh("static_mesh")
-    local dynamic_mesh = graph:add_mesh("dynamic_mesh")
+    local static_mesh = render_graph.mesh("static_mesh")
+    local dynamic_mesh = render_graph.mesh("dynamic_mesh")
     local reset = graph:import_task("reset_octree")
     -- The static construction records once unless the application rebuilds it every frame (no trigger); the application
     -- triggers the imported reset with the same event.
@@ -82,9 +82,9 @@ function voxel_octree.subgraph(identifier: string, parameters: wbe.OctreeRecipeP
     build_double_sided.trigger = parameters.static_build
     local clear_dynamic = graph:import_task("clear_dynamic_octree")
     local dynamic = construction("dynamic_octree", dynamic_mesh, dynamic_build_pipeline, "opaque",
-        graph:reference(target.dynamic_mesh_transform_ids[1]))
+        render_graph.reference(target.dynamic_mesh_transform_ids[1]))
     local dynamic_second = construction("dynamic_octree_second", dynamic_mesh, dynamic_build_pipeline, "opaque",
-        graph:reference(target.dynamic_mesh_transform_ids[2]))
+        render_graph.reference(target.dynamic_mesh_transform_ids[2]))
     -- Debug views: the leaf gather serves both views, and the node gather only the node view.
     local leaf_groups = parameters.leaf_gather_group_count
     local leaf_gather_params: render_graph.RTParamsRunComputePipelineVK = {

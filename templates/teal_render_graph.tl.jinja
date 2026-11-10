@@ -105,7 +105,6 @@ local record render_graph
         tasks: {Task}
         -- Snapshot a non-empty list of graph resource handles without assigning a graph resource id.
         resource_bundle: function(self: Graph, resources: {Resource}): ResourceBundle
-        add_mesh: function(self: Graph, key: string): Resource
         -- Register a resource on the render graph under key; description is a reflected parameters struct, type_name its
         -- reflected name, which selects the registrator, and resource_type the C++ type of the registered object.
         register_resource: function(self: Graph, key: string, type_name: string, description: any,
@@ -115,23 +114,6 @@ local record render_graph
         register_compute_pipeline: function(self: Graph, key: string, params: wbe.RDParamsComputePipelineVK): Resource
         -- A registered image is bound like an import.
         register_image: function(self: Graph, key: string, params: wbe.RDParamsImageVK): Resource
-        add_compute_pipeline: function(self: Graph, key: string): Resource
-        add_graphics_pipeline: function(self: Graph, key: string): Resource
-        add_buffer: function(self: Graph, id: string, usage: wbe.RendResPrimaryUsageVK, size: integer): Resource
-        add_storage_buffer: function(self: Graph, id: string, size: integer): Resource
-        add_image: function(self: Graph, id: string, usage: wbe.RendResPrimaryUsageVK,
-            format: wbe.ImageFormatVK, extent?: wbe.RendExtent2DParamsVK,
-            additional_usage?: {wbe.ImageUsageFlagVK}, mip_levels?: integer): Resource
-        add_storage_image: function(self: Graph, id: string, format: wbe.ImageFormatVK,
-            width: integer, height: integer, additional_usage?: {wbe.ImageUsageFlagVK}): Resource
-        add_image_view: function(self: Graph, id: string, image: Resource, view?: wbe.RendImageViewParamsVK): Resource
-        add_clamp_to_edge_sampler: function(self: Graph, id: string, params?: wbe.RendSamplerParamsVK): Resource
-        import_resource: function(self: Graph, id: string): Resource
-        port: function(self: Graph, id: string): Resource
-        reference: function(self: Graph, id: string): Resource
-        indirect_dispatch: function(self: Graph, pipeline: Resource,
-            indirect_buffer: Resource, offset: integer,
-            bindings?: {string:Resource}): {{ dispatch.type }}
         as_subgraph: function(self: Graph, id: string, ports: {string:Resource}, imports?: {string}): Task
         add: function(self: Graph, task: Task): Task
         get: function(self: Graph, id: string): Task
@@ -160,6 +142,8 @@ local record render_graph
         additional_usage?: {wbe.ImageUsageFlagVK}): Resource
     image_view: function(id: string, image: Resource, view?: wbe.RendImageViewParamsVK): Resource
     clamp_to_edge_sampler: function(id: string, params?: wbe.RendSamplerParamsVK): Resource
+    -- A mesh registered on the render graph under key.
+    mesh: function(key: string): Resource
     -- A pipeline registered on the render graph under key. With a description, the handle registers it: the graph emits
     -- the registration when a task names the handle, merging equal registrations of a key.
     compute_pipeline: function(key: string, description?: wbe.RDParamsComputePipelineVK): Resource

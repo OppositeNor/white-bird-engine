@@ -202,7 +202,6 @@ end
 
 -- Shadow and reflective-shadow-map targets of every light. Every light shares one shadow sampler.
 local function create_light_resources(graph_builder: Builder)
-    local graph = graph_builder.graph
     local context = graph_builder.context
     local formats = context.formats
     local shadow_extent = graph_builder.shadow_extent
@@ -212,16 +211,16 @@ local function create_light_resources(graph_builder: Builder)
         local billboard_info = light_id("light_billboard_info", light)
         graph_builder.imports[#graph_builder.imports + 1] = light_info
         graph_builder.imports[#graph_builder.imports + 1] = billboard_info
-        resources[light_info] = graph:import_resource(light_info)
-        resources[billboard_info] = graph:import_resource(billboard_info)
-        local depth = graph:add_image(light_id("shadowmap_depth_image", light), "image_depth_target", formats.shadowmap_depth, shadow_extent)
-        local color = graph:add_image(light_id("shadowmap_color_image", light), "image_render_target", formats.rsm_flux, shadow_extent)
-        local normal = graph:add_image(light_id("rsm_normal_image", light), "image_render_target", formats.rsm_normal, shadow_extent)
-        local moments = graph:add_image(light_id("shadow_moments_image", light), "image_render_target", formats.shadow_moments,
+        resources[light_info] = render_graph.import_resource(light_info)
+        resources[billboard_info] = render_graph.import_resource(billboard_info)
+        local depth = render_graph.image(light_id("shadowmap_depth_image", light), "image_depth_target", formats.shadowmap_depth, shadow_extent)
+        local color = render_graph.image(light_id("shadowmap_color_image", light), "image_render_target", formats.rsm_flux, shadow_extent)
+        local normal = render_graph.image(light_id("rsm_normal_image", light), "image_render_target", formats.rsm_normal, shadow_extent)
+        local moments = render_graph.image(light_id("shadow_moments_image", light), "image_render_target", formats.shadow_moments,
             shadow_extent, { "transfer_src", "transfer_dst" }, context.shadow_mipmap_level_count)
-        local horizontal = graph:add_image(light_id("shadow_moments_sat_horizontal_image", light), "image_read_write",
+        local horizontal = render_graph.image(light_id("shadow_moments_sat_horizontal_image", light), "image_read_write",
             formats.shadow_moments, shadow_extent)
-        local summed = graph:add_image(light_id("shadow_moments_sat_image", light), "image_read_write", formats.shadow_moments,
+        local summed = render_graph.image(light_id("shadow_moments_sat_image", light), "image_read_write", formats.shadow_moments,
             shadow_extent)
         resources[light_id("shadowmap_depth", light)] = depth:view(light_id("shadowmap_depth", light))
         resources[light_id("shadowmap_color", light)] = color:view(light_id("shadowmap_color", light))
@@ -233,35 +232,34 @@ local function create_light_resources(graph_builder: Builder)
         resources[light_id("shadow_sat_horizontal", light)] = horizontal:view(light_id("shadow_sat_horizontal", light))
         resources[light_id("shadow_sat", light)] = summed:view(light_id("shadow_sat", light))
     end
-    resources.shadow_sampler = graph:add_clamp_to_edge_sampler("shadow_sampler",
+    resources.shadow_sampler = render_graph.clamp_to_edge_sampler("shadow_sampler",
         { min_lod = 0.0, max_lod = context.shadow_mipmap_level_count - 1.0 })
 end
 
 -- The G-buffer targets and the lighting and post-processing outputs. Views retain their source image handles.
 local function create_screen_resources(graph_builder: Builder)
-    local graph = graph_builder.graph
     local context = graph_builder.context
     local formats = context.formats
     local bloom_extent = graph_builder.bloom_extent
     local resources = graph_builder.resources
-    resources.gbuffer_albedo = graph:add_image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo):view("gbuffer_albedo")
-    resources.gbuffer_normal = graph:add_image("gbuffer_normal_image", "image_render_target", formats.gbuffer_normal):view("gbuffer_normal")
-    resources.gbuffer_rma = graph:add_image("gbuffer_rma_image", "image_render_target", formats.gbuffer_rma):view("gbuffer_rma")
-    resources.gbuffer_depth = graph:add_image("gbuffer_depth_image", "image_depth_target", formats.gbuffer_depth):view("gbuffer_depth")
-    resources.gbuffer_sampler = graph:add_clamp_to_edge_sampler("gbuffer_sampler", { min_filter = "nearest", mag_filter = "nearest" })
+    resources.gbuffer_albedo = render_graph.image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo):view("gbuffer_albedo")
+    resources.gbuffer_normal = render_graph.image("gbuffer_normal_image", "image_render_target", formats.gbuffer_normal):view("gbuffer_normal")
+    resources.gbuffer_rma = render_graph.image("gbuffer_rma_image", "image_render_target", formats.gbuffer_rma):view("gbuffer_rma")
+    resources.gbuffer_depth = render_graph.image("gbuffer_depth_image", "image_depth_target", formats.gbuffer_depth):view("gbuffer_depth")
+    resources.gbuffer_sampler = render_graph.clamp_to_edge_sampler("gbuffer_sampler", { min_filter = "nearest", mag_filter = "nearest" })
 
     -- The bloom images keep the extent of the initial swap chain, because the bloom readback buffer is sized by it.
-    resources.direct_lighting = graph:add_image("direct_lighting_image", "image_read_write", formats.lighting_output):view("direct_lighting")
-    resources.indirect_lighting = graph:add_image("indirect_lighting_image", "image_read_write", formats.lighting_output):view("indirect_lighting")
-    resources.result_image = graph:add_image("result_color_image", "image_read_write", formats.lighting_output):view("result_image")
-    resources.bloom_ping = graph:add_image("bloom_ping_image", "image_read_write", formats.lighting_output,
+    resources.direct_lighting = render_graph.image("direct_lighting_image", "image_read_write", formats.lighting_output):view("direct_lighting")
+    resources.indirect_lighting = render_graph.image("indirect_lighting_image", "image_read_write", formats.lighting_output):view("indirect_lighting")
+    resources.result_image = render_graph.image("result_color_image", "image_read_write", formats.lighting_output):view("result_image")
+    resources.bloom_ping = render_graph.image("bloom_ping_image", "image_read_write", formats.lighting_output,
         bloom_extent, { "transfer_src" }):view("bloom_ping")
-    resources.bloom_pong = graph:add_image("bloom_pong_image", "image_read_write", formats.lighting_output,
+    resources.bloom_pong = render_graph.image("bloom_pong_image", "image_read_write", formats.lighting_output,
         bloom_extent):view("bloom_pong")
     -- The present pipeline renders in the swap-chain format, so the sequence matches the presented image.
-    resources.frame_sequence = graph:add_image("frame_sequence_image", "image_render_target", context.swap_chain_format):view("frame_sequence")
-    resources.bloom_sampler = graph:add_clamp_to_edge_sampler("bloom_sampler")
-    resources.light_billboard_sampler = graph:add_clamp_to_edge_sampler("light_billboard_sampler")
+    resources.frame_sequence = render_graph.image("frame_sequence_image", "image_render_target", context.swap_chain_format):view("frame_sequence")
+    resources.bloom_sampler = render_graph.clamp_to_edge_sampler("bloom_sampler")
+    resources.light_billboard_sampler = render_graph.clamp_to_edge_sampler("light_billboard_sampler")
 end
 
 -- Tasks the application builds in C++.
@@ -346,7 +344,7 @@ local function add_mesh_draws(graph_builder: Builder)
             mesh = graph_builder.dynamic_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_dynamic },
             parts = { "opaque" },
-            transform = graph:reference(dynamic_transforms[1]),
+            transform = render_graph.reference(dynamic_transforms[1]),
             render_extent = shadow_extent,
             clear_values = {},
             color_load_op = "load",
@@ -360,7 +358,7 @@ local function add_mesh_draws(graph_builder: Builder)
             mesh = graph_builder.dynamic_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_dynamic },
             parts = { "opaque" },
-            transform = graph:reference(dynamic_transforms[2]),
+            transform = render_graph.reference(dynamic_transforms[2]),
             render_extent = shadow_extent,
             clear_values = {},
             color_load_op = "load",
@@ -403,7 +401,7 @@ local function add_mesh_draws(graph_builder: Builder)
         mesh = graph_builder.dynamic_mesh,
         pipeline = { default = graph_builder.pipelines.gbuffer_dynamic },
         parts = { "opaque" },
-        transform = graph:reference(dynamic_transforms[1]),
+        transform = render_graph.reference(dynamic_transforms[1]),
         clear_values = {},
         color_load_op = "load",
         depth_load_op = "load",
@@ -417,7 +415,7 @@ local function add_mesh_draws(graph_builder: Builder)
         mesh = graph_builder.dynamic_mesh,
         pipeline = { default = graph_builder.pipelines.gbuffer_dynamic },
         parts = { "opaque" },
-        transform = graph:reference(dynamic_transforms[2]),
+        transform = render_graph.reference(dynamic_transforms[2]),
         clear_values = {},
         color_load_op = "load",
         depth_load_op = "load",
@@ -733,7 +731,7 @@ function exports.build(context: wbe.DeferredRecipeContext, parameters: wbe.Defer
         builder.imports[#builder.imports + 1] = id
     end
     for _, id in ipairs(builder.imports) do
-        builder.resources[id] = graph:import_resource(id)
+        builder.resources[id] = render_graph.import_resource(id)
     end
     create_light_resources(builder)
     create_screen_resources(builder)

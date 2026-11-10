@@ -24,9 +24,9 @@ local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("skinned_mesh_camera_info")
-    local skinning_transforms = graph:import_resource("skinned_mesh_skinning_transforms")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("skinned_mesh_camera_info")
+    local skinning_transforms = render_graph.import_resource("skinned_mesh_skinning_transforms")
     -- The shader reads position from the geometry binding and the joint ids and weights from the joint-binding binding,
     -- which the draw binds from the compiled mesh.
     local mesh = graph:register_mesh("skinned_mesh", { mesh = "model_simple_skin.mesh" })

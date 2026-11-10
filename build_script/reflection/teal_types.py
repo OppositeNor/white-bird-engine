@@ -128,10 +128,9 @@ _RECIPE_RESOURCE_SCOPES = ("graph", "task_local")
 _RENDER_OBJECT = "WBE_RENDER_OBJECT"
 # The shared render_graph module's Graph members. Teal lets them silently override a generated constructor of the
 # same name, so generation rejects one.
-_GRAPH_MEMBERS = {"tasks", "add", "get", "import_task", "chain", "build",
-                  "add_mesh", "add_compute_pipeline", "add_graphics_pipeline", "add_buffer", "add_storage_buffer",
-                  "add_image", "add_storage_image", "add_image_view", "add_clamp_to_edge_sampler", "import_resource",
-                  "port", "reference", "indirect_dispatch", "as_subgraph"}
+_GRAPH_MEMBERS = {"tasks", "resource_bundle", "register_resource", "register_mesh", "register_graphics_pipeline",
+                  "register_compute_pipeline", "register_image", "as_subgraph", "add", "get", "import_task", "multiplex",
+                  "chain", "build"}
 
 
 def _template_argument(p_type: str) -> tuple[str, str]:
@@ -215,7 +214,7 @@ class _RenderTaskDescriber:
         if p_scope is not None:
             scope, target = p_scope
             resource = {"kind": "resource", "scope": scope}
-            # Every resource field takes handles only; graph:reference() names a graph resource by id.
+            # Every resource field takes handles only; render_graph.reference() names a graph resource by id.
             resource_type = "Resource"
             if scope == "registered":
                 resource["expected_type"] = "WhiteBirdEngine::" + target

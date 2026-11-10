@@ -181,7 +181,7 @@ assert(require("render_graph_utils.render_graph") == common)
 assert(require("render_graph_utils.render_graph_tasks") == constructors)
 return { build = function()
     local graph = graph_utils.new()
-    local pipeline = graph:add_compute_pipeline("pipeline")
+    local pipeline = graph_utils.compute_pipeline("pipeline")
     local compute = graph:compute("compute", { pipeline = pipeline })
     assert(graph:get("compute") == compute)
     return graph:build()
@@ -202,11 +202,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, CollectsHandleBindingsEdgesAndImageDepe
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local image = graph:add_storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
-    local view = graph:add_image_view("output", image)
-    local sampler = graph:add_clamp_to_edge_sampler("sampler")
-    local scratch = graph:add_buffer("scratch", "buffer_storage", 64)
-    local unused = graph:add_storage_buffer("unused", 32)
+    local image = render_graph.storage_image("output_image", "r16g16b16a16_sfloat", 16, 8)
+    local view = render_graph.image_view("output", image)
+    local sampler = render_graph.clamp_to_edge_sampler("sampler")
+    local scratch = render_graph.buffer("scratch", "buffer_storage", 64)
+    local unused = render_graph.storage_buffer("unused", 32)
     assert(render_graph.enum_name("image_read_write") == "IMAGE_READ_WRITE")
     local write = graph:add({ id = "write", type = "registry_probe", params = { label = "write" }, uses = { scratch } })
     local read = graph:add({ id = "read", type = "registry_probe", params = { label = "read" } })
@@ -254,12 +254,12 @@ TEST_F(WBERendGraphScriptVKResourceTest, LowersImportedHandlesAndCollectsParentP
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local target_image = graph:add_storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
-    local target = graph:add_image_view("target", target_image)
-    local input = graph:import_resource("input")
-    local member = graph:reference("input.member")
+    local target_image = render_graph.storage_image("target_image", "r16g16b16a16_sfloat", 16, 8)
+    local target = render_graph.image_view("target", target_image)
+    local input = render_graph.import_resource("input")
+    local member = render_graph.reference("input.member")
     local nested = render_graph.new()
-    local color = nested:port("color")
+    local color = render_graph.port("color")
     nested:add({ id = "draw", type = "registry_probe", params = { label = "draw" }, bindings = { output = color } })
     local prepare = graph:add({ id = "prepare", type = "registry_probe", params = { label = "prepare" }, uses = { input, member } })
     local effect = graph:add(nested:as_subgraph("effect", { unused = target, color = target }, { "nested_only" }))
@@ -328,7 +328,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, ReusesHandlesWithoutLeakingDeclarations
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local first = render_graph.new()
-    local shared = first:add_storage_buffer("shared", 16)
+    local shared = render_graph.storage_buffer("shared", 16)
     first:add({ id = "first", type = "registry_probe", bindings = { input = shared }, uses = { shared, shared } })
     local second = render_graph.new()
     second:add({ id = "second", type = "registry_probe" })
@@ -402,7 +402,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, BatchedConnectionsLowerEachResourceAndP
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
@@ -444,7 +444,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, ConnectionFanOutLeavesConsumersUnordere
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
@@ -479,8 +479,8 @@ TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesSnapshotMembersAndPreser
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local color = graph:add_storage_buffer("color", 16)
-    local depth = graph:add_storage_buffer("depth", 32)
+    local color = render_graph.storage_buffer("color", 16)
+    local depth = render_graph.storage_buffer("depth", 32)
     local source = { depth, color, depth }
     local bundle = graph:resource_bundle(source)
     assert(bundle.id == nil)
@@ -533,10 +533,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesCollectOnlyUsedMembersAn
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local image = graph:add_storage_image("image", "r16g16b16a16_sfloat", 16, 8)
+    local image = render_graph.storage_image("image", "r16g16b16a16_sfloat", 16, 8)
     local view = image:view()
-    local scratch = graph:add_storage_buffer("scratch", 64)
-    local unused = graph:add_storage_buffer("unused", 32)
+    local scratch = render_graph.storage_buffer("scratch", 64)
+    local unused = render_graph.storage_buffer("unused", 32)
     local bundle = graph:resource_bundle({ view, scratch })
     graph:resource_bundle({ unused })
     assert(#graph:build().resources == 0)
@@ -573,11 +573,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConstructionRejectsInvali
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local resource = graph:add_storage_buffer("resource", 16)
-    local other = graph:add_storage_buffer("other", 32)
-    local mesh = graph:add_mesh("mesh")
-    local compute = graph:add_compute_pipeline("compute")
-    local graphics = graph:add_graphics_pipeline("graphics")
+    local resource = render_graph.storage_buffer("resource", 16)
+    local other = render_graph.storage_buffer("other", 32)
+    local mesh = render_graph.mesh("mesh")
+    local compute = render_graph.compute_pipeline("compute")
+    local graphics = render_graph.graphics_pipeline("graphics")
     local bundle = graph:resource_bundle({ resource })
     local invalid_lists = {
         {},
@@ -611,9 +611,9 @@ TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundleConnectionFailuresLeaveEx
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local resource = graph:add_storage_buffer("resource", 16)
-    local other = graph:add_storage_buffer("other", 32)
-    local registered = graph:add_mesh("mesh")
+    local resource = render_graph.storage_buffer("resource", 16)
+    local other = render_graph.storage_buffer("other", 32)
+    local registered = render_graph.mesh("mesh")
     local producer = graph:import_task("producer")
     local consumer = graph:import_task("consumer")
     local third = graph:import_task("third")
@@ -672,8 +672,8 @@ TEST_F(WBERendGraphScriptVKResourceTest, ResourceBundlesPreserveConflictingOwned
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local first = graph:add_storage_buffer("same", 16)
-    local second = graph:add_storage_buffer("same", 32)
+    local first = render_graph.storage_buffer("same", 16)
+    local second = render_graph.storage_buffer("same", 32)
     local bundle = graph:resource_bundle({ first, second })
     local producer = graph:import_task("producer")
     local consumer = graph:import_task("consumer")
@@ -693,7 +693,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, InputsFromBindsTaskLocalNamesAndConnect
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local color = graph_utils.storage_buffer("color", 16)
@@ -736,7 +736,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, ConnectionBatchesValidateBeforeChanging
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local resource = graph_utils.storage_buffer("resource", 16)
@@ -787,7 +787,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, InputConnectionsPreserveConflictingOwne
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local first = graph_utils.storage_buffer("same", 16)
@@ -990,10 +990,10 @@ TEST_F(WBERendGraphScriptVKResourceTest, RegisteredResourcesLowerWithoutGraphRes
 local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
-    local mesh = graph:add_mesh("static_mesh")
-    local graphics = graph:add_graphics_pipeline("shared_name")
-    local compute = graph:add_compute_pipeline("shared_name")
-    graph:add_mesh("unused_mesh")
+    local mesh = graph_utils.mesh("static_mesh")
+    local graphics = graph_utils.graphics_pipeline("shared_name")
+    local compute = graph_utils.compute_pipeline("shared_name")
+    graph_utils.mesh("unused_mesh")
     assert(#graph.tasks == 0)
     local draw = graph:draw_mesh("mesh", { mesh = mesh, pipeline = { default = graphics }, parts = { "opaque" } })
     graph:compute("compute", { pipeline = compute })
@@ -1084,13 +1084,13 @@ TEST_F(WBERendGraphScriptVKResourceTest, RegisteredResourcesRejectWrongTypesBefo
 local graph_utils = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = graph_utils.graph()
-    local graphics = graph:add_graphics_pipeline("graphics")
-    local compute = graph:add_compute_pipeline("compute")
-    local mesh = graph:add_mesh("mesh")
+    local graphics = graph_utils.graphics_pipeline("graphics")
+    local compute = graph_utils.compute_pipeline("compute")
+    local mesh = graph_utils.mesh("mesh")
     local invalid_calls = {
-        function() graph:add_mesh("") end,
-        function() graph:add_compute_pipeline("") end,
-        function() graph:add_graphics_pipeline("") end,
+        function() graph_utils.mesh("") end,
+        function() graph_utils.compute_pipeline("") end,
+        function() graph_utils.graphics_pipeline("") end,
         function() graph:compute("invalid", { pipeline = "compute" }) end,
         function() graph:compute("invalid", { pipeline = graphics }) end,
         function() graph:draw("invalid", { pipeline = compute }) end,
@@ -1135,16 +1135,16 @@ TEST_F(WBERendGraphScriptVKResourceTest, DatabaseResourcesRejectGraphBindingsBef
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local compute = graph:add_compute_pipeline("compute")
-    local graphics = graph:add_graphics_pipeline("graphics")
-    local buffer = graph:add_storage_buffer("buffer", 16)
+    local compute = render_graph.compute_pipeline("compute")
+    local graphics = render_graph.graphics_pipeline("graphics")
+    local buffer = render_graph.storage_buffer("buffer", 16)
     local producer = graph:compute("producer", { pipeline = compute })
     local consumer = graph:draw("consumer", { pipeline = graphics })
     consumer:bind("valid", buffer)
     producer:connect(consumer, buffer)
     local bindings = consumer.bindings
     local edges = producer.edges
-    for _, resource in ipairs({ graph:add_mesh("mesh"), compute, graphics }) do
+    for _, resource in ipairs({ render_graph.mesh("mesh"), compute, graphics }) do
         local invalid_calls = {
             function() graph:full_memory_barrier("invalid", { resource = resource }) end,
             function() graph:compute_sequential("invalid", { dispatches = {
@@ -1160,7 +1160,7 @@ return { build = function()
             function() consumer:color_target(0, resource) end,
             function() consumer:depth_target(resource) end,
             function() resource:view() end,
-            function() graph:add_image_view("invalid", resource) end,
+            function() render_graph.image_view("invalid", resource) end,
         }
         for _, call in ipairs(invalid_calls) do
             assert(not pcall(call))
@@ -1217,18 +1217,18 @@ return { build = function()
             consumer:bind("input", buffer)
         end,
         function(graph, producer, consumer, buffer, resource)
-            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { bindings = { input = resource } })
+            graph:compute("invalid", { pipeline = render_graph.compute_pipeline("compute") }, { bindings = { input = resource } })
         end,
         function(graph, producer, consumer, buffer, resource)
-            graph:compute("invalid", { pipeline = graph:add_compute_pipeline("compute") }, { uses = { resource } })
+            graph:compute("invalid", { pipeline = render_graph.compute_pipeline("compute") }, { uses = { resource } })
         end,
     }
     for _, resource_kind in ipairs({ "mesh", "compute", "graphics" }) do
         for _, bind in ipairs(invalid_bindings) do
             local graph = render_graph.new()
-            local resource = resource_kind == "mesh" and graph:add_mesh("resource") or
-                resource_kind == "compute" and graph:add_compute_pipeline("resource") or graph:add_graphics_pipeline("resource")
-            local buffer = graph:add_storage_buffer("buffer", 16)
+            local resource = resource_kind == "mesh" and render_graph.mesh("resource") or
+                resource_kind == "compute" and render_graph.compute_pipeline("resource") or render_graph.graphics_pipeline("resource")
+            local buffer = render_graph.storage_buffer("buffer", 16)
             local producer = graph:add({ id = "producer", type = "registry_probe" })
             local consumer = graph:add({ id = "consumer", type = "registry_probe" })
             bind(graph, producer, consumer, buffer, resource)
@@ -1247,11 +1247,11 @@ TEST_F(WBERendGraphScriptVKResourceTest, ImageMethodsCacheDefaultViewsAndPreserv
 local render_graph = require("render_graph_utils.render_graph_utils")
 return { build = function()
     local graph = render_graph.new()
-    local image = graph:add_image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
+    local image = render_graph.image("image", "image_read_write", "r16g16b16a16_sfloat", { width = 16, height = 8 }, nil, 4)
     local view = image:view()
     assert(image:view() == view)
     local range = image:view("image_range", { base_mip_level = 1, mip_level_count = 3 })
-    graph:draw("draw", { pipeline = graph:add_graphics_pipeline("pipeline") }):color_target(0, view)
+    graph:draw("draw", { pipeline = render_graph.graphics_pipeline("pipeline") }):color_target(0, view)
     graph:cpu_acquire_image("readback", { image_view = range })
     return graph:build()
 end }
@@ -1291,7 +1291,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedConstructorsDoNotMutateCallerParam
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local buffer = graph_utils.storage_buffer("commands", 64)
@@ -1332,7 +1332,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, AttachmentMethodsKeepAliasesTaskScopedA
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function graphics_pipeline(p_key)
-    return helper_graph:add_graphics_pipeline(p_key)
+    return graph_utils.graphics_pipeline(p_key)
 end
 return { build = function()
     local first = graph_utils.import_resource("first")
@@ -1356,7 +1356,7 @@ end }
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function graphics_pipeline(p_key)
-    return helper_graph:add_graphics_pipeline(p_key)
+    return graph_utils.graphics_pipeline(p_key)
 end
 return { build = function()
     local target = graph_utils.import_resource("target")
@@ -1372,7 +1372,7 @@ end }
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function graphics_pipeline(p_key)
-    return helper_graph:add_graphics_pipeline(p_key)
+    return graph_utils.graphics_pipeline(p_key)
 end
 return { build = function()
     local graph = graph_utils.graph()
@@ -1390,7 +1390,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, SequentialBindingsTakeHandlesAndRejectC
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local commands = graph_utils.storage_buffer("commands", 64)
@@ -1418,7 +1418,7 @@ end }
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local graph = graph_utils.graph()
@@ -1435,7 +1435,7 @@ end }
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function()
     local commands = graph_utils.storage_buffer("commands", 64)
@@ -1469,7 +1469,7 @@ end }
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function graphics_pipeline(p_key)
-    return helper_graph:add_graphics_pipeline(p_key)
+    return graph_utils.graphics_pipeline(p_key)
 end
 return { build = function()
     local image = graph_utils.storage_image("image", "r16g16b16a16_sfloat", 16, 8)
@@ -1488,7 +1488,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, TypedResourceParametersRejectAliasesTha
 local graph_utils = require("render_graph_utils.render_graph_utils")
 local helper_graph = graph_utils.new()
 local function compute_pipeline(p_key)
-    return helper_graph:add_compute_pipeline(p_key)
+    return graph_utils.compute_pipeline(p_key)
 end
 return { build = function(context)
     local commands = graph_utils.storage_buffer("commands", 64)

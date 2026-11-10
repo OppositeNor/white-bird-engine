@@ -24,13 +24,13 @@ local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("camera_info")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("camera_info")
     local function pipeline(key: string): render_graph.Resource
         return render_graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
     end
     graph:draw_mesh("run_material_variants", {
-        mesh = graph:add_mesh("material_variants.cube"),
+        mesh = render_graph.mesh("material_variants.cube"),
         pipeline = {
             default = pipeline("draw_cube_unshaded_pipeline"),
             tinted = pipeline("draw_cube_unshaded_tinted_pipeline"),

@@ -143,11 +143,11 @@ local exports = {}
 
 function exports.build(_context: wbe.RendRecipeContextVK): wbe.RendGraphRecipeVK
     local graph = Graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("camera_info")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("camera_info")
     graph:draw_mesh("run_static_mesh", {
-        mesh = graph:add_mesh("model_cube_static.mesh"),
-        pipeline = { default = graph:add_graphics_pipeline("draw_cube_unshaded_pipeline") },
+        mesh = render_graph.mesh("model_cube_static.mesh"),
+        pipeline = { default = render_graph.graphics_pipeline("draw_cube_unshaded_pipeline") },
         parts = { "opaque" },
     }, { uses = { camera_info } }):color_target(0, swap_chain)
     return graph:build()
@@ -158,21 +158,23 @@ return exports
 
 ### Resource handles
 
-Every resource method returns a `Graph.Resource` handle:
+Resources are handles made by functions of the `render_graph` module, not by the graph; a graph discovers the ones its
+tasks reach when it builds:
 
-- Graph-owned resources: `:add_buffer(id, usage, size)`, `:add_storage_buffer(id, size)`,
-  `:add_image(id, usage, format, extent?, additional_usage?, mip_levels?)`, `:add_storage_image(id, format, width, height,
-  additional_usage?)`, `:add_image_view(id, image, view?)`, and `:add_clamp_to_edge_sampler(id, sampler?)`. An image with
-  no extent follows the swap chain.
+- Graph-owned resources: `render_graph.buffer(id, usage, size)`, `render_graph.storage_buffer(id, size)`,
+  `render_graph.image(id, usage, format, extent?, additional_usage?, mip_levels?)`, `render_graph.storage_image(id, format,
+  width, height, additional_usage?)`, `render_graph.image_view(id, image, view?)`, and
+  `render_graph.clamp_to_edge_sampler(id, sampler?)`. An image with no extent follows the swap chain.
 - `image:view()` returns a cached default view with id `<image id>.view`, whose type, format, and range follow the image.
   `image:view(id, view?)` names a view or customizes its mip, layer, or aspect range; a customized view needs an id. A view
   keeps its image reachable.
-- `:import_resource(id)` names a resource C++ supplies through `RendGraphRecipeImportsVK`; `:reference(id)` names an
-  enclosing resource or a composite member such as `<mesh>.<member>` without declaring another import; `:port(id)` names a
-  port of a graph that becomes a subgraph. Views may be taken of all three; C++ validates the actual kind.
-- `:add_mesh(key)`, `:add_compute_pipeline(key)`, and `:add_graphics_pipeline(key)` name entries the application registered
-  in the render database. They are only valid in task params, never as edges, aliases, or attachments, and the task checks
-  their type.
+- `render_graph.import_resource(id)` names a resource C++ supplies through `RendGraphRecipeImportsVK`;
+  `render_graph.reference(id)` names an enclosing resource or a composite member such as `<mesh>.<member>` without
+  declaring another import; `render_graph.port(id)` names a port of a graph that becomes a subgraph. Views may be taken of
+  all three; C++ validates the actual kind.
+- `render_graph.mesh(key)`, `render_graph.compute_pipeline(key)`, and `render_graph.graphics_pipeline(key)` name entries
+  registered on the graph, by a `graph:register_*()` call or a handle carrying its registration. They are only valid in
+  task params, never as edges, aliases, or attachments, and the task checks their type.
 
 Nothing is registered with the graph: `graph:build()` emits the resources reachable from task params, aliases, edges,
 `uses`, and ports, each once. Unused handles are omitted, and two different owned handles with the same id fail.
@@ -181,7 +183,7 @@ The module exposes the same constructors as functions (`Graph.storage_buffer()`,
 handles or dispatches take no graph.
 
 ```lua
-local albedo = graph:add_image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo):view("gbuffer_albedo")
+local albedo = render_graph.image("gbuffer_albedo_image", "image_render_target", formats.gbuffer_albedo):view("gbuffer_albedo")
 draw_gbuffer:color_target(0, albedo)
 lighting:alias("gbuffer_albedo", albedo)
 graph:chain(albedo, { draw_gbuffer, lighting })
@@ -197,7 +199,7 @@ task handle. `options` holds `aliases`, `uses`, `trigger`, and `toggle`. Params 
 
 ```lua
 local lighting = graph:compute("lighting", {
-    pipeline = graph:add_compute_pipeline("lighting_shader"),
+    pipeline = render_graph.compute_pipeline("lighting_shader"),
     group_count_x = groups_x,
     group_count_y = groups_y,
     queue_family = "compute_1",

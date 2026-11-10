@@ -65,8 +65,8 @@ local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
     local graph = render_graph.new()
-    local swap_chain = graph:import_resource("swap_chain")
-    local camera_info = graph:import_resource("camera_info")
+    local swap_chain = render_graph.import_resource("swap_chain")
+    local camera_info = render_graph.import_resource("camera_info")
     graph:draw_mesh("run_static_mesh", {
         mesh = graph:register_mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" }),
         pipeline = { default = render_graph.graphics_pipeline("draw_cube_unshaded_pipeline", {
@@ -79,9 +79,10 @@ end
 return exports
 ```
 
-- **Handles, not strings.** Resource methods (`graph:add_image()`, `image:view()`, `graph:import_resource()`, ...) and
+- **Handles, not strings.** The `render_graph` module's resource functions (`render_graph.image()`, `image:view()`,
+  `render_graph.import_resource()`, ...; graphs have no resource methods) and
   registered-resource declarations (`graph:register_mesh()`, `graph:register_graphics_pipeline()`, ...,
-  `graph:add_mesh()`, `graph:add_compute_pipeline()`, `graph:add_graphics_pipeline()`) return
+  `render_graph.mesh()`, `render_graph.compute_pipeline()`, `render_graph.graphics_pipeline()`) return
   `render_graph.Resource` handles. Pass them to task params, `:bind()`, `:color_target()`, `:depth_target()`, edges, and subgraph
   ports. `graph:build()` emits only the resources reachable from tasks, so there is no resource list to maintain.
 - **Typed constructors.** `graph:compute()`, `:draw()`, `:draw_mesh()`, ... are generated from the task classes and
@@ -126,7 +127,7 @@ objects between graphs.
   `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected.
 - **Resources.** Graph-owned resources are buffers, images, image views, and samplers. Everything owned elsewhere is an import,
   supplied through `RendGraphRecipeImportsVK::add()` (or `add_resource(id, *bindable)` in C++); composites register
-  `<id>.<member>`, which recipes name with `graph:reference()`. Buffers that need initial data are application-owned imports.
+  `<id>.<member>`, which recipes name with `render_graph.reference()`. Buffers that need initial data are application-owned imports.
   Keep the description structs' `operator==` complete, because diffing relies on it.
 - **Meshes** are drawn with `graph:draw_mesh()` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), which imports the mesh
   under its registration key on the graph. Do not hand-assemble mesh draws.

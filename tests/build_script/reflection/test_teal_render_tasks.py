@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
 from typing import Any
 import unittest
@@ -103,9 +104,9 @@ class TealRenderTasksTest(unittest.TestCase):
         for method in ['"compute"', "end", "two words", ""]:
             with self.subTest(method=method), self.assertRaisesRegex(ValueError, "one identifier"):
                 _describe([params, _task("RTComputeVK", method, params.name)])
-        for method in ["chain", "add_mesh", "add_compute_pipeline", "add_graphics_pipeline", "add_buffer", "add_storage_buffer",
-                       "add_image", "add_storage_image", "add_image_view", "add_clamp_to_edge_sampler", "import_resource",
-                       "port", "reference", "indirect_dispatch", "as_subgraph"]:
+        for method in ["tasks", "resource_bundle", "register_resource", "register_mesh", "register_graphics_pipeline",
+                       "register_compute_pipeline", "register_image", "as_subgraph", "add", "get", "import_task", "multiplex",
+                       "chain", "build"]:
             with self.subTest(method=method), self.assertRaisesRegex(ValueError, "shadows"):
                 _describe([params, _task("RTComputeVK", method, params.name)])
         with self.assertRaisesRegex(ValueError, "more than one"):
@@ -145,9 +146,9 @@ class TealRenderTasksTest(unittest.TestCase):
             (generated / "render_graph_utils").mkdir(parents=True)
             (generated / "render_graph_utils" / "render_graph_tasks.tl").write_text(module)
             (generated / "render_graph_utils/render_graph.tl").write_text(common)
-            core_types = ["RendRecipeResourceVK", "RendImageViewParamsVK", "RendRecipeTriggerVK", "RendRecipeToggleVK",
-                          "RendGraphRecipeVK", "RendResPrimaryUsageVK", "ImageFormatVK", "RendExtent2DParamsVK",
-                          "ImageUsageFlagVK", "RendSamplerParamsVK", "RTParamsComputeDispatchVK"]
+            # A stand-in for the generated wbe declarations, declaring every wbe type the rendered modules name, so it
+            # follows the templates as they change.
+            core_types = sorted(set(re.findall(r"\bwbe\.([A-Za-z_]\w*)", common + module)))
             (generated / "wbe.d.tl").write_text("local record wbe\n" + "".join(
                 f"    interface {name}\n    end\n" for name in core_types) + "end\nreturn wbe\n")
             implementation = generated / "render_graph_utils/render_graph_utils.tl"
@@ -155,9 +156,9 @@ class TealRenderTasksTest(unittest.TestCase):
 local render_graph_tasks = require("render_graph_utils.render_graph_tasks")
 function Graph.new(): Graph.Graph
     local graph: Graph.Graph = { tasks = {} }
-    render_graph_tasks.install(graph, function(p_id: string, _type: string, p_params: any, _options: Graph.TaskOptions,
+    render_graph_tasks.install(graph, function(id: string, _type: string, params: any, _options: Graph.TaskOptions,
         _fields: {render_graph_tasks.ResourceField}): Graph.Task
-        local task: Graph.Task = { id = p_id, params = p_params, graph = graph }
+        local task: Graph.Task = { id = id, params = params, graph = graph }
         graph.tasks[#graph.tasks + 1] = task
         return task
     end)
@@ -171,7 +172,7 @@ local type Shared = require("render_graph_utils.render_graph")
 local graph = Graph.new()
 local params: Graph.RTParamsCopyVK = { pipeline = "pipeline", buffer = { id = "buffer" } }
 local task: Shared.Task = graph:copy("copy", params)
-graph:copy("other", { pipeline = "pipeline", buffer = "buffer" })
+graph:copy("other", { pipeline = "pipeline", buffer = { id = "other_buffer" } })
 assert(#graph.tasks == 2)
 assert(task.graph == graph)
 local captured = task.params as Graph.RTParamsCopyVK
@@ -184,12 +185,18 @@ return graph
             self.assertNotIn('require("render_graph_utils.', common)
             (generated / "render_graph_utils/render_graph.lua").write_text(
                 compiler._compile_teal(generated / "render_graph_utils/render_graph.tl"))
-            self.assertIn('p_make_task(p_id, "wire_copy", p_params, p_options, copy_fields)',
+            self.assertIn('make_task(id, "wire_copy", params, options, copy_fields)',
                           compiler._compile_teal(generated / "render_graph_utils" / "render_graph_tasks.tl"))
             (generated / "render_graph_utils/render_graph_tasks.lua").write_text(
                 compiler._compile_teal(generated / "render_graph_utils/render_graph_tasks.tl"))
             (generated / "render_graph_utils/render_graph_utils.lua").write_text(compiler._compile_teal(implementation))
             consumer_lua = compiler._compile_teal(consumer)
+            # Resource fields take handles only; a resource id string fails the type check.
+            string_consumer = Path(temporary) / "string_consumer.tl"
+            string_consumer.write_text('local Graph = require("render_graph_utils.render_graph_utils")\n'
+                                       'Graph.new():copy("copy", { pipeline = "pipeline", buffer = "buffer" })\n')
+            with self.assertRaisesRegex(RuntimeError, "Failed to compile Teal script"):
+                compiler._compile_teal(string_consumer)
             runtime = lupa.lua55.LuaRuntime(unpack_returned_tuples=True)
             runtime.execute("package.path = ...", (generated / "?.lua").as_posix())
             runtime.execute(consumer_lua)

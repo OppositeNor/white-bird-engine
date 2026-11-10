@@ -230,7 +230,7 @@ meshes are compiled and imported once), builds and imports the material table fo
 Different submeshes of one mesh can be drawn with different pipelines in one task. Each material has a pipeline variant
 (`RUMaterial::get_pipeline_variant()`, `default` unless the material sets `pipeline_variant`). The mesh compiler batches
 draws only with draws of the same variant, so every `MeshDrawBatchVK` carries one variant. `pipeline` maps each variant the
-task draws to its pipeline (`pipeline = { default = gbuffer_opaque, foliage = graph:add_graphics_pipeline("gbuffer_foliage") }`;
+task draws to its pipeline (`pipeline = { default = gbuffer_opaque, foliage = render_graph.graphics_pipeline("gbuffer_foliage") }`;
 in C++, `RTParamsGraphicsDrawMeshVK::make_default_pipeline(key)` builds a one-pipeline map). The task binds each batch's
 pipeline before its indirect draw. Drawing a variant the task does not map throws; mapping a variant the mesh does not use is allowed, so one map
 can serve several meshes. All of a task's pipelines must render to the same targets, the task aliases the union of the

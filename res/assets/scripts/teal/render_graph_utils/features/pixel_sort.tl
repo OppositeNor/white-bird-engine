@@ -89,13 +89,13 @@ function pixel_sort.subgraph(id: string, params: wbe.PixelSortRecipeParams, targ
     local column_group_count = ceil_div(line_count, PIXEL_SORT_COLUMN_WORKGROUP_SIZE)
 
     local graph = render_graph.new()
-    local color = graph:port("color")
-    local contrast = graph:import_resource(params.contrast_import)
-    local source = graph:add_storage_image("pixel_sort_source_image", params.color_format, width, height)
+    local color = render_graph.port("color")
+    local contrast = render_graph.import_resource(params.contrast_import)
+    local source = render_graph.storage_image("pixel_sort_source_image", params.color_format, width, height)
         :view("pixel_sort_source")
-    local mask = graph:add_storage_image(
+    local mask = render_graph.storage_image(
         "pixel_sort_mask_image", scope == "SPAN" and "r16g16b16a16_uint" or "r16_uint", width, height):view("pixel_sort_mask")
-    local column_offsets = graph:add_storage_buffer(
+    local column_offsets = render_graph.storage_buffer(
         "pixel_sort_column_offsets", (PIXEL_SORT_COLUMN_OFFSETS_START + line_count) * UINT32_SIZE)
     -- The sort is sized for every pixel inside the mask.
     local sort_buffers = sort.radix_sort_buffers(RADIX_SORT_BUFFER_NAMES, element_count)
