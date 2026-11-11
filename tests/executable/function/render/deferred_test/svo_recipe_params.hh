@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -99,11 +98,6 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVORecipeParams : public RecipeFeatureParams
      */
     WBE_META(WBE_REFLECT)
     std::string dynamic_shader_prefix;
-    /**
-     * @brief The import names of the application's SVO buffers.
-     */
-    WBE_META(WBE_REFLECT)
-    std::vector<std::string> imports;
     /**
      * @brief The byte sizes of the scratch buffers.
      */

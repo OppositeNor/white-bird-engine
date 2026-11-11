@@ -25,7 +25,7 @@ namespace WhiteBirdEngine {
  * @brief Description of a texture registered on a render graph under the "image" kind (RRImageVK). Copyable and movable.
  *
  * The texture is uploaded into an image and registered as its default view, which recipes bind by the registration key
- * through `render_graph.import_resource()`. Deserialization is strict.
+ * through the import handle `graph.registered_image()` returns. Deserialization is strict.
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RDParamsImageVK {
     /**

@@ -333,6 +333,8 @@ struct RendTaskDescVK {
 
     // The id of this task within the graph.
     RendTaskID task_id;
+    // The name diagnostics and profiles show for the task; empty shows its id.
+    std::string debug_name;
     // Resource dependencies from this task to later tasks.
     Vector<RendResEdgeDescVK, RenderAllocator> next;
     // Task-local to graph resource identifier map.
@@ -372,6 +374,8 @@ struct RendSubgraphVK {
 
     // The id other tasks connect to; also the prefix of its members' ids.
     RendTaskID subgraph_id;
+    // The name diagnostics and profiles show for the subgraph; empty shows its id.
+    std::string debug_name;
     // The ids of the tasks inside the subgraph, those of nested subgraphs included.
     Vector<RendTaskID, RenderAllocator> members;
     // Resource dependencies from the subgraph to later tasks or subgraphs.
@@ -415,8 +419,9 @@ struct RendGraphDescVK {
      * for descriptors whose tasks name no registered resource.
      */
     explicit RendGraphDescVK(RenderAllocator* p_allocator, IRenderGraph* p_render_graph = nullptr)
-        : allocator(p_allocator), render_graph(p_render_graph), tasks(p_allocator), resources(p_allocator), buffers(p_allocator),
-          images(p_allocator), image_views(p_allocator), samplers(p_allocator), subgraphs(p_allocator) {
+        : allocator(p_allocator), render_graph(p_render_graph), tasks(p_allocator), resources(p_allocator),
+          buffers(p_allocator), images(p_allocator), image_views(p_allocator), samplers(p_allocator), subgraphs(p_allocator),
+          debug_names(p_allocator), exports(p_allocator) {
     }
 
     /**
@@ -526,6 +531,33 @@ struct RendGraphDescVK {
      * @throws std::runtime_error If p_resource_id is empty.
      */
     RendGraphDescVK& add_sampler(std::string_view p_resource_id, RendSamplerFactoryVK p_factory = nullptr);
+
+    /**
+     * @brief Name a graph-owned resource for debugging.
+     *
+     * The graph names every object it creates for the resource `<graph key>.<p_debug_name>` (with `[<slot>]` for each
+     * frame's copy), which Vulkan debug tools and validation messages show; resources without a debug name are named by
+     * their id. Renaming a resource does not recreate it.
+     *
+     * @param p_resource_id Graph resource identifier of a resource added with add_buffer(), add_image(), add_image_view(),
+     * or add_sampler().
+     * @param p_debug_name The debug name; several resources may share one.
+     * @return This graph descriptor.
+     * @throws std::runtime_error If either argument is empty or p_resource_id already has a debug name.
+     */
+    RendGraphDescVK& set_debug_name(std::string_view p_resource_id, std::string_view p_debug_name);
+
+    /**
+     * @brief Export a resource under a name, which RenderGraphVK::acquire_resource() takes, so that C++ can reach a
+     * resource whose id it does not know, such as one a recipe generated. Subgraphs cannot export.
+     *
+     * @param p_export_name The name C++ uses.
+     * @param p_resource_id Graph resource identifier of the exported resource; it must be declared or imported when the
+     * graph is compiled.
+     * @return This graph descriptor.
+     * @throws std::runtime_error If either argument is empty or p_export_name is already exported.
+     */
+    RendGraphDescVK& add_export(std::string_view p_export_name, std::string_view p_resource_id);
     /**
      * @brief Add a subgraph, flattened into this descriptor under p_subgraph_id.
      *
@@ -534,14 +566,17 @@ struct RendGraphDescVK {
      * inside it, by its tasks' accesses and aliases, its edges, and its views' images, name a port, which resolves to the
      * resource it is bound to; else a resource it declares; else a resource of the enclosing graph, unchanged. Its imports are
      * imports of this descriptor; one the descriptor already imports under the same id must be the same resource. Edges
-     * inside the subgraph must stay inside it. Members keep their factories; other tasks may connect to them directly.
+     * inside the subgraph must stay inside it. Members keep their factories; other tasks may connect to them directly. Its
+     * debug names, and those of its tasks and nested subgraphs (their ids when they have none), become
+     * `<subgraph name>.<name>`, where the subgraph name is p_subgraph's debug name, or p_subgraph_id when it has none.
      *
      * @param p_subgraph_id Identifier other tasks connect to; it must not be the id of a task or subgraph of this descriptor.
      * @param p_subgraph The subgraph; it is copied.
      * @param p_ports Binding of every port of p_subgraph.
      * @return The added subgraph, to connect it to later tasks; invalidated when another subgraph is added.
      * @throws std::runtime_error If p_subgraph_id is empty or taken, a port is unbound, bound twice, unknown, or names a
-     * resource the subgraph declares or imports, an edge inside it leaves it, or an import conflicts with this descriptor's.
+     * resource the subgraph declares or imports, an edge inside it leaves it, an import conflicts with this descriptor's, or
+     * the subgraph exports a resource.
      */
     RendSubgraphVK& add_subgraph(
         std::string_view p_subgraph_id, const RendSubgraphDescVK& p_subgraph, std::span<const RendSubgraphPortBindingVK> p_ports);
@@ -578,6 +613,10 @@ struct RendGraphDescVK {
     Vector<RendSamplerDeclVK, RenderAllocator> samplers;
     // Subgraphs added with add_subgraph(); their members are in tasks. The graph resolves the edges to and from them.
     Vector<RendSubgraphVK, RenderAllocator> subgraphs;
+    // Debug names of graph-owned resources, by resource id; see set_debug_name().
+    Map<std::string, std::string, RenderAllocator> debug_names;
+    // Graph resource identifiers by export name; see add_export().
+    Map<std::string, std::string, RenderAllocator> exports;
 };
 
 /**
@@ -609,6 +648,8 @@ struct RendSubgraphDescVK {
 
     // The tasks, resources, and nested subgraphs of the subgraph.
     RendGraphDescVK graph;
+    // The name diagnostics and profiles show for the subgraph; empty shows its id.
+    std::string debug_name;
     // The ports, each bound to a resource of the enclosing graph when the subgraph is added.
     Vector<std::string, RenderAllocator> ports;
 };

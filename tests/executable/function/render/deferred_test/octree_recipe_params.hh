@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -53,11 +52,6 @@ struct WBE_META(WBE_REFLECT_SCRIPT) OctreeGroupCount {
  * VoxelRenderFeatureOctree::configure_recipe(). Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) OctreeRecipeParams : public RecipeFeatureParams {
-    /**
-     * @brief The import names of the application's octree textures and buffers.
-     */
-    WBE_META(WBE_REFLECT)
-    std::vector<std::string> imports;
     /**
      * @brief The number of octree levels, which have one storage view each.
      */

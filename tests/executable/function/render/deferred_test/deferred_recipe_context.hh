@@ -139,6 +139,11 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeCon
     WBE_META(WBE_REFLECT)
     std::string bloom_acquire_event;
     /**
+     * @brief The event id the bloom acquisition emits its images under.
+     */
+    WBE_META(WBE_REFLECT)
+    std::string bloom_image_event;
+    /**
      * @brief The trigger event id of this graph's frame sequence.
      */
     WBE_META(WBE_REFLECT)
@@ -174,10 +179,10 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeCon
     WBE_META(WBE_REFLECT)
     DataValue post_processing;
     /**
-     * @brief The graph ids of the dynamic mesh entities' transforms, one per drawn entity.
+     * @brief The member of every dynamic mesh entity import that holds its whole-mesh transform.
      */
     WBE_META(WBE_REFLECT)
-    std::vector<std::string> dynamic_mesh_transform_ids;
+    std::string dynamic_mesh_transform_member;
     /**
      * @brief The RTToggleVK toggles of the tasks each voxel debug view mode group records.
      */

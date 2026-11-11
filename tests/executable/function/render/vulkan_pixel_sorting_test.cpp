@@ -77,7 +77,8 @@ using WhiteBirdEngine::PixelSortOrientation;
 
 inline constexpr std::string_view RT_DRAW_IMGUI = "draw_imgui";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_SOURCE = "pixel_sort_source";
-inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE = "pixel_sorting_post_processing_output_image";
+// The name the recipe exports its result image under.
+inline constexpr std::string_view PIXEL_SORTING_OUTPUT_IMAGE_EXPORT = "post_processing_output_image";
 inline constexpr std::string_view REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS = "pixel_sorting_post_processing_params";
 inline constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 inline constexpr float PIXEL_SORT_DEFAULT_MIN_METRIC = 0.20F;
@@ -378,7 +379,7 @@ private:
         }
         // The graph re-runs the recipe whenever it rebuilds, such as after the first-frame swap chain resize.
         render_graph = WBE::acquire_test_render_graph(*renderer, PIXEL_SORTING_RENDER_GRAPH, make_bindings(vertical));
-        result_image = render_graph->acquire_resource(REND_RES_PIXEL_SORTING_POST_PROCESSING_OUTPUT_IMAGE);
+        result_image = render_graph->acquire_resource(PIXEL_SORTING_OUTPUT_IMAGE_EXPORT);
         built_orientation = p_orientation;
     }
 

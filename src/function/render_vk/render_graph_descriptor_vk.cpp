@@ -199,6 +199,11 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
             std::format("Failed to add render graph subgraph '{}': a task or subgraph already has the id.", p_subgraph_id));
     }
     const RendGraphDescVK& inner = p_subgraph.graph;
+    if (!inner.exports.empty()) {
+        throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it exports '{}'; only the outermost graph exports resources.",
+            p_subgraph_id,
+            inner.exports.begin()->first));
+    }
     SubgraphScope scope(allocator, p_subgraph_id);
 
     // Ports name resources of this graph; they must not shadow what the subgraph declares or imports.
@@ -284,12 +289,22 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
     for (const RendSamplerDeclVK& sampler : inner.samplers) {
         samplers.push_back({.res_id = scope.prefixed(sampler.res_id), .factory = sampler.factory});
     }
+    // Debug names nest under the subgraph's name, as ids nest under its id.
+    const std::string name_prefix = p_subgraph.debug_name.empty() ? std::string(p_subgraph_id) : p_subgraph.debug_name;
+    const auto nested_name = [&name_prefix](std::string_view p_debug_name, std::string_view p_id) {
+        return std::format("{}.{}", name_prefix, p_debug_name.empty() ? p_id : p_debug_name);
+    };
+    for (const auto& [resource_id, debug_name] : inner.debug_names) {
+        debug_names.insert_or_assign(scope.prefixed(resource_id), nested_name(debug_name, resource_id));
+    }
 
     RendSubgraphVK record(allocator, p_subgraph_id);
+    record.debug_name = p_subgraph.debug_name;
     const Vector<RenderTaskResourceMap::ScopeBinding, RenderAllocator> bindings = scope.bindings(allocator);
     for (const RendTaskDescVK& inner_task : inner.tasks) {
         RendTaskDescVK task = inner_task;
         task.task_id = scope.prefixed(inner_task.task_id);
+        task.debug_name = nested_name(inner_task.debug_name, inner_task.task_id);
         rename_edges(task.next);
         task.resource_map.enclose(bindings);
         record.members.push_back(task.task_id);
@@ -298,6 +313,7 @@ RendSubgraphVK& RendGraphDescVK::add_subgraph(
     for (const RendSubgraphVK& inner_record : inner.subgraphs) {
         RendSubgraphVK nested = inner_record;
         nested.subgraph_id = scope.prefixed(inner_record.subgraph_id);
+        nested.debug_name = nested_name(inner_record.debug_name, inner_record.subgraph_id);
         for (RendTaskID& member : nested.members) {
             member = scope.prefixed(member);
         }
@@ -382,6 +398,33 @@ RendGraphDescVK& RendGraphDescVK::add_image_view(
         };
     }
     image_views.push_back({.res_id = std::string(p_resource_id), .image_id = std::string(p_image_id), .factory = std::move(p_factory)});
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::set_debug_name(std::string_view p_resource_id, std::string_view p_debug_name) {
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to name render graph resource: resource id is empty.");
+    }
+    if (p_debug_name.empty()) {
+        throw std::runtime_error(std::format("Failed to name render graph resource '{}': the debug name is empty.", p_resource_id));
+    }
+    if (!debug_names.emplace(std::string(p_resource_id), std::string(p_debug_name)).second) {
+        throw std::runtime_error(std::format("Failed to name render graph resource '{}': it is already named.", p_resource_id));
+    }
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_export(std::string_view p_export_name, std::string_view p_resource_id) {
+    if (p_export_name.empty()) {
+        throw std::runtime_error("Failed to export render graph resource: the export name is empty.");
+    }
+    if (p_resource_id.empty()) {
+        throw std::runtime_error(std::format("Failed to export render graph resource as '{}': resource id is empty.", p_export_name));
+    }
+    if (!exports.emplace(std::string(p_export_name), std::string(p_resource_id)).second) {
+        throw std::runtime_error(
+            std::format("Failed to export render graph resource as '{}': the name is already exported.", p_export_name));
+    }
     return *this;
 }
 

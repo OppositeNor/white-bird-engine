@@ -104,15 +104,7 @@ public:
     static std::string get_dynamic_level_resource_id(uint32_t p_level);
 
     static constexpr std::string_view RT_RESET_OCTREE = "reset_octree";
-    static constexpr std::string_view RT_RUN_BUILD_OCTREE = "run_build_octree";
-    static constexpr std::string_view RT_RUN_BUILD_OCTREE_DOUBLE_SIDED = "run_build_octree_double_sided";
     static constexpr std::string_view RT_CLEAR_DYNAMIC_OCTREE = "clear_dynamic_octree";
-    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE = "dynamic_octree";
-    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_OCTREE_SECOND = "dynamic_octree_second";
-    static constexpr std::string_view RT_GATHER_OCTREE_DEBUG_LEAVES = "gather_octree_debug_leaves";
-    static constexpr std::string_view RT_GATHER_OCTREE_DEBUG_NODES = "gather_octree_debug_nodes";
-    static constexpr std::string_view RT_RUN_OCTREE_DEBUG_DRAW = "run_octree_debug_draw";
-    static constexpr std::string_view RT_RUN_OCTREE_DEBUG_NODE_DRAW = "run_octree_debug_node_draw";
 
     static constexpr std::string_view OCTREE_INFO = "octree_info";
     /** Static texture viewed with every mip level, read by traversal. */
@@ -126,8 +118,6 @@ public:
     static constexpr std::string_view OCTREE_DEBUG_NODE_LIST = "octree_debug_node_list";
 
 private:
-    static constexpr std::string_view RT_OCTREE_FRAME_BEGIN = "octree_frame_begin";
-    static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr VkFormat OCTREE_FORMAT = VK_FORMAT_R8_UINT;
     static constexpr uint32_t OCTREE_MAX_DEPTH = 9;

@@ -24,35 +24,48 @@
 local type wbe = require("wbe")
 
 local record render_graph
-    -- A graph-owned description, an external import, a subgraph port, or a registered entry. Image views retain their source.
+    -- A resource the recipe declares (a buffer, image, image view, or sampler, whose id the graph generates when it is
+    -- built), an import C++ supplies, a member of an imported composite, a subgraph port, or a registered entry. A view
+    -- retains its source image.
     record Resource
-        id: string
         kind: string
+        -- The id of an import or member, the name of a port, or the key of a registered entry; nil for a declared resource.
+        key: string
+        -- The debug name of a declared resource.
+        name: string
         resource_type: string
         description: wbe.RendRecipeResourceVK
         -- The registration a registered handle carries; a task whose params name the handle emits it.
         registration: wbe.RendRecipeRegistrationVK
         dependencies: {Resource}
-        view: function(self: Resource, id?: string, view?: wbe.RendImageViewParamsVK): Resource
+        -- The image's default view, or a new view of it configured by view.
+        view: function(self: Resource, view?: ImageViewDescriptor): Resource
+        -- A member of an imported composite, which C++ registers as `<import id>.<member>`.
+        member: function(self: Resource, name: string): Resource
     end
 
-    -- A reusable, ordered resource sequence for connections; constructing one does not collect its members.
-    record ResourceBundle
-        resources: {Resource}
+    -- The descriptors of declared resources: their reflected parameters and an optional debug name, which names the
+    -- objects the graph creates for them.
+    interface BufferDescriptor is wbe.RendBufferParamsVK
+        name: string
     end
 
+    interface ImageDescriptor is wbe.RendImageParamsVK
+        name: string
+    end
+
+    interface ImageViewDescriptor is wbe.RendImageViewParamsVK
+        name: string
+    end
+
+    interface SamplerDescriptor is wbe.RendSamplerParamsVK
+        name: string
+    end
+
+    -- Options of a task: its debug name, the resource of every name its shaders and render targets use, and its gating.
     record TaskOptions
+        name: string
         bindings: {string:Resource}
-        uses: {Resource}
-        trigger: wbe.RendRecipeTriggerVK
-        toggle: wbe.RendRecipeToggleVK
-    end
-
-    -- Options of Graph:multiplex(): the branch selection, and what applies to the multiplexer as a whole.
-    record MultiplexOptions
-        select: wbe.RendRecipeSelectVK
-        bindings: {string:Resource}
-        uses: {Resource}
         trigger: wbe.RendRecipeTriggerVK
         toggle: wbe.RendRecipeToggleVK
     end
@@ -62,35 +75,61 @@ local record render_graph
         resource: Resource
     end
 
-    -- Resource handles bind task-local names without changing the explicit ordering of connect edges.
+    -- A typed task, a task C++ supplies (an import), a multiplexer, or a subgraph, whose id the build generates, except an
+    -- import's. Bindings map task-local names to resources without ordering anything; edges order the task before others.
     record Task
-        id: string
+        kind: string
+        -- The id of an imported task.
+        key: string
+        -- The debug name.
+        name: string
         ["type"]: string
-        import: boolean
         params: any
+        -- The resource fields of a typed task's params, which the build lowers.
+        fields: any
         bindings: {string:Resource}
         edges: {Edge}
-        graph: Graph
+        trigger: wbe.RendRecipeTriggerVK
+        toggle: wbe.RendRecipeToggleVK
+        select: wbe.RendRecipeSelectVK
+        branch_tasks: {Task}
+        subgraph_tasks: {Task}
+        ports: {string:Resource}
         bind: function(self: Task, local_name: string, resource: Resource): Task
         connect: function(self: Task, next_task: Task, resource: Resource): Task
         connect: function(self: Task, next_task: Task, resources: {Resource}): Task
-        connect: function(self: Task, next_task: Task, bundle: ResourceBundle): Task
         connect_all: function(self: Task, next_tasks: {Task}, resource: Resource): Task
         connect_all: function(self: Task, next_tasks: {Task}, resources: {Resource}): Task
-        connect_all: function(self: Task, next_tasks: {Task}, bundle: ResourceBundle): Task
         inputs_from: function(self: Task, producer: Task, bindings: {string:Resource}): Task
         color_target: function(self: Task, index: integer, resource: Resource): Task
         depth_target: function(self: Task, resource: Resource): Task
+    end
+
+    -- A multiplexer: typed branches built without edges, triggers, or toggles, the branch selection, and what applies to
+    -- the multiplexer as a whole.
+    record MultiplexDescriptor
+        name: string
+        branches: {Task}
+        select: wbe.RendRecipeSelectVK
+        bindings: {string:Resource}
         trigger: wbe.RendRecipeTriggerVK
         toggle: wbe.RendRecipeToggleVK
-        subgraph: wbe.RendGraphRecipeVK
+    end
+
+    -- A subgraph: its tasks in order, and the resource of the enclosing graph each port name its tasks use is bound to.
+    record SubgraphDescriptor
+        name: string
+        tasks: {Task}
         ports: {string:Resource}
-        branches: {wbe.RendRecipeBranchVK}
-        select: wbe.RendRecipeSelectVK
-        -- Collect resources without declaring an access or adding an ordering edge.
-        uses: {Resource}
-        -- The registrations of the registered handles the task's params name.
-        registrations: {wbe.RendRecipeRegistrationVK}
+        trigger: wbe.RendRecipeTriggerVK
+        toggle: wbe.RendRecipeToggleVK
+    end
+
+    -- A recipe: its tasks in order, which sets the generated ids, and the resources C++ acquires by name
+    -- (RenderGraphVK::acquire_resource()).
+    record BuildDescriptor
+        tasks: {Task}
+        exports: {string:Resource}
     end
 {% for interface in api.interfaces %}
 
@@ -101,63 +140,47 @@ local record render_graph
     end
 {% endfor %}
 
-    record Graph
-        tasks: {Task}
-        -- Snapshot a non-empty list of graph resource handles without assigning a graph resource id.
-        resource_bundle: function(self: Graph, resources: {Resource}): ResourceBundle
-        -- Register a resource on the render graph under key; description is a reflected parameters struct, type_name its
-        -- reflected name, which selects the registrator, and resource_type the C++ type of the registered object.
-        register_resource: function(self: Graph, key: string, type_name: string, description: any,
-            resource_type: string): Resource
-        register_mesh: function(self: Graph, key: string, params: wbe.RDParamsMeshVK): Resource
-        register_graphics_pipeline: function(self: Graph, key: string, params: wbe.RDParamsGraphicsPipelineVK): Resource
-        register_compute_pipeline: function(self: Graph, key: string, params: wbe.RDParamsComputePipelineVK): Resource
-        -- A registered image is bound like an import.
-        register_image: function(self: Graph, key: string, params: wbe.RDParamsImageVK): Resource
-        as_subgraph: function(self: Graph, id: string, ports: {string:Resource}, imports?: {string}): Task
-        add: function(self: Graph, task: Task): Task
-        get: function(self: Graph, id: string): Task
-        import_task: function(self: Graph, id: string): Task
-        -- A multiplexer task that records the selected one of branches: typed tasks built on another graph, such as a
-        -- scratch Graph.new(), without edges, triggers, or toggles. It takes their types, params, bindings, and uses; the
-        -- branches share its bindings, and must run on one queue family.
-        multiplex: function(self: Graph, id: string, branches: {Task}, options: MultiplexOptions): Task
-        chain: function(self: Graph, resource: Resource, tasks: {Task})
-        chain: function(self: Graph, resources: {Resource}, tasks: {Task})
-        chain: function(self: Graph, bundle: ResourceBundle, tasks: {Task})
-        build: function(self: Graph, imports?: {string}, ports?: {string}): wbe.RendGraphRecipeVK
-{% for constructor in api.constructors %}
-        {{ constructor.method }}: function(self: Graph, id: string, params: {{ constructor.params_type }},
-            options?: TaskOptions): Task
-{% endfor %}
-    end
-
     enum_name: function(value: string): string
-    buffer: function(id: string, usage: wbe.RendResPrimaryUsageVK, size: integer): Resource
-    storage_buffer: function(id: string, size: integer): Resource
-    image: function(id: string, usage: wbe.RendResPrimaryUsageVK, format: wbe.ImageFormatVK,
-        extent?: wbe.RendExtent2DParamsVK, additional_usage?: {wbe.ImageUsageFlagVK},
-        mip_levels?: integer): Resource
-    storage_image: function(id: string, format: wbe.ImageFormatVK, width: integer, height: integer,
-        additional_usage?: {wbe.ImageUsageFlagVK}): Resource
-    image_view: function(id: string, image: Resource, view?: wbe.RendImageViewParamsVK): Resource
-    clamp_to_edge_sampler: function(id: string, params?: wbe.RendSamplerParamsVK): Resource
-    -- A mesh registered on the render graph under key.
-    mesh: function(key: string): Resource
-    -- A pipeline registered on the render graph under key. With a description, the handle registers it: the graph emits
-    -- the registration when a task names the handle, merging equal registrations of a key.
+    buffer: function(descriptor: BufferDescriptor): Resource
+    -- A buffer of usage buffer_storage.
+    storage_buffer: function(descriptor: BufferDescriptor): Resource
+    image: function(descriptor: ImageDescriptor): Resource
+    -- An image of usage image_read_write.
+    storage_image: function(descriptor: ImageDescriptor): Resource
+    image_view: function(image: Resource, descriptor?: ImageViewDescriptor): Resource
+    clamp_to_edge_sampler: function(descriptor?: SamplerDescriptor): Resource
+    -- Entries registered on the render graph under key. With a description, the handle registers the entry: the build
+    -- emits the registration when a task names the handle, merging equal registrations of a key; without one, it names an
+    -- entry registered elsewhere.
+    mesh: function(key: string, description?: wbe.RDParamsMeshVK): Resource
     compute_pipeline: function(key: string, description?: wbe.RDParamsComputePipelineVK): Resource
     graphics_pipeline: function(key: string, description?: wbe.RDParamsGraphicsPipelineVK): Resource
     -- A compute pipeline compiled from the shader shader and registered under the same key.
     shader_compute_pipeline: function(shader: string): Resource
-    import_resource: function(id: string): Resource
-    port: function(id: string): Resource
-    reference: function(id: string): Resource
+    -- An entry of a custom description type: type_name is the reflected name of the description struct, which selects the
+    -- registrator, and resource_type the C++ type of the registered object.
+    registered_resource: function(key: string, type_name: string, description: any, resource_type: string): Resource
+    -- A registered image, bound like an import.
+    registered_image: function(key: string, description: wbe.RDParamsImageVK): Resource
+    -- A resource C++ supplies under id.
+    import: function(id: string): Resource
+    port: function(name: string): Resource
     indirect_dispatch: function(pipeline: Resource, indirect_buffer: Resource, offset: integer,
         bindings?: {string:Resource}): {{ dispatch.type }}
-    subgraph: function(id: string, recipe: wbe.RendGraphRecipeVK, ports: {string:Resource}): Task
-    graph: function(): Graph
-    new: function(): Graph
+{% for constructor in api.constructors %}
+    {{ constructor.method }}: function(params: {{ constructor.params_type }}, options?: TaskOptions): Task
+{% endfor %}
+    -- A task of a registered type without a constructor, whose params name no resource.
+    task: function(type_name: string, params: any, options?: TaskOptions): Task
+    -- A task C++ supplies under id.
+    import_task: function(id: string): Task
+    multiplex: function(descriptor: MultiplexDescriptor): Task
+    subgraph: function(descriptor: SubgraphDescriptor): Task
+    -- Order tasks on every resource, each after the one before it.
+    chain: function(resource: Resource, tasks: {Task})
+    chain: function(resources: {Resource}, tasks: {Task})
+    -- Generate the ids of the declared resources and tasks the recipe reaches, and emit it.
+    build: function(descriptor: BuildDescriptor): wbe.RendGraphRecipeVK
 end
 
 return render_graph

@@ -21,11 +21,13 @@
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/ro_staging_buffer_vk.hh"
+#include "function/render_vk/rt_params_cpu_in_flight_buffer_acquire_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include <cstdint>
@@ -38,13 +40,17 @@
 
 namespace WhiteBirdEngine {
 
-RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(const RenderContextVK* p_render_data, std::string_view p_buffer_id)
-    : render_data(p_render_data), buffer_id(p_buffer_id), event_manager(EventManager::get_singleton()) {
+RTCPUInFlightBufferAcquireVK::RTCPUInFlightBufferAcquireVK(
+    const RenderContextVK* p_render_data, std::string_view p_buffer_id, std::string_view p_event_id)
+    : render_data(p_render_data), buffer_id(p_buffer_id), event_id(p_event_id), event_manager(EventManager::get_singleton()) {
     if (render_data == nullptr || render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
     }
     if (buffer_id.empty()) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: buffer resource id is empty.");
+    }
+    if (event_id.empty()) {
+        throw std::runtime_error("RTCPUInFlightBufferAcquireVK: event id is empty.");
     }
     if (event_manager == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: no EventManager exists to emit acquisitions through.");
@@ -56,7 +62,7 @@ Unique<IRenderTaskVK> RTCPUInFlightBufferAcquireVK::create(
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightBufferAcquireVK: render data is unavailable.");
     }
-    return make_unique<RTCPUInFlightBufferAcquireVK>(p_render_data->allocator, p_render_data, p_params.buffer);
+    return make_unique<RTCPUInFlightBufferAcquireVK>(p_render_data->allocator, p_render_data, p_params.buffer, p_params.event);
 }
 
 void RTCPUInFlightBufferAcquireVK::append_accesses(
@@ -84,8 +90,8 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
     const size_t buffer_size = buffer->fields().buffer_size;
 
     const size_t staging_buffer_size = ROStagingBufferVK::required_buffer_size(buffer_size);
-    Ref<ROStagingBufferVK> staging_buffer =
-        render_data->create_staging_buffer(ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT));
+    Ref<ROStagingBufferVK> staging_buffer = render_data->create_staging_buffer(
+        ROStagingBufferVK::Builder().set_size(staging_buffer_size).set_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT));
     const ROStagingBufferVK::Allocation staging_allocation = staging_buffer->allocate_region(buffer_size);
     const VkBufferCopy copy_region{
         .srcOffset = 0,
@@ -122,7 +128,7 @@ void RTCPUInFlightBufferAcquireVK::record(VkCommandBuffer p_command_buffer, doub
             buffer_size,
             acquired_buffer = std::move(acquired_buffer),
             event_manager = event_manager,
-            event_id = buffer_id]() mutable {
+            event_id = event_id] mutable {
             std::memcpy(acquired_buffer.content.data(), mapped_memory, buffer_size);
             event_manager->emit(event_id, acquired_buffer);
         },

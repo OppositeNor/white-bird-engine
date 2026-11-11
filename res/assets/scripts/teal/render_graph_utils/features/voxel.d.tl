@@ -16,26 +16,28 @@
 -- recipes that include them. Declarations only: import them with `local type voxel = require("render_graph_utils.features.voxel")`.
 
 local type wbe = require("wbe")
-local type render_graph = require("render_graph_utils.render_graph")
+local type graph = require("render_graph_utils.render_graph")
 
 local record voxel
     -- What the including recipe supplies to a voxel structure's subgraph, whose ports `color` and `depth` the overlays draw
     -- through.
     record Target
-        -- The transforms of the two dynamic mesh entities.
-        dynamic_mesh_transform_ids: {string}
+        -- The whole-mesh transforms of the two dynamic mesh entities, members of their imports.
+        dynamic_mesh_transforms: {graph.Resource}
         -- The voxel debug view toggles by mode group.
         debug_view_toggles: wbe.VoxelDebugViewToggles
         -- The color target of the overlays.
-        color_target: render_graph.Resource
+        color_target: graph.Resource
         -- The depth target the overlays test against.
-        depth_target: render_graph.Resource
+        depth_target: graph.Resource
         -- The formats of the color and depth targets, which the overlay pipelines render to.
         color_format: wbe.ImageFormatVK
         depth_format: wbe.ImageFormatVK
-        -- The graph resource ids of the lights' reflective-shadow-map slots, by the task-local ids of the lights[] array of
-        -- the lighting shaders (for example "shadowmap_color[0]"); the structures that inject radiance bind them.
-        rsm_slot_ids: {string:string}
+        -- The lights' reflective-shadow-map slots, by the names of the lights[] array of the lighting shaders (for example
+        -- "shadowmap_color[0]"); the structures that inject radiance bind them through ports of those names.
+        rsm_slots: {string:graph.Resource}
+        -- The sampler of the lights' shadow maps, which the radiance injection samples the slots with.
+        shadow_sampler: graph.Resource
     end
 end
 

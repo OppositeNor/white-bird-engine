@@ -16,28 +16,26 @@
 -- Imports: `swap_chain` (the swap chain image views) and `camera_info` (the application's camera uniform buffer).
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local camera_info = render_graph.import_resource("camera_info")
     -- The mesh and the pipeline are registered on the render graph from their resources; rebuilds keep them unless the
     -- swap chain format, and so the pipeline's description, changes.
-    local static_mesh = graph:register_mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" })
-    local pipeline = graph:register_graphics_pipeline("draw_cube_unshaded_pipeline", {
-        pipeline = "draw_cube_unshaded_pipeline",
-        color_formats = { context.swap_chain_format },
-    })
-    graph:draw_mesh("run_static_mesh", {
-        mesh = static_mesh,
-        pipeline = { default = pipeline },
+    local draw = graph.draw_mesh({
+        mesh = graph.mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" }),
+        pipeline = { default = graph.graphics_pipeline("draw_cube_unshaded_pipeline", {
+            pipeline = "draw_cube_unshaded_pipeline",
+            color_formats = { context.swap_chain_format },
+        }) },
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
-    }, { uses = { camera_info } }):color_target(0, swap_chain)
-    return graph:build()
+    }, {
+        name = "draw_static_mesh",
+        bindings = { camera_info = graph.import("camera_info") },
+    }):color_target(0, graph.import("swap_chain"))
+    return graph.build({ tasks = { draw } })
 end
 
 return exports

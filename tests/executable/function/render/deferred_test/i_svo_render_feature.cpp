@@ -21,9 +21,9 @@
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/rend_graph_recipe_params_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "i_voxel_render_feature.hh"
 #include "svo_recipe_params.hh"
@@ -46,7 +46,8 @@ ISVORenderFeature::ISVORenderFeature(RendererVK* p_renderer,
     std::string_view p_dynamic_shader_prefix,
     bool p_rebuild_static_every_frame)
     : renderer_vk(p_renderer), render_context(nullptr), render_allocator(nullptr),
-      static_mesh_resources(std::move(p_static_mesh_resources)), svo_volume(VoxelVolume::enclose(p_scene_bounds, SVO_EXTENT)), rebuild_static_every_frame(p_rebuild_static_every_frame),
+      static_mesh_resources(std::move(p_static_mesh_resources)),
+      svo_volume(VoxelVolume::enclose(p_scene_bounds, SVO_EXTENT)), rebuild_static_every_frame(p_rebuild_static_every_frame),
       shader_prefix(p_shader_prefix), dynamic_shader_prefix(p_dynamic_shader_prefix) {
     if (renderer_vk == nullptr || static_mesh_resources == MEM_NULL) {
         throw std::runtime_error("ISVORenderFeature: renderer and scene are required.");
@@ -64,8 +65,8 @@ void ISVORenderFeature::create_resources() {
     svo_nodes = render_context->create_buffer(
         ROBufferVK::Builder().set_properties(sizeof(SVONode), SVO_MAX_NODE_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     // The leaf buffer holds the static leaves followed by the dynamic leaves.
-    svo_leaves = render_context->create_buffer(ROBufferVK::Builder().set_properties(
-        sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    svo_leaves = render_context->create_buffer(
+        ROBufferVK::Builder().set_properties(sizeof(SVOLeaf), SVO_MAX_LEAVES_COUNT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     svo_debug_draw_index_buffer = create_initialized_buffer(
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VOXEL_DEBUG_CUBE_INDICES.data(), sizeof(VOXEL_DEBUG_CUBE_INDICES));
     svo_debug_draw_solid_index_buffer = create_initialized_buffer(
@@ -85,8 +86,8 @@ void ISVORenderFeature::create_resources() {
             &initial_debug_draw_command,
             sizeof(initial_debug_draw_command));
     const SVODebugDrawSettings initial_debug_draw_settings{.depth = debug_depth, .style = static_cast<uint32_t>(debug_draw_style)};
-    svo_debug_draw_settings =
-        create_initialized_buffer(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &initial_debug_draw_settings, sizeof(initial_debug_draw_settings));
+    svo_debug_draw_settings = create_initialized_buffer(
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &initial_debug_draw_settings, sizeof(initial_debug_draw_settings));
     initialize();
 }
 
@@ -187,7 +188,8 @@ void ISVORenderFeature::configure_recipe(
         .debug_draw_node_list = sizeof(uint32_t) * SVO_MAX_NODE_COUNT,
     };
     if (!rebuild_static_every_frame) {
-        params.static_build = RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
+        params.static_build =
+            RendRecipeTriggerVK{.event = std::string(p_inputs.static_build_event), .activate = p_inputs.static_build_pending};
     }
     // The buffers holding initial contents or state shared by both graphs; the module declares the per-frame scratch buffers.
     const std::array<std::pair<std::string_view, const Ref<ROBufferVK>*>, 8> buffers{
@@ -204,7 +206,6 @@ void ISVORenderFeature::configure_recipe(
     };
     for (const auto& [name, buffer] : buffers) {
         p_imports.add(name, **buffer);
-        params.imports.emplace_back(name);
     }
     SerializableSD<SVORecipeParams>::serialize(p_parameters, params);
 }

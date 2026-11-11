@@ -23,10 +23,10 @@
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/rt_params_cpu_in_flight_acquire_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/rt_params_cpu_in_flight_acquire_vk.hh"
 #include <cstdint>
 #include <future>
 #include <string>
@@ -40,10 +40,10 @@ namespace WhiteBirdEngine {
  * @brief Starts an asynchronous CPU acquisition of a graph image on every recording.
  *
  * Every recording starts an independent acquisition into memory it allocates itself, and emits the completed result as an
- * AcquiredImage payload through the EventManager, using the source image-view resource id as the event id. Subscribe with
- * `subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(image_view_id, ...)`. Acquisitions never share memory, so consecutive recordings may be in flight together;
- * wrap in RTTriggeredVK for on-demand acquisition, and use RTTriggeredVK::enabled_for() to acquire a frame sequence.
- * Instances are neither copyable nor movable.
+ * AcquiredImage payload through the EventManager under the task's event id. Subscribe with
+ * `subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(event_id, ...)`. Acquisitions never share memory, so consecutive
+ * recordings may be in flight together; wrap in RTTriggeredVK for on-demand acquisition, and use
+ * RTTriggeredVK::enabled_for() to acquire a frame sequence. Instances are neither copyable nor movable.
  */
 class WBE_META(WBE_RENDER_TASK(cpu_acquire_image), WBE_SERIALIZATION_ALIASES(cpu_acquire_image)) RTCPUInFlightAcquireVK final
     : public IRenderTaskVK {
@@ -76,7 +76,6 @@ public:
         Vector<uint8_t, HeapAllocatorGlobal> content;
     };
 
-
     RTCPUInFlightAcquireVK() = delete;
     virtual ~RTCPUInFlightAcquireVK() override = default;
     RTCPUInFlightAcquireVK(const RTCPUInFlightAcquireVK&) = delete;
@@ -91,10 +90,11 @@ public:
      * outlive every acquisition the task starts.
      *
      * @param p_render_data Base Vulkan render data.
-     * @param p_image_view_id Render-graph resource id of the source image view; it is also the event id of every acquisition.
-     * @throws std::runtime_error If the render data is unavailable, the id is empty, or no EventManager exists.
+     * @param p_image_view_id Task-local resource id of the source image view.
+     * @param p_event_id Event id every acquisition is emitted under.
+     * @throws std::runtime_error If the render data is unavailable, either id is empty, or no EventManager exists.
      */
-    RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id);
+    RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id, std::string_view p_event_id);
     /**
      * @brief Create the task from recipe parameters; used by RenderTaskRegistryVK.
      * @param p_render_data Base Vulkan render data.
@@ -104,7 +104,8 @@ public:
      * @throws std::runtime_error Under the conditions of the constructor.
      */
     WBE_META(WBE_REFLECT)
-    static Unique<IRenderTaskVK> create(const RenderContextVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& p_context);
+    static Unique<IRenderTaskVK> create(
+        const RenderContextVK* p_render_data, const RTParamsCPUInFlightAcquireVK& p_params, const RendGraphContextVK& p_context);
 
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::GRAPHICS;
@@ -119,6 +120,7 @@ public:
 private:
     const RenderContextVK* render_data = nullptr;
     std::string image_view_id;
+    std::string event_id;
     EventManager* event_manager = nullptr;
     Ref<RenderObjectContainerVK> image_view_container;
     Vector<std::future<void>, RenderAllocator> pending_acquisitions;

@@ -23,17 +23,21 @@
 
 When the graph has a name and a global render cache, graph-owned objects are cached there as `<graph name>.<resource id>`
 (the definition key, followed by `[<instance key>]` for other instances),
-with `[slot]` appended for per-frame copies.
+with `[slot]` appended for per-frame copies. Every graph-owned object is named `<graph name>.<debug name>` (same suffix),
+its resource's debug name (`RendGraphDescVK::set_debug_name()`, from the recipe's `name`) or else its id.
 
 ## Core APIs
 
-- `function/render_vk/render_graph_descriptor_vk.hh`: `RendGraphDescVK` (tasks, resources, `add_*`, `add_task`, `get_task`,
-  `add_subgraph`, `get_subgraph`, `contains_resource`), `RendTaskDescVK` (`task_id`, `factory`, `connect()`, `alias()`),
-  `RendSubgraphDescVK`, `RendSubgraphVK`, and the factory typedefs.
+- `function/render_vk/render_graph_descriptor_vk.hh`: `RendGraphDescVK` (tasks, resources, `add_*`, `set_debug_name`,
+  `add_export`, `add_task`, `get_task`, `add_subgraph`, `get_subgraph`, `contains_resource`), `RendTaskDescVK` (`task_id`,
+  `debug_name`, `factory`, `connect()`, `alias()`), `RendSubgraphDescVK` (with its `debug_name`), `RendSubgraphVK`, and the
+  factory typedefs.
+- `function/render/render_task_resource_map.hh`: `RenderTaskResourceMap`, the task-local to graph id map behind `alias()`;
+  `require_bindings()` makes it strict, as recipe tasks' maps are, so every identifier the task uses must be mapped.
 - `function/render/render_resource_unit.hh` (`RURenderGraph`), `function/render/i_render_graph_bindings.hh`,
   `function/render_vk/i_render_graph_bindings_vk.hh`, `function/render_vk/render_graph_bindings_function_vk.hh`, and
   `function/render/render_graph_instance_cache.hh`: definitions, bindings, and instance identity.
-- `function/render_vk/render_graph_vk.hh`: `build_from_recipe()`, `build_from_descriptor()`, `update_context()`, `rebuild()`, `acquire_resource(id)`,
+- `function/render_vk/render_graph_vk.hh`: `build_from_recipe()`, `build_from_descriptor()`, `update_context()`, `rebuild()`, `acquire_resource(export_name)`,
   `dump_graph_metadata()`, `list_descriptors()`.
 - `function/render_vk/rend_graph_resource_diff_vk.hh`: rebuild diff planning.
 - `function/render_vk/i_render_task_vk.hh`: `QueueFamilyVK`, `RendResUsageVK`, `ResAccessVK`, and the `IRenderTaskVK`
@@ -87,8 +91,9 @@ Every import is an `IBindableRenderResourceVK`; null containers are rejected. Wh
 stable container (`ROCMultislotsVK`) and mutate the objects inside it. Swap-chain-style containers use `p_flush = false`. The
 renderer replaces the swap-chain container when `frames_in_flight` changes, so the graph acquires it again on every build.
 
-Update graph-owned buffers through `acquire_resource(id)` on the rendering thread, and re-acquire after a rebuild that
-replaced the container.
+Update graph-owned buffers through `acquire_resource(export_name)` on the rendering thread, and re-acquire after a rebuild
+that replaced the container. Only exported resources (`add_export()`, a recipe's `graph.build{ exports = ... }`) can be
+acquired, since recipe resource ids are generated.
 
 ## Rebuild diffing
 
@@ -112,6 +117,8 @@ one id and returns a `RendSubgraphVK&` to `connect` from. It is flattened on add
 Imports stay graph-wide, and importing the same object again merges. Edges to and from the subgraph id resolve at build from
 accesses: an incoming edge on R reaches members that access R without an edge on R from another member, and an outgoing one
 leaves members that access R without an edge on R to another member. Order a subgraph's port accesses with internal edges.
+Debug names of its resources, tasks, and nested subgraphs (their ids when unnamed) become `<subgraph name>.<name>`, and a
+subgraph cannot export.
 
 ## Resource dependency model
 
@@ -145,42 +152,46 @@ a graphics task through edges (skipped when the graph has no graphics task).
 
 ## Built-in task types
 
-All in `include/function/render_vk/`. Registered types are usable from recipes by their recipe type name.
+All in `include/function/render_vk/`. Registered types are usable from recipes by their recipe type name; the
+constructor column names the generated `graph.<constructor>()`.
 
 | Class | Recipe type | Constructor | Purpose |
 | --- | --- | --- | --- |
-| `RTRunComputePipelineVK` | `run_compute_pipeline` | `:compute` | One compute dispatch; queue configurable, default graphics |
-| `RTRunComputePipelineIndirectVK` | `run_compute_pipeline_indirect` | `:compute_indirect` | Dispatch with counts read from a buffer |
-| `RTRunComputePipelinesSequentialVK` | `run_compute_pipelines_sequential` | `:compute_sequential` | Ordered compute passes in one command buffer |
-| `RTPingPongVK` | `ping_pong` | `:ping_pong` | Alternates two compute pipelines for N iterations |
+| `RTRunComputePipelineVK` | `run_compute_pipeline` | `compute` | One compute dispatch; queue configurable, default graphics |
+| `RTRunComputePipelineIndirectVK` | `run_compute_pipeline_indirect` | `compute_indirect` | Dispatch with counts read from a buffer |
+| `RTRunComputePipelinesSequentialVK` | `run_compute_pipelines_sequential` | `compute_sequential` | Ordered compute passes in one command buffer |
+| `RTPingPongVK` | `ping_pong` | `ping_pong` | Alternates two compute pipelines for N iterations |
 | `RTMaxDownsampleVK` | `max_downsample` | — | Mip chain by 2x2 max, one view per mip |
-| `RTRunGraphicsPipelineVK` | `run_graphics_pipeline` | `:draw` | One graphics pipeline draw (`Builder`) |
-| `RTRunGraphicsPipelineIndirectVK` | `run_graphics_pipeline_indirect` | `:draw_indirect` | Indexed indirect draws for non-mesh geometry |
-| `RTGraphicsDrawMeshVK` | `graphics_draw_mesh` | `:draw_mesh` | Draws parts of a compiled mesh; imports and aliases it |
-| `RTGenerateMipmapsVK` | `generate_mipmaps` | `:generate_mipmaps` | Color mip chain with filtered blits |
-| `RTFullMemoryBarrierVK` | `full_memory_barrier` | `:full_memory_barrier` | Orders a frame's persistent-state mutation after the previous frame's consumers |
-| `RTCPUInFlightAcquireVK` | `cpu_acquire_image` | `:cpu_acquire_image` | Async image readback, emitted through `EventManager` |
-| `RTCPUInFlightBufferAcquireVK` | `cpu_acquire_buffer` | — | Async buffer readback, emitted through `EventManager` |
+| `RTRunGraphicsPipelineVK` | `run_graphics_pipeline` | `draw` | One graphics pipeline draw (`Builder`) |
+| `RTRunGraphicsPipelineIndirectVK` | `run_graphics_pipeline_indirect` | `draw_indirect` | Indexed indirect draws for non-mesh geometry |
+| `RTGraphicsDrawMeshVK` | `graphics_draw_mesh` | `draw_mesh` | Draws parts of a compiled mesh; imports and aliases it |
+| `RTGenerateMipmapsVK` | `generate_mipmaps` | `generate_mipmaps` | Color mip chain with filtered blits |
+| `RTFullMemoryBarrierVK` | `full_memory_barrier` | `full_memory_barrier` | Orders a frame's persistent-state mutation after the previous frame's consumers |
+| `RTCPUInFlightAcquireVK` | `cpu_acquire_image` | `cpu_acquire_image` | Async image readback, emitted through `EventManager` under the params' `event` |
+| `RTCPUInFlightBufferAcquireVK` | `cpu_acquire_buffer` | — | Async buffer readback, emitted through `EventManager` under the params' `event` |
 | `RTRunGraphicsPipelinesSequentialVK` | — | — | Ordered graphics passes in one command buffer |
 | `RTBuildAccelerationStructuresVK` | — | — | Records a prepared acceleration-structure build |
 | `RTTriggeredVK` | task `trigger` option | — | Records its child on triggered or enabled frames |
 | `RTToggleVK` | task `toggle` option | — | Records its child while enabled |
 
-Types without a constructor are added with `graph:add({ id, type, params })`. Compute tasks default to `GRAPHICS`; graphics
+Types without a constructor are created with `graph.task(type, params, options?)`, whose params name no resource. Compute tasks default to `GRAPHICS`; graphics
 tasks always run on graphics. Prefer an existing type before adding one.
 
 ## Debug output
 
-- `RenderGraphVK::dump_graph_metadata()` returns `RendGraphMetadataVK` (tasks with queue, order, and subgraph; edges with
-  stages, accesses, and `cross_queue`; subgraphs).
-- `TimestampQueryPluginVK` (enabled by `RendererCapabilities::timestamp_query`) writes `gpu_timestamp_report.json`;
-  `python export_render_graph.py` turns it into Mermaid Markdown or Graphviz SVG.
+- `RenderGraphVK::dump_graph_metadata()` returns `RendGraphMetadataVK` (tasks with `name`, queue, order, and subgraph; edges
+  with `resource_name`, stages, accesses, and `cross_queue`; subgraphs with `name`). Names are debug names, or ids where
+  there are none; diagnostics describe resources as `'<name>' (<id>)`.
+- `TimestampQueryPluginVK` (enabled by `RendererCapabilities::timestamp_query`) writes `gpu_timestamp_report.json`, whose
+  tasks and subgraphs carry `name` and edges `resource_name`; `python export_render_graph.py` turns it into Mermaid
+  Markdown or Graphviz SVG.
 - `write_descriptor_debug_output(name, graph->list_descriptors())` dumps descriptor rows (to `test_env/descriptor_debug/` in
   tests).
 
 ## Failure checklist
 
-- Every id a task accesses is declared, imported, or aliased to one, and every import is supplied with a non-null container.
+- Every name a recipe task uses is bound to a resource handle (recipe task maps are strict), every id a C++ task accesses
+  is declared, imported, or aliased to one, and every import is supplied with a non-null container.
 - Every conflict has a same-resource edge chain, and both ends of each edge access the resource.
 - Storage resources that are only read are annotated `read`; otherwise they count as writes.
 - Compute tasks on another queue reach a graphics task.
@@ -193,7 +204,8 @@ tasks always run on graphics. Prefer an existing type before adding one.
 - `tests/executable/function/render/vulkan_draw_triangle_test.cpp`: the smallest definition, with bindings that supply nothing.
 - `vulkan_draw_cube_test.cpp`, `vulkan_draw_sponza_test.cpp`: application-owned buffers with initial data, shadow maps, and a
   derived context; `vulkan_draw_skinned_mesh_test.cpp`: an imported native ImGui task.
-- `vulkan_pixel_sorting_test.cpp`: one instance per orientation, switched by activation;
+- `vulkan_pixel_sorting_test.cpp`: one instance per orientation, switched by activation, reading its result image back
+  through an export;
   `deferred_test/deferred_render_graph.cpp`: two definitions differing in parameters, feature modules, and rebuilds.
 - `src/function/render_vk/render_graph_vk.cpp`: authoritative build, diff, validation, barrier, and submission behavior.
 - `src/function/render_vk/renderer_vk.cpp`: acquisition, activation, swap-chain container, execution, presentation, delayed

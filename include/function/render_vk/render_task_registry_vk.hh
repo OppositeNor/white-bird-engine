@@ -16,8 +16,9 @@
 #define WBE_FILE_RENDER_TASK_REGISTRY_VK_HH
 
 #include "core/data/data_value.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render/i_render_graph.hh"
 #include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
 #include <span>
 #include <string_view>
 
@@ -29,7 +30,7 @@ namespace WhiteBirdEngine {
  *
  * The registry is generated from every class annotated with WBE_META(WBE_RENDER_TASK). A task type is registered under its
  * class name and under each WBE_SERIALIZATION_ALIASES entry; a name used twice fails the build. Annotating the class
- * WBE_RENDER_TASK(<method>) instead also generates the recipe constructor Graph:<method>() of
+ * WBE_RENDER_TASK(<method>) instead also generates the recipe constructor `graph.<method>()` of
  * render_graph_utils.render_graph, which creates the task type of the first alias. Every such class must declare
  *
  * @code
@@ -82,10 +83,8 @@ public:
      * @throws std::runtime_error If the task type is unknown, p_render_data is null, or the parameters cannot be
      * deserialized.
      */
-    static RendTaskFactoryVK create_factory(std::string_view p_task_type,
-        const DataValue& p_params,
-        const RenderContextVK* p_render_data,
-        IRenderGraph* p_render_graph = nullptr);
+    static RendTaskFactoryVK create_factory(
+        std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data, IRenderGraph* p_render_graph = nullptr);
 
     /**
      * @brief Add one render task to a graph descriptor.
@@ -102,11 +101,8 @@ public:
      * @throws std::runtime_error Under the conditions of create_factory(), if p_task_id is empty or already used in p_graph,
      * or whatever prepare_graph() throws.
      */
-    static RendTaskDescVK& add_task(RendGraphDescVK& p_graph,
-        std::string_view p_task_id,
-        std::string_view p_task_type,
-        const DataValue& p_params,
-        const RenderContextVK* p_render_data);
+    static RendTaskDescVK& add_task(
+        RendGraphDescVK& p_graph, std::string_view p_task_id, std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data);
 
     /**
      * @brief Prepare one render task for an existing task descriptor without adding a task to the graph.
@@ -123,11 +119,8 @@ public:
      * @return The task's factory, suitable for RendTaskDescVK::factory or for composing.
      * @throws std::runtime_error Under the conditions of create_factory(), or whatever prepare_graph() throws.
      */
-    static RendTaskFactoryVK prepare_task(RendGraphDescVK& p_graph,
-        RendTaskDescVK& p_task,
-        std::string_view p_task_type,
-        const DataValue& p_params,
-        const RenderContextVK* p_render_data);
+    static RendTaskFactoryVK prepare_task(
+        RendGraphDescVK& p_graph, RendTaskDescVK& p_task, std::string_view p_task_type, const DataValue& p_params, const RenderContextVK* p_render_data);
 
     /**
      * @brief Check whether a task type name is registered.

@@ -54,45 +54,54 @@ renderer->activate_render_graph(graph);
 
 ## Write the recipe
 
-A recipe is a Teal `script` resource under `res/assets/scripts/teal/render_graphs/` whose `build(context, parameters)` creates a graph,
-adds handles and tasks to it, and returns `graph:build()`:
+A recipe is a Teal `script` resource under `res/assets/scripts/teal/render_graphs/` whose `build(context, parameters)`
+declares resource and task handles and returns `graph.build({ tasks = { ... } })`. There is no graph object:
 
 ```lua
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local camera_info = render_graph.import_resource("camera_info")
-    graph:draw_mesh("run_static_mesh", {
-        mesh = graph:register_mesh("model_cube_static.mesh", { mesh = "model_cube_static.mesh" }),
-        pipeline = { default = render_graph.graphics_pipeline("draw_cube_unshaded_pipeline", {
-            pipeline = "draw_cube_unshaded_pipeline", color_formats = { context.swap_chain_format } }) },
+    local function pipeline(key: string): graph.Resource
+        return graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
+    end
+    local draw = graph.draw_mesh({
+        mesh = graph.mesh("material_variants.cube"),
+        pipeline = {
+            default = pipeline("draw_cube_unshaded_pipeline"),
+            tinted = pipeline("draw_cube_unshaded_tinted_pipeline"),
+        },
         parts = { "opaque" },
-    }, { uses = { camera_info } }):color_target(0, swap_chain)
-    return graph:build()
+        clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
+    }, {
+        name = "draw_material_variants",
+        bindings = { camera_info = graph.import("camera_info") },
+    }):color_target(0, graph.import("swap_chain"))
+    return graph.build({ tasks = { draw } })
 end
 
 return exports
 ```
 
-- **Handles, not strings.** The `render_graph` module's resource functions (`render_graph.image()`, `image:view()`,
-  `render_graph.import_resource()`, ...; graphs have no resource methods) and
-  registered-resource declarations (`graph:register_mesh()`, `graph:register_graphics_pipeline()`, ...,
-  `render_graph.mesh()`, `render_graph.compute_pipeline()`, `render_graph.graphics_pipeline()`) return
-  `render_graph.Resource` handles. Pass them to task params, `:bind()`, `:color_target()`, `:depth_target()`, edges, and subgraph
-  ports. `graph:build()` emits only the resources reachable from tasks, so there is no resource list to maintain.
-- **Typed constructors.** `graph:compute()`, `:draw()`, `:draw_mesh()`, ... are generated from the task classes and
-  type-check their params. Each takes `(id, params, { bindings?, uses?, trigger?, toggle? })` and returns a task handle.
-- **Explicit edges.** Order tasks with `graph:chain(resource, { a, b, c })`, `a:connect(b, resource)`,
-  `a:connect_all({ b, c }, resource)`, or `b:inputs_from(a, { local_name = resource })`. `uses` and bindings never add edges.
+- **Handles, not strings.** Declarations take a descriptor table and an optional debug `name` (`graph.buffer{}`,
+  `graph.storage_buffer{}`, `graph.image{}`, `graph.storage_image{}`, `image:view(descriptor?)`, `graph.image_view(image,
+  descriptor?)`, `graph.clamp_to_edge_sampler{}`); imports are `graph.import(id)` and `import:member(name)`. The build
+  generates ids (`<kind>-<8 hex>`, stable across rebuilds) and emits only what tasks reach; names become Vulkan debug
+  names, so name every resource. C++ reaches a declared resource only through
+  `graph.build{ exports = { <name> = resource } }` and `RenderGraphVK::acquire_resource(<name>)`.
+- **Typed constructors.** `graph.compute()`, `graph.draw()`, `graph.draw_mesh()`, ... are generated from the task classes
+  and type-check their params. Each takes `(params, { name?, bindings?, trigger?, toggle? })` and returns a task handle;
+  `name` is the debug name profiles and diagnostics show, and the build generates task ids (`<type>-<8 hex>`).
+- **Explicit bindings.** `bindings` (and `task:bind()`, `:color_target()`, `:depth_target()`) map every name the task's
+  shaders and render targets use, imports included; recipe task maps are strict, so an unbound name fails.
+- **Explicit edges.** Order tasks with `graph.chain(resource, { a, b, c })`, `a:connect(b, resource)`,
+  `a:connect_all({ b, c }, resource)`, or `b:inputs_from(a, { local_name = resource })`. Bindings never add edges.
 - **C++ pieces.** Tasks that need application objects (ImGui, acceleration-structure builds) are supplied with
-  `RendGraphRecipeImportsVK::add_task()` by the bindings and referenced with `graph:import_task(id)`. Everything else the
-  application owns (buffers, acceleration structures, entities whose members shaders name) is an import the recipe
-  declares; nothing is added to a built descriptor in C++.
+  `RendGraphRecipeImportsVK::add_task()` by the bindings and referenced with `graph.import_task(id)`, whose `:bind()`
+  aliases the identifiers the C++ task uses. Everything else the application owns (buffers, acceleration structures,
+  entities whose members shaders name) is an import the recipe declares; nothing is added to a built descriptor in C++.
 - **Pure C++ descriptors** exist only for focused compiler tests (`RenderGraphVK::build_from_descriptor()`).
 
 Read [references/recipes-and-scripts.md](references/recipes-and-scripts.md) before writing or changing a recipe, a feature
@@ -101,20 +110,21 @@ module, a context struct, a trigger or toggle, an imported task, or a new task t
 ## Register named resources on the graph
 
 Meshes, pipelines, and images that tasks name by key are registered on the graph by the recipe, never kept alive by the
-application or looked up globally. Descriptions that depend on application choices (such as a mesh's buffer usages) come
-through the context:
+application or looked up globally. Their handles carry the registration, which the build emits when a task reaches the
+handle. Descriptions that depend on application choices (such as a mesh's buffer usages) come through the context:
 
 ```lua
-local static_mesh = graph:register_mesh("static_mesh", context.static_mesh) -- a wbe.RDParamsMeshVK
-graph:register_compute_pipeline("blur", { shader = "blur_shader" })
-local scan = render_graph.shader_compute_pipeline("prefix_scan_shader") -- registered when a task names it
-local texture = graph:register_image("noise", { texture = "noise_texture" }) -- bound like an import
+local static_mesh = graph.mesh("static_mesh", context.static_mesh) -- a wbe.RDParamsMeshVK
+local blur = graph.compute_pipeline("blur", { shader = "blur_shader" })
+local scan = graph.shader_compute_pipeline("prefix_scan_shader") -- compiled from the shader of the same key
+local texture = graph.registered_image("noise", { texture = "noise_texture" }) -- bound like an import
+local named_elsewhere = graph.mesh("dynamic_mesh") -- no description: registered by another handle
 ```
 
-Registrations persist across rebuilds and equal re-registrations compile nothing. The description's type selects its
-registrator. A custom description type gets an `IResourceRegistrator` (usually `RRTyped<TParams>`), installed with
-`add_resource_registrator(registrator)`, and is used from Teal with
-`graph:register_resource(key, "<TParams name>", description, resource_type)`. `GlobalRenderCache` only dedupes compiled
+Registrations persist across rebuilds and equal re-registrations compile nothing; different descriptions of one key fail.
+The description's type selects its registrator. A custom description type gets an `IResourceRegistrator` (usually
+`RRTyped<TParams>`), installed with `add_resource_registrator(registrator)`, and is used from Teal with
+`graph.registered_resource(key, "<TParams name>", description, resource_type)`. `GlobalRenderCache` only dedupes compiled
 objects between graphs.
 
 ## Core rules
@@ -124,13 +134,15 @@ objects between graphs.
   must be ordered by a chain of edges on that same resource, or construction fails. Read-read pairs do not conflict.
 - **Tasks report their own accesses** through `append_accesses()`: reflected shader resources (`WBE_DESCRIPTOR` access),
   render targets, and fixed-function buffers. Aliases only map task-local ids to graph resources; graphics tasks render to
-  `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected.
+  `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected, and recipe tasks' maps resolve
+  nothing to itself.
 - **Resources.** Graph-owned resources are buffers, images, image views, and samplers. Everything owned elsewhere is an import,
   supplied through `RendGraphRecipeImportsVK::add()` (or `add_resource(id, *bindable)` in C++); composites register
-  `<id>.<member>`, which recipes name with `render_graph.reference()`. Buffers that need initial data are application-owned imports.
+  `<id>.<member>`, which recipes name with `graph.import(id):member(member)`. Buffers that need initial data are
+  application-owned imports.
   Keep the description structs' `operator==` complete, because diffing relies on it.
-- **Meshes** are drawn with `graph:draw_mesh()` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), which imports the mesh
-  under its registration key on the graph. Do not hand-assemble mesh draws.
+- **Meshes** are drawn with `graph.draw_mesh()` (`RTGraphicsDrawMeshVK`, or `add_to_graph()` in C++), whose `mesh` is a
+  `graph.mesh()` handle it imports the mesh under. Do not hand-assemble mesh draws.
 - **Per-material pipelines.** `pipeline` maps material pipeline variants to pipelines:
   `pipeline = { default = ..., foliage = ... }`; a material without `pipeline_variant` is `default`. Draws batch per variant;
   an unmapped variant throws, and the pipelines must share render targets and one material texture contract.

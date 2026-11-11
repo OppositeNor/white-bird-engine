@@ -42,7 +42,8 @@ its rendered content changes.
 | any annotated class | — | `TypeUUID<T>`, `TypeUUIDManager` (enums excluded) |
 
 Field and method annotations: `WBE_REFLECT`, `WBE_REFLECT_REQUIRED`, `WBE_SERIALIZATION_ALIASES(...)`, and on render-task
-params fields that hold resource ids, `WBE_RECIPE_RESOURCE(graph)` or `WBE_RECIPE_RESOURCE(task_local)`. An attribute is a
+params fields that hold resource ids, a bare `WBE_RECIPE_RESOURCE` (graph resources) or
+`WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph). An attribute is a
 bare name or `NAME(<parameters>)`; reflection records the trimmed parameters by attribute name. Assignment syntax is an
 error. Methods are recorded for every consumer, but only the render-task registry and the recipe constructors use them
 today (both read `create`).

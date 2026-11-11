@@ -18,27 +18,27 @@
 -- camera uniform buffer).
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local camera_info = render_graph.import_resource("camera_info")
-    local function pipeline(key: string): render_graph.Resource
-        return render_graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
+    local function pipeline(key: string): graph.Resource
+        return graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
     end
-    graph:draw_mesh("run_material_variants", {
-        mesh = render_graph.mesh("material_variants.cube"),
+    local draw = graph.draw_mesh({
+        mesh = graph.mesh("material_variants.cube"),
         pipeline = {
             default = pipeline("draw_cube_unshaded_pipeline"),
             tinted = pipeline("draw_cube_unshaded_tinted_pipeline"),
         },
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
-    }, { uses = { camera_info } }):color_target(0, swap_chain)
-    return graph:build()
+    }, {
+        name = "draw_material_variants",
+        bindings = { camera_info = graph.import("camera_info") },
+    }):color_target(0, graph.import("swap_chain"))
+    return graph.build({ tasks = { draw } })
 end
 
 return exports

@@ -12,6 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+#include "../entity_draw_data.hh"
 #include "../render_test.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/allocator/i_allocator.hh"
@@ -219,6 +220,7 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
     };
     const size_t graph_index = p_use_summed_area_table ? 1U : 0U;
     context.bloom_acquire_event = BLOOM_ACQUIRE_EVENT_IDS[graph_index];
+    context.bloom_image_event = BLOOM_IMAGE_EVENT_ID;
     context.frame_sequence_event = FRAME_SEQUENCE_EVENT_IDS[graph_index];
     context.has_mesh_acceleration_structure = mesh_acceleration_structure != MEM_NULL;
     context.static_mesh = static_mesh_params;
@@ -240,8 +242,8 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
     };
     for (size_t entity = 0; entity < dynamic_mesh->get_entity_count(); ++entity) {
         context.dynamic_mesh_entity_ids.emplace_back(dynamic_mesh->get_entity_key(entity));
-        context.dynamic_mesh_transform_ids.emplace_back(dynamic_mesh->get_entity_transform_id(entity));
     }
+    context.dynamic_mesh_transform_member = EntityDrawData::TRANSFORM;
     return context;
 }
 
@@ -269,10 +271,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_mesh_acceleration_struct
     return RendTaskDescVK(render_allocator,
         RT_BUILD_MESH_ACCELERATION_STRUCTURE,
         [this, acceleration_structure = mesh_acceleration_structure](const RendGraphContextVK& /*p_context*/) {
-            auto build = make_unique<RTBuildAccelerationStructuresVK>(render_allocator,
-                render_context,
-                IBindableRenderResourceVK::make_member_resource_id(MESH_ACCELERATION_STRUCTURE_KEY, MeshAccelerationStructureVK::TOP_LEVEL),
-                [acceleration_structure](VkCommandBuffer p_command_buffer) {
+            auto build = make_unique<RTBuildAccelerationStructuresVK>(
+                render_allocator, render_context, TOP_LEVEL_ACCELERATION_STRUCTURE, [acceleration_structure](VkCommandBuffer p_command_buffer) {
                     acceleration_structure->record_build(p_command_buffer);
                 });
             return make_unique<RTTriggeredVK>(render_allocator, std::move(build), true);
@@ -289,7 +289,8 @@ RendTaskDescVK ApplicationVulkanDeferredPBRTest::create_frame_sequence_acquire_t
                 throw std::runtime_error("The deferred render graph was recreated during a frame sequence capture.");
             }
             // Completed acquisitions reach write_frame_sequence_frame() through the event registered in setup_bloom_acquisition().
-            return make_unique<RTCPUInFlightAcquireVK>(render_allocator, render_context, FRAME_SEQUENCE_IMAGE_VIEW);
+            return make_unique<RTCPUInFlightAcquireVK>(
+                render_allocator, render_context, FRAME_SEQUENCE_IMAGE_VIEW, FRAME_SEQUENCE_IMAGE_EVENT_ID);
         },
         std::string(FRAME_SEQUENCE_EVENT_IDS[p_use_summed_area_table ? 1U : 0U]),
         render_context);

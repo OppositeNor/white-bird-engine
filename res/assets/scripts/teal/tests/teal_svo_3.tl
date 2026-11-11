@@ -16,21 +16,20 @@
 -- script backend; see WBERendGraphScriptVKResourceTest.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 local svo_3 = require("render_graph_utils.svo_3")
 
 local exports = {}
 
 function exports.build(): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    svo_3.add_leaf_deduplication(graph, {
-        svo_info = render_graph.import_resource("svo_info"),
-        mesh = render_graph.mesh("static_mesh"),
+    local deduplication = svo_3.leaf_deduplication({
+        svo_info = graph.import("svo_info"),
+        mesh = graph.mesh("static_mesh"),
         max_depth = 6,
         max_leaf_count = 100000,
         queue_family = "compute_1",
     })
-    return graph:build()
+    return graph.build({ tasks = deduplication.tasks })
 end
 
 return exports

@@ -16,25 +16,21 @@
 -- Imports: `swap_chain`, which the renderer supplies.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local triangle = graph:register_mesh("triangle", { mesh = "triangle" })
-    local pipeline = graph:register_graphics_pipeline("draw_triangle_pipeline", {
-        pipeline = "draw_triangle_pipeline",
-        color_formats = { context.swap_chain_format },
-    })
-    graph:draw_mesh("run_pipeline", {
-        mesh = triangle,
-        pipeline = { default = pipeline },
+    local draw = graph.draw_mesh({
+        mesh = graph.mesh("triangle", { mesh = "triangle" }),
+        pipeline = { default = graph.graphics_pipeline("draw_triangle_pipeline", {
+            pipeline = "draw_triangle_pipeline",
+            color_formats = { context.swap_chain_format },
+        }) },
         parts = { "opaque" },
         clear_values = { { color = { 0.0, 0.0, 0.0, 1.0 } } },
-    }):color_target(0, swap_chain)
-    return graph:build()
+    }, { name = "draw_triangle" }):color_target(0, graph.import("swap_chain"))
+    return graph.build({ tasks = { draw } })
 end
 
 return exports

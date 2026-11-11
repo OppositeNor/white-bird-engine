@@ -24,7 +24,7 @@
 
 local type wbe = require("wbe")
 local math_utils = require("utils.math")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local ceil_div = math_utils.ceil_div
 
@@ -52,23 +52,23 @@ local record sort
         "uint2"
     end
 
-    -- Names of the graph-owned buffers created for a radix sort.
-    record RadixSortBufferNames
-        keys: string
-        keys_swap: string
-        histogram: string
-        dispatch: string
+    -- The buffers of a radix sort to declare: sized for up to max_element_count keys of key_type (uint by default), and
+    -- named for debugging `<name>.keys`, `<name>.keys_swap`, `<name>.histogram`, and `<name>.dispatch` when name is set.
+    record RadixSortBuffersDescriptor
+        name: string
+        max_element_count: integer
+        key_type: RadixSortKeyType
     end
 
     -- The graph resources of a radix sort.
     record RadixSortBuffers
         -- The keys, sorted in place. The sort reads and writes it, so order its producers before and its consumers after
         -- the sort task on it.
-        keys: render_graph.Resource
+        keys: graph.Resource
         -- Scratch buffers the sort alone uses: the keys between passes, the histograms, and the indirect dispatches.
-        keys_swap: render_graph.Resource
-        histogram: render_graph.Resource
-        dispatch: render_graph.Resource
+        keys_swap: graph.Resource
+        histogram: graph.Resource
+        dispatch: graph.Resource
         -- The type of the keys the buffers hold.
         key_type: RadixSortKeyType
     end
@@ -76,9 +76,15 @@ local record sort
     -- The bits a radix sort orders the keys by, [begin_bit, end_bit) of the key as an unsigned integer; uint2 keys are
     -- the 64-bit (x << 32) | y. Both ends must be multiples of 8, and the range must span an even number of 8-bit digits,
     -- so that the sorted keys end up in the key buffer. Each end defaults to the respective end of the key.
-    record RadixSortOptions
+    interface RadixSortBits
         begin_bit: integer
         end_bit: integer
+    end
+
+    -- A sort task: its debug name, its queue family (graphics by default), and the bits it sorts by.
+    record RadixSortOptions is RadixSortBits
+        name: string
+        queue_family: wbe.QueueFamilyVK
     end
 end
 
@@ -86,11 +92,15 @@ local KEY_BIT_SIZES: {sort.RadixSortKeyType:integer} = { uint = 32, uint2 = 64 }
 -- The prefix of the ids of the per-pass pipelines of each key type.
 local PASS_PIPELINE_PREFIXES: {sort.RadixSortKeyType:string} = { uint = "radix_sort_", uint2 = "radix_sort_uint2_" }
 
--- Graph-owned buffers sized to sort up to max_element_count keys of sort_key_type (uint by default). The sort task
--- references these handles, so the graph discovers their storage when it builds the recipe.
-function sort.radix_sort_buffers(names: sort.RadixSortBufferNames, max_element_count: integer,
-    sort_key_type?: sort.RadixSortKeyType): sort.RadixSortBuffers
-    local key_type: sort.RadixSortKeyType = sort_key_type or "uint"
+local function member_name(name: string, member: string): string
+    return name ~= nil and name .. "." .. member or nil
+end
+
+-- The graph-owned buffers of a radix sort. The sort task references these handles, so the build discovers them.
+function sort.radix_sort_buffers(descriptor: sort.RadixSortBuffersDescriptor): sort.RadixSortBuffers
+    local key_type: sort.RadixSortKeyType = descriptor.key_type or "uint"
+    local max_element_count = descriptor.max_element_count
+    local name = descriptor.name
     -- The sort has one local sort per RADIX_SORT_ELEMENTS_PER_WORKGROUP keys, up to RADIX_SORT_MAX_WORKGROUP_COUNT.
     local max_local_sort_num =
         math_utils.clamp(ceil_div(max_element_count, RADIX_SORT_ELEMENTS_PER_WORKGROUP), 1, RADIX_SORT_MAX_WORKGROUP_COUNT)
@@ -98,21 +108,27 @@ function sort.radix_sort_buffers(names: sort.RadixSortBufferNames, max_element_c
     local key_size = KEY_BIT_SIZES[key_type] // 8
     local key_buffer_size = RADIX_SORT_DATA_START * UINT32_SIZE + max_element_count * key_size
     return {
-        keys = render_graph.storage_buffer(names.keys, key_buffer_size),
-        keys_swap = render_graph.storage_buffer(names.keys_swap, key_buffer_size),
+        keys = graph.storage_buffer({ name = member_name(name, "keys"), size = key_buffer_size }),
+        keys_swap = graph.storage_buffer({ name = member_name(name, "keys_swap"), size = key_buffer_size }),
         -- The metadata, one sub-histogram per local sort, and one overflow histogram per histogram prefix scan workgroup.
-        histogram = render_graph.storage_buffer(names.histogram,
-            (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * UINT32_SIZE),
+        histogram = graph.storage_buffer({
+            name = member_name(name, "histogram"),
+            size = (RADIX_SORT_DATA_START + (max_local_sort_num + max_overflow_num) * RADIX_SORT_BUCKET_COUNT) * UINT32_SIZE,
+        }),
         -- The indirect dispatches of the passes, written from the local sort count of the keys.
-        dispatch = render_graph.buffer(names.dispatch, "buffer_indirect", RADIX_SORT_DISPATCH_BUFFER_SIZE),
+        dispatch = graph.buffer({
+            name = member_name(name, "dispatch"),
+            usage = "buffer_indirect",
+            size = RADIX_SORT_DISPATCH_BUFFER_SIZE,
+        }),
         key_type = key_type,
     }
 end
 
 -- The bit offsets of the digits a sort of buffers with settings orders by, from the least significant one up.
-local function radix_sort_bit_regions(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortOptions): {integer}
+local function radix_sort_bit_regions(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortBits): {integer}
     local key_bit_size = KEY_BIT_SIZES[buffers.key_type]
-    local options: sort.RadixSortOptions = settings or {}
+    local options: sort.RadixSortBits = settings or {}
     local begin_bit = options.begin_bit or 0
     local end_bit = options.end_bit or key_bit_size
     if begin_bit % RADIX_SORT_DIGIT_BIT_SIZE ~= 0 then
@@ -145,19 +161,19 @@ local function radix_sort_bit_regions(buffers: sort.RadixSortBuffers, settings?:
 end
 
 local function radix_sort_params(buffers: sort.RadixSortBuffers,
-    queue_family?: wbe.QueueFamilyVK, settings?: sort.RadixSortOptions): render_graph.RTParamsRunComputePipelinesSequentialVK
+    queue_family?: wbe.QueueFamilyVK, settings?: sort.RadixSortBits): graph.RTParamsRunComputePipelinesSequentialVK
     local pass_pipeline_prefix = PASS_PIPELINE_PREFIXES[buffers.key_type]
     local keys = buffers.keys
     local keys_swap = buffers.keys_swap
     local histogram = buffers.histogram
     local dispatch = buffers.dispatch
     -- The element count is fixed once the keys are registered, so every pass uses the same dispatches.
-    local dispatches: {render_graph.RTParamsComputeDispatchVK} = {
-        { pipeline = render_graph.shader_compute_pipeline("radix_sort_prepare_dispatch"), bindings = { input_buffer = keys, dispatch_buffer = dispatch } },
+    local dispatches: {graph.RTParamsComputeDispatchVK} = {
+        { pipeline = graph.shader_compute_pipeline("radix_sort_prepare_dispatch"), bindings = { input_buffer = keys, dispatch_buffer = dispatch } },
     }
-    local function indirect(pipeline: string, offset: integer, bindings: {string:render_graph.Resource})
+    local function indirect(pipeline: string, offset: integer, bindings: {string:graph.Resource})
         dispatches[#dispatches + 1] =
-            { pipeline = render_graph.shader_compute_pipeline(pipeline), indirect_buffer = dispatch, indirect_offset = offset, bindings = bindings }
+            { pipeline = graph.shader_compute_pipeline(pipeline), indirect_buffer = dispatch, indirect_offset = offset, bindings = bindings }
     end
     for pass, bit_offset in ipairs(radix_sort_bit_regions(buffers, settings)) do
         -- Pass p reads the keys from one buffer and scatters them into the other, so after an even number of passes
@@ -170,7 +186,7 @@ local function radix_sort_params(buffers: sort.RadixSortBuffers,
         indirect("radix_sort_histogram_prefix_sum", RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_OFFSET, { histogram_buffer = histogram })
         -- The overflow histograms are scanned in a single workgroup.
         dispatches[#dispatches + 1] =
-            { pipeline = render_graph.shader_compute_pipeline("radix_sort_histogram_overflow_prefix_sum"), bindings = { histogram_buffer = histogram } }
+            { pipeline = graph.shader_compute_pipeline("radix_sort_histogram_overflow_prefix_sum"), bindings = { histogram_buffer = histogram } }
         indirect("radix_sort_histogram_add_overflow", RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET, { histogram_buffer = histogram })
         indirect(pass_pipeline_prefix .. "scatter_" .. bit_region, RADIX_SORT_LOCAL_SORT_DISPATCH_OFFSET,
             { input_buffer = input_keys, histogram_buffer = histogram, output_buffer = output_keys })
@@ -181,26 +197,29 @@ end
 -- The dispatches that sort buffers.keys in place by the bits of settings, bound to the buffers' handles, for a
 -- run_compute_pipelines_sequential task that may dispatch other passes before and after them. Like the sort task, they
 -- read the element count from the keys, so the count must be written before they run.
-function sort.radix_sort_dispatches(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortOptions): {render_graph.RTParamsComputeDispatchVK}
+function sort.radix_sort_dispatches(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortBits): {graph.RTParamsComputeDispatchVK}
     return radix_sort_params(buffers, nil, settings).dispatches
 end
 
--- Adds the sort to graph and returns its registered task object.
-function sort.add_radix_sort_task(graph: render_graph.Graph, id: string, buffers: sort.RadixSortBuffers,
-    queue_family?: wbe.QueueFamilyVK, settings?: sort.RadixSortOptions): render_graph.Task
-    return graph:compute_sequential(id, radix_sort_params(buffers, queue_family, settings))
+-- The task that sorts buffers.keys in place.
+function sort.radix_sort_task(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortOptions): graph.Task
+    local options: sort.RadixSortOptions = settings or {}
+    return graph.compute_sequential(radix_sort_params(buffers, options.queue_family, options), { name = options.name })
 end
 
--- Adds to graph a sort of the uint2 keys of buffers by x alone, which carries each y as the payload of its x, and
--- returns its registered task object. Keys with equal x keep their input order. It runs the last 4 passes of the full
--- uint2 sort, those of bits [32, 64).
-function sort.add_radix_sort_key_value_task(graph: render_graph.Graph, id: string, buffers: sort.RadixSortBuffers,
-    queue_family?: wbe.QueueFamilyVK): render_graph.Task
+-- The task that sorts the uint2 keys of buffers by x alone, which carries each y as the payload of its x. Keys with
+-- equal x keep their input order. It runs the last 4 passes of the full uint2 sort, those of bits [32, 64), so settings
+-- set no bits.
+function sort.radix_sort_key_value_task(buffers: sort.RadixSortBuffers, settings?: sort.RadixSortOptions): graph.Task
+    local options: sort.RadixSortOptions = settings or {}
     if buffers.key_type ~= "uint2" then
-        error(string.format("sort: the key-value radix sort %s requires uint2 keys, got %s keys.", id,
+        error(string.format("sort: the key-value radix sort %s requires uint2 keys, got %s keys.", tostring(options.name),
             tostring(buffers.key_type)))
     end
-    return sort.add_radix_sort_task(graph, id, buffers, queue_family, { begin_bit = 32 })
+    if options.begin_bit ~= nil or options.end_bit ~= nil then
+        error("sort: the key-value radix sort sorts bits [32, 64); it takes no bit range.")
+    end
+    return sort.radix_sort_task(buffers, { name = options.name, queue_family = options.queue_family, begin_bit = 32 })
 end
 
 return sort

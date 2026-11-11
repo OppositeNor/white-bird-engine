@@ -21,15 +21,21 @@
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_resource_list_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/roc_single_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
+#include "utils/utils.hh"
 #include <array>
+#include <cstdint>
 #include <gtest/gtest.h>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -89,7 +95,7 @@ TEST(WBERenderGraphDescriptorVKTest, DescriptorStoresTaskFactory) {
         ++created_count;
         return make_unique<RTDirectDescriptorVK>(&allocator, &destroyed);
     });
-    RendTaskDescVK copied_descriptor = descriptor;
+    const RendTaskDescVK& copied_descriptor = descriptor;
 
     EXPECT_EQ(copied_descriptor.task_id, "direct_task");
     ASSERT_NE(copied_descriptor.factory, nullptr);
@@ -307,7 +313,8 @@ TEST(WBERenderGraphDescriptorVKTest, ResourceMapScopesApplyAfterTheTaskBindingsW
     RenderAllocator allocator(WBE_KI_B(64));
     RenderTaskResourceMap map(&allocator);
     map.bind("render_target_colors[0]", "color");
-    const std::array<RenderTaskResourceMap::ScopeBinding, 2> inner{{{.source = "color", .target = "result_image"}, {.source = "keys", .target = "sort.keys"}}};
+    const std::array<RenderTaskResourceMap::ScopeBinding, 2> inner{
+        {{.source = "color", .target = "result_image"}, {.source = "keys", .target = "sort.keys"}}};
     map.enclose(inner);
     // An enclosing scope sees the inner scope's results: the inner `sort.keys` becomes `deferred.sort.keys`.
     const std::array<RenderTaskResourceMap::ScopeBinding, 2> outer{
@@ -381,6 +388,51 @@ TEST(WBERenderGraphDescriptorVKTest, SubgraphsArePrefixedAndResolveTheirPortsAnd
     EXPECT_THROW(descriptor.get_subgraph("missing"), std::runtime_error);
 }
 
+TEST(WBERenderGraphDescriptorVKTest, StrictResourceMapsRejectUnboundIdentifiersAndExemptIdentityBindings) {
+    RenderAllocator allocator(WBE_KI_B(16));
+    RenderTaskResourceMap map(&allocator);
+    map.bind("input", "buffer-0000abcd").bind("buffer-0000beef", "buffer-0000beef");
+    // A map that is not strict resolves what it leaves unmapped to itself.
+    EXPECT_EQ(map.resolve("camera_info"), "camera_info");
+    map.require_bindings("draw");
+    EXPECT_EQ(map.resolve("input"), "buffer-0000abcd");
+    try {
+        (void)map.resolve("camera_info");
+        ADD_FAILURE() << "An unbound identifier resolved.";
+    } catch (const std::runtime_error& error) {
+        EXPECT_NE(std::string_view(error.what()).find("task 'draw' uses resource 'camera_info', which it does not bind"), std::string_view::npos)
+            << error.what();
+    }
+    // The identity binding is never resolved, which is no unused mapping; another unused binding is.
+    EXPECT_NO_THROW(map.validate_all_used("draw"));
+    map.bind("unused", "buffer-0000abcd");
+    EXPECT_THROW(map.validate_all_used("draw"), std::runtime_error);
+    EXPECT_THROW(map.require_bindings(""), std::runtime_error);
+}
+
+TEST(WBERenderGraphDescriptorVKTest, DebugNamesAndExportsAreStoredAndSubgraphsPrefixTheirNames) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_sampler("sampler-0000abcd").set_debug_name("sampler-0000abcd", "linear").add_export("linear_sampler", "sampler-0000abcd");
+    EXPECT_EQ(descriptor.debug_names.find("sampler-0000abcd")->second, "linear");
+    EXPECT_EQ(descriptor.exports.find("linear_sampler")->second, "sampler-0000abcd");
+    EXPECT_THROW(descriptor.set_debug_name("sampler-0000abcd", "again"), std::runtime_error);
+    EXPECT_THROW(descriptor.set_debug_name("", "name"), std::runtime_error);
+    EXPECT_THROW(descriptor.set_debug_name("sampler-0000abcd", ""), std::runtime_error);
+    EXPECT_THROW(descriptor.add_export("linear_sampler", "sampler-0000abcd"), std::runtime_error);
+    EXPECT_THROW(descriptor.add_export("", "sampler-0000abcd"), std::runtime_error);
+    EXPECT_THROW(descriptor.add_export("other", ""), std::runtime_error);
+
+    RendSubgraphDescVK subgraph(&allocator);
+    subgraph.graph.add_sampler("sampler-0000beef").set_debug_name("sampler-0000beef", "nearest");
+    descriptor.add_subgraph("post", subgraph, std::span<const RendSubgraphPortBindingVK>{});
+    EXPECT_EQ(descriptor.debug_names.find("post.sampler-0000beef")->second, "post.nearest");
+    // Subgraphs cannot export.
+    RendSubgraphDescVK exporting(&allocator);
+    exporting.graph.add_sampler("sampler-0000cafe").add_export("exported", "sampler-0000cafe");
+    EXPECT_THROW(descriptor.add_subgraph("exporting", exporting, std::span<const RendSubgraphPortBindingVK>{}), std::runtime_error);
+}
+
 TEST(WBERenderGraphDescriptorVKTest, NestedSubgraphsArePrefixedAgain) {
     RenderAllocator allocator(WBE_KI_B(128));
     RendSubgraphDescVK outer(&allocator);
@@ -423,8 +475,8 @@ TEST(WBERenderGraphDescriptorVKTest, SubgraphImportsMergeIntoTheGraph) {
     const Ref<IRenderObjectVK> camera = descriptor.resources[1].container->get().dynamic_cast_ref<IRenderObjectVK>();
     RendSubgraphDescVK rewrapping(&allocator);
     rewrapping.graph.add_resource(RendResVK{.res_id = "camera", .container = make_ref<ROCSingleVK>(&allocator, [camera](uint32_t /*p_slot*/) {
-        return camera;
-    })});
+                                                return camera;
+                                            })});
     descriptor.add_subgraph("rewrapping", rewrapping, {});
     EXPECT_EQ(descriptor.resources.size(), 2U);
     // A second subgraph importing another resource under an imported id conflicts.

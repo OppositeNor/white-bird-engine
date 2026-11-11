@@ -20,7 +20,7 @@
 -- scanned buffer holds the element count in its metadata, followed by the elements; see large_prefix_scan_utils.slang.
 
 local math_utils = require("utils.math")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local ceil_div = math_utils.ceil_div
 
@@ -36,24 +36,26 @@ local LARGE_PREFIX_SCAN_DISPATCH_BUFFER_SIZE = 12
 local UINT32_SIZE = 4
 
 local record large_prefix_scan
-    -- Names of the graph-owned buffers created for a large prefix scan.
-    record LargePrefixScanBufferNames
-        sections: string
-        dispatch: string
+    -- The scratch buffers of a large prefix scan to declare: sized to scan up to max_element_count elements, and named for
+    -- debugging `<name>.sections` and `<name>.dispatch` when name is set.
+    record LargePrefixScanBuffersDescriptor
+        name: string
+        max_element_count: integer
     end
 
     -- The scratch buffers of a large prefix scan, which the scan alone uses: the block and section totals, and the
     -- indirect dispatch of the block passes.
     record LargePrefixScanBuffers
-        sections: render_graph.Resource
-        dispatch: render_graph.Resource
+        sections: graph.Resource
+        dispatch: graph.Resource
     end
 end
 
--- Graph-owned scratch buffers sized to scan up to max_element_count elements. The scan dispatches reference these
--- handles, so the graph discovers their storage when it builds the recipe.
-function large_prefix_scan.buffers(names: large_prefix_scan.LargePrefixScanBufferNames,
-    max_element_count: integer): large_prefix_scan.LargePrefixScanBuffers
+-- Graph-owned scratch buffers of a large prefix scan. The scan dispatches reference these handles, so the build
+-- discovers them.
+function large_prefix_scan.buffers(descriptor: large_prefix_scan.LargePrefixScanBuffersDescriptor): large_prefix_scan.LargePrefixScanBuffers
+    local max_element_count = descriptor.max_element_count
+    local name = descriptor.name
     local max_block_num = ceil_div(max_element_count, LARGE_PREFIX_SCAN_BLOCK_SIZE)
     if max_block_num > LARGE_PREFIX_SCAN_MAX_BLOCK_NUM then
         error(string.format("large_prefix_scan: %d elements need more than %d blocks.", max_element_count,
@@ -61,9 +63,15 @@ function large_prefix_scan.buffers(names: large_prefix_scan.LargePrefixScanBuffe
     end
     return {
         -- The section totals, then one block total per block.
-        sections = render_graph.storage_buffer(names.sections,
-            (LARGE_PREFIX_SCAN_SECTION_NUM + math.max(max_block_num, 1)) * UINT32_SIZE),
-        dispatch = render_graph.buffer(names.dispatch, "buffer_indirect", LARGE_PREFIX_SCAN_DISPATCH_BUFFER_SIZE),
+        sections = graph.storage_buffer({
+            name = name ~= nil and name .. ".sections" or nil,
+            size = (LARGE_PREFIX_SCAN_SECTION_NUM + math.max(max_block_num, 1)) * UINT32_SIZE,
+        }),
+        dispatch = graph.buffer({
+            name = name ~= nil and name .. ".dispatch" or nil,
+            usage = "buffer_indirect",
+            size = LARGE_PREFIX_SCAN_DISPATCH_BUFFER_SIZE,
+        }),
     }
 end
 
@@ -75,19 +83,19 @@ end
 -- The dispatches that compute the inclusive prefix sum of data in place, bound to the handles of data and buffers.
 -- Each pass follows the previous one, and the passes read the element count from data, so the count must be written
 -- before they run and must not exceed the maximum element count buffers was sized for.
-function large_prefix_scan.dispatches(data: render_graph.Resource,
-    buffers: large_prefix_scan.LargePrefixScanBuffers): {render_graph.RTParamsComputeDispatchVK}
+function large_prefix_scan.dispatches(data: graph.Resource,
+    buffers: large_prefix_scan.LargePrefixScanBuffers): {graph.RTParamsComputeDispatchVK}
     local sections = buffers.sections
     local dispatch = buffers.dispatch
     return {
-        { pipeline = render_graph.compute_pipeline("large_prefix_scan_prepare_dispatch"),
+        { pipeline = graph.compute_pipeline("large_prefix_scan_prepare_dispatch"),
             bindings = { data_buffer = data, dispatch_buffer = dispatch } },
-        render_graph.indirect_dispatch(render_graph.compute_pipeline("large_prefix_scan_blocks"), dispatch, 0,
+        graph.indirect_dispatch(graph.compute_pipeline("large_prefix_scan_blocks"), dispatch, 0,
             { data_buffer = data, sections_buffer = sections }),
-        { pipeline = render_graph.compute_pipeline("large_prefix_scan_sections"),
+        { pipeline = graph.compute_pipeline("large_prefix_scan_sections"),
             group_count_x = LARGE_PREFIX_SCAN_SECTION_NUM, bindings = { data_buffer = data, sections_buffer = sections } },
-        { pipeline = render_graph.compute_pipeline("large_prefix_scan_totals"), bindings = { sections_buffer = sections } },
-        render_graph.indirect_dispatch(render_graph.compute_pipeline("large_prefix_scan_add"), dispatch, 0,
+        { pipeline = graph.compute_pipeline("large_prefix_scan_totals"), bindings = { sections_buffer = sections } },
+        graph.indirect_dispatch(graph.compute_pipeline("large_prefix_scan_add"), dispatch, 0,
             { data_buffer = data, sections_buffer = sections }),
     }
 end

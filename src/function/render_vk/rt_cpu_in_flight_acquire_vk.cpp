@@ -22,11 +22,13 @@
 #include "function/event/event_manager.hh"
 #include "function/render/render_defs.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_image_view_vk.hh"
 #include "function/render_vk/ro_image_vk.hh"
+#include "function/render_vk/rt_params_cpu_in_flight_acquire_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include <chrono>
@@ -53,11 +55,14 @@ RenderAllocator* get_render_data_allocator(const RenderContextVK* p_render_data)
 
 } // namespace
 
-RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id)
-    : render_data(p_render_data), image_view_id(p_image_view_id), event_manager(EventManager::get_singleton()),
-      pending_acquisitions(get_render_data_allocator(p_render_data)) {
+RTCPUInFlightAcquireVK::RTCPUInFlightAcquireVK(const RenderContextVK* p_render_data, std::string_view p_image_view_id, std::string_view p_event_id)
+    : render_data(p_render_data), image_view_id(p_image_view_id), event_id(p_event_id),
+      event_manager(EventManager::get_singleton()), pending_acquisitions(get_render_data_allocator(p_render_data)) {
     if (image_view_id.empty()) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: image-view resource id is empty.");
+    }
+    if (event_id.empty()) {
+        throw std::runtime_error("RTCPUInFlightAcquireVK: event id is empty.");
     }
     if (event_manager == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: no EventManager exists to emit acquisitions through.");
@@ -69,7 +74,7 @@ Unique<IRenderTaskVK> RTCPUInFlightAcquireVK::create(
     if (p_render_data == nullptr || p_render_data->allocator == nullptr) {
         throw std::runtime_error("RTCPUInFlightAcquireVK: render data is unavailable.");
     }
-    return make_unique<RTCPUInFlightAcquireVK>(p_render_data->allocator, p_render_data, p_params.image_view);
+    return make_unique<RTCPUInFlightAcquireVK>(p_render_data->allocator, p_render_data, p_params.image_view, p_params.event);
 }
 
 void RTCPUInFlightAcquireVK::append_accesses(
@@ -118,10 +123,7 @@ void RTCPUInFlightAcquireVK::record(VkCommandBuffer /*p_command_buffer*/, double
     Worker* worker = Worker::get_singleton();
     WBE_DEBUG_ASSERT(worker != nullptr);
     pending_acquisitions.push_back(worker->submit_task(
-        [acquire_future = std::move(acquire_future),
-            acquired_image = std::move(acquired_image),
-            event_manager = event_manager,
-            event_id = image_view_id]() mutable {
+        [acquire_future = std::move(acquire_future), acquired_image = std::move(acquired_image), event_manager = event_manager, event_id = event_id] mutable {
             acquire_future.get();
             event_manager->emit(event_id, acquired_image);
         }));

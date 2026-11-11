@@ -13,20 +13,30 @@
    limitations under the License.
 */
 #include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
+#include "core/allocator/i_allocator.hh"
 #include "core/allocator/stl_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/material_texture_contract.hh"
 #include "function/render/i_render_graph.hh"
+#include "function/render/material_texture_contract.hh"
 #include "function/render/rd_typed.hh"
+#include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
 #include "function/render_vk/i_bindable_render_resource_vk.hh"
+#include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/mesh_draw_batch_vk.hh"
 #include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/rd_params_mesh_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
+#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/render_vk/render_graph_descriptor_vk.hh"
+#include "function/render_vk/render_graph_vk.hh"
+#include "function/render_vk/render_task_create_utils_vk.hh"
 #include "function/render_vk/ro_graphics_pipeline_vk.hh"
+#include "function/render_vk/rt_params_clear_value_vk.hh"
+#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
+#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
@@ -34,12 +44,14 @@
 #include "utils/defs.hh"
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
@@ -64,8 +76,9 @@ void validate_parts(const RTParamsGraphicsDrawMeshVK& p_params) {
     for (size_t i = 0; i < p_params.parts.size(); ++i) {
         if (std::find(p_params.parts.begin(), p_params.parts.begin() + static_cast<std::ptrdiff_t>(i), p_params.parts[i]) !=
             p_params.parts.begin() + static_cast<std::ptrdiff_t>(i)) {
-            throw std::runtime_error(std::format(
-                "{}: mesh part '{}' is listed more than once.", TASK_NAME, EnumReflection<MeshPartVK>::enum_to_string(p_params.parts[i])));
+            throw std::runtime_error(std::format("{}: mesh part '{}' is listed more than once.",
+                TASK_NAME,
+                EnumReflection<MeshPartVK>::enum_to_string(p_params.parts[i])));
         }
     }
 }
@@ -113,8 +126,10 @@ Vector<VariantPipelineVK, RenderAllocator> acquire_variant_pipelines(
     return result;
 }
 
-const VariantPipelineVK& find_variant_pipeline(
-    const Vector<VariantPipelineVK, RenderAllocator>& p_pipelines, const RTParamsGraphicsDrawMeshVK& p_params, MeshPartVK p_part, std::string_view p_variant) {
+const VariantPipelineVK& find_variant_pipeline(const Vector<VariantPipelineVK, RenderAllocator>& p_pipelines,
+    const RTParamsGraphicsDrawMeshVK& p_params,
+    MeshPartVK p_part,
+    std::string_view p_variant) {
     auto found = std::ranges::find_if(p_pipelines, [p_variant](const VariantPipelineVK& p_pipeline) {
         return p_pipeline.variant == p_variant;
     });
@@ -128,7 +143,8 @@ const VariantPipelineVK& find_variant_pipeline(
     return *found;
 }
 
-const VariantPipelineVK* find_declaring_pipeline(const Vector<VariantPipelineVK, RenderAllocator>& p_pipelines, std::string_view p_resource_id) {
+const VariantPipelineVK* find_declaring_pipeline(
+    const Vector<VariantPipelineVK, RenderAllocator>& p_pipelines, std::string_view p_resource_id) {
     auto found = std::ranges::find_if(p_pipelines, [p_resource_id](const VariantPipelineVK& p_pipeline) {
         return pipeline_declares(*p_pipeline.pipeline, p_resource_id);
     });
@@ -163,12 +179,12 @@ const MaterialTextureContract& resolve_shared_material_contract(const Vector<Var
 
 Ref<MeshResourcesVK> acquire_registered_mesh(const IRenderGraph* p_render_graph, std::string_view p_mesh_key) {
     if (p_render_graph == nullptr) {
-        throw std::runtime_error(std::format("{}: the task is not on a render graph, so mesh '{}' cannot be resolved.", TASK_NAME, p_mesh_key));
+        throw std::runtime_error(
+            std::format("{}: the task is not on a render graph, so mesh '{}' cannot be resolved.", TASK_NAME, p_mesh_key));
     }
     Ref<MeshResourcesVK> mesh = p_render_graph->try_acquire_registered<MeshResourcesVK>(p_mesh_key);
     if (mesh == MEM_NULL) {
-        throw std::runtime_error(std::format(
-            "{}: no mesh is registered on the render graph under '{}'; add the task with add_to_graph() or RenderTaskRegistryVK::add_task().",
+        throw std::runtime_error(std::format("{}: no mesh is registered on the render graph under '{}'; add the task with add_to_graph() or RenderTaskRegistryVK::add_task().",
             TASK_NAME,
             p_mesh_key));
     }
@@ -183,8 +199,10 @@ RTGraphicsDrawMeshVK::RTGraphicsDrawMeshVK(Unique<RTRunGraphicsPipelineIndirectV
     }
 }
 
-Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(
-    const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsGraphicsDrawMeshVK& p_params, const RendGraphContextVK& p_context) {
+Unique<IRenderTaskVK> RTGraphicsDrawMeshVK::create(const RenderContextVK* p_render_data,
+    IRenderGraph* p_render_graph,
+    const RTParamsGraphicsDrawMeshVK& p_params,
+    const RendGraphContextVK& p_context) {
     validate_parts(p_params);
     const Vector<VariantPipelineVK, RenderAllocator> pipelines = acquire_variant_pipelines(p_render_data, p_render_graph, p_params);
     Ref<MeshResourcesVK> mesh = acquire_registered_mesh(p_render_graph, p_params.mesh);
@@ -250,14 +268,27 @@ void RTGraphicsDrawMeshVK::prepare_graph(
             p_task.alias(p_shader_id, p_graph_id);
         }
     };
+    // The fixed-function buffers are named by their graph ids, which the task binds to themselves.
+    const auto bind_directly = [&p_task](const std::string& p_graph_id) {
+        p_task.alias(p_graph_id, p_graph_id);
+    };
+    for (size_t i = 0; i < mesh->get_vertex_buffer_count(); ++i) {
+        bind_directly(mesh_member(p_params, MeshResourcesVK::get_vertex_buffer_member(i)));
+    }
+    bind_directly(mesh_member(p_params, MeshResourcesVK::INDICES));
+    for (MeshPartVK part : p_params.parts) {
+        bind_directly(mesh_member(p_params, MeshResourcesVK::get_draw_commands_member(part)));
+    }
     alias_declared(REND_RES_MESH_SUBMESHES, mesh_member(p_params, MeshResourcesVK::SUBMESHES));
     alias_declared(REND_RES_MESH_NODES, mesh_member(p_params, MeshResourcesVK::NODES));
     alias_declared(REND_RES_MESH_INSTANCES, mesh_member(p_params, MeshResourcesVK::INSTANCES));
     alias_declared(REND_RES_MESH_MATERIAL_SAMPLER, mesh_member(p_params, MeshResourcesVK::MATERIAL_SAMPLER));
-    if (const VariantPipelineVK* transform_reader = find_declaring_pipeline(pipelines, REND_RES_MESH_TRANSFORM); transform_reader != nullptr) {
+    if (const VariantPipelineVK* transform_reader = find_declaring_pipeline(pipelines, REND_RES_MESH_TRANSFORM);
+        transform_reader != nullptr) {
         if (!p_params.transform.has_value() || p_params.transform->empty()) {
-            throw std::runtime_error(std::format(
-                "{}: pipeline '{}' reads the whole-mesh transform, but no transform resource is set.", TASK_NAME, transform_reader->pipeline_key));
+            throw std::runtime_error(std::format("{}: pipeline '{}' reads the whole-mesh transform, but no transform resource is set.",
+                TASK_NAME,
+                transform_reader->pipeline_key));
         }
         p_task.alias(REND_RES_MESH_TRANSFORM, *p_params.transform);
     }
@@ -294,7 +325,8 @@ RendTaskDescVK& RTGraphicsDrawMeshVK::add_to_graph(
     return p_graph.get_task(p_task_id);
 }
 
-void RTGraphicsDrawMeshVK::append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
+void RTGraphicsDrawMeshVK::append_accesses(
+    Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const {
     draw->append_accesses(p_reads, p_writes);
 }
 

@@ -266,9 +266,8 @@ void VoxelRenderFeatureOctree::configure_recipe(
     }
 
     // Textures and buffers.
-    const auto import = [&p_imports, &params](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
+    const auto import = [&p_imports](std::string_view p_name, const IBindableRenderResourceVK& p_resource) {
         p_imports.add(p_name, p_resource);
-        params.imports.emplace_back(p_name);
     };
     import(OCTREE_INFO, *octree_info);
     import(OCTREE_STATIC, *static_view);

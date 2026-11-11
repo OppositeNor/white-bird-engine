@@ -42,12 +42,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Graph resource id of the index buffer (32-bit indices).
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE)
     std::string index_buffer;
     /**
      * @brief Graph resource id of the buffer of VkDrawIndexedIndirectCommand records.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE)
     std::string indirect_buffer;
     /**
      * @brief Number of indirect draw records, from the start of the indirect buffer.

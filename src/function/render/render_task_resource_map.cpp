@@ -76,7 +76,8 @@ RenderTaskResourceMap& RenderTaskResourceMap::enclose(std::span<const ScopeBindi
         }
         for (size_t j = 0; j < i; ++j) {
             if (p_scope[j].source == p_scope[i].source) {
-                throw std::runtime_error(std::format("RenderTaskResourceMap: scope maps resource '{}' more than once.", p_scope[i].source));
+                throw std::runtime_error(
+                    std::format("RenderTaskResourceMap: scope maps resource '{}' more than once.", p_scope[i].source));
             }
         }
     }
@@ -107,14 +108,28 @@ RenderTaskResourceMap& RenderTaskResourceMap::enclose(std::span<const ScopeBindi
     return *this;
 }
 
+RenderTaskResourceMap& RenderTaskResourceMap::require_bindings(std::string_view p_task_id) {
+    if (p_task_id.empty()) {
+        throw std::runtime_error("RenderTaskResourceMap: a strict map needs the task id.");
+    }
+    strict_task_id = p_task_id;
+    return *this;
+}
+
 std::string_view RenderTaskResourceMap::resolve(std::string_view p_task_resource_id) const {
     std::string_view result = p_task_resource_id;
+    bool mapped = false;
     for (size_t i = 0; i < entries.size(); ++i) {
         if (entries[i].source == p_task_resource_id) {
             used[i] = 1;
             result = entries[i].target;
+            mapped = true;
             break;
         }
+    }
+    if (!strict_task_id.empty() && !mapped) {
+        throw std::runtime_error(std::format(
+            "RenderTaskResourceMap: task '{}' uses resource '{}', which it does not bind.", strict_task_id, p_task_resource_id));
     }
     for (const Entry& entry : scope) {
         if (entry.source == result) {
@@ -126,7 +141,7 @@ std::string_view RenderTaskResourceMap::resolve(std::string_view p_task_resource
 
 void RenderTaskResourceMap::validate_all_used(std::string_view p_task_id) const {
     for (size_t i = 0; i < entries.size(); ++i) {
-        if (used[i] == 0) {
+        if (used[i] == 0 && entries[i].source != entries[i].target) {
             throw std::runtime_error(std::format(
                 "RenderTaskResourceMap: task '{}' maps resource '{}', which the task never uses.", p_task_id, entries[i].source));
         }

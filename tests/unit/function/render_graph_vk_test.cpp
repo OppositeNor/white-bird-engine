@@ -361,6 +361,25 @@ TEST(WBERenderGraphVKTest, RejectsDuplicateGraphResourceRegistration) {
     EXPECT_THROW(build_graph(graph, descriptor), std::runtime_error);
 }
 
+TEST(WBERenderGraphVKTest, AcquiresExportedResourcesByTheirExportNames) {
+    RenderAllocator allocator(WBE_KI_B(128));
+    RenderContextVK render_data(&allocator);
+    RendGraphDescVK descriptor(&allocator);
+    descriptor.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&allocator, &render_data)).add_export("exported", TEST_LOGICAL_RESOURCE);
+    descriptor.add_task(make_probe_desc(&allocator, "probe", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
+    RenderGraphVK graph(&render_data);
+    EXPECT_NE(build_error(graph, descriptor).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
+    EXPECT_NE(graph.acquire_resource("exported"), MEM_NULL);
+    // C++ reaches resources only through their export names.
+    EXPECT_THROW((void)graph.acquire_resource(TEST_LOGICAL_RESOURCE), std::runtime_error);
+
+    RendGraphDescVK undeclared(&allocator);
+    undeclared.add_export("exported", TEST_MISSING_RESOURCE);
+    undeclared.add_task(make_probe_desc(&allocator, "probe", QueueFamilyVK::GRAPHICS, {}, {}));
+    RenderGraphVK undeclared_graph(&render_data);
+    EXPECT_NE(build_error(undeclared_graph, undeclared).find("export 'exported' names resource"), std::string::npos);
+}
+
 TEST(WBERenderGraphVKTest, MissingReflectedResourceFailsDuringTaskBinding) {
     RenderAllocator allocator(WBE_KI_B(128));
     RenderContextVK render_data(&allocator);

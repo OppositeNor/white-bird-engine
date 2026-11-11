@@ -18,31 +18,32 @@
 -- `skinned_mesh_skinning_transforms` storage buffer, and its `draw_skinned_mesh_imgui` task.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.RendRecipeContextVK, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local camera_info = render_graph.import_resource("skinned_mesh_camera_info")
-    local skinning_transforms = render_graph.import_resource("skinned_mesh_skinning_transforms")
+    local swap_chain = graph.import("swap_chain")
     -- The shader reads position from the geometry binding and the joint ids and weights from the joint-binding binding,
     -- which the draw binds from the compiled mesh.
-    local mesh = graph:register_mesh("skinned_mesh", { mesh = "model_simple_skin.mesh" })
-    local pipeline = graph:register_graphics_pipeline("draw_skinned_mesh_pipeline", {
-        pipeline = "draw_skinned_mesh_pipeline",
-        color_formats = { context.swap_chain_format },
-    })
-    local draw = graph:draw_mesh("draw_skinned_mesh", {
-        mesh = mesh,
-        pipeline = { default = pipeline },
+    local draw = graph.draw_mesh({
+        mesh = graph.mesh("skinned_mesh", { mesh = "model_simple_skin.mesh" }),
+        pipeline = { default = graph.graphics_pipeline("draw_skinned_mesh_pipeline", {
+            pipeline = "draw_skinned_mesh_pipeline",
+            color_formats = { context.swap_chain_format },
+        }) },
         parts = { "opaque" },
         clear_values = { { color = { 0.05, 0.05, 0.05, 1.0 } } },
-    }, { uses = { camera_info, skinning_transforms } }):color_target(0, swap_chain)
-    local imgui = graph:import_task("draw_skinned_mesh_imgui")
-    graph:chain(swap_chain, { draw, imgui })
-    return graph:build()
+    }, {
+        name = "draw_skinned_mesh",
+        bindings = {
+            skinned_mesh_camera_info = graph.import("skinned_mesh_camera_info"),
+            skinned_mesh_skinning_transforms = graph.import("skinned_mesh_skinning_transforms"),
+        },
+    }):color_target(0, swap_chain)
+    local imgui = graph.import_task("draw_skinned_mesh_imgui")
+    graph.chain(swap_chain, { draw, imgui })
+    return graph.build({ tasks = { draw, imgui } })
 end
 
 return exports

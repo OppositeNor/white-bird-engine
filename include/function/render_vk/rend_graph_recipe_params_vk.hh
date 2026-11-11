@@ -51,10 +51,16 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeResourceVK {
     /**
-     * @brief Graph resource id.
+     * @brief Graph resource id, which the recipe's tasks, edges, and exports name the resource by. The Teal
+     * `render_graph_utils` library generates it.
      */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string id;
+    /**
+     * @brief Debug name of the resource; see RendGraphDescVK::set_debug_name(). Empty names the resource by its id.
+     */
+    WBE_META(WBE_REFLECT)
+    std::string name;
     /**
      * @brief Set to declare a buffer.
      */
@@ -179,10 +185,17 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RendRecipeTaskVK {
     /**
-     * @brief Task id, unique in the recipe.
+     * @brief Task id, unique in the recipe. The Teal `render_graph_utils` library generates it, except for an import's,
+     * which is the supplied task's.
      */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string id;
+    /**
+     * @brief Debug name of the task, which diagnostics and profiles show (RendTaskDescVK::debug_name); empty shows its id.
+     * A subgraph's names its members.
+     */
+    WBE_META(WBE_REFLECT)
+    std::string name;
     /**
      * @brief A task type name registered in RenderTaskRegistryVK; required unless the task is an import, a subgraph, or a
      * multiplexer.
@@ -190,7 +203,8 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     std::string type;
     /**
-     * @brief Whether the caller supplies the task; an import sets no type, params, aliases, trigger, or toggle.
+     * @brief Whether the caller supplies the task; an import sets no type, params, trigger, or toggle. Its aliases bind the
+     * identifiers the supplied task uses to the recipe's resources, and what they leave unmapped resolves to itself.
      */
     WBE_META(WBE_REFLECT)
     bool import = false;
@@ -200,7 +214,9 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     DataValue params;
     /**
-     * @brief Map from task-local resource id to graph resource id; see RendTaskDescVK::alias().
+     * @brief Map from task-local resource id to graph resource id; see RendTaskDescVK::alias(). Unless the task is an
+     * import, it must map every identifier the task uses, since recipe tasks resolve nothing to itself
+     * (RenderTaskResourceMap::require_bindings()).
      */
     WBE_META(WBE_REFLECT)
     DataValue aliases;
@@ -302,6 +318,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
      */
     WBE_META(WBE_REFLECT)
     std::vector<std::string> ports;
+    /**
+     * @brief Map from export name to the graph resource id it exports; see RendGraphDescVK::add_export(). Only the
+     * outermost recipe exports.
+     */
+    WBE_META(WBE_REFLECT)
+    DataValue exports;
 };
 
 } // namespace WhiteBirdEngine

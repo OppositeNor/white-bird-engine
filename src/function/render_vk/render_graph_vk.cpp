@@ -288,11 +288,16 @@ ResourceScopeVK resource_scope(RendResUsageVK p_usage, bool p_write, QueueFamily
     throw std::runtime_error("RenderGraphVK: resource usage is invalid for the declared read/write direction.");
 }
 
+// A task as diagnostics name it: `'<name>' (<id>)`, or `'<id>'` when it has no debug name.
+std::string describe_task(const RGNode& p_node) {
+    return p_node.name == p_node.task_id ? std::format("'{}'", p_node.task_id) : std::format("'{}' ({})", p_node.name, p_node.task_id);
+}
+
 void validate_declared_resource(
     const Map<std::string, Ref<RendResVK>, RenderAllocator>& p_resources, const RGNode& p_node, const ResAccessVK& p_access, bool p_is_write) {
     if (!p_resources.contains(p_access.res_id)) {
-        throw std::runtime_error(std::format("RenderGraphVK: task '{}' {} undeclared resource '{}'.",
-            p_node.task_id,
+        throw std::runtime_error(std::format("RenderGraphVK: task {} {} undeclared resource '{}'.",
+            describe_task(p_node),
             p_is_write ? "writes" : "reads",
             p_access.res_id));
     }
@@ -593,7 +598,8 @@ DataValue make_recipe_context(DataValue p_prepared, const RendRecipeContextVK& p
 struct RenderGraphVK::RebuildState {
     RebuildState() = delete;
     explicit RebuildState(RenderAllocator* p_allocator)
-        : signatures(p_allocator), owned_containers(p_allocator), task_descs(p_allocator), subgraphs(p_allocator) {
+        : signatures(p_allocator), owned_containers(p_allocator), task_descs(p_allocator), subgraphs(p_allocator),
+          debug_names(p_allocator), exports(p_allocator) {
     }
     ~RebuildState() = default;
     RebuildState(const RebuildState&) = delete;
@@ -608,6 +614,9 @@ struct RenderGraphVK::RebuildState {
     Map<std::string, Ref<RenderObjectContainerVK>, RenderAllocator> owned_containers;
     Vector<RendTaskDescVK, RenderAllocator> task_descs;
     Vector<RendSubgraphVK, RenderAllocator> subgraphs;
+    // The current build's debug names of owned resources and exports; see RendGraphDescVK.
+    Map<std::string, std::string, RenderAllocator> debug_names;
+    Map<std::string, std::string, RenderAllocator> exports;
 };
 
 namespace {
@@ -798,11 +807,11 @@ void RenderGraphVK::add_resource_edge(Ref<RGNode> p_from, Ref<RGNode> p_to, std:
     EdgeScopeVK dst_scope = node_resource_scope(*p_to, p_resource_id);
     auto ensure_accessed = [&](const EdgeScopeVK& p_scope, const RGNode& p_node) {
         if (p_scope.stage == VK_PIPELINE_STAGE_2_NONE) {
-            throw std::runtime_error(std::format("RenderGraphVK: edge '{}' -> '{}' carries resource '{}', but task '{}' does not access it.",
-                p_from->task_id,
-                p_to->task_id,
-                p_resource_id,
-                p_node.task_id));
+            throw std::runtime_error(std::format("RenderGraphVK: edge {} -> {} carries resource {}, but task {} does not access it.",
+                describe_task(*p_from),
+                describe_task(*p_to),
+                describe_resource(p_resource_id),
+                describe_task(p_node)));
         }
     };
     ensure_accessed(src_scope, *p_from);
@@ -956,7 +965,7 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
             return std::ranges::find(p_subgraph.members, node->task_id) != p_subgraph.members.end();
         });
         metadata.tasks.push_back(
-            {.task_id = node->task_id, .queue_family = node->in_queue, .topological_order = node->topo_order, .subgraph_id = subgraph_id});
+            {.task_id = node->task_id, .name = node->name, .queue_family = node->in_queue, .topological_order = node->topo_order, .subgraph_id = subgraph_id});
     }
     // A subgraph is added after the subgraphs nested in it, so walking the records backwards lists every parent first.
     metadata.subgraphs.reserve(subgraphs.size());
@@ -964,7 +973,9 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
         const RendTaskID parent_id = innermost([&subgraph](const RendSubgraphVK& p_candidate) {
             return subgraph.subgraph_id.starts_with(std::format("{}.", p_candidate.subgraph_id));
         });
-        metadata.subgraphs.push_back({.subgraph_id = subgraph.subgraph_id, .parent_subgraph_id = parent_id});
+        metadata.subgraphs.push_back({.subgraph_id = subgraph.subgraph_id,
+            .name = subgraph.debug_name.empty() ? subgraph.subgraph_id : subgraph.debug_name,
+            .parent_subgraph_id = parent_id});
     }
     metadata.edges.reserve(resource_edges.size());
     for (const auto& edge : resource_edges) {
@@ -972,6 +983,7 @@ RendGraphMetadataVK RenderGraphVK::dump_graph_metadata() const {
             .from_task_id = edge->from->task_id,
             .to_task_id = edge->to->task_id,
             .resource_id = edge->res_id,
+            .resource_name = std::string(resource_name(edge->res_id)),
             .src_stage = edge->src_stage,
             .src_access = edge->src_access,
             .dst_stage = edge->dst_stage,
@@ -1125,18 +1137,27 @@ void RenderGraphVK::bind_owned_resource(std::string_view p_resource_id, Ref<Rend
 
 Ref<RenderObjectContainerVK> RenderGraphVK::create_container(
     std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const {
-    RenderObjectContainerVK::Factory factory = std::move(p_factory);
-    if (!resource_key.empty() && render_data->render_cache != nullptr) {
-        // Register every object the container creates, including ones recreated after the context changes, as
-        // `<graph key>.<id>`, or `<graph key>.<id>[<slot>]` for each frame's copy; registering names the object.
-        factory = [this, inner = std::move(factory), key = std::format("{}.{}", resource_key, p_resource_id), p_per_frame](uint32_t p_slot) {
+    // Register every object the container creates, including ones recreated after the context changes, as
+    // `<graph key>.<id>`, or `<graph key>.<id>[<slot>]` for each frame's copy, then name it by its debug name the same way.
+    // The debug name is looked up when the object is created, so a recreated object takes the current build's name.
+    RenderObjectContainerVK::Factory factory =
+        [this, inner = std::move(p_factory), resource_id = std::string(p_resource_id), p_per_frame](uint32_t p_slot) {
             Ref<IRenderObjectVK> result = inner(p_slot);
-            if (result != MEM_NULL) {
-                render_data->render_cache->insert(p_per_frame ? std::format("{}[{}]", key, p_slot) : key, result);
+            if (result == MEM_NULL) {
+                return result;
             }
+            const auto slot_suffix = [p_per_frame, p_slot](std::string p_name) {
+                return p_per_frame ? std::format("{}[{}]", p_name, p_slot) : p_name;
+            };
+            if (!resource_key.empty() && render_data->render_cache != nullptr) {
+                render_data->render_cache->insert(slot_suffix(std::format("{}.{}", resource_key, resource_id)), result);
+            }
+            const auto debug_name = rebuild_state->debug_names.find(resource_id);
+            const std::string_view name = debug_name != rebuild_state->debug_names.end() ? std::string_view(debug_name->second)
+                                                                                         : std::string_view(resource_id);
+            result->set_debug_name(slot_suffix(resource_key.empty() ? std::string(name) : std::format("{}.{}", resource_key, name)));
             return result;
         };
-    }
     if (p_per_frame) {
         const uint32_t frames = std::max<uint32_t>(render_data->frames_in_flight, 1U);
         return make_ref<ROCMultislotsVK>(render_data->allocator, render_data->allocator, frames, std::move(factory));
@@ -1152,7 +1173,15 @@ void RenderGraphVK::apply_descriptor(const RendGraphDescVK& p_desc) {
         RendGraphResourceDiffVK::plan(rebuild_state->signatures, next, render_data->allocator);
 
     // The new configuration is valid; switch to it. Containers create their objects from these signatures.
+    for (const auto& [export_name, resource_id] : p_desc.exports) {
+        if (!imports.contains(resource_id) && !next.contains(resource_id)) {
+            throw std::runtime_error(std::format(
+                "RenderGraphVK: export '{}' names resource '{}', which the graph does not declare.", export_name, resource_id));
+        }
+    }
     rebuild_state->signatures = std::move(next);
+    rebuild_state->debug_names = p_desc.debug_names;
+    rebuild_state->exports = p_desc.exports;
     all_resources = std::move(imports);
     auto& owned_containers = rebuild_state->owned_containers;
     for (auto container = owned_containers.begin(); container != owned_containers.end();) {
@@ -1245,10 +1274,25 @@ void RenderGraphVK::rebuild() {
     apply_descriptor(make_descriptor());
 }
 
-Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_resource_id) const {
-    auto resource = all_resources.find(p_resource_id);
+std::string_view RenderGraphVK::resource_name(std::string_view p_resource_id) const {
+    const auto debug_name = rebuild_state->debug_names.find(p_resource_id);
+    return debug_name == rebuild_state->debug_names.end() ? p_resource_id : std::string_view(debug_name->second);
+}
+
+std::string RenderGraphVK::describe_resource(std::string_view p_resource_id) const {
+    const std::string_view name = resource_name(p_resource_id);
+    return name == p_resource_id ? std::format("'{}'", p_resource_id) : std::format("'{}' ({})", name, p_resource_id);
+}
+
+Ref<RenderObjectContainerVK> RenderGraphVK::acquire_resource(std::string_view p_export_name) const {
+    const auto exported = rebuild_state->exports.find(p_export_name);
+    if (exported == rebuild_state->exports.end()) {
+        throw std::runtime_error(std::format("RenderGraphVK: no resource is exported as '{}'.", p_export_name));
+    }
+    auto resource = all_resources.find(exported->second);
     if (resource == all_resources.end() || resource->second == MEM_NULL || resource->second->container == MEM_NULL) {
-        throw std::runtime_error(std::format("RenderGraphVK: resource '{}' is not declared or has no container.", p_resource_id));
+        throw std::runtime_error(std::format(
+            "RenderGraphVK: export '{}' names resource '{}', which has no container.", p_export_name, exported->second));
     }
     return resource->second->container;
 }
@@ -1297,6 +1341,7 @@ void RenderGraphVK::instantiate_tasks(const Vector<RendTaskDescVK, RenderAllocat
         }
         Ref<RGNode> node = add_node(std::move(task));
         node->task_id = task_desc.task_id;
+        node->name = task_desc.debug_name.empty() ? task_desc.task_id : task_desc.debug_name;
         node->resource_map = task_desc.resource_map;
         node->render_task->bind_resources(RendResViewVK(&all_resources, &node->resource_map));
         node->render_task->append_accesses(node->reads, node->writes);
@@ -1651,10 +1696,10 @@ void RenderGraphVK::validate_resource_conflicts() const {
                     continue;
                 }
                 if (!has_resource_path(accesses[before].node, accesses[after].node, resource_id)) {
-                    throw std::runtime_error(std::format("RenderGraphVK: tasks '{}' and '{}' both access resource '{}' without a chain of edges on that resource.",
-                        accesses[before].node->task_id,
-                        accesses[after].node->task_id,
-                        resource_id));
+                    throw std::runtime_error(std::format("RenderGraphVK: tasks {} and {} both access resource {} without a chain of edges on that resource.",
+                        describe_task(*accesses[before].node),
+                        describe_task(*accesses[after].node),
+                        describe_resource(resource_id)));
                 }
             }
         }

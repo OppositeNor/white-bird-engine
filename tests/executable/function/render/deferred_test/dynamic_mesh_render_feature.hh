@@ -78,12 +78,6 @@ public:
     std::string_view get_entity_key(size_t p_entity_index) const;
 
     /**
-     * @brief Get the graph id of an entity's whole-mesh transform, for graphics_draw_mesh's transform parameter.
-     * @throws std::runtime_error If p_entity_index is out of range.
-     */
-    std::string get_entity_transform_id(size_t p_entity_index) const;
-
-    /**
      * @brief Place one entity; every frame slot applies the latest transform.
      * @throws std::runtime_error If p_entity_index is out of range or the transform is invalid.
      */

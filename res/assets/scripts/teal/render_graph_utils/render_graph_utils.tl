@@ -12,16 +12,28 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Implements the generated render_graph_utils.render_graph API for authoring render-graph recipes.
--- Handles describe a graph; Graph:build() emits the plain recipe tables C++ consumes.
+-- Implements the generated render_graph_utils.render_graph API for authoring render-graph recipes. A recipe describes its
+-- graph with handles: resources and tasks are free-standing descriptions, and graph.build() generates the ids of the
+-- declared resources and tasks it reaches and emits the plain recipe tables C++ consumes.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph")
+local graph = require("render_graph_utils.render_graph")
 local render_graph_tasks = require("render_graph_utils.render_graph_tasks")
 
-local function validate_id(identifier: string)
-    if type(identifier) ~= "string" or identifier == "" then
-        error("render_graph: resource and task ids must be non-empty strings.", 3)
+-- Every resource and task handle, so that snapshots of task params keep handles instead of copying them. Weak, since a
+-- handle is only state of the recipe run that created it.
+local resource_handles: {any:boolean} = setmetatable({}, { __mode = "k" })
+local task_handles: {any:boolean} = setmetatable({}, { __mode = "k" })
+
+local function validate_name(value: string, what: string)
+    if type(value) ~= "string" or value == "" then
+        error("render_graph: " .. what .. " must be a non-empty string.", 3)
+    end
+end
+
+local function validate_optional_name(value: string)
+    if value ~= nil then
+        validate_name(value, "a debug name")
     end
 end
 
@@ -34,20 +46,30 @@ local function sorted_keys<T>(map: {string:T}): {string}
     return keys
 end
 
-local function validate_resource(resource_handle: render_graph.Resource)
-    if type(resource_handle) ~= "table" then
-        error("render_graph: expected a resource handle.", 3)
-    end
-    validate_id(resource_handle.id)
-    if type(resource_handle.kind) ~= "string" or type(resource_handle.dependencies) ~= "table" then
+local function is_resource(value: any): boolean
+    return resource_handles[value] == true
+end
+
+local function is_task(value: any): boolean
+    return task_handles[value] == true
+end
+
+local function validate_resource(resource_handle: graph.Resource)
+    if not is_resource(resource_handle) then
         error("render_graph: expected a resource handle.", 3)
     end
 end
 
-local function validate_graph_resource(resource_handle: render_graph.Resource)
+local function validate_graph_resource(resource_handle: graph.Resource)
     validate_resource(resource_handle)
     if resource_handle.kind == "registered" then
         error("render_graph: registered resources cannot be used as graph bindings or dependencies.", 3)
+    end
+end
+
+local function validate_task(task_handle: graph.Task)
+    if not is_task(task_handle) then
+        error("render_graph: expected a task handle.", 3)
     end
 end
 
@@ -76,79 +98,96 @@ local function validate_list<T>(input_values: {T}, name: string, allow_empty: bo
     end
 end
 
-local function validate_graph_resource_list(resource_handles: {render_graph.Resource})
-    validate_list(resource_handles, "resource", false)
-    for _, resource in ipairs(resource_handles) do
-        validate_graph_resource(resource)
-    end
-end
-
--- Teal cannot discriminate a record/array union; the public methods expose typed overloads instead.
-local function connection_resources(resource_handles: any): {render_graph.Resource}
-    if type(resource_handles) ~= "table" then
-        error("render_graph: expected a resource handle, a resource bundle, or a non-empty resource list.", 3)
-    end
-    if (resource_handles as render_graph.Resource).id ~= nil then
-        local resource = resource_handles as render_graph.Resource
+-- Teal cannot discriminate a record/array union; the public functions expose typed overloads instead.
+local function connection_resources(resources: any): {graph.Resource}
+    if is_resource(resources) then
+        local resource = resources as graph.Resource
         validate_graph_resource(resource)
         return { resource }
     end
-    local resources = resource_handles as {render_graph.Resource}
-    if (resource_handles as render_graph.ResourceBundle).resources ~= nil then
-        resources = (resource_handles as render_graph.ResourceBundle).resources
+    if type(resources) ~= "table" then
+        error("render_graph: expected a resource handle or a non-empty resource list.", 3)
     end
-    validate_graph_resource_list(resources)
-    return resources
+    local list = resources as {graph.Resource}
+    validate_list(list, "resource", false)
+    for _, resource in ipairs(list) do
+        validate_graph_resource(resource)
+    end
+    return list
 end
 
-local function append_edge(producer: render_graph.Task, consumer: render_graph.Task,
-    resource_handle: render_graph.Resource)
-    producer.edges = producer.edges or {}
+-- Copy plain data, keeping the handles it holds.
+local function snapshot(input_value: any): any
+    if type(input_value) ~= "table" or is_resource(input_value) or is_task(input_value) then
+        return input_value
+    end
+    local result: {any:any} = {}
+    for key, value in pairs(input_value as {any:any}) do
+        result[key] = snapshot(value)
+    end
+    return result
+end
+
+local function contains_handle(input_value: any): boolean
+    if is_resource(input_value) or is_task(input_value) then
+        return true
+    end
+    if type(input_value) ~= "table" then
+        return false
+    end
+    for _, value in pairs(input_value as {any:any}) do
+        if contains_handle(value) then
+            return true
+        end
+    end
+    return false
+end
+
+local function copy_bindings(resource_bindings: {string:graph.Resource}): {string:graph.Resource}
+    local result: {string:graph.Resource} = {}
+    for local_name, resource in pairs(resource_bindings or {}) do
+        validate_name(local_name, "a task-local resource name")
+        validate_graph_resource(resource)
+        result[local_name] = resource
+    end
+    return result
+end
+
+local function append_edge(producer: graph.Task, consumer: graph.Task, resource_handle: graph.Resource)
     producer.edges[#producer.edges + 1] = { to = consumer, resource = resource_handle }
 end
 
-local function attach_task(task_handle: render_graph.Task,
-    validate_task?: function(task_handle: render_graph.Task, binding_name?: string,
-        resource_handle?: render_graph.Resource)): render_graph.Task
-    function task_handle:bind(binding_name: string, resource_handle: render_graph.Resource): render_graph.Task
-        if validate_task == nil then
-            error("render_graph: add the task to a graph before binding a resource.", 2)
-        end
-        validate_id(binding_name)
+local function new_task(task_handle: graph.Task): graph.Task
+    validate_optional_name(task_handle.name)
+    task_handle.bindings = task_handle.bindings or {}
+    task_handle.edges = {}
+    task_handles[task_handle] = true
+
+    function task_handle:bind(binding_name: string, resource_handle: graph.Resource): graph.Task
+        validate_name(binding_name, "a task-local resource name")
         validate_graph_resource(resource_handle)
-        validate_task(self, binding_name, resource_handle)
-        self.bindings = self.bindings or {}
         if self.bindings[binding_name] ~= nil then
-            error("render_graph: task-local resource '" .. binding_name .. "' is mapped more than once.", 2)
+            error("render_graph: task-local resource '" .. binding_name .. "' is bound more than once.", 2)
         end
         self.bindings[binding_name] = resource_handle
         return self
     end
 
-    local function connect(self: render_graph.Task, next_task: render_graph.Task,
-        resource_handles: any): render_graph.Task
-        if validate_task == nil then
-            error("render_graph: add the task to a graph before connecting it.", 2)
-        end
-        validate_task(self)
+    local function connect(self: graph.Task, next_task: graph.Task, resources: any): graph.Task
         validate_task(next_task)
-        self.graph:chain(connection_resources(resource_handles), { self, next_task })
+        for _, resource in ipairs(connection_resources(resources)) do
+            append_edge(self, next_task, resource)
+        end
         return self
     end
     task_handle.connect = connect
 
-    local function connect_all(self: render_graph.Task, next_tasks: {render_graph.Task},
-        resource_handles: any): render_graph.Task
-        if validate_task == nil then
-            error("render_graph: add the task to a graph before connecting it.", 2)
-        end
-        validate_task(self)
+    local function connect_all(self: graph.Task, next_tasks: {graph.Task}, resources: any): graph.Task
         validate_list(next_tasks, "target task", false)
         for _, task in ipairs(next_tasks) do
             validate_task(task)
         end
-        local resources = connection_resources(resource_handles)
-        for _, resource in ipairs(resources) do
+        for _, resource in ipairs(connection_resources(resources)) do
             for _, task in ipairs(next_tasks) do
                 append_edge(self, task, resource)
             end
@@ -157,26 +196,19 @@ local function attach_task(task_handle: render_graph.Task,
     end
     task_handle.connect_all = connect_all
 
-    function task_handle:inputs_from(producer: render_graph.Task,
-        resource_bindings: {string:render_graph.Resource}): render_graph.Task
-        if validate_task == nil then
-            error("render_graph: add the task to a graph before assigning inputs.", 2)
-        end
-        validate_task(self)
+    function task_handle:inputs_from(producer: graph.Task, resource_bindings: {string:graph.Resource}): graph.Task
         validate_task(producer)
         if type(resource_bindings) ~= "table" or next(resource_bindings) == nil then
             error("render_graph: input bindings must be a non-empty map of task-local names to resources.", 2)
         end
         for local_name, resource in pairs(resource_bindings) do
-            validate_id(local_name)
+            validate_name(local_name, "a task-local resource name")
             validate_graph_resource(resource)
-            validate_task(self, local_name, resource)
-            if self.bindings ~= nil and self.bindings[local_name] ~= nil then
-                error("render_graph: task-local resource '" .. local_name .. "' is mapped more than once.", 2)
+            if self.bindings[local_name] ~= nil then
+                error("render_graph: task-local resource '" .. local_name .. "' is bound more than once.", 2)
             end
         end
-        self.bindings = self.bindings or {}
-        local connected: {render_graph.Resource:boolean} = {}
+        local connected: {graph.Resource:boolean} = {}
         for _, local_name in ipairs(sorted_keys(resource_bindings)) do
             local resource = resource_bindings[local_name]
             self.bindings[local_name] = resource
@@ -188,62 +220,63 @@ local function attach_task(task_handle: render_graph.Task,
         return self
     end
 
-    function task_handle:color_target(target_index: integer, resource_handle: render_graph.Resource): render_graph.Task
+    function task_handle:color_target(target_index: integer, resource_handle: graph.Resource): graph.Task
         if type(target_index) ~= "number" or target_index < 0 or target_index % 1 ~= 0 then
             error("render_graph: color attachment indices must be non-negative integers.", 2)
         end
         return self:bind(string.format("render_target_colors[%d]", target_index), resource_handle)
     end
 
-    function task_handle:depth_target(resource_handle: render_graph.Resource): render_graph.Task
+    function task_handle:depth_target(resource_handle: graph.Resource): graph.Task
         return self:bind("render_target_depth", resource_handle)
     end
     return task_handle
 end
 
-local function attach_resource(resource_handle: render_graph.Resource): render_graph.Resource
-    local default_view: render_graph.Resource
-    function resource_handle:view(identifier?: string, view?: wbe.RendImageViewParamsVK): render_graph.Resource
-        if self.kind ~= "image" and self.kind ~= "import" and self.kind ~= "reference" and self.kind ~= "port" then
-            error("render_graph: image views require an image resource.", 2)
+local function is_image(resource_handle: graph.Resource): boolean
+    local kind = resource_handle.kind
+    return kind == "image" or kind == "import" or kind == "member" or kind == "port"
+end
+
+local function new_resource(resource_handle: graph.Resource): graph.Resource
+    resource_handle.dependencies = resource_handle.dependencies or {}
+    resource_handles[resource_handle] = true
+    local default_view: graph.Resource
+    function resource_handle:view(view?: graph.ImageViewDescriptor): graph.Resource
+        if view ~= nil then
+            return graph.image_view(self, view)
         end
-        if identifier == nil then
-            if view ~= nil then
-                error("render_graph: a customized image view requires an explicit id.", 2)
-            end
-            if default_view == nil then
-                default_view = render_graph.image_view(self.id .. ".view", self)
-            end
-            return default_view
+        if default_view == nil then
+            -- The default view takes the image's debug name.
+            default_view = graph.image_view(self, { name = self.name })
         end
-        return render_graph.image_view(identifier, self, view)
+        return default_view
+    end
+    function resource_handle:member(member_name: string): graph.Resource
+        if self.kind ~= "import" then
+            error("render_graph: only imports have members.", 2)
+        end
+        validate_name(member_name, "a member name")
+        return new_resource({ kind = "member", key = self.key .. "." .. member_name, dependencies = { self } })
     end
     return resource_handle
 end
 
-local function owned_resource(resource_description: wbe.RendRecipeResourceVK, kind: string,
-    dependencies?: {render_graph.Resource}): render_graph.Resource
-    validate_id(resource_description.id)
-    return attach_resource({ id = resource_description.id, kind = kind, description = resource_description, dependencies = dependencies or {} })
+-- The reflected parameters of a descriptor, without its debug name, and the debug name.
+local function descriptor_params(descriptor: any): {string:any}, string
+    local params: {string:any} = {}
+    for key, value in pairs((descriptor or {}) as {string:any}) do
+        params[key] = snapshot(value)
+    end
+    local name = params.name as string
+    params.name = nil
+    validate_optional_name(name)
+    return params, name
 end
 
--- Snapshot plain task parameters after the adapters have replaced their documented resource fields.
-local function copy_data(input_value: any): any
-    if type(input_value) ~= "table" then
-        return input_value
-    end
-    local result: {any:any} = {}
-    for key, value in pairs(input_value as {any:any}) do
-        result[key] = copy_data(value)
-    end
-    return result
-end
-
-local function registered_resource(resource_key: string, type_name: string,
-    resource_registration?: wbe.RendRecipeRegistrationVK): render_graph.Resource
-    validate_id(resource_key)
-    return attach_resource({ id = resource_key, kind = "registered", resource_type = type_name, registration = resource_registration,
-        dependencies = {} })
+local function declared_resource(kind: string, name: string, description: wbe.RendRecipeResourceVK,
+    dependencies?: {graph.Resource}): graph.Resource
+    return new_resource({ kind = kind, name = name, description = description, dependencies = dependencies })
 end
 
 local function deep_equal(left_value: any, right_value: any): boolean
@@ -265,346 +298,435 @@ local function deep_equal(left_value: any, right_value: any): boolean
     return true
 end
 
--- Add a registration to an ordered list unless an equal registration of its key is already there; a different
--- registration of the same key fails.
-local function merge_registration(resource_registrations: {wbe.RendRecipeRegistrationVK},
-    by_key: {string:wbe.RendRecipeRegistrationVK}, resource_registration: wbe.RendRecipeRegistrationVK, level: integer)
-    local previous = by_key[resource_registration.key]
-    if previous == nil then
-        by_key[resource_registration.key] = resource_registration
-        resource_registrations[#resource_registrations + 1] = resource_registration
-    elseif previous.type ~= resource_registration.type or not deep_equal(previous.description, resource_registration.description) then
-        error("render_graph: resource '" .. resource_registration.key .. "' is registered with different descriptions.", level)
+local function make_registration(resource_key: string, type_name: string, resource_description: any): wbe.RendRecipeRegistrationVK
+    validate_name(resource_key, "a registration key")
+    validate_name(type_name, "a description type name")
+    if contains_handle(resource_description) then
+        error("render_graph: registration descriptions hold no handles.", 3)
     end
+    return { key = resource_key, type = type_name, description = snapshot(resource_description) }
 end
 
-local function make_registration(resource_key: string, type_name: string, resource_description: any): wbe.RendRecipeRegistrationVK
-    validate_id(resource_key)
-    validate_id(type_name)
-    return { key = resource_key, type = type_name, description = copy_data(resource_description) }
+local function registered_resource(resource_key: string, type_name: string,
+    resource_registration?: wbe.RendRecipeRegistrationVK): graph.Resource
+    validate_name(resource_key, "a registration key")
+    return new_resource({ kind = "registered", key = resource_key, resource_type = type_name,
+        registration = resource_registration })
 end
+
+-- 32-bit FNV-1a of text.
+local function hash(text: string): integer
+    local result = 0x811c9dc5
+    for i = 1, #text do
+        result = ((result ~ string.byte(text, i)) * 0x01000193) & 0xffffffff
+    end
+    return result
+end
+
+-- Check a typed task's params against its resource fields when the task is created, so that a wrong value fails at the
+-- call that passes it.
+local function check_params(parameters: any, fields: {render_graph_tasks.ResourceField})
+    local function check(input_value: any, resource_field: render_graph_tasks.ResourceField)
+        if input_value == nil then
+            return
+        elseif resource_field.kind == "resource" then
+            if not is_resource(input_value) then
+                error("render_graph: resource field '" .. tostring(resource_field.name) .. "' takes a resource handle.", 5)
+            end
+            local resource = input_value as graph.Resource
+            if resource_field.scope == "registered" then
+                if resource.kind ~= "registered" or resource.resource_type ~= resource_field.expected_type then
+                    error("render_graph: expected a registered resource of type '" .. resource_field.expected_type .. "'.", 5)
+                end
+            elseif resource.kind == "registered" then
+                error("render_graph: registered resources cannot be used as graph bindings or dependencies.", 5)
+            end
+        elseif resource_field.kind == "list" then
+            for _, value in ipairs(input_value as {any}) do
+                check(value, resource_field.element)
+            end
+        elseif resource_field.kind == "map" then
+            for _, value in pairs(input_value as {string:any}) do
+                check(value, resource_field.element)
+            end
+        else
+            local values = input_value as {string:any}
+            for _, field in ipairs(resource_field.fields) do
+                check(values[field.name], field)
+            end
+        end
+    end
+    check(parameters, { kind = "record", fields = fields })
+end
+
+local function gating_options(options: graph.TaskOptions): wbe.RendRecipeTriggerVK, wbe.RendRecipeToggleVK
+    return snapshot(options.trigger) as wbe.RendRecipeTriggerVK, snapshot(options.toggle) as wbe.RendRecipeToggleVK
+end
+
+-- The typed constructors keep the handles in their params; the build lowers them with the resource fields.
+local function make_typed_task(type_name: string, parameters: any, settings: graph.TaskOptions,
+    fields: {render_graph_tasks.ResourceField}): graph.Task
+    check_params(parameters, fields)
+    local options: graph.TaskOptions = settings or {}
+    local trigger, toggle = gating_options(options)
+    return new_task({
+        kind = "typed",
+        name = options.name,
+        type = type_name,
+        params = snapshot(parameters),
+        fields = fields,
+        bindings = copy_bindings(options.bindings),
+        trigger = trigger,
+        toggle = toggle,
+    })
+end
+render_graph_tasks.install(graph, make_typed_task)
 
 -- The canonical name of a reflected enum value. C++ serializes an enum as its enumerator name, and lowercase aliases
 -- recipes may also write name the same enumerator.
-function render_graph.enum_name(input_value: string): string
+function graph.enum_name(input_value: string): string
     return string.upper(input_value)
 end
 
-function render_graph.buffer(identifier: string, usage: wbe.RendResPrimaryUsageVK, size: integer): render_graph.Resource
-    return owned_resource({ id = identifier, buffer = { usage = usage, size = size } }, "buffer")
+function graph.buffer(descriptor: graph.BufferDescriptor): graph.Resource
+    local params, name = descriptor_params(descriptor)
+    return declared_resource("buffer", name, { buffer = (params as any) as wbe.RendBufferParamsVK })
 end
 
-function render_graph.storage_buffer(identifier: string, size: integer): render_graph.Resource
-    return render_graph.buffer(identifier, "buffer_storage", size)
+function graph.storage_buffer(descriptor: graph.BufferDescriptor): graph.Resource
+    if descriptor.usage ~= nil then
+        error("render_graph: storage_buffer() sets the usage; declare other buffers with buffer().", 2)
+    end
+    local params, name = descriptor_params(descriptor)
+    params.usage = "buffer_storage"
+    return declared_resource("buffer", name, { buffer = (params as any) as wbe.RendBufferParamsVK })
 end
 
--- A graph-owned 2D image. Omitted extent keeps the default of wbe.RendImageParamsVK.
-function render_graph.image(identifier: string, usage: wbe.RendResPrimaryUsageVK, format: wbe.ImageFormatVK,
-    extent?: wbe.RendExtent2DParamsVK, additional_usage?: {wbe.ImageUsageFlagVK},
-    mip_levels?: integer): render_graph.Resource
-    return owned_resource({
-        id = identifier,
-        image = {
-            usage = usage,
-            format = format,
-            extent = extent,
-            additional_usage = additional_usage,
-            mip_levels = mip_levels,
-        },
-    }, "image")
+-- A graph-owned image. Omitted fields keep the defaults of wbe.RendImageParamsVK.
+function graph.image(descriptor: graph.ImageDescriptor): graph.Resource
+    local params, name = descriptor_params(descriptor)
+    return declared_resource("image", name, { image = (params as any) as wbe.RendImageParamsVK })
 end
 
-function render_graph.storage_image(identifier: string, format: wbe.ImageFormatVK, width: integer, height: integer,
-    additional_usage?: {wbe.ImageUsageFlagVK}): render_graph.Resource
-    return render_graph.image(identifier, "image_read_write", format, { width = width, height = height }, additional_usage)
+function graph.storage_image(descriptor: graph.ImageDescriptor): graph.Resource
+    if descriptor.usage ~= nil then
+        error("render_graph: storage_image() sets the usage; declare other images with image().", 2)
+    end
+    local params, name = descriptor_params(descriptor)
+    params.usage = "image_read_write"
+    return declared_resource("image", name, { image = (params as any) as wbe.RendImageParamsVK })
 end
 
--- A view keeps its source image reachable even when no task accesses the image directly.
-function render_graph.image_view(identifier: string, image: render_graph.Resource,
-    view?: wbe.RendImageViewParamsVK): render_graph.Resource
-    if image.kind ~= "image" and image.kind ~= "import" and image.kind ~= "reference" and image.kind ~= "port" then
+-- A view keeps its source image reachable even when no task accesses the image directly. The build fills in the image's
+-- id.
+function graph.image_view(image: graph.Resource, descriptor?: graph.ImageViewDescriptor): graph.Resource
+    validate_resource(image)
+    if not is_image(image) then
         error("render_graph: image views require an image resource.", 2)
     end
-    return owned_resource({ id = identifier, image_view = { image = image.id, view = view } }, "image_view", { image })
+    local params, name = descriptor_params(descriptor)
+    return declared_resource("image_view", name,
+        { image_view = { image = "", view = (params as any) as wbe.RendImageViewParamsVK } }, { image })
 end
 
-function render_graph.clamp_to_edge_sampler(identifier: string, parameters?: wbe.RendSamplerParamsVK): render_graph.Resource
-    local params: wbe.RendSamplerParamsVK = parameters or {}
+function graph.clamp_to_edge_sampler(descriptor?: graph.SamplerDescriptor): graph.Resource
+    local params, name = descriptor_params(descriptor)
     params.address_mode_u = "clamp_to_edge"
     params.address_mode_v = "clamp_to_edge"
     params.address_mode_w = "clamp_to_edge"
-    return owned_resource({ id = identifier, sampler = params }, "sampler")
+    return declared_resource("sampler", name, { sampler = (params as any) as wbe.RendSamplerParamsVK })
 end
 
--- A mesh registered on the render graph under resource_key, by the recipe or elsewhere; a draw naming a key nobody
--- registered registers the mesh resource of that key with the default options.
-function render_graph.mesh(resource_key: string): render_graph.Resource
-    return registered_resource(resource_key, "WhiteBirdEngine::MeshResourcesVK")
+-- A mesh registered on the render graph under resource_key. With a description, the handle registers it; without one, it
+-- names a mesh registered elsewhere, and a draw naming a key nobody registered registers the mesh resource of that key
+-- with the default options.
+function graph.mesh(resource_key: string, resource_description?: wbe.RDParamsMeshVK): graph.Resource
+    local registration = resource_description ~= nil and make_registration(resource_key, "RDParamsMeshVK", resource_description) or nil
+    return registered_resource(resource_key, "WhiteBirdEngine::MeshResourcesVK", registration)
 end
 
--- Pipelines are resources registered on the render graph under resource_key.
--- With a description, the handle registers the pipeline: a graph emits the registration when one of its tasks names the
--- handle.
-function render_graph.compute_pipeline(resource_key: string, resource_description?: wbe.RDParamsComputePipelineVK): render_graph.Resource
+-- Pipelines are resources registered on the render graph under resource_key. With a description, the handle registers
+-- the pipeline.
+function graph.compute_pipeline(resource_key: string, resource_description?: wbe.RDParamsComputePipelineVK): graph.Resource
     local registration = resource_description ~= nil and make_registration(resource_key, "RDParamsComputePipelineVK", resource_description) or nil
     return registered_resource(resource_key, "WhiteBirdEngine::ROComputePipelineVK", registration)
 end
 
-function render_graph.graphics_pipeline(resource_key: string, resource_description?: wbe.RDParamsGraphicsPipelineVK): render_graph.Resource
+function graph.graphics_pipeline(resource_key: string, resource_description?: wbe.RDParamsGraphicsPipelineVK): graph.Resource
     local registration = resource_description ~= nil and make_registration(resource_key, "RDParamsGraphicsPipelineVK", resource_description) or nil
     return registered_resource(resource_key, "WhiteBirdEngine::ROGraphicsPipelineVK", registration)
 end
 
 -- A compute pipeline compiled from the shader shader_key and registered under the same key.
-function render_graph.shader_compute_pipeline(shader_key: string): render_graph.Resource
-    return render_graph.compute_pipeline(shader_key, { shader = shader_key })
+function graph.shader_compute_pipeline(shader_key: string): graph.Resource
+    return graph.compute_pipeline(shader_key, { shader = shader_key })
 end
 
--- External resources are supplied by C++; a repeated import handle with the same id denotes the same import.
-function render_graph.import_resource(identifier: string): render_graph.Resource
-    validate_id(identifier)
-    return attach_resource({ id = identifier, kind = "import", dependencies = {} })
+-- A resource of a custom description type, registered under resource_key: type_name is the reflected name of the
+-- description struct, which selects the registrator, and resource_type the C++ type of the registered object.
+function graph.registered_resource(resource_key: string, type_name: string, resource_description: any,
+    resource_type: string): graph.Resource
+    return registered_resource(resource_key, resource_type, make_registration(resource_key, type_name, resource_description))
 end
 
--- Ports belong to the nested recipe and are bound by its enclosing subgraph task.
-function render_graph.port(identifier: string): render_graph.Resource
-    validate_id(identifier)
-    return attach_resource({ id = identifier, kind = "port", dependencies = {} })
+-- A resource C++ supplies under identifier; import handles of the same identifier denote the same import.
+function graph.import(identifier: string): graph.Resource
+    validate_name(identifier, "an import id")
+    return new_resource({ kind = "import", key = identifier })
 end
 
--- Reference an enclosing resource or a member of an imported composite without declaring another import.
--- C++ resolves and validates the id when it assembles the graph.
-function render_graph.reference(identifier: string): render_graph.Resource
-    validate_id(identifier)
-    return attach_resource({ id = identifier, kind = "reference", dependencies = {} })
+-- An image registered on the render graph under resource_key and bound like an import: C++ resolves the unsupplied
+-- import to the registered view.
+function graph.registered_image(resource_key: string, resource_description: wbe.RDParamsImageVK): graph.Resource
+    local registration = make_registration(resource_key, "RDParamsImageVK", resource_description)
+    local resource = graph.import(resource_key)
+    resource.registration = registration
+    return resource
 end
 
--- A dispatch accepts graph handles or task-local strings, resolved inside the containing task's handle bindings.
-function render_graph.indirect_dispatch(pipeline_handle: render_graph.Resource,
-    indirect_buffer: render_graph.Resource, offset: integer,
-    resource_bindings?: {string:render_graph.Resource}): render_graph.RTParamsComputeDispatchVK
+-- A port of a subgraph, which the subgraph binds to a resource of the enclosing graph.
+function graph.port(port_name: string): graph.Resource
+    validate_name(port_name, "a port name")
+    return new_resource({ kind = "port", key = port_name })
+end
+
+-- A dispatch of a compute_sequential task; its bindings map the pipeline's reflected names to resource handles.
+function graph.indirect_dispatch(pipeline_handle: graph.Resource, indirect_buffer: graph.Resource, offset: integer,
+    resource_bindings?: {string:graph.Resource}): graph.RTParamsComputeDispatchVK
     return { pipeline = pipeline_handle, indirect_buffer = indirect_buffer, indirect_offset = offset, bindings = resource_bindings }
 end
 
-function render_graph.subgraph(identifier: string, recipe: wbe.RendGraphRecipeVK,
-    explicit_ports: {string:render_graph.Resource}): render_graph.Task
-    return attach_task({ id = identifier, subgraph = recipe, ports = explicit_ports })
+-- A task of a registered type without a generated constructor, whose params name no resource.
+function graph.task(type_name: string, parameters: any, settings?: graph.TaskOptions): graph.Task
+    validate_name(type_name, "a task type")
+    if contains_handle(parameters) then
+        error("render_graph: task params of type '" .. type_name .. "' name resources; use its typed constructor.", 2)
+    end
+    local options: graph.TaskOptions = settings or {}
+    local trigger, toggle = gating_options(options)
+    return new_task({
+        kind = "typed",
+        name = options.name,
+        type = type_name,
+        params = snapshot(parameters),
+        bindings = copy_bindings(options.bindings),
+        trigger = trigger,
+        toggle = toggle,
+    })
 end
 
-local function copy_fields<T>(input_value: T): {string:any}
-    local result: {string:any} = {}
-    for key, value in pairs(input_value as {string:any}) do
-        result[key] = value
-    end
-    return result
+-- A task C++ supplies under identifier (RendGraphRecipeImportsVK::add_task()); its bindings map the identifiers it uses
+-- to resources.
+function graph.import_task(identifier: string): graph.Task
+    validate_name(identifier, "an imported task id")
+    return new_task({ kind = "import", key = identifier })
 end
 
-local function resource_id(input_value: render_graph.Resource, additional_uses: {render_graph.Resource}): string
-    if input_value == nil then
-        return nil
+-- A task that records the selected one of its branches: typed tasks without edges, triggers, or toggles. The branches
+-- share the multiplexer's bindings, and must run on one queue family.
+function graph.multiplex(descriptor: graph.MultiplexDescriptor): graph.Task
+    validate_list(descriptor.branches, "branch", false)
+    if descriptor.select == nil then
+        error("render_graph: a multiplexer sets no select.", 2)
     end
-    validate_graph_resource(input_value)
-    additional_uses[#additional_uses + 1] = input_value
-    return input_value.id
+    local branches: {graph.Task} = {}
+    for index, branch in ipairs(descriptor.branches) do
+        validate_task(branch)
+        if branch.kind ~= "typed" then
+            error("render_graph: multiplexer branch " .. index .. " is not a typed task.", 2)
+        end
+        if #branch.edges ~= 0 or branch.trigger ~= nil or branch.toggle ~= nil then
+            error("render_graph: multiplexer branch " .. index .. " connects, triggers, or toggles; set those on the multiplexer.", 2)
+        end
+        branches[index] = branch
+    end
+    return new_task({
+        kind = "multiplex",
+        name = descriptor.name,
+        branch_tasks = branches,
+        select = snapshot(descriptor.select) as wbe.RendRecipeSelectVK,
+        bindings = copy_bindings(descriptor.bindings),
+        trigger = snapshot(descriptor.trigger) as wbe.RendRecipeTriggerVK,
+        toggle = snapshot(descriptor.toggle) as wbe.RendRecipeToggleVK,
+    })
 end
 
--- Lower a registered handle to its key, collecting the registration it carries into resource_registrations.
-local function registered_key(input_value: any, expected_type: string, resource_registrations: {wbe.RendRecipeRegistrationVK}): string
-    local resource = input_value as render_graph.Resource
-    validate_resource(resource)
-    if resource.kind ~= "registered" or resource.resource_type ~= expected_type then
-        error("render_graph: expected a registered resource of type '" .. expected_type .. "'.", 3)
+-- The tasks of descriptor as one subgraph task, whose ports map each port name its tasks use to a resource of the
+-- enclosing graph. Its trigger and toggle gate every member.
+function graph.subgraph(descriptor: graph.SubgraphDescriptor): graph.Task
+    validate_list(descriptor.tasks, "task", true)
+    local subgraph_tasks: {graph.Task} = {}
+    for index, task in ipairs(descriptor.tasks) do
+        validate_task(task)
+        subgraph_tasks[index] = task
     end
-    if resource.registration ~= nil then
-        resource_registrations[#resource_registrations + 1] = resource.registration
-    end
-    return resource.id
+    return new_task({
+        kind = "subgraph",
+        name = descriptor.name,
+        subgraph_tasks = subgraph_tasks,
+        ports = copy_bindings(descriptor.ports),
+        trigger = snapshot(descriptor.trigger) as wbe.RendRecipeTriggerVK,
+        toggle = snapshot(descriptor.toggle) as wbe.RendRecipeToggleVK,
+    })
 end
 
-function render_graph.graph(): render_graph.Graph
-    local tasks: {render_graph.Task} = {}
-    local task_by_id: {string:render_graph.Task} = {}
-    local registered_ids: {render_graph.Task:string} = {}
-    local parameter_ids: {render_graph.Task:{string:boolean}} = {}
-    local registered_count = 0
-    local registrations: {wbe.RendRecipeRegistrationVK} = {}
+-- Order tasks on every one of resources, each after the one before it.
+local function chain(resources: any, tasks: {graph.Task})
+    local list = connection_resources(resources)
+    validate_list(tasks, "task", true)
+    for _, task in ipairs(tasks) do
+        validate_task(task)
+    end
+    for _, resource in ipairs(list) do
+        for i = 2, #tasks do
+            append_edge(tasks[i - 1], tasks[i], resource)
+        end
+    end
+end
+graph.chain = chain
+
+local function non_empty<T>(map: {string:T}): {string:T}
+    return next(map) ~= nil and map or nil
+end
+
+-- Emit the recipe of tasks: generate the ids of the declared resources and tasks they reach, in the order of the list.
+-- port_names are the ports of a nested recipe, and exports the resources C++ acquires by name.
+local function build_recipe(tasks: {graph.Task}, port_names: {string},
+    exports: {string:graph.Resource}): wbe.RendGraphRecipeVK
+    validate_list(tasks, "task", true)
+    local resources: {wbe.RendRecipeResourceVK} = {}
+    local imports: {string} = {}
+    local ports: {string} = {}
+    local import_ids: {string:boolean} = {}
+    local port_ids: {string:boolean} = {}
+    local ids: {graph.Resource:string} = {}
+    local generated_ids: {string:boolean} = {}
+    local ordinals: {string:integer} = {}
+    local visiting: {graph.Resource:boolean} = {}
+    local wire_registrations: {wbe.RendRecipeRegistrationVK} = {}
     local registrations_by_key: {string:wbe.RendRecipeRegistrationVK} = {}
-    local graph: render_graph.Graph = { tasks = tasks }
 
-    -- Register a resource on the render graph when the recipe is built. The description's reflected type name selects the
-    -- registrator. Explicit registrations are emitted in order, before any task, whether or not a task uses them; an equal
-    -- registration of a key again is merged, and a different one fails.
-    local function add_registration(resource_registration: wbe.RendRecipeRegistrationVK)
-        merge_registration(registrations, registrations_by_key, resource_registration, 4)
-    end
-
-    function graph:register_resource(resource_key: string, type_name: string, resource_description: any,
-        resource_type: string): render_graph.Resource
-        local registration = make_registration(resource_key, type_name, resource_description)
-        add_registration(registration)
-        return registered_resource(resource_key, resource_type, registration)
-    end
-
-    function graph:register_mesh(resource_key: string, parameters: wbe.RDParamsMeshVK): render_graph.Resource
-        local registration = make_registration(resource_key, "RDParamsMeshVK", parameters)
-        add_registration(registration)
-        return registered_resource(resource_key, "WhiteBirdEngine::MeshResourcesVK", registration)
-    end
-
-    function graph:register_graphics_pipeline(resource_key: string,
-        parameters: wbe.RDParamsGraphicsPipelineVK): render_graph.Resource
-        local pipeline = render_graph.graphics_pipeline(resource_key, parameters)
-        add_registration(pipeline.registration)
-        return pipeline
-    end
-
-    function graph:register_compute_pipeline(resource_key: string,
-        parameters: wbe.RDParamsComputePipelineVK): render_graph.Resource
-        local pipeline = render_graph.compute_pipeline(resource_key, parameters)
-        add_registration(pipeline.registration)
-        return pipeline
-    end
-
-    -- A registered image is bound like an import: C++ resolves an unsupplied import to the registered view.
-    function graph:register_image(resource_key: string, parameters: wbe.RDParamsImageVK): render_graph.Resource
-        add_registration(make_registration(resource_key, "RDParamsImageVK", parameters))
-        return render_graph.import_resource(resource_key)
-    end
-
-    function graph:resource_bundle(resource_handles: {render_graph.Resource}): render_graph.ResourceBundle
-        validate_graph_resource_list(resource_handles)
-        local resources: {render_graph.Resource} = {}
-        for _, resource in ipairs(resource_handles) do
-            resources[#resources + 1] = resource
-        end
-        return { resources = resources }
-    end
-
-    function graph:as_subgraph(identifier: string, explicit_ports: {string:render_graph.Resource},
-        explicit_imports?: {string}): render_graph.Task
-        return render_graph.subgraph(identifier, self:build(explicit_imports, sorted_keys(explicit_ports)), explicit_ports)
-    end
-
-    local function validate_parameter_binding(task_handle: render_graph.Task, binding_name: string,
-        resource_handle: render_graph.Resource)
-        local ids = parameter_ids[task_handle]
-        if ids ~= nil and ids[binding_name] and resource_handle.id ~= binding_name then
-            error("render_graph: task parameter resource '" .. binding_name .. "' conflicts with a task binding.", 3)
+    local function add_registration(registration: wbe.RendRecipeRegistrationVK)
+        local previous = registrations_by_key[registration.key]
+        if previous == nil then
+            registrations_by_key[registration.key] = registration
+            wire_registrations[#wire_registrations + 1] = registration
+        elseif previous.type ~= registration.type or not deep_equal(previous.description, registration.description) then
+            error("render_graph: resource '" .. registration.key .. "' is registered with different descriptions.", 4)
         end
     end
 
-    local function validate_parameter_bindings(task_handle: render_graph.Task)
-        for local_name, resource in pairs(task_handle.bindings or {}) do
-            validate_parameter_binding(task_handle, local_name, resource)
+    -- `<kind>-<hash>` of a kind, a debug name, and how many ids of that kind and name were generated before it, so that
+    -- rebuilds, which reach everything in the same order, keep every id, and a named one keeps its id when unrelated
+    -- declarations are added.
+    local function generate_id(kind: string, name: string): string
+        local ordinal_key = kind .. "\0" .. (name or "")
+        local ordinal = (ordinals[ordinal_key] or 0) + 1
+        ordinals[ordinal_key] = ordinal
+        local id = string.format("%s-%08x", kind, hash(ordinal_key .. "\0" .. ordinal))
+        if generated_ids[id] then
+            error("render_graph: generated id '" .. id .. "' collides; rename '" .. tostring(name) .. "'.", 4)
+        end
+        generated_ids[id] = true
+        return id
+    end
+
+    local function add_import(identifier: string)
+        if port_ids[identifier] then
+            error("render_graph: '" .. identifier .. "' is both an import and a port.", 4)
+        end
+        if not import_ids[identifier] then
+            imports[#imports + 1] = identifier
+            import_ids[identifier] = true
         end
     end
 
-    local function validate_task(task_handle: render_graph.Task, binding_name?: string,
-        resource_handle?: render_graph.Resource)
-        if type(task_handle) ~= "table" then
-            error("render_graph: expected a task handle belonging to this graph.", 3)
+    local function add_port(port_name: string)
+        if import_ids[port_name] then
+            error("render_graph: '" .. port_name .. "' is both an import and a port.", 4)
         end
-        local id = registered_ids[task_handle]
-        if task_handle.graph ~= graph or id == nil or task_by_id[id] ~= task_handle then
-            error("render_graph: task handle does not belong to this graph.", 3)
-        end
-        if task_handle.id ~= id then
-            error("render_graph: the registered task id '" .. id .. "' was changed.", 3)
-        end
-        validate_parameter_bindings(task_handle)
-        if binding_name ~= nil then
-            validate_parameter_binding(task_handle, binding_name, resource_handle)
+        if not port_ids[port_name] then
+            ports[#ports + 1] = port_name
+            port_ids[port_name] = true
         end
     end
 
-    function graph:add(task_handle: render_graph.Task): render_graph.Task
-        validate_id(task_handle.id)
-        if task_handle.graph ~= nil and task_handle.graph ~= self then
-            error("render_graph: task '" .. task_handle.id .. "' already belongs to another graph.", 2)
+    for _, port_name in ipairs(port_names) do
+        add_port(port_name)
+    end
+
+    local function resource_id(resource_handle: graph.Resource): string
+        validate_graph_resource(resource_handle)
+        local id = ids[resource_handle]
+        if id ~= nil then
+            return id
         end
-        if task_by_id[task_handle.id] ~= nil then
-            error("render_graph: the task id '" .. task_handle.id .. "' is added twice.", 2)
+        if visiting[resource_handle] then
+            error("render_graph: resource dependency cycle.", 4)
         end
-        if registered_ids[task_handle] ~= nil then
-            error("render_graph: the registered task id was changed before adding it again.", 2)
+        visiting[resource_handle] = true
+        local dependency_ids: {string} = {}
+        for _, dependency in ipairs(resource_handle.dependencies) do
+            dependency_ids[#dependency_ids + 1] = resource_id(dependency)
         end
-        if task_handle.bindings ~= nil then
-            local bindings: {string:render_graph.Resource} = {}
-            for local_name, resource in pairs(task_handle.bindings) do
-                bindings[local_name] = resource
+        visiting[resource_handle] = nil
+        local kind = resource_handle.kind
+        if kind == "import" then
+            id = resource_handle.key
+            add_import(id)
+            if resource_handle.registration ~= nil then
+                add_registration(resource_handle.registration)
             end
-            task_handle.bindings = bindings
-        end
-        if task_handle.edges ~= nil then
-            local edges: {render_graph.Edge} = {}
-            for _, edge in ipairs(task_handle.edges) do
-                edges[#edges + 1] = { to = edge.to, resource = edge.resource }
+        elseif kind == "port" then
+            id = resource_handle.key
+            add_port(id)
+        elseif kind == "member" then
+            id = resource_handle.key
+        else
+            id = generate_id(kind, resource_handle.name)
+            local description = snapshot(resource_handle.description) as wbe.RendRecipeResourceVK
+            description.id = id
+            description.name = resource_handle.name
+            if description.image_view ~= nil then
+                description.image_view.image = dependency_ids[1]
             end
-            task_handle.edges = edges
+            resources[#resources + 1] = description
         end
-        attach_task(task_handle, validate_task)
-        task_handle.graph = self
-        self.tasks[#self.tasks + 1] = task_handle
-        task_by_id[task_handle.id] = task_handle
-        registered_ids[task_handle] = task_handle.id
-        registered_count = registered_count + 1
-        return task_handle
+        ids[resource_handle] = id
+        return id
     end
 
-    local function make_task(identifier: string, type_name: string, parameters: any,
-        settings?: render_graph.TaskOptions, additional_uses?: {render_graph.Resource},
-        resource_registrations?: {wbe.RendRecipeRegistrationVK}): render_graph.Task
-        local options: render_graph.TaskOptions = settings or {}
-        local uses: {render_graph.Resource} = {}
-        for _, resource in ipairs(options.uses or {}) do
-            uses[#uses + 1] = resource
+    local function lower_bindings(resource_bindings: {string:graph.Resource}, aliases: {string:string})
+        for _, local_name in ipairs(sorted_keys(resource_bindings or {})) do
+            local id = resource_id(resource_bindings[local_name])
+            local previous = aliases[local_name]
+            if previous ~= nil and previous ~= id then
+                error("render_graph: task-local resource '" .. local_name .. "' is bound to two resources.", 4)
+            end
+            aliases[local_name] = id
         end
-        for _, resource in ipairs(additional_uses or {}) do
-            uses[#uses + 1] = resource
-        end
-        local task: render_graph.Task = {
-            id = identifier,
-            type = type_name,
-            params = copy_data(parameters),
-            bindings = options.bindings,
-            uses = uses,
-            trigger = copy_data(options.trigger) as wbe.RendRecipeTriggerVK,
-            toggle = copy_data(options.toggle) as wbe.RendRecipeToggleVK,
-            registrations = resource_registrations,
-        }
-        local ids: {string:boolean} = {}
-        for _, resource in ipairs(additional_uses or {}) do
-            ids[resource.id] = true
-        end
-        parameter_ids[task] = ids
-        validate_parameter_bindings(task)
-        return graph:add(task)
     end
 
-    -- The typed constructors lower registered keys to strings and graph resource handles to IDs, retaining only the latter.
-    -- A task-local handle also binds its graph ID as an identity binding, which cannot shadow an unrelated shader binding.
-    -- Every handle stays reachable, so collection still rejects distinct owned descriptions of the same graph ID.
-    local function make_typed_task(identifier: string, type_name: string, parameters: any, settings: render_graph.TaskOptions,
-        fields: {render_graph_tasks.ResourceField}): render_graph.Task
-        local uses: {render_graph.Resource} = {}
-        local task_local_uses: {render_graph.Resource} = {}
-        local task_registrations: {wbe.RendRecipeRegistrationVK} = {}
+    -- Lower a typed task's params: a graph handle becomes its id, which the task binds to itself, and a registered handle
+    -- its key, whose registration the recipe emits.
+    local function lower_params(parameters: any, fields: {render_graph_tasks.ResourceField}, aliases: {string:string}): any
+        if fields == nil then
+            return parameters
+        end
         local function lower(input_value: any, resource_field: render_graph_tasks.ResourceField): any
             if input_value == nil then
                 return nil
             elseif resource_field.kind == "resource" then
+                local resource = input_value as graph.Resource
                 if resource_field.scope == "registered" then
-                    return registered_key(input_value, resource_field.expected_type, task_registrations)
+                    if resource.registration ~= nil then
+                        add_registration(resource.registration)
+                    end
+                    return resource.key
                 end
-                if input_value is string then
-                    error("render_graph: resource fields take handles; name '" .. input_value ..
-                        "' with render_graph.reference().", 4)
-                end
-                local resource = input_value as render_graph.Resource
-                if resource_field.scope == "task_local" then
-                    task_local_uses[#task_local_uses + 1] = resource
-                end
-                return resource_id(resource, uses)
+                local id = resource_id(resource)
+                aliases[id] = id
+                return id
             elseif resource_field.kind == "list" then
                 local result: {any} = {}
                 for _, value in ipairs(input_value as {any}) do
@@ -620,282 +742,93 @@ function render_graph.graph(): render_graph.Graph
                 return result
             end
             local values = input_value as {string:any}
-            local result = copy_fields(values)
+            local result: {string:any} = {}
+            for key, value in pairs(values) do
+                result[key] = value
+            end
             for _, field in ipairs(resource_field.fields) do
                 result[field.name] = lower(values[field.name], field)
             end
             return result
         end
-        local params = lower(parameters, { kind = "record", fields = fields })
-
-        local options: render_graph.TaskOptions = settings or {}
-        local bindings: {string:render_graph.Resource} = {}
-        for local_name, resource in pairs(options.bindings or {}) do
-            bindings[local_name] = resource
+        local result = lower(parameters, { kind = "record", fields = fields })
+        if contains_handle(result) then
+            error("render_graph: task params hold a handle in a field that names no resource.", 4)
         end
-        for _, resource in ipairs(task_local_uses) do
-            local previous = bindings[resource.id]
-            if previous ~= nil and previous.id ~= resource.id then
-                error("render_graph: task-local resource '" .. resource.id ..
-                    "' conflicts with an explicit task binding.", 3)
-            end
-            bindings[resource.id] = previous or resource
-        end
-        return make_task(identifier, type_name, params, {
-            bindings = next(bindings) ~= nil and bindings or options.bindings,
-            uses = options.uses,
-            trigger = options.trigger,
-            toggle = options.toggle,
-        }, uses, task_registrations)
-    end
-    render_graph_tasks.install(graph, make_typed_task)
-
-    function graph:import_task(identifier: string): render_graph.Task
-        return self:add({ id = identifier, import = true })
+        return result
     end
 
-    function graph:multiplex(identifier: string, branch_tasks: {render_graph.Task},
-        settings: render_graph.MultiplexOptions): render_graph.Task
-        validate_list(branch_tasks, "branch", false)
-        if settings == nil or settings.select == nil then
-            error("render_graph: multiplexer '" .. tostring(identifier) .. "' sets no select.", 2)
-        end
-        local bindings: {string:render_graph.Resource} = {}
-        local function add_binding(binding_name: string, resource_handle: render_graph.Resource)
-            local previous = bindings[binding_name]
-            if previous ~= nil and previous.id ~= resource_handle.id then
-                error("render_graph: multiplexer '" .. identifier .. "' maps task-local resource '" .. binding_name ..
-                    "' to more than one graph resource.", 3)
-            end
-            bindings[binding_name] = previous or resource_handle
-        end
-        for local_name, resource in pairs(settings.bindings or {}) do
-            add_binding(local_name, resource)
-        end
-        local uses: {render_graph.Resource} = {}
-        for _, resource in ipairs(settings.uses or {}) do
-            uses[#uses + 1] = resource
-        end
-        -- The branches' parameter handles keep their identity bindings from being redirected.
-        local ids: {string:boolean} = {}
-        local branches: {wbe.RendRecipeBranchVK} = {}
-        -- The branches were built on another graph, so the multiplexer carries their registrations into this one.
-        local branch_registrations: {wbe.RendRecipeRegistrationVK} = {}
-        for index, branch in ipairs(branch_tasks) do
-            if branch.graph == self then
-                error("render_graph: multiplexer '" .. identifier .. "' branch " .. index ..
-                    " belongs to the same graph; build branches on a separate graph.", 2)
-            end
-            if branch.type == nil or branch.import or branch.subgraph ~= nil or branch.branches ~= nil then
-                error("render_graph: multiplexer '" .. identifier .. "' branch " .. index .. " is not a typed task.", 2)
-            end
-            if branch.edges ~= nil or branch.trigger ~= nil or branch.toggle ~= nil then
-                error("render_graph: multiplexer '" .. identifier .. "' branch " .. index ..
-                    " connects, triggers, or toggles; set those on the multiplexer.", 2)
-            end
-            branches[#branches + 1] = { type = branch.type, params = copy_data(branch.params) }
-            for local_name, resource in pairs(branch.bindings or {}) do
-                add_binding(local_name, resource)
-            end
-            for _, resource in ipairs(branch.uses or {}) do
-                uses[#uses + 1] = resource
-                ids[resource.id] = true
-            end
-            for _, registration in ipairs(branch.registrations or {}) do
-                branch_registrations[#branch_registrations + 1] = registration
-            end
-        end
-        local task: render_graph.Task = {
-            id = identifier,
-            branches = branches,
-            select = copy_data(settings.select) as wbe.RendRecipeSelectVK,
-            bindings = next(bindings) ~= nil and bindings or nil,
-            uses = uses,
-            trigger = copy_data(settings.trigger) as wbe.RendRecipeTriggerVK,
-            toggle = copy_data(settings.toggle) as wbe.RendRecipeToggleVK,
-            registrations = branch_registrations,
-        }
-        parameter_ids[task] = ids
-        validate_parameter_bindings(task)
-        return graph:add(task)
-    end
-
-    function graph:get(identifier: string): render_graph.Task
-        local task = task_by_id[identifier]
-        if task == nil then
-            error("render_graph: no task has the id '" .. tostring(identifier) .. "'.", 2)
-        end
+    -- Task ids first, so that edges may point to later tasks.
+    local task_ids: {graph.Task:string} = {}
+    for index, task in ipairs(tasks) do
         validate_task(task)
-        return task
+        if task_ids[task] ~= nil then
+            error("render_graph: task " .. index .. " is listed twice.", 3)
+        end
+        task_ids[task] = task.kind == "import" and task.key or generate_id(task.type or task.kind, task.name)
     end
-
-    local function chain(_: render_graph.Graph, resource_handles: any, task_handles: {render_graph.Task})
-        local resources = connection_resources(resource_handles)
-        validate_list(task_handles, "task", true)
-        for _, task in ipairs(task_handles) do
-            validate_task(task)
-        end
-        for _, resource in ipairs(resources) do
-            for i = 2, #task_handles do
-                append_edge(task_handles[i - 1], task_handles[i], resource)
+    local wire_tasks: {wbe.RendRecipeTaskVK} = {}
+    for _, task in ipairs(tasks) do
+        local aliases: {string:string} = {}
+        local wire_task: wbe.RendRecipeTaskVK = {
+            id = task_ids[task],
+            name = task.name,
+            type = task.type,
+            import = task.kind == "import" or nil,
+            trigger = task.trigger,
+            toggle = task.toggle,
+            select = task.select,
+        }
+        if task.kind == "typed" then
+            wire_task.params = lower_params(task.params, task.fields as {render_graph_tasks.ResourceField}, aliases)
+        elseif task.kind == "multiplex" then
+            local branches: {wbe.RendRecipeBranchVK} = {}
+            for _, branch in ipairs(task.branch_tasks) do
+                lower_bindings(branch.bindings, aliases)
+                branches[#branches + 1] = {
+                    type = branch.type,
+                    params = lower_params(branch.params, branch.fields as {render_graph_tasks.ResourceField}, aliases),
+                }
             end
+            wire_task.branches = branches
+        elseif task.kind == "subgraph" then
+            wire_task.subgraph = build_recipe(task.subgraph_tasks, sorted_keys(task.ports), {})
+            local wire_ports: {string:string} = {}
+            lower_bindings(task.ports, wire_ports)
+            wire_task.ports = wire_ports
         end
+        lower_bindings(task.bindings, aliases)
+        wire_task.aliases = non_empty(aliases)
+        if #task.edges ~= 0 then
+            local edges: {wbe.RendRecipeEdgeVK} = {}
+            for _, edge in ipairs(task.edges) do
+                local to = task_ids[edge.to]
+                if to == nil then
+                    error("render_graph: an edge leaves the built tasks; list both of its tasks.", 3)
+                end
+                edges[#edges + 1] = { to = to, resource = resource_id(edge.resource) }
+            end
+            wire_task.connect = edges
+        end
+        wire_tasks[#wire_tasks + 1] = wire_task
     end
-    graph.chain = chain
-
-    function graph:build(explicit_imports?: {string}, explicit_ports?: {string}): wbe.RendGraphRecipeVK
-        local resources: {wbe.RendRecipeResourceVK} = {}
-        local wire_tasks: {wbe.RendRecipeTaskVK} = {}
-        local imports: {string} = {}
-        local ports: {string} = {}
-        local import_ids: {string:boolean} = {}
-        local port_ids: {string:boolean} = {}
-        local resource_by_id: {string:render_graph.Resource} = {}
-        local visiting: {render_graph.Resource:boolean} = {}
-        local collected: {render_graph.Resource:boolean} = {}
-        local seen_tasks: {render_graph.Task:boolean} = {}
-
-        if #self.tasks ~= registered_count then
-            error("render_graph: the registered task list was changed.", 2)
-        end
-        for _, task in ipairs(self.tasks) do
-            validate_task(task)
-            if seen_tasks[task] then
-                error("render_graph: the registered task list contains a duplicate handle.", 2)
-            end
-            seen_tasks[task] = true
-        end
-
-        local function add_import(identifier: string)
-            validate_id(identifier)
-            if port_ids[identifier] then
-                error("render_graph: resource '" .. identifier .. "' is both an import and a port.", 3)
-            end
-            if not import_ids[identifier] then
-                imports[#imports + 1] = identifier
-                import_ids[identifier] = true
-            end
-        end
-
-        local function add_port(identifier: string)
-            validate_id(identifier)
-            if import_ids[identifier] then
-                error("render_graph: resource '" .. identifier .. "' is both an import and a port.", 3)
-            end
-            if not port_ids[identifier] then
-                ports[#ports + 1] = identifier
-                port_ids[identifier] = true
-            end
-        end
-
-        for _, id in ipairs(explicit_imports or {}) do
-            add_import(id)
-        end
-        for _, id in ipairs(explicit_ports or {}) do
-            add_port(id)
-        end
-
-        local function collect(resource_handle: render_graph.Resource)
-            validate_graph_resource(resource_handle)
-            if visiting[resource_handle] then
-                error("render_graph: resource dependency cycle at '" .. resource_handle.id .. "'.", 3)
-            end
-            if collected[resource_handle] then
-                return
-            end
-            local previous = resource_by_id[resource_handle.id]
-            if previous ~= nil and previous ~= resource_handle and previous.kind ~= "reference" and
-                resource_handle.kind ~= "reference" then
-                if previous.kind ~= resource_handle.kind or resource_handle.description ~= nil or previous.description ~= nil then
-                    error("render_graph: conflicting resource handles for '" .. resource_handle.id .. "'.", 3)
-                end
-            end
-            if previous == nil or resource_handle.kind ~= "reference" then
-                resource_by_id[resource_handle.id] = resource_handle
-            end
-            visiting[resource_handle] = true
-            for _, dependency in ipairs(resource_handle.dependencies) do
-                collect(dependency)
-            end
-            if resource_handle.kind == "import" then
-                add_import(resource_handle.id)
-            elseif resource_handle.kind == "port" then
-                add_port(resource_handle.id)
-            elseif resource_handle.kind ~= "reference" then
-                if import_ids[resource_handle.id] or port_ids[resource_handle.id] then
-                    error("render_graph: owned resource '" .. resource_handle.id .. "' is also an import or port.", 3)
-                end
-                local description = resource_handle.description
-                if description == nil or description.id ~= resource_handle.id then
-                    error("render_graph: resource '" .. resource_handle.id .. "' has no matching description.", 3)
-                end
-                resources[#resources + 1] = description
-            end
-            visiting[resource_handle] = nil
-            collected[resource_handle] = true
-        end
-
-        local function resource_ids(resource_bindings: {string:render_graph.Resource}): {string:string}
-            local result: {string:string} = {}
-            for _, key in ipairs(sorted_keys(resource_bindings)) do
-                local resource = resource_bindings[key]
-                collect(resource)
-                result[key] = resource.id
-            end
-            return result
-        end
-
-        for _, task in ipairs(self.tasks) do
-            local wire_task: wbe.RendRecipeTaskVK = {
-                id = task.id,
-                type = task.type,
-                import = task.import,
-                params = task.params,
-                trigger = task.trigger,
-                toggle = task.toggle,
-                subgraph = task.subgraph,
-                branches = task.branches,
-                select = task.select,
-            }
-            if task.bindings ~= nil then
-                wire_task.aliases = resource_ids(task.bindings)
-            end
-            if task.edges ~= nil then
-                local edges: {wbe.RendRecipeEdgeVK} = {}
-                for _, edge in ipairs(task.edges) do
-                    validate_task(edge.to)
-                    collect(edge.resource)
-                    edges[#edges + 1] = { to = edge.to.id, resource = edge.resource.id }
-                end
-                wire_task.connect = edges
-            end
-            if task.ports ~= nil then
-                wire_task.ports = resource_ids(task.ports)
-            end
-            for _, resource in ipairs(task.uses or {}) do
-                collect(resource)
-            end
-            wire_tasks[#wire_tasks + 1] = wire_task
-        end
-        -- The explicit registrations, then those of the registered handles the tasks name, each key once.
-        local wire_registrations: {wbe.RendRecipeRegistrationVK} = {}
-        local wire_registrations_by_key: {string:wbe.RendRecipeRegistrationVK} = {}
-        for _, registration in ipairs(registrations) do
-            merge_registration(wire_registrations, wire_registrations_by_key, registration, 2)
-        end
-        for _, task in ipairs(self.tasks) do
-            for _, registration in ipairs(task.registrations or {}) do
-                merge_registration(wire_registrations, wire_registrations_by_key, registration, 2)
-            end
-        end
-        return { imports = imports, registrations = wire_registrations, resources = resources, tasks = wire_tasks,
-            ports = ports }
+    local wire_exports: {string:string} = {}
+    for _, export_name in ipairs(sorted_keys(exports)) do
+        validate_name(export_name, "an export name")
+        wire_exports[export_name] = resource_id(exports[export_name])
     end
-    return graph
+    return { imports = imports, registrations = wire_registrations, resources = resources, tasks = wire_tasks,
+        ports = ports, exports = non_empty(wire_exports) }
 end
 
-function render_graph.new(): render_graph.Graph
-    return render_graph.graph()
+-- The recipe of descriptor's tasks, in order, and its exports.
+function graph.build(descriptor: graph.BuildDescriptor): wbe.RendGraphRecipeVK
+    local exports: {string:graph.Resource} = {}
+    for export_name, resource in pairs(descriptor.exports or {}) do
+        validate_graph_resource(resource)
+        exports[export_name] = resource
+    end
+    return build_recipe(descriptor.tasks, {}, exports)
 end
 
-return render_graph
+return graph

@@ -224,6 +224,8 @@ struct RGNode {
     Unique<IRenderTaskVK> render_task;
     // String identifier copied from the graph descriptor for diagnostics.
     RendTaskID task_id;
+    // The name diagnostics show for the task: its debug name, or its id when it has none.
+    std::string name;
     // Resource edges whose previous task is this node.
     Vector<RefWeak<RGResEdge>, RenderAllocator> out_edges;
     // Task resource map copied from the descriptor; the graph resolves every task-local identifier through it.
@@ -283,7 +285,9 @@ public:
      * @param p_render_data The base render data.
      * @param p_resource_key The key the graph is registered under. When it is set and the render data has a
      * GlobalRenderCache, every resource the graph allocates is registered as `<p_resource_key>.<resource id>`, with
-     * `[<slot>]` appended for each per-frame copy, which also names it.
+     * `[<slot>]` appended for each per-frame copy. Every allocated object is named `<p_resource_key>.<debug name>` (with the
+     * same suffix), its resource's debug name (RendGraphDescVK::set_debug_name()) or else its id, and only by the debug name
+     * when the key is empty.
      */
     explicit RenderGraphVK(const RenderContextVK* p_render_data, std::string_view p_resource_key = {});
 
@@ -402,7 +406,7 @@ public:
      * @brief Register a mesh the ResourceManager loaded; see register_mesh(std::string_view, RDParamsMeshVK).
      *
      * The description names the handle's resource key, so this registers exactly what the key-based call, or a recipe's
-     * graph:register_mesh(), registers for the same resource.
+     * `graph.mesh(key, description)` handle, registers for the same resource.
      *
      * @param p_key The registration key.
      * @param p_mesh The mesh; its resource key replaces p_options.mesh.
@@ -499,16 +503,17 @@ public:
     RendGraphMetadataVK dump_graph_metadata() const;
 
     /**
-     * @brief Acquire the container bound to a graph resource.
+     * @brief Acquire the container bound to an exported graph resource (RendGraphDescVK::add_export()).
      *
      * Resources allocated by the graph are held in an ROCSingleVK, or in an ROCMultislotsVK with one slot per frame in
      * flight when they were declared per frame. Use the container to update graph-owned buffers on the rendering thread.
      *
-     * @param p_resource_id The graph resource identifier.
+     * @param p_export_name The name the resource is exported under.
      * @return The resource container.
-     * @throws std::runtime_error If the resource is not declared or is an aggregate resource list.
+     * @throws std::runtime_error If nothing is exported under the name, or the exported resource is an aggregate resource
+     * list.
      */
-    Ref<RenderObjectContainerVK> acquire_resource(std::string_view p_resource_id) const;
+    Ref<RenderObjectContainerVK> acquire_resource(std::string_view p_export_name) const;
 
 private:
     const RenderContextVK* render_data;
@@ -556,7 +561,12 @@ private:
     void apply_owned_resource(std::string_view p_resource_id, RendResRebuildActionVK p_action);
     Ref<IRenderObjectVK> create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const;
     void bind_owned_resource(std::string_view p_resource_id, Ref<RenderObjectContainerVK> p_container);
-    // Objects the container creates are registered as `<resource_key>.<p_resource_id>`; see RenderGraphVK().
+    // The debug name of a graph-owned resource of the current build, or p_resource_id when it has none.
+    std::string_view resource_name(std::string_view p_resource_id) const;
+    // A resource as diagnostics name it: `'<name>' (<id>)`, or `'<id>'` when it has no debug name.
+    std::string describe_resource(std::string_view p_resource_id) const;
+    // Objects the container creates are registered as `<resource_key>.<p_resource_id>` and named by their debug name; see
+    // RenderGraphVK().
     Ref<RenderObjectContainerVK> create_container(
         std::string_view p_resource_id, bool p_per_frame, RenderObjectContainerVK::Factory p_factory) const;
     void build_tasks(const Vector<RendTaskDescVK, RenderAllocator>& p_tasks, const Vector<RendSubgraphVK, RenderAllocator>& p_subgraphs);

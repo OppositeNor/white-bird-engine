@@ -19,57 +19,43 @@
 -- `light_billboard_info` buffers.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 
 local exports = {}
 
 function exports.build(context: wbe.ShadowedMeshRecipeContext, _parameters: {string:any}): wbe.RendGraphRecipeVK
-    local graph = render_graph.new()
-    local swap_chain = render_graph.import_resource("swap_chain")
-    local camera_info = render_graph.import_resource("camera_info")
-    local gbuffer_camera_info = render_graph.import_resource("gbuffer_camera_info")
-    local spot_light_info = render_graph.import_resource("spot_light_info")
-    local shadow_light_info = render_graph.import_resource("shadow_light_info")
-    local spot_light_count = render_graph.import_resource("spot_light_count")
-    local light_billboard_info = render_graph.import_resource("light_billboard_info")
-    -- The billboard texture is registered on the graph, which binds the registered view for its import.
-    local light_billboard_texture = graph:register_image("light_billboard_texture", { texture = "spot_light_billboard" })
+    local swap_chain = graph.import("swap_chain")
     local shadow_extent: wbe.RendExtent2DParamsVK = { width = context.shadow_extent.width, height = context.shadow_extent.height }
 
-    local mesh = graph:register_mesh("static_mesh", { mesh = "sponza.mesh" })
+    local mesh = graph.mesh("static_mesh", { mesh = "sponza.mesh" })
     local function pipeline(key: string, pipeline_key: string, color_format: wbe.ImageFormatVK,
-        depth_format?: wbe.ImageFormatVK): render_graph.Resource
-        return graph:register_graphics_pipeline(key, {
+        depth_format?: wbe.ImageFormatVK): graph.Resource
+        return graph.graphics_pipeline(key, {
             pipeline = pipeline_key,
             color_formats = { color_format },
             depth_format = depth_format,
         })
     end
-    local shadow_opaque_pipeline = pipeline("forward_sponza_shadow_opaque", "shadowmap_spot", context.shadow_color_format,
-        context.shadow_depth_format)
-    local shadow_masked_pipeline = pipeline("forward_sponza_shadow_masked", "shadowmap_spot_masked",
-        context.shadow_color_format, context.shadow_depth_format)
-    local main_opaque_pipeline = pipeline("forward_sponza_main_opaque", "forward_cook_torrance_pbr", context.swap_chain_format,
-        context.depth_format)
-    local main_masked_pipeline = pipeline("forward_sponza_main_masked", "forward_cook_torrance_pbr_masked",
-        context.swap_chain_format, context.depth_format)
-    local light_billboard_pipeline = pipeline("light_billboard_pipeline", "billboard_face_camera_pipeline",
-        context.swap_chain_format)
 
-    local shadow_depth = render_graph.image("shadowmap_depth_image", "image_depth_target", context.shadow_depth_format,
-        shadow_extent):view("shadowmap_depth")
-    local shadow_color = render_graph.image("shadowmap_color_image", "image_render_target", context.shadow_color_format,
-        shadow_extent):view("shadowmap_color")
-    local depth = render_graph.image("draw_sponza_depth_image", "image_depth_target", context.depth_format):view("sponza_depth")
-    local shadow_sampler = render_graph.clamp_to_edge_sampler("shadow_sampler")
-    local light_billboard_sampler = render_graph.clamp_to_edge_sampler("light_billboard_sampler")
+    local shadow_depth = graph.image({
+        name = "shadowmap_depth",
+        usage = "image_depth_target",
+        format = context.shadow_depth_format,
+        extent = shadow_extent,
+    }):view()
+    local shadow_color = graph.image({
+        name = "shadowmap_color",
+        usage = "image_render_target",
+        format = context.shadow_color_format,
+        extent = shadow_extent,
+    }):view()
+    local depth = graph.image({ name = "sponza_depth", usage = "image_depth_target", format = context.depth_format }):view()
 
     -- The masked passes load what the opaque pass of their targets wrote.
-    local function draw(identifier: string, pipeline_handle: render_graph.Resource, part: wbe.MeshPartVK, load: boolean,
-        extent?: wbe.RendExtent2DParamsVK, bindings?: {string:render_graph.Resource},
-        uses?: {render_graph.Resource}): render_graph.Task
+    local function draw(name: string, pipeline_handle: graph.Resource, part: wbe.MeshPartVK, load: boolean,
+        extent: wbe.RendExtent2DParamsVK, bindings: {string:graph.Resource}): graph.Task
         local load_op: wbe.AttachmentLoadOpVK = load and "load" or "clear"
-        return graph:draw_mesh(identifier, {
+        return graph.draw_mesh({
             mesh = mesh,
             pipeline = { default = pipeline_handle },
             parts = { part },
@@ -77,35 +63,49 @@ function exports.build(context: wbe.ShadowedMeshRecipeContext, _parameters: {str
             clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } }, { depth = 0.0 } },
             color_load_op = load_op,
             depth_load_op = load_op,
-        }, { bindings = bindings, uses = uses })
+        }, { name = name, bindings = bindings })
     end
-    local shadow_opaque = draw("run_shadowmap_opaque", shadow_opaque_pipeline, "opaque", false, shadow_extent, nil,
-        { shadow_light_info }):color_target(0, shadow_color):depth_target(shadow_depth)
-    local shadow_masked = draw("run_shadowmap_masked", shadow_masked_pipeline, "masked", true, shadow_extent, nil,
-        { shadow_light_info }):color_target(0, shadow_color):depth_target(shadow_depth)
-    -- The main passes sample the shadow depth through their reflected "shadowmap" resource.
-    local main_uses = { camera_info, spot_light_info, spot_light_count, shadow_sampler }
-    local main_opaque = draw("run_main_opaque", main_opaque_pipeline, "opaque", false, nil, { shadowmap = shadow_depth },
-        main_uses):color_target(0, swap_chain):depth_target(depth)
-    local main_masked = draw("run_main_masked", main_masked_pipeline, "masked", true, nil, { shadowmap = shadow_depth },
-        main_uses):color_target(0, swap_chain):depth_target(depth)
-    local light_billboard_params: render_graph.RTParamsRunGraphicsPipelineVK = {
-        pipeline = light_billboard_pipeline,
+    local shadow_bindings = { shadow_light_info = graph.import("shadow_light_info") }
+    local shadow_opaque = draw("draw_shadow_map_opaque", pipeline("forward_sponza_shadow_opaque", "shadowmap_spot",
+        context.shadow_color_format, context.shadow_depth_format), "opaque", false, shadow_extent, shadow_bindings)
+        :color_target(0, shadow_color):depth_target(shadow_depth)
+    local shadow_masked = draw("draw_shadow_map_masked", pipeline("forward_sponza_shadow_masked", "shadowmap_spot_masked",
+        context.shadow_color_format, context.shadow_depth_format), "masked", true, shadow_extent, shadow_bindings)
+        :color_target(0, shadow_color):depth_target(shadow_depth)
+    local main_bindings = {
+        shadowmap = shadow_depth,
+        shadow_sampler = graph.clamp_to_edge_sampler({ name = "shadow_sampler" }),
+        camera_info = graph.import("camera_info"),
+        spot_light_info = graph.import("spot_light_info"),
+        spot_light_count = graph.import("spot_light_count"),
+    }
+    local main_opaque = draw("draw_main_opaque", pipeline("forward_sponza_main_opaque", "forward_cook_torrance_pbr",
+        context.swap_chain_format, context.depth_format), "opaque", false, nil, main_bindings)
+        :color_target(0, swap_chain):depth_target(depth)
+    local main_masked = draw("draw_main_masked", pipeline("forward_sponza_main_masked", "forward_cook_torrance_pbr_masked",
+        context.swap_chain_format, context.depth_format), "masked", true, nil, main_bindings)
+        :color_target(0, swap_chain):depth_target(depth)
+    local light_billboard_params: graph.RTParamsRunGraphicsPipelineVK = {
+        pipeline = pipeline("light_billboard_pipeline", "billboard_face_camera_pipeline", context.swap_chain_format),
         color_load_op = "load",
         draw_vertex_count = 6,
     }
-    local light_billboard = graph:draw("run_light_billboard", light_billboard_params, {
-        uses = { gbuffer_camera_info, light_billboard_info, light_billboard_texture, light_billboard_sampler },
+    local light_billboard = graph.draw(light_billboard_params, {
+        name = "draw_light_billboard",
+        bindings = {
+            gbuffer_camera_info = graph.import("gbuffer_camera_info"),
+            light_billboard_info = graph.import("light_billboard_info"),
+            -- The billboard texture is registered on the graph, which binds the registered view for its import.
+            light_billboard_texture = graph.registered_image("light_billboard_texture", { texture = "spot_light_billboard" }),
+            light_billboard_sampler = graph.clamp_to_edge_sampler({ name = "light_billboard_sampler" }),
+        },
     }):color_target(0, swap_chain)
 
-    shadow_opaque:connect(shadow_masked, shadow_color)
-    shadow_opaque:connect(shadow_masked, shadow_depth)
-    shadow_masked:connect(main_opaque, shadow_depth)
-    shadow_masked:connect(main_masked, shadow_depth)
-    main_opaque:connect(main_masked, swap_chain)
-    main_opaque:connect(main_masked, depth)
+    shadow_opaque:connect(shadow_masked, { shadow_color, shadow_depth })
+    shadow_masked:connect_all({ main_opaque, main_masked }, shadow_depth)
+    main_opaque:connect(main_masked, { swap_chain, depth })
     main_masked:connect(light_billboard, swap_chain)
-    return graph:build()
+    return graph.build({ tasks = { shadow_opaque, shadow_masked, main_opaque, main_masked, light_billboard } })
 end
 
 return exports

@@ -34,12 +34,12 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     /**
      * @brief Graph resource id of the view of the base mip level.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE)
     std::string source_view;
     /**
      * @brief Graph resource id of the view covering the whole mip chain.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE)
     std::string mip_chain_view;
     /**
      * @brief Extent of the base mip level; the swap chain extent by default.

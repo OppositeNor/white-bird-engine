@@ -28,10 +28,15 @@ namespace WhiteBirdEngine {
  */
 struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParamsCPUInFlightAcquireVK {
     /**
-     * @brief Render-graph resource id of the source image view; it is also the event id of every acquisition.
+     * @brief Render-graph resource id of the source image view.
      */
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(graph))
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE)
     std::string image_view;
+    /**
+     * @brief Event id every acquisition is emitted under.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string event;
 };
 
 } // namespace WhiteBirdEngine

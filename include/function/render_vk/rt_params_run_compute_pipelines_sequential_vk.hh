@@ -37,10 +37,10 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED, WBE_RECIPE_RESOURCE(registered, ROComputePipelineVK))
     std::string pipeline;
     /**
-     * @brief Task-local resource id of the buffer holding the dispatch's VkDispatchIndirectCommand; empty for a direct
-     * dispatch, which uses the group counts.
+     * @brief Resource id of the buffer holding the dispatch's VkDispatchIndirectCommand, resolved through the task's
+     * aliases; empty for a direct dispatch, which uses the group counts.
      */
-    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(task_local))
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE)
     std::string indirect_buffer;
     /**
      * @brief Byte offset of the command in the indirect buffer; a multiple of 4, and 0 for a direct dispatch.
@@ -48,11 +48,11 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     uint64_t indirect_offset = 0;
     /**
-     * @brief Bindings of the dispatch's pipeline: a map from a resource id the pipeline reflects to the task-local resource
-     * id it binds, which the task's aliases then map to a graph resource. Lets dispatches of one task bind one shader
-     * resource to different resources.
+     * @brief Bindings of the dispatch's pipeline: a map from a resource id the pipeline reflects to the resource id it
+     * binds, resolved through the task's aliases. Lets dispatches of one task bind one shader resource to different
+     * resources.
      */
-    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE(task_local))
+    WBE_META(WBE_REFLECT, WBE_RECIPE_RESOURCE)
     DataValue bindings;
     /**
      * @brief Dispatch workgroup count along x passed to vkCmdDispatch.

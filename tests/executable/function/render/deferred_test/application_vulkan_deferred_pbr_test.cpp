@@ -741,14 +741,13 @@ void ApplicationVulkanDeferredPBRTest::setup_light_billboard_overlay_resources()
 
 void ApplicationVulkanDeferredPBRTest::setup_bloom_acquisition() {
     bloom_extent = render_context->swap_chain_extent;
-    // Each acquisition task emits under the id of the image view it reads.
     EventManager* event_manager = EventManager::get_singleton();
     bloom_acquire_registration = event_manager->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(
-        BLOOM_PING_IMAGE_VIEW, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
+        BLOOM_IMAGE_EVENT_ID, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
             write_completed_bloom_acquire(p_image);
         });
     frame_sequence_acquire_registration = event_manager->subscribe<RTCPUInFlightAcquireVK::AcquiredImage>(
-        FRAME_SEQUENCE_IMAGE_VIEW, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
+        FRAME_SEQUENCE_IMAGE_EVENT_ID, [this](const RTCPUInFlightAcquireVK::AcquiredImage& p_image) {
             write_frame_sequence_frame(p_image);
         });
 }
@@ -758,28 +757,8 @@ ApplicationVulkanDeferredPBRTest::SpotLightGraphIds ApplicationVulkanDeferredPBR
         return std::format("{}_{}", p_base, p_light_index);
     };
     return SpotLightGraphIds{
-        .shadowmap_depth_image = id("shadowmap_depth_image"),
-        .shadowmap_color_image = id("shadowmap_color_image"),
-        .rsm_normal_image = id("rsm_normal_image"),
-        .shadow_moments_image = id("shadow_moments_image"),
-        .shadow_moments_summed_area_table_horizontal_image = id("shadow_moments_sat_horizontal_image"),
-        .shadow_moments_summed_area_table_image = id("shadow_moments_sat_image"),
-        .shadowmap_depth = id(SHADOWMAP_DEPTH_IMAGE_VIEW),
-        .shadowmap_color = id(SHADOWMAP_COLOR_IMAGE_VIEW),
-        .rsm_normal = id(RSM_NORMAL_IMAGE_VIEW),
-        .shadow_moments = id(SHADOW_MOMENTS_IMAGE_VIEW),
-        .shadow_moments_sampled = id(SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW),
-        .shadow_moments_summed_area_table_horizontal = id(SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW),
-        .shadow_moments_summed_area_table = id(SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW),
         .shadow_light_info = id(SHADOW_LIGHT_INFO_BUFFER),
         .light_billboard_info = id(LIGHT_BILLBOARD_INFO_BUFFER),
-        .run_shadow_opaque = id(RT_RUN_DEFERRED_SHADOW_OPAQUE),
-        .run_shadow_double_sided = id(RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED),
-        .run_dynamic_shadow = id(RT_RUN_DYNAMIC_SHADOW),
-        .run_dynamic_shadow_second = id(RT_RUN_DYNAMIC_SHADOW_SECOND),
-        .generate_shadow_mipmaps = id(RT_GENERATE_SHADOW_MIPMAPS),
-        .build_shadow_moments_summed_area_table = id(RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE),
-        .run_light_billboard = id(RT_RUN_LIGHT_BILLBOARD),
     };
 }
 

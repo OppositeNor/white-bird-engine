@@ -20,15 +20,15 @@
 -- TODO: Build the tree from the unique leaves.
 
 local type wbe = require("wbe")
-local render_graph = require("render_graph_utils.render_graph_utils")
+local graph = require("render_graph_utils.render_graph_utils")
 local dedup_large = require("render_graph_utils.dedup_large")
 
 local record svo_3
     record LeafParams
         -- The SVO info buffer, whose max_deferred_task_count must equal max_leaf_count.
-        svo_info: render_graph.Resource
+        svo_info: graph.Resource
         -- The mesh rasterized into the SVO.
-        mesh: render_graph.Resource
+        mesh: graph.Resource
         -- The SVO's max_depth, which sets the rasterization extent to 2^max_depth.
         max_depth: integer
         -- The capacity of the deferred list.
@@ -40,43 +40,43 @@ local record svo_3
     record LeafDeduplication
         -- The unique leaves: their count in the metadata, followed by their Morton codes in ascending order, in the layout
         -- of a radix sort key buffer.
-        unique_leaves: render_graph.Resource
-        -- The task that writes the unique leaves; order their consumers after it on unique_leaves.
-        deduplicate: render_graph.Task
+        unique_leaves: graph.Resource
+        -- The tasks, in order; the last writes the unique leaves, so order their consumers after it on unique_leaves.
+        tasks: {graph.Task}
+        deduplicate: graph.Task
     end
 end
 
--- Adds to graph the tasks that gather the leaves of params.mesh and deduplicate them.
-function svo_3.add_leaf_deduplication(graph: render_graph.Graph, params: svo_3.LeafParams): svo_3.LeafDeduplication
-    local buffers = dedup_large.buffers({ keys = "svo_3_deferred_list", unique_keys = "svo_3_unique_leaves" },
-        params.max_leaf_count)
+-- The tasks that gather the leaves of params.mesh and deduplicate them.
+function svo_3.leaf_deduplication(params: svo_3.LeafParams): svo_3.LeafDeduplication
+    local buffers = dedup_large.buffers({ name = "svo_3_leaves", max_element_count = params.max_leaf_count })
     local deferred_list = buffers.keys
     local queue_family = params.queue_family
 
-    local reset = graph:compute("svo_3_reset_deferred_list", {
-        pipeline = render_graph.compute_pipeline("svo_deferred_count_reset_pong_shader"),
+    local reset = graph.compute({
+        pipeline = graph.compute_pipeline("svo_deferred_count_reset_pong_shader"),
         queue_family = queue_family,
-    }, { bindings = { svo_deferred_list_pong = deferred_list } })
+    }, { name = "svo_3_reset_deferred_list", bindings = { svo_deferred_list_pong = deferred_list } })
     local extent = 1 << params.max_depth
-    local gather = graph:draw_mesh("svo_3_gather_leaves", {
+    local gather = graph.draw_mesh({
         mesh = params.mesh,
-        pipeline = { default = render_graph.graphics_pipeline("svo_3_gather_leaves_pipeline") },
+        pipeline = { default = graph.graphics_pipeline("svo_3_gather_leaves_pipeline") },
         parts = { "opaque", "double_sided" },
         render_extent = { width = extent, height = extent },
-    }, { bindings = { svo_info = params.svo_info, svo_deferred_list = deferred_list } })
+    }, { name = "svo_3_gather_leaves", bindings = { svo_info = params.svo_info, svo_deferred_list = deferred_list } })
     -- The clamping of the leaf count and the deduplication run as one task.
-    local dispatches: {render_graph.RTParamsComputeDispatchVK} = {
-        { pipeline = render_graph.compute_pipeline("svo_3_prepare_leaves_shader"),
+    local dispatches: {graph.RTParamsComputeDispatchVK} = {
+        { pipeline = graph.compute_pipeline("svo_3_prepare_leaves_shader"),
             bindings = { svo_info = params.svo_info, svo_deferred_list = deferred_list } },
     }
     for _, dispatch in ipairs(dedup_large.dispatches(buffers)) do
         dispatches[#dispatches + 1] = dispatch
     end
-    local deduplicate = graph:compute_sequential("svo_3_deduplicate_leaves",
-        { dispatches = dispatches, queue_family = queue_family })
+    local deduplicate = graph.compute_sequential({ dispatches = dispatches, queue_family = queue_family },
+        { name = "svo_3_deduplicate_leaves" })
 
-    graph:chain(deferred_list, { reset, gather, deduplicate })
-    return { unique_leaves = buffers.unique_keys, deduplicate = deduplicate }
+    graph.chain(deferred_list, { reset, gather, deduplicate })
+    return { unique_leaves = buffers.unique_keys, tasks = { reset, gather, deduplicate }, deduplicate = deduplicate }
 end
 
 return svo_3

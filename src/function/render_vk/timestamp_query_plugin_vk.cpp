@@ -20,9 +20,9 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/descriptor_heap_allocator_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
+#include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/render_graph_metadata_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
 #include "platform/file_system/file_system.hh"
 #include "platform/file_system/path.hh"
 #include "utils/defs.hh"
@@ -90,8 +90,8 @@ double TimestampQueryPluginVK::DurationStatistics::get_standard_deviation() cons
 
 TimestampQueryPluginVK::TimestampQueryPluginVK(const RenderContextVK* p_render_data)
     : render_data(p_render_data), report_path(FileSystem::get_executable_dir() / DEFAULT_REPORT_FILE_NAME),
-      frame_queries(p_render_data->allocator), query_results(p_render_data->allocator), task_statistics(p_render_data->allocator),
-      graph_keys(p_render_data->allocator), graph_metadata(p_render_data->allocator) {
+      frame_queries(p_render_data->allocator), query_results(p_render_data->allocator),
+      task_statistics(p_render_data->allocator), graph_keys(p_render_data->allocator), graph_metadata(p_render_data->allocator) {
     singleton = this;
 }
 
@@ -210,8 +210,7 @@ void TimestampQueryPluginVK::on_before_task_recorded(
             std::format("Failed to record GPU timestamps: a frame records more than {} render-graph tasks.", MAX_TASKS_PER_FRAME));
     }
     const auto first_query = static_cast<uint32_t>(frame.tasks.size() * 2);
-    frame.tasks.push_back(
-        {.graph_key = std::string(get_graph_key(p_graph)), .task_id = p_task_id, .queue_family = p_queue_family});
+    frame.tasks.push_back({.graph_key = std::string(get_graph_key(p_graph)), .task_id = p_task_id, .queue_family = p_queue_family});
     frame.task_open = true;
     // The reset and both writes are query commands on the same queue, so they execute in submission order.
     vkCmdResetQueryPool(p_command_buffer, frame.query_pool, first_query, 2);
@@ -369,11 +368,26 @@ void TimestampQueryPluginVK::write_report() const {
     std::ranges::stable_sort(sorted_tasks, [](const auto* p_left, const auto* p_right) {
         return p_left->second.total > p_right->second.total;
     });
+    // The names of the registered graphs' tasks, by graph key and task id.
+    const auto task_name = [this](std::string_view p_graph_key, std::string_view p_task_id) -> std::string {
+        for (const RegisteredGraphMetadata& registered : graph_metadata) {
+            if (registered.graph_key != p_graph_key) {
+                continue;
+            }
+            for (const RendGraphTaskMetadataVK& task_metadata : registered.metadata.tasks) {
+                if (task_metadata.task_id == p_task_id) {
+                    return task_metadata.name;
+                }
+            }
+        }
+        return std::string(p_task_id);
+    };
     report["tasks"] = nlohmann::json::array();
     for (const auto* entry : sorted_tasks) {
         nlohmann::json task = statistics_json(entry->second);
         task["render_graph"] = std::get<0>(entry->first);
         task["task_id"] = std::get<2>(entry->first);
+        task["name"] = task_name(std::get<0>(entry->first), std::get<2>(entry->first));
         task["queue"] = queue_family_name(std::get<1>(entry->first));
         report["tasks"].push_back(std::move(task));
     }
@@ -387,11 +401,11 @@ void TimestampQueryPluginVK::write_report() const {
         for (const RendGraphTaskMetadataVK& task_metadata : registered.metadata.tasks) {
             nlohmann::json task;
             task["task_id"] = task_metadata.task_id;
+            task["name"] = task_metadata.name;
             task["queue"] = queue_family_name(task_metadata.queue_family);
             task["topological_order"] = task_metadata.topological_order;
             task["subgraph"] = task_metadata.subgraph_id.empty() ? nlohmann::json(nullptr) : nlohmann::json(task_metadata.subgraph_id);
-            auto statistics =
-                task_statistics.find(TaskKey(registered.graph_key, task_metadata.queue_family, task_metadata.task_id));
+            auto statistics = task_statistics.find(TaskKey(registered.graph_key, task_metadata.queue_family, task_metadata.task_id));
             task["timing"] = statistics == task_statistics.end() ? nlohmann::json(nullptr) : statistics_json(statistics->second);
             graph["tasks"].push_back(std::move(task));
         }
@@ -401,6 +415,7 @@ void TimestampQueryPluginVK::write_report() const {
             edge["from"] = edge_metadata.from_task_id;
             edge["to"] = edge_metadata.to_task_id;
             edge["resource"] = edge_metadata.resource_id;
+            edge["resource_name"] = edge_metadata.resource_name;
             edge["from_task_writes"] = edge_metadata.from_task_writes;
             edge["to_task_writes"] = edge_metadata.to_task_writes;
             edge["cross_queue"] = edge_metadata.cross_queue;
@@ -415,8 +430,9 @@ void TimestampQueryPluginVK::write_report() const {
         for (const RendGraphSubgraphMetadataVK& subgraph_metadata : registered.metadata.subgraphs) {
             nlohmann::json subgraph;
             subgraph["id"] = subgraph_metadata.subgraph_id;
+            subgraph["name"] = subgraph_metadata.name;
             subgraph["parent"] = subgraph_metadata.parent_subgraph_id.empty() ? nlohmann::json(nullptr)
-                                                                               : nlohmann::json(subgraph_metadata.parent_subgraph_id);
+                                                                              : nlohmann::json(subgraph_metadata.parent_subgraph_id);
             graph["subgraphs"].push_back(std::move(subgraph));
         }
         report["render_graphs"].push_back(std::move(graph));

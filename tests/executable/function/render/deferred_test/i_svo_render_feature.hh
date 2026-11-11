@@ -100,22 +100,6 @@ public:
     virtual void configure_recipe(
         DataValue& p_parameters, RendGraphRecipeImportsVK& p_imports, const VoxelRecipeInputs& p_inputs) const override;
 
-
-    static constexpr std::string_view RT_RUN_BUILD_SVO_DOUBLE_SIDED = "run_build_svo_double_sided";
-    static constexpr std::string_view RT_RESET_SVO = "reset_svo";
-    static constexpr std::string_view RT_RUN_BUILD_SVO = "run_build_svo";
-    static constexpr std::string_view RT_RUN_BUILD_SVO_DEFERRED = "run_build_svo_deferred";
-    static constexpr std::string_view RT_CAPTURE_SVO_PRE_DEFERRED_DEBUG = "capture_svo_pre_deferred_debug";
-    static constexpr std::string_view RT_SETUP_SVO_DEBUG_DRAW = "setup_svo_debug_draw";
-    static constexpr std::string_view RT_RUN_SVO_DEBUG_DRAW = "run_svo_debug_draw";
-    static constexpr std::string_view RT_RUN_SVO_PRE_DEFERRED_DEBUG_DRAW = "run_svo_pre_deferred_debug_draw";
-    static constexpr std::string_view RT_UPDATE_SVO_STATES = "update_svo_states";
-    static constexpr std::string_view RT_STATIC_SVO_DEFERRED = "static_svo_deferred";
-    static constexpr std::string_view RT_CLEAR_DYNAMIC_SVO = "clear_dynamic_svo";
-    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_SVO = "dynamic_svo";
-    static constexpr std::string_view RT_RUN_BUILD_DYNAMIC_SVO_SECOND = "dynamic_svo_second";
-    static constexpr std::string_view RT_PUBLISH_DYNAMIC_SVO = "publish_dynamic_svo";
-
     static constexpr std::string_view SVO_INFO = "svo_info";
     static constexpr std::string_view SVO_NODE_BUFFER = "svo_node_buffer";
     static constexpr std::string_view SVO_LEAF_BUFFER = "svo_leaf_buffer";
@@ -177,8 +161,6 @@ protected:
     RenderAllocator* render_allocator;
 
 private:
-    static constexpr std::string_view RT_SVO_FRAME_BEGIN = "svo_frame_begin";
-    static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
     static constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
     static constexpr size_t SVO_EXTENT = size_t{1} << SVO_MAX_DEPTH;
     // Shared by the static leaves and the dynamic leaves that follow them in the leaf buffer.

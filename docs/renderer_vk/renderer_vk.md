@@ -111,8 +111,9 @@ Shaders receive each resource as an aligned `uint2` field in a single push-data 
 `WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`:
 
 - `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`.
-- `resource_id` names the graph resource, directly or through the task's `RendTaskDescVK::alias()`. An id ending in `[]`
-  resolves per element of the enclosing descriptor struct array (`shadowmap[0]`, `shadowmap[1]`, ...).
+- `resource_id` is the task-local name the task's `RendTaskDescVK::alias()` maps to a graph resource; recipe tasks bind
+  every such name explicitly (their `bindings`), and only C++-built tasks may leave a name that equals a graph resource id
+  unmapped. An id ending in `[]` resolves per element of the enclosing descriptor struct array (`shadowmap[0]`, `shadowmap[1]`, ...).
 - `ACCESS` is optional: `read`, `write`, or `read_write`. Only storage buffers and images may be written; they default to
   `read_write`, so annotate read-only ones with `read`.
 
@@ -220,17 +221,17 @@ is validated against the reflection-only `ParameterBlock<MeshContractMetadata> m
 ### Drawing
 
 Draw meshes with `RTGraphicsDrawMeshVK` (recipe type `graphics_draw_mesh`, or `RTGraphicsDrawMeshVK::add_to_graph()` in C++).
-Its params (`RTParamsGraphicsDrawMeshVK`) name the mesh resource key, a `pipeline` map from material pipeline variants to
-graphics pipelines' render-database keys, the `parts` to draw (`opaque`, `masked`, `double_sided`), an optional `transform`
+Its params (`RTParamsGraphicsDrawMeshVK`) name the mesh registered on the graph (a `graph.mesh()` handle in a recipe), a
+`pipeline` map from material pipeline variants to pipelines registered on the graph, the `parts` to draw (`opaque`, `masked`, `double_sided`), an optional `transform`
 resource, the render extent, clear values, and load ops. When the task is added it acquires the compiled mesh, imports it under its key if not yet imported (so shared
 meshes are compiled and imported once), builds and imports the material table for the pipelines' contract, and aliases the
-`REND_RES_MESH_*` ids the pipelines declare. The caller aliases the render targets. Do not assemble mesh draws from
+`REND_RES_MESH_*` ids the pipelines declare. The caller binds the render targets and every other name the pipelines use. Do not assemble mesh draws from
 `RTRunGraphicsPipelineIndirectVK` by hand; use that task directly only for non-mesh indexed indirect draws.
 
 Different submeshes of one mesh can be drawn with different pipelines in one task. Each material has a pipeline variant
 (`RUMaterial::get_pipeline_variant()`, `default` unless the material sets `pipeline_variant`). The mesh compiler batches
 draws only with draws of the same variant, so every `MeshDrawBatchVK` carries one variant. `pipeline` maps each variant the
-task draws to its pipeline (`pipeline = { default = gbuffer_opaque, foliage = render_graph.graphics_pipeline("gbuffer_foliage") }`;
+task draws to its pipeline (`pipeline = { default = gbuffer_opaque, foliage = graph.graphics_pipeline("gbuffer_foliage") }`;
 in C++, `RTParamsGraphicsDrawMeshVK::make_default_pipeline(key)` builds a one-pipeline map). The task binds each batch's
 pipeline before its indirect draw. Drawing a variant the task does not map throws; mapping a variant the mesh does not use is allowed, so one map
 can serve several meshes. All of a task's pipelines must render to the same targets, the task aliases the union of the
@@ -245,31 +246,41 @@ places the mesh, so one compiled mesh can be drawn at several places and moving 
 it as `<entity key>.transform`.
 
 ```lua
-local params: wbe.RTParamsGraphicsDrawMeshVK = {
-    mesh = "model_cube_static.mesh",
-    pipeline = { default = "draw_cube_unshaded_pipeline" },
+local function pipeline(key: string): graph.Resource
+    return graph.graphics_pipeline(key, { pipeline = key, color_formats = { context.swap_chain_format } })
+end
+local draw = graph.draw_mesh({
+    mesh = graph.mesh("material_variants.cube"),
+    pipeline = {
+        default = pipeline("draw_cube_unshaded_pipeline"),
+        tinted = pipeline("draw_cube_unshaded_tinted_pipeline"),
+    },
     parts = { "opaque" },
-}
--- task: { id = "run_static_mesh", type = "graphics_draw_mesh", params = params,
---         aliases = { ["render_target_colors[0]"] = "swap_chain" } }
+    clear_values = { { color = { 0.0, 0.0, 0.0, 0.0 } } },
+}, {
+    name = "draw_material_variants",
+    bindings = { camera_info = graph.import("camera_info") },
+}):color_target(0, graph.import("swap_chain"))
 ```
 
 ### Pipelines
 
 `GraphicsPipelineCompilerVK(context).compile(key, pipeline_resource)` compiles an `RUGraphicsPipeline` for the attachment
 formats in its context and registers it in the `RenderDatabase` under the key, which recipe params reference.
-`ComputePipelineCompilerVK(context).compile(key, shader)` does the same for compute shaders. Recipes normally register the pipelines their tasks name on the graph instead. Ray-tracing pipelines are built with `ROPipelineRayTracingVK::Builder`.
+`ComputePipelineCompilerVK(context).compile(key, shader)` does the same for compute shaders. Recipes normally register the
+pipelines their tasks name on the graph instead, with handles that carry their registration (`graph.graphics_pipeline(key,
+description)`, `graph.compute_pipeline(key, description)`, `graph.shader_compute_pipeline(shader)`). Ray-tracing pipelines are built with `ROPipelineRayTracingVK::Builder`.
 
 ## Render Targets
 
 Graphics tasks render into the task-local resources `render_target_colors[<index>]` and `render_target_depth`
 (`RenderTargetsVK::color_id()` and `RenderTargetsVK::DEPTH_ID`). The number of color targets and the use of depth follow the
-pipeline's attachment formats; every pipeline in one task shares that layout. Map them to graph resources with `alias()` (or
-recipe `aliases`).
+pipeline's attachment formats; every pipeline in one task shares that layout. Map them to graph resources with `alias()` (in
+a recipe, `task:color_target(index, resource)` and `task:depth_target(resource)`).
 
 - Clear values follow target order: all colors, then depth. Empty clears every target to zero.
 - Color and depth load ops control how a follow-up task reuses targets produced earlier; a loaded target is also read.
-- Task ids, aliases, and dependencies belong to the task descriptor, not the task configuration.
+- Task ids, debug names, aliases, and dependencies belong to the task descriptor, not the task configuration.
 
 ## Acceleration Structures
 
@@ -285,12 +296,16 @@ Ray-tracing acceleration structures are explicit resources; the renderer keeps n
    with an `RTBuildAccelerationStructuresVK` task writing `<key>.top_level`, wrapped in `RTTriggeredVK` to run once, and order
    consumers after it with edges.
 
-The deferred test supplies the build task to its recipe as an imported task and adds the acceleration-structure import to
-the descriptor the recipe builder returns (`tests/executable/function/render/deferred_test/deferred_render_graph.cpp`).
+The deferred test supplies the acceleration structure as the `mesh_acceleration_structure` import and the build task as an
+imported task, which its recipe binds to the TLAS member
+(`graph.import_task("build_mesh_acceleration_structure"):bind("top_level_acceleration_structure",
+graph.import("mesh_acceleration_structure"):member("top_level"))`; see
+`tests/executable/function/render/deferred_test/deferred_render_graph.cpp` and `render_graphs/deferred.tl`).
 
 ## Render Database
 
 `RenderDatabase` (`function/render/render_database.hh`) is a weak registry of compiled render objects keyed by name and type:
 compiled pipelines, meshes, cached binary uploads, and graph-owned resources of keyed graphs (`<graph key>.<resource id>`,
-with `[slot]` for per-frame copies). Registering an object also names it for debugging. It holds entries weakly, so the
+with `[slot]` for per-frame copies). Registering an object also names it for debugging; graph-owned objects are named by
+their resources' debug names instead (`<graph key>.<debug name>`). It holds entries weakly, so the
 owner must keep each object alive.

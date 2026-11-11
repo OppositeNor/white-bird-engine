@@ -33,6 +33,8 @@ namespace WhiteBirdEngine {
 struct RendGraphTaskMetadataVK {
     /** The task identifier. */
     RendTaskID task_id;
+    /** The task's debug name, or its identifier when it has none. */
+    std::string name;
     /** The queue family the task is submitted to. */
     QueueFamilyVK queue_family = QueueFamilyVK::GRAPHICS;
     /** The position of the task in the graph's execution order, starting at 0. */
@@ -48,6 +50,8 @@ struct RendGraphTaskMetadataVK {
 struct RendGraphSubgraphMetadataVK {
     /** The subgraph identifier, which prefixes its members' ids. */
     RendTaskID subgraph_id;
+    /** The subgraph's debug name, or its identifier when it has none. */
+    std::string name;
     /** The subgraph that directly contains this one; empty for a subgraph of the graph itself. */
     RendTaskID parent_subgraph_id;
 };
@@ -64,6 +68,8 @@ struct RendGraphEdgeMetadataVK {
     RendTaskID to_task_id;
     /** The graph resource identifier carried by the edge; aggregate resource lists are expanded to their entries. */
     std::string resource_id;
+    /** The resource's debug name, or its identifier when it has none. */
+    std::string resource_name;
     /** The pipeline stages at which the previous task uses the resource. */
     VkPipelineStageFlags2 src_stage = VK_PIPELINE_STAGE_2_NONE;
     /** The writes of the previous task that are made available to the next task. */

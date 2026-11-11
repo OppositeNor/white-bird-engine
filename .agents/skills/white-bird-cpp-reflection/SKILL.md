@@ -90,9 +90,10 @@ A `WBE_RENDER_TASK` class declares
 where `TParams` is a strict, script-reflected params struct. The generated `render_task_registry.gen.cpp` implements
 `RenderTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
 `static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. Each alias is a `type`
-name recipes can use. `WBE_RENDER_TASK(<method>)` also generates the recipe constructor `graph:<method>(id, params,
-options?)`, which uses the first alias; mark params fields that hold resource ids `WBE_RECIPE_RESOURCE(graph)` or
-`WBE_RECIPE_RESOURCE(task_local)` so that it accepts resource handles there. See
+name recipes can use. `WBE_RENDER_TASK(<method>)` also generates the recipe constructor `graph.<method>(params,
+options?)`, which uses the first alias; mark params fields that hold resource ids `WBE_RECIPE_RESOURCE` (graph resources,
+which the build binds to themselves) or `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the
+graph) so that it accepts resource handles, and only handles, there. See
 `include/function/render_vk/render_task_registry_vk.hh` and `docs/renderer_vk/render_graph.md`.
 
 ## Script types and Teal declarations

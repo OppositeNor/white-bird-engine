@@ -30,7 +30,8 @@ namespace WhiteBirdEngine {
  *
  * A task refers to resources by task-local identifiers: reflected shader resource ids, render targets such as
  * `render_target_colors[0]`, and ids passed to its constructor. RendTaskDescVK owns one map per task; the render graph
- * resolves every identifier the task binds or reports as an access through it. Unmapped identifiers resolve to themselves.
+ * resolves every identifier the task binds or reports as an access through it. Unmapped identifiers resolve to themselves,
+ * unless require_bindings() made the map strict, as recipe tasks' maps are: then every identifier must be mapped.
  *
  * Bindings of the enclosing scopes, such as the render graph subgraphs that contain the task, map the result further; see
  * enclose(). They are not the task's own aliases, so they need not be used.
@@ -94,14 +95,24 @@ public:
     RenderTaskResourceMap& enclose(std::span<const ScopeBinding> p_scope);
 
     /**
+     * @brief Make the map strict: resolve() then rejects identifiers the task's own bindings do not map, instead of
+     * resolving them to themselves. A task that names a graph resource directly binds it to itself.
+     * @param p_task_id Task identifier used in the error message.
+     * @return *this.
+     */
+    RenderTaskResourceMap& require_bindings(std::string_view p_task_id);
+
+    /**
      * @brief Resolve a task-local identifier and record the matching entry as used.
      * @param p_task_resource_id Identifier used by the task.
-     * @return The graph identifier after the task's bindings and its scopes; p_task_resource_id when neither maps it.
+     * @return The graph identifier after the task's bindings and its scopes; p_task_resource_id when neither maps it and
+     * the map is not strict.
+     * @throws std::runtime_error If the map is strict and its bindings do not map p_task_resource_id.
      */
     std::string_view resolve(std::string_view p_task_resource_id) const;
 
     /**
-     * @brief Require that every entry was resolved at least once.
+     * @brief Require that every entry was resolved at least once. Entries that map an identifier to itself are exempt.
      * @param p_task_id Task identifier used in the error message.
      * @throws std::runtime_error If an entry was never resolved.
      */
@@ -117,6 +128,8 @@ private:
     Vector<Entry, RenderAllocator> scope;
     // Resolution bookkeeping, parallel to entries.
     mutable Vector<uint8_t, RenderAllocator> used;
+    // The task id of a strict map; empty when the map is not strict.
+    std::string strict_task_id;
 };
 
 } // namespace WhiteBirdEngine

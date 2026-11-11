@@ -21,89 +21,115 @@ Recipes only build descriptors; they never touch render objects.
 
 ## The graph API
 
-`local render_graph = require("render_graph_utils.render_graph_utils")` gives the implementation;
-`render_graph.new()` creates a graph, and the module also exposes the types `render_graph.Graph`, `render_graph.Resource`,
-`render_graph.Task`, `render_graph.ResourceBundle`, and the handle-accepting params interfaces
-`render_graph.RTParams<Name>VK`. For types only, import the generated declarations with
-`local type render_graph = require("render_graph_utils.render_graph")`.
+`local graph = require("render_graph_utils.render_graph_utils")` gives the implementation. There is no graph object: the
+module's functions make free-standing resource and task handles, and `graph.build()` emits what the listed tasks reach.
+The module also exposes the types `graph.Resource`, `graph.Task`, the descriptor interfaces (`graph.BufferDescriptor`,
+`graph.ImageDescriptor`, `graph.ImageViewDescriptor`, `graph.SamplerDescriptor`), and the handle-accepting params
+interfaces `graph.RTParams<Name>VK`. For types only, import the generated declarations with
+`local type graph = require("render_graph_utils.render_graph")`.
 
 ### Resources
 
 | Call | Returns |
 | --- | --- |
-| `render_graph.buffer(id, usage, size)`, `render_graph.storage_buffer(id, size)` | Graph-owned buffer |
-| `render_graph.image(id, usage, format, extent?, additional_usage?, mip_levels?)` | Graph-owned 2D image; an omitted extent follows the swap chain |
-| `render_graph.storage_image(id, format, width, height, additional_usage?)` | `image_read_write` image |
-| `image:view()`, `image:view(id, view_params?)`, `render_graph.image_view(id, image, view_params?)` | View; `:view()` caches a default view with id `<image id>.view`, and a customized view needs an explicit id |
-| `render_graph.clamp_to_edge_sampler(id, sampler_params?)` | Graph-owned sampler |
-| `render_graph.import_resource(id)` | A resource C++ supplies through `RendGraphRecipeImportsVK` |
-| `render_graph.reference(id)` | An existing enclosing resource or composite member (`<id>.<member>`), without declaring another import |
-| `render_graph.port(id)` | A port of this graph, bound when it becomes a subgraph |
-| `render_graph.mesh(key)`, `render_graph.compute_pipeline(key)`, `render_graph.graphics_pipeline(key)` | Entry registered on the graph elsewhere; usable only in task params, never as an edge or binding |
-| `graph:register_mesh(key, params)`, `graph:register_graphics_pipeline(key, params)`, `graph:register_compute_pipeline(key, params)` | Registers the entry on the graph (`registrations`) and returns its handle |
-| `render_graph.compute_pipeline(key, description)`, `render_graph.graphics_pipeline(key, description)`, `render_graph.shader_compute_pipeline(shader)` | A handle that carries its registration; a task naming it emits the registration, merging equal ones per key. Needs no graph, so shared helpers use it |
-| `graph:register_image(key, params)` | Registers a texture and returns an import handle; the builder binds the registered view |
-| `graph:register_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
-| `:resource_bundle({ ... })` | A reusable ordered list for edges; it declares nothing |
+| `graph.buffer{ name?, usage, size, ... }`, `graph.storage_buffer{ name?, size, ... }` | Graph-owned buffer (`RendBufferParamsVK`); `storage_buffer` sets usage `buffer_storage` |
+| `graph.image{ name?, usage, format, extent?, ... }`, `graph.storage_image{ name?, format, extent?, ... }` | Graph-owned image (`RendImageParamsVK`; an omitted extent follows the swap chain); `storage_image` sets usage `image_read_write` |
+| `image:view()`, `image:view(descriptor)`, `graph.image_view(image, descriptor?)` | View; `:view()` caches the default view, which takes the image's name; a descriptor (`RendImageViewParamsVK` plus `name`) selects a mip, layer, or aspect range |
+| `graph.clamp_to_edge_sampler{ name?, ... }` | Graph-owned sampler (`RendSamplerParamsVK`) |
+| `graph.import(id)` | A resource C++ supplies under `id` through `RendGraphRecipeImportsVK`; handles of one id denote one import |
+| `import:member(name)` | The member `<id>.<name>` of an imported composite (a mesh entity's transform, an acceleration structure's `top_level`) |
+| `graph.port(name)` | A port of a subgraph, bound by `graph.subgraph{ ports = ... }` |
+| `graph.mesh(key, description?)`, `graph.compute_pipeline(key, description?)`, `graph.graphics_pipeline(key, description?)` | Entry registered on the graph; with a description the handle carries its registration, without one it names an entry registered elsewhere. Usable only in task params, never as an edge or binding |
+| `graph.shader_compute_pipeline(shader)` | A compute pipeline compiled from the shader of that key and registered under it |
+| `graph.registered_image(key, description)` | Registers a texture and returns an import handle; the builder binds the registered view |
+| `graph.registered_resource(key, type, description, resource_type)` | Registers a description of a custom reflected type `type`, which selects its `IResourceRegistrator` |
 
-`graph:build()` collects every resource reachable from task params, bindings, edges, `uses`, and ports (views pull in their
-image), emits each once, and omits unused handles. Two different owned handles with the same id fail. The handle methods
-do not touch the graph; the module exposes them as functions too (`render_graph.storage_buffer()`, `render_graph.compute_pipeline()`,
-`render_graph.graphics_pipeline()`, `render_graph.import_resource()`, `render_graph.indirect_dispatch()`, ...), so helpers that only build
-handles or dispatches take no graph. A view may also be
-taken of an import, reference, or port; C++ validates the actual kind.
+Declared resources get generated ids, `<kind>-<8 hex>`, from their kind, debug name, and ordinal among declarations of that
+kind and name in the order the build reaches them, so rebuilds keep every id (and content) and a named resource keeps its id
+when others are added. The name is the Vulkan debug name of the graph's objects (`<graph key>.<name>`) and appears in
+diagnostics; name every resource and never read the ids. A registration is emitted when a built task's params reach its
+handle; equal registrations of a key merge and different ones fail.
+
+```lua
+local shadow_depth = graph.image({
+    name = "shadowmap_depth",
+    usage = "image_depth_target",
+    format = context.shadow_depth_format,
+    extent = shadow_extent,
+}):view()
+local mask = graph.storage_image({ name = "pixel_sort_mask", format = "r16_uint", extent = extent }):view()
+local transform = graph.import(entity_id):member(context.dynamic_mesh_transform_member)
+```
 
 ### Tasks
 
 The typed constructors are generated from task classes annotated `WBE_RENDER_TASK(<method>)` (see the table in
-[system-and-usage.md](system-and-usage.md#built-in-task-types)). Each is `graph:<method>(id, params, options?)`, where
-`options` is `{ bindings?, uses?, trigger?, toggle? }`, and returns a `render_graph.Task`. Params type-check against
-`render_graph.RTParams<Name>VK`, which accepts handles in the fields marked `WBE_RECIPE_RESOURCE`. Params and option tables are
-copied, so a table can be reused for several tasks.
+[system-and-usage.md](system-and-usage.md#built-in-task-types)). Each is `graph.<method>(params, options?)`, where
+`options` is `{ name?, bindings?, trigger?, toggle? }`, and returns a `graph.Task`. Params type-check against
+`graph.RTParams<Name>VK`, which accepts handles, and only handles, in the fields marked `WBE_RECIPE_RESOURCE`. Params and
+option tables are copied, so a table can be reused for several tasks.
 
-- `task:bind(local_name, resource)` maps a task-local id. A name maps once per task; different tasks may reuse it. A
-  handle passed in params cannot be redirected by a binding of the same name.
+```lua
+local write_pixels = graph.compute({
+    pipeline = graph.shader_compute_pipeline("write_sorted_pixels_" .. orientation .. "_shader"),
+    group_count_x = tile_group_count_x,
+    group_count_y = tile_group_count_y,
+}, { name = "write_sorted_pixels", bindings = {
+    pixel_sort_source = source,
+    pixel_sort_keys = sort_buffers.keys,
+    pixel_sort_mask = mask,
+    pixel_sort_destination = destination,
+} })
+```
+
+- `name` is the task's debug name (`RendTaskDescVK::debug_name`), which profiles and diagnostics show; the build generates
+  task ids, `<type>-<8 hex>` like resource ids.
+- Every name a task's shaders reflect or its render targets use is bound explicitly, imports included. Recipe tasks' maps
+  are strict (`RenderTaskResourceMap::require_bindings()`), so an unbound name fails; nothing matches a resource by id. A
+  handle in a params resource field is bound by the build.
+- `task:bind(name, resource)` adds a binding; a name binds once per task, and different tasks may reuse it.
 - `task:color_target(index, resource)` and `task:depth_target(resource)` bind `render_target_colors[<index>]` and
   `render_target_depth`.
-- A `compute_sequential` dispatch's `bindings` (and `indirect_dispatch()`'s last argument) map the shader resource ids
-  of that dispatch's pipeline to graph resource handles, so dispatches of one task can bind the same shader id
-  differently (the radix sort's passes alternate between its key buffers). Dispatch bindings belong to one dispatch;
-  task bindings (`task:bind()`, the `bindings` option) belong to the task. Resource fields of typed params take handles only, never id strings: name a resource by id with
-  `render_graph.reference(id)`.
-- `uses = { handle, ... }` keeps resources reachable that the task accesses only through same-name reflected shader
-  bindings (for example a camera buffer or a single-task scratch buffer). It declares no access and adds no edge.
-- `graph:import_task(id)` references a C++ task supplied with `imports.add_task()`.
-- `graph:add(task)` adds a raw task description (a custom type without a constructor, or a feature subgraph). Annotate its
-  `params` with the reflected `wbe.RTParams<Name>VK`, since raw params are untyped and use string ids.
-- `graph:get(id)` looks up a task; prefer keeping the handles.
+- A `compute_sequential` dispatch's `bindings` (and `graph.indirect_dispatch(pipeline, buffer, offset, bindings?)`) map the
+  names of that dispatch's pipeline to handles, so dispatches of one task can bind one shader name differently (the radix
+  sort's passes alternate between its key buffers). Dispatch bindings belong to one dispatch; task bindings to the task.
+- `graph.task(type, params, options?)` creates a registered type without a constructor; its params name no resource.
+- `graph.import_task(id)` references a C++ task supplied with `imports.add_task()`.
 
 Task methods return the task, so they chain fluently.
 
 ### Edges
 
-Each method below adds one edge per resource between task handles of the same graph; a resource argument is one handle, a
-non-empty list, or a bundle.
+Each function below adds one edge per resource between task handles; a resource argument is one handle or a non-empty
+list of them.
 
-- `graph:chain(resources, { a, b, c })` orders adjacent tasks: `a -> b -> c`. Every adjacent pair must access every resource.
+- `graph.chain(resources, { a, b, c })` orders adjacent tasks: `a -> b -> c`. Every adjacent pair must access every resource.
 - `a:connect(b, resources)` is a two-task chain.
 - `a:connect_all({ b, c }, resources)` fans out, leaving `b` and `c` unordered with each other.
 - `b:inputs_from(a, { local_name = resource, ... })` binds each name on `b` and adds one `a -> b` edge per distinct
   resource.
 
-### Emitted schema
+Both tasks of every edge must be in the built task list.
 
-`graph:build(imports?, ports?)` lowers everything to the plain `RendGraphRecipeVK` tables C++ reads
-(`rend_graph_recipe_params_vk.hh`); handles and methods never cross the Lua/C++ boundary.
+### Building and the emitted schema
 
-- `imports`: every import id. Pass the full list to `graph:build(imports)` when C++ supplies imports that only an imported
-  task binds, so supplied-import matching stays strict.
-- `resources`: each declares exactly one of `buffer`, `image`, `image_view` (`{ image, view }`), or `sampler`.
-- `tasks`: `{ id, type, params, aliases, connect = { { to, resource } }, trigger, toggle, subgraph, ports }`, where
-  `aliases` is the task's bindings (the C++ `RendTaskDescVK::alias()` map). Imported
-  tasks carry only `id`, `import = true`, and `connect`.
+`graph.build({ tasks = { ... }, exports = { <name> = resource } })` takes the tasks in order, which fixes their ids, and
+lowers everything to the plain `RendGraphRecipeVK` tables C++ reads (`rend_graph_recipe_params_vk.hh`); handles never cross
+the Lua/C++ boundary. A task listed twice, or an edge to an unlisted task, fails.
 
-Params are strictly deserialized: unknown keys fail. Pipeline keys name pipelines registered on the graph, normally by the recipe itself. Enums serialize as canonical names; compare `render_graph.enum_name(value) == "CANONICAL_NAME"`, which
-also accepts the lowercase aliases.
+- `imports`: every import id the tasks reach.
+- `registrations`: `{ key, type, description }`, where `type` is the reflected name of the description struct, resolved
+  through `TypeUUIDManager`; applied before that level's imports and tasks.
+- `resources`: each has an `id`, an optional `name`, and exactly one of `buffer`, `image`, `image_view` (`{ image, view }`),
+  or `sampler`.
+- `tasks`: `{ id, name, type, params, aliases, connect = { { to, resource } }, trigger, toggle, branches, select, subgraph,
+  ports }`, where `aliases` is the task's bindings (the C++ `RendTaskDescVK::alias()` map). Imported tasks carry `id`,
+  `import = true`, `aliases`, and `connect`.
+- `exports`: export names to resource ids, which `RenderGraphVK::acquire_resource(<export name>)` takes, so C++ reaches a
+  resource whose generated id it does not know. Only the outermost recipe exports.
+
+Params are strictly deserialized: unknown keys fail. Enums serialize as canonical names; compare
+`graph.enum_name(value) == "CANONICAL_NAME"`, which also accepts the lowercase aliases.
 
 ## Context
 
@@ -126,36 +152,63 @@ Examples: `tests/executable/function/render/pixel_sorting_recipe_context.hh`, `s
   `enable_for(0)` after the first recorded frame, so later rebuilds create it inactive.
 - `toggle = { event, enabled }` wraps it with `RTToggleVK`, outside any trigger, recording every frame while enabled
   (`Command::enable()` / `disable()`). Rebuilds re-run the recipe, so pass the toggle's current state through the context.
-- A trigger or toggle on a subgraph task wraps every member; set it on the task `as_subgraph()` returns
-  (`subgraph.toggle = { ... }`).
-- A multiplexer records one of several branch tasks: build them with the typed constructors on a scratch graph and pass them
-  to `graph:multiplex(id, branches, { select = { event, branch }, bindings?, uses?, trigger?, toggle? })`, emitted as
-  `branches = { { type, params } }` and `select`. `RTMultiplexerVK` is one graph node: it reports and binds every branch,
+- A trigger or toggle on a subgraph task wraps every member; set it in `graph.subgraph{ trigger?, toggle? }`.
+- A multiplexer records one of several branch tasks: build them with the typed constructors, without edges, triggers, or
+  toggles, and pass them to `graph.multiplex{ name?, branches = { ... }, select = { event, branch }, bindings?, trigger?,
+  toggle? }`, emitted as `branches = { { type, params } }` and `select`. `RTMultiplexerVK` is one graph node: it reports and binds every branch,
   records the selected one, and switches on `RTMultiplexerVK::Command { branch }`; an out-of-range branch throws. Branches
   share one resource map (identical bindings merge, conflicting ones throw) and must run on one queue family, and they set
   no edges, triggers, or toggles of their own. Pass the current branch through the context.
 
-`EventManager` lives in `function/event/event_manager.hh`; CPU readback tasks also emit their results through it under the
-source resource id.
+`EventManager` lives in `function/event/event_manager.hh`; CPU readback tasks (`graph.cpu_acquire_image()`) also emit
+their results through it under their params' explicit `event` id:
+
+```lua
+local acquire_params: graph.RTParamsCPUInFlightAcquireVK = { image_view = bloom_ping, event = context.bloom_image_event }
+local acquire_bloom = graph.cpu_acquire_image(acquire_params, {
+    name = "acquire_bloom",
+    trigger = { event = context.bloom_acquire_event },
+})
+```
 
 ## Imported C++ tasks
 
-Build a `RendTaskDescVK` with its factory and aliases, supply it with `imports.add_task()`, and reference it in the recipe
-with `graph:import_task(id)`; connect it like any task. Imported tasks set no `type`, `params`, `bindings`, `trigger`, or
-`toggle` in the recipe. Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_render_graph.cpp`,
+Build a `RendTaskDescVK` with its factory, supply it with `imports.add_task()`, and reference it in the recipe with
+`graph.import_task(id)`; connect it like any task. An imported task keeps its id and sets no `type`, `params`, `trigger`, or
+`toggle`; `:bind()` aliases the identifiers the C++ task uses to recipe resources (so the resources are reached and
+imported), and what it leaves unmapped resolves to itself:
+
+```lua
+local build_acceleration_structure = graph.import_task("build_mesh_acceleration_structure")
+    :bind("top_level_acceleration_structure", graph.import("mesh_acceleration_structure"):member("top_level"))
+local draw_imgui = graph.import_task("draw_imgui")
+```
+ Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_render_graph.cpp`,
 `vulkan_pixel_sorting_test.cpp`.
 
 ## Feature subgraph modules
 
-A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(id, params, target)`. It builds its
-own `render_graph.new()`, declares its port handles with `render_graph.port(name)`, and returns
-`graph:as_subgraph(id, { name = parent_resource, ... }, imports?)`, a task the parent adds with `parent:add(...)` and
-connects like any task. The port map declares every port and binds it to a parent resource; owned resources stay scoped
-to the subgraph.
+A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(name, params, target)`. It names its
+ports with `graph.port(<port>)`, declares its own resources and tasks, and returns
+`graph.subgraph{ name = name, tasks = { ... }, ports = { <port> = <enclosing resource> }, trigger?, toggle? }`, a task the
+recipe lists in its build and connects like any task. The port map binds every port to an enclosing resource; tasks inside
+reach the enclosing graph's declared resources only through ports, owned resources stay scoped to the subgraph, and debug
+names become `<subgraph name>.<name>`.
+
+```lua
+local color = graph.port("color")
+-- ... tasks bound to color and the feature's own resources, ordered with graph.chain() ...
+return graph.subgraph({
+    name = name,
+    tasks = { copy_source, count_mask, prefix_sum, register_keys, radix_sort, write_pixels },
+    ports = { color = target.color_view },
+    toggle = { event = params.toggle_event, enabled = params.enabled },
+})
+```
 
 Its C++ side provides `configure_recipe(DataValue&, RendGraphRecipeImportsVK&)`, which serializes its
 `WBE_REFLECT_SCRIPT` params struct (derived from `RecipeFeatureParams`, including the `module` name) into the context and
-supplies its resources and C++ tasks. The recipe calls `require(params.module).subgraph(id, params, target)`.
+supplies its resources and C++ tasks. The recipe calls `require(params.module).subgraph(name, params, target)`.
 
 Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `features/voxel_svo.tl` and
 `features/voxel_octree.tl` with the deferred test's voxel features, and `render_graphs/deferred.tl`.
@@ -165,9 +218,9 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
 1. Write `include/function/render_vk/rt_params_<name>_vk.hh` with
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
    fields `WBE_REFLECT_REQUIRED`. Mark fields that hold ids so the constructor takes handles (only handles) there:
-   `WBE_RECIPE_RESOURCE(graph)` for graph resource ids, `WBE_RECIPE_RESOURCE(task_local)` for ids the task's aliases map,
-   and `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` for keys registered on the graph such as pipelines and meshes (the type
-   must be a `WBE_RENDER_OBJECT` class). Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.
+   a bare `WBE_RECIPE_RESOURCE` for graph resources, which the build binds to themselves, and
+   `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` for keys registered on the graph such as pipelines and meshes (the
+   type must be a `WBE_RENDER_OBJECT` class). Values that are not resources, such as event ids, stay plain fields. Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.
 2. Mark the task `WBE_META(WBE_RENDER_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))`, or with a bare
    `WBE_RENDER_TASK` to register it without a recipe constructor, and declare
    `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`,
@@ -179,7 +232,7 @@ Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `fe
    `resolve_task_push_constants_vk`) in `create()`.
 4. Rebuild. `render_task_registry.gen.cpp` registers the class name and aliases; a missing `create` or duplicate name fails
    the build. The params struct appears in `wbe.d.tl`, its handle-accepting interface in the generated
-   `render_graph_utils.render_graph`, and the `graph:<method>()` constructor, which creates the type `<name>`, in the
+   `render_graph_utils.render_graph`, and the `graph.<method>()` constructor, which creates the type `<name>`, in the
    generated `render_graph_utils.render_graph_tasks`.
 
 Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.hh` (standard), `rt_graphics_draw_mesh_vk.hh`
@@ -202,11 +255,13 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 - `require` is the only import mechanism; modules load once per backend and cyclic requires fail. New import sources are
   `IScriptModuleResolver`s whose `try_resolve()` must not throw.
 
-`render_graph_utils.sort` provides `radix_sort_buffers(names, max_count, key_type?)` and
-`add_radix_sort_task(graph, id, buffers, queue_family?, options?)`, for `uint` keys or `uint2` keys ordered by `x` then
-`y`, sorted by every bit or by an `options` bit range of an even number of 8-bit digits (bits `[32, 64)` of `uint2` keys
-sort by `x` and carry `y` as a payload, which `add_radix_sort_key_value_task(graph, id, buffers,
-queue_family?)` does); `utils.math` provides `ceil_div` and `clamp`.
+`render_graph_utils.sort` provides `radix_sort_buffers({ name?, max_element_count, key_type? })`, which declares the
+sort's buffers (named `<name>.keys` and so on), and `radix_sort_task(buffers, { name?, queue_family?, begin_bit?, end_bit?
+})`, for `uint` keys or `uint2` keys ordered by `x` then `y`, sorted by every bit or by a bit range of an even number of
+8-bit digits (bits `[32, 64)` of `uint2` keys sort by `x` and carry `y` as a payload, which
+`radix_sort_key_value_task(buffers, options?)` does); `radix_sort_dispatches(buffers, bits?)` returns the passes for a
+longer `compute_sequential` task. `large_prefix_scan` and `dedup_large` likewise provide `buffers()` and `dispatches()`;
+`utils.math` provides `ceil_div` and `clamp`.
 
 ## Tests
 

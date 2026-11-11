@@ -21,8 +21,8 @@ local type render_graph = require("render_graph_utils.render_graph")
 
 local record render_graph_tasks
     -- A params field that holds resource ids: an id ("resource"), or a list, a map, or a record of nested fields that
-    -- hold them. A "graph" id names a graph resource, a "task_local" id names one through the task's bindings, and a
-    -- "registered" key identifies an entry of expected_type registered on the render graph.
+    -- hold them. A "graph" id names a graph resource, which the task binds to itself, and a "registered" key identifies an
+    -- entry of expected_type registered on the render graph.
     enum ResourceFieldKind
         "resource"
         "list"
@@ -32,7 +32,6 @@ local record render_graph_tasks
 
     enum ResourceScope
         "graph"
-        "task_local"
         "registered"
     end
 
@@ -61,14 +60,14 @@ local {{ constructor.method }}_fields: {render_graph_tasks.ResourceField} = {
 }
 {% endfor %}
 
--- Install the constructors on a graph. Each passes its id, task type, params, options, and resource fields to make_task.
-function render_graph_tasks.install(graph: render_graph.Graph,
-    make_task: function(id: string, type_name: string, params: any, options: render_graph.TaskOptions,
+-- Install the constructors on the render_graph module. Each passes its task type, params, options, and resource fields to
+-- make_task.
+function render_graph_tasks.install(module: render_graph,
+    make_task: function(type_name: string, params: any, options: render_graph.TaskOptions,
         fields: {render_graph_tasks.ResourceField}): render_graph.Task)
 {% for constructor in api.constructors %}
-    graph.{{ constructor.method }} = function(_self: render_graph.Graph, id: string, params: any,
-        options?: render_graph.TaskOptions): render_graph.Task
-        return make_task(id, "{{ constructor.type }}", params, options, {{ constructor.method }}_fields)
+    module.{{ constructor.method }} = function(params: any, options?: render_graph.TaskOptions): render_graph.Task
+        return make_task("{{ constructor.type }}", params, options, {{ constructor.method }}_fields)
     end
 {% endfor %}
 end

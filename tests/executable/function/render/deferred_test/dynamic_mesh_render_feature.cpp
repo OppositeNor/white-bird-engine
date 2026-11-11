@@ -75,11 +75,4 @@ void DynamicMeshRenderFeature::set_transform(size_t p_entity_index, const glm::m
     entities[p_entity_index]->set_transform(p_transform);
 }
 
-std::string DynamicMeshRenderFeature::get_entity_transform_id(size_t p_entity_index) const {
-    if (p_entity_index >= entities.size()) {
-        throw std::runtime_error("Dynamic mesh entity index is out of range.");
-    }
-    return IBindableRenderResourceVK::make_member_resource_id(entity_keys[p_entity_index], EntityDrawData::TRANSFORM);
-}
-
 } // namespace WhiteBirdEngine

@@ -91,7 +91,7 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
         ])
         metadata.classes.append(_params("NestedParams", [
             _field("pipeline", "std::string", ["registered", "ROComputePipelineVK"]),
-            _field("buffer", "std::string", ["graph"]),
+            _field("buffer", "std::string", []),
         ]))
         api = _describe(metadata)
         mesh = {"kind": "resource", "scope": "registered", "expected_type": "WhiteBirdEngine::MeshResourcesVK"}
@@ -127,8 +127,8 @@ class DatabaseRecipeResourcesTest(unittest.TestCase):
             self.assertNotIn("render_resources", tasks)
             consumer = generated / "consumer.tl"
             prefix = '''local type Graph = require("render_graph_utils.render_graph")
-local mesh: Graph.Resource = { id = "static_mesh", kind = "registered", resource_type = "WhiteBirdEngine::MeshResourcesVK" }
-local pipeline: Graph.Resource = { id = "pipeline", kind = "registered", resource_type = "WhiteBirdEngine::ROGraphicsPipelineVK" }
+local mesh: Graph.Resource = { key = "static_mesh", kind = "registered", resource_type = "WhiteBirdEngine::MeshResourcesVK" }
+local pipeline: Graph.Resource = { key = "pipeline", kind = "registered", resource_type = "WhiteBirdEngine::ROGraphicsPipelineVK" }
 '''
             # The common Resource type keeps the public authoring API uniform. The expected type is checked at runtime.
             for value in ["mesh", "pipeline"]:

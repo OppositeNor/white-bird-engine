@@ -127,58 +127,20 @@ private:
         "deferred_mipmap_graph",
         "deferred_summed_area_table_graph",
     };
-    static constexpr std::string_view GBUFFER_ALBEDO_IMAGE_VIEW = "gbuffer_albedo";
-    static constexpr std::string_view GBUFFER_NORMAL_IMAGE_VIEW = "gbuffer_normal";
-    static constexpr std::string_view GBUFFER_RMA_IMAGE_VIEW = "gbuffer_rma";
-    static constexpr std::string_view GBUFFER_DEPTH_IMAGE_VIEW = "gbuffer_depth";
-    static constexpr std::string_view SHADOWMAP_COLOR_IMAGE_VIEW = "shadowmap_color";
-    static constexpr std::string_view RSM_NORMAL_IMAGE_VIEW = "rsm_normal";
-    static constexpr std::string_view SHADOWMAP_DEPTH_IMAGE_VIEW = "shadowmap_depth";
-    static constexpr std::string_view SHADOW_MOMENTS_IMAGE_VIEW = "shadow_moments";
-    static constexpr std::string_view SHADOW_MOMENTS_SAMPLED_IMAGE_VIEW = "shadow_moments_sampled";
-    static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_HORIZONTAL_IMAGE_VIEW = "shadow_sat_horizontal";
-    static constexpr std::string_view SHADOW_MOMENTS_SUMMED_AREA_TABLE_IMAGE_VIEW = "shadow_sat";
-    static constexpr std::string_view DIRECT_LIGHTING_IMAGE_VIEW = "direct_lighting";
-    static constexpr std::string_view INDIRECT_LIGHTING_IMAGE_VIEW = "indirect_lighting";
-    static constexpr std::string_view RESULT_IMAGE_VIEW = "result_image";
-    static constexpr std::string_view BLOOM_PING_IMAGE_VIEW = "bloom_ping";
-    static constexpr std::string_view BLOOM_PONG_IMAGE_VIEW = "bloom_pong";
+    // Task-local id of the frame sequence image the imported acquisition reads; the recipe binds it to its image view.
     static constexpr std::string_view FRAME_SEQUENCE_IMAGE_VIEW = "frame_sequence";
     static constexpr std::string_view GBUFFER_CAMERA_INFO_BUFFER = "gbuffer_camera_info";
     static constexpr std::string_view COMPOSITION_CAMERA_INFO_BUFFER = "composition_camera_info";
     // Task-local id of the shadow passes' light camera; each light's passes alias it to that light's buffer.
     static constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
     static constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_infos";
-    static constexpr std::string_view SHADOW_SAMPLER = "shadow_sampler";
-    static constexpr std::string_view GBUFFER_SAMPLER = "gbuffer_sampler";
-    static constexpr std::string_view BLOOM_SAMPLER = "bloom_sampler";
-    static constexpr std::string_view KAWASE_BLUR_PING = "kawase_blur_ping";
-    static constexpr std::string_view KAWASE_BLUR_PONG = "kawase_blur_pong";
-    static constexpr std::string_view KAWASE_BLUR_SAMPLER = "kawase_blur_sampler";
     static constexpr std::string_view LIGHT_BILLBOARD_INFO_BUFFER = "light_billboard_info";
-    static constexpr std::string_view LIGHT_BILLBOARD_TEXTURE_IMAGE_VIEW = "light_billboard_texture";
-    static constexpr std::string_view LIGHT_BILLBOARD_SAMPLER = "light_billboard_sampler";
 
     static constexpr std::string_view RT_BUILD_MESH_ACCELERATION_STRUCTURE = "build_mesh_acceleration_structure";
     static constexpr std::string_view MESH_ACCELERATION_STRUCTURE_KEY = "mesh_acceleration_structure";
-    static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER_DOUBLE_SIDED = "run_gbuffer_double_sided";
-    static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_DOUBLE_SIDED = "run_shadow_double_sided";
-    static constexpr std::string_view RT_RUN_DEFERRED_GBUFFER = "run_gbuffer";
-    static constexpr std::string_view RT_RUN_DEFERRED_SHADOW_OPAQUE = "run_shadow_opaque";
-    static constexpr std::string_view RT_RUN_DYNAMIC_SHADOW = "dynamic_shadow";
-    static constexpr std::string_view RT_RUN_DYNAMIC_SHADOW_SECOND = "dynamic_shadow_second";
-    static constexpr std::string_view RT_RUN_DYNAMIC_GBUFFER = "dynamic_gbuffer";
-    static constexpr std::string_view RT_RUN_DYNAMIC_GBUFFER_SECOND = "dynamic_gbuffer_second";
-    static constexpr std::string_view RT_GENERATE_SHADOW_MIPMAPS = "generate_shadow_mipmaps";
-    static constexpr std::string_view RT_BUILD_SHADOW_MOMENTS_SUMMED_AREA_TABLE = "build_shadow_sat";
-    static constexpr std::string_view RT_RUN_DIRECT_LIGHTING = "run_direct_lighting";
-    static constexpr std::string_view RT_RUN_INDIRECT_LIGHTING = "run_indirect_lighting";
-    static constexpr std::string_view RT_COMBINE_LIGHTING = "combine_lighting";
-    static constexpr std::string_view RT_EXTRACT_BLOOM = "extract_bloom";
-    static constexpr std::string_view RT_BLUR_BLOOM = "blur_bloom";
-    static constexpr std::string_view RT_ACQUIRE_BLOOM = "acquire_bloom";
-    static constexpr std::string_view RT_RUN_PRESENT_RESULT_IMAGE = "present_result_image";
-    static constexpr std::string_view RT_RUN_PRESENT_FRAME_SEQUENCE = "present_frame_sequence";
+    // Task-local id of the top-level acceleration structure the imported build writes; the recipe binds it to the import's
+    // member.
+    static constexpr std::string_view TOP_LEVEL_ACCELERATION_STRUCTURE = "top_level_acceleration_structure";
     static constexpr std::string_view RT_ACQUIRE_FRAME_SEQUENCE = "acquire_frame_sequence";
     // Event ids of the RTTriggeredVK::Command that drives each graph's on-demand tasks, indexed like
     // deferred_render_graphs. Each graph has its own ids so a request never arms the inactive graph.
@@ -191,7 +153,9 @@ private:
         "deferred_pbr_test.mipmap.frame_sequence",
         "deferred_pbr_test.summed_area_table.frame_sequence",
     };
-    static constexpr std::string_view RT_RUN_LIGHT_BILLBOARD = "run_light_billboard";
+    // Event ids the bloom and frame sequence acquisitions emit their images under, shared by both graphs.
+    static constexpr std::string_view BLOOM_IMAGE_EVENT_ID = "deferred_pbr_test.bloom_image";
+    static constexpr std::string_view FRAME_SEQUENCE_IMAGE_EVENT_ID = "deferred_pbr_test.frame_sequence_image";
     // Event ids of the RTToggleVK::Command that gates the tasks of each voxel debug view mode group, shared by both graphs;
     // see is_voxel_debug_view_toggle_enabled(). The recipe receives them as VoxelDebugViewToggles.
     static constexpr std::array<std::string_view, 3> VOXEL_DEBUG_VIEW_TOGGLE_EVENT_IDS = {
@@ -213,30 +177,10 @@ private:
     static constexpr uint32_t SPOT_LIGHT_COUNT = 2;
     static_assert(SPOT_LIGHT_COUNT >= 1U && SPOT_LIGHT_COUNT <= MAX_SPOT_LIGHT_INFO_COUNT);
 
-    // Graph resource and task ids owned by one spot light. Every id is the shared base name suffixed with the light index.
+    // Import ids of one spot light's buffers: the shared base name suffixed with the light index.
     struct SpotLightGraphIds {
-        std::string shadowmap_depth_image;
-        std::string shadowmap_color_image;
-        std::string rsm_normal_image;
-        std::string shadow_moments_image;
-        std::string shadow_moments_summed_area_table_horizontal_image;
-        std::string shadow_moments_summed_area_table_image;
-        std::string shadowmap_depth;
-        std::string shadowmap_color;
-        std::string rsm_normal;
-        std::string shadow_moments;
-        std::string shadow_moments_sampled;
-        std::string shadow_moments_summed_area_table_horizontal;
-        std::string shadow_moments_summed_area_table;
         std::string shadow_light_info;
         std::string light_billboard_info;
-        std::string run_shadow_opaque;
-        std::string run_shadow_double_sided;
-        std::string run_dynamic_shadow;
-        std::string run_dynamic_shadow_second;
-        std::string generate_shadow_mipmaps;
-        std::string build_shadow_moments_summed_area_table;
-        std::string run_light_billboard;
     };
 
     struct CompositionCameraInfo {
