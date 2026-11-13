@@ -16,13 +16,13 @@
 #include "svo/svo_utils.slang"
 
 struct SVOResetDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
+    [wbe::descriptor("storage_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "write")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "write")]
     uint2 deferred_list_ping;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong", "write")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list_pong;
 };
 

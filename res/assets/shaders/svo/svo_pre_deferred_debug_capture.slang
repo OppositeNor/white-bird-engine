@@ -24,15 +24,15 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct SVOPreDeferredDebugCaptureDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "read")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_info_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_info_buffer")]
     uint2 captured_svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_list_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_list_buffer")]
     uint2 captured_deferred_list;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_draw_indirect_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
 };
 

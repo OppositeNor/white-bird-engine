@@ -15,9 +15,9 @@
 #include "utils.slang"
 
 struct BloomExtractDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image", "result_image")] uint2 bloom_input;
-    [WBE_DESCRIPTOR("storage_image", "bloom_ping")] uint2 bloom_output;
-    [WBE_DESCRIPTOR("sampler", "bloom_sampler")] uint2 bloom_sampler;
+    [wbe::descriptor("sampled_image", "result_image")] uint2 bloom_input;
+    [wbe::descriptor("storage_image", "bloom_ping")] uint2 bloom_output;
+    [wbe::descriptor("sampler", "bloom_sampler")] uint2 bloom_sampler;
 };
 
 static const float BLOOM_THRESHOLD = 1.0;

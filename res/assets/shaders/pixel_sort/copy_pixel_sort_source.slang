@@ -23,9 +23,9 @@
 /** Descriptor indices of the resources used by the copy pass. */
 struct CopyPixelSortSourceDescriptorIndices {
     /** Image whose pixels are sorted. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sort_input")] uint2 input;
+    [wbe::descriptor("sampled_image", "pixel_sort_input")] uint2 input;
     /** Image receiving the copy; must have the extent of input. */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sort_source", "write")] uint2 source;
+    [wbe::descriptor("storage_image", "pixel_sort_source", "write")] uint2 source;
 };
 
 [vk::push_constant]

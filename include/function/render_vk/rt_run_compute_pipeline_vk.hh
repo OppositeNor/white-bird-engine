@@ -76,7 +76,7 @@ struct WBE_META(WBE_RENDER_TASK(compute), WBE_SERIALIZATION_ALIASES(run_compute_
         const RenderContextVK* p_render_data, IRenderGraph* p_render_graph, const RTParamsRunComputePipelineVK& p_params, const RendGraphContextVK& p_context);
 
     /**
-     * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.
+     * @brief Set a custom wbe::push_constant value pushed with every later dispatch of the pipeline.
      *
      * Call on the rendering thread; values set before graph construction are retained.
      *

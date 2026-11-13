@@ -26,7 +26,7 @@ struct VSInput {
     /**
      * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 position;
 };
 
@@ -89,17 +89,17 @@ struct SVODescriptorIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
+    [wbe::descriptor("storage_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list, which receives the Morton code of every rasterized leaf.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list")]
     uint2 deferred_list;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 
     MeshDescriptorIndices mesh;

@@ -16,10 +16,10 @@
 #include "dedup/dedup_large_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "keys", "read")] uint2 keys;
-    [WBE_DESCRIPTOR("storage_buffer", "marks", "read")] uint2 marks;
-    [WBE_DESCRIPTOR("storage_buffer", "unique_keys", "write")] uint2 unique_keys;
-    [WBE_PUSH_CONSTANT("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::descriptor("storage_buffer", "keys", "read")] uint2 keys;
+    [wbe::descriptor("storage_buffer", "marks", "read")] uint2 marks;
+    [wbe::descriptor("storage_buffer", "unique_keys", "write")] uint2 unique_keys;
+    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]

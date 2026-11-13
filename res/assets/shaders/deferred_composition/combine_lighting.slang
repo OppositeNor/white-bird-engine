@@ -15,13 +15,13 @@
 #include "deferred_composition/deferred_composition_utils.slang"
 
 struct CombineLightingDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image", "gbuffer_rma")]
+    [wbe::descriptor("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [WBE_DESCRIPTOR("sampled_image", "direct_lighting")]
+    [wbe::descriptor("sampled_image", "direct_lighting")]
     uint2 direct_lighting;
-    [WBE_DESCRIPTOR("sampled_image", "indirect_lighting")]
+    [wbe::descriptor("sampled_image", "indirect_lighting")]
     uint2 indirect_lighting;
-    [WBE_DESCRIPTOR("storage_image", "result_image")]
+    [wbe::descriptor("storage_image", "result_image")]
     uint2 result_image;
 };
 

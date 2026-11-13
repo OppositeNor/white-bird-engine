@@ -319,6 +319,7 @@ local function add_mesh_draws(graph_builder: Builder)
     end
     local shadow_extent = graph_builder.shadow_extent
     for light = 0, graph_builder.context.spot_light_count - 1 do
+        -- Per-light tasks
         local tasks: LightTasks = {}
         graph_builder.light_tasks[light + 1] = tasks
         local shadow_color = resources[light_id("shadowmap_color", light)]
@@ -330,6 +331,7 @@ local function add_mesh_draws(graph_builder: Builder)
             shadow_light_info = resources[light_id("shadow_light_info", light)],
         }
 
+        -- Shadowmap task
         tasks.run_shadow_opaque = graph.draw_mesh({
             mesh = graph_builder.static_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_opaque },
@@ -339,10 +341,11 @@ local function add_mesh_draws(graph_builder: Builder)
             color_load_op = "clear",
             depth_load_op = "clear",
         }, { name = light_id("run_shadow_opaque", light), bindings = light_bindings }):depth_target(shadow_depth)
-        :color_target(0, shadow_color)
-        :color_target(1, rsm_normal)
-        :color_target(2, shadow_moments)
+            :color_target(0, shadow_color)
+            :color_target(1, rsm_normal)
+            :color_target(2, shadow_moments)
 
+        -- Double sided shadow
         tasks.run_shadow_double_sided = graph.draw_mesh({
             mesh = graph_builder.static_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_double_sided },
@@ -352,10 +355,11 @@ local function add_mesh_draws(graph_builder: Builder)
             color_load_op = "load",
             depth_load_op = "load",
         }, { name = light_id("run_shadow_double_sided", light), bindings = light_bindings }):depth_target(shadow_depth)
-        :color_target(0, shadow_color)
-        :color_target(1, rsm_normal)
-        :color_target(2, shadow_moments)
+            :color_target(0, shadow_color)
+            :color_target(1, rsm_normal)
+            :color_target(2, shadow_moments)
 
+        -- Shadow for dynamic objects
         tasks.dynamic_shadow = graph.draw_mesh({
             mesh = graph_builder.dynamic_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_dynamic },
@@ -366,10 +370,9 @@ local function add_mesh_draws(graph_builder: Builder)
             color_load_op = "load",
             depth_load_op = "load",
         }, { name = light_id("dynamic_shadow", light), bindings = light_bindings }):depth_target(shadow_depth)
-        :color_target(0, shadow_color)
-        :color_target(1, rsm_normal)
-        :color_target(2, shadow_moments)
-
+            :color_target(0, shadow_color)
+            :color_target(1, rsm_normal)
+            :color_target(2, shadow_moments)
         tasks.dynamic_shadow_second = graph.draw_mesh({
             mesh = graph_builder.dynamic_mesh,
             pipeline = { default = graph_builder.pipelines.shadow_dynamic },
@@ -380,9 +383,9 @@ local function add_mesh_draws(graph_builder: Builder)
             color_load_op = "load",
             depth_load_op = "load",
         }, { name = light_id("dynamic_shadow_second", light), bindings = light_bindings }):depth_target(shadow_depth)
-        :color_target(0, shadow_color)
-        :color_target(1, rsm_normal)
-        :color_target(2, shadow_moments)
+            :color_target(0, shadow_color)
+            :color_target(1, rsm_normal)
+            :color_target(2, shadow_moments)
     end
 
     local gbuffer_clear_values = { CLEAR_BLACK, CLEAR_BLACK, CLEAR_BLACK, CLEAR_DEPTH }
@@ -398,10 +401,10 @@ local function add_mesh_draws(graph_builder: Builder)
         color_load_op = "clear",
         depth_load_op = "clear",
     }, gbuffer_options("run_gbuffer"))
-    :depth_target(resources.gbuffer_depth)
-    :color_target(0, resources.gbuffer_albedo)
-    :color_target(1, resources.gbuffer_normal)
-    :color_target(2, resources.gbuffer_rma)
+        :depth_target(resources.gbuffer_depth)
+        :color_target(0, resources.gbuffer_albedo)
+        :color_target(1, resources.gbuffer_normal)
+        :color_target(2, resources.gbuffer_rma)
 
     graph_builder.tasks.run_gbuffer_double_sided = graph.draw_mesh({
         mesh = graph_builder.static_mesh,
@@ -411,10 +414,10 @@ local function add_mesh_draws(graph_builder: Builder)
         color_load_op = "load",
         depth_load_op = "load",
     }, gbuffer_options("run_gbuffer_double_sided"))
-    :depth_target(resources.gbuffer_depth)
-    :color_target(0, resources.gbuffer_albedo)
-    :color_target(1, resources.gbuffer_normal)
-    :color_target(2, resources.gbuffer_rma)
+        :depth_target(resources.gbuffer_depth)
+        :color_target(0, resources.gbuffer_albedo)
+        :color_target(1, resources.gbuffer_normal)
+        :color_target(2, resources.gbuffer_rma)
 
     graph_builder.tasks.dynamic_gbuffer = graph.draw_mesh({
         mesh = graph_builder.dynamic_mesh,
@@ -425,10 +428,10 @@ local function add_mesh_draws(graph_builder: Builder)
         color_load_op = "load",
         depth_load_op = "load",
     }, gbuffer_options("dynamic_gbuffer"))
-    :depth_target(resources.gbuffer_depth)
-    :color_target(0, resources.gbuffer_albedo)
-    :color_target(1, resources.gbuffer_normal)
-    :color_target(2, resources.gbuffer_rma)
+        :depth_target(resources.gbuffer_depth)
+        :color_target(0, resources.gbuffer_albedo)
+        :color_target(1, resources.gbuffer_normal)
+        :color_target(2, resources.gbuffer_rma)
 
     graph_builder.tasks.dynamic_gbuffer_second = graph.draw_mesh({
         mesh = graph_builder.dynamic_mesh,
@@ -439,10 +442,10 @@ local function add_mesh_draws(graph_builder: Builder)
         color_load_op = "load",
         depth_load_op = "load",
     }, gbuffer_options("dynamic_gbuffer_second"))
-    :depth_target(resources.gbuffer_depth)
-    :color_target(0, resources.gbuffer_albedo)
-    :color_target(1, resources.gbuffer_normal)
-    :color_target(2, resources.gbuffer_rma)
+        :depth_target(resources.gbuffer_depth)
+        :color_target(0, resources.gbuffer_albedo)
+        :color_target(1, resources.gbuffer_normal)
+        :color_target(2, resources.gbuffer_rma)
 end
 
 -- Shadow filtering of every light.
@@ -535,10 +538,13 @@ local function add_lighting(graph_builder: Builder)
     for slot, resource in pairs(rsm_slot_resources(graph_builder)) do
         indirect_lighting_bindings[slot] = resource
     end
+    -- TODO(8): Add an SVOGI indirect lighting pipeline as a third branch here: trace a few cones per pixel over the
+    -- hemisphere of the G-buffer normal with cone_tracing() (TODO(7)), binding the occupancy and reduced radiance buffers
+    -- the voxel_svo subgraph exports or imports, and select it with the multiplexer's select event.
     local branches: {graph.Task} = {}
     for index, pipeline in ipairs({ graph_builder.pipelines.indirect_lighting, graph_builder.pipelines.indirect_lighting_debug_view }) do
         local params: graph.RTParamsRunComputePipelineVK =
-        { pipeline = pipeline, group_count_x = screen_tiles_x, group_count_y = screen_tiles_y, queue_family = "compute_2" }
+            { pipeline = pipeline, group_count_x = screen_tiles_x, group_count_y = screen_tiles_y, queue_family = "compute_2" }
         branches[index] = graph.compute(params, { name = "indirect_lighting_branch_" .. index })
     end
     graph_builder.tasks.indirect_lighting = graph.multiplex({
@@ -553,11 +559,11 @@ local function add_lighting(graph_builder: Builder)
         group_count_y = screen_tiles_y,
         queue_family = "compute_1",
     }, { name = "combine_lighting", bindings = {
-        direct_lighting = resources.direct_lighting,
-        indirect_lighting = resources.indirect_lighting,
-        gbuffer_rma = resources.gbuffer_rma,
-        result_image = resources.result_image,
-    } })
+            direct_lighting = resources.direct_lighting,
+            indirect_lighting = resources.indirect_lighting,
+            gbuffer_rma = resources.gbuffer_rma,
+            result_image = resources.result_image,
+        } })
 end
 
 -- Post-processing, a subgraph, modifies the result image in place after composition. Returns the last task that writes
@@ -589,10 +595,10 @@ local function add_bloom_and_presentation(graph_builder: Builder)
         group_count_y = bloom_tiles_y,
         queue_family = "compute_1",
     }, { name = "extract_bloom", bindings = {
-        result_image = resources.result_image,
-        bloom_sampler = resources.bloom_sampler,
-        bloom_ping = resources.bloom_ping,
-    } })
+            result_image = resources.result_image,
+            bloom_sampler = resources.bloom_sampler,
+            bloom_ping = resources.bloom_ping,
+        } })
     -- Starting from ping, even iterations blur ping into pong and odd iterations blur pong back into ping, so an even
     -- iteration count leaves the result in ping.
     graph_builder.tasks.blur_bloom = graph.ping_pong({

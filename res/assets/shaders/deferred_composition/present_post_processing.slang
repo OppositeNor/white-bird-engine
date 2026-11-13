@@ -20,11 +20,11 @@ VSOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID) {
 }
 
 struct PresentPostProcessingDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image", "result_image")]
+    [wbe::descriptor("sampled_image", "result_image")]
     uint2 result_image;
-    [WBE_DESCRIPTOR("sampled_image", "bloom_ping")]
+    [wbe::descriptor("sampled_image", "bloom_ping")]
     uint2 bloom_image;
-    [WBE_DESCRIPTOR("sampler", "bloom_sampler")]
+    [wbe::descriptor("sampler", "bloom_sampler")]
     uint2 result_sampler;
 };
 

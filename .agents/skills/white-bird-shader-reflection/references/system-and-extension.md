@@ -39,15 +39,15 @@ Compiled fixtures in tests are parsed directly from `test_env/res/assets/shaders
 
 ## Vulkan descriptor-heap support
 
-`src/function/render_vk/shader_metadata_vk_utils.cpp` parses `WBE_DESCRIPTOR` types through
+`src/function/render_vk/shader_metadata_vk_utils.cpp` parses `wbe::descriptor` types through
 `EnumReflection<ShaderDescriptorHeapTypeVK>` (canonical names with lowercase aliases). Each annotation takes two or three
 string arguments: type, non-empty resource id, optional access. It must mark an aligned eight-byte `uint2` in the entry
 point's only push-data parameter. The walker flattens nested structs and fixed-size struct arrays into paths such as
 `lights[0].shadowmap`; paths identify layout fields, while binding uses resource ids.
 
 Rejected with `std::runtime_error`: fewer than two arguments, unknown types, `write` on read-only types, misaligned or
-overlapping fields, duplicate paths, more than one push-data parameter, a field carrying both `WBE_DESCRIPTOR` and
-`WBE_PUSH_CONSTANT`, an indexed resource id outside a struct array, or a bare `[]`. A descriptor-free entry point yields an
+overlapping fields, duplicate paths, more than one push-data parameter, a field carrying both `wbe::descriptor` and
+`wbe::push_constant`, an indexed resource id outside a struct array, or a bare `[]`. A descriptor-free entry point yields an
 empty layout. Graphics stages merge when equal paths agree on type, resource id, and offset; differing accesses combine to
 `read_write`.
 
@@ -67,7 +67,7 @@ binds both heaps on every task command buffer.
 
 All are declared in `res/assets/shaders/utils/utils.slang`.
 
-### `WBE_DESCRIPTOR`
+### `wbe::descriptor`
 
 See above. Per-array-instance ids: an id ending in `[]` becomes `<name>[i]` for element `i` of the nearest enclosing
 descriptor struct array; multiple fields may share one id.
@@ -76,7 +76,7 @@ Ray tracing keeps the metadata declaration and runtime index distinct:
 
 ```slang
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("acceleration_structure", "acceleration_structure")]
+    [wbe::descriptor("acceleration_structure", "acceleration_structure")]
     uint2 scene;
 };
 
@@ -88,7 +88,7 @@ RaytracingAccelerationStructure scene_acceleration_structure;
 Files: `shader_metadata_vk_utils.{hh,cpp}`, `pipeline_descriptor_bindings_vk.{hh,cpp}`, `descriptor_heap_allocator_vk.cpp`,
 `ray_tracing_plugin_vk.cpp`, `ro_acceleration_structure_vk.hh`, fixture `res/assets/shaders/descriptor_heap_reflection`.
 
-### `WBE_PUSH_CONSTANT`
+### `wbe::push_constant`
 
 Marks a four-byte scalar in the push-data block. `"time"` requires `float` (renderer time, `double` → `float`);
 `"frame_slot"` requires `uint`. Other identifiers are custom `uint`, `int`, or `float` constants
@@ -98,7 +98,7 @@ Marks a four-byte scalar in the push-data block. `"time"` requires `float` (rend
 (returns `bool`); values persist across pushes. Their recipe params take a `push_constants` table of identifier → number.
 Graphics tasks have none. Recording crashes if a custom constant was never set.
 
-### `WBE_VERTEX_INPUT`
+### `wbe::vertex_input`
 
 `VertexInputContractResolver` searches entry-point parameter fields recursively; an omitted role defaults to the field name,
 and annotated fields must be `varyingInput`. Formats: scalar or vector `float32`, `int32`, `uint32` with one to four
@@ -107,7 +107,7 @@ with the same format, only bindings actually read become Vulkan bindings (renumb
 back), and `resolve_requirement()` / `ROGraphicsPipelineVK::get_vertex_input_requirement()` expose a mesh-independent
 `VertexInputRequirement`. Fixture: `res/assets/shaders/vertex_input_attributes`.
 
-### `WBE_TEXTURE` and the material contract
+### `wbe::texture` and the material contract
 
 `MaterialTextureContractResolver` reads direct children of `MaterialParams`. Each annotated index is a four-byte `int32`
 scalar; roles are unique by name and hash and come from the shader.

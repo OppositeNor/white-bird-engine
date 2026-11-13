@@ -34,37 +34,37 @@ struct OctreeDebugGatherLeavesDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
+    [wbe::descriptor("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Descriptor-heap reference to the static octree texture with every mip level.
      */
-    [WBE_DESCRIPTOR("sampled_image", "octree_static")]
+    [wbe::descriptor("sampled_image", "octree_static")]
     uint2 static_levels;
     /**
      * @brief Descriptor-heap reference to the dynamic octree texture with every mip level.
      */
-    [WBE_DESCRIPTOR("sampled_image", "octree_dynamic")]
+    [wbe::descriptor("sampled_image", "octree_dynamic")]
     uint2 dynamic_levels;
     /**
      * @brief Descriptor-heap reference to octree_debug_leaf_masks.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_leaf_masks", "write")]
+    [wbe::descriptor("storage_buffer", "octree_debug_leaf_masks", "write")]
     uint2 leaf_masks;
     /**
      * @brief Descriptor-heap reference to octree_debug_draw_indirect_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_draw_indirect_buffer", "write")]
+    [wbe::descriptor("storage_buffer", "octree_debug_draw_indirect_buffer", "write")]
     uint2 indirect_draw;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_node_list", "write")]
+    [wbe::descriptor("storage_buffer", "octree_debug_node_list", "write")]
     uint2 node_list;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_draw_indirect_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_node_draw_indirect_buffer", "write")]
+    [wbe::descriptor("storage_buffer", "octree_debug_node_draw_indirect_buffer", "write")]
     uint2 node_indirect_draw;
 };
 

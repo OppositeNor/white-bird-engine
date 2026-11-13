@@ -81,14 +81,14 @@ void report_shader_debug_error(ShaderDebugError p_error, uint p_frame_slot) {
 
 /** Marks a vertex entry-point field and selects a resource attribute by role. */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_VERTEX_INPUTAttribute {
+struct wbe_vertex_inputAttribute {
     /** Vertex attribute role; an empty value selects the annotated field name. */
     string vertex_role = "";
 };
 
 /** Marks a push-data uint2 as an index into one descriptor-heap arena. */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_DESCRIPTORAttribute {
+struct wbe_descriptorAttribute {
     /** Descriptor category interpreted by the Vulkan pipeline compiler. */
     string descriptor_type;
     /** Logical render-graph resource identifier resolved by the owning task. */
@@ -105,7 +105,7 @@ struct WBE_DESCRIPTORAttribute {
  * identifier is a custom uint, int, or float value the owning render task sets with set_push_constant().
  */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_PUSH_CONSTANTAttribute {
+struct wbe_push_constantAttribute {
     /** Renderer value identifier or custom push-constant identifier. */
     string value;
 };
@@ -117,27 +117,27 @@ struct Vertex3DTexturedInput {
     /**
      * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 position;
     /**
      * @brief The normal of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 normal;
     /**
      * @brief The tanglent vector of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 tangent;
     /**
      * @brief The bitangent vector of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 bitangent;
     /**
      * @brief The uv value.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float2 uv;
 };
 
@@ -206,7 +206,7 @@ static const uint WBE_MAX_MATERIAL_COUNT = 32;
 
 /** Marks an integer material parameter as the descriptor index for one texture role. */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_TEXTUREAttribute {
+struct wbe_textureAttribute {
     /** Texture role; an empty value selects the annotated variable name. */
     string texture_role = "";
 };
@@ -222,13 +222,13 @@ struct MaterialTextureContractMetadata {
 /** Fixed descriptor indices for one material's textures. */
 struct MaterialParams {
     /** Albedo texture descriptor index. */
-    [WBE_TEXTURE("albedo")]
+    [wbe::texture("albedo")]
     int albedo_index;
     /** Normal texture descriptor index. */
-    [WBE_TEXTURE("normal")]
+    [wbe::texture("normal")]
     int normal_index;
     /** RMA texture descriptor index. */
-    [WBE_TEXTURE("rma")]
+    [wbe::texture("rma")]
     int rma_index;
 };
 
@@ -278,17 +278,17 @@ struct MeshContractMetadata {
  * @brief Mesh storage buffers matching the renderer's mesh binding contract.
  */
 struct MeshDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "mesh_submeshes", "read")]
+    [wbe::descriptor("storage_buffer", "mesh_submeshes", "read")]
     uint2 submeshes;
     /** Instance-local transforms, relative to the mesh transform. */
-    [WBE_DESCRIPTOR("storage_buffer", "mesh_nodes", "read")]
+    [wbe::descriptor("storage_buffer", "mesh_nodes", "read")]
     uint2 nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "mesh_instances", "read")]
+    [wbe::descriptor("storage_buffer", "mesh_instances", "read")]
     uint2 instances;
 #ifdef WBE_MESH_TRANSFORM
     /** One NodeData holding the whole mesh's transform and normal transform. Only declared by shader variants that
      * define WBE_MESH_TRANSFORM, i.e. variants drawing placed (entity) meshes. */
-    [WBE_DESCRIPTOR("storage_buffer", "mesh_transform", "read")]
+    [wbe::descriptor("storage_buffer", "mesh_transform", "read")]
     uint2 transform;
 #endif
 };

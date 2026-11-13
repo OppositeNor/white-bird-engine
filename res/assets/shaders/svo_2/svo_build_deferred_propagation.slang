@@ -25,46 +25,46 @@ struct SVODescriptorIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
+    [wbe::descriptor("storage_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
     /**
      * @brief Descriptor-heap reference to svo_leaf_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer")]
     uint2 tree_leaves;
 
 #ifdef WBE_USE_PING_WRITE
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong", "read")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list_write;
 #else
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "read")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong")]
     uint2 deferred_list_write;
 #endif
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

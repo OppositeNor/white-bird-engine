@@ -25,7 +25,7 @@
 /** Descriptor indices of the resources used by the column prefix sum pass. */
 struct PrefixSumPixelSortColumnsDescriptorIndices {
     /** Buffer holding the mask count of every line, summed in place. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
+    [wbe::descriptor("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
 };
 
 [vk::push_constant]

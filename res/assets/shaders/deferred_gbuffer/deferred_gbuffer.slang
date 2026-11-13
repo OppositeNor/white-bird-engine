@@ -21,11 +21,11 @@ ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 struct DeferredGBufferDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
+    [wbe::descriptor("uniform_buffer", "material_params")]
     uint2 material_params;
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
+    [wbe::descriptor("sampler", "material_sampler")]
     uint2 material_sampler;
     MeshDescriptorIndices mesh;
 };

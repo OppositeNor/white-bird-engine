@@ -132,7 +132,7 @@ objects between graphs.
 - **Edges are the only ordering.** Each edge carries one resource, and both tasks must access it; stages and accesses are
   derived from the `RendResUsageVK` usages both report. Every read-write, write-read, and write-write conflict on a resource
   must be ordered by a chain of edges on that same resource, or construction fails. Read-read pairs do not conflict.
-- **Tasks report their own accesses** through `append_accesses()`: reflected shader resources (`WBE_DESCRIPTOR` access),
+- **Tasks report their own accesses** through `append_accesses()`: reflected shader resources (`wbe::descriptor` access),
   render targets, and fixed-function buffers. Aliases only map task-local ids to graph resources; graphics tasks render to
   `render_target_colors[<index>]` and `render_target_depth`. Unused aliases are rejected, and recipe tasks' maps resolve
   nothing to itself.

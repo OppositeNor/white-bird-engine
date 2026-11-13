@@ -114,6 +114,11 @@ void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block
     p_svo_occupancy.write_data_at_index(parent.data_index, occupancy_sum / 8.0f, p_frame_slot);
 }
 
+// TODO(5): Add propagate_svo_radiance(), mirroring propagate_svo_occupancy() above: average the eight siblings' radiance
+// into the parent, with the same depth, dynamic/static block, and empty-child checks. Leaves' parents are written
+// first from the 27 subvoxels of each leaf (as inject_svo_leaf_parent_occupancy() does for occupancy). Weighting by
+// occupancy keeps empty children from darkening the average. Add its entry shader and svogi.toml resource.
+
 struct Cone {
     float3 start_pos;
     float3 dir;
@@ -126,7 +131,11 @@ float cone_tracing<T>(SVOReadBuffer<float> p_occupancy, StructuredBuffer<T> p_da
     float t = 0.0;
     T accumulated = T();
     for (uint i = 0; i < WBE_SVO_CONE_TRACE_MAX_STEPS; ++i) {
-        // TODO
+        // TODO(7): Implement the march: choose the depth whose voxel size matches the cone diameter at t
+        // (2 * t * cone_angle_tanhalf), sample occupancy and radiance at that depth (interpolating between depths), and
+        // composite front to back (accumulated += (1 - alpha) * occupancy * radiance; alpha += (1 - alpha) * occupancy).
+        // Stop when alpha saturates, t exceeds max_distance, or the position leaves the SVO. Return the accumulated
+        // value (the function currently returns nothing, and its float return type should probably be T).
     }
 }
 

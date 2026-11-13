@@ -70,7 +70,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT)
     uint32_t group_count_z = 1;
     /**
-     * @brief Custom WBE_PUSH_CONSTANT values: a map from identifier to number, typed as the pipeline declares each one.
+     * @brief Custom wbe::push_constant values: a map from identifier to number, typed as the pipeline declares each one.
      */
     WBE_META(WBE_REFLECT)
     DataValue push_constants;

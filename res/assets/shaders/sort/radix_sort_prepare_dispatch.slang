@@ -16,9 +16,9 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
-    [WBE_DESCRIPTOR("storage_buffer", "dispatch_buffer", "write")] uint2 dispatch_buffer;
-    [WBE_PUSH_CONSTANT("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::descriptor("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
+    [wbe::descriptor("storage_buffer", "dispatch_buffer", "write")] uint2 dispatch_buffer;
+    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]

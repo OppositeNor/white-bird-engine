@@ -28,7 +28,7 @@ struct VSInput {
     /**
      * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 position;
 };
 
@@ -82,15 +82,15 @@ struct GSOutput {
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
 
 struct SVODescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
+    [wbe::descriptor("storage_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list;
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 
     MeshDescriptorIndices mesh;

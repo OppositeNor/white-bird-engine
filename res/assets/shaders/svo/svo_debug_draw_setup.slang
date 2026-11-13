@@ -24,15 +24,15 @@ struct DrawIndexedIndirectCommand {
 };
 
 struct SVODebugDrawSetupDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_debug_draw_indirect_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_debug_draw_settings")]
+    [wbe::descriptor("uniform_buffer", "svo_debug_draw_settings")]
     uint2 settings;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_debug_draw_node_list", "write")]
+    [wbe::descriptor("storage_buffer", "svo_debug_draw_node_list", "write")]
     uint2 node_list;
 };
 

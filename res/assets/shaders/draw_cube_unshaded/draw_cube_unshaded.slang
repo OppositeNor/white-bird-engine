@@ -26,17 +26,17 @@ struct Vertex3DUnshadedInput {
     /**
      * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT("position")]
+    [wbe::vertex_input("position")]
     float3 position;
     /**
      * @brief The normal of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 normal;
     /**
      * @brief The uv of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float2 uv;
 };
 
@@ -44,7 +44,7 @@ struct Vertex3DUnshadedInput {
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
 struct DrawCubeUnshadedDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
+    [wbe::descriptor("uniform_buffer", "camera_info")]
     uint2 camera_info;
     MeshDescriptorIndices mesh;
 };

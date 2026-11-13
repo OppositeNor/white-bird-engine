@@ -71,6 +71,10 @@ uint large_prefix_scan_blocks_per_section(uint p_block_num) {
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  * @param p_scratch Scratch array of one element per block element; its contents are overwritten.
  */
+// TODO(3): The large prefix scan only handles uint with Add<uint>. Make these passes (and the large_prefix_scan_*.slang
+// entry points) generic over the element type T and operator O : IOperator<T>, so SVOGI can run
+// SegmentedPrefix<float3x3, Add<float3x3>> over SegmentedWrapper<float3x3>; the block and section totals must then hold
+// T as well. Keep the uint instantiation for the existing users, and add tests next to the existing prefix scan tests.
 void large_prefix_scan_blocks(RWStructuredBuffer<uint> p_data, RWStructuredBuffer<uint> p_sections, uint p_block,
         uint p_thread_id, __ref groupshared uint p_scratch[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE]) {
     uint element_count = p_data[WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX];

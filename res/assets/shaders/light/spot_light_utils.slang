@@ -66,20 +66,20 @@ struct SpotLightInfoBuffer {
 
 struct LightParamDescriptorIndices {
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [WBE_DESCRIPTOR("sampled_image", "shadow_moments[]")]
+    [wbe::descriptor("sampled_image", "shadow_moments[]")]
 #else
-    [WBE_DESCRIPTOR("sampled_image", "shadow_moments_sampled[]")]
+    [wbe::descriptor("sampled_image", "shadow_moments_sampled[]")]
 #endif
     uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [WBE_DESCRIPTOR("sampled_image", "shadow_sat[]")]
+    [wbe::descriptor("sampled_image", "shadow_sat[]")]
     uint2 shadow_moments_summed_area_table;
 #endif
-    [WBE_DESCRIPTOR("sampled_image", "shadowmap_color[]")]
+    [wbe::descriptor("sampled_image", "shadowmap_color[]")]
     uint2 rsm_flux;
-    [WBE_DESCRIPTOR("sampled_image", "rsm_normal[]")]
+    [wbe::descriptor("sampled_image", "rsm_normal[]")]
     uint2 rsm_octa_normal;
-    [WBE_DESCRIPTOR("sampler", "shadow_sampler")]
+    [wbe::descriptor("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
 };
 

@@ -84,7 +84,7 @@ struct WBE_META(WBE_RENDER_TASK(ping_pong), WBE_SERIALIZATION_ALIASES(ping_pong)
         VkExtent3D p_dispatch_group_count);
 
     /**
-     * @brief Set a custom WBE_PUSH_CONSTANT value for every pipeline that declares the identifier.
+     * @brief Set a custom wbe::push_constant value for every pipeline that declares the identifier.
      *
      * The value is pushed with every later dispatch. Call on the rendering thread; values set before graph construction are
      * retained. Prefix pipelines

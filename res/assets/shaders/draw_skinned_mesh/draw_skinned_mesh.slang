@@ -23,17 +23,17 @@ struct SkinnedMeshVertexInput {
     /**
      * @brief The bind-pose mesh-space position.
      */
-    [WBE_VERTEX_INPUT("position")]
+    [wbe::vertex_input("position")]
     float3 position;
     /**
      * @brief The indices of the skeleton joints the vertex binds to.
      */
-    [WBE_VERTEX_INPUT("joint_binding_ids")]
+    [wbe::vertex_input("joint_binding_ids")]
     int4 joint_ids;
     /**
      * @brief The influence weight of each bound joint; the weights sum to 1.
      */
-    [WBE_VERTEX_INPUT("joint_binding_weights")]
+    [wbe::vertex_input("joint_binding_weights")]
     float4 joint_weights;
 };
 
@@ -58,12 +58,12 @@ struct DrawSkinnedMeshDescriptorIndices {
     /**
      * @brief The per-frame view and projection matrices.
      */
-    [WBE_DESCRIPTOR("uniform_buffer", "skinned_mesh_camera_info")]
+    [wbe::descriptor("uniform_buffer", "skinned_mesh_camera_info")]
     uint2 camera_info;
     /**
      * @brief The skinning transform of every skeleton joint, mapping bind-pose mesh space to posed model space.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "skinned_mesh_skinning_transforms", "read")]
+    [wbe::descriptor("storage_buffer", "skinned_mesh_skinning_transforms", "read")]
     uint2 skinning_transforms;
 };
 

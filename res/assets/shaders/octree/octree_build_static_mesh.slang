@@ -30,7 +30,7 @@ struct VSInput {
     /**
      * @brief The position of the vertex.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 position;
 };
 
@@ -92,15 +92,15 @@ struct OctreeBuildDescriptorIndices {
      * readers of the full view after it. Declared first, so a first write moves every mip level into the unified layout.
      */
 #ifdef WBE_DYNAMIC_BUILD
-    [WBE_DESCRIPTOR("storage_image", "octree_dynamic", "write")]
+    [wbe::descriptor("storage_image", "octree_dynamic", "write")]
 #else
-    [WBE_DESCRIPTOR("storage_image", "octree_static", "write")]
+    [wbe::descriptor("storage_image", "octree_static", "write")]
 #endif
     uint2 texture;
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
+    [wbe::descriptor("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Storage views of the texture's mip levels.

@@ -33,7 +33,7 @@ class RendResViewVK;
 
 /**
  * @class PushConstantValueVK
- * @brief Typed 32-bit value for a custom WBE_PUSH_CONSTANT field.
+ * @brief Typed 32-bit value for a custom wbe::push_constant field.
  *
  * The type must match the reflected scalar type of every field receiving the value. Copyable and movable.
  */
@@ -106,7 +106,7 @@ public:
     void bind_resources(const RendResViewVK& p_resources);
 
     /**
-     * @brief Set every custom WBE_PUSH_CONSTANT field with the identifier, if this pipeline declares any.
+     * @brief Set every custom wbe::push_constant field with the identifier, if this pipeline declares any.
      *
      * The value is retained and pushed by every later push() call until it is set again.
      *
@@ -118,7 +118,7 @@ public:
     bool try_set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
 
     /**
-     * @brief Set every custom WBE_PUSH_CONSTANT field with the identifier.
+     * @brief Set every custom wbe::push_constant field with the identifier.
      *
      * @param p_name Custom push-constant identifier.
      * @param p_value Value whose type must match each reflected field.

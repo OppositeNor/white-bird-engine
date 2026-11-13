@@ -33,17 +33,17 @@
 struct KawaseBlurDescriptorIndices {
 #ifdef WBE_KAWASE_BLUR_WRITE_PING
     /** Image sampled by the blur. */
-    [WBE_DESCRIPTOR("sampled_image", "kawase_blur_pong")] uint2 source;
+    [wbe::descriptor("sampled_image", "kawase_blur_pong")] uint2 source;
     /** Image receiving the blurred result. */
-    [WBE_DESCRIPTOR("storage_image", "kawase_blur_ping", "write")] uint2 destination;
+    [wbe::descriptor("storage_image", "kawase_blur_ping", "write")] uint2 destination;
 #else
     /** Image sampled by the blur. */
-    [WBE_DESCRIPTOR("sampled_image", "kawase_blur_ping")] uint2 source;
+    [wbe::descriptor("sampled_image", "kawase_blur_ping")] uint2 source;
     /** Image receiving the blurred result. */
-    [WBE_DESCRIPTOR("storage_image", "kawase_blur_pong", "write")] uint2 destination;
+    [wbe::descriptor("storage_image", "kawase_blur_pong", "write")] uint2 destination;
 #endif
     /** Linear-filtering sampler used for every tap. */
-    [WBE_DESCRIPTOR("sampler", "kawase_blur_sampler")] uint2 blur_sampler;
+    [wbe::descriptor("sampler", "kawase_blur_sampler")] uint2 blur_sampler;
 };
 
 [vk::push_constant]

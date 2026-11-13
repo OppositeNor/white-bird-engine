@@ -16,7 +16,7 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
+    [wbe::descriptor("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
 };
 
 [vk::push_constant]

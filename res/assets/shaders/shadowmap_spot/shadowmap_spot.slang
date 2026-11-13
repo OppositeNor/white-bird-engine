@@ -30,7 +30,7 @@ struct ShadowVSOutput {
  * @brief Constant buffer providing the spot light's view and projection matrices.
  */
 struct ShadowDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "shadow_light_info")]
+    [wbe::descriptor("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
     MeshDescriptorIndices mesh;
 };

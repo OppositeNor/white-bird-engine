@@ -35,6 +35,8 @@ local LARGE_PREFIX_SCAN_MAX_BLOCK_NUM = 65535
 local LARGE_PREFIX_SCAN_DISPATCH_BUFFER_SIZE = 12
 local UINT32_SIZE = 4
 
+-- TODO(3): Once the shaders are generic, let buffers() and dispatches() take the element byte size and the pipelines of
+-- a specific instantiation (for example the segmented float3x3 one SVOGI needs), instead of assuming uint elements.
 local record large_prefix_scan
     -- The scratch buffers of a large prefix scan to declare: sized to scan up to max_element_count elements, and named for
     -- debugging `<name>.sections` and `<name>.dispatch` when name is set.

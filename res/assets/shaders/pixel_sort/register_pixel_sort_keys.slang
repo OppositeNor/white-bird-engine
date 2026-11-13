@@ -30,20 +30,20 @@
 /** Descriptor indices of the resources used by the register pass. */
 struct RegisterPixelSortKeysDescriptorIndices {
     /** Image whose pixels are sorted. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
+    [wbe::descriptor("sampled_image", "pixel_sort_source")] uint2 source;
     /** The contrast range of the sorted pixels and the metric they are sorted by. */
-    [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
+    [wbe::descriptor("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
     /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
+    [wbe::descriptor("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Radix sort key buffer receiving the keys, their count, and the local sort count. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
+    [wbe::descriptor("storage_buffer", "pixel_sort_keys", "write")] uint2 keys;
     /**
      * Mask image receiving the line rank of every masked pixel, and with the span scope its span offset and span length;
      * must have the extent of source, and be R16G16B16A16_UINT with the span scope or R16_UINT with the line scope.
      */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "write")] uint2 mask;
+    [wbe::descriptor("storage_image", "pixel_sort_mask", "write")] uint2 mask;
     /** Renderer frame slot receiving shader-debug errors. */
-    [WBE_PUSH_CONSTANT("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]

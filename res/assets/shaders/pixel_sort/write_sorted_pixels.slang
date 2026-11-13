@@ -29,19 +29,19 @@
 /** Descriptor indices of the resources used by the write pass. */
 struct WriteSortedPixelsDescriptorIndices {
     /** Image whose pixels are sorted. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
+    [wbe::descriptor("sampled_image", "pixel_sort_source")] uint2 source;
     /** Radix sort key buffer holding the sorted keys. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_keys", "read")] uint2 keys;
+    [wbe::descriptor("storage_buffer", "pixel_sort_keys", "read")] uint2 keys;
     /** Mask image holding the line rank, span offset, and span length of every masked pixel, from register_pixel_sort_keys. */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sort_mask", "read")] uint2 mask;
+    [wbe::descriptor("storage_image", "pixel_sort_mask", "read")] uint2 mask;
     /** The scope of the sort. */
-    [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
+    [wbe::descriptor("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
     /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
+    [wbe::descriptor("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
     /** Image receiving the sorted pixels; must have the extent of source. */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sort_destination", "write")] uint2 destination;
+    [wbe::descriptor("storage_image", "pixel_sort_destination", "write")] uint2 destination;
     /** Renderer frame slot receiving shader-debug errors. */
-    [WBE_PUSH_CONSTANT("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]

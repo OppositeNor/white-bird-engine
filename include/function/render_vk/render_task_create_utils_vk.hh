@@ -55,14 +55,14 @@ Ref<ROGraphicsPipelineVK> acquire_task_graphics_pipeline_vk(
  * @brief One custom push-constant value resolved from recipe parameters.
  */
 struct TaskPushConstantVK {
-    /** Custom WBE_PUSH_CONSTANT identifier. */
+    /** Custom wbe::push_constant identifier. */
     std::string name;
     /** The value, typed as the pipelines declare the identifier. */
     PushConstantValueVK value;
 };
 
 /**
- * @brief Resolve recipe push constants, a map from custom WBE_PUSH_CONSTANT identifier to number, for a task's create().
+ * @brief Resolve recipe push constants, a map from custom wbe::push_constant identifier to number, for a task's create().
  *
  * Each value is converted to the scalar type the first of p_layouts that declares the identifier reflects: integers must be
  * in range for `uint` and `int` fields, and integer-valued floats are accepted for them.

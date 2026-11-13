@@ -31,25 +31,25 @@ struct OctreeDebugDrawDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
+    [wbe::descriptor("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
 #ifdef WBE_OCTREE_DEBUG_NODES
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_node_list", "read")]
+    [wbe::descriptor("storage_buffer", "octree_debug_node_list", "read")]
     uint2 node_list;
 #else
     /**
      * @brief Descriptor-heap reference to octree_debug_leaf_masks.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_leaf_masks", "read")]
+    [wbe::descriptor("storage_buffer", "octree_debug_leaf_masks", "read")]
     uint2 leaf_masks;
 #endif
     /**
      * @brief Descriptor-heap reference to the G-buffer camera.
      */
-    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
 };
 

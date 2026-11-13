@@ -238,7 +238,7 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     for (size_t i = 1; i < global_parameter.type.fields.size(); ++i) {
         const ShaderMetadataTypeField& texture_field = global_parameter.type.fields[i];
         ASSERT_EQ(texture_field.user_attributes.size(), 1U);
-        EXPECT_EQ(texture_field.user_attributes[0].name, "WBE_TEXTURE");
+        EXPECT_EQ(texture_field.user_attributes[0].name, "wbe_texture");
         ASSERT_EQ(texture_field.user_attributes[0].arguments.size(), 1U);
         EXPECT_EQ(texture_field.user_attributes[0].arguments[0].kind, "string");
         std::string expected_texture_role = i < 6 ? std::format("role_{}", i) : std::string();
@@ -289,7 +289,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(uniform_buffer.binding.offset, 0);
     EXPECT_EQ(uniform_buffer.binding.size, 8);
     ASSERT_EQ(uniform_buffer.user_attributes.size(), 1U);
-    EXPECT_EQ(uniform_buffer.user_attributes[0].name, "WBE_DESCRIPTOR");
+    EXPECT_EQ(uniform_buffer.user_attributes[0].name, "wbe_descriptor");
     // Slang reflects the default value of the omitted access argument.
     ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[0].string_value, "uniform_buffer");
@@ -324,7 +324,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(acceleration_structure_index.binding.offset, 48);
     EXPECT_EQ(acceleration_structure_index.binding.size, 8);
     ASSERT_EQ(acceleration_structure_index.user_attributes.size(), 1U);
-    EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "WBE_DESCRIPTOR");
+    EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "wbe_descriptor");
     ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[1].string_value, "acceleration_structure");
@@ -336,7 +336,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(time.binding.offset, 56);
     EXPECT_EQ(time.binding.size, 4);
     ASSERT_EQ(time.user_attributes.size(), 1U);
-    EXPECT_EQ(time.user_attributes[0].name, "WBE_PUSH_CONSTANT");
+    EXPECT_EQ(time.user_attributes[0].name, "wbe_push_constant");
     ASSERT_EQ(time.user_attributes[0].arguments.size(), 1U);
     EXPECT_EQ(time.user_attributes[0].arguments[0].string_value, "time");
 }
@@ -367,7 +367,7 @@ TEST(WBEShaderMetadataVKTest, LoadsNestedMaterialTextureContractFromCompiledSlan
         EXPECT_EQ(field.type.scalar_type, "int32");
         EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(int32_t)));
         ASSERT_EQ(field.user_attributes.size(), 1U);
-        EXPECT_EQ(field.user_attributes[0].name, "WBE_TEXTURE");
+        EXPECT_EQ(field.user_attributes[0].name, "wbe_texture");
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 1U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].kind, "string");
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, expected_texture_roles[i]);
@@ -406,7 +406,7 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) 
         EXPECT_EQ(field.binding.kind, "uniform");
         EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(uint32_t) * 2));
         ASSERT_EQ(field.user_attributes.size(), 1U);
-        EXPECT_EQ(field.user_attributes[0].name, "WBE_DESCRIPTOR");
+        EXPECT_EQ(field.user_attributes[0].name, "wbe_descriptor");
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 3U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
         EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_resource_ids[i]);
@@ -471,7 +471,7 @@ TEST(WBEShaderMetadataVKTest, LoadsVertexInputRolesAndAutomaticallyAssignedLocat
         EXPECT_EQ(fields[i].binding.kind, "varyingInput");
         EXPECT_EQ(fields[i].binding.index, static_cast<int32_t>(i));
         ASSERT_EQ(fields[i].user_attributes.size(), 1U);
-        EXPECT_EQ(fields[i].user_attributes[0].name, "WBE_VERTEX_INPUT");
+        EXPECT_EQ(fields[i].user_attributes[0].name, "wbe_vertex_input");
         ASSERT_EQ(fields[i].user_attributes[0].arguments.size(), 1U);
         EXPECT_EQ(fields[i].user_attributes[0].arguments[0].kind, "string");
         const std::string expected_argument = i == 0 ? std::string(expected_roles[i]) : std::string();

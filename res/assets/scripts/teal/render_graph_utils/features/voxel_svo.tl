@@ -21,6 +21,7 @@
 -- the SVO buffers with initial contents or state both deferred graphs share, which every graph imports by the names the
 -- shaders reflect, and the module declares the scratch buffers each frame rewrites before reading. See ISVORenderFeature in
 -- tests/executable/function/render/deferred_test/i_svo_render_feature.hh.
+local sort = require("render_graph_utils.sort")
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
@@ -54,6 +55,7 @@ local record Tasks
     find_debug_draw_nodes: graph.Task
     debug_draw: graph.Task
     pre_deferred_debug_draw: graph.Task
+    radiance_sort: graph.Task
 end
 
 -- The subgraph under construction, shared by the build steps.
@@ -108,6 +110,9 @@ local function create_buffers(parameters: wbe.SVORecipeParams): {string:graph.Re
     scratch("svogi_occupancy_buffer", sizes.occupancy)
     scratch("svogi_radiance_index_buffer", sizes.radiance_index)
     scratch("svogi_radiance_staged_buffer", sizes.radiance_staged)
+    -- TODO(4): Declare the reduced radiance buffer here (one radiance value, and optionally a sample count, per leaf
+    -- subvoxel, indexed by data index like svogi_occupancy_buffer), plus the sort and scan scratch buffers from
+    -- sort.radix_sort_buffers() and large_prefix_scan.buffers(). Add their sizes to SVORecipeParams.buffer_sizes.
     -- The post-construction view's node list, rewritten each frame at a node depth before the draw reads it.
     scratch("svo_debug_draw_node_list", sizes.debug_draw_node_list)
     return buffers
@@ -374,17 +379,39 @@ local function add_svogi_injection(builder: Builder)
     for slot in pairs(builder.target.rsm_slots) do
         radiance_bindings[slot] = graph.port(slot)
     end
-    local radiance_injection_params: graph.RTParamsRunComputePipelineVK = {
+    tasks.radiance_injection = graph.compute({
         pipeline = pipelines.radiance_injection,
         group_count_x = parameters.radiance_injection_group_count,
         group_count_y = parameters.radiance_injection_group_count,
         queue_family = "compute_1",
-    }
-    tasks.radiance_injection = graph.compute(radiance_injection_params, { name = "inject_svogi_radiance", bindings = radiance_bindings })
+    }, { name = "inject_svogi_radiance", bindings = radiance_bindings })
+    -- TODO(2): Sort the (key, index) pairs in svogi_radiance_index_buffer by key with sort.radix_sort_key_value_task()
+    -- (render_graph_utils/sort.tl; pixel_sort.tl is an example). The counted buffer's count drives the indirect dispatches.
+    local radiance_sort_buffers = sort.radix_sort_buffers({
+        name = "svogi_radiance_sort",
+        max_element_count = (parameters.buffer_sizes.radiance_index),
+        key_type = "uint2",
+    })
+    buffers.svogi_radiance_index_buffer = radiance_sort_buffers.keys
+    tasks.radiance_sort = sort.radix_sort_key_value_task(radiance_sort_buffers, {
+        name = "SVOGI Radiance sort",
+        queue_family = "GRAPHICS",
+    })
+    -- TODO(4): After the sort, add the reduction tasks:
+    --   a. A compute pass that gathers svogi_radiance_staged_buffer through the sorted indices and sets each entry's
+    --      `break` to 1 where its key differs from the previous key (and on the first entry).
+    --   b. A segmented inclusive scan with SegmentedPrefix<float3x3, Add<float3x3>> (needs TODO(3)).
+    --   c. A compute pass that writes each segment's last element (the next key differs, or it is the last entry) into
+    --      the reduced radiance buffer at key / 27, subvoxel key % 27. Divide by the segment length for an average.
+    -- TODO(5): Then propagate the reduced radiance up the tree, one depth per dispatch, mirroring
+    -- tasks.occupancy_propagation above (a graph.compute_sequential over child_depth = max_depth - 1 down to 2).
 end
 
 -- The debug views: the post-construction tree, drawn by the post-SVO-build and occupancy views, and the pre-deferred
 -- propagation view.
+-- TODO(9): Add a radiance debug view next to the occupancy one (svo_debug_draw_*_occupancy_pipeline in svo/svo.toml and
+-- the occupancy branches of the debug-draw multiplexer below), coloring nodes by their reduced or propagated radiance,
+-- to check TODO(4) and TODO(5) before cone tracing depends on them.
 local function add_debug_views(builder: Builder)
     local buffers = builder.buffers
     local pipelines = builder.graphics_pipelines
@@ -444,6 +471,9 @@ end
 local function connect_tasks(builder: Builder)
     local buffers = builder.buffers
     local tasks = builder.tasks
+    -- TODO(6): Append the sort, reduction, and radiance propagation tasks from TODO(2), TODO(4), and TODO(5) to
+    -- `injection`, chain the new buffers through them (as svogi_occupancy_buffer is chained below), and list the tasks in
+    -- the subgraph's task sequence in voxel_svo.subgraph().
     local injection = { tasks.occupancy_injection, tasks.occupancy_propagation, tasks.radiance_injection }
     -- The static rasterization, then the static deferred construction and the dynamic rasterization, which the publication
     -- passes follow.

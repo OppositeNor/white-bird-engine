@@ -23,9 +23,9 @@
  */
 struct OctreeLevelDescriptorIndices {
 #ifdef WBE_DYNAMIC_BUILD
-    [WBE_DESCRIPTOR("storage_image", "octree_dynamic_levels[]")]
+    [wbe::descriptor("storage_image", "octree_dynamic_levels[]")]
 #else
-    [WBE_DESCRIPTOR("storage_image", "octree_static_levels[]")]
+    [wbe::descriptor("storage_image", "octree_static_levels[]")]
 #endif
     uint2 level;
 };

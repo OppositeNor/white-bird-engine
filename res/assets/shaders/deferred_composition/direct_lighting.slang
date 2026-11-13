@@ -15,22 +15,22 @@
 #include "deferred_composition/deferred_composition_utils.slang"
 
 struct DirectLightingDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "composition_camera_info")]
+    [wbe::descriptor("uniform_buffer", "composition_camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
+    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("sampled_image", "gbuffer_albedo")]
+    [wbe::descriptor("sampled_image", "gbuffer_albedo")]
     uint2 gbuffer_albedo;
-    [WBE_DESCRIPTOR("sampled_image", "gbuffer_normal")]
+    [wbe::descriptor("sampled_image", "gbuffer_normal")]
     uint2 gbuffer_octa_normal;
-    [WBE_DESCRIPTOR("sampled_image", "gbuffer_rma")]
+    [wbe::descriptor("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [WBE_DESCRIPTOR("sampled_image", "gbuffer_depth")]
+    [wbe::descriptor("sampled_image", "gbuffer_depth")]
     uint2 gbuffer_depth;
-    [WBE_DESCRIPTOR("sampler", "gbuffer_sampler")]
+    [wbe::descriptor("sampler", "gbuffer_sampler")]
     uint2 gbuffer_sampler;
-    [WBE_DESCRIPTOR("storage_image", "direct_lighting")]
+    [wbe::descriptor("storage_image", "direct_lighting")]
     uint2 direct_lighting_output;
 };
 

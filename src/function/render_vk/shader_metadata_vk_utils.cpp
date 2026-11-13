@@ -48,7 +48,7 @@ bool entry_point_uses_push_data(const ShaderMetadataEntryPoint& p_entry_point, c
 ShaderDescriptorHeapTypeVK descriptor_heap_type_from_name(std::string_view p_name) {
     const std::optional<ShaderDescriptorHeapTypeVK> type = EnumReflection<ShaderDescriptorHeapTypeVK>::try_string_to_enum(p_name);
     if (!type.has_value()) {
-        throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: unsupported descriptor type '{}'.", p_name));
+        throw std::runtime_error(std::format("Failed to resolve wbe::descriptor: unsupported descriptor type '{}'.", p_name));
     }
     return *type;
 }
@@ -67,12 +67,12 @@ ShaderDescriptorAccessVK descriptor_access(
     const std::optional<ShaderDescriptorAccessVK> parsed_access = EnumReflection<ShaderDescriptorAccessVK>::try_string_to_enum(name);
     if (!parsed_access.has_value()) {
         throw std::runtime_error(
-            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has unsupported access '{}'.", p_field_path, name));
+            std::format("Failed to resolve wbe::descriptor: field '{}' has unsupported access '{}'.", p_field_path, name));
     }
     const ShaderDescriptorAccessVK access = *parsed_access;
     if (access != ShaderDescriptorAccessVK::READ && !descriptor_type_is_writable(p_type)) {
         throw std::runtime_error(
-            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' writes a descriptor type that is read-only.", p_field_path));
+            std::format("Failed to resolve wbe::descriptor: field '{}' writes a descriptor type that is read-only.", p_field_path));
     }
     return access;
 }
@@ -118,11 +118,11 @@ void append_descriptor_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDescr
     for (const ShaderDescriptorHeapFieldVK& existing : p_layout.fields) {
         if (existing.field_path == p_field.field_path) {
             throw std::runtime_error(
-                std::format("Failed to resolve WBE_DESCRIPTOR: field path '{}' is declared more than once.", p_field.field_path));
+                std::format("Failed to resolve wbe::descriptor: field path '{}' is declared more than once.", p_field.field_path));
         }
         if (fields_overlap(existing, p_field)) {
             throw std::runtime_error(std::format(
-                "Failed to resolve WBE_DESCRIPTOR: fields '{}' and '{}' overlap in push data.", existing.field_path, p_field.field_path));
+                "Failed to resolve wbe::descriptor: fields '{}' and '{}' overlap in push data.", existing.field_path, p_field.field_path));
         }
     }
     for (const ShaderDefaultPushFieldVK& existing : p_layout.default_fields) {
@@ -173,10 +173,10 @@ void append_default_push_field(ShaderDescriptorHeapLayoutVK& p_layout, ShaderDef
     for (const ShaderDefaultPushFieldVK& existing : p_layout.default_fields) {
         if (existing.field_path == p_field.field_path) {
             throw std::runtime_error(std::format(
-                "Failed to resolve WBE_PUSH_CONSTANT: field path '{}' is declared more than once.", p_field.field_path));
+                "Failed to resolve wbe::push_constant: field path '{}' is declared more than once.", p_field.field_path));
         }
         if (fields_overlap(existing, p_field)) {
-            throw std::runtime_error(std::format("Failed to resolve WBE_PUSH_CONSTANT: fields '{}' and '{}' overlap in push data.",
+            throw std::runtime_error(std::format("Failed to resolve wbe::push_constant: fields '{}' and '{}' overlap in push data.",
                 existing.field_path,
                 p_field.field_path));
         }
@@ -200,11 +200,11 @@ std::string resolve_descriptor_resource_id(
     }
     if (p_resource_id.size() == INDEXED_RESOURCE_ID_SUFFIX.size()) {
         throw std::runtime_error(
-            std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has an indexed resource id without a name.", p_field_path));
+            std::format("Failed to resolve wbe::descriptor: field '{}' has an indexed resource id without a name.", p_field_path));
     }
     if (!p_array_index.has_value()) {
         throw std::runtime_error(std::format(
-            "Failed to resolve WBE_DESCRIPTOR: field '{}' has an indexed resource id outside a descriptor struct array.", p_field_path));
+            "Failed to resolve wbe::descriptor: field '{}' has an indexed resource id outside a descriptor struct array.", p_field_path));
     }
     p_resource_id.remove_suffix(INDEXED_RESOURCE_ID_SUFFIX.size());
     return std::format("{}[{}]", p_resource_id, *p_array_index);
@@ -219,22 +219,22 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
     for (const ShaderMetadataTypeField& field : p_fields) {
         if (field.binding.offset < 0 || field.binding.size < 0) {
             throw std::runtime_error(
-                std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' has a negative layout value.", field.name));
+                std::format("Failed to resolve wbe::descriptor: field '{}' has a negative layout value.", field.name));
         }
         uint64_t field_offset = static_cast<uint64_t>(p_parent_offset) + static_cast<uint32_t>(field.binding.offset);
         uint64_t field_extent = field_offset + static_cast<uint32_t>(field.binding.size);
         if (field_offset > std::numeric_limits<uint32_t>::max() || field_extent > std::numeric_limits<uint32_t>::max()) {
             throw std::runtime_error(
-                std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' exceeds the supported push-data size.", field.name));
+                std::format("Failed to resolve wbe::descriptor: field '{}' exceeds the supported push-data size.", field.name));
         }
         extent = std::max(extent, field_extent);
 
         std::string field_path = p_parent_path.empty() ? field.name : std::format("{}.{}", p_parent_path, field.name);
-        const ShaderMetadataUserAttribute* descriptor_attribute = find_unique_attribute(field, "WBE_DESCRIPTOR");
-        const ShaderMetadataUserAttribute* default_push_attribute = find_unique_attribute(field, "WBE_PUSH_CONSTANT");
+        const ShaderMetadataUserAttribute* descriptor_attribute = find_unique_attribute(field, "wbe_descriptor");
+        const ShaderMetadataUserAttribute* default_push_attribute = find_unique_attribute(field, "wbe_push_constant");
         if (descriptor_attribute != nullptr && default_push_attribute != nullptr) {
             throw std::runtime_error(
-                std::format("Failed to resolve push data: field '{}' has both WBE_DESCRIPTOR and WBE_PUSH_CONSTANT.", field_path));
+                std::format("Failed to resolve push data: field '{}' has both wbe::descriptor and wbe::push_constant.", field_path));
         }
         if (descriptor_attribute != nullptr) {
             const std::vector<ShaderMetadataUserAttributeArgument>& arguments = descriptor_attribute->arguments;
@@ -244,14 +244,14 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                         return p_argument.kind != "string";
                     }) ||
                 arguments[0].string_value.empty() || arguments[1].string_value.empty()) {
-                throw std::runtime_error(std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' requires descriptor-type and resource-id non-empty string arguments and an optional access argument.",
+                throw std::runtime_error(std::format("Failed to resolve wbe::descriptor: field '{}' requires descriptor-type and resource-id non-empty string arguments and an optional access argument.",
                     field_path));
             }
             if (field.type.kind != "vector" || field.type.element_scalar_type != "uint32" || field.type.element_count != 2 ||
                 field.binding.kind != "uniform" || std::cmp_not_equal(field.binding.size, sizeof(uint32_t) * 2) ||
                 field_offset % (sizeof(uint32_t) * 2) != 0) {
                 throw std::runtime_error(
-                    std::format("Failed to resolve WBE_DESCRIPTOR: field '{}' must be an aligned eight-byte uint2.", field_path));
+                    std::format("Failed to resolve wbe::descriptor: field '{}' must be an aligned eight-byte uint2.", field_path));
             }
             const ShaderDescriptorHeapTypeVK type = descriptor_heap_type_from_name(arguments[0].string_value);
             append_descriptor_field(p_layout,
@@ -267,7 +267,7 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
             if (default_push_attribute->arguments.size() != 1 || default_push_attribute->arguments[0].kind != "string" ||
                 default_push_attribute->arguments[0].string_value.empty()) {
                 throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_PUSH_CONSTANT: field '{}' requires one non-empty string argument.", field_path));
+                    "Failed to resolve wbe::push_constant: field '{}' requires one non-empty string argument.", field_path));
             }
             const std::string& value_name = default_push_attribute->arguments[0].string_value;
             const ShaderDefaultPushValueVK value = default_push_value_from_name(value_name);
@@ -276,7 +276,7 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
                 field.binding.kind != "uniform" || std::cmp_not_equal(field.binding.size, sizeof(uint32_t)) ||
                 field_offset % sizeof(uint32_t) != 0) {
                 throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_PUSH_CONSTANT: field '{}' has an invalid type or four-byte scalar layout.", field_path));
+                    "Failed to resolve wbe::push_constant: field '{}' has an invalid type or four-byte scalar layout.", field_path));
             }
             append_default_push_field(p_layout,
                 ShaderDefaultPushFieldVK{
@@ -290,13 +290,13 @@ uint32_t collect_descriptor_heap_fields(const std::vector<ShaderMetadataTypeFiel
         if (field.type.kind == "array" && field.type.element_count > 0 && !field.fields.empty()) {
             if (field.binding.element_stride <= 0) {
                 throw std::runtime_error(std::format(
-                    "Failed to resolve WBE_DESCRIPTOR: descriptor struct array '{}' has no element stride.", field_path));
+                    "Failed to resolve wbe::descriptor: descriptor struct array '{}' has no element stride.", field_path));
             }
             for (int32_t i = 0; i < field.type.element_count; ++i) {
                 uint64_t element_offset = field_offset + static_cast<uint64_t>(i) * field.binding.element_stride;
                 if (element_offset > std::numeric_limits<uint32_t>::max()) {
                     throw std::runtime_error(std::format(
-                        "Failed to resolve WBE_DESCRIPTOR: descriptor struct array '{}' exceeds push data.", field_path));
+                        "Failed to resolve wbe::descriptor: descriptor struct array '{}' exceeds push data.", field_path));
                 }
                 extent = std::max<uint64_t>(extent,
                     collect_descriptor_heap_fields(

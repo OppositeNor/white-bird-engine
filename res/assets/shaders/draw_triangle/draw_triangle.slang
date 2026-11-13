@@ -16,7 +16,7 @@
 #include "utils.slang"
 
 struct DrawTrianglePushData {
-    [WBE_PUSH_CONSTANT("time")]
+    [wbe::push_constant("time")]
     float time;
 };
 
@@ -30,12 +30,12 @@ struct TriangleVertexInput {
     /**
      * @brief Position attribute.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 position;
     /**
      * @brief Texture-coordinate attribute.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float2 uv;
 };
 

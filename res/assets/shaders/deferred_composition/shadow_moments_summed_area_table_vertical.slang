@@ -15,9 +15,9 @@
 #include "utils.slang"
 
 struct ShadowMomentsVerticalDescriptorIndices {
-    [WBE_DESCRIPTOR("sampled_image", "shadow_sat_horizontal")]
+    [wbe::descriptor("sampled_image", "shadow_sat_horizontal")]
     uint2 shadow_moments_horizontal_input;
-    [WBE_DESCRIPTOR("storage_image", "shadow_sat")]
+    [wbe::descriptor("storage_image", "shadow_sat")]
     uint2 shadow_moments_summed_area_table_output;
 };
 

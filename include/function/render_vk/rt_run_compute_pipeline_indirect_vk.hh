@@ -69,7 +69,7 @@ struct WBE_META(WBE_RENDER_TASK(compute_indirect), WBE_SERIALIZATION_ALIASES(run
         QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     /**
-     * @brief Set a custom WBE_PUSH_CONSTANT value pushed with every later dispatch of the pipeline.
+     * @brief Set a custom wbe::push_constant value pushed with every later dispatch of the pipeline.
      *
      * Call on the rendering thread; values set before graph construction are retained.
      *

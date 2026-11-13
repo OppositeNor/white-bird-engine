@@ -17,18 +17,18 @@
 #include "svo/svo.slang"
 
 struct SVOPreDeferredDebugDrawDescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
 
-    [WBE_DESCRIPTOR("storage_buffer", "svo_pre_deferred_debug_list_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_list_buffer", "read")]
     uint2 deferred_list;
-    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

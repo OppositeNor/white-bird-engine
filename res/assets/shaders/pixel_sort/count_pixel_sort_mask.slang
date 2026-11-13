@@ -25,11 +25,11 @@
 /** Descriptor indices of the resources used by the count pass. */
 struct CountPixelSortMaskDescriptorIndices {
     /** Image whose pixels are sorted. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sort_source")] uint2 source;
+    [wbe::descriptor("sampled_image", "pixel_sort_source")] uint2 source;
     /** The contrast range of the sorted pixels. */
-    [WBE_DESCRIPTOR("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
+    [wbe::descriptor("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
     /** Buffer receiving the mask count of every line. */
-    [WBE_DESCRIPTOR("storage_buffer", "pixel_sort_column_offsets", "write")] uint2 column_offsets;
+    [wbe::descriptor("storage_buffer", "pixel_sort_column_offsets", "write")] uint2 column_offsets;
 };
 
 [vk::push_constant]

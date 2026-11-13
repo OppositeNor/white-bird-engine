@@ -130,7 +130,7 @@ struct WBE_META(WBE_RENDER_TASK(compute_sequential), WBE_SERIALIZATION_ALIASES(r
         const RenderContextVK* p_render_data, const Dispatch& p_dispatch, QueueFamilyVK p_queue_family = QueueFamilyVK::GRAPHICS);
 
     /**
-     * @brief Set a custom WBE_PUSH_CONSTANT value for every entry that declares the identifier.
+     * @brief Set a custom wbe::push_constant value for every entry that declares the identifier.
      *
      * The value is pushed with every later dispatch. Call on the rendering thread; values set before graph construction are
      * retained.
@@ -142,7 +142,7 @@ struct WBE_META(WBE_RENDER_TASK(compute_sequential), WBE_SERIALIZATION_ALIASES(r
     void set_push_constant(std::string_view p_name, PushConstantValueVK p_value);
 
     /**
-     * @brief Set a custom WBE_PUSH_CONSTANT value for one entry.
+     * @brief Set a custom wbe::push_constant value for one entry.
      *
      * The value is pushed with every later dispatch of the entry. Call on the rendering thread.
      *

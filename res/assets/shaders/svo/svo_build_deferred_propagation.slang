@@ -19,24 +19,24 @@
 #endif
 
 struct SVODescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info")]
+    [wbe::descriptor("storage_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer")]
     uint2 tree_leaves;
 #ifdef WBE_USE_PING_WRITE
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong", "read")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "read")]
     uint2 deferred_list_read;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list_write;
 #else
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "read")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list_read;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong")]
     uint2 deferred_list_write;
 #endif
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

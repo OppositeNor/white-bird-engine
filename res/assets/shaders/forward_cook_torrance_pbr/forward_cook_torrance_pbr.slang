@@ -21,14 +21,14 @@ ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
 struct ForwardDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "camera_info")]
+    [wbe::descriptor("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer", "material_params")]
+    [wbe::descriptor("uniform_buffer", "material_params")]
     uint2 material_params;
     ForwardLightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [WBE_DESCRIPTOR("uniform_buffer", "spot_light_count")]
+    [wbe::descriptor("uniform_buffer", "spot_light_count")]
     uint2 light_count;
-    [WBE_DESCRIPTOR("sampler", "material_sampler")]
+    [wbe::descriptor("sampler", "material_sampler")]
     uint2 material_sampler;
     MeshDescriptorIndices mesh;
 };

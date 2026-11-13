@@ -17,10 +17,10 @@
 
 struct SVODeferredCountResetDescriptorIndices {
 #ifdef WBE_RESET_PING_COUNT
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_ping", "write")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "write")]
     uint2 deferred_list;
 #else
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list_pong", "write")]
+    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list;
 #endif
 };

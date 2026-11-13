@@ -57,24 +57,24 @@ static MaterialTextureContract reflect_material_texture_contract(const ShaderMet
     }
     ShaderRoleFieldResolver role_resolver;
     std::vector<ShaderRoleFieldResolver::Field> fields =
-        role_resolver.collect_fields(materials_field->fields, "WBE_TEXTURE", ShaderRoleFieldResolver::Traversal::DIRECT);
+        role_resolver.collect_fields(materials_field->fields, "wbe_texture", ShaderRoleFieldResolver::Traversal::DIRECT);
     for (ShaderRoleFieldResolver::Field& resolved_field : fields) {
         const ShaderMetadataTypeField& field = *resolved_field.metadata;
         if (field.type.kind != "scalar" || field.type.scalar_type != "int32" || field.binding.kind != "uniform" ||
             field.binding.offset < 0 || std::cmp_not_equal(field.binding.size, sizeof(int32_t))) {
-            throw std::runtime_error(std::format("Failed to resolve material texture contract: WBE_TEXTURE field '{}' must be a 32-bit uniform integer.",
+            throw std::runtime_error(std::format("Failed to resolve material texture contract: wbe::texture field '{}' must be a 32-bit uniform integer.",
                 field.name));
         }
         const size_t field_offset = static_cast<size_t>(field.binding.offset);
         if (field_offset > result.table_stride || sizeof(int32_t) > result.table_stride - field_offset) {
             throw std::runtime_error(std::format(
-                "Failed to resolve material texture contract: WBE_TEXTURE field '{}' exceeds the material stride.", field.name));
+                "Failed to resolve material texture contract: wbe::texture field '{}' exceeds the material stride.", field.name));
         }
         result.texture_fields.push_back(
             MaterialTextureContract::TextureField{.role = std::move(resolved_field.role), .offset = field_offset});
     }
     if (result.texture_fields.empty()) {
-        throw std::runtime_error("Failed to resolve material texture contract: MaterialParams has no WBE_TEXTURE fields.");
+        throw std::runtime_error("Failed to resolve material texture contract: MaterialParams has no wbe::texture fields.");
     }
     return result;
 }

@@ -21,13 +21,13 @@ struct BillboardInfo {
 };
 
 struct BillboardDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_DESCRIPTOR("uniform_buffer", "light_billboard_info")]
+    [wbe::descriptor("uniform_buffer", "light_billboard_info")]
     uint2 billboard_info;
-    [WBE_DESCRIPTOR("sampled_image", "light_billboard_texture")]
+    [wbe::descriptor("sampled_image", "light_billboard_texture")]
     uint2 texture_image;
-    [WBE_DESCRIPTOR("sampler", "light_billboard_sampler")]
+    [wbe::descriptor("sampler", "light_billboard_sampler")]
     uint2 texture_sampler;
 };
 

@@ -111,12 +111,12 @@ static RUVertexAttributeFormat reflect_vertex_format(const ShaderMetadataTypeAto
         scalar_type = p_type.element_scalar_type;
         component_count = p_type.element_count;
     } else {
-        throw std::runtime_error(std::format("Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' has unsupported shader type '{}'.",
+        throw std::runtime_error(std::format("Failed to resolve vertex input contract: wbe::vertex_input field '{}' has unsupported shader type '{}'.",
             p_field_name,
             p_type.kind));
     }
     if (component_count < 1 || component_count > 4) {
-        throw std::runtime_error(std::format("Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' has unsupported component count {}.",
+        throw std::runtime_error(std::format("Failed to resolve vertex input contract: wbe::vertex_input field '{}' has unsupported component count {}.",
             p_field_name,
             component_count));
     }
@@ -137,7 +137,7 @@ static RUVertexAttributeFormat reflect_vertex_format(const ShaderMetadataTypeAto
         return FORMATS[index];
     }
     throw std::runtime_error(std::format(
-        "Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' has unsupported scalar type '{}'.", p_field_name, scalar_type));
+        "Failed to resolve vertex input contract: wbe::vertex_input field '{}' has unsupported scalar type '{}'.", p_field_name, scalar_type));
 }
 
 struct VertexAttributeMatch {
@@ -218,10 +218,10 @@ VertexInputRequirement VertexInputContractResolver::resolve_requirement(const Sh
     VertexInputRequirement result;
     for (const ShaderMetadataParameter& parameter : entry_point.parameters) {
         std::vector<ShaderRoleFieldResolver::Field> fields =
-            role_resolver.collect_fields(parameter.type.fields, "WBE_VERTEX_INPUT", ShaderRoleFieldResolver::Traversal::RECURSIVE);
+            role_resolver.collect_fields(parameter.type.fields, "wbe_vertex_input", ShaderRoleFieldResolver::Traversal::RECURSIVE);
         for (ShaderRoleFieldResolver::Field& field : fields) {
             if (field.metadata->binding.kind != "varyingInput" || field.metadata->binding.index < 0) {
-                throw std::runtime_error(std::format("Failed to resolve vertex input contract: WBE_VERTEX_INPUT field '{}' is not a located varying input.",
+                throw std::runtime_error(std::format("Failed to resolve vertex input contract: wbe::vertex_input field '{}' is not a located varying input.",
                     field.metadata->name));
             }
             const uint32_t location = static_cast<uint32_t>(field.metadata->binding.index);

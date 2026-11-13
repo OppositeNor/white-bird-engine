@@ -21,12 +21,12 @@ struct DynamicDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
 };
 [vk::push_constant]

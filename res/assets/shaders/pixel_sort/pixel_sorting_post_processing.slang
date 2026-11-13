@@ -30,13 +30,13 @@ struct PixelSortingPostProcessingParams {
 /** Descriptor indices of the resources used by the post-processing pass. */
 struct PixelSortingPostProcessingDescriptorIndices {
     /** The pixel-sorted image, from write_sorted_pixels. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sort_destination")] uint2 sorted_image;
+    [wbe::descriptor("sampled_image", "pixel_sort_destination")] uint2 sorted_image;
     /** Clamp-to-edge sampler for filtered reads of the sorted image. */
-    [WBE_DESCRIPTOR("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
+    [wbe::descriptor("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
     /** The parameters of the post-processing effects. */
-    [WBE_DESCRIPTOR("uniform_buffer", "pixel_sorting_post_processing_params")] uint2 params;
+    [wbe::descriptor("uniform_buffer", "pixel_sorting_post_processing_params")] uint2 params;
     /** Image receiving the post-processed pixels; must have the extent of sorted_image. */
-    [WBE_DESCRIPTOR("storage_image", "pixel_sorting_post_processing_output", "write")] uint2 output;
+    [wbe::descriptor("storage_image", "pixel_sorting_post_processing_output", "write")] uint2 output;
 };
 
 [vk::push_constant]

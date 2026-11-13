@@ -376,16 +376,16 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
   pipelines, so materials never name pipelines or passes.
 - Every material texture slot has a non-empty, shader-defined `texture_role`; do not introduce a closed engine-side texture-role
   enum or whitelist.
-- Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `WBE_TEXTURE` in `utils/utils.slang`.
-  - `[WBE_TEXTURE("albedo")] int albedo_index;` selects the explicit `albedo` role.
-  - `[WBE_TEXTURE] int detail_index;` uses `detail_index` as the role.
+- Shader texture roles are declared on integer fields of the global `MaterialParams` struct with `wbe::texture` in `utils/utils.slang`.
+  - `[wbe::texture("albedo")] int albedo_index;` selects the explicit `albedo` role.
+  - `[wbe::texture] int detail_index;` uses `detail_index` as the role.
 - `MaterialTextureContractMetadata.material_sampler` and `MaterialTextureContractMetadata.textures` are fixed metadata-only
   members; `MaterialParamsBuffer.materials` is the fixed runtime material-table member. Applications may configure only the
   `material_textures` and `material_params` base variable names and the `default_material` resource key.
 - Static-mesh compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
   material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
   `rma`.
-- Vulkan shader resources are declared as aligned `uint2` fields in push data with `WBE_DESCRIPTOR("TYPE", "resource_id", "ACCESS")`,
+- Vulkan shader resources are declared as aligned `uint2` fields in push data with `wbe::descriptor("TYPE", "resource_id", "ACCESS")`,
   where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`, and
   the optional `ACCESS` is `read`, `write`, or `read_write`. Storage buffers and images default to `read_write`; annotate read-only
   ones with `read`. Runtime shaders access the renderer-owned global heaps through those indices; metadata-only resource

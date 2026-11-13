@@ -22,32 +22,32 @@ struct OctreeDebugGatherNodesDescriptorIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_info", "read")]
+    [wbe::descriptor("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Descriptor-heap reference to the static octree texture with every mip level.
      */
-    [WBE_DESCRIPTOR("sampled_image", "octree_static")]
+    [wbe::descriptor("sampled_image", "octree_static")]
     uint2 static_levels;
     /**
      * @brief Descriptor-heap reference to the dynamic octree texture with every mip level.
      */
-    [WBE_DESCRIPTOR("sampled_image", "octree_dynamic")]
+    [wbe::descriptor("sampled_image", "octree_dynamic")]
     uint2 dynamic_levels;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_node_list")]
+    [wbe::descriptor("storage_buffer", "octree_debug_node_list")]
     uint2 node_list;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_draw_indirect_buffer.
      */
-    [WBE_DESCRIPTOR("storage_buffer", "octree_debug_node_draw_indirect_buffer")]
+    [wbe::descriptor("storage_buffer", "octree_debug_node_draw_indirect_buffer")]
     uint2 node_indirect_draw;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

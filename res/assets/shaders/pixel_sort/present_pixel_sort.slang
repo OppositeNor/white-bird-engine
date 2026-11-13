@@ -27,9 +27,9 @@ struct VSOutput {
 /** Descriptor indices of the resources used by the present pass. */
 struct PresentPixelSortDescriptorIndices {
     /** The post-processed pixel-sorted image, from pixel_sorting_post_processing. */
-    [WBE_DESCRIPTOR("sampled_image", "pixel_sorting_post_processing_output")] uint2 sorted_image;
+    [wbe::descriptor("sampled_image", "pixel_sorting_post_processing_output")] uint2 sorted_image;
     /** Sampler used to scale the sorted image to the render target. */
-    [WBE_DESCRIPTOR("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
+    [wbe::descriptor("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
 };
 
 [vk::push_constant]

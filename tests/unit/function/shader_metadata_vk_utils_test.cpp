@@ -92,7 +92,7 @@ ShaderMetadataTypeField make_vertex_shader_field(
         field.type.element_count = p_component_count;
     }
     ShaderMetadataUserAttribute attribute;
-    attribute.name = "WBE_VERTEX_INPUT";
+    attribute.name = "wbe_vertex_input";
     if (!p_role.empty()) {
         ShaderMetadataUserAttributeArgument argument;
         argument.kind = "string";
@@ -132,7 +132,7 @@ ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name,
     field.binding.size = 8;
     field.binding.element_stride = 4;
     ShaderMetadataUserAttribute attribute;
-    attribute.name = "WBE_DESCRIPTOR";
+    attribute.name = "wbe_descriptor";
     ShaderMetadataUserAttributeArgument argument;
     argument.kind = "string";
     argument.string_value = p_descriptor_type;
@@ -157,7 +157,7 @@ ShaderMetadataTypeField make_default_push_field(
     field.binding.offset = p_offset;
     field.binding.size = 4;
     ShaderMetadataUserAttribute attribute;
-    attribute.name = "WBE_PUSH_CONSTANT";
+    attribute.name = "wbe_push_constant";
     ShaderMetadataUserAttributeArgument argument;
     argument.kind = "string";
     argument.string_value = p_value;

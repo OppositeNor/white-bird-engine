@@ -22,31 +22,31 @@ struct VertexInputAttributes {
     /**
      * @brief Position with an explicit reflected role.
      */
-    [WBE_VERTEX_INPUT("position")]
+    [wbe::vertex_input("position")]
     float3 position;
 
     /**
      * @brief Normal with an implicit reflected role.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 normal;
 
     /**
      * @brief Tangent with an implicit reflected role.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 tangent;
 
     /**
      * @brief Bitangent with an implicit reflected role.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float3 bitangent;
 
     /**
      * @brief Texture coordinate with an implicit reflected role.
      */
-    [WBE_VERTEX_INPUT]
+    [wbe::vertex_input]
     float2 uv;
 };
 

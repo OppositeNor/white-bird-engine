@@ -20,24 +20,24 @@
 // voxels show, instead of its edges; WBE_SVO_DEBUG_DRAW_OCCUPANCY colors each voxel by its injected occupancy.
 
 struct SVODebugDrawDescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_debug_draw_settings")]
+    [wbe::descriptor("uniform_buffer", "svo_debug_draw_settings")]
     uint2 settings;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_debug_draw_node_list", "read")]
+    [wbe::descriptor("storage_buffer", "svo_debug_draw_node_list", "read")]
     uint2 node_list;
 #if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
-    [WBE_DESCRIPTOR("storage_buffer", "svogi_occupancy_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svogi_occupancy_buffer", "read")]
     uint2 occupancy;
 #endif
 
-    [WBE_DESCRIPTOR("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

@@ -71,7 +71,7 @@ struct AliasContractAttribute
 
 /** @brief Marks a reflected field as a material texture descriptor index. */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct WBE_TEXTUREAttribute
+struct wbe_textureAttribute
 {
     /** @brief Texture role; an empty value selects the annotated variable name. */
     string texture_role = "";
@@ -101,22 +101,22 @@ struct AttributePayload
     [VariableContract("field")]
     float4 color;
     /** @brief First explicit texture-role index. */
-    [WBE_TEXTURE("role_1")]
+    [wbe::texture("role_1")]
     int texture_index_1;
     /** @brief Second explicit texture-role index. */
-    [WBE_TEXTURE("role_2")]
+    [wbe::texture("role_2")]
     int texture_index_2;
     /** @brief Third explicit texture-role index. */
-    [WBE_TEXTURE("role_3")]
+    [wbe::texture("role_3")]
     int texture_index_3;
     /** @brief Fourth explicit texture-role index. */
-    [WBE_TEXTURE("role_4")]
+    [wbe::texture("role_4")]
     int texture_index_4;
     /** @brief Fifth explicit texture-role index. */
-    [WBE_TEXTURE("role_5")]
+    [wbe::texture("role_5")]
     int texture_index_5;
     /** @brief Texture-role index that exercises variable-name fallback. */
-    [WBE_TEXTURE]
+    [wbe::texture]
     int texture_index_6;
 };
 

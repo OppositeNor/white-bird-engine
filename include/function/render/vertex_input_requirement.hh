@@ -26,7 +26,7 @@ namespace WhiteBirdEngine {
  * @class VertexInputRequirement
  * @brief Backend-neutral vertex input one shader vertex entry consumes, independent of any mesh. Copyable and movable.
  *
- * Produced by VertexInputContractResolver::resolve_requirement() from the WBE_VERTEX_INPUT fields of the entry; matching it
+ * Produced by VertexInputContractResolver::resolve_requirement() from the wbe::vertex_input fields of the entry; matching it
  * against a mesh's vertex bindings with VertexInputContractResolver::resolve() gives the VertexInputContract of a draw. Roles and
  * locations are unique.
  */

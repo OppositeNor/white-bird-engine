@@ -16,8 +16,8 @@
 #include "prefix_sum/large_prefix_scan_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "data_buffer", "read_write")] uint2 data_buffer;
-    [WBE_DESCRIPTOR("storage_buffer", "sections_buffer", "write")] uint2 sections_buffer;
+    [wbe::descriptor("storage_buffer", "data_buffer", "read_write")] uint2 data_buffer;
+    [wbe::descriptor("storage_buffer", "sections_buffer", "write")] uint2 sections_buffer;
 };
 
 [vk::push_constant]

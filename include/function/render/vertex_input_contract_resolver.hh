@@ -68,7 +68,7 @@ public:
 
     /**
      * @brief Collect the vertex input a shader vertex entry consumes, without a resource layout.
-     * @throws std::runtime_error When a WBE_VERTEX_INPUT field is not a located varying input or has an unsupported type, or a
+     * @throws std::runtime_error When a wbe::vertex_input field is not a located varying input or has an unsupported type, or a
      * role or location is duplicated.
      */
     VertexInputRequirement resolve_requirement(const ShaderMetadata& p_metadata, std::string_view p_entry_name) const;

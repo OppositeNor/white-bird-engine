@@ -17,15 +17,15 @@
 #include "svogi/svogi_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "atlas", "write")]
+    [wbe::descriptor("storage_buffer", "atlas", "write")]
     uint2 atlas;
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 

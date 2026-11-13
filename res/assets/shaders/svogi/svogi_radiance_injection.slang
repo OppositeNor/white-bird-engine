@@ -20,19 +20,19 @@
 #include "light/spot_light_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("uniform_buffer", "svo_info")]
+    [wbe::descriptor("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [WBE_DESCRIPTOR("storage_buffer", "index_buffer", "write")]
+    [wbe::descriptor("storage_buffer", "index_buffer", "write")]
     uint2 index_buffer;
-    [WBE_DESCRIPTOR("storage_buffer", "staged_buffer", "write")]
+    [wbe::descriptor("storage_buffer", "staged_buffer", "write")]
     uint2 staged_buffer;
-    [WBE_DESCRIPTOR("storage_buffer", "spot_light_infos", "read")]
+    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
-    [WBE_PUSH_CONSTANT("frame_slot")]
+    [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
     LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
 };
@@ -91,7 +91,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         // We treat the flux as small VPLs. We inject those VPLs into the voxels.
         uint subvoxel_index;
         float3 subvoxel_position = svo_pos_to_subvoxel_pos(trace_info.svo_position, subvoxel_index);
-        // We'll use the 3 most significant bit for recording the subvoxel index, and the rest are the data index.
+        // Encode data index and subvoxel_index together.
         uint key = 27 * data_index + subvoxel_index;
         local_index_buffer[index] = uint2(key, index);
         float3x3 radiance_vector = float3x3(subvoxel_position * color.r,

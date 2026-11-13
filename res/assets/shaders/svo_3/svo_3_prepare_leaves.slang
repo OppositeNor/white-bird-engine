@@ -17,9 +17,9 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescriptorIndices {
-    [WBE_DESCRIPTOR("storage_buffer", "svo_info", "read")] uint2 svo_info;
-    [WBE_DESCRIPTOR("storage_buffer", "svo_deferred_list", "read_write")] uint2 deferred_list;
-    [WBE_PUSH_CONSTANT("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::descriptor("storage_buffer", "svo_info", "read")] uint2 svo_info;
+    [wbe::descriptor("storage_buffer", "svo_deferred_list", "read_write")] uint2 deferred_list;
+    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]

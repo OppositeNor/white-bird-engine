@@ -30,9 +30,9 @@
 namespace WhiteBirdEngine {
 
 /**
- * @brief Resource category selected by a reflected WBE_DESCRIPTOR annotation.
+ * @brief Resource category selected by a reflected wbe::descriptor annotation.
  *
- * Reflected; the aliases are the type names written in WBE_DESCRIPTOR.
+ * Reflected; the aliases are the type names written in wbe::descriptor.
  */
 enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorHeapTypeVK : uint8_t {
     UNIFORM_BUFFER WBE_META(WBE_SERIALIZATION_ALIASES(uniform_buffer)),
@@ -44,10 +44,10 @@ enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorHeapTypeVK : uint8_t {
 };
 
 /**
- * @brief Shader access to a descriptor-heap resource, selected by the optional third WBE_DESCRIPTOR argument.
+ * @brief Shader access to a descriptor-heap resource, selected by the optional third wbe::descriptor argument.
  *
  * Uniform buffers, sampled images, samplers, and acceleration structures are always read. Storage buffers and storage images
- * default to READ_WRITE when the argument is omitted. Reflected; the aliases are the access names written in WBE_DESCRIPTOR.
+ * default to READ_WRITE when the argument is omitted. Reflected; the aliases are the access names written in wbe::descriptor.
  */
 enum class WBE_META(WBE_REFLECT_ENUM) ShaderDescriptorAccessVK : uint8_t {
     /** The shader only reads the resource. */
@@ -76,7 +76,7 @@ struct ShaderDescriptorHeapFieldVK {
 };
 
 /**
- * @brief Value source selected by a reflected WBE_PUSH_CONSTANT annotation.
+ * @brief Value source selected by a reflected wbe::push_constant annotation.
  */
 enum class ShaderDefaultPushValueVK : uint8_t {
     /** Elapsed renderer time as a float. */
@@ -88,7 +88,7 @@ enum class ShaderDefaultPushValueVK : uint8_t {
 };
 
 /**
- * @brief Scalar type of a reflected four-byte WBE_PUSH_CONSTANT field.
+ * @brief Scalar type of a reflected four-byte wbe::push_constant field.
  */
 enum class ShaderPushConstantTypeVK : uint8_t {
     UINT32,
@@ -136,7 +136,7 @@ VkShaderStageFlagBits shader_stage_flag_from_metadata_stage(std::string_view p_s
 /**
  * @brief Reflect and match one vertex entry point against the vertex bindings of a submesh.
  *
- * Every field marked WBE_VERTEX_INPUT must match an exact resource role and format declared by exactly one binding. Extra
+ * Every field marked wbe::vertex_input must match an exact resource role and format declared by exactly one binding. Extra
  * resource attributes and bindings are allowed. Locations come from the reflected varying-input binding indices. Only the
  * bindings the entry reads become Vulkan bindings, numbered from zero in binding order; source_bindings maps them back to
  * p_vertex_bindings. A vertex entry without annotated fields produces an empty vertex-less state.
@@ -163,12 +163,12 @@ VertexInputDescriptionVK build_vertex_input_description_vk(
  * @brief Collect the explicit uint2 descriptor-heap push-data contract used by one shader entry point.
  *
  * A descriptor-free entry point produces an empty layout. Otherwise it may use exactly one pushConstantBuffer parameter.
- * WBE_DESCRIPTOR fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments, and an
+ * wbe::descriptor fields must be eight-byte uint2 values with supported descriptor-type and resource-id string arguments, and an
  * optional access argument: `read`, `write`, or `read_write`. Only storage buffers and storage images may be written.
  * A resource id ending in `[]` is per element: inside element `i` of the nearest enclosing descriptor struct array,
  * `shadowmap[]` resolves to `shadowmap[i]`, so each element can be aliased to its own graph resource. Other resource ids
  * are shared by every element. An indexed resource id outside a descriptor struct array, or one without a name, is rejected.
- * WBE_PUSH_CONSTANT fields must be four-byte scalars with one non-empty identifier. `time` (float) and `frame_slot` (uint) are
+ * wbe::push_constant fields must be four-byte scalars with one non-empty identifier. `time` (float) and `frame_slot` (uint) are
  * renderer-provided; every other identifier declares a custom uint, int, or float value supplied by the owning task.
  *
  * @throws std::runtime_error When the reflected push-data or annotation contract is malformed.

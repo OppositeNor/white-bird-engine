@@ -27,7 +27,7 @@ namespace WhiteBirdEngine {
 
 static ShaderMetadataUserAttribute make_texture_contract_attribute(std::string_view p_role = {}) {
     ShaderMetadataUserAttribute result;
-    result.name = "WBE_TEXTURE";
+    result.name = "wbe_texture";
     if (!p_role.empty()) {
         ShaderMetadataUserAttributeArgument argument;
         argument.kind = "string";

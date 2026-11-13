@@ -26,9 +26,9 @@
 /** Descriptor indices of the two mip levels used by one max-downsample pass. */
 struct MaxDownsampleDescriptorIndices {
     /** Previous mip level, read with texel loads. */
-    [WBE_DESCRIPTOR("sampled_image", "max_downsample_source")] uint2 source;
+    [wbe::descriptor("sampled_image", "max_downsample_source")] uint2 source;
     /** Generated mip level. */
-    [WBE_DESCRIPTOR("storage_image", "max_downsample_destination", "write")] uint2 destination;
+    [wbe::descriptor("storage_image", "max_downsample_destination", "write")] uint2 destination;
 };
 
 [vk::push_constant]
