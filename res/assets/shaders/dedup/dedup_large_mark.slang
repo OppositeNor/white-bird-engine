@@ -30,6 +30,6 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [numthreads(WBE_DEDUP_LARGE_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     CountedBuffer<uint> keys = CountedBuffer<uint>(descriptor_indices.keys, descriptor_indices.shader_debug_frame_slot);
-    RWStructuredBuffer<uint> marks = ResourceDescriptorHeap[descriptor_indices.marks.x];
+    CountedBuffer<uint> marks = CountedBuffer<uint>(descriptor_indices.marks, descriptor_indices.shader_debug_frame_slot);
     dedup_large_mark(keys, marks, p_dispatch_thread_id.x);
 }

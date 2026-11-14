@@ -28,7 +28,7 @@
         if (!(p_condition)) { \
             report_shader_debug_error(p_error, p_frame_slot); \
         } \
-    } while (0)
+    } while (false)
 #else
 #define WBE_SHADER_DEBUG_ASSERT(p_condition, p_error, p_frame_slot)
 #endif

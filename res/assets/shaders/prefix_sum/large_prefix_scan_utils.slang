@@ -17,6 +17,7 @@
 #define WBE_FILE_LARGE_PREFIX_SCAN_UTILS_SLANG
 
 #include "prefix_sum/prefix_sum_utils.slang"
+#include "utils/counted_buffer.slang"
 
 // The large prefix scan computes the in-place inclusive prefix sum of a buffer in four passes:
 // 1. large_prefix_scan_blocks: each workgroup scans one block of WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE elements and stores the
@@ -25,19 +26,16 @@
 //    block totals and store the section total.
 // 3. large_prefix_scan_totals: one workgroup scans the section totals.
 // 4. large_prefix_scan_add: each workgroup adds to its block the sum of every earlier block.
-// The scanned buffer holds the element count at WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX and the elements from
-// WBE_LARGE_PREFIX_SCAN_DATA_START, the layout of the radix sort key buffers (see radix_sort_utils.slang). The sections
-// buffer holds the section totals, then the block totals.
+// The scanned buffer is a counted buffer of uint (see counted_buffer.slang), the layout of the radix sort key buffers (see
+// radix_sort_utils.slang). The sections buffer holds the section totals, then the block totals.
 
 // The number of invocations of the block passes; each owns 4 contiguous elements of a block.
-#define WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE 64
-#define WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE 256
+static const uint WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE = 64;
+static const uint WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE = 256;
 // The number of sections, which is also the number of section totals scanned by one workgroup.
-#define WBE_LARGE_PREFIX_SCAN_SECTION_NUM 256
-#define WBE_LARGE_PREFIX_SCAN_DATA_START 4
-#define WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX 0
-#define WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START 0
-#define WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START WBE_LARGE_PREFIX_SCAN_SECTION_NUM
+static const uint WBE_LARGE_PREFIX_SCAN_SECTION_NUM = 256;
+static const uint WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START = 0;
+static const uint WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START = WBE_LARGE_PREFIX_SCAN_SECTION_NUM;
 
 /**
  * @brief Get the number of blocks, and so of block-pass workgroups, of a large prefix scan.
@@ -75,21 +73,21 @@ uint large_prefix_scan_blocks_per_section(uint p_block_num) {
 // entry points) generic over the element type T and operator O : IOperator<T>, so SVOGI can run
 // SegmentedPrefix<float3x3, Add<float3x3>> over SegmentedWrapper<float3x3>; the block and section totals must then hold
 // T as well. Keep the uint instantiation for the existing users, and add tests next to the existing prefix scan tests.
-void large_prefix_scan_blocks(RWStructuredBuffer<uint> p_data, RWStructuredBuffer<uint> p_sections, uint p_block,
-        uint p_thread_id, __ref groupshared uint p_scratch[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE]) {
-    uint element_count = p_data[WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX];
+void large_prefix_scan_blocks<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
+        uint p_thread_id, __ref groupshared T p_scratch[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE]) {
+    uint element_count = p_data.size();
     uint thread_data_start = p_thread_id * 4;
     uint block_start = p_block * WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE;
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint element = block_start + thread_data_start + i;
-        p_scratch[thread_data_start + i] = element < element_count ? p_data[WBE_LARGE_PREFIX_SCAN_DATA_START + element] : 0;
+        p_scratch[thread_data_start + i] = select(element < element_count, p_data.get(element), O::identity());
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_sum_64_256<T, O>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint element = block_start + thread_data_start + i;
         if (element < element_count) {
-            p_data[WBE_LARGE_PREFIX_SCAN_DATA_START + element] = p_scratch[thread_data_start + i];
+            p_data.set(element, p_scratch[thread_data_start + i]);
         }
     }
     if (p_thread_id == WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE - 1) {
@@ -109,13 +107,13 @@ void large_prefix_scan_blocks(RWStructuredBuffer<uint> p_data, RWStructuredBuffe
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  * @param p_scratch Scratch array of one element per invocation; its contents are overwritten.
  */
-void large_prefix_scan_sections(RWStructuredBuffer<uint> p_data, RWStructuredBuffer<uint> p_sections, uint p_section,
-        uint p_thread_id, __ref groupshared uint p_scratch[WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE]) {
-    uint block_num = large_prefix_scan_block_num(p_data[WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX]);
+void large_prefix_scan_sections<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_section,
+        uint p_thread_id, __ref groupshared T p_scratch[WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE]) {
+    uint block_num = large_prefix_scan_block_num(p_data.size());
     uint blocks_per_section = large_prefix_scan_blocks_per_section(block_num);
     uint section_begin = min(p_section * blocks_per_section, block_num);
     uint section_end = min(section_begin + blocks_per_section, block_num);
-    uint total = workgroup_general_prefix_sum<uint, Add<uint>, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE>(p_sections,
+    T total = workgroup_general_prefix_sum<T, O, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE>(p_sections,
         WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START + section_begin, section_end - section_begin, p_thread_id, p_scratch);
     if (p_thread_id == 0) {
         p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + p_section] = total;
@@ -131,14 +129,14 @@ void large_prefix_scan_sections(RWStructuredBuffer<uint> p_data, RWStructuredBuf
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  * @param p_scratch Scratch array of one element per section; its contents are overwritten.
  */
-void large_prefix_scan_totals(RWStructuredBuffer<uint> p_sections, uint p_thread_id,
-        __ref groupshared uint p_scratch[WBE_LARGE_PREFIX_SCAN_SECTION_NUM]) {
+void large_prefix_scan_totals<T, O: IOperator<T>>(RWStructuredBuffer<T> p_sections, uint p_thread_id,
+        __ref groupshared T p_scratch[WBE_LARGE_PREFIX_SCAN_SECTION_NUM]) {
     uint thread_data_start = p_thread_id * 4;
     [unroll] for (uint i = 0; i < 4; ++i) {
         p_scratch[thread_data_start + i] = p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + thread_data_start + i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_sum_64_256<T, O>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + thread_data_start + i] = p_scratch[thread_data_start + i];
     }
@@ -154,23 +152,23 @@ void large_prefix_scan_totals(RWStructuredBuffer<uint> p_sections, uint p_thread
  * @param p_block The block of this workgroup, in [0, large_prefix_scan_block_num(element count)).
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  */
-void large_prefix_scan_add(RWStructuredBuffer<uint> p_data, RWStructuredBuffer<uint> p_sections, uint p_block,
+void large_prefix_scan_add<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
         uint p_thread_id) {
     if (p_block == 0) {
         return;
     }
-    uint element_count = p_data[WBE_LARGE_PREFIX_SCAN_ELEMENT_COUNT_INDEX];
+    uint element_count = p_data.size();
     uint previous_block = p_block - 1;
     uint previous_section = previous_block / large_prefix_scan_blocks_per_section(large_prefix_scan_block_num(element_count));
-    uint offset = p_sections[WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START + previous_block];
+    T offset = p_sections[WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START + previous_block];
     if (previous_section > 0) {
-        offset += p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + previous_section - 1];
+        offset = O::apply(p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + previous_section - 1], offset);
     }
     uint element_start = p_block * WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE + p_thread_id * 4;
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint element = element_start + i;
         if (element < element_count) {
-            p_data[WBE_LARGE_PREFIX_SCAN_DATA_START + element] += offset;
+            p_data.set(element, O::apply(offset, p_data.get(element)));
         }
     }
 }

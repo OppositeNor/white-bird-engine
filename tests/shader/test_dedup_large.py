@@ -41,7 +41,7 @@ def deduplicate(p_device: spy.Device, p_load_kernel: KernelLoader, p_sorted_keys
     key_data = make_scan_data(p_sorted_keys)
     key_data[0] = key_count * KEY_BYTE_SIZE
     keys = create_buffer(p_device, key_data)
-    # The marks overwrite the guard-filled elements, and the scan reads the count the marks write.
+    # The marks overwrite the guard-filled elements, and the scan reads the byte size the marks write.
     marks = create_buffer(p_device, np.full(DATA_START + key_count + GUARD_COUNT, GUARD_VALUE, dtype=np.uint32))
     unique_keys = create_buffer(p_device, np.full(DATA_START + key_count + GUARD_COUNT, GUARD_VALUE, dtype=np.uint32))
     buffers = {"keys": keys, "marks": marks, "unique_keys": unique_keys}

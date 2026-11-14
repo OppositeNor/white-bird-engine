@@ -32,7 +32,7 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     uint frame_slot = descriptor_indices.shader_debug_frame_slot;
     CountedBuffer<uint> keys = CountedBuffer<uint>(descriptor_indices.keys, frame_slot);
-    RWStructuredBuffer<uint> marks = ResourceDescriptorHeap[descriptor_indices.marks.x];
+    CountedBuffer<uint> marks = CountedBuffer<uint>(descriptor_indices.marks, frame_slot);
     CountedBuffer<uint> unique_keys = CountedBuffer<uint>(descriptor_indices.unique_keys, frame_slot);
     dedup_large_scatter(keys, marks, unique_keys, p_dispatch_thread_id.x);
 }

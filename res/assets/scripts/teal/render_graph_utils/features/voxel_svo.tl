@@ -21,7 +21,8 @@
 -- the SVO buffers with initial contents or state both deferred graphs share, which every graph imports by the names the
 -- shaders reflect, and the module declares the scratch buffers each frame rewrites before reading. See ISVORenderFeature in
 -- tests/executable/function/render/deferred_test/i_svo_render_feature.hh.
-local sort = require("render_graph_utils.sort")
+-- Disabled with the SVOGI radiance sort below until the large prefix scan is generic (TODO(3)).
+-- local sort = require("render_graph_utils.sort")
 
 local type wbe = require("wbe")
 local type voxel = require("render_graph_utils.features.voxel")
@@ -387,16 +388,17 @@ local function add_svogi_injection(builder: Builder)
     }, { name = "inject_svogi_radiance", bindings = radiance_bindings })
     -- TODO(2): Sort the (key, index) pairs in svogi_radiance_index_buffer by key with sort.radix_sort_key_value_task()
     -- (render_graph_utils/sort.tl; pixel_sort.tl is an example). The counted buffer's count drives the indirect dispatches.
-    local radiance_sort_buffers = sort.radix_sort_buffers({
-        name = "svogi_radiance_sort",
-        max_element_count = (parameters.buffer_sizes.radiance_index),
-        key_type = "uint2",
-    })
-    buffers.svogi_radiance_index_buffer = radiance_sort_buffers.keys
-    tasks.radiance_sort = sort.radix_sort_key_value_task(radiance_sort_buffers, {
-        name = "SVOGI Radiance sort",
-        queue_family = "GRAPHICS",
-    })
+    -- Disabled until the large prefix scan is generic (TODO(3)); restore it with the sort require at the top.
+    -- local radiance_sort_buffers = sort.radix_sort_buffers({
+    --     name = "svogi_radiance_sort",
+    --     max_element_count = (parameters.buffer_sizes.radiance_index),
+    --     key_type = "uint2",
+    -- })
+    -- buffers.svogi_radiance_index_buffer = radiance_sort_buffers.keys
+    -- tasks.radiance_sort = sort.radix_sort_key_value_task(radiance_sort_buffers, {
+    --     name = "SVOGI Radiance sort",
+    --     queue_family = "GRAPHICS",
+    -- })
     -- TODO(4): After the sort, add the reduction tasks:
     --   a. A compute pass that gathers svogi_radiance_staged_buffer through the sorted indices and sets each entry's
     --      `break` to 1 where its key differs from the previous key (and on the first entry).

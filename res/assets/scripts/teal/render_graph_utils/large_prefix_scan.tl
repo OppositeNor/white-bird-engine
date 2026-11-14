@@ -17,15 +17,16 @@
 -- is scanned and its total stored, 256 sections of the block totals are scanned and their totals stored, the section
 -- totals are scanned in one workgroup, and every block adds the sum of the blocks before it. The application compiles the pipelines under their shader ids (large_prefix_scan_prepare_dispatch,
 -- large_prefix_scan_blocks, large_prefix_scan_sections, large_prefix_scan_totals, and large_prefix_scan_add). The
--- scanned buffer holds the element count in its metadata, followed by the elements; see large_prefix_scan_utils.slang.
+-- scanned buffer is a counted buffer of uint: a header holding the byte size of the elements, followed by the elements;
+-- see large_prefix_scan_utils.slang and counted_buffer.slang.
 
 local math_utils = require("utils.math")
 local graph = require("render_graph_utils.render_graph_utils")
 
 local ceil_div = math_utils.ceil_div
 
--- Must match WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE, WBE_LARGE_PREFIX_SCAN_SECTION_NUM, and WBE_LARGE_PREFIX_SCAN_DATA_START in
--- large_prefix_scan_utils.slang.
+-- Must match WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE and WBE_LARGE_PREFIX_SCAN_SECTION_NUM in large_prefix_scan_utils.slang, and
+-- LARGE_PREFIX_SCAN_DATA_START the header uints, WBE_COUNTED_BUFFER_HEADER_WORD_NUM in counted_buffer.slang.
 local LARGE_PREFIX_SCAN_BLOCK_SIZE = 256
 local LARGE_PREFIX_SCAN_SECTION_NUM = 256
 local LARGE_PREFIX_SCAN_DATA_START = 4
@@ -83,7 +84,7 @@ function large_prefix_scan.data_buffer_size(max_element_count: integer): integer
 end
 
 -- The dispatches that compute the inclusive prefix sum of data in place, bound to the handles of data and buffers.
--- Each pass follows the previous one, and the passes read the element count from data, so the count must be written
+-- Each pass follows the previous one, and the passes read the element count from the header of data, so the count must be written
 -- before they run and must not exceed the maximum element count buffers was sized for.
 function large_prefix_scan.dispatches(data: graph.Resource,
     buffers: large_prefix_scan.LargePrefixScanBuffers): {graph.RTParamsComputeDispatchVK}

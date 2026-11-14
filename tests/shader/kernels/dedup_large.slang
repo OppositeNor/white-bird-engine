@@ -21,15 +21,16 @@
 #include "dedup/dedup_large_utils.slang"
 
 RWByteAddressBuffer keys;
-RWStructuredBuffer<uint> marks;
+RWByteAddressBuffer marks;
 RWByteAddressBuffer unique_keys;
 
 [shader("compute")]
 [numthreads(WBE_DEDUP_LARGE_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #if KERNEL_PASS == 0
-    dedup_large_mark(CountedBuffer<uint>(keys, 0), marks, p_dispatch_thread_id.x);
+    dedup_large_mark(CountedBuffer<uint>(keys, 0), CountedBuffer<uint>(marks, 0), p_dispatch_thread_id.x);
 #else
-    dedup_large_scatter(CountedBuffer<uint>(keys, 0), marks, CountedBuffer<uint>(unique_keys, 0), p_dispatch_thread_id.x);
+    dedup_large_scatter(CountedBuffer<uint>(keys, 0), CountedBuffer<uint>(marks, 0), CountedBuffer<uint>(unique_keys, 0),
+        p_dispatch_thread_id.x);
 #endif
 }
