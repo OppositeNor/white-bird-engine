@@ -78,7 +78,7 @@ Ref<IRenderObject> RRComputePipelineVK::compile_typed(
         .render_data = render_data,
         .render_cache = renderer->get_global_render_cache(),
     };
-    return ComputePipelineCompilerVK(context).compile(p_key, shader).compute_pipeline;
+    return ComputePipelineCompilerVK(context).compile(p_key, shader, p_params.variant).compute_pipeline;
 }
 
 } // namespace WhiteBirdEngine

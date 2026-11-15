@@ -20,6 +20,8 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_macro_value.hh"
+#include "function/render/shader_variant_resolver.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -37,22 +39,47 @@ class ROShaderVK;
 /**
  * @struct ShaderDescVK
  * @brief Resource creation description; copyable and movable.
- * Copying duplicates the owned SPIR-V words; moving transfers them. Source resources need not outlive this description.
+ * Copying duplicates the owned SPIR-V words of every variant; moving transfers them. Source resources need not outlive
+ * this description.
  */
 struct ShaderDescVK {
     friend ROShaderVK;
-    // The source code of the shader.
-    Required<std::vector<uint32_t>> code;
-    // Size of the code in SPIR-V words.
-    Required<size_t> code_size;
+    /**
+     * @class Variant
+     * @brief SPIR-V words of one macro variant.
+     */
+    struct Variant {
+        /**
+         * @brief The variant's key (ShaderVariantResolver::make_key()).
+         */
+        HashCode key = 0;
+        /**
+         * @brief The variant's SPIR-V words.
+         */
+        std::vector<uint32_t> code;
+    };
+    /**
+     * @brief The macros the variants enumerate; empty for a shader without macros.
+     */
+    std::vector<ShaderMacroDeclaration> macro_declarations;
+    /**
+     * @brief The variants, sorted by unique key.
+     */
+    Required<std::vector<Variant>> variants;
 
-    // Set the shader source code.
+    /**
+     * @brief Set the source code of a shader without macros, as its only variant.
+     */
     ShaderDescVK& set_code(std::span<const uint32_t> p_code);
 
-    // Set from a resource ID.
+    /**
+     * @brief Set every variant from a resource ID.
+     */
     ShaderDescVK& set_code(std::string_view p_resource_id);
 
-    // Set from a resource.
+    /**
+     * @brief Set every variant from a resource.
+     */
     ShaderDescVK& set_code(RefRes<RUShader> p_resource);
 
     /**
@@ -68,12 +95,12 @@ struct ShaderDescVK {
     Unique<ROShaderVK> create_unique(const RenderContextVK* p_render_context) const;
 
 private:
-    VkShaderModule create_vk_object(const RenderContextVK* p_render_data) const;
+    static VkShaderModule create_vk_object(const RenderContextVK* p_render_data, const Variant& p_variant);
 };
 
 /**
- * @class ShaderVK
- * @brief Shader class for Vulkan.
+ * @class ROShaderVK
+ * @brief Shader class for Vulkan. Holds one shader module per macro variant of its source, all created eagerly.
  *
  */
 class WBE_META(WBE_RENDER_OBJECT) ROShaderVK final : public IRenderObjectVK {
@@ -117,14 +144,31 @@ public:
     ROShaderVK(const RenderContextVK* p_render_context, RefRes<RUShader> p_resource);
 
     /**
-     * @brief Get the shader module.
+     * @brief Get the shader module of the variant defining no macros beyond the defaults; same as get_variant({}).
      *
      * @return The shader module.
+     * @throws std::runtime_error When the empty selection names no variant.
      */
     VkShaderModule get_shader_module() const;
 
+    /**
+     * @brief Get the shader module of the variant a macro selection names, by binary search.
+     *
+     * @param p_selection The selected macro values; see ShaderVariantResolver::resolve_key() for the defaults of the
+     * macros it leaves out.
+     * @return The variant's shader module, owned by this object.
+     * @throws std::runtime_error When the selection is invalid or names no variant.
+     */
+    VkShaderModule get_variant(const std::vector<ShaderMacroValue>& p_selection = {}) const;
+
 private:
-    VkShaderModule shader_module = VK_NULL_HANDLE;
+    struct VariantModule {
+        HashCode key = 0;
+        VkShaderModule module = VK_NULL_HANDLE;
+    };
+    std::vector<ShaderMacroDeclaration> macro_declarations;
+    // Sorted by key.
+    std::vector<VariantModule> variant_modules;
 
     void init(const Builder& p_builder);
 };

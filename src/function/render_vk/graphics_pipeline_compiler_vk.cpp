@@ -83,9 +83,11 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
     Ref<ROShaderVK> vertex_shader = compile_shader(p_pipeline_resource->vertex_stage);
     Ref<ROShaderVK> geometry_shader = MEM_NULL;
     Ref<ROShaderVK> fragment_shader = compile_shader(p_pipeline_resource->fragment_stage);
-    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline_resource->vertex_stage);
+    std::vector<ShaderMacroValue> vertex_variant = p_pipeline_resource->vertex_stage_variant.to_selection();
+    std::vector<ShaderMacroValue> fragment_variant = p_pipeline_resource->fragment_stage_variant.to_selection();
+    ShaderMetadata vertex_metadata = ShaderMetadataLoader().load(p_pipeline_resource->vertex_stage, vertex_variant);
     std::optional<ShaderMetadata> geometry_metadata;
-    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline_resource->fragment_stage);
+    ShaderMetadata fragment_metadata = ShaderMetadataLoader().load(p_pipeline_resource->fragment_stage, fragment_variant);
     std::string vertex_entry = resolve_pipeline_stage_entry(vertex_metadata, "vertex", p_pipeline_resource->vertex_stage_entry);
     std::string geometry_entry;
     if (p_pipeline_resource->geometry_stage != nullptr) {
@@ -96,7 +98,8 @@ GraphicsPipelineCompilerVK::CompileResult GraphicsPipelineCompilerVK::compile(
                 "Failed to compile graphics pipeline '{}': geometry shaders are not supported by this device.", p_resource_key));
         }
         geometry_shader = compile_shader(p_pipeline_resource->geometry_stage);
-        geometry_metadata = ShaderMetadataLoader().load(p_pipeline_resource->geometry_stage);
+        geometry_metadata = ShaderMetadataLoader().load(p_pipeline_resource->geometry_stage,
+            p_pipeline_resource->geometry_stage_variant.to_selection());
         geometry_entry = resolve_pipeline_stage_entry(*geometry_metadata, "geometry", p_pipeline_resource->geometry_stage_entry);
     }
     std::string fragment_entry = resolve_pipeline_stage_entry(fragment_metadata, "fragment", p_pipeline_resource->fragment_stage_entry);
@@ -127,9 +130,16 @@ Ref<ROGraphicsPipelineVK> GraphicsPipelineCompilerVK::compile_graphics_pipeline(
     std::string_view p_geometry_stage_entry,
     std::string_view p_fragment_stage_entry) {
     ROGraphicsPipelineVK::Config::ShaderConfig shader_config;
-    shader_config.set_shaders(p_vertex_shader, p_fragment_shader, p_vertex_stage_entry, p_fragment_stage_entry);
+    shader_config.set_shaders(p_vertex_shader,
+        p_fragment_shader,
+        p_vertex_stage_entry,
+        p_fragment_stage_entry,
+        p_pipeline_resource.vertex_stage_variant.to_selection(),
+        p_pipeline_resource.fragment_stage_variant.to_selection());
     if (p_geometry_shader != MEM_NULL) {
-        shader_config.set_geometry_shader(p_geometry_shader, p_geometry_stage_entry);
+        shader_config.set_geometry_shader(p_geometry_shader,
+            p_geometry_stage_entry,
+            p_pipeline_resource.geometry_stage_variant.to_selection());
     }
     auto pipeline_builder = ROGraphicsPipelineVK::Builder().default_render_opaque_configuration(context.render_data, shader_config);
     pipeline_builder.config.attachment_config.set_color_formats(context.color_attachment_formats)

@@ -20,10 +20,12 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_pipeline_vk.hh"
+#include "function/render/shader_macro_value.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 #include <string>
 #include <string_view>
+#include <vector>
 #include <vulkan/vulkan_core.h>
 namespace WhiteBirdEngine {
 
@@ -46,6 +48,8 @@ struct ComputePipelineDescVK {
         std::string entry_function = "main";
         /** Shader instance. */
         Ref<ROShaderVK> shader;
+        /** Macro values selecting the shader's variant; empty selects the default variant. */
+        std::vector<ShaderMacroValue> variant;
     };
 
     // Compute shader stage.
@@ -56,10 +60,13 @@ struct ComputePipelineDescVK {
      *
      * @param p_shader The shader instance.
      * @param p_entry_function The shader entry function.
+     * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
      * @return *this.
      */
-    ComputePipelineDescVK& set_shader_stage(Ref<ROShaderVK> p_shader, std::string_view p_entry_function = "main") {
-        shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader};
+    ComputePipelineDescVK& set_shader_stage(Ref<ROShaderVK> p_shader,
+        std::string_view p_entry_function = "main",
+        const std::vector<ShaderMacroValue>& p_variant = {}) {
+        shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = p_variant};
         return *this;
     }
 

@@ -46,20 +46,18 @@ color_blend = false
 id = "rsm_spot_shader"
 source_type = "shader"
 src = "assets/shaders/shadowmap_spot/rsm_spot.slang"
-
-[[resources]]
-id = "rsm_spot_mesh_transform_shader"
-source_type = "shader"
-src = "assets/shaders/shadowmap_spot/rsm_spot.slang"
+# WBE_MESH_TRANSFORM applies the entity's mesh transform, for placed meshes.
 macros = [
-    { name = "WBE_MESH_TRANSFORM" },
+    { macro = "WBE_MESH_TRANSFORM", options = ["1"], optional = true },
 ]
 
 [[resources]]
 id = "rsm_spot_dynamic"
 type = "graphics_pipeline"
-vertex_stage_id = "rsm_spot_mesh_transform_shader"
-fragment_stage_id = "rsm_spot_mesh_transform_shader"
+vertex_stage_id = "rsm_spot_shader"
+vertex_stage_variant = [{ macro = "WBE_MESH_TRANSFORM", value = "1" }]
+fragment_stage_id = "rsm_spot_shader"
+fragment_stage_variant = [{ macro = "WBE_MESH_TRANSFORM", value = "1" }]
 fragment_stage_entry = "fragment_main"
 depth_test = true
 depth_write = true

@@ -2267,6 +2267,47 @@ TEST_F(ResourcePopulatorTest, MaterialPipelineVariant) {
     EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, empty_parser.get_data()), std::runtime_error);
 }
 
+TEST_F(ResourcePopulatorTest, ShaderRejectsVariantsSharingAMacroCombination) {
+    WBE::ResourceUnitLoaderShader loader;
+    WBE::StackAllocator stack_allocator(256 * 1024);
+    std::stringstream stream;
+    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
+        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    };
+    auto res_chunk = MockResourceChunk::Builder()
+                         .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
+                         .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
+                             [&stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
+                             }))
+                         .build(stream);
+    constexpr std::string_view JSON_BUFFER = R"(
+    {
+        "id": "duplicate_variant_shader",
+        "type": "shader",
+        "macros": [{ "macro": "WBE_TEST_VARIANT", "options": ["1"] }],
+        "variants": [
+            {
+                "macros": [{ "macro": "WBE_TEST_VARIANT", "value": "1" }],
+                "path": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.spv",
+                "metadata": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json"
+            },
+            {
+                "macros": [{ "macro": "WBE_TEST_VARIANT", "value": "1" }],
+                "path": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.spv",
+                "metadata": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json"
+            }
+        ]
+    }
+    )";
+    WBE::ParserJSON parser;
+    parser.parse_from_buffer(JSON_BUFFER);
+
+    EXPECT_THROW(loader.populate_scheme_from_data(*res_chunk, parser.get_data()), std::runtime_error);
+}
+
 TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
     WBE::ResourceUnitLoaderGraphicsPipeline loader;
     WBE::StackAllocator stack_allocator(64 * 1024);
@@ -2318,6 +2359,7 @@ TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
         "vertex_stage_entry": "vertex_main",
         "fragment_stage_id": "fragment_shader",
         "fragment_stage_entry": "fragment_main",
+        "fragment_stage_variant": [{ "macro": "WBE_TEST_VARIANT", "value": "2" }],
         "depth_test": false,
         "depth_write": false,
         "cull_backfaces": false,
@@ -2336,6 +2378,9 @@ TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
     EXPECT_EQ(captured_pipeline->fragment_stage.get(), fragment_shader_ref.get());
     EXPECT_STREQ(captured_pipeline->vertex_stage_entry.get(), "vertex_main");
     EXPECT_STREQ(captured_pipeline->fragment_stage_entry.get(), "fragment_main");
+    EXPECT_EQ(captured_pipeline->vertex_stage_variant.count, 0);
+    const std::vector<WBE::ShaderMacroValue> fragment_variant = captured_pipeline->fragment_stage_variant.to_selection();
+    EXPECT_EQ(fragment_variant, (std::vector<WBE::ShaderMacroValue>{{.macro = "WBE_TEST_VARIANT", .value = "2"}}));
     EXPECT_FALSE(captured_pipeline->depth_test);
     EXPECT_FALSE(captured_pipeline->depth_write);
     EXPECT_FALSE(captured_pipeline->cull_backfaces);

@@ -46,7 +46,7 @@ id = "svo_2_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
 macros = [
-    { name = "WBE_USE_PING_WRITE" },
+    { macro = "WBE_USE_PING_WRITE", options = ["1"] },
 ]
 
 [[resources]]
@@ -61,8 +61,8 @@ src = "assets/shaders/svo_2/svo_build_static_mesh.slang"
 depth_test = false
 cull_backfaces = false
 macros = [
-    { name = "WBE_DYNAMIC_BUILD" },
-    { name = "WBE_MESH_TRANSFORM" },
+    { macro = "WBE_DYNAMIC_BUILD", options = ["1"] },
+    { macro = "WBE_MESH_TRANSFORM", options = ["1"] },
 ]
 
 [[resources]]
@@ -81,7 +81,7 @@ id = "svo_2_dynamic_build_deferred_propagation_pong_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
 macros = [
-    { name = "WBE_DYNAMIC_BUILD" },
+    { macro = "WBE_DYNAMIC_BUILD", options = ["1"] },
 ]
 
 [[resources]]
@@ -89,8 +89,8 @@ id = "svo_2_dynamic_build_deferred_propagation_ping_write_shader"
 source_type = "shader"
 src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang"
 macros = [
-    { name = "WBE_USE_PING_WRITE" },
-    { name = "WBE_DYNAMIC_BUILD" },
+    { macro = "WBE_USE_PING_WRITE", options = ["1"] },
+    { macro = "WBE_DYNAMIC_BUILD", options = ["1"] },
 ]
 
 [[resources]]

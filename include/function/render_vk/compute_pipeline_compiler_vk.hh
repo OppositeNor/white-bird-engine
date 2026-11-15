@@ -20,12 +20,14 @@
 #include "function/render/global_render_cache.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_macro_value.hh"
 #include "function/render_vk/pipeline_compiler_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/ro_shader_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <string_view>
+#include <vector>
 
 namespace WhiteBirdEngine {
 
@@ -51,13 +53,25 @@ public:
 
     explicit ComputePipelineCompilerVK(const ComputePipelineCompilerVKContext& p_context);
 
-    CompileResult compile(std::string_view p_resource_key, RefRes<RUShader> p_shader_resource);
+    /**
+     * @brief Compile a variant of a compute shader resource into a pipeline cached under p_resource_key.
+     *
+     * @param p_resource_key The pipeline's cache key.
+     * @param p_shader_resource The compute shader resource.
+     * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
+     * @return The compiled pipeline.
+     */
+    CompileResult compile(std::string_view p_resource_key,
+        RefRes<RUShader> p_shader_resource,
+        const std::vector<ShaderMacroValue>& p_variant = {});
 
 private:
     ComputePipelineCompilerVKContext context;
 
-    Ref<ROComputePipelineVK> compile_compute_pipeline(
-        std::string_view p_resource_key, Ref<ROShaderVK> p_compute_shader, std::string_view p_compute_entry);
+    Ref<ROComputePipelineVK> compile_compute_pipeline(std::string_view p_resource_key,
+        Ref<ROShaderVK> p_compute_shader,
+        std::string_view p_compute_entry,
+        const std::vector<ShaderMacroValue>& p_variant);
 };
 
 } // namespace WhiteBirdEngine

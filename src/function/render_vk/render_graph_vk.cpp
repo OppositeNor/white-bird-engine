@@ -726,8 +726,10 @@ Ref<ROGraphicsPipelineVK> RenderGraphVK::register_graphics_pipeline(
     return register_graphics_pipeline(p_key, std::move(p_options));
 }
 
-Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(std::string_view p_key, RefRes<RUShader> p_shader) {
-    return register_compute_pipeline(p_key, RDParamsComputePipelineVK{.shader = require_resource_key(p_shader.get(), "shader", p_key)});
+Ref<ROComputePipelineVK> RenderGraphVK::register_compute_pipeline(
+    std::string_view p_key, RefRes<RUShader> p_shader, std::vector<ShaderMacroValue> p_variant) {
+    return register_compute_pipeline(p_key,
+        RDParamsComputePipelineVK{.shader = require_resource_key(p_shader.get(), "shader", p_key), .variant = std::move(p_variant)});
 }
 
 RenderGraphVK::~RenderGraphVK() {

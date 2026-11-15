@@ -1694,7 +1694,7 @@ TEST_F(WBERendGraphScriptVKResourceTest, RunsTheShippedDeferredRecipeWithItsVoxe
     ASSERT_NE(indirect_lighting, nullptr);
     const DataValue::List& indirect_branches = indirect_lighting->get_entry("branches").as_list();
     ASSERT_EQ(indirect_branches.size(), 2U);
-    EXPECT_EQ(indirect_branches[1].get_entry("params").get_value<std::string>("pipeline"), "indirect_lighting_rsm_debug_view_shader");
+    EXPECT_EQ(indirect_branches[1].get_entry("params").get_value<std::string>("pipeline"), "indirect_lighting_rsm_shader[WBE_VOXEL_DEBUG_VIEW=1]");
     EXPECT_EQ(indirect_lighting->get_entry("select").get_value<std::string>("event"), "test.voxel_debug_view.lighting");
     EXPECT_EQ(indirect_lighting->get_entry("aliases").get_value<std::string>("shadowmap_color[1]"),
         named_id(mipmap, "shadowmap_color_1", "image_view"));

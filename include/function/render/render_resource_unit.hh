@@ -18,6 +18,8 @@
 #include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
+#include "function/render/shader_macro_value.hh"
+#include "function/render/shader_variant_resolver.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -42,17 +44,65 @@
 namespace WhiteBirdEngine {
 
 /**
+ * @class RUSchemaShaderMacro
+ * @brief A macro a shader resource enumerates variants over.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaShaderMacro {
+    /**
+     * @brief The macro's name.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string macro;
+    /**
+     * @brief The values the macro takes in the variants.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::vector<std::string> options;
+    /**
+     * @brief Whether some variants leave the macro undefined.
+     */
+    WBE_META(WBE_REFLECT)
+    bool optional = false;
+};
+
+/**
+ * @class RUSchemaShaderVariant
+ * @brief One compiled macro combination of a shader resource.
+ */
+struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaShaderVariant {
+    /**
+     * @brief The macros the variant defines; the declared macros absent here are undefined.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMacroValue> macros;
+    /**
+     * @brief The path to the variant's SPIR-V file.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string path;
+    /**
+     * @brief The path to the variant's metadata file.
+     */
+    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
+    std::string metadata;
+};
+
+/**
  * @class RUSchemaShader
  * @brief The scheme of RUShader.
  */
 struct WBE_META(WBE_SERIALIZABLE) RUSchemaShader : public RUSchema {
     WBE_DECL_SERIALIZABLE(RUSchemaShader)
-    // The path to the shader file.
+    /**
+     * @brief The macros the variants enumerate.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<RUSchemaShaderMacro> macros;
+    /**
+     * @brief Every macro combination, each compiled separately; the ACP emits one per combination.
+     */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string path;
-    // The path to the shader's metadata file.
-    WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string metadata;
+    std::vector<RUSchemaShaderVariant> variants;
 };
 
 /**
@@ -70,6 +120,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // The vertex shader of the pipeline.
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaShader> vertex_stage;
+    /**
+     * @brief Macro values selecting the vertex shader's variant; see ShaderVariantResolver.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMacroValue> vertex_stage_variant;
     // The resource ID of the tessellation shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> tessellation_stage_id;
@@ -79,6 +134,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // The tessellation shader of the pipeline.
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaShader> tessellation_stage;
+    /**
+     * @brief Macro values selecting the tessellation shader's variant; see ShaderVariantResolver.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMacroValue> tessellation_stage_variant;
     // The resource ID of the geometry shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> geometry_stage_id;
@@ -88,6 +148,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // The geometry shader of the pipeline.
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaShader> geometry_stage;
+    /**
+     * @brief Macro values selecting the geometry shader's variant; see ShaderVariantResolver.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMacroValue> geometry_stage_variant;
     // The resource ID of the fragment shader.
     WBE_META(WBE_REFLECT)
     std::optional<std::string> fragment_stage_id;
@@ -97,6 +162,11 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaGraphicsPipeline : public RUSchema {
     // The fragment shader of the pipeline.
     WBE_META(WBE_REFLECT)
     std::optional<RUSchemaShader> fragment_stage;
+    /**
+     * @brief Macro values selecting the fragment shader's variant; see ShaderVariantResolver.
+     */
+    WBE_META(WBE_REFLECT)
+    std::vector<ShaderMacroValue> fragment_stage_variant;
     // Should enable depth test.
     WBE_META(WBE_REFLECT)
     bool depth_test = true;
@@ -413,9 +483,92 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaSDF : public RUSchema {
 };
 
 /**
+ * @class RUShaderMacro
+ * @brief A macro declaration of a shader resource, with its strings in the resource's chunk.
+ */
+struct RUShaderMacro {
+    /**
+     * @brief The macro's name, NUL-terminated.
+     */
+    RefRes<char> macro;
+    /**
+     * @brief The macro's options, option_count NUL-terminated strings.
+     */
+    RefRes<RefRes<char>> options;
+    /**
+     * @brief The number of options.
+     */
+    size_t option_count = 0;
+    /**
+     * @brief Whether some variants leave the macro undefined.
+     */
+    bool optional = false;
+};
+
+/**
+ * @class RUShaderVariant
+ * @brief One compiled macro combination of a shader resource.
+ */
+struct RUShaderVariant {
+    /**
+     * @brief The variant's key (ShaderVariantResolver::make_key() of the macros it defines).
+     */
+    HashCode key = 0;
+    /**
+     * @brief The SPIR-V words.
+     */
+    RefRes<uint32_t> data;
+    /**
+     * @brief The number of SPIR-V words.
+     */
+    size_t size = 0;
+    /**
+     * @brief The path to the variant's metadata, NUL-terminated.
+     */
+    RefRes<char> metadata_path;
+};
+
+/**
+ * @class RUShaderMacroValue
+ * @brief A macro value of a stored variant selection, with its strings in the resource's chunk.
+ */
+struct RUShaderMacroValue {
+    /**
+     * @brief The macro's name, NUL-terminated.
+     */
+    RefRes<char> macro;
+    /**
+     * @brief The macro's value, NUL-terminated.
+     */
+    RefRes<char> value;
+};
+
+/**
+ * @class RUShaderVariantSelection
+ * @brief A stored shader variant selection: count macro values in the resource's chunk. Empty selects the default variant.
+ */
+struct RUShaderVariantSelection {
+    /**
+     * @brief The first macro value; null when count is zero.
+     */
+    RefRes<RUShaderMacroValue> values;
+    /**
+     * @brief The number of macro values.
+     */
+    size_t count = 0;
+
+    /**
+     * @brief Copy the selection out of the chunk.
+     *
+     * @return The selected macro values.
+     */
+    std::vector<ShaderMacroValue> to_selection() const;
+};
+
+/**
  * @class RUShader
- * @brief Shader resource unit. Contains a word count and a MemID pointing to
- * the data chunk that stores the SPIR-V words.
+ * @brief Shader resource unit. Holds every compiled macro variant of one shader source, as a table sorted by variant
+ * key, whose SPIR-V words and metadata paths live in the same chunk.
  *
  * Push any chunk-owned payload data before emplacing this unit so the stored
  * references remain valid. Chunk teardown now runs registered resource-unit
@@ -424,12 +577,48 @@ struct WBE_META(WBE_SERIALIZABLE) RUSchemaSDF : public RUSchema {
  *
  */
 struct RUShader : public ResourceUnit {
-    // The shader SPIR-V words.
-    RefRes<uint32_t> data;
-    // The number of SPIR-V words.
-    size_t size;
-    // The path to the metadata. Ending with an NUL terminater.
-    RefRes<char> metadata_path;
+    /**
+     * @brief The macros the variants enumerate, macro_count of them.
+     */
+    RefRes<RUShaderMacro> macros;
+    /**
+     * @brief The number of macro declarations.
+     */
+    size_t macro_count = 0;
+    /**
+     * @brief The variant table, variant_count entries sorted by unique key.
+     */
+    RefRes<RUShaderVariant> variants;
+    /**
+     * @brief The number of variants; at least one.
+     */
+    size_t variant_count = 0;
+
+    /**
+     * @brief Get the variant a macro selection names, by binary search of the variant table.
+     *
+     * Copies the macro declarations to resolve the selection, so it belongs on compilation paths, not per-frame ones.
+     *
+     * @param p_selection The selected macro values; see ShaderVariantResolver::resolve_key() for the defaults of the
+     * macros it leaves out.
+     * @return The variant, owned by the resource.
+     * @throws std::runtime_error When the selection is invalid or names no compiled variant.
+     */
+    const RUShaderVariant& get_variant(const std::vector<ShaderMacroValue>& p_selection = {}) const;
+
+    /**
+     * @brief Copy the macro declarations.
+     *
+     * @return The declarations, in resource order.
+     */
+    std::vector<ShaderMacroDeclaration> get_macro_declarations() const;
+
+    /**
+     * @brief View the variant table.
+     *
+     * @return The variants, sorted by key.
+     */
+    std::span<const RUShaderVariant> get_variants() const;
 };
 
 /**
@@ -442,18 +631,34 @@ struct RUGraphicsPipeline : public ResourceUnit {
     RefRes<RUShader> vertex_stage;
     // Entry function for the vertex stage.
     RefRes<char> vertex_stage_entry;
+    /**
+     * @brief Macro values selecting the vertex shader's variant.
+     */
+    RUShaderVariantSelection vertex_stage_variant;
     // The tessellation shader.
     RefRes<RUShader> tessellation_stage;
     // Entry function for the tessellation stage.
     RefRes<char> tessellation_stage_entry;
+    /**
+     * @brief Macro values selecting the tessellation shader's variant.
+     */
+    RUShaderVariantSelection tessellation_stage_variant;
     // The geometry shader.
     RefRes<RUShader> geometry_stage;
     // Entry function for the geometry stage.
     RefRes<char> geometry_stage_entry;
+    /**
+     * @brief Macro values selecting the geometry shader's variant.
+     */
+    RUShaderVariantSelection geometry_stage_variant;
     // The fragment shader.
     RefRes<RUShader> fragment_stage;
     // Entry function for the fragment stage.
     RefRes<char> fragment_stage_entry;
+    /**
+     * @brief Macro values selecting the fragment shader's variant.
+     */
+    RUShaderVariantSelection fragment_stage_variant;
     // Should enable depth test.
     bool depth_test = true;
     // Should enable depth write.

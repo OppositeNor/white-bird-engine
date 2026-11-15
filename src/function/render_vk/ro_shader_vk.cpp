@@ -17,6 +17,7 @@
 #include "function/render_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_variant_resolver.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/render_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -26,6 +27,7 @@
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -46,8 +48,9 @@ TypeID ROShaderVK::get_type_uuid() const {
 }
 
 ShaderDescVK& ShaderDescVK::set_code(std::span<const uint32_t> p_code) {
-    code = std::vector<uint32_t>(p_code.begin(), p_code.end());
-    code_size = p_code.size();
+    macro_declarations.clear();
+    variants = std::vector<Variant>{
+        Variant{.key = ShaderVariantResolver().make_key({}), .code = std::vector<uint32_t>(p_code.begin(), p_code.end())}};
     return *this;
 }
 
@@ -57,18 +60,26 @@ ShaderDescVK& ShaderDescVK::set_code(std::string_view p_resource_id) {
 }
 
 ShaderDescVK& ShaderDescVK::set_code(RefRes<RUShader> p_resource) {
-    if (p_resource == nullptr || p_resource->data == nullptr) {
-        throw std::runtime_error("Failed to set shader code: shader resource is missing binary data.");
+    if (p_resource == nullptr) {
+        throw std::runtime_error("Failed to set shader code: shader resource is missing.");
     }
-    return set_code(std::span(p_resource->data.get(), p_resource->size));
+    std::vector<Variant> resource_variants;
+    for (const RUShaderVariant& variant : p_resource->get_variants()) {
+        if (variant.data == nullptr) {
+            throw std::runtime_error("Failed to set shader code: shader resource variant is missing binary data.");
+        }
+        resource_variants.push_back(Variant{.key = variant.key, .code = std::vector<uint32_t>(variant.data.get(), variant.data.get() + variant.size)});
+    }
+    macro_declarations = p_resource->get_macro_declarations();
+    variants = std::move(resource_variants);
+    return *this;
 }
 
-VkShaderModule ShaderDescVK::create_vk_object(const RenderContextVK* p_render_data) const {
+VkShaderModule ShaderDescVK::create_vk_object(const RenderContextVK* p_render_data, const Variant& p_variant) {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    WBE_REQUIRED(code);
-    create_info.pCode = (*code).data();
-    create_info.codeSize = WBE_REQUIRED(code_size) * sizeof(decltype(*(*code).data()));
+    create_info.pCode = p_variant.code.data();
+    create_info.codeSize = p_variant.code.size() * sizeof(uint32_t);
 
     VkShaderModule result = VK_NULL_HANDLE;
     if (vkCreateShaderModule(p_render_data->logic_device, &create_info, p_render_data->allocation_callbacks, &result) != VK_SUCCESS) {
@@ -97,24 +108,45 @@ ROShaderVK::ROShaderVK(const RenderContextVK* p_render_context, RefRes<RUShader>
 }
 
 VkShaderModule ROShaderVK::get_shader_module() const {
-    return shader_module;
+    return get_variant({});
+}
+
+VkShaderModule ROShaderVK::get_variant(const std::vector<ShaderMacroValue>& p_selection) const {
+    ShaderVariantResolver resolver;
+    HashCode key = resolver.resolve_key(macro_declarations, p_selection);
+    return resolver.find(std::span<const VariantModule>(variant_modules), key, "shader object").module;
 }
 
 ROShaderVK::~ROShaderVK() {
     // Deallocate resource after frames in flight.
     render_data->register_delayed_call(
-        [render_data = render_data, shader_module = shader_module]() {
-            vkDestroyShaderModule(render_data->logic_device, shader_module, render_data->allocation_callbacks);
+        [render_data = render_data, variant_modules = std::move(variant_modules)]() {
+            for (const VariantModule& variant_module : variant_modules) {
+                vkDestroyShaderModule(render_data->logic_device, variant_module.module, render_data->allocation_callbacks);
+            }
         },
         render_data->frames_in_flight);
 }
 
 void ROShaderVK::init(const Builder& p_builder) {
-    shader_module = p_builder.create_vk_object(render_data);
+    const std::vector<ShaderDescVK::Variant>& variants = WBE_REQUIRED(p_builder.variants);
+    if (variants.empty()) {
+        throw std::runtime_error("Failed to create shader: the description has no variants.");
+    }
+    macro_declarations = p_builder.macro_declarations;
+    variant_modules.reserve(variants.size());
+    for (const ShaderDescVK::Variant& variant : variants) {
+        if (!variant_modules.empty() && variant_modules.back().key >= variant.key) {
+            throw std::runtime_error("Failed to create shader: variants must be sorted by unique key.");
+        }
+        variant_modules.push_back(VariantModule{.key = variant.key, .module = ShaderDescVK::create_vk_object(render_data, variant)});
+    }
 }
 
 void ROShaderVK::apply_debug_name(std::string_view p_name) {
-    set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_SHADER_MODULE, shader_module, p_name);
+    for (const VariantModule& variant_module : variant_modules) {
+        set_debug_object_name_vk(render_data, VK_OBJECT_TYPE_SHADER_MODULE, variant_module.module, p_name);
+    }
 }
 
 } // namespace WhiteBirdEngine

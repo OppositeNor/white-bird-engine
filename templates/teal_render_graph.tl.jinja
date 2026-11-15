@@ -155,8 +155,9 @@ local record render_graph
     mesh: function(key: string, description?: wbe.RDParamsMeshVK): Resource
     compute_pipeline: function(key: string, description?: wbe.RDParamsComputePipelineVK): Resource
     graphics_pipeline: function(key: string, description?: wbe.RDParamsGraphicsPipelineVK): Resource
-    -- A compute pipeline compiled from the shader shader and registered under the same key.
-    shader_compute_pipeline: function(shader: string): Resource
+    -- A compute pipeline compiled from a variant of the shader shader: the default variant registered under the same key,
+    -- or the selected one under `<shader>[<macro>=<value>,...]`.
+    shader_compute_pipeline: function(shader: string, variant?: {wbe.ShaderMacroValue}): Resource
     -- An entry of a custom description type: type_name is the reflected name of the description struct, which selects the
     -- registrator, and resource_type the C++ type of the registered object.
     registered_resource: function(key: string, type_name: string, description: any, resource_type: string): Resource

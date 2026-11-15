@@ -99,6 +99,21 @@ constexpr HashCode dynam_hash(std::string_view p_str) {
 }
 
 /**
+ * @brief Continue a hash with a string, so that a sequence of strings hashes as a chain.
+ *
+ * @param p_seed The hash so far.
+ * @param p_str The string to append.
+ * @return The hash code of the sequence extended with the string.
+ */
+constexpr HashCode dynam_hash_append(HashCode p_seed, std::string_view p_str) {
+    HashCode result = p_seed;
+    for (char character : p_str) {
+        result = result * 33 + static_cast<uint8_t>(character);
+    }
+    return result;
+}
+
+/**
  * @brief Hash a int32_t in compile time.
  *
  * @param p_val The value to hash.

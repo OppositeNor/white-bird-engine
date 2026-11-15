@@ -22,12 +22,16 @@
 
 namespace WhiteBirdEngine {
 
-ShaderMetadata ShaderMetadataLoader::load(RefRes<RUShader> p_shader) const {
-    if (p_shader == nullptr || p_shader->metadata_path == nullptr) {
+ShaderMetadata ShaderMetadataLoader::load(RefRes<RUShader> p_shader, const std::vector<ShaderMacroValue>& p_variant) const {
+    if (p_shader == nullptr) {
+        throw std::runtime_error("Failed to load shader metadata: shader resource is missing.");
+    }
+    const RUShaderVariant& variant = p_shader->get_variant(p_variant);
+    if (variant.metadata_path == nullptr) {
         throw std::runtime_error("Failed to load shader metadata: metadata path is missing.");
     }
     ParserJSON metadata_parser;
-    metadata_parser.parse(get_resource_path(p_shader->metadata_path.get()));
+    metadata_parser.parse(get_resource_path(variant.metadata_path.get()));
     ShaderMetadata metadata;
     metadata.deserialize(metadata_parser.get_data());
     return metadata;

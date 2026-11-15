@@ -16,7 +16,7 @@
 -- conservative rasterization registers the Morton code of every covered leaf in the deferred list, once per covering
 -- triangle, and the large deduplication (see render_graph_utils.dedup_large) writes each code once to the unique leaves.
 -- The application compiles the pipelines of svo_3.toml, those of the large deduplication, and
--- svo_deferred_count_reset_pong_shader, and owns the SVO info buffer.
+-- svo_deferred_count_reset_shader, and owns the SVO info buffer.
 -- TODO: Build the tree from the unique leaves.
 
 local type wbe = require("wbe")
@@ -54,7 +54,7 @@ function svo_3.leaf_deduplication(params: svo_3.LeafParams): svo_3.LeafDeduplica
     local queue_family = params.queue_family
 
     local reset = graph.compute({
-        pipeline = graph.compute_pipeline("svo_deferred_count_reset_pong_shader"),
+        pipeline = graph.compute_pipeline("svo_deferred_count_reset_shader"),
         queue_family = queue_family,
     }, { name = "svo_3_reset_deferred_list", bindings = { svo_deferred_list_pong = deferred_list } })
     local extent = 1 << params.max_depth

@@ -42,24 +42,27 @@ ComputePipelineCompilerVK::ComputePipelineCompilerVK(const ComputePipelineCompil
 }
 
 ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
-    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource) {
+    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource, const std::vector<ShaderMacroValue>& p_variant) {
     if (p_shader_resource == nullptr || p_shader_resource->resource_key == nullptr) {
         throw std::runtime_error("Failed to compile compute pipeline: shader resource key was not propagated.");
     }
     Ref<ROShaderVK> compute_shader = compile_shader(p_shader_resource);
-    ShaderMetadata shader_metadata = ShaderMetadataLoader().load(p_shader_resource);
+    ShaderMetadata shader_metadata = ShaderMetadataLoader().load(p_shader_resource, p_variant);
     // Compute shaders are compiled from shader resources directly, so the shader must reflect exactly one compute entry point.
     std::string compute_entry(ShaderMetadataQuery().resolve_entry_point(shader_metadata, "compute", {}).name);
     ShaderDescriptorHeapLayoutVK descriptor_layout = collect_shader_descriptor_heap_layout(shader_metadata, "compute", compute_entry);
-    Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry);
+    Ref<ROComputePipelineVK> compute_pipeline = compile_compute_pipeline(p_resource_key, compute_shader, compute_entry, p_variant);
     compute_pipeline->set_descriptor_layout(descriptor_layout);
     return CompileResult{.compute_pipeline = compute_pipeline};
 }
 
 Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
-    std::string_view p_resource_key, Ref<ROShaderVK> p_compute_shader, std::string_view p_compute_entry) {
+    std::string_view p_resource_key,
+    Ref<ROShaderVK> p_compute_shader,
+    std::string_view p_compute_entry,
+    const std::vector<ShaderMacroValue>& p_variant) {
     ROComputePipelineVK::Builder pipeline_builder;
-    pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry);
+    pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry, p_variant);
     Ref<ROComputePipelineVK> compute_pipeline = context.render_data->create_compute_pipeline(pipeline_builder);
     context.render_cache->insert(p_resource_key, compute_pipeline);
     return compute_pipeline;

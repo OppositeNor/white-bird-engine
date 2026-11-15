@@ -433,11 +433,13 @@ public:
         std::string_view p_key, RefRes<RUGraphicsPipeline> p_pipeline, RDParamsGraphicsPipelineVK p_options);
 
     /**
-     * @brief Register a compute pipeline from a shader the ResourceManager loaded; see register_mesh(std::string_view,
-     * RefRes<RUMesh3D>, RDParamsMeshVK).
+     * @brief Register a compute pipeline from a variant of a shader the ResourceManager loaded; see
+     * register_mesh(std::string_view, RefRes<RUMesh3D>, RDParamsMeshVK).
+     * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
      * @return The registered pipeline.
      */
-    Ref<ROComputePipelineVK> register_compute_pipeline(std::string_view p_key, RefRes<RUShader> p_shader);
+    Ref<ROComputePipelineVK> register_compute_pipeline(
+        std::string_view p_key, RefRes<RUShader> p_shader, std::vector<ShaderMacroValue> p_variant = {});
 
     /**
      * @brief Get the context the graph-owned resources were last built for.

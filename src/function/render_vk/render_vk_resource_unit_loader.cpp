@@ -17,6 +17,8 @@
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/render_resource_unit.hh"
+#include "function/render/shader_macro_value.hh"
+#include "function/render/shader_variant_resolver.hh"
 #include "function/render/vertex_attribute_format_info.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
@@ -244,15 +246,81 @@ RefRes<RUTexture> populate_texture_resource(IResourceChunk& p_res_chunk, const R
     return std::any_cast<RefRes<RUTexture>>(texture_loader.populate_scheme_ptr(p_res_chunk, p_scheme));
 }
 
-RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemaShader& p_scheme) {
+RUShaderMacro populate_shader_macro(IResourceChunk& p_res_chunk, const RUSchemaShaderMacro& p_scheme) {
+    if (p_scheme.macro.empty()) {
+        throw std::runtime_error("Failed to populate shader resource: macro name must not be empty.");
+    }
+    if (p_scheme.options.empty()) {
+        throw std::runtime_error(std::format("Failed to populate shader resource: macro '{}' has no options.", p_scheme.macro));
+    }
+    std::vector<RefRes<char>> options;
+    options.reserve(p_scheme.options.size());
+    for (const std::string& option : p_scheme.options) {
+        options.push_back(populate_text(p_res_chunk, option));
+    }
+    RUShaderMacro macro;
+    macro.macro = populate_text(p_res_chunk, p_scheme.macro);
+    macro.options = p_res_chunk.push_data(options.size() * sizeof(RefRes<char>), options.data()).force_cast<RefRes<char>>();
+    macro.option_count = options.size();
+    macro.optional = p_scheme.optional;
+    return macro;
+}
+
+RUShaderVariant populate_shader_variant(IResourceChunk& p_res_chunk, const RUSchemaShaderVariant& p_scheme) {
     auto file_path = get_resource_path(p_scheme.path);
     auto file_content = load_binary_file<uint32_t>(file_path.string().c_str());
     auto data = p_res_chunk.push_data(file_content.size() * sizeof(decltype(*file_content.data())), file_content.data());
+    RUShaderVariant variant;
+    variant.key = ShaderVariantResolver().make_key(p_scheme.macros);
+    variant.data = data.force_cast<uint32_t>();
+    variant.size = file_content.size();
+    variant.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
+    return variant;
+}
+
+RefRes<RUShader> populate_shader_resource(IResourceChunk& p_res_chunk, const RUSchemaShader& p_scheme) {
+    if (p_scheme.variants.empty()) {
+        throw std::runtime_error(std::format("Failed to populate shader resource {}: it has no variants.", p_scheme.id));
+    }
+    std::vector<RUShaderMacro> macros;
+    macros.reserve(p_scheme.macros.size());
+    for (const RUSchemaShaderMacro& macro_scheme : p_scheme.macros) {
+        macros.push_back(populate_shader_macro(p_res_chunk, macro_scheme));
+    }
+    std::vector<RUShaderVariant> variants;
+    variants.reserve(p_scheme.variants.size());
+    for (const RUSchemaShaderVariant& variant_scheme : p_scheme.variants) {
+        variants.push_back(populate_shader_variant(p_res_chunk, variant_scheme));
+    }
+    std::ranges::sort(variants, {}, &RUShaderVariant::key);
+    auto duplicate = std::ranges::adjacent_find(variants, {}, &RUShaderVariant::key);
+    if (duplicate != variants.end()) {
+        throw std::runtime_error(std::format(
+            "Failed to populate shader resource {}: two variants share the key {}; variant macro combinations must be unique.", p_scheme.id, duplicate->key));
+    }
     RUShader resource_unit;
-    resource_unit.metadata_path = populate_text(p_res_chunk, p_scheme.metadata);
-    resource_unit.data = data.force_cast<uint32_t>();
-    resource_unit.size = file_content.size();
+    if (!macros.empty()) {
+        resource_unit.macros = p_res_chunk.push_data(macros.size() * sizeof(RUShaderMacro), macros.data()).force_cast<RUShaderMacro>();
+    }
+    resource_unit.macro_count = macros.size();
+    resource_unit.variants = p_res_chunk.push_data(variants.size() * sizeof(RUShaderVariant), variants.data()).force_cast<RUShaderVariant>();
+    resource_unit.variant_count = variants.size();
     return p_res_chunk.push_res_unit(p_scheme.id, resource_unit).force_cast<RUShader>();
+}
+
+RUShaderVariantSelection push_variant_selection(IResourceChunk& p_res_chunk, const std::vector<ShaderMacroValue>& p_values) {
+    if (p_values.empty()) {
+        return {};
+    }
+    std::vector<RUShaderMacroValue> values;
+    values.reserve(p_values.size());
+    for (const ShaderMacroValue& value : p_values) {
+        values.push_back(RUShaderMacroValue{.macro = populate_text(p_res_chunk, value.macro), .value = populate_text(p_res_chunk, value.value)});
+    }
+    return RUShaderVariantSelection{
+        .values = p_res_chunk.push_data(values.size() * sizeof(RUShaderMacroValue), values.data()).force_cast<RUShaderMacroValue>(),
+        .count = values.size(),
+    };
 }
 
 void populate_pipeline_stage(IResourceChunk& p_res_chunk,
@@ -322,6 +390,10 @@ RefRes<RUGraphicsPipeline> populate_graphics_pipeline_resource(IResourceChunk& p
     resource_unit.fragment_stage_entry = push_stage_entry(p_res_chunk,
         resolve_pipeline_stage_entry(
             p_scheme.fragment_stage_entry, scheme_has_pipeline_stage(p_scheme.fragment_stage_id, p_scheme.fragment_stage)));
+    resource_unit.vertex_stage_variant = push_variant_selection(p_res_chunk, p_scheme.vertex_stage_variant);
+    resource_unit.tessellation_stage_variant = push_variant_selection(p_res_chunk, p_scheme.tessellation_stage_variant);
+    resource_unit.geometry_stage_variant = push_variant_selection(p_res_chunk, p_scheme.geometry_stage_variant);
+    resource_unit.fragment_stage_variant = push_variant_selection(p_res_chunk, p_scheme.fragment_stage_variant);
     resource_unit.depth_test = p_scheme.depth_test;
     resource_unit.depth_write = p_scheme.depth_write;
     resource_unit.cull_backfaces = p_scheme.cull_backfaces;

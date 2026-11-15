@@ -46,7 +46,7 @@ ROComputePipelineVK::ROComputePipelineVK(const RenderContextVK* p_render_data, c
     VkPipelineShaderStageCreateInfo shader_stage_create_info{};
     shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shader_stage_create_info.module = shader_stage.shader->get_shader_module();
+    shader_stage_create_info.module = shader_stage.shader->get_variant(shader_stage.variant);
     shader_stage_create_info.pName = shader_stage.entry_function.c_str();
     VkComputePipelineCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;

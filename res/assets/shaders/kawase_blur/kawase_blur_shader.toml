@@ -14,14 +14,10 @@
 include = []
 
 [[resources]]
-id = "kawase_blur_pong_write_shader"
+id = "kawase_blur_shader"
 source_type = "shader"
 src = "assets/shaders/kawase_blur/kawase_blur.slang"
-
-[[resources]]
-id = "kawase_blur_ping_write_shader"
-source_type = "shader"
-src = "assets/shaders/kawase_blur/kawase_blur.slang"
+# Without the macro the blur writes pong; with it, ping.
 macros = [
-    { name = "WBE_KAWASE_BLUR_WRITE_PING" },
+    { macro = "WBE_KAWASE_BLUR_WRITE_PING", options = ["1"], optional = true },
 ]
