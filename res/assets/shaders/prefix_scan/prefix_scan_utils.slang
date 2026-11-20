@@ -13,8 +13,8 @@
    limitations under the License.
 */
 
-#ifndef WBE_FILE_PREFIX_SUM_UTILS_SLANG
-#define WBE_FILE_PREFIX_SUM_UTILS_SLANG
+#ifndef WBE_FILE_PREFIX_SCAN_UTILS_SLANG
+#define WBE_FILE_PREFIX_SCAN_UTILS_SLANG
 
 /**
  * @brief An associative binary operator that a prefix scan combines elements with.
@@ -129,7 +129,7 @@ struct SegmentedBreakPrefix<T, O : IOperator<T>> : IOperator<SegmentedWrapper<T>
  * @param p_start The index of the first of the 4 contiguous elements this invocation owns; a multiple of 4 in
  * [0, 256).
  */
-void workgroup_inclusive_prefix_sum_64_256<T, O : IOperator<T>>(__ref groupshared T p_data[256], uint p_start) {
+void workgroup_inclusive_prefix_scan_64_256<T, O : IOperator<T>>(__ref groupshared T p_data[256], uint p_start) {
     [unroll] for (uint i = 0; i < 8; ++i) {
         // We split the 256 entries in chunks of 4, where each thread updates the 4 entries they're responsible of.
         uint offset = 1 << i;
@@ -177,7 +177,7 @@ void workgroup_inclusive_prefix_sum_64_256<T, O : IOperator<T>>(__ref groupshare
  * @return The combination of every element in the range, O::identity() for an empty range, the same in every
  * invocation.
  */
-T workgroup_general_prefix_sum<T, O : IOperator<T>, let N : uint>(RWStructuredBuffer<T> p_buffer, uint p_start,
+T workgroup_general_prefix_scan<T, O : IOperator<T>, let N : uint>(RWStructuredBuffer<T> p_buffer, uint p_start,
         uint p_element_count, uint p_thread_id, __ref groupshared T p_scratch[N]) {
     // The combination of every element in the earlier chunks.
     T carry = O::identity();

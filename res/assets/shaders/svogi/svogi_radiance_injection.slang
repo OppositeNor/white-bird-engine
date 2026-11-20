@@ -14,7 +14,7 @@
 */
 
 #include "svogi/svogi_utils.slang"
-#include "prefix_sum/prefix_sum_utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 #include "utils/utils.slang"
 #include "utils/counted_buffer.slang"
 #include "light/spot_light_utils.slang"

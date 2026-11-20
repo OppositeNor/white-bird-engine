@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "prefix_sum/large_prefix_scan_utils.slang"
+#include "prefix_scan/large_prefix_scan_utils.slang"
 
 struct DescriptorIndices {
     [wbe::descriptor("storage_buffer", "sections_buffer", "read_write")] uint2 sections_buffer;

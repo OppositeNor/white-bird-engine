@@ -16,24 +16,28 @@ include = []
 [[resources]]
 id = "large_prefix_scan_prepare_dispatch"
 source_type = "shader"
-src = "assets/shaders/prefix_sum/large_prefix_scan_prepare_dispatch.slang"
+src = "assets/shaders/prefix_scan/large_prefix_scan_prepare_dispatch.slang"
+macros = [
+    { macro = "WBE_LARGE_PREFIX_SCAN_ELEMENT_TYPE", options = ["SegmentedWrapper<float3x3>"] },
+    { macro = "WBE_LARGE_PREFIX_SCAN_OPERATOR", options = ["SegmentedPrefix<float3x3, Add<float3x3>>"] },
+]
 
 [[resources]]
 id = "large_prefix_scan_blocks"
 source_type = "shader"
-src = "assets/shaders/prefix_sum/large_prefix_scan_blocks.slang"
+src = "assets/shaders/prefix_scan/large_prefix_scan_blocks.slang"
 
 [[resources]]
 id = "large_prefix_scan_sections"
 source_type = "shader"
-src = "assets/shaders/prefix_sum/large_prefix_scan_sections.slang"
+src = "assets/shaders/prefix_scan/large_prefix_scan_sections.slang"
 
 [[resources]]
 id = "large_prefix_scan_totals"
 source_type = "shader"
-src = "assets/shaders/prefix_sum/large_prefix_scan_totals.slang"
+src = "assets/shaders/prefix_scan/large_prefix_scan_totals.slang"
 
 [[resources]]
 id = "large_prefix_scan_add"
 source_type = "shader"
-src = "assets/shaders/prefix_sum/large_prefix_scan_add.slang"
+src = "assets/shaders/prefix_scan/large_prefix_scan_add.slang"

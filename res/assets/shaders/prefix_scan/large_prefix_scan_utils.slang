@@ -16,10 +16,18 @@
 #ifndef WBE_FILE_LARGE_PREFIX_SCAN_UTILS_SLANG
 #define WBE_FILE_LARGE_PREFIX_SCAN_UTILS_SLANG
 
-#include "prefix_sum/prefix_sum_utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 #include "utils/counted_buffer.slang"
 
-// The large prefix scan computes the in-place inclusive prefix sum of a buffer in four passes:
+#ifndef WBE_PREFIX_SCAN_TYPE
+#define WBE_PREFIX_SCAN_TYPE uint
+#endif
+
+#ifndef WBE_PREFIX_SCAN_OPERATION
+#define WBE_PREFIX_SCAN_OPERATION Add<WBE_PREFIX_SCAN_TYPE>
+#endif
+
+// The large prefix scan computes the in-place inclusive prefix scan of a buffer in four passes:
 // 1. large_prefix_scan_blocks: each workgroup scans one block of WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE elements and stores the
 //    block total.
 // 2. large_prefix_scan_sections: WBE_LARGE_PREFIX_SCAN_SECTION_NUM workgroups each scan one contiguous section of the
@@ -83,7 +91,7 @@ void large_prefix_scan_blocks<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStr
         p_scratch[thread_data_start + i] = select(element < element_count, p_data.get(element), O::identity());
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<T, O>(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_scan_64_256<T, O>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint element = block_start + thread_data_start + i;
         if (element < element_count) {
@@ -113,7 +121,7 @@ void large_prefix_scan_sections<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWS
     uint blocks_per_section = large_prefix_scan_blocks_per_section(block_num);
     uint section_begin = min(p_section * blocks_per_section, block_num);
     uint section_end = min(section_begin + blocks_per_section, block_num);
-    T total = workgroup_general_prefix_sum<T, O, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE>(p_sections,
+    T total = workgroup_general_prefix_scan<T, O, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE>(p_sections,
         WBE_LARGE_PREFIX_SCAN_BLOCK_TOTALS_START + section_begin, section_end - section_begin, p_thread_id, p_scratch);
     if (p_thread_id == 0) {
         p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + p_section] = total;
@@ -136,7 +144,7 @@ void large_prefix_scan_totals<T, O: IOperator<T>>(RWStructuredBuffer<T> p_sectio
         p_scratch[thread_data_start + i] = p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + thread_data_start + i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<T, O>(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_scan_64_256<T, O>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         p_sections[WBE_LARGE_PREFIX_SCAN_SECTION_TOTALS_START + thread_data_start + i] = p_scratch[thread_data_start + i];
     }

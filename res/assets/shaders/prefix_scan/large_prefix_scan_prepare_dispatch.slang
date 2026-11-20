@@ -13,12 +13,15 @@
    limitations under the License.
 */
 #include "utils/utils.slang"
-#include "prefix_sum/large_prefix_scan_utils.slang"
+#include "prefix_scan/large_prefix_scan_utils.slang"
 
 struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "data_buffer", "read")] uint2 data_buffer;
-    [wbe::descriptor("storage_buffer", "dispatch_buffer", "write")] uint2 dispatch_buffer;
-    [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
+    [wbe::descriptor("storage_buffer", "data_buffer", "read")]
+    uint2 data_buffer;
+    [wbe::descriptor("storage_buffer", "dispatch_buffer", "write")]
+    uint2 dispatch_buffer;
+    [wbe::push_constant("frame_slot")]
+    uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
@@ -29,8 +32,8 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    CountedBuffer<uint> data_buffer =
-        CountedBuffer<uint>(descriptor_indices.data_buffer, descriptor_indices.shader_debug_frame_slot);
+    CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer =
+        CountedBuffer<WBE_PREFIX_SCAN_TYPE>(descriptor_indices.data_buffer, descriptor_indices.shader_debug_frame_slot);
     RWStructuredBuffer<uint> dispatch_buffer = ResourceDescriptorHeap[descriptor_indices.dispatch_buffer.x];
     dispatch_buffer[0] = large_prefix_scan_block_num(data_buffer.size());
     dispatch_buffer[1] = 1;

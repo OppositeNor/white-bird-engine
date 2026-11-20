@@ -14,10 +14,10 @@
 */
 /**
  * @file workgroup_inclusive_prefix_sum_64_256.slang
- * @brief Test kernel that runs workgroup_inclusive_prefix_sum_64_256 in place over a 256-element buffer on one 64-wide
+ * @brief Test kernel that runs workgroup_inclusive_prefix_scan_64_256 with Add<uint> in place over a 256-element buffer on one 64-wide
  * workgroup.
  */
-#include "prefix_sum/prefix_sum_utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 
 RWStructuredBuffer<uint> data;
 groupshared uint shared_data[256];
@@ -29,7 +29,7 @@ void main(uint3 p_group_thread_id : SV_GroupThreadID) {
         shared_data[i] = data[i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(shared_data, p_group_thread_id.x * 4);
+    workgroup_inclusive_prefix_scan_64_256<uint, Add<uint>>(shared_data, p_group_thread_id.x * 4);
     for (uint i = p_group_thread_id.x; i < 256; i += 64) {
         data[i] = shared_data[i];
     }

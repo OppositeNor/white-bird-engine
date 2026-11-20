@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 from build_script.utils import list_files
 
+print("WBEConfig: Preparing configurations...")
+
 # enable_shader_debug defaults to False when omitted by a target.
 # enable-tsan defaults to False when omitted by a target; True builds everything with ThreadSanitizer.
 target_info = {

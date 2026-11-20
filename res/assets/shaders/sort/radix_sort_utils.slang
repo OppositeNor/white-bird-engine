@@ -17,7 +17,7 @@
 
 #include "utils/utils.slang"
 #include "utils/counted_buffer.slang"
-#include "prefix_sum/prefix_sum_utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 
 #define WBE_RADIX_SORT_BUCKET_BIT_SIZE 8
 #define WBE_RADIX_SORT_BUCKET_COUNT (1 << WBE_RADIX_SORT_BUCKET_BIT_SIZE)
@@ -209,7 +209,7 @@ void workgroup_radix_sort_step_64_256(__ref groupshared uint p_data[256],
     }
     GroupMemoryBarrierWithGroupSync();
     // Perform the prefix sum, to transform each entry of it to the histogram till the corresponding point.
-    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, p_thread_id * 4);
+    workgroup_inclusive_prefix_scan_64_256<uint, Add<uint>>(p_scratch, p_thread_id * 4);
     // The last element is the workgroup histogram.
     uint histogram = p_scratch[255];
     // Exclusive prefix sum of the packed histogram

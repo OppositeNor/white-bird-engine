@@ -20,19 +20,13 @@
 #include "function/render/render_defs.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "i_post_processing.hh"
 #include "pixel_sort_recipe_params.hh"
-#include <array>
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <string_view>
-#include <utility>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {

@@ -14,27 +14,19 @@
 */
 #include "pixel_sort.hh"
 #include "../render_test.hh"
-#include "core/allocator/i_allocator.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/function_utils.hh"
 #include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_task_vk.hh"
 #include "function/render_vk/rend_graph_recipe_builder_vk.hh"
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/renderer_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
 #include "function/render_vk/vulkan_enums_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "i_post_processing.hh"
 #include "pixel_sort_recipe_params.hh"
-#include "resource/resource_manager/resource_manager.hh"
-#include <array>
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <stdexcept>

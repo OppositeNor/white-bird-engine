@@ -16,7 +16,7 @@
 #define WBE_FILE_RADIX_SORT_UINT2_UTILS_SLANG
 
 #include "sort/radix_sort_utils.slang"
-#include "prefix_sum/prefix_sum_utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 
 // The uint2 radix sort orders uint2 keys lexicographically, by x and then by y, i.e. as the 64-bit value (x << 32) | y,
 // whose bits [0, 32) are y and bits [32, 64) are x. Each pass sorts stably by one WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit,
@@ -153,7 +153,7 @@ void radix_sort_uint2_scatter(CountedBuffer<uint2> p_input_keys, RWStructuredBuf
         p_scratch[thread_data_start + i] = p_histogram_buffer[last_sub_histogram_start + thread_data_start + i];
     }
     GroupMemoryBarrierWithGroupSync();
-    workgroup_inclusive_prefix_sum_64_256<uint, Add<uint>>(p_scratch, thread_data_start);
+    workgroup_inclusive_prefix_scan_64_256<uint, Add<uint>>(p_scratch, thread_data_start);
     [unroll] for (uint i = 0; i < 4; ++i) {
         uint digit = thread_data_start + i;
         // The index of the first digit underflows past the end, so it reads zero.

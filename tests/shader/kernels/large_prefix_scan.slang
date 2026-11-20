@@ -14,14 +14,14 @@
 */
 /**
  * @file large_prefix_scan.slang
- * @brief Test kernel that runs one pass of the large prefix scan from prefix_sum/large_prefix_scan_utils.slang over
+ * @brief Test kernel that runs one pass of the large prefix scan from prefix_scan/large_prefix_scan_utils.slang over
  * ELEMENT_TYPE elements combined with OPERATOR.
  * @details Required defines: ELEMENT_TYPE, the element type T; OPERATOR, an IOperator<T> such as Add<uint> or
  * SegmentedPrefix<float3x3, Add<float3x3> >; and KERNEL_PASS, 0 for large_prefix_scan_blocks(), 1 for
  * large_prefix_scan_sections(), 2 for large_prefix_scan_totals(), and 3 for large_prefix_scan_add(). Each workgroup runs
  * the pass for its group id. The scanned buffer is a counted buffer of T, and the sections buffer holds T.
  */
-#include "prefix_sum/large_prefix_scan_utils.slang"
+#include "prefix_scan/large_prefix_scan_utils.slang"
 
 RWByteAddressBuffer data;
 RWStructuredBuffer<ELEMENT_TYPE> sections;

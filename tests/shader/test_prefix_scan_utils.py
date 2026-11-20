@@ -74,7 +74,7 @@ def run_general_prefix_sum(p_device: spy.Device, p_load_kernel: KernelLoader, p_
     return buffer.to_numpy().view(np.uint32)
 
 
-def general_prefix_sum_input(p_rng: np.random.Generator, p_data_start: int, p_data_count: int,
+def general_prefix_scan_input(p_rng: np.random.Generator, p_data_start: int, p_data_count: int,
         p_values: np.ndarray | None = None) -> np.ndarray:
     """Random guards around the range."""
     data = p_rng.integers(0, 1 << 20, p_data_start + p_data_count + GUARD_COUNT, dtype=np.uint32)
@@ -113,7 +113,7 @@ GENERAL_PREFIX_SUM_SHAPES = [
 def test_workgroup_general_prefix_sum(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
         p_data_start: int, p_data_count: int, p_workgroup_size: int) -> None:
     # Elements outside the range must be left unchanged.
-    data = general_prefix_sum_input(rng, p_data_start, p_data_count, rng.integers(0, 1000, p_data_count,
+    data = general_prefix_scan_input(rng, p_data_start, p_data_count, rng.integers(0, 1000, p_data_count,
         dtype=np.uint32))
     result = run_general_prefix_sum(device, load_kernel, data, p_data_start, p_data_count, p_workgroup_size)
     np.testing.assert_array_equal(result, general_prefix_sum_expected(data, p_data_start, p_data_count))
@@ -125,7 +125,7 @@ def test_workgroup_general_prefix_sum_single_element(device: spy.Device, load_ke
     # A lone value at the front must reach every later chunk, and nothing may be added twice.
     values = np.zeros(p_data_count, dtype=np.uint32)
     values[0] = 7
-    data = general_prefix_sum_input(rng, 0, p_data_count, values)
+    data = general_prefix_scan_input(rng, 0, p_data_count, values)
     result = run_general_prefix_sum(device, load_kernel, data, 0, p_data_count, p_workgroup_size)
     np.testing.assert_array_equal(result, general_prefix_sum_expected(data, 0, p_data_count))
 
@@ -160,7 +160,7 @@ def test_workgroup_general_prefix_scan_non_commutative(device: spy.Device, load_
     data_count = 1000
     values = rng.integers(0, 1000, data_count, dtype=np.uint32)
     values[rng.random(data_count) < 0.7] = 0
-    data = general_prefix_sum_input(rng, 0, data_count, values)
+    data = general_prefix_scan_input(rng, 0, data_count, values)
     expected = data.copy()
     last = np.uint32(0)
     for i in range(data_count):
@@ -239,27 +239,27 @@ SEGMENTED_SCAN_SHAPES = [
 
 @pytest.mark.parametrize(("p_data_start", "p_data_count", "p_workgroup_size", "p_flag_probability"),
     SEGMENTED_SCAN_SHAPES)
-def test_workgroup_general_prefix_sum_segmented(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
+def test_workgroup_general_prefix_scan_segmented(device: spy.Device, load_kernel: KernelLoader, rng: np.random.Generator,
         p_data_start: int, p_data_count: int, p_workgroup_size: int, p_flag_probability: float) -> None:
     values, flags = segmented_input(rng, p_data_count, p_flag_probability)
     run_general_segmented_scan(device, load_kernel, rng, values, flags, p_data_start, p_workgroup_size)
 
 
-def test_workgroup_general_prefix_sum_segmented_without_flags(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_without_flags(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Without flags the whole range is one segment, so the result is the plain prefix sum.
     values = rng.integers(0, 1000, 1000, dtype=np.uint32)
     run_general_segmented_scan(device, load_kernel, rng, values, np.zeros(1000, dtype=np.uint32), 0, 64)
 
 
-def test_workgroup_general_prefix_sum_segmented_every_element_flagged(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_every_element_flagged(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Every element starts its own segment, so every value is unchanged.
     values = rng.integers(0, 1000, 1000, dtype=np.uint32)
     run_general_segmented_scan(device, load_kernel, rng, values, np.ones(1000, dtype=np.uint32), 0, 64)
 
 
-def test_workgroup_general_prefix_sum_segmented_boundary_flags(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_boundary_flags(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Segments starting exactly at and right after invocation (4-element) and chunk (256-element) boundaries, and one
     # segment spanning a whole chunk, must neither leak earlier sums nor drop any.
@@ -270,7 +270,7 @@ def test_workgroup_general_prefix_sum_segmented_boundary_flags(device: spy.Devic
 
 
 @pytest.mark.parametrize("p_flag_probability", [0.0, 0.02, 0.3, 1.0])
-def test_workgroup_inclusive_prefix_sum_64_256_segmented(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_inclusive_prefix_scan_64_256_segmented(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator, p_flag_probability: float) -> None:
     values, flags = segmented_input(rng, FIXED_ELEMENT_COUNT, p_flag_probability)
     # Segments starting at and around invocation boundaries.
@@ -282,7 +282,7 @@ def test_workgroup_inclusive_prefix_sum_64_256_segmented(device: spy.Device, loa
     np.testing.assert_array_equal(result, segmented_scan_expected(values, flags))
 
 
-def test_workgroup_general_prefix_sum_segmented_any_nonzero_flag(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_any_nonzero_flag(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Any nonzero flag starts a segment, and the combined flag is 1.
     values = rng.integers(0, 1000, 1000, dtype=np.uint32)
@@ -319,7 +319,7 @@ SEGMENTED_BREAK_SCAN_SHAPES = [
 
 @pytest.mark.parametrize(("p_data_start", "p_data_count", "p_workgroup_size", "p_flag_probability"),
     SEGMENTED_BREAK_SCAN_SHAPES)
-def test_workgroup_general_prefix_sum_segmented_break(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_break(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator, p_data_start: int, p_data_count: int, p_workgroup_size: int,
         p_flag_probability: float) -> None:
     values, flags = segmented_input(rng, p_data_count, p_flag_probability)
@@ -327,7 +327,7 @@ def test_workgroup_general_prefix_sum_segmented_break(device: spy.Device, load_k
         "SegmentedBreakPrefix")
 
 
-def test_workgroup_general_prefix_sum_segmented_break_counts(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_general_prefix_scan_segmented_break_counts(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator) -> None:
     # Flags are summed as counts, not ORed, and the sums wrap around.
     values = rng.integers(0, 1000, 1000, dtype=np.uint32)
@@ -336,7 +336,7 @@ def test_workgroup_general_prefix_sum_segmented_break_counts(device: spy.Device,
 
 
 @pytest.mark.parametrize("p_flag_probability", [0.0, 0.3, 1.0])
-def test_workgroup_inclusive_prefix_sum_64_256_segmented_break(device: spy.Device, load_kernel: KernelLoader,
+def test_workgroup_inclusive_prefix_scan_64_256_segmented_break(device: spy.Device, load_kernel: KernelLoader,
         rng: np.random.Generator, p_flag_probability: float) -> None:
     values, flags = segmented_input(rng, FIXED_ELEMENT_COUNT, p_flag_probability)
     data = np.stack([values, flags], axis=1)

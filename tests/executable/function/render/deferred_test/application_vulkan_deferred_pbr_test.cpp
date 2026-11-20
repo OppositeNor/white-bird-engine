@@ -25,7 +25,6 @@
 #include "function/input_manager/key_codes.hh"
 #include "function/render/render_defs.hh"
 #include "function/render/render_resource_unit.hh"
-#include "function/render_vk/compute_pipeline_compiler_vk.hh"
 #include "function/render_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/render_vk/i_render_object_vk.hh"
 #include "function/render_vk/mesh_acceleration_structure_compiler_vk.hh"
@@ -36,7 +35,6 @@
 #include "function/render_vk/render_graph_context_vk.hh"
 #include "function/render_vk/render_graph_vk.hh"
 #include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
 #include "function/render_vk/roc_multislots_vk.hh"
 #include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/render_vk/rt_triggered_vk.hh"
@@ -432,10 +430,17 @@ void ApplicationVulkanDeferredPBRTest::write_frame_sequence_frame(RTCPUInFlightA
     // Count the frame even if writing throws, so the rendering thread never waits for it; the acquisition task rethrows.
     struct WrittenCountGuard {
         std::atomic<uint32_t>& written_count;
+
+        WrittenCountGuard(std::atomic<uint32_t>& p_written_count)
+            : written_count(p_written_count) {}
         ~WrittenCountGuard() {
             written_count.fetch_add(1, std::memory_order_release);
             written_count.notify_all();
         }
+        WrittenCountGuard(const WrittenCountGuard& p_other) = delete;
+        WrittenCountGuard(WrittenCountGuard&& p_other) = delete;
+        WrittenCountGuard& operator=(const WrittenCountGuard& p_other) = delete;
+        WrittenCountGuard& operator=(WrittenCountGuard&& p_other) = delete;
 
     } written_count_guard{frame_sequence_written_count};
 
@@ -530,7 +535,7 @@ void ApplicationVulkanDeferredPBRTest::release_draw_task() {
     }
 }
 
-void ApplicationVulkanDeferredPBRTest::draw_configuration_window() {
+void ApplicationVulkanDeferredPBRTest::draw_configuration_window() { // NOLINT
     static constexpr std::array<const char*, 2> SHADOW_FILTERING_NAMES{"Mipmaps", "Summed-area table"};
     ImGui::Begin("Deferred Rendering", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     // Every control writes the request its shortcut key writes, so the window and the keys stay in sync.

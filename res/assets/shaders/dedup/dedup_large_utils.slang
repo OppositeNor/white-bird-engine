@@ -17,7 +17,7 @@
 #define WBE_FILE_DEDUP_LARGE_UTILS_SLANG
 
 #include "sort/radix_sort_utils.slang"
-#include "prefix_sum/large_prefix_scan_utils.slang"
+#include "prefix_scan/large_prefix_scan_utils.slang"
 
 // The large deduplication removes the repeated keys of a key buffer in four steps: the radix sort orders the keys,
 // dedup_large_mark() marks the first key of every run of equal keys, the large prefix scan turns the marks into each
