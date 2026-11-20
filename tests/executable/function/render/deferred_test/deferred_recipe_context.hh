@@ -83,7 +83,7 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeFormats {
 /**
  * @class DeferredRecipeParameters
  * @brief The static parameters of the rend_graphs.deferred recipe, set by each deferred render graph definition in
- * res/assets/rend_graphs/rend_graphs.toml. Copyable and movable.
+ * res/assets/rend_graphs/rend_graphs.manifest.lua. Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeParameters {
     /**

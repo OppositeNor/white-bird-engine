@@ -14,30 +14,40 @@
 
 import json
 import os
-import tomllib
 from pathlib import Path
 from typing import Any
 from build_script.resource.acp.acp_compiler import ManifestData, ManifestResource, SOURCE_RESOURCE_FILE_KEY, SOURCE_RESOURCE_TYPE_KEY, ACPCompiler
+from build_script.resource.acp.manifest_loader_lua import SOURCE_MANIFEST_SUFFIX, LuaManifestLoader
 
-SOURCE_MANIFEST_SUFFIX = ".toml"
 RUNTIME_MANIFEST_SUFFIX = ".json"
 
 class ACP:
     """The asset conditioning pipeline.
 
-    This pipeline consumes TOML manifest files from the source resource
-    directory, compiles/copies entries by resource type, and emits JSON runtime
-    index files into the output resource directory. A source manifest
-    ``<path>.toml`` is emitted as ``<path>.json``.
+    This pipeline consumes Lua manifest files from the source resource
+    directory (see LuaManifestLoader), compiles/copies entries by resource type,
+    and emits JSON runtime index files into the output resource directory. A
+    source manifest ``<path>.manifest.lua`` is emitted as ``<path>.json``, whose
+    ``include`` lists the runtime paths of the manifests it requires.
     """
 
-    def __init__(self, res_dir: Path, res_output_dir: Path, enabled_test: bool = False) -> None:
+    def __init__(self, res_dir: Path, res_output_dir: Path, enabled_test: bool = False,
+                 helper_roots: list[Path] | None = None) -> None:
+        """Create the pipeline.
+
+        Args:
+            res_dir: The source resource directory.
+            res_output_dir: The output resource directory.
+            enabled_test: Whether test_only resources are compiled.
+            helper_roots: Resource directories searched in order for manifest helper modules; res_dir alone by default.
+        """
         self._res_dir = res_dir
+        self._helper_roots = helper_roots if helper_roots is not None else [res_dir]
+        self._manifest_loader = LuaManifestLoader(res_dir, self._helper_roots)
         self._res_output_dir = res_output_dir
         self._enabled_test = enabled_test
         self._compiler_map: dict[str, ACPCompiler] = {}
         self._root_manifest_paths: list[str] = []
-        self._manifest_sources: dict[str, dict[str, Any]] = {}
         self._processed_manifests: dict[str, dict[str, Any]] = {}
         self._seen_resource_ids: set[str] = set()
 
@@ -56,7 +66,7 @@ class ACP:
 
     def process_resources(self) -> None:
         """Process manifests and generate runtime index files."""
-        self._manifest_sources.clear()
+        self._manifest_loader = LuaManifestLoader(self._res_dir, self._helper_roots)
         self._root_manifest_paths = self._load_root_manifest_paths()
         self._processed_manifests.clear()
         self._seen_resource_ids.clear()
@@ -72,77 +82,20 @@ class ACP:
         root_manifest_dir = Path.joinpath(self._res_dir, Path("res_chunks"))
         for manifest_file in sorted(root_manifest_dir.rglob(f"*{SOURCE_MANIFEST_SUFFIX}")):
             relative_manifest_path = manifest_file.relative_to(self._res_dir).as_posix()
-            if not self._load_manifest_source(relative_manifest_path, False):
-                continue
+            # Evaluating a root evaluates every manifest it requires, which records the include edges.
+            self._load_manifest_source(relative_manifest_path)
             manifest_paths.append(relative_manifest_path)
         return manifest_paths
 
-    def _load_manifest_source(self, manifest_rel_path: str, is_required: bool) -> bool:
-        normalized_manifest_path = Path(manifest_rel_path).as_posix()
-        if normalized_manifest_path in self._manifest_sources:
-            return True
-
-        if Path(normalized_manifest_path).is_absolute():
-            raise RuntimeError(
-                f"WBEACP: Manifest path must be relative to the resource directory: {manifest_rel_path}."
-            )
-
-        manifest_path = Path.joinpath(self._res_dir, Path(normalized_manifest_path))
-        if not manifest_path.exists() or not manifest_path.is_file():
-            if is_required:
-                raise RuntimeError(
-                    f"WBEACP: Manifest include target does not exist: {normalized_manifest_path}."
-                )
-            return False
-
-        with open(manifest_path, "rb") as file:
-            try:
-                data = tomllib.load(file)
-            except tomllib.TOMLDecodeError as error:
-                raise RuntimeError(
-                    f"WBEACP: Failed to parse TOML manifest {normalized_manifest_path}: {error}."
-                ) from error
-        if not isinstance(data, dict) or "resources" not in data:
-            if is_required:
-                raise RuntimeError(
-                    f"WBEACP: Manifest include target is not a manifest: {normalized_manifest_path}."
-                )
-            return False
-        if not isinstance(data["resources"], list):
-            raise RuntimeError(
-                f"WBEACP: Manifest resources must be an array: {normalized_manifest_path}."
-            )
-
-        data["include"] = self._normalize_include_paths(data.get("include", []), normalized_manifest_path)
-        self._scope_enabled(data.get("scope", "global"), normalized_manifest_path)
-        self._manifest_sources[normalized_manifest_path] = data
-        return True
+    def _load_manifest_source(self, manifest_rel_path: str) -> ManifestData:
+        record = self._manifest_loader.evaluate(manifest_rel_path)
+        self._scope_enabled(record.data.get("scope", "global"), manifest_rel_path)
+        return record.data
 
     def _scope_enabled(self, scope: Any, context: str) -> bool:
         if scope not in ("global", "test_only"):
             raise RuntimeError(f"WBEACP: Invalid scope '{scope}' in {context}.")
         return scope == "global" or self._enabled_test
-
-    def _normalize_include_paths(self, include_entries: Any, manifest_rel_path: str) -> list[str]:
-        if include_entries is None:
-            include_entries = []
-        if not isinstance(include_entries, list):
-            raise RuntimeError(
-                f"WBEACP: Manifest include field must be an array: {manifest_rel_path}."
-            )
-
-        normalized_include: list[str] = []
-        for include_entry in include_entries:
-            if not isinstance(include_entry, str) or not include_entry:
-                raise RuntimeError(
-                    f"WBEACP: Manifest include entry must be a non-empty string: {manifest_rel_path}."
-                )
-            if Path(include_entry).suffix != SOURCE_MANIFEST_SUFFIX:
-                raise RuntimeError(
-                    f"WBEACP: Manifest include entry must reference a {SOURCE_MANIFEST_SUFFIX} manifest in {manifest_rel_path}: {include_entry}."
-                )
-            normalized_include.append(Path(include_entry).as_posix())
-        return normalized_include
 
     def _process_manifest(self, manifest_rel_path: str, include_stack: list[str]) -> bool:
         if manifest_rel_path in self._processed_manifests:
@@ -153,22 +106,15 @@ class ACP:
                 f"WBEACP: Manifest include recursion detected: {' -> '.join(recursion_chain)}."
             )
 
-        source_manifest = self._manifest_sources.get(manifest_rel_path)
-        if source_manifest is None:
-            raise RuntimeError(
-                f"WBEACP: Manifest include target was not found: {manifest_rel_path}."
-            )
+        source_manifest = self._load_manifest_source(manifest_rel_path)
         if not self._scope_enabled(source_manifest.get("scope", "global"), manifest_rel_path):
             return False
 
         include_stack.append(manifest_rel_path)
-        include_paths = source_manifest.get("include", [])
+        # The manifests it requires, in the order of their first require.
+        include_paths = self._manifest_loader.evaluate(manifest_rel_path).includes
         processed_include_paths: list[str] = []
         for include_path in include_paths:
-            if not self._load_manifest_source(include_path, True):
-                raise RuntimeError(
-                    f"WBEACP: Manifest include target does not exist: {include_path} (included by {manifest_rel_path})."
-                )
             if self._process_manifest(include_path, include_stack):
                 processed_include_paths.append(include_path)
 
@@ -199,13 +145,13 @@ class ACP:
 
         processed_manifest: ManifestData = {
             "resources": processed_resources,
+            "include": [self._get_runtime_manifest_path(include_path) for include_path in include_paths],
         }
-        if "include" in manifest_data:
-            processed_manifest["include"] = [self._get_runtime_manifest_path(include_path) for include_path in include_paths]
         return processed_manifest
 
     def _get_runtime_manifest_path(self, manifest_rel_path: str) -> str:
-        return Path(manifest_rel_path).with_suffix(RUNTIME_MANIFEST_SUFFIX).as_posix()
+        normalized_path = Path(manifest_rel_path).as_posix()
+        return normalized_path[:-len(SOURCE_MANIFEST_SUFFIX)] + RUNTIME_MANIFEST_SUFFIX
 
     def _write_manifest(self, manifest_rel_path: str, manifest_data: dict[str, Any]) -> None:
         output_path = Path.joinpath(self._res_output_dir, Path(self._get_runtime_manifest_path(manifest_rel_path)))

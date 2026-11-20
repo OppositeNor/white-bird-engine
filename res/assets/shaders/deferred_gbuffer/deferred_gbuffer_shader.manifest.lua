@@ -1,0 +1,68 @@
+-- Copyright 2025 OppositeNor
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+return {
+    resources = {
+        {
+            id = "deferred_gbuffer_shader",
+            source_type = "shader",
+            src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang",
+            -- WBE_MESH_TRANSFORM declares the per-mesh transform used by dynamic meshes.
+            macros = { { macro = "WBE_MESH_TRANSFORM", options = { "1" }, optional = true } },
+        },
+        {
+            id = "deferred_gbuffer_dynamic",
+            type = "graphics_pipeline",
+            vertex_stage_id = "deferred_gbuffer_shader",
+            vertex_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            fragment_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            fragment_stage_entry = "fragment_main",
+            depth_test = true,
+            depth_write = true,
+            color_blend = false,
+        },
+        {
+            id = "deferred_gbuffer",
+            type = "graphics_pipeline",
+            vertex_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_entry = "fragment_main",
+            depth_test = true,
+            depth_write = true,
+            color_blend = false,
+        },
+        {
+            id = "deferred_gbuffer_masked",
+            type = "graphics_pipeline",
+            vertex_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_entry = "fragment_masked_main",
+            depth_test = true,
+            depth_write = true,
+            cull_backfaces = false,
+            color_blend = false,
+        },
+        {
+            id = "deferred_gbuffer_opaque_double_sided",
+            type = "graphics_pipeline",
+            vertex_stage_id = "deferred_gbuffer_shader",
+            fragment_stage_id = "deferred_gbuffer_shader",
+            depth_test = true,
+            depth_write = true,
+            color_blend = false,
+            cull_backfaces = false,
+            fragment_stage_entry = "fragment_double_sided_main",
+        },
+    },
+}

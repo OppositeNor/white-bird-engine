@@ -47,6 +47,7 @@ Render objects and renderer-backend helpers are confined to the rendering thread
 
 ## Data and build
 
-- Configuration and resource manifests are TOML; ACP emits runtime manifests as JSON.
+- Configuration files are TOML. Resource manifests are sandboxed Lua (`<name>.manifest.lua`); ACP emits runtime manifests
+  as JSON.
 - Reflection generates `*.gen.*` files and Teal declarations before the ACP runs. Never edit generated files.
 - Build only through `python build.py`, and validate with `python validation.py`.

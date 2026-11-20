@@ -12,15 +12,18 @@ re-runs the recipe for its first build and every rebuild; applications never ret
 
 ## Define, bind, and acquire a graph
 
-```toml
-# res/assets/rend_graphs/rend_graphs.toml (reachable from a root chunk)
-[[resources]]
-id = "my_graph"
-type = "rend_graph"
-recipe = "rend_graphs.my_graph"
-
-[resources.parameters]
-bloom_blur_pass_count = 8
+```lua
+-- res/assets/rend_graphs/rend_graphs.manifest.lua (reachable from a root chunk)
+return {
+    resources = {
+        {
+            id = "my_graph",
+            type = "rend_graph",
+            recipe = "rend_graphs.my_graph",
+            parameters = { bloom_blur_pass_count = 8 },
+        },
+    },
+}
 ```
 
 ```cpp

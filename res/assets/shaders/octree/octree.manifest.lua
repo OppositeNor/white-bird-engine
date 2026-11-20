@@ -1,0 +1,89 @@
+-- Copyright 2026 OppositeNor
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--     http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+return {
+    resources = {
+        {
+            id = "octree_build_static_mesh",
+            source_type = "shader",
+            src = "assets/shaders/octree/octree_build_static_mesh.slang",
+        },
+        {
+            id = "octree_build_static_mesh_pipeline",
+            type = "graphics_pipeline",
+            vertex_stage_id = "octree_build_static_mesh",
+            geometry_stage_id = "octree_build_static_mesh",
+            fragment_stage_id = "octree_build_static_mesh",
+            depth_test = false,
+            depth_write = false,
+            cull_backfaces = false,
+            conservative_rasterization = false,
+        },
+        {
+            id = "octree_dynamic_build_static_mesh",
+            source_type = "shader",
+            src = "assets/shaders/octree/octree_build_static_mesh.slang",
+            macros = {
+                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
+                { macro = "WBE_MESH_TRANSFORM", options = { "1" } },
+            },
+        },
+        {
+            id = "octree_dynamic_build_static_mesh_pipeline",
+            type = "graphics_pipeline",
+            vertex_stage_id = "octree_dynamic_build_static_mesh",
+            geometry_stage_id = "octree_dynamic_build_static_mesh",
+            fragment_stage_id = "octree_dynamic_build_static_mesh",
+            depth_test = false,
+            depth_write = false,
+            cull_backfaces = false,
+        },
+        {
+            id = "octree_debug_gather_leaves_shader",
+            source_type = "shader",
+            src = "assets/shaders/octree/octree_debug_gather_leaves.slang",
+        },
+        {
+            id = "octree_debug_gather_nodes_shader",
+            source_type = "shader",
+            src = "assets/shaders/octree/octree_debug_gather_nodes.slang",
+        },
+        {
+            id = "octree_debug_draw_shader",
+            source_type = "shader",
+            src = "assets/shaders/octree/octree_debug_draw.slang",
+            -- WBE_OCTREE_DEBUG_NODES draws the octree nodes instead of the leaves.
+            macros = { { macro = "WBE_OCTREE_DEBUG_NODES", options = { "1" }, optional = true } },
+        },
+        {
+            id = "octree_debug_draw_pipeline",
+            type = "graphics_pipeline",
+            vertex_stage_id = "octree_debug_draw_shader",
+            fragment_stage_id = "octree_debug_draw_shader",
+            depth_test = true,
+            depth_write = false,
+            cull_backfaces = false,
+        },
+        {
+            id = "octree_debug_node_draw_pipeline",
+            type = "graphics_pipeline",
+            vertex_stage_id = "octree_debug_draw_shader",
+            vertex_stage_variant = { { macro = "WBE_OCTREE_DEBUG_NODES", value = "1" } },
+            fragment_stage_id = "octree_debug_draw_shader",
+            fragment_stage_variant = { { macro = "WBE_OCTREE_DEBUG_NODES", value = "1" } },
+            depth_test = true,
+            depth_write = false,
+            cull_backfaces = false,
+        },
+    },
+}

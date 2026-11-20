@@ -121,7 +121,7 @@ private:
     // only by the next tick, so the bound must leave room for it and at least one submitted frame.
     static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
     static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
-    // The render graph definitions of res/assets/rend_graphs/rend_graphs.toml, whose recipe is rend_graphs.deferred,
+    // The render graph definitions of res/assets/rend_graphs/rend_graphs.manifest.lua, whose recipe is rend_graphs.deferred,
     // indexed like deferred_rend_graphs: the mipmap and the summed-area table graph.
     static constexpr std::array<std::string_view, 2> DEFERRED_REND_GRAPHS = {
         "deferred_mipmap_graph",

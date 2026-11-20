@@ -1,36 +1,66 @@
 # Asset Standard
 
-Assets are described by TOML manifest files (`.toml`) in the `res` folder and processed by ACP during build time.
-ACP emits each source manifest `<path>.toml` as the JSON runtime index file `<path>.json`; runtime code refers to the
-`.json` path. Reflection runs before ACP, so ACP can type-check Teal scripts against the generated declarations.
+Assets are described by Lua manifest files (`<name>.manifest.lua`) in the `res` folder and processed by ACP during build
+time. ACP emits each source manifest `<path>.manifest.lua` as the JSON runtime index file `<path>.json`; runtime code
+refers to the `.json` path. Reflection runs before ACP, so ACP can type-check Teal scripts against the generated
+declarations.
 
 ## Manifest Discovery
 
-ACP only starts from root manifests matching `res/res_chunks/**/*.toml`. It does not scan every TOML file under
-`res`, because other files may also be TOML and must not be treated as manifests.
+ACP only starts from root manifests matching `res/res_chunks/**/*.manifest.lua`. It does not scan every manifest under
+`res`.
 
-Root manifests may reference additional manifests with the `include` array. Include paths are resolved
-relative to the resource root and must name `.toml` source manifests. ACP loads only those referenced manifest files from
-the resource tree, then recursively follows their includes. Emitted runtime manifests list the corresponding `.json` paths.
+A manifest references other manifests with `require`. A dotted name other than a `manifest_utils` helper names a
+manifest relative to the resource root: `require("assets.materials.default_material")` is
+`assets/materials/default_material.manifest.lua`. ACP evaluates each required manifest once and records it as an include
+of the manifest that required it, also when the call comes from a helper that manifest uses, in the order of the first
+require. Emitted runtime manifests list the corresponding `.json` paths in `include`; manifests never write `include`
+themselves. Only the `require` calls that run count, so a require in an untaken branch adds nothing, and a require cycle
+fails the build.
 
-TOML files outside `res/res_chunks/` are processed only when they are reachable through `include` from
-a root chunk manifest. Included files must be valid ACP manifests with a `resources` array.
+`require` returns a handle to the manifest: `path` is its resource-root-relative path, and `id(name)` returns `name`
+after checking that the manifest declares a top-level resource with that id, so a reference to another manifest's
+resource is checked at build time and always comes with its include.
+
+Manifests outside `res/res_chunks/` are processed only when a root chunk manifest reaches them through `require`. Every
+manifest must return a table with a `resources` array.
 
 ## Manifest Layout
 
-Manifests are TOML 1.0 documents parsed with Python's `tomllib`. Top-level `include` is an array of manifest paths, and
-each resource is one `[[resources]]` table. Nested resources use `[[resources.<field>]]` arrays of tables or inline tables:
+A manifest is a Lua chunk that returns the manifest table: an optional `scope` and the `resources` array, one table per
+resource. Nested resources are tables in resource fields.
 
-```toml
-include = ["assets/materials/default_material.toml"]
+ACP evaluates manifests in a sandbox that exposes only the pure standard library (`string`, `table`, `math` without
+`random`, `utf8`, and the base functions without `load`, `dofile`, or `require` of arbitrary modules); there is no `io`,
+`os`, `debug`, or `package`, so a manifest always evaluates to the same data. Declarations may be computed with ordinary
+Lua, such as a loop over shader passes. Shared helpers live in `res/manifest_utils/<name>.lua` and are loaded with
+`require("manifest_utils.<name>")` in the same sandbox, once per ACP run; a project's manifests look in the project's
+`res` first, then the engine's.
 
-[[resources]]
-id = "example_shader"
-source_type = "shader"
-src = "assets/shaders/example.slang"
+The returned tables become data: a table with keys 1..n is an array, an empty table is an empty array, a table with only
+string keys is a map (emitted with sorted keys), and any other table, or a function, is an error. Lua integers stay
+integers and floats stay floats.
+
+```lua
+local scripts = require("assets.scripts.teal.lua_scripts")
+
+return {
+    resources = {
+        {
+            id = "example_shader",
+            source_type = "shader",
+            src = "assets/shaders/example.slang",
+        },
+        {
+            id = "example_graph",
+            type = "rend_graph",
+            recipe = scripts.id("rend_graphs.draw_triangle"),
+        },
+    },
+}
 ```
 
-A manifest with no resources still declares `resources = []`. TOML has no null; omit optional fields instead.
+A manifest with no resources still returns `resources = {}`. Lua tables cannot hold nil; omit optional fields instead.
 
 ## Resource Scope
 
@@ -40,8 +70,8 @@ compiled only when tests are enabled. ACP validates scope values, filters entrie
 compilation, and omits `scope` from runtime index files.
 
 Set `scope` on an individual resource entry, or on a whole manifest when all its resources
-and includes are test-only. A test-only manifest is skipped for deployment. A global
-manifest may include a test-only manifest; ACP removes that include from deployment output.
+and the manifests it requires are test-only. A test-only manifest is skipped for deployment. A global
+manifest may require a test-only manifest; ACP removes that include from deployment output.
 For a nested resource, keep it in the same scope as its containing resource.
 
 Source manifests live under `res/`. ACP writes deployment resources under `build/<target>/bin/res` and, for targets that
@@ -88,15 +118,17 @@ The engine loads `audio`, `binary`, `font`, `image`, `texture`, `text`, `script`
 Shader macros are compile-only and are not emitted into the runtime manifest. They select shader variants, such as the
 `WBE_MESH_TRANSFORM` variants of mesh shaders:
 
-```toml
-[[resources]]
-id = "example_shader_variant"
-source_type = "shader"
-src = "assets/shaders/example.slang"
-macros = [
-    { name = "WBE_MACRO_1" },
-    { name = "WBE_MACRO_2", value = "1" },
-]
+```lua
+return {
+    resources = {
+        {
+            id = "example_shader_variant",
+            source_type = "shader",
+            src = "assets/shaders/example.slang",
+            macros = { { name = "WBE_MACRO_1" }, { name = "WBE_MACRO_2", value = "1" } },
+        },
+    },
+}
 ```
 
 ## Pipeline Resources
@@ -111,15 +143,20 @@ also sets `depth_test`, `depth_write`, and `cull_backfaces` (all default `true`)
 
 Material resources fill shader-defined texture slots:
 
-```toml
-[[resources]]
-id = "example_material"
-type = "material"
-textures = [
-    { texture_role = "albedo", texture_id = "example_albedo" },
-    { texture_role = "normal", texture_id = "example_normal" },
-    { texture_role = "rma", texture_id = "example_rma" },
-]
+```lua
+return {
+    resources = {
+        {
+            id = "example_material",
+            type = "material",
+            textures = {
+                { texture_role = "albedo", texture_id = "example_albedo" },
+                { texture_role = "normal", texture_id = "example_normal" },
+                { texture_role = "rma", texture_id = "example_rma" },
+            },
+        },
+    },
+}
 ```
 
 Materials do not declare a `material_type` or graphics pipelines; the graphics pipeline the application draws them with and its
@@ -169,11 +206,11 @@ validate varying locations, scalar/vector formats, and resource byte layouts.
 
 - `model` takes `source_file`, `combine_nodes`, `flip_v`, `scale_vertex_pos`, `texture_output_dir`, `geometry_output_dir`,
   `source_space` / `target_space` (`{ up, right, front }`), and `texture_config` (`{ default, roles.<role> }`). Skinned models
-  also produce a skeleton and joint-binding vertex attributes. Example: `res/assets/models/models.toml`.
+  also produce a skeleton and joint-binding vertex attributes. Example: `res/assets/models/models.manifest.lua`.
 - `static_geometry` takes a non-empty `source_files` array and rejects `combine_nodes`.
 - A hand-authored `mesh` gives each submesh `vertices_data` and `indices_data` (position, normal, tangent, bitangent, uv, and
   optional joint bindings); ACP writes the binaries and an opaque submesh with one identity instance. Examples:
-  `res/assets/meshes/cube.toml`, `triangle.toml`.
+  `res/assets/meshes/cube.manifest.lua`, `triangle.manifest.lua`.
 - `model`, `static_geometry`, and `mesh` accept `sdf_config = { enabled, resolution, data_structure }`. `enabled` defaults
   to false, and the other fields are read only when it is true: `resolution` is the number of samples per unit of distance,
   and `data_structure` must be `texture_3d`. ACP samples the signed distance to the mesh's triangles, placed by their
@@ -194,13 +231,18 @@ cell. Distances are negative inside the surface.
 
 ## Script Resources
 
-Scripts live under `res/assets/scripts/teal/` and are declared in `res/assets/scripts/teal/lua_scripts.toml`:
+Scripts live under `res/assets/scripts/teal/` and are declared in `res/assets/scripts/teal/lua_scripts.manifest.lua`:
 
-```toml
-[[resources]]
-id = "rend_graph_utils.rend_graph_utils"
-source_type = "script"
-source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl"
+```lua
+return {
+    resources = {
+        {
+            id = "rend_graph_utils.rend_graph_utils",
+            source_type = "script",
+            source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl",
+        },
+    },
+}
 ```
 
 - A script's id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes. ACP does not

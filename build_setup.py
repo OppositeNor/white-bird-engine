@@ -112,7 +112,8 @@ acp_dependencies_compiler = BuildDependencyACP(
     Path(root_dir), Path(dependency_build_dir), Path(dependencies_dir), build_config.dependency_build_info)
 acp = ACP(Path(resource_dir), Path(resource_output_dir), enabled_test=False)
 test_env_acp = ACP(Path(resource_dir), Path(test_env_res_output_dir), enabled_test=True)
-project_acp = (ACP(Path(project_resource_dir), Path(resource_output_dir), enabled_test=False)
+project_acp = (ACP(Path(project_resource_dir), Path(resource_output_dir), enabled_test=False,
+                   helper_roots=[Path(project_resource_dir), Path(resource_dir)])
                if project_resource_dir is not None else None)
 acp_compilers_configured = False
 

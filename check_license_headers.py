@@ -34,6 +34,11 @@ LICENSE_HEADER_FILE_NAMES = {
     "CMakeLists.txt",
 }
 
+# Lua resource manifests; other Lua files, such as test fixtures, are not checked.
+LICENSE_HEADER_FILE_NAME_SUFFIXES = (
+    ".manifest.lua",
+)
+
 
 def is_license_tracked_file(file_path: str) -> bool:
     """Return whether a file should be checked for an Apache license header.
@@ -42,7 +47,8 @@ def is_license_tracked_file(file_path: str) -> bool:
         file_path: The file path to inspect.
     """
     path = Path(file_path)
-    return path.suffix in LICENSE_HEADER_FILE_EXTENSIONS or path.name in LICENSE_HEADER_FILE_NAMES
+    return (path.suffix in LICENSE_HEADER_FILE_EXTENSIONS or path.name in LICENSE_HEADER_FILE_NAMES
+            or path.name.endswith(LICENSE_HEADER_FILE_NAME_SUFFIXES))
 
 def has_apache_license_header(file_pathes: list[str], max_lines: int | None = 30) -> None:
     """Check if all files has an Apache 2.0 license header.

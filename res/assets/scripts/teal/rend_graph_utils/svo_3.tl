@@ -15,7 +15,7 @@
 -- Leaf gathering and deduplication of the third sparse voxel octree construction (svo_3), for recipes that build it. The
 -- conservative rasterization registers the Morton code of every covered leaf in the deferred list, once per covering
 -- triangle, and the large deduplication (see rend_graph_utils.dedup_large) writes each code once to the unique leaves.
--- The application compiles the pipelines of svo_3.toml, those of the large deduplication, and
+-- The application compiles the pipelines of svo_3.manifest.lua, those of the large deduplication, and
 -- svo_deferred_count_reset_shader, and owns the SVO info buffer.
 -- TODO: Build the tree from the unique leaves.
 

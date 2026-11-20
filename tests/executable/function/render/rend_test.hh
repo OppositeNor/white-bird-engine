@@ -281,7 +281,7 @@ using RendTestExtentFactory = std::function<VkExtent2D(const RendGraphContextVK&
  * before the renderer shuts down.
  *
  * @param p_renderer The renderer.
- * @param p_resource_key The render graph definition key, declared in res/assets/rend_graphs/rend_graphs.toml.
+ * @param p_resource_key The render graph definition key, declared in res/assets/rend_graphs/rend_graphs.manifest.lua.
  * @param p_bindings The bindings of the instance.
  * @param p_activate Whether to activate the graph.
  * @return The graph.

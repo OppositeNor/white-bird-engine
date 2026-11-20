@@ -410,7 +410,7 @@ end
 
 -- The debug views: the post-construction tree, drawn by the post-SVO-build and occupancy views, and the pre-deferred
 -- propagation view.
--- TODO(9): Add a radiance debug view next to the occupancy one (svo_debug_draw_*_occupancy_pipeline in svo/svo.toml and
+-- TODO(9): Add a radiance debug view next to the occupancy one (svo_debug_draw_*_occupancy_pipeline in svo/svo.manifest.lua and
 -- the occupancy branches of the debug-draw multiplexer below), coloring nodes by their reduced or propagated radiance,
 -- to check TODO(4) and TODO(5) before cone tracing depends on them.
 local function add_debug_views(builder: Builder)

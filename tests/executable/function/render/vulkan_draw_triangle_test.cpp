@@ -35,7 +35,7 @@
 
 namespace WBE = WhiteBirdEngine;
 
-// The render graph definition, res/assets/rend_graphs/rend_graphs.toml, whose recipe is rend_graphs.draw_triangle.
+// The render graph definition, res/assets/rend_graphs/rend_graphs.manifest.lua, whose recipe is rend_graphs.draw_triangle.
 inline constexpr std::string_view DRAW_TRIANGLE_REND_GRAPH = "draw_triangle_graph";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {

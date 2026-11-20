@@ -117,7 +117,7 @@ void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block
 // TODO(5): Add propagate_svo_radiance(), mirroring propagate_svo_occupancy() above: average the eight siblings' radiance
 // into the parent, with the same depth, dynamic/static block, and empty-child checks. Leaves' parents are written
 // first from the 27 subvoxels of each leaf (as inject_svo_leaf_parent_occupancy() does for occupancy). Weighting by
-// occupancy keeps empty children from darkening the average. Add its entry shader and svogi.toml resource.
+// occupancy keeps empty children from darkening the average. Add its entry shader and svogi.manifest.lua resource.
 
 struct Cone {
     float3 start_pos;

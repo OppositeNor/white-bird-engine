@@ -150,7 +150,7 @@ local pipeline: Graph.Resource = { key = "pipeline", kind = "registered", resour
             resources = compiler.compile({"id": "rend_graph_utils.rend_graph_tasks", "source_type": "script",
                                           "source_file": "rend_graph_utils/rend_graph_tasks.tl",
                                           "path": "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua"},
-                                         Path("lua_scripts.toml"), directory / "res", output)
+                                         Path("lua_scripts.manifest.lua"), directory / "res", output)
             self.assertEqual(resources[0]["path"], "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua")
             self.assertTrue((output / "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua").is_file())
 

@@ -80,7 +80,7 @@ For non-trivial implementation tasks:
   C++-built descriptors and imported tasks; recipe tasks' maps are strict.
 - Applications compose complete graphs only in Teal. A graph definition is a manifest `rend_graph` resource
   (`RURendGraph`, `RUSchemaRendGraph` in `function/render/rend_resource_unit.hh`) naming its `recipe` script and
-  static `parameters`; definitions live in `res/assets/rend_graphs/rend_graphs.toml`. Acquire an instance with
+  static `parameters`; definitions live in `res/assets/rend_graphs/rend_graphs.manifest.lua`. Acquire an instance with
   `IRenderer::acquire_rend_graph(definition_key, bindings)` and select what renders with
   `activate_rend_graph(graph)` (null clears it); both run on the rendering thread. There is no key-based registration
   and no application rebuild callback.
@@ -236,7 +236,7 @@ For non-trivial implementation tasks:
 ### Scripts
 
 - Script sources live under `res/assets/scripts/teal/` and are `script` resources declared in
-  `res/assets/scripts/teal/lua_scripts.toml`: recipes in `rend_graphs/`, reusable recipe parts (modules whose
+  `res/assets/scripts/teal/lua_scripts.manifest.lua`: recipes in `rend_graphs/`, reusable recipe parts (modules whose
   `subgraph(id, params, target)` returns a subgraph task) in `rend_graph_utils/features/`, graph helpers in
   `rend_graph_utils/`, and general script helpers in `utils/`.
 - A script's resource id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes
@@ -248,7 +248,7 @@ For non-trivial implementation tasks:
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
 - Modules that reflection generates (`rend_graph_utils.rend_graph` and `rend_graph_utils.rend_graph_tasks`) are
   written to `build/<target>/teal/`, which `require`
-  also resolves against. Their `lua_scripts.toml` entries give `source_file` relative to that directory, where the ACP
+  also resolves against. Their `lua_scripts.manifest.lua` entries give `source_file` relative to that directory, where the ACP
   looks first, and set `path` under `assets/scripts/teal/`.
 - `require` is the only import mechanism. It loads each module once per backend and shares its export table, and cyclic
   requires fail. Implement new import sources as an `IScriptModuleResolver`, whose `try_resolve()` must not throw.
@@ -356,13 +356,27 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 
 ## Resource Pipeline / ACP
 
-- ACP source manifests are TOML (`.toml`), parsed with Python's `tomllib`. ACP output stays JSON: source `<path>.toml` is
-  emitted as runtime `<path>.json`, and runtime code refers to the `.json` path.
-- ACP root manifest discovery starts only from `res/res_chunks/**/*.toml`.
-- Do not make ACP scan every TOML file under a resource tree.
-- Manifest files outside `res_chunks` are processed only when reachable from a root chunk manifest through `include`.
-- `include` paths are resource-root-relative `.toml` manifest paths. Included files must contain a `resources` array.
-- `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest to skip its entire include tree, or on an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
+- ACP source manifests are Lua chunks named `<name>.manifest.lua` that `return` the manifest table (`resources` and an optional
+  `scope`); there are no TOML manifests. `LuaManifestLoader` (`build_script/resource/acp/manifest_loader_lua.py`)
+  evaluates them in a sandbox with only the pure standard library (no `io`, `os`, `debug`, `package`, `load`, `dofile`,
+  `math.random`, or `string.dump`), so evaluation is deterministic; compute declarations with ordinary Lua instead of
+  copying them. ACP output stays JSON: source `<path>.manifest.lua` is emitted as runtime `<path>.json`, and runtime code
+  refers to the `.json` path.
+- Returned tables become data: keys 1..n make an array, an empty table is an empty array, string keys make a map (emitted
+  with sorted keys), and anything else (mixed keys, holes, functions) is an error.
+- `require` is the only way a manifest names other files. `require("manifest_utils.<name>")` loads the helper module
+  `res/manifest_utils/<name>.lua` in the same sandbox, once per ACP run; a project's manifests search the project's `res`
+  first, then the engine's. Any other dotted name requires a manifest (`require("assets.meshes.cube")` is
+  `assets/meshes/cube.manifest.lua`): ACP evaluates it once and records it as an include of the manifest being evaluated,
+  in first-require order, which the emitted JSON's `include` lists as runtime paths. There is no hand-written `include`.
+  The returned handle has the manifest's `path` and `id(name)`, which fails the build unless that manifest declares the
+  resource; reference other manifests' resources through it. A helper should require manifests only inside its
+  functions, since its body runs once. Cyclic requires fail.
+- ACP root manifest discovery starts only from `res/res_chunks/**/*.manifest.lua`.
+- Do not make ACP scan every manifest under a resource tree.
+- Manifest files outside `res_chunks` are processed only when a root chunk manifest reaches them through `require`, and
+  only the `require` calls that run count. Every manifest must return a `resources` array.
+- `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest to skip everything it requires, or on an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
 - `wbe-utils-model-compiler` owns final mesh and material resource shaping. Keep `acp_compiler_model.py` limited to ACP path/schema
   adaptation; do not normalize compiled material textures in the ACP adapter.
 - Mesh SDFs (`sdf_config` on `model`, `static_geometry`, and `mesh`) are emitted by the model compiler's `MeshSDFBuilder`

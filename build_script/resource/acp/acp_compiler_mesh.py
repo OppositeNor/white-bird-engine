@@ -17,6 +17,7 @@ import re
 import struct
 from typing import Any, override
 from build_script.resource.acp.acp_compiler import ManifestResource, ACPCompiler
+from build_script.resource.acp.manifest_loader_lua import get_manifest_stem
 
 from wbe_utils_model_compiler import MeshSDFBuilder, SDFCompiler, SDFConfig
 
@@ -191,7 +192,7 @@ class ACPCompilerMesh(ACPCompiler):
             return submesh_id
         if isinstance(resource_id, str) and resource_id:
             return f"{resource_id}.submesh.{submesh_index}"
-        return f"{manifest_path.stem}.submesh.{submesh_index}"
+        return f"{get_manifest_stem(manifest_path)}.submesh.{submesh_index}"
 
     def _geometry_output_path(self, resource: ManifestResource, manifest_path: Path) -> Path:
         raw_output_dir = resource.get("geometry_output_dir", manifest_path.parent.as_posix())
@@ -205,15 +206,15 @@ class ACPCompilerMesh(ACPCompiler):
                 f"ACPCompilerMesh: geometry_output_dir must be resource-root-relative in {manifest_path}: {raw_output_dir}."
             )
         output_dir = Path(output_dir.as_posix())
-        output_name = resource.get("_geometry_output_name", resource.get("id", manifest_path.stem))
+        output_name = resource.get("_geometry_output_name", resource.get("id", get_manifest_stem(manifest_path)))
         if not isinstance(output_name, str) or not output_name:
-            output_name = manifest_path.stem
+            output_name = get_manifest_stem(manifest_path)
         return output_dir / f"{self._sanitize_file_stem(output_name)}.geometry.bin"
 
     def _geometry_resource_id(self, resource: ManifestResource, manifest_path: Path) -> str:
-        output_name = resource.get("_geometry_output_name", resource.get("id", manifest_path.stem))
+        output_name = resource.get("_geometry_output_name", resource.get("id", get_manifest_stem(manifest_path)))
         if not isinstance(output_name, str) or not output_name:
-            output_name = manifest_path.stem
+            output_name = get_manifest_stem(manifest_path)
         return f"{self._sanitize_file_stem(output_name)}.geometry"
 
     def _sanitize_file_stem(self, value: str) -> str:

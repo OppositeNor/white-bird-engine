@@ -7,16 +7,19 @@ graphs only in Teal: a manifest **definition** names a recipe and its static par
 ## Definitions, Instances, and Rebuilds
 
 A definition is a `rend_graph` resource (`RURendGraph`), declared in a manifest reachable from a root chunk; the
-engine's are in `res/assets/rend_graphs/rend_graphs.toml`. It is immutable and holds no renderer state:
+engine's are in `res/assets/rend_graphs/rend_graphs.manifest.lua`. It is immutable and holds no renderer state:
 
-```toml
-[[resources]]
-id = "scene_graph"
-type = "rend_graph"
-recipe = "rend_graphs.scene"
-
-[resources.parameters]
-bloom_blur_pass_count = 8
+```lua
+return {
+    resources = {
+        {
+            id = "scene_graph",
+            type = "rend_graph",
+            recipe = "rend_graphs.scene",
+            parameters = { bloom_blur_pass_count = 8 },
+        },
+    },
+}
 ```
 
 The application acquires and activates an instance on the rendering thread:

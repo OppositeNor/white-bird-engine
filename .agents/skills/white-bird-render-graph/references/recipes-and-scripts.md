@@ -240,7 +240,7 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 
 ## Scripts and Teal
 
-- Sources live under `res/assets/scripts/teal/` and are `script` resources declared in `lua_scripts.toml`: recipes in
+- Sources live under `res/assets/scripts/teal/` and are `script` resources declared in `lua_scripts.manifest.lua`: recipes in
   `rend_graphs/` (`deferred.tl`, `draw_cube_unshaded.tl`, `pixel_sorting.tl`), features in `rend_graph_utils/features/`,
   graph helpers in `rend_graph_utils/` (`rend_graph_utils.tl`, `sort.tl`, `large_prefix_scan.tl`, `dedup_large.tl`,
   `svo_3.tl`), and general helpers in `utils/` (`math.tl`). Test-only scripts under `tests/` use `scope = "test_only"`.
