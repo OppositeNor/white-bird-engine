@@ -19,26 +19,26 @@
 #include "utils/counted_buffer.slang"
 #include "light/spot_light_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+struct DescIndices {
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [wbe::descriptor("storage_buffer", "index_buffer", "write")]
+    [wbe::desc("storage_buffer", "index_buffer", "write")]
     uint2 index_buffer;
-    [wbe::descriptor("storage_buffer", "staged_buffer", "write")]
+    [wbe::desc("storage_buffer", "staged_buffer", "write")]
     uint2 staged_buffer;
-    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
+    [wbe::desc("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
-    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    LightParamDescIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 // Stage buffer is written in float3x3, where each row represents ir, ig, ib
 groupshared float3x3 local_staged_buffer[256 * WBE_MAX_SPOT_LIGHT_COUNT];
@@ -52,15 +52,15 @@ groupshared uint global_index_start;
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    CountedBuffer<uint2> index_buffer = CountedBuffer<uint2>(descriptor_indices.index_buffer, descriptor_indices.shader_debug_frame_slot);
-    RWStructuredBuffer<SegmentedWrapper<float3x3>> staged_buffer = ResourceDescriptorHeap[descriptor_indices.staged_buffer.x];
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    CountedBuffer<uint2> index_buffer = CountedBuffer<uint2>(di.index_buffer, di.shader_debug_frame_slot);
+    RWStructuredBuffer<SegmentedWrapper<float3x3>> staged_buffer = ResourceDescriptorHeap[di.staged_buffer.x];
+    uint frame_slot = di.shader_debug_frame_slot;
 
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
-    uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
+    uint spot_light_count = get_spot_light_count(di.light_infos);
     float2 uv = float2(dispatch_thread_id) / float2(uint2(16, 16) * WorkgroupCount().xy);
     if (all(p_group_thread_id.xy == uint2(0, 0))) {
         buffer_tracker = 0;
@@ -69,7 +69,7 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     // We first gather all the voxels each invocation in this workgroup is going to write into, perform a sort on them, and
     // sum up the ones that are in the same voxel.
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLight spot_light = SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[spot_light_index], spot_light_index);
+        SpotLight spot_light = SpotLight(di.light_infos, di.lights[spot_light_index], spot_light_index);
         // Read the position and the flux from the same shadow-map texel; the reflective shadow map shares its extent.
         uint2 shadow_size = spot_light.get_shadow_size();
         uint2 texel = min(uint2(uv * float2(shadow_size)), shadow_size - 1);

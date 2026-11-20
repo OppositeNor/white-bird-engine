@@ -1,0 +1,207 @@
+# Copyright 2026 OppositeNor
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+from pathlib import Path
+import re
+from tempfile import TemporaryDirectory
+from typing import Any
+import unittest
+
+from jinja2 import Environment, FileSystemLoader
+import lupa.lua55
+
+from build_script.reflection.metadata_types import ClassMetadata, FieldMetadata, Metadata, MethodMetadata
+from build_script.reflection.teal_types import TEAL_FILTERS, teal_rend_tasks
+from build_script.resource.acp.acp_compiler_script import ACPCompilerScript
+
+_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _params(p_name: str, p_fields: list[FieldMetadata]) -> ClassMetadata:
+    return ClassMetadata(name=p_name, attribute=["WBE", "WBE_REFLECT_SCRIPT"], fields=p_fields)
+
+
+def _task(p_name: str, p_method: str | None, p_params: str, p_aliases: list[str] | None = None) -> ClassMetadata:
+    return ClassMetadata(name=p_name, attribute=["WBE", "WBE_REND_TASK"],
+                            attribute_parameters={} if p_method is None else {"WBE_REND_TASK": [p_method]},
+                            aliases=["wire_" + str(p_method)] if p_aliases is None else p_aliases,
+                            methods=[MethodMetadata(method_name="create", is_static=True,
+                                                       type=["const RendContextVK *", f"const {p_params} &",
+                                                             "const RendGraphContextVK &"])])
+
+
+def _field(p_name: str, p_type: str, p_scope: str | None = None) -> FieldMetadata:
+    """A params field; p_scope "graph" annotates it with a bare WBE_RECIPE_RESOURCE, and another scope passes the scope as
+    the annotation's parameter."""
+    if p_scope is None:
+        return FieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT"])
+    parameters: dict[str, list[str]] = {} if p_scope == "graph" else {"WBE_RECIPE_RESOURCE": [p_scope]}
+    return FieldMetadata(name=p_name, type=p_type, attribute=["WBE", "WBE_REFLECT", "WBE_RECIPE_RESOURCE"],
+                            attribute_parameters=parameters)
+
+
+def _describe(p_classes: list[ClassMetadata]) -> dict[str, Any]:
+    return teal_rend_tasks(Metadata(classes=p_classes), ["WBE_REND_TASK"], ["WBE_REFLECT_SCRIPT"])
+
+
+class TealRendTasksTest(unittest.TestCase):
+    def test_constructors_without_resource_fields_take_the_reflected_params(self) -> None:
+        params = _params("RTParamsComputeVK", [_field("pipeline", "std::string")])
+        api = _describe([params, _task("RTComputeVK", "compute", params.name)])
+        self.assertEqual(api, {"interfaces": [], "constructors": [
+            {"method": "compute", "type": "wire_compute", "params_type": "wbe.RTParamsComputeVK", "fields": []}]})
+        api = _describe([params, _task("RTComputeVK", "compute", params.name, [])])
+        self.assertEqual(api["constructors"][0]["type"], "RTComputeVK")
+
+    def test_resource_fields_get_authoring_interfaces_and_descriptions(self) -> None:
+        dispatch = _params("RTParamsDispatchVK", [
+            _field("pipeline", "std::string"),
+            _field("indirect_buffer", "std::string", "graph"),
+            _field("aliases", "DataValue", "graph"),
+        ])
+        params = _params("RTParamsSequentialVK", [
+            _field("dispatches", "std::vector<RTParamsDispatchVK>"),
+            _field("views", "std::vector<std::string>", "graph"),
+            _field("transform", "std::optional<std::string>", "graph"),
+            _field("counts", "std::vector<uint32_t>"),
+        ])
+        api = _describe([params, dispatch, _task("RTSequentialVK", "compute_sequential", params.name)])
+        graph = {"kind": "resource", "scope": "graph"}
+        self.assertEqual(api["constructors"][0]["params_type"], "RTParamsSequentialVK")
+        self.assertEqual(api["constructors"][0]["fields"], [
+            {"name": "dispatches", "kind": "list", "element": {"kind": "record", "fields": [
+                {"name": "indirect_buffer", **graph},
+                {"name": "aliases", "kind": "map", "element": graph},
+            ]}},
+            {"name": "views", "kind": "list", "element": graph},
+            {"name": "transform", **graph},
+        ])
+        interfaces = {interface["name"]: interface["fields"] for interface in api["interfaces"]}
+        self.assertEqual(list(interfaces), ["RTParamsDispatchVK", "RTParamsSequentialVK"])
+        self.assertEqual(interfaces["RTParamsSequentialVK"], [
+            {"name": "dispatches", "type": "{RTParamsDispatchVK}"},
+            {"name": "views", "type": "{Resource}"},
+            {"name": "transform", "type": "Resource"},
+            {"name": "counts", "type": "{integer}"},
+        ])
+        self.assertEqual(interfaces["RTParamsDispatchVK"][2], {"name": "aliases", "type": "{string:Resource}"})
+
+    def test_bare_rend_task_has_no_constructor(self) -> None:
+        params = _params("RTParamsComputeVK", [])
+        self.assertEqual(_describe([params, _task("RTRegistryOnlyVK", None, params.name)]),
+                         {"interfaces": [], "constructors": []})
+
+    def test_invalid_constructor_names_fail_generation(self) -> None:
+        params = _params("RTParamsComputeVK", [])
+        for method in ['"compute"', "end", "two words", ""]:
+            with self.subTest(method=method), self.assertRaisesRegex(ValueError, "one identifier"):
+                _describe([params, _task("RTComputeVK", method, params.name)])
+        for method in ["enum_name", "buffer", "storage_buffer", "image", "storage_image", "image_view", "clamp_to_edge_sampler",
+                       "mesh", "compute_pipeline", "graphics_pipeline", "shader_compute_pipeline", "registered_resource",
+                       "registered_image", "import", "port", "indirect_dispatch", "task", "import_task", "multiplex", "subgraph",
+                       "chain", "build"]:
+            with self.subTest(method=method), self.assertRaisesRegex(ValueError, "shadows"):
+                _describe([params, _task("RTComputeVK", method, params.name)])
+        with self.assertRaisesRegex(ValueError, "more than one"):
+            _describe([params, _task("RTFirstVK", "compute", params.name), _task("RTSecondVK", "compute", params.name)])
+
+    def test_invalid_tasks_and_resource_fields_fail_generation(self) -> None:
+        params = _params("RTParamsComputeVK", [_field("buffer", "uint32_t", "graph")])
+        task = _task("RTComputeVK", "compute", params.name)
+        with self.assertRaisesRegex(ValueError, "std::string ids"):
+            _describe([params, task])
+        params.fields = [_field("buffer", "std::string", "task")]
+        with self.assertRaisesRegex(ValueError, r"must be WBE_RECIPE_RESOURCE or"):
+            _describe([params, task])
+        params.fields = []
+        task.methods[0].type = task.methods[0].type[:2]
+        with self.assertRaisesRegex(ValueError, "create"):
+            _describe([params, task])
+        with self.assertRaisesRegex(ValueError, "WBE_REFLECT_SCRIPT"):
+            _describe([params, _task("RTComputeVK", "compute", "RTParamsHiddenVK")])
+        nested = ClassMetadata(name="RTParamsHiddenVK", fields=[_field("buffer", "std::string", "graph")])
+        params.fields = [_field("hidden", "RTParamsHiddenVK")]
+        with self.assertRaisesRegex(ValueError, "WBE_REFLECT_SCRIPT"):
+            _describe([params, nested, _task("RTComputeVK", "compute", params.name)])
+
+    def test_generated_module_type_checks_and_packages_from_the_generated_directory(self) -> None:
+        params = _params("RTParamsCopyVK", [_field("pipeline", "std::string"),
+                                            _field("buffer", "std::optional<std::string>", "graph")])
+        metadata = Metadata(classes=[params, _task("RTCopyVK", "copy", params.name)])
+        environment = Environment(loader=FileSystemLoader(_ROOT / "templates"), trim_blocks=True, lstrip_blocks=True)
+        environment.filters.update(TEAL_FILTERS)
+        module = environment.get_template("teal_rend_graph_tasks.tl.jinja").render(
+            metadata=metadata, rend_tasks=["WBE_REND_TASK"], reflect_script=["WBE_REFLECT_SCRIPT"], _prefix="Test.")
+        common = environment.get_template("teal_rend_graph.tl.jinja").render(
+            metadata=metadata, rend_tasks=["WBE_REND_TASK"], reflect_script=["WBE_REFLECT_SCRIPT"], _prefix="Test.")
+        with TemporaryDirectory() as temporary:
+            generated = Path(temporary) / "generated"
+            (generated / "rend_graph_utils").mkdir(parents=True)
+            (generated / "rend_graph_utils" / "rend_graph_tasks.tl").write_text(module)
+            (generated / "rend_graph_utils/rend_graph.tl").write_text(common)
+            # A stand-in for the generated wbe declarations, declaring every wbe type the rendered modules name, so it
+            # follows the templates as they change.
+            core_types = sorted(set(re.findall(r"\bwbe\.([A-Za-z_]\w*)", common + module)))
+            (generated / "wbe.d.tl").write_text("local record wbe\n" + "".join(
+                f"    interface {name}\n    end\n" for name in core_types) + "end\nreturn wbe\n")
+            implementation = generated / "rend_graph_utils/rend_graph_utils.tl"
+            implementation.write_text('''local graph = require("rend_graph_utils.rend_graph")
+local rend_graph_tasks = require("rend_graph_utils.rend_graph_tasks")
+rend_graph_tasks.install(graph, function(type_name: string, params: any, options: graph.TaskOptions,
+    _fields: {rend_graph_tasks.ResourceField}): graph.Task
+    return { kind = "typed", ["type"] = type_name, params = params, name = (options or {}).name }
+end)
+return graph
+''')
+            consumer = Path(temporary) / "consumer.tl"
+            consumer.write_text('''local graph = require("rend_graph_utils.rend_graph_utils")
+local params: graph.RTParamsCopyVK = { pipeline = "pipeline", buffer = { kind = "buffer" } }
+local task: graph.Task = graph.copy(params, { name = "copy" })
+local other = graph.copy({ pipeline = "pipeline", buffer = { kind = "buffer" } })
+assert(task.type == "wire_copy" and task.name == "copy" and other.name == nil)
+local captured = task.params as graph.RTParamsCopyVK
+assert(captured.pipeline == "pipeline")
+return task
+''')
+            compiler = ACPCompilerScript(_ROOT / "dependencies" / "tl", [generated], generated)
+            self.assertNotIn("<Resource>", common)
+            self.assertNotIn("install<", module)
+            self.assertNotIn('require("rend_graph_utils.', common)
+            (generated / "rend_graph_utils/rend_graph.lua").write_text(
+                compiler._compile_teal(generated / "rend_graph_utils/rend_graph.tl"))
+            self.assertIn('make_task("wire_copy", params, options, copy_fields)',
+                          compiler._compile_teal(generated / "rend_graph_utils" / "rend_graph_tasks.tl"))
+            (generated / "rend_graph_utils/rend_graph_tasks.lua").write_text(
+                compiler._compile_teal(generated / "rend_graph_utils/rend_graph_tasks.tl"))
+            (generated / "rend_graph_utils/rend_graph_utils.lua").write_text(compiler._compile_teal(implementation))
+            consumer_lua = compiler._compile_teal(consumer)
+            # Resource fields take handles only; a resource id string fails the type check.
+            string_consumer = Path(temporary) / "string_consumer.tl"
+            string_consumer.write_text('local graph = require("rend_graph_utils.rend_graph_utils")\n'
+                                       'graph.copy({ pipeline = "pipeline", buffer = "buffer" })\n')
+            with self.assertRaisesRegex(RuntimeError, "Failed to compile Teal script"):
+                compiler._compile_teal(string_consumer)
+            runtime = lupa.lua55.LuaRuntime(unpack_returned_tuples=True)
+            runtime.execute("package.path = ...", (generated / "?.lua").as_posix())
+            runtime.execute(consumer_lua)
+            output = Path(temporary) / "output"
+            resources = compiler.compile({"id": "rend_graph_utils.rend_graph_tasks", "source_type": "script",
+                                          "source_file": "rend_graph_utils/rend_graph_tasks.tl",
+                                          "path": "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua"},
+                                         Path("lua_scripts.toml"), Path(temporary) / "res", output)
+            self.assertEqual(resources[0]["path"], "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua")
+            self.assertTrue((output / "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

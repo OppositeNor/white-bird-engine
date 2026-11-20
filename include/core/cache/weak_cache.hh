@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_WEAK_CACHE_HH
 #define WBE_FILE_WEAK_CACHE_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include <cstddef>
@@ -40,7 +40,7 @@ namespace WhiteBirdEngine {
  * @tparam AllocType The allocator type of the cache's storage.
  * @tparam RefAllocType The allocator type of the cached references.
  */
-template <typename TKey, typename TValue, typename AllocType, typename RefAllocType = HeapAllocator>
+template <typename TKey, typename TValue, typename AllocType, typename RefAllocType = HeapAlloc>
 class WeakCache final {
 public:
     WeakCache() = delete;
@@ -67,10 +67,10 @@ public:
     /**
      * @brief Construct an empty cache.
      *
-     * @param p_allocator The allocator of the cache's storage; it must outlive the cache.
-     * @throws std::runtime_error If p_allocator is null.
+     * @param p_alloc The allocator of the cache's storage; it must outlive the cache.
+     * @throws std::runtime_error If p_alloc is null.
      */
-    explicit WeakCache(AllocType* p_allocator) : entries(validate_allocator(p_allocator)) {
+    explicit WeakCache(AllocType* p_alloc) : entries(validate_alloc(p_alloc)) {
     }
 
     /**
@@ -203,11 +203,11 @@ public:
 private:
     Map<TKey, RefWeak<TValue, RefAllocType>, AllocType> entries;
 
-    static AllocType* validate_allocator(AllocType* p_allocator) {
-        if (p_allocator == nullptr) {
+    static AllocType* validate_alloc(AllocType* p_alloc) {
+        if (p_alloc == nullptr) {
             throw std::runtime_error("Failed to create weak cache: the allocator is null.");
         }
-        return p_allocator;
+        return p_alloc;
     }
 };
 

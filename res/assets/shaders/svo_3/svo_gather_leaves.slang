@@ -85,16 +85,16 @@ static const uint VOXEL_CLAIM_BIT_MASK = 31u;
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
  */
-struct SVODescriptorIndices {
+struct SVODescIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [wbe::descriptor("storage_buffer", "svo_info")]
+    [wbe::desc("storage_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list, which receives the Morton code of every rasterized leaf.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list")]
+    [wbe::desc("storage_buffer", "svo_deferred_list")]
     uint2 deferred_list;
     /**
      * @brief Renderer frame slot used for shader validation reports.
@@ -102,11 +102,11 @@ struct SVODescriptorIndices {
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODescIndices> di;
 
 /**
  * @brief Transform a mesh vertex for the svo.
@@ -116,13 +116,13 @@ ConstantBuffer<SVODescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
     SVOInfo svo_info = svo_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
 
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     SubmeshData submesh = submeshes[instance.submesh_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
@@ -219,10 +219,10 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  */
 [shader("fragment")]
 void fragment_main(GSOutput p_input) {
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
+    uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> deferred_list =
-        CountedBuffer<uint>(descriptor_indices.deferred_list, frame_slot);
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+        CountedBuffer<uint>(di.deferred_list, frame_slot);
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
     // Helper invocations cannot publish storage writes and receive undefined atomic results.
     // Keep them out of allocation retry loops; this shader does not need derivatives.
     if (IsHelperLane()) {
@@ -233,7 +233,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;
@@ -247,7 +247,7 @@ void fragment_main(GSOutput p_input) {
     uint leaf_index;
     bool fits = deferred_list.try_atomic_expand(1, leaf_index);
     WBE_SHADER_DEBUG_ASSERT(leaf_index < svo_info_buffer[0].max_deferred_task_count,
-        ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+        ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, di.shader_debug_frame_slot);
     // svo_3_prepare_leaves clamps the count of leaves that do not fit.
     if (fits) {
         deferred_list.set(leaf_index, voxel_morton_code);

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render/vertex_input_contract_resolver.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_query.hh"
 #include "function/render/shader_role_field_resolver.hh"

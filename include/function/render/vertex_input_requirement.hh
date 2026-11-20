@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_VERTEX_INPUT_REQUIREMENT_HH
 #define WBE_FILE_VERTEX_INPUT_REQUIREMENT_HH
 
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_role.hh"
 #include <cstdint>
 #include <vector>

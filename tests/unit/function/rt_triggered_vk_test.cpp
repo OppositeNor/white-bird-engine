@@ -12,21 +12,21 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "function/event/event_manager.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_task_registry_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
-#include "render_task_registry_vk_test_tasks.hh"
+#include "rend_task_registry_vk_test_tasks.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
 #include <functional>
@@ -48,7 +48,7 @@ struct TriggerProbeState {
     std::function<void()> on_record;
 };
 
-class RTTriggerProbeVK final : public IRenderTaskVK {
+class RTTriggerProbeVK final : public IRendTaskVK {
 public:
     RTTriggerProbeVK() = delete;
     explicit RTTriggerProbeVK(TriggerProbeState& p_state) : state(p_state) {
@@ -63,7 +63,7 @@ public:
     virtual QueueFamilyVK queue_family() const override {
         return QueueFamilyVK::COMPUTE_1;
     }
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RendAlloc>& p_reads, Vector<ResAccessVK, RendAlloc>& p_writes) const override {
         p_reads.emplace_back("input", RendResUsageVK::STORAGE_BUFFER);
         p_writes.emplace_back("output", RendResUsageVK::STORAGE_IMAGE);
     }
@@ -100,9 +100,9 @@ protected:
 } // namespace
 
 TEST(WBERTTriggeredVKTest, ConsumesOneActivationAndCanBeRearmed) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state));
     task.record(VK_NULL_HANDLE, 1.0);
     EXPECT_EQ(state.recordings, 0);
     task.trigger();
@@ -120,9 +120,9 @@ TEST(WBERTTriggeredVKTest, ConsumesOneActivationAndCanBeRearmed) {
 }
 
 TEST(WBERTTriggeredVKTest, ActivationDuringRecordingRemainsPending) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), true);
     state.on_record = [&task] {
         task.trigger();
     };
@@ -135,9 +135,9 @@ TEST(WBERTTriggeredVKTest, ActivationDuringRecordingRemainsPending) {
 }
 
 TEST(WBERTTriggeredVKTest, EnabledForRecordsRequestedFrames) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state));
     task.enabled_for(3);
     EXPECT_EQ(task.get_remaining_frames(), 3U);
     for (int i = 0; i < 5; ++i) {
@@ -148,9 +148,9 @@ TEST(WBERTTriggeredVKTest, EnabledForRecordsRequestedFrames) {
 }
 
 TEST(WBERTTriggeredVKTest, TriggerDoesNotShortenEnabledPeriod) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state));
     task.enabled_for(3);
     task.trigger();
     EXPECT_EQ(task.get_remaining_frames(), 3U);
@@ -160,25 +160,25 @@ TEST(WBERTTriggeredVKTest, TriggerDoesNotShortenEnabledPeriod) {
 }
 
 TEST(WBERTTriggeredVKTest, EnabledForZeroCancelsPendingFrames) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), true);
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), true);
     task.enabled_for(0);
     task.record(VK_NULL_HANDLE, 0.0);
     EXPECT_EQ(state.recordings, 0);
 }
 
 TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
     {
-        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state));
-        Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
+        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state));
+        Map<std::string, Ref<RendResVK>, RendAlloc> resources(&alloc);
         task.bind_resources(RendResViewVK(&resources));
         EXPECT_EQ(state.bindings, 1);
         EXPECT_EQ(task.queue_family(), QueueFamilyVK::COMPUTE_1);
-        Vector<ResAccessVK, RenderAllocator> reads(&allocator);
-        Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+        Vector<ResAccessVK, RendAlloc> reads(&alloc);
+        Vector<ResAccessVK, RendAlloc> writes(&alloc);
         task.append_accesses(reads, writes);
         ASSERT_EQ(reads.size(), 1U);
         ASSERT_EQ(writes.size(), 1U);
@@ -193,13 +193,13 @@ TEST(WBERTTriggeredVKTest, InactiveWrapperForwardsSetupAndOwnsChild) {
 }
 
 TEST(WBERTTriggeredVKTest, RejectsNullChild) {
-    EXPECT_THROW((RTTriggeredVK{Unique<IRenderTaskVK>{}}), std::runtime_error);
+    EXPECT_THROW((RTTriggeredVK{Unique<IRendTaskVK>{}}), std::runtime_error);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, TriggerCommandRecordsOnce) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), "probe.trigger");
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), "probe.trigger");
     EventManager* events = EventManager::get_singleton();
 
     task.record(VK_NULL_HANDLE, 0.0);
@@ -212,9 +212,9 @@ TEST_F(WBERTTriggeredVKEventTest, TriggerCommandRecordsOnce) {
 }
 
 TEST_F(WBERTTriggeredVKEventTest, EnableForCommandRecordsTheRequestedFrames) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), "probe.sequence");
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), "probe.sequence");
     EventManager::get_singleton()->emit("probe.sequence", RTTriggeredVK::Command::enable_for(3));
     EXPECT_EQ(task.get_remaining_frames(), 3U);
     for (int i = 0; i < 5; ++i) {
@@ -230,13 +230,13 @@ TEST_F(WBERTTriggeredVKEventTest, EnableForCommandRecordsTheRequestedFrames) {
 }
 
 TEST_F(WBERTTriggeredVKEventTest, TasksSharingAnIdRunOnTheSameFrames) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState present_state;
     TriggerProbeState acquire_state;
     TriggerProbeState other_state;
-    RTTriggeredVK present(make_unique<RTTriggerProbeVK>(&allocator, present_state), "probe.shared");
-    RTTriggeredVK acquire(make_unique<RTTriggerProbeVK>(&allocator, acquire_state), "probe.shared");
-    RTTriggeredVK other(make_unique<RTTriggerProbeVK>(&allocator, other_state), "probe.other");
+    RTTriggeredVK present(make_unique<RTTriggerProbeVK>(&alloc, present_state), "probe.shared");
+    RTTriggeredVK acquire(make_unique<RTTriggerProbeVK>(&alloc, acquire_state), "probe.shared");
+    RTTriggeredVK other(make_unique<RTTriggerProbeVK>(&alloc, other_state), "probe.other");
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.shared"), 2U);
 
     EventManager::get_singleton()->emit("probe.shared", RTTriggeredVK::Command::enable_for(2));
@@ -251,10 +251,10 @@ TEST_F(WBERTTriggeredVKEventTest, TasksSharingAnIdRunOnTheSameFrames) {
 }
 
 TEST_F(WBERTTriggeredVKEventTest, DestroyingTheTaskEndsTheSubscription) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
     {
-        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), "probe.lifetime");
+        RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), "probe.lifetime");
         EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.lifetime"), 1U);
     }
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.lifetime"), 0U);
@@ -263,38 +263,38 @@ TEST_F(WBERTTriggeredVKEventTest, DestroyingTheTaskEndsTheSubscription) {
 }
 
 TEST_F(WBERTTriggeredVKEventTest, RejectsAnEmptyOrNullEventId) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&allocator, state), ""), std::runtime_error);
-    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&allocator, state), std::string_view()), std::runtime_error);
-    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&allocator, state), static_cast<const char*>(nullptr)), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&alloc, state), ""), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&alloc, state), std::string_view()), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&alloc, state), static_cast<const char*>(nullptr)), std::runtime_error);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, StringLiteralSelectsTheEventConstructor) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
-    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&allocator, state), "probe.literal");
+    RTTriggeredVK task(make_unique<RTTriggerProbeVK>(&alloc, state), "probe.literal");
     // A literal must subscribe, not convert to the bool that would arm the task.
     EXPECT_EQ(task.get_remaining_frames(), 0U);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.literal"), 1U);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryWrapsEveryCreatedTask) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     TriggerProbeState state;
     int factory_calls = 0;
     VkExtent2D seen_extent{};
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
-        [&](const RendGraphContextVK& p_context) -> Unique<IRenderTaskVK> {
+        [&](const RendGraphContextVK& p_context) -> Unique<IRendTaskVK> {
             ++factory_calls;
             seen_extent = p_context.swap_chain_extent;
-            return make_unique<RTTriggerProbeVK>(&allocator, state);
+            return make_unique<RTTriggerProbeVK>(&alloc, state);
         },
         "probe.wrapped",
-        &render_data);
+        &rend_data);
 
-    Unique<IRenderTaskVK> task = factory(RendGraphContextVK{.swap_chain_extent = {.width = 800, .height = 600}});
+    Unique<IRendTaskVK> task = factory(RendGraphContextVK{.swap_chain_extent = {.width = 800, .height = 600}});
     EXPECT_EQ(factory_calls, 1);
     EXPECT_EQ(seen_extent.width, 800U);
     auto* triggered = dynamic_cast<RTTriggeredVK*>(task.get());
@@ -310,87 +310,87 @@ TEST_F(WBERTTriggeredVKEventTest, WrapFactoryWrapsEveryCreatedTask) {
 }
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryCreatesAFreshWrapperOnEveryEvaluation) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     TriggerProbeState state;
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
-        [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-            return make_unique<RTTriggerProbeVK>(&allocator, state);
+        [&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+            return make_unique<RTTriggerProbeVK>(&alloc, state);
         },
         "probe.recreated",
-        &render_data);
+        &rend_data);
 
-    Unique<IRenderTaskVK> first = factory(RendGraphContextVK{});
+    Unique<IRendTaskVK> first = factory(RendGraphContextVK{});
     EventManager::get_singleton()->emit("probe.recreated", RTTriggeredVK::Command::enable_for(5));
     EXPECT_EQ(dynamic_cast<RTTriggeredVK*>(first.get())->get_remaining_frames(), 5U);
     // A recreated task starts in its initial state, as the graph recreates tasks after a resize.
     first.reset();
-    Unique<IRenderTaskVK> second = factory(RendGraphContextVK{});
+    Unique<IRendTaskVK> second = factory(RendGraphContextVK{});
     EXPECT_EQ(dynamic_cast<RTTriggeredVK*>(second.get())->get_remaining_frames(), 0U);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.recreated"), 1U);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryHonoursActivation) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     TriggerProbeState state;
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
-        [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-            return make_unique<RTTriggerProbeVK>(&allocator, state);
+        [&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+            return make_unique<RTTriggerProbeVK>(&alloc, state);
         },
         "probe.active",
-        &render_data,
+        &rend_data,
         true);
-    Unique<IRenderTaskVK> task = factory(RendGraphContextVK{});
+    Unique<IRendTaskVK> task = factory(RendGraphContextVK{});
     task->record(VK_NULL_HANDLE, 0.0);
     task->record(VK_NULL_HANDLE, 0.0);
     EXPECT_EQ(state.recordings, 1);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryRejectsInvalidInputs) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     TriggerProbeState state;
-    const RendTaskFactoryVK inner = [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-        return make_unique<RTTriggerProbeVK>(&allocator, state);
+    const RendTaskFactoryVK inner = [&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+        return make_unique<RTTriggerProbeVK>(&alloc, state);
     };
-    EXPECT_THROW(RTTriggeredVK::wrap_factory(RendTaskFactoryVK(), "probe.invalid", &render_data), std::runtime_error);
-    EXPECT_THROW(RTTriggeredVK::wrap_factory(inner, "", &render_data), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK::wrap_factory(RendTaskFactoryVK(), "probe.invalid", &rend_data), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK::wrap_factory(inner, "", &rend_data), std::runtime_error);
     EXPECT_THROW(RTTriggeredVK::wrap_factory(inner, "probe.invalid", nullptr), std::runtime_error);
 }
 
 TEST_F(WBERTTriggeredVKEventTest, WrapFactoryComposesWithTheTaskRegistry) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     DataValue params;
     params.set_entry("label", DataValue::make_string("triggered"));
     const RendTaskFactoryVK factory = RTTriggeredVK::wrap_factory(
-        RenderTaskRegistryVK::create_factory("registry_probe", params, &render_data), "probe.registry", &render_data);
-    Unique<IRenderTaskVK> task = factory(RendGraphContextVK{});
+        RendTaskRegistryVK::create_factory("registry_probe", params, &rend_data), "probe.registry", &rend_data);
+    Unique<IRendTaskVK> task = factory(RendGraphContextVK{});
     ASSERT_NE(dynamic_cast<RTTriggeredVK*>(task.get()), nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("probe.registry"), 1U);
 }
 
 // Runs without a test global, so no EventManager exists.
 TEST(WBERTTriggeredVKStandaloneTest, EventModeRequiresEventManager) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     TriggerProbeState state;
     ASSERT_EQ(EventManager::get_singleton(), nullptr);
-    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&allocator, state), "probe.no_manager"), std::runtime_error);
+    EXPECT_THROW(RTTriggeredVK(make_unique<RTTriggerProbeVK>(&alloc, state), "probe.no_manager"), std::runtime_error);
 }
 
 // Runs without a test global, so no EventManager exists.
 TEST(WBERTTriggeredVKStandaloneTest, WrapFactoryRequiresEventManager) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     TriggerProbeState state;
     ASSERT_EQ(EventManager::get_singleton(), nullptr);
     EXPECT_THROW(RTTriggeredVK::wrap_factory(
-                     [&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-                         return make_unique<RTTriggerProbeVK>(&allocator, state);
+                     [&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+                         return make_unique<RTTriggerProbeVK>(&alloc, state);
                      },
                      "probe.no_manager",
-                     &render_data),
+                     &rend_data),
         std::runtime_error);
 }
 

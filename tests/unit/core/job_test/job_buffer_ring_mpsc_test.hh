@@ -48,8 +48,8 @@ protected:
     std::unique_ptr<WBE::Global> global;
 
     // Helper to get allocator from global
-    WBE::HeapAllocatorDefault* get_allocator() {
-        return global->engine_core->pool_allocator;
+    WBE::HeapAllocDefault* get_allocator() {
+        return global->engine_core->pool_alloc;
     }
 };
 

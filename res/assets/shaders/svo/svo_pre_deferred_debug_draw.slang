@@ -16,17 +16,17 @@
 #include "svo/svo_utils.slang"
 #include "svo/svo.slang"
 
-struct SVOPreDeferredDebugDrawDescriptorIndices {
-    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
+struct SVOPreDeferredDebugDrawDescIndices {
+    [wbe::desc("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
 
-    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_list_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_pre_deferred_debug_list_buffer", "read")]
     uint2 deferred_list;
-    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
@@ -47,7 +47,7 @@ struct SVOPreDeferredDebugDrawVertexOutput {
 };
 
 [vk::push_constant]
-ConstantBuffer<SVOPreDeferredDebugDrawDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVOPreDeferredDebugDrawDescIndices> di;
 
 uint3 get_deferred_task_grid_position(uint p_task, SVOInfo p_tree_info) {
     return get_deferred_list_entry_voxel(p_task, p_tree_info.max_depth);
@@ -58,16 +58,16 @@ uint3 get_deferred_task_grid_position(uint p_task, SVOInfo p_tree_info) {
  */
 [shader("vertex")]
 SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    StructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
     SVOInfo svo_info = svo_info_buffer[0];
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
     bool is_deferred_task = p_instance_id >= svo.get_total_leaves();
-    if (!is_deferred_task && !svo.is_leaf_occupied(p_instance_id, descriptor_indices.shader_debug_frame_slot)) {
+    if (!is_deferred_task && !svo.is_leaf_occupied(p_instance_id, di.shader_debug_frame_slot)) {
         SVOPreDeferredDebugDrawVertexOutput empty_output;
         empty_output.position = float4(2.0, 2.0, 2.0, 1.0);
         empty_output.color = float4(0.0);
@@ -76,7 +76,7 @@ SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVert
     uint3 grid_position = is_deferred_task
         ? get_deferred_task_grid_position(
               deferred_list[p_instance_id - svo.get_total_leaves()], svo_info)
-        : svo.get_leaf_grid_position(p_instance_id, descriptor_indices.shader_debug_frame_slot);
+        : svo.get_leaf_grid_position(p_instance_id, di.shader_debug_frame_slot);
     uint3 corner = uint3((p_vertex_id >> 2) & 1, (p_vertex_id >> 1) & 1, p_vertex_id & 1);
     float voxel_width = svo_info.width / float(1u << svo_info.max_depth);
     float3 world_position = svo_info.origin + float3(grid_position + corner) * voxel_width;

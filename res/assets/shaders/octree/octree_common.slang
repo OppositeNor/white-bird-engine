@@ -39,7 +39,7 @@ static const uint OCTREE_OCCUPIED = 0;
 /**
  * @brief Number of per-level storage-image descriptors bound by the construction passes; max_depth + 1 must not exceed it.
  */
-static const uint OCTREE_LEVEL_DESCRIPTOR_COUNT = 10;
+static const uint OCTREE_LEVEL_DESC_COUNT = 10;
 /**
  * @brief Occupancy flag of a node occupied by the static scene.
  */

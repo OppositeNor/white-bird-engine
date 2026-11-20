@@ -15,14 +15,14 @@
 #include "utils/utils.slang"
 #include "sort/radix_sort_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
-    [wbe::descriptor("storage_buffer", "histogram_buffer", "write")] uint2 histogram_buffer;
+struct DescIndices {
+    [wbe::desc("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
+    [wbe::desc("storage_buffer", "histogram_buffer", "write")] uint2 histogram_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 #define WORKGROUP_SIZE 64
 
@@ -39,10 +39,10 @@ groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     CountedBuffer<uint> keys =
-        CountedBuffer<uint>(descriptor_indices.input_buffer, descriptor_indices.shader_debug_frame_slot);
+        CountedBuffer<uint>(di.input_buffer, di.shader_debug_frame_slot);
     // A uint view of the same buffer, which is only read, for the range workgroup_scope_radix_sort_histogram counts.
-    RWStructuredBuffer<uint> input_words = ResourceDescriptorHeap[descriptor_indices.input_buffer.x];
-    RWStructuredBuffer<uint> histogram_buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
+    RWStructuredBuffer<uint> input_words = ResourceDescriptorHeap[di.input_buffer.x];
+    RWStructuredBuffer<uint> histogram_buffer = ResourceDescriptorHeap[di.histogram_buffer.x];
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
     // The starting position of a thread in a 256 chunk.

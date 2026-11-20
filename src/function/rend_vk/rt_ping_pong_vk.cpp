@@ -1,0 +1,221 @@
+/* Copyright 2026 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "function/rend_vk/rt_ping_pong_vk.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/pipeline_desc_bindings_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_task_create_utils_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/ro_compute_pipeline_vk.hh"
+#include "function/rend_vk/rt_params_ping_pong_vk.hh"
+#include "function/rend_vk/shader_metadata_vk_utils.hh"
+#include <array>
+#include <cstdint>
+#include <format>
+#include <stdexcept>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <vulkan/vulkan_core.h>
+
+namespace WhiteBirdEngine {
+
+RTPingPongVK::RTPingPongVK(const RendContextVK* p_rend_data,
+    Ref<ROComputePipelineVK> p_ping_pipeline,
+    Ref<ROComputePipelineVK> p_pong_pipeline,
+    bool p_init_state,
+    uint32_t p_iterations,
+    VkExtent3D p_dispatch_group_count,
+    QueueFamilyVK p_queue_family)
+    : rend_data(p_rend_data), queue_family_id(p_queue_family), ping_pipeline(std::move(p_ping_pipeline)),
+      pong_pipeline(std::move(p_pong_pipeline)), dispatch_group_count(p_dispatch_group_count),
+      init_state(p_init_state), iterations(p_iterations) {
+    if (rend_data == nullptr || rend_data->alloc == nullptr) {
+        throw std::runtime_error("RTPingPongVK: render data and its allocator must not be null.");
+    }
+    if (ping_pipeline == MEM_NULL) {
+        throw std::runtime_error("RTPingPongVK: ping compute pipeline is null.");
+    }
+    if (pong_pipeline == MEM_NULL) {
+        throw std::runtime_error("RTPingPongVK: pong compute pipeline is null.");
+    }
+    ping_desc_bindings =
+        make_unique<PipelineDescBindingsVK>(rend_data->alloc, rend_data, ping_pipeline->get_desc_layout());
+    pong_desc_bindings =
+        make_unique<PipelineDescBindingsVK>(rend_data->alloc, rend_data, pong_pipeline->get_desc_layout());
+}
+
+void RTPingPongVK::set_iteration_prefixes(
+    Ref<ROComputePipelineVK> p_ping_prefix_pipeline, Ref<ROComputePipelineVK> p_pong_prefix_pipeline, VkExtent3D p_dispatch_group_count) {
+    if (resources_bound) {
+        throw std::runtime_error("RTPingPongVK: prefixes cannot change after graph binding.");
+    }
+    if (p_ping_prefix_pipeline == MEM_NULL || p_pong_prefix_pipeline == MEM_NULL) {
+        throw std::runtime_error("RTPingPongVK: ping and pong prefix pipelines must not be null.");
+    }
+    ping_prefix_pipeline = std::move(p_ping_prefix_pipeline);
+    pong_prefix_pipeline = std::move(p_pong_prefix_pipeline);
+    prefix_dispatch_group_count = p_dispatch_group_count;
+    ping_prefix_desc_bindings = make_unique<PipelineDescBindingsVK>(
+        rend_data->alloc, rend_data, ping_prefix_pipeline->get_desc_layout());
+    pong_prefix_desc_bindings = make_unique<PipelineDescBindingsVK>(
+        rend_data->alloc, rend_data, pong_prefix_pipeline->get_desc_layout());
+}
+
+void RTPingPongVK::bind_resources(const RendResViewVK& p_resources) {
+    resources_bound = true;
+    ping_desc_bindings->bind_resources(p_resources);
+    pong_desc_bindings->bind_resources(p_resources);
+    if (ping_prefix_desc_bindings != MEM_NULL) {
+        ping_prefix_desc_bindings->bind_resources(p_resources);
+        pong_prefix_desc_bindings->bind_resources(p_resources);
+    }
+}
+
+void RTPingPongVK::append_accesses(Vector<ResAccessVK, RendAlloc>& p_reads, Vector<ResAccessVK, RendAlloc>& p_writes) const {
+    ping_desc_bindings->append_accesses(p_reads, p_writes);
+    pong_desc_bindings->append_accesses(p_reads, p_writes);
+    if (!ping_prefix_desc_bindings.is_null()) {
+        ping_prefix_desc_bindings->append_accesses(p_reads, p_writes);
+        pong_prefix_desc_bindings->append_accesses(p_reads, p_writes);
+    }
+}
+
+void RTPingPongVK::record(VkCommandBuffer p_command_buffer, double /*p_delta*/) {
+    bool current_state = init_state;
+    for (uint32_t iteration = 0; iteration < iterations; ++iteration) {
+        if (ping_prefix_desc_bindings != MEM_NULL) {
+            if (current_state) {
+                vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pong_prefix_pipeline->get_pipeline());
+                pong_prefix_desc_bindings->push(p_command_buffer);
+            } else {
+                vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, ping_prefix_pipeline->get_pipeline());
+                ping_prefix_desc_bindings->push(p_command_buffer);
+            }
+            vkCmdDispatch(p_command_buffer,
+                prefix_dispatch_group_count.width,
+                prefix_dispatch_group_count.height,
+                prefix_dispatch_group_count.depth);
+        }
+
+        if (ping_prefix_desc_bindings != MEM_NULL) {
+            VkMemoryBarrier2 pass_barrier{
+                .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                                 VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+            };
+            VkDependencyInfo dependency_info{
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .memoryBarrierCount = 1,
+                .pMemoryBarriers = &pass_barrier,
+            };
+            vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
+        }
+
+        if (current_state) {
+            vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pong_pipeline->get_pipeline());
+            pong_desc_bindings->push(p_command_buffer);
+        } else {
+            vkCmdBindPipeline(p_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, ping_pipeline->get_pipeline());
+            ping_desc_bindings->push(p_command_buffer);
+        }
+        vkCmdDispatch(p_command_buffer, dispatch_group_count.width, dispatch_group_count.height, dispatch_group_count.depth);
+        current_state = !current_state;
+
+        if (iteration + 1 < iterations) {
+            VkMemoryBarrier2 pass_barrier{
+                .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+                .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                .dstAccessMask = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                                 VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+            };
+            VkDependencyInfo dependency_info{
+                .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                .memoryBarrierCount = 1,
+                .pMemoryBarriers = &pass_barrier,
+            };
+            vkCmdPipelineBarrier2(p_command_buffer, &dependency_info);
+        }
+    }
+}
+
+void RTPingPongVK::set_push_constant(std::string_view p_name, PushConstantValueVK p_value) {
+    bool declared = ping_desc_bindings->try_set_push_constant(p_name, p_value);
+    declared = pong_desc_bindings->try_set_push_constant(p_name, p_value) || declared;
+    if (ping_prefix_desc_bindings != MEM_NULL) {
+        declared = ping_prefix_desc_bindings->try_set_push_constant(p_name, p_value) || declared;
+        declared = pong_prefix_desc_bindings->try_set_push_constant(p_name, p_value) || declared;
+    }
+    if (!declared) {
+        throw std::runtime_error(std::format("RTPingPongVK: no compute pipeline declares push constant '{}'.", p_name));
+    }
+}
+
+Unique<IRendTaskVK> RTPingPongVK::create(
+    const RendContextVK* p_rend_data, IRendGraph* p_rend_graph, const RTParamsPingPongVK& p_params, const RendGraphContextVK& /*p_context*/) {
+    if (p_params.ping_prefix_pipeline.has_value() != p_params.pong_prefix_pipeline.has_value()) {
+        throw std::runtime_error("RTPingPongVK: ping_prefix_pipeline and pong_prefix_pipeline must be set together.");
+    }
+    Ref<ROComputePipelineVK> ping_pipeline = acquire_task_compute_pipeline_vk(p_rend_graph, "RTPingPongVK", p_params.ping_pipeline);
+    Ref<ROComputePipelineVK> pong_pipeline = acquire_task_compute_pipeline_vk(p_rend_graph, "RTPingPongVK", p_params.pong_pipeline);
+    Ref<ROComputePipelineVK> ping_prefix_pipeline = MEM_NULL;
+    Ref<ROComputePipelineVK> pong_prefix_pipeline = MEM_NULL;
+    if (p_params.ping_prefix_pipeline.has_value()) {
+        ping_prefix_pipeline = acquire_task_compute_pipeline_vk(p_rend_graph, "RTPingPongVK", *p_params.ping_prefix_pipeline);
+        pong_prefix_pipeline = acquire_task_compute_pipeline_vk(p_rend_graph, "RTPingPongVK", *p_params.pong_prefix_pipeline);
+    }
+    // set_push_constant() applies a value to every pipeline of the task that declares its identifier.
+    const auto layout_of = [](const Ref<ROComputePipelineVK>& p_pipeline) {
+        return p_pipeline == MEM_NULL ? nullptr : &p_pipeline->get_desc_layout();
+    };
+    const std::array<const ShaderDescHeapLayoutVK*, 4> layouts{
+        layout_of(ping_pipeline),
+        layout_of(pong_pipeline),
+        layout_of(ping_prefix_pipeline),
+        layout_of(pong_prefix_pipeline),
+    };
+    const std::vector<TaskPushConstantVK> push_constants =
+        resolve_task_push_constants_vk(p_params.push_constants, layouts, "RTPingPongVK");
+    Unique<RTPingPongVK> task = make_unique<RTPingPongVK>(p_rend_data->alloc,
+        p_rend_data,
+        std::move(ping_pipeline),
+        std::move(pong_pipeline),
+        p_params.init_state,
+        p_params.iterations,
+        VkExtent3D{.width = p_params.group_count_x, .height = p_params.group_count_y, .depth = p_params.group_count_z},
+        p_params.queue_family);
+    if (ping_prefix_pipeline != MEM_NULL) {
+        task->set_iteration_prefixes(std::move(ping_prefix_pipeline),
+            std::move(pong_prefix_pipeline),
+            VkExtent3D{.width = p_params.prefix_group_count_x, .height = p_params.prefix_group_count_y, .depth = p_params.prefix_group_count_z});
+    }
+    for (const TaskPushConstantVK& push_constant : push_constants) {
+        task->set_push_constant(push_constant.name, push_constant.value);
+    }
+    return task;
+}
+
+} // namespace WhiteBirdEngine

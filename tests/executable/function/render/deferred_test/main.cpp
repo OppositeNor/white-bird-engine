@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "../render_test.hh"
+#include "../rend_test.hh"
 #include "application_vulkan_deferred_pbr_test.hh"
 #include "core/logging/log.hh"
 #include "core/profiling/profiler.hh"
@@ -34,8 +34,8 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_draw_task();
             game_application.run();
             game_application.release_draw_task();
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_alloc->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
                 WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
                     ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));

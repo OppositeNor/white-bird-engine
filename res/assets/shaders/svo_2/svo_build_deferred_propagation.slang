@@ -21,44 +21,44 @@
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
  */
-struct SVODescriptorIndices {
+struct SVODescIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [wbe::descriptor("storage_buffer", "svo_info")]
+    [wbe::desc("storage_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
     /**
      * @brief Descriptor-heap reference to svo_leaf_buffer.
      */
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer")]
     uint2 tree_leaves;
 
 #ifdef WBE_USE_PING_WRITE
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "read")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_pong", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list_write;
 #else
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "read")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list_read;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_pong")]
     uint2 deferred_list_write;
 #endif
     /**
@@ -69,7 +69,7 @@ struct SVODescriptorIndices {
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODescIndices> di;
 
 /**
  * @brief Retraces each retained voxel from the root and queues it again in the opposite list on contention.
@@ -77,13 +77,13 @@ ConstantBuffer<SVODescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
     // The list may exceed one dispatch's thread count, so each invocation strides over the whole dispatch.
     uint task_stride = WorkgroupCount().x * 128;
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[descriptor_indices.deferred_list_read.x];
-    RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[descriptor_indices.deferred_list_write.x];
+    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[di.deferred_list_read.x];
+    RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[di.deferred_list_write.x];
     uint deferred_task_count = deferred_list_read[SVO_DEFERRED_LIST_COUNT_INDEX];
     for (uint task_index = p_dispatch_thread_id.x; task_index < deferred_task_count; task_index += task_stride) {
         uint task = deferred_list_read[SVO_DEFERRED_LIST_ENTRY_OFFSET + task_index];
@@ -91,15 +91,15 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
         SVONodeTraceInfo trace_info = to_trace_info(task, svo_info[0].max_depth);
         // Try to allocate the node.
     #ifdef WBE_DYNAMIC_BUILD
-        if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+        if (!try_dynamic_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, di.shader_debug_frame_slot)) {
 #else
-        if (!try_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+        if (!try_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, di.shader_debug_frame_slot)) {
 #endif
             // If allocation failed, push this to the deferred list.
             uint new_task_index;
             InterlockedAdd(deferred_list_write[SVO_DEFERRED_LIST_COUNT_INDEX], 1, new_task_index);
             WBE_SHADER_DEBUG_ASSERT(new_task_index < svo_info[0].max_deferred_task_count,
-                ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+                ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, di.shader_debug_frame_slot);
             deferred_list_write[SVO_DEFERRED_LIST_ENTRY_OFFSET + new_task_index] = task;
         }
     }

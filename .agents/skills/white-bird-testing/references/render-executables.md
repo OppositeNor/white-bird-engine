@@ -3,17 +3,17 @@
 
 ## Inspect current implementation
 
-Read the header-only shared utility in `tests/executable/function/render/render_test.hh`, the relevant test's `main()` and `render_update()`, and the capture contract in `include/function/render/i_renderer.hh`. Check `git diff` first for updated probes or user changes. Read `tests/executable/function/render/generate.toml` only when adding, removing, or renaming a rendering executable. Do not assume old binaries or screenshots reflect current source.
+Read the header-only shared utility in `tests/executable/function/render/rend_test.hh`, the relevant test's `main()` and `rend_update()`, and the capture contract in `include/function/render/i_renderer.hh`. Check `git diff` first for updated probes or user changes. Read `tests/executable/function/render/generate.toml` only when adding, removing, or renaming a rendering executable. Do not assume old binaries or screenshots reflect current source.
 
 ## Shared test hooks
 
 Every executable test that renders must:
 
-- Include `render_test.hh` and call `WBE::on_exec_test_start()` at the beginning of `main()`, before application/renderer initialization and thread startup. It handles `WBE_WAIT_PROCESS_INJECT` only.
-- Call `WBE::on_exec_test_render(renderer, current_frame)` from its render-thread `render_update()`, before any early return. Pass the renderer by reference and its monotonic frame counter, not the rotating frame slot or acquired swapchain image index. It reads the capture variables on every call and returns `true` when it requested a capture this frame (the deferred test hides its ImGui window on such frames).
+- Include `rend_test.hh` and call `WBE::on_exec_test_start()` at the beginning of `main()`, before application/renderer initialization and thread startup. It handles `WBE_WAIT_PROCESS_INJECT` only.
+- Call `WBE::on_exec_test_rend(renderer, current_frame)` from its render-thread `rend_update()`, before any early return. Pass the renderer by reference and its monotonic frame counter, not the rotating frame slot or acquired swapchain image index. It reads the capture variables on every call and returns `true` when it requested a capture this frame (the deferred test hides its ImGui window on such frames).
 - Optionally call `WBE::on_exec_test_logic(window)` from the logic thread to support `WBE_EXEC_TEST_RESIZE`.
 
-`render_test.hh` is a header-only helper library; there is no `render_test.cpp` to link. Besides the hooks it provides `acquire_test_render_graph()` and `release_test_render_graph()`, the mesh registration keys, camera and spot-light GPU structs, and descriptor debug output. Every executable's graph is a definition in `res/assets/render_graphs/render_graphs.toml` whose Teal recipe it acquires with its bindings (see the `white-bird-render-graph` skill); `vulkan_draw_triangle_test.cpp` and `vulkan_draw_cube_unshaded_test.cpp` are the minimal ones. Each build logs `Compiling render graph ...`, so the log shows that only the first build, resizes, and explicit rebuilds run the recipe. When adding a new rendering executable, add only that executable's source pattern to `tests/executable/function/render/generate.toml`. Do not edit `executable_test.gen.cmake`.
+`rend_test.hh` is a header-only helper library; there is no `rend_test.cpp` to link. Besides the hooks it provides `acquire_test_rend_graph()` and `release_test_rend_graph()`, the mesh registration keys, camera and spot-light GPU structs, and descriptor debug output. Every executable's graph is a definition in `res/assets/rend_graphs/rend_graphs.toml` whose Teal recipe it acquires with its bindings (see the `white-bird-render-graph` skill); `vulkan_draw_triangle_test.cpp` and `vulkan_draw_cube_unshaded_test.cpp` are the minimal ones. Each build logs `Compiling render graph ...`, so the log shows that only the first build, resizes, and explicit rebuilds run the recipe. When adding a new rendering executable, add only that executable's source pattern to `tests/executable/function/render/generate.toml`. Do not edit `executable_test.gen.cmake`.
 
 The shared test utility owns environment parsing and one-shot trigger state. Keep those policies out of the engine. Use `IRenderer::request_frame_capture()` for capture, never a hard-coded engine screenshot path or environment hook. Renderer access is render-thread confined; requests originating elsewhere must use `IRenderer::add_job()`.
 
@@ -25,7 +25,7 @@ Every executable test links the `wbe_executable_test_utilities` static library (
 
 ```cpp
 ApplicationVulkanDrawCubeTest()
-    : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {}
+    : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {}
 ```
 
 Game code queries keys only through `IInputManager::get_singleton()`. `ApplicationGame` creates an `InputManagerRegular` when no manager is supplied; do not construct a second input manager, because the singleton throws. Keep test-only input policy in the utilities library, not in the engine.
@@ -49,7 +49,7 @@ For iterative visual checks, build with `python build.py -t debug` (or the reque
 From the repository root, choose a fresh absolute PNG path whose parent exists:
 
 ```sh
-WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/tmp/wbe-triangle-check.png WBE_CAPTURE_FRAME=5 ./build/debug/bin/wbe_render_test_vulkan_draw_triangle_test
+WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/tmp/wbe-triangle-check.png WBE_CAPTURE_FRAME=5 ./build/debug/bin/wbe_rend_test_vulkan_draw_triangle_test
 ```
 
 - `WBE_CAPTURE_PNG`: unset or empty disables capture; otherwise requires an absolute path. Choose a new path for each experiment to avoid mistaking stale output for success.
@@ -57,8 +57,8 @@ WBE_WAIT_PROCESS_INJECT=0 WBE_CAPTURE_PNG=/tmp/wbe-triangle-check.png WBE_CAPTUR
 - `WBE_CAPTURE_INTERVAL`: positive integer; captures every N frames from `WBE_CAPTURE_FRAME` on, to `<stem>_frame<N><ext>`. Unset captures once.
 - `WBE_WAIT_PROCESS_INJECT`: exactly `0` or `1` (anything else throws). `1` prints the PID and waits for Enter before renderer initialization; use it when attaching Nsight or another injector, and preserve stdin access. Use `0` for unattended captures.
 - `WBE_EXEC_TEST_RESIZE=<width>x<height>@<logic frame>`: resizes the window from the logic thread at that frame (tests that call `on_exec_test_logic`), exercising swap-chain rebuilds.
-- `WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS=1`: the deferred test logs `Render graph measurement:` lines with each instance's creation time, warm acquisition and explicit rebuild times (mean of 10, before the run), and the mean frame time of frames 120 to 1120. Measure on a release target.
-- `WBE_EXEC_TEST_RAY_TRACING` and `WBE_EXEC_TEST_TIMESTAMP_QUERY`: enable those renderer capabilities in the deferred and pixel-sorting tests. Timestamp queries write `gpu_timestamp_report.json`, which names tasks and subgraphs by their recipe debug `name` and edges by `resource_name` (ids are generated), and which `python export_render_graph.py` turns into a Mermaid or SVG graph.
+- `WBE_EXEC_TEST_MEASURE_REND_GRAPHS=1`: the deferred test logs `Render graph measurement:` lines with each instance's creation time, warm acquisition and explicit rebuild times (mean of 10, before the run), and the mean frame time of frames 120 to 1120. Measure on a release target.
+- `WBE_EXEC_TEST_RAY_TRACING` and `WBE_EXEC_TEST_TIMESTAMP_QUERY`: enable those renderer capabilities in the deferred and pixel-sorting tests. Timestamp queries write `gpu_timestamp_report.json`, which names tasks and subgraphs by their recipe debug `name` and edges by `resource_name` (ids are generated), and which `python export_rend_graph.py` turns into a Mermaid or SVG graph.
 
 The test continues after capture; it does not automatically exit. Observe the capture log and output file, then stop only the process you launched. `SIGTERM` is a clean shutdown on POSIX: SDL turns it into `SDL_QUIT`, the same path as closing the window. A timeout or `SIGKILL` is not a clean test exit. Respect GUI/GPU execution approvals.
 
@@ -76,7 +76,7 @@ Use [check_deferred.py](../scripts/check_deferred.py) for the deferred executabl
 
 The deferred executable's controls:
 
-- `R`: switches between the instances of the mipmap and summed-area-table definitions (`activate_render_graph`), logging `Deferred shadow filtering:`.
+- `R`: switches between the instances of the mipmap and summed-area-table definitions (`activate_rend_graph`), logging `Deferred shadow filtering:`.
 - `V`: cycles the voxel debug view (disabled, post SVO build, pre deferred propagation, and, for the SVOs, occupancy) through `RTToggleVK` and `RTMultiplexerVK` events passed to the recipe as `VoxelDebugViewToggles`. While the post-build or occupancy view is shown, the configuration window's "Voxel draw style" combo (wireframe or solid) and "Voxel debug depth" slider select how and which tree depth it draws; they have no keys.
 - `1`: toggles pixel-sort post-processing (`pixel_sort.toggle`). `B`: triggers bloom acquisition (`RTTriggeredVK`).
 - `F1`: captures to `test_env/captures/deferred_<ms>_frame_<n>.png`. `T`: selects the next spot light.
@@ -103,7 +103,7 @@ forces the variable to `0`.
 texture octree). For the octree, the first `V` view draws its leaves and bounds, and the second adds its occupied nodes
 colored by depth; both read the octree textures, and the helper captures only the first.
 
-Run configurations sequentially. Each invocation creates a fresh directory under `build/render_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
+Run configurations sequentially. Each invocation creates a fresh directory under `build/rend_checks/` containing `application.log`, `result.json`, and (in capture mode) five PNGs: mipmap lighting, two summed-area-table frames, and two voxel-overlay frames. `result.json` records the input sequence, actual captured frame numbers, paths, CPU affinity, elapsed time, and exit status. Open the PNGs to assess rotation, instance visibility, occlusion and occupancy; the helper's success does not establish visual correctness.
 
 In capture mode the helper passes all key presses up front through `WBE_EXEC_TEST_INPUT_SEQUENCE`, timed with `delay`: after `--settle` seconds (default 5) from the first logic tick it presses `R`, then `F1` twice, then `V`, then `F1` twice. The first frame is captured through `WBE_CAPTURE_FRAME=15`. It then waits for all five captures, checks that the lighting switch was logged after the initial capture, and fails asking for a larger `--settle` otherwise. Stability mode sends no input and removes inherited capture and input settings. The helper does not clear an inherited `WBE_CAPTURE_INTERVAL`; unset it before capture-mode runs.
 

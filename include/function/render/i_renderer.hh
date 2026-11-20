@@ -18,9 +18,9 @@
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/global_render_cache.hh"
-#include "function/render/i_render_graph.hh"
-#include "function/render/i_render_graph_bindings.hh"
+#include "function/render/global_rend_cache.hh"
+#include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_graph_bindings.hh"
 #include "utils/interface/i_singleton.hh"
 #include <cstdint>
 #include <functional>
@@ -29,7 +29,7 @@
 #include <string_view>
 namespace WhiteBirdEngine {
 
-WBE_LABEL(WBE_CHANNEL_RENDER, WBE_CHANNEL);
+WBE_LABEL(WBE_CHANNEL_REND, WBE_CHANNEL);
 
 /**
  * @struct RendererCapabilities
@@ -65,7 +65,7 @@ struct RendererCapabilities {
      * When enabled, the renderer provides a descriptor pool for code that cannot use the renderer's descriptor heaps, such
      * as third-party libraries.
      */
-    bool descriptor_set = false;
+    bool desc_set = false;
 };
 
 /**
@@ -133,16 +133,16 @@ public:
      *
      * @return The renderer's global render cache.
      */
-    virtual Ref<GlobalRenderCache> get_global_render_cache() = 0;
+    virtual Ref<GlobalRendCache> get_global_rend_cache() = 0;
 
     /**
      * @brief Acquire an instance of a render graph definition, compiling it when no live instance matches.
      *
-     * p_resource_key names an RURenderGraph resource, whose recipe the backend runs with the definition's parameters and the
+     * p_resource_key names an RURendGraph resource, whose recipe the backend runs with the definition's parameters and the
      * context and imports p_bindings prepare; the graph rebuilds itself from the same three when its context changes or it
      * is rebuilt. Acquiring the same definition with bindings of the same instance key returns the live instance, which
      * must have been acquired with the same bindings object; bindings with another instance key acquire an independent
-     * instance. The renderer holds instances weakly: the caller's references (and activate_render_graph()) keep an
+     * instance. The renderer holds instances weakly: the caller's references (and activate_rend_graph()) keep an
      * instance alive, and an instance whose references were all released is compiled again by the next acquisition. Release
      * every reference before the renderer shuts down. Call on the rendering thread.
      *
@@ -153,7 +153,7 @@ public:
      * definition, p_bindings is null or of another backend, a live instance of the same identity was acquired with another
      * bindings object, or compiling the graph fails.
      */
-    virtual Ref<IRenderGraph> acquire_render_graph(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings) = 0;
+    virtual Ref<IRendGraph> acquire_rend_graph(std::string_view p_resource_key, Ref<IRendGraphBindings> p_bindings) = 0;
 
     /**
      * @brief Select the render graph the renderer executes every frame, or clear the selection.
@@ -165,7 +165,7 @@ public:
      * @throws std::runtime_error If p_graph is not null and belongs to another backend or another renderer, or the backend
      * does not support render graphs.
      */
-    virtual void activate_render_graph(Ref<IRenderGraph> p_graph) = 0;
+    virtual void activate_rend_graph(Ref<IRendGraph> p_graph) = 0;
 };
 
 } // namespace WhiteBirdEngine

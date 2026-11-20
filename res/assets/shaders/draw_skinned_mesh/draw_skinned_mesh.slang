@@ -54,21 +54,21 @@ struct SkinnedMeshVSOutput {
 /**
  * @brief Descriptor indices of the resources used by the skinned mesh pass.
  */
-struct DrawSkinnedMeshDescriptorIndices {
+struct DrawSkinnedMeshDescIndices {
     /**
      * @brief The per-frame view and projection matrices.
      */
-    [wbe::descriptor("uniform_buffer", "skinned_mesh_camera_info")]
+    [wbe::desc("uniform_buffer", "skinned_mesh_camera_info")]
     uint2 camera_info;
     /**
      * @brief The skinning transform of every skeleton joint, mapping bind-pose mesh space to posed model space.
      */
-    [wbe::descriptor("storage_buffer", "skinned_mesh_skinning_transforms", "read")]
+    [wbe::desc("storage_buffer", "skinned_mesh_skinning_transforms", "read")]
     uint2 skinning_transforms;
 };
 
 [vk::push_constant]
-ConstantBuffer<DrawSkinnedMeshDescriptorIndices> descriptor_indices;
+ConstantBuffer<DrawSkinnedMeshDescIndices> di;
 
 /**
  * @brief Skin a bind-pose vertex by its joint binding and transform it into clip space.
@@ -77,8 +77,8 @@ ConstantBuffer<DrawSkinnedMeshDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 SkinnedMeshVSOutput vertex_main(SkinnedMeshVertexInput p_input) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    StructuredBuffer<SkinningTransform> skinning_transforms = ResourceDescriptorHeap[descriptor_indices.skinning_transforms.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    StructuredBuffer<SkinningTransform> skinning_transforms = ResourceDescriptorHeap[di.skinning_transforms.x];
     JointBinding joint_binding;
     joint_binding.joint_ids = p_input.joint_ids;
     joint_binding.joint_weights = p_input.joint_weights;

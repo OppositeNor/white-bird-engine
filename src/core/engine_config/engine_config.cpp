@@ -15,7 +15,7 @@
 #include "core/engine_config/engine_config.hh"
 #include "core/engine_config/engine_config_options.hh"
 #include "core/parser/parser_toml.hh"
-#include "generated/cla_configuration.gen.hh"
+#include "generated/cla_config.gen.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "platform/file_system/path.hh"
 #include <boost/program_options/options_description.hpp>
@@ -36,7 +36,7 @@ void EngineConfig::parse_cla(uint32_t p_argc, char* p_argv[]) {
     }
 
     boost::program_options::options_description options("White Bird Engine options");
-    CLAConfiguration<EngineConfigOptions>::add_options(options);
+    CLAConfig<EngineConfigOptions>::add_options(options);
 
     const auto parsed =
         boost::program_options::command_line_parser(static_cast<int>(p_argc), p_argv).options(options).allow_unregistered().run();
@@ -44,7 +44,7 @@ void EngineConfig::parse_cla(uint32_t p_argc, char* p_argv[]) {
     boost::program_options::store(parsed, arguments);
     boost::program_options::notify(arguments);
 
-    CLAConfiguration<EngineConfigOptions>::apply(arguments, config_options);
+    CLAConfig<EngineConfigOptions>::apply(arguments, config_options);
 }
 
 void EngineConfig::parse_config_file(const Path& p_path) {

@@ -14,7 +14,7 @@
 """Parse the attribute list that WBE_META stringifies into an annotation.
 
 An attribute is a bare name, such as `WBE_REFLECT`, or a name with parenthesized parameters, such as
-`WBE_RENDER_TASK(compute)`. Parameters stay trimmed source text for the generator that consumes the attribute; commas
+`WBE_REND_TASK(compute)`. Parameters stay trimmed source text for the generator that consumes the attribute; commas
 nested in parentheses, brackets, braces, or quoted literals do not separate them.
 """
 import re

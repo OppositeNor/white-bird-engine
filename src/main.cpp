@@ -31,8 +31,8 @@ int main(int p_argc, char* p_argv[]) {
             // Not running the application is also an option.
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
             WBE::stdout_log(WBE::WBE_CHANNEL_USER)->message("Hello World!");
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_alloc->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
                 WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
                     ->message(std::format(

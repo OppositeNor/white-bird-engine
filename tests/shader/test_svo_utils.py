@@ -103,17 +103,17 @@ def children_state(p_children_data: int) -> int:
 
 
 @pytest.mark.parametrize("p_version", UTILS_VERSIONS, ids=UTILS_VERSION_IDS)
-@pytest.mark.parametrize(("p_operation", "p_counter", "p_initial_count"),
+@pytest.mark.parametrize(("p_operation", "p_counter", "p_init_count"),
     [(OPERATION_RESERVE_NODES, "node_count", 8), (OPERATION_RESERVE_LEAVES, "leaves_count", 0)])
 def test_try_reserve_svo_blocks(device: spy.Device, load_kernel: KernelLoader, p_version: tuple[int, str],
-        p_operation: int, p_counter: str, p_initial_count: int) -> None:
+        p_operation: int, p_counter: str, p_init_count: int) -> None:
     # Concurrent reservations receive disjoint eight-element blocks that tile the counter's growth.
     invocation_count = 100
     state = reset_svo(4, 8 + 8 * invocation_count, 8 * invocation_count)
     result = run_operation(device, load_kernel, p_version, p_operation, state, invocation_count)
     assert np.all(result.results[:, 0] == 1)
-    np.testing.assert_array_equal(np.sort(result.results[:, 1]), p_initial_count + 8 * np.arange(invocation_count))
-    assert result.tree_info[p_counter][0] == p_initial_count + 8 * invocation_count
+    np.testing.assert_array_equal(np.sort(result.results[:, 1]), p_init_count + 8 * np.arange(invocation_count))
+    assert result.tree_info[p_counter][0] == p_init_count + 8 * invocation_count
 
 
 @pytest.mark.parametrize("p_version", UTILS_VERSIONS, ids=UTILS_VERSION_IDS)

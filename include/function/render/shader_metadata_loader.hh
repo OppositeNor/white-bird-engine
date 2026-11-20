@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SHADER_METADATA_LOADER_HH
 #define WBE_FILE_SHADER_METADATA_LOADER_HH
 
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_macro_value.hh"
 #include "function/render/shader_metadata.hh"
 #include "resource/resource_unit/resource_unit.hh"

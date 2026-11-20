@@ -72,47 +72,47 @@ For non-trivial implementation tasks:
   make graph construction fail. Same-queue edges become pipeline barriers and cross-queue edges use timeline semaphores.
 - The graph compiler allocates graph-owned buffers, images, image views, and samplers declared with `RendGraphDescVK::add_buffer()`,
   `add_image()`, `add_image_view()`, and `add_sampler()`. Use `add_resource(id, *bindable)` only to import resources owned outside
-  the graph; every import is an `IBindableRenderResourceVK`, and composites register their members under `<id>.<member>`.
-- Tasks report every access themselves through `IRenderTaskVK::append_accesses()` (reflected shader resources, render targets, and
-  fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `render_target_colors[<index>]`
-  and `render_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
-  the task's `RenderTaskResourceMap`; tasks do not take resource maps. Unmapped identifiers resolve to themselves only in
+  the graph; every import is an `IBindableRendResourceVK`, and composites register their members under `<id>.<member>`.
+- Tasks report every access themselves through `IRendTaskVK::append_accesses()` (reflected shader resources, render targets, and
+  fixed-function buffers); there is no descriptor-level access declaration. Graphics tasks render into `rend_target_colors[<index>]`
+  and `rend_target_depth`. The only way to map task-local identifiers to graph resources is `RendTaskDescVK::alias()`, backed by
+  the task's `RendTaskResourceMap`; tasks do not take resource maps. Unmapped identifiers resolve to themselves only in
   C++-built descriptors and imported tasks; recipe tasks' maps are strict.
-- Applications compose complete graphs only in Teal. A graph definition is a manifest `render_graph` resource
-  (`RURenderGraph`, `RUSchemaRenderGraph` in `function/render/render_resource_unit.hh`) naming its `recipe` script and
-  static `parameters`; definitions live in `res/assets/render_graphs/render_graphs.toml`. Acquire an instance with
-  `IRenderer::acquire_render_graph(definition_key, bindings)` and select what renders with
-  `activate_render_graph(graph)` (null clears it); both run on the rendering thread. There is no key-based registration
+- Applications compose complete graphs only in Teal. A graph definition is a manifest `rend_graph` resource
+  (`RURendGraph`, `RUSchemaRendGraph` in `function/render/rend_resource_unit.hh`) naming its `recipe` script and
+  static `parameters`; definitions live in `res/assets/rend_graphs/rend_graphs.toml`. Acquire an instance with
+  `IRenderer::acquire_rend_graph(definition_key, bindings)` and select what renders with
+  `activate_rend_graph(graph)` (null clears it); both run on the rendering thread. There is no key-based registration
   and no application rebuild callback.
-- Bindings (`IRenderGraphBindings`, Vulkan `IRenderGraphBindingsVK::prepare()`, or `RenderGraphBindingsFunctionVK`) carry
+- Bindings (`IRendGraphBindings`, Vulkan `IRendGraphBindingsVK::prepare()`, or `RendGraphBindingsFunctionVK`) carry
   an immutable instance key and prepare, for every build, the serialized application context and the
   `RendGraphRecipeImportsVK` (runtime resources and native task factories). They never see the descriptor or the graph,
   and must not retain their graph; the graph retains them. The graph supplies the renderer facts of the context and the
   `REND_RES_SWAP_CHAIN` import (when the recipe declares it and the bindings do not), acquired again on every build.
-- Instances are cached weakly in `GlobalRenderCache` under `RenderGraphInstanceCache::make_cache_key(definition,
+- Instances are cached weakly in `GlobalRendCache` under `RendGraphInstanceCache::make_cache_key(definition,
   instance)`: the same definition, instance key, and bindings object reuse the live graph, another bindings object for a
   live identity throws, and different instance keys are independent graphs. Callers (applications, `Scene`, and the
   renderer's activation) hold graphs strongly and must release them before the renderer shuts down. A `Scene` acquires one
-  instance per distinct world definition and instance key, with the bindings supplied by `add_render_graph_bindings()`,
+  instance per distinct world definition and instance key, with the bindings supplied by `add_rend_graph_bindings()`,
   and queues acquisitions, activations, and releases through `add_job()`; its teardown leaves the activation in place.
-- A compiled `RenderGraphVK` keeps its recipe source (`RendGraphRecipeSourceVK`) and re-runs it for the first build, on a
+- A compiled `RendGraphVK` keeps its recipe source (`RendGraphRecipeSourceVK`) and re-runs it for the first build, on a
   context change, and on `rebuild()`; an unchanged frame runs no script and prepares no bindings. Use buffer updates and
-  toggle/select/trigger events for nonstructural changes. `RenderGraphVK::build_from_descriptor()` builds a fixed C++
+  toggle/select/trigger events for nonstructural changes. `RendGraphVK::build_from_desc()` builds a fixed C++
   descriptor and exists only for focused compiler tests.
-- Named resources that tasks use (meshes, pipelines, images) are registered on their graph (`IRenderGraph`, in
-  `function/render/i_render_graph.hh`) in two steps: load the source resources into the `ResourceManager`, then
+- Named resources that tasks use (meshes, pipelines, images) are registered on their graph (`IRendGraph`, in
+  `function/render/i_rend_graph.hh`) in two steps: load the source resources into the `ResourceManager`, then
   `register_resource(key, description)`. The description's type (`IResourceDescription::get_type_uuid()`) selects the
   `IResourceRegistrator` that compiles it, as a resource schema's type selects its loader; there is no separate kind.
-  `RenderGraphVK` installs `RRMeshVK`, `RRImageVK`, `RRGraphicsPipelineVK`, and `RRComputePipelineVK`, whose descriptions
+  `RendGraphVK` installs `RRMeshVK`, `RRImageVK`, `RRGraphicsPipelineVK`, and `RRComputePipelineVK`, whose descriptions
   are the `WBE_REFLECT_SCRIPT` structs `RDParams<Name>VK` held in an `RDTyped<TParams>`. Recipes register them; the C++
-  `RenderGraphVK::register_mesh(key, mesh_handle, options)` and the like name the handle's resource key, so they equal
+  `RendGraphVK::register_mesh(key, mesh_handle, options)` and the like name the handle's resource key, so they equal
   the key-based and Teal registrations (anonymous resources cannot be registered), and `add_resource_registrator()` installs one registrator per further
   description type. The graph holds registered objects strongly, keys are graph-local, registrations survive rebuilds, and
   re-registering a key with an equal description compiles nothing, so recipes register on every rebuild. Do
   not keep `Ref`s to registered objects just to keep them alive; acquire them with `acquire_registered<T>(key)`. Task
-  types resolve registered resources through `RendGraphDescVK::get_render_graph()` in `prepare_graph()`, or by declaring
-  `create(const RenderContextVK*, IRenderGraph*, const TParams&, const RendGraphContextVK&)`.
-- `GlobalRenderCache` (`function/render/global_render_cache.hh`, built on `core/cache/weak_cache.hh`'s `WeakCache`) is the
+  types resolve registered resources through `RendGraphDescVK::get_rend_graph()` in `prepare_graph()`, or by declaring
+  `create(const RendContextVK*, IRendGraph*, const TParams&, const RendGraphContextVK&)`.
+- `GlobalRendCache` (`function/render/global_rend_cache.hh`, built on `core/cache/weak_cache.hh`'s `WeakCache`) is the
   renderer's weak cache of compiled objects, keyed by source resource and object type, which compilers use to share
   compiled objects between graphs. Applications do not look up named resources there.
 - Rebuilds diff the new descriptor against the current graph (`RendGraphResourceDiffVK`): a graph-owned resource is kept,
@@ -127,7 +127,7 @@ For non-trivial implementation tasks:
 
 - A recipe is a Teal `script` resource whose module exports `build(context, parameters)`, where `parameters` is its
   definition's static map (type it with a `WBE_REFLECT_SCRIPT` struct when the recipe reads it). Recipes are pure
-  descriptions: bind the library as `local graph = require("render_graph_utils.render_graph_utils")`, declare resources
+  descriptions: bind the library as `local graph = require("rend_graph_utils.rend_graph_utils")`, declare resources
   and tasks as free-standing handles with its module functions, and return `graph.build({ tasks = { ... }, exports = { ... } })`,
   which emits the plain `RendGraphRecipeVK` table (`imports`, `registrations`, `resources`, `tasks`, `exports`; see
   `rend_graph_recipe_params_vk.hh`). There is no graph object. `RendGraphScriptVK` runs the recipe and
@@ -139,8 +139,8 @@ For non-trivial implementation tasks:
   Lua from `swap_chain_extent`.
 - A resource is either declared by the recipe or imported. Declarations take one descriptor table of the reflected
   parameters plus an optional debug `name`: `graph.buffer{}`, `graph.storage_buffer{}`, `graph.image{}`,
-  `graph.storage_image{}`, `image:view(descriptor?)` (no argument: the image's default view, which takes its name),
-  `graph.image_view(image, descriptor?)`, and `graph.clamp_to_edge_sampler{}`. The build generates their ids,
+  `graph.storage_image{}`, `image:view(desc?)` (no argument: the image's default view, which takes its name),
+  `graph.image_view(image, desc?)`, and `graph.clamp_to_edge_sampler{}`. The build generates their ids,
   `<kind>-<8 hex>` from the kind, the name, and the declaration's ordinal among those of that kind and name in the order the
   build reaches them, so rebuilds keep every id (and the resources' contents) and a named resource keeps its id when others
   are added. The name becomes the Vulkan debug name of the objects the graph creates (`RendGraphDescVK::set_debug_name()`)
@@ -150,7 +150,7 @@ For non-trivial implementation tasks:
   bindable object registered on the graph under its name (`graph.registered_image()`). Composite imports expose their
   members as `import:member(<member>)`. Recipes cannot set initial data, so buffers that need it are application-owned
   imports. C++ reaches a recipe-declared resource only through an export: `graph.build{ exports = { <name> = resource } }`
-  and `RenderGraphVK::acquire_resource(<name>)`.
+  and `RendGraphVK::acquire_resource(<name>)`.
 - Registered entries are handles that carry their registration: `graph.mesh(key, description?)`,
   `graph.compute_pipeline(key, description?)`, `graph.graphics_pipeline(key, description?)`,
   `graph.shader_compute_pipeline(shader)` (registered from the shader of the same key), `graph.registered_image(key,
@@ -167,7 +167,7 @@ For non-trivial implementation tasks:
   does not list, is an error.
 - Shader names bind explicitly: a task's `bindings` (and `task:bind()`, `color_target()`, `depth_target()`) map every name
   its shaders reflect and its render targets use to a resource handle, imports included. Recipe tasks' resource maps are
-  strict (`RenderTaskResourceMap::require_bindings()`), so an unbound name fails instead of matching a resource by id.
+  strict (`RendTaskResourceMap::require_bindings()`), so an unbound name fails instead of matching a resource by id.
   Edges come only from explicit connections (`graph.chain()`, `task:connect()`, `connect_all()`, `inputs_from()`),
   recorded on the task handles and emitted as `connect` entries (`{ to = <task id>, resource = <resource id> }`). An
   optional `trigger` wraps the task with `RTTriggeredVK`, and an optional `toggle` (`{ event, enabled }`) wraps it with
@@ -222,31 +222,31 @@ For non-trivial implementation tasks:
   wbe.RendGraphRecipeVK`. Reflected enum fields are declared as their Teal enum of names and aliases, without integers:
   enums serialize as their canonical names; compare `graph.enum_name(value)` with the canonical upper-case name, which
   also accepts the lowercase aliases. The typed constructors check params against the generated
-  `graph.RTParams<Name>VK` interfaces, and the resource descriptors against `graph.BufferDescriptor` and the like, which
+  `graph.RTParams<Name>VK` interfaces, and the resource descriptors against `graph.BufferDesc` and the like, which
   extend the reflected parameter structs. The generated repo-root `tlconfig.lua` points the Teal language server at the
   same paths for the last built target.
-- The typed task constructors (`graph.compute()`, `graph.draw_mesh()`, ...) are generated into `render_graph_utils.render_graph_tasks`
-  (`templates/teal_render_graph_tasks.tl.jinja`) from the task classes annotated `WBE_RENDER_TASK(<method>)` and installed
+- The typed task constructors (`graph.compute()`, `graph.draw_mesh()`, ...) are generated into `rend_graph_utils.rend_graph_tasks`
+  (`templates/teal_rend_graph_tasks.tl.jinja`) from the task classes annotated `WBE_REND_TASK(<method>)` and installed
   on the module; each creates the task type of its class's first `WBE_SERIALIZATION_ALIASES` entry, and a bare
-  `WBE_RENDER_TASK` only registers the type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE` (graph
-  resources) or `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph) so the constructor
+  `WBE_REND_TASK` only registers the type. Mark params fields that hold resource ids `WBE_RECIPE_RESOURCE` (graph
+  resources) or `WBE_RECIPE_RESOURCE(registered, <RendObjectType>)` (keys registered on the graph) so the constructor
   takes resource handles there, and only handles; the build lowers a graph handle to its id with an identity alias.
   Do not hand-write constructors or handle-bearing params records.
 
 ### Scripts
 
 - Script sources live under `res/assets/scripts/teal/` and are `script` resources declared in
-  `res/assets/scripts/teal/lua_scripts.toml`: recipes in `render_graphs/`, reusable recipe parts (modules whose
-  `subgraph(id, params, target)` returns a subgraph task) in `render_graph_utils/features/`, graph helpers in
-  `render_graph_utils/`, and general script helpers in `utils/`.
+  `res/assets/scripts/teal/lua_scripts.toml`: recipes in `rend_graphs/`, reusable recipe parts (modules whose
+  `subgraph(id, params, target)` returns a subgraph task) in `rend_graph_utils/features/`, graph helpers in
+  `rend_graph_utils/`, and general script helpers in `utils/`.
 - A script's resource id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes
-  (`render_graph_utils/render_graph_utils.tl` is `render_graph_utils.render_graph_utils`). Keep the two in sync, so that
+  (`rend_graph_utils/rend_graph_utils.tl` is `rend_graph_utils.rend_graph_utils`). Keep the two in sync, so that
   `require` resolves the same module at runtime (through `SMRResourceManager`) and in the editor.
 - Scripts may be written in Lua (`.lua`) or Teal (`.tl`). `ACPCompilerScript` copies Lua sources and type-checks and
   compiles Teal sources to `<name>.lua` with the vendored compiler in `dependencies/tl`, run in-process through `lupa`;
   a type error fails the build. Teal modules resolve `require` against `res/assets/scripts/teal/` at compile time, so a
   Teal module can require a Lua module only through a `.d.tl` declaration next to it.
-- Modules that reflection generates (`render_graph_utils.render_graph` and `render_graph_utils.render_graph_tasks`) are
+- Modules that reflection generates (`rend_graph_utils.rend_graph` and `rend_graph_utils.rend_graph_tasks`) are
   written to `build/<target>/teal/`, which `require`
   also resolves against. Their `lua_scripts.toml` entries give `source_file` relative to that directory, where the ACP
   looks first, and set `path` under `assets/scripts/teal/`.
@@ -385,7 +385,7 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - Static-mesh compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
   material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
   `rma`.
-- Vulkan shader resources are declared as aligned `uint2` fields in push data with `wbe::descriptor("TYPE", "resource_id", "ACCESS")`,
+- Vulkan shader resources are declared as aligned `uint2` fields in push data with `wbe::desc("TYPE", "resource_id", "ACCESS")`,
   where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`, and
   the optional `ACCESS` is `read`, `write`, or `read_write`. Storage buffers and images default to `read_write`; annotate read-only
   ones with `read`. Runtime shaders access the renderer-owned global heaps through those indices; metadata-only resource
@@ -418,11 +418,11 @@ There are other aliases: `RefRes` is an alias of `RefRaw`, with `AllowDestruct` 
 Construct via factories, passing the allocator:
 
 ```cpp
-Ref<Foo> r = make_ref<Foo>(allocator, args...);
-Unique<Foo> u = make_unique<Foo>(allocator, args...);
+Ref<Foo> r = make_ref<Foo>(alloc, args...);
+Unique<Foo> u = make_unique<Foo>(alloc, args...);
 ```
 
-Containers: use `Vector<T, <HeapAllocatorType>>` etc. from `core/allocator/stl_allocator.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
+Containers: use `Vector<T, <HeapAllocType>>` etc. from `core/alloc/stl_alloc.hh` rather than raw `std::vector`. Custom allocator types follow standard `allocator_traits` member names: `rebind::other`, `propagate_on_container_copy_assignment`, `propagate_on_container_move_assignment`, `propagate_on_container_swap`.
 
 ## Special Member Functions (Rule of 6)
 
@@ -447,11 +447,21 @@ Rules:
 ## Naming
 
 - `snake_case` for files, variables, functions, members. `PascalCase` for types. `UPPER_SNAKE` for macros and constants of macro-like nature.
-- C++ function parameters: prefix `p_` (e.g. `p_allocator`, `p_buffer_size`). Teal, Lua, and Python function parameters: no `p_` prefix. Local variables: no prefix. Member fields: no prefix.
-- **No abbreviations** unless they are universally well-known. Examples:
-  - Forbidden: `ci` (use `create_info`), `mgr` (use `manager`), `tex` (use `texture`), `cfg` (use `config` only if widely understood, else `configuration`).
-  - Allowed well-known: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer), `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan), `rma` (roughness, metallic, and ambient-occlusion texture channel pack).
-- If a name is too long, each word may be shortened to its first **≥4** letters. Examples: `initiate` → `init`, `information` → `info`, `allocator` → `alloc`; use shortening only when it remains unambiguous (`init`, `info`, `config`, `descr`).
+- C++ function parameters: prefix `p_` (e.g. `p_alloc`, `p_buffer_size`). Teal, Lua, and Python function parameters: no `p_` prefix. Local variables: no prefix. Member fields: no prefix.
+- **No abbreviations** outside the allowed list below; consistency comes from the list, not from judgment. Forbidden
+  examples: `ci` (use `create_info`), `mgr` (use `manager`), `tex` (use `texture`), `cfg` (use `config`).
+  - Allowed everywhere: `MPSC` (multiple producers, single consumer), `SPSC` (single producer, single consumer),
+    `i`/`j`/`k` as for-loop indices, `id`, `uuid`, `gpu`, `cpu`, `os`, `vk` (Vulkan), `rma` (roughness, metallic, and
+    ambient-occlusion texture channel pack), `init` (initialize, initial), `info` (information), `config`
+    (configuration), `desc` (descriptor), `alloc` (allocator), `Rend` (Render, only inside a compound
+    name such as `RendRes`, `RendGraphVK`, or `rend_vk`; the word on its own stays `render`, and `Renderer` is not
+    shortened).
+    `allocation` and `description` stay spelled out, so they never collide with `alloc` and `desc`.
+  - Allowed in Slang only: `di` for the push-constant `ConstantBuffer<DescriptorIndices>` of a shader entry point.
+  - An allowed abbreviation is required in new names (`RendFooVK`, not `RenderFooVK`); existing names are not renamed
+    unless requested.
+  - To add an abbreviation, add it to this list. Interface prefixes of derived implementations (`RO`, `RT`, ...) follow
+    API Design instead.
 - Preserve domain spellings already used in the codebase (e.g. test labels) even if unusual.
 
 ## Style
@@ -482,7 +492,7 @@ Avoid placing complex logic, control flow, or dependency-heavy code in headers. 
 ## API Design
 
 - **Prefer exposing classes and interfaces over free-function wrappers.** When a feature has internal state, a constructable context, or a small set of related operations, declare the class in the public header and expose its members. Do not hide it behind a file-local impl class wrapped by free functions in the .cpp. Internal helpers, anonymous-namespace utilities, and detail types stay in the `.cpp`.
-- **Name derived implementations with the interface (or its abbreviation) as a prefix.** For example, `RenderObject` → `ROImage`, `ROGraphicsPipelineVK`; `Renderer` → `RendererVK`; `RenderTask` → `RTRunGraphicsPipelineVK`. Pick a short, consistent abbreviation per interface and use it for all derived types.
+- **Name derived implementations with the interface (or its abbreviation) as a prefix.** For example, `RendObject` → `ROImage`, `ROGraphicsPipelineVK`; `Renderer` → `RendererVK`; `RendTask` → `RTRunGraphicsPipelineVK`. Pick a short, consistent abbreviation per interface and use it for all derived types.
 
 ## Documentation
 
@@ -510,7 +520,7 @@ Document contracts, ownership, threading, and errors; do not restate signatures.
 ## Reflection / Codegen
 
 - All C++ header code are scanned by `build_script/reflection/metaparser.py`.
-- A `WBE_META` attribute is a bare name (`WBE_REFLECT`) or a name with parameters (`WBE_RENDER_TASK(compute)`), which
+- A `WBE_META` attribute is a bare name (`WBE_REFLECT`) or a name with parameters (`WBE_REND_TASK(compute)`), which
   metadata keeps as trimmed text in `attribute_parameters`; there is no assignment syntax. Declare serialization aliases as
   `WBE_SERIALIZATION_ALIASES(name, ...)`, each a name of letters, digits, and underscores.
 - Generated artifacts live in `*.gen.*` files; regenerated automatically each build. Do not edit by hand.

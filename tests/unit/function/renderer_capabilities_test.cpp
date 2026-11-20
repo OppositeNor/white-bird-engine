@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_dummy/renderer_dummy.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_dummy/renderer_dummy.hh"
 #include "utils/defs.hh"
 #include <future>
 #include <gtest/gtest.h>
@@ -24,22 +24,22 @@
 namespace WhiteBirdEngine {
 
 TEST(WBERendererCapabilitiesTest, DummyRendererDisablesUnsupportedCapabilities) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RendererCapabilities capabilities{.conservative_rasterization = true, .ray_tracing = true, .ray_query = true, .timestamp_query = true, .descriptor_set = true};
+    RendAlloc alloc(WBE_KI_B(64));
+    RendererCapabilities capabilities{.conservative_rasterization = true, .ray_tracing = true, .ray_query = true, .timestamp_query = true, .desc_set = true};
 
-    RendererDummy renderer(&allocator, capabilities);
+    RendererDummy renderer(&alloc, capabilities);
 
     EXPECT_FALSE(capabilities.conservative_rasterization);
     EXPECT_FALSE(capabilities.ray_tracing);
     EXPECT_FALSE(capabilities.ray_query);
     EXPECT_FALSE(capabilities.timestamp_query);
-    EXPECT_FALSE(capabilities.descriptor_set);
+    EXPECT_FALSE(capabilities.desc_set);
 }
 
 TEST(WBERendererCapabilitiesTest, DefaultTryAddJobAcceptsJobs) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     RendererCapabilities capabilities{};
-    RendererDummy renderer(&allocator, capabilities);
+    RendererDummy renderer(&alloc, capabilities);
 
     std::optional<std::future<void>> result = renderer.try_add_job([]() {
     });

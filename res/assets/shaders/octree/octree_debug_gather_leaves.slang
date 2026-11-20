@@ -30,46 +30,46 @@
 /**
  * @brief Reflected descriptor-heap bindings of the debug leaf gather.
  */
-struct OctreeDebugGatherLeavesDescriptorIndices {
+struct OctreeDebugGatherLeavesDescIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [wbe::descriptor("storage_buffer", "octree_info", "read")]
+    [wbe::desc("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Descriptor-heap reference to the static octree texture with every mip level.
      */
-    [wbe::descriptor("sampled_image", "octree_static")]
+    [wbe::desc("sampled_image", "octree_static")]
     uint2 static_levels;
     /**
      * @brief Descriptor-heap reference to the dynamic octree texture with every mip level.
      */
-    [wbe::descriptor("sampled_image", "octree_dynamic")]
+    [wbe::desc("sampled_image", "octree_dynamic")]
     uint2 dynamic_levels;
     /**
      * @brief Descriptor-heap reference to octree_debug_leaf_masks.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_leaf_masks", "write")]
+    [wbe::desc("storage_buffer", "octree_debug_leaf_masks", "write")]
     uint2 leaf_masks;
     /**
      * @brief Descriptor-heap reference to octree_debug_draw_indirect_buffer.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_draw_indirect_buffer", "write")]
+    [wbe::desc("storage_buffer", "octree_debug_draw_indirect_buffer", "write")]
     uint2 indirect_draw;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_node_list", "write")]
+    [wbe::desc("storage_buffer", "octree_debug_node_list", "write")]
     uint2 node_list;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_draw_indirect_buffer.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_node_draw_indirect_buffer", "write")]
+    [wbe::desc("storage_buffer", "octree_debug_node_draw_indirect_buffer", "write")]
     uint2 node_indirect_draw;
 };
 
 [vk::push_constant]
-ConstantBuffer<OctreeDebugGatherLeavesDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeDebugGatherLeavesDescIndices> di;
 
 groupshared uint subgrid_mask[OCTREE_DEBUG_SUBGRID_MASK_WORD_COUNT];
 
@@ -77,11 +77,11 @@ groupshared uint subgrid_mask[OCTREE_DEBUG_SUBGRID_MASK_WORD_COUNT];
 // Mirrors OCTREE_DEBUG_SUBGRID_INVOCATION_EXTENT, which numthreads cannot read.
 [numthreads(4, 4, 8)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID, uint p_group_index : SV_GroupIndex) {
-    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-    Texture3D<uint> static_levels = ResourceDescriptorHeap[descriptor_indices.static_levels.x];
-    Texture3D<uint> dynamic_levels = ResourceDescriptorHeap[descriptor_indices.dynamic_levels.x];
-    RWStructuredBuffer<OctreeDebugSubgridMask> leaf_masks = ResourceDescriptorHeap[descriptor_indices.leaf_masks.x];
-    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
+    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[di.octree_info.x];
+    Texture3D<uint> static_levels = ResourceDescriptorHeap[di.static_levels.x];
+    Texture3D<uint> dynamic_levels = ResourceDescriptorHeap[di.dynamic_levels.x];
+    RWStructuredBuffer<OctreeDebugSubgridMask> leaf_masks = ResourceDescriptorHeap[di.leaf_masks.x];
+    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[di.indirect_draw.x];
     OctreeInfo info = octree_info_buffer[0];
     uint3 grid_extent = get_octree_debug_subgrid_grid_extent(info.max_depth);
     uint subgrid_index = get_octree_debug_subgrid_index(p_group_id, grid_extent);
@@ -134,9 +134,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     command.instance_count = 1;
     command.first_instance = subgrid_count * OCTREE_DEBUG_SUBGRID_LEAF_COUNT;
     indirect_draw[subgrid_count] = command;
-    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[descriptor_indices.node_list.x];
+    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
     RWStructuredBuffer<DrawIndexedIndirectCommand> node_indirect_draw =
-        ResourceDescriptorHeap[descriptor_indices.node_indirect_draw.x];
+        ResourceDescriptorHeap[di.node_indirect_draw.x];
     node_list[OCTREE_DEBUG_NODE_LIST_COUNT_INDEX] = 0;
     command.instance_count = 0;
     command.first_instance = 0;

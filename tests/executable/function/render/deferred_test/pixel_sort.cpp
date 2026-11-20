@@ -13,17 +13,17 @@
    limitations under the License.
 */
 #include "pixel_sort.hh"
-#include "../render_test.hh"
+#include "../rend_test.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "i_post_processing.hh"
 #include "pixel_sort_recipe_params.hh"
@@ -40,7 +40,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 // The Lua module that adds the effect's resources and tasks to a recipe.
-constexpr std::string_view PIXEL_SORT_RECIPE_MODULE = "render_graph_utils.features.pixel_sort";
+constexpr std::string_view PIXEL_SORT_RECIPE_MODULE = "rend_graph_utils.features.pixel_sort";
 // The import name, and global render cache key, of the contrast buffer.
 constexpr std::string_view REND_RES_PIXEL_SORT_CONTRAST = "pixel_sort_contrast";
 
@@ -86,8 +86,8 @@ void PixelSort::validate_layout(VkExtent2D p_extent, PixelSortDirection p_direct
 }
 
 PixelSort::PixelSort(
-    RenderAllocator* p_allocator, RendererVK* p_renderer, RenderTestExtentFactory p_extent, VkFormat p_color_format, const PixelSortSettings& p_settings)
-    : IPostProcessing(p_allocator, TOGGLE_EVENT_ID), renderer(p_renderer), extent(std::move(p_extent)),
+    RendAlloc* p_alloc, RendererVK* p_renderer, RendTestExtentFactory p_extent, VkFormat p_color_format, const PixelSortSettings& p_settings)
+    : IPostProcessing(p_alloc, TOGGLE_EVENT_ID), renderer(p_renderer), extent(std::move(p_extent)),
       color_format(p_color_format) {
     if (renderer == nullptr) {
         throw std::runtime_error("Failed to create the pixel sort post-processing: renderer is null.");
@@ -98,12 +98,12 @@ PixelSort::PixelSort(
     static_cast<void>(set_settings(p_settings));
     // Recipes cannot set initial data, so the effect owns the contrast buffer and every graph imports it.
     const PixelSortContrastGPU contrast = make_contrast(settings);
-    contrast_buffer = renderer->get_render_context()->create_buffer(ROBufferVK::Builder()
-                          .initial_data(&contrast, sizeof(contrast), DeviceDomain::HOST_DEVICE)
+    contrast_buffer = renderer->get_rend_context()->create_buffer(ROBufferVK::Builder()
+                          .init_data(&contrast, sizeof(contrast), DeviceDomain::HOST_DEVICE)
                           .set_size(sizeof(contrast))
                           .set_domain(DeviceDomain::HOST_DEVICE)
                           .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-    renderer->get_global_render_cache()->insert(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
+    renderer->get_global_rend_cache()->insert(REND_RES_PIXEL_SORT_CONTRAST, contrast_buffer);
 }
 
 void PixelSort::validate_settings(const PixelSortSettings& p_settings) {
@@ -133,7 +133,7 @@ void PixelSort::validate_settings(const PixelSortSettings& p_settings) {
 bool PixelSort::set_settings(const PixelSortSettings& p_settings) {
     validate_settings(p_settings);
     // Reject a direction whose lines are too long for the extent of the current renderer state before any graph uses it.
-    validate_layout(extent(RendGraphContextVK::from_render_data(*renderer->get_render_context())), p_settings.direction);
+    validate_layout(extent(RendGraphContextVK::from_rend_data(*renderer->get_rend_context())), p_settings.direction);
     const bool requires_rebuild = p_settings.direction != settings.direction || p_settings.scope != settings.scope;
     settings = p_settings;
     return requires_rebuild;

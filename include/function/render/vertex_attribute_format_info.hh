@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_VERTEX_ATTRIBUTE_FORMAT_INFO_HH
 #define WBE_FILE_VERTEX_ATTRIBUTE_FORMAT_INFO_HH
 
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include <cstddef>
 
 namespace WhiteBirdEngine {

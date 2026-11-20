@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Jinja filters that describe reflected C++ types as Teal declarations in `wbe`, and concrete render-task authoring
-interfaces and constructors in the shared `render_graph` module."""
+interfaces and constructors in the shared `rend_graph` module."""
 import re
 from typing import Any, Callable
 from build_script.reflection.metadata_types import ClassMetadata, FieldMetadata, Metadata
@@ -124,8 +124,8 @@ def teal_parent(p_parent: str, p_scope: dict[str, Any]) -> str:
 
 
 _RECIPE_RESOURCE = "WBE_RECIPE_RESOURCE"
-_RENDER_OBJECT = "WBE_RENDER_OBJECT"
-# The shared render_graph module's own functions. Teal lets them silently override a generated constructor of the same
+_REND_OBJECT = "WBE_REND_OBJECT"
+# The shared rend_graph module's own functions. Teal lets them silently override a generated constructor of the same
 # name, so generation rejects one.
 _MODULE_MEMBERS = {"enum_name", "buffer", "storage_buffer", "image", "storage_image", "image_view", "clamp_to_edge_sampler",
                    "mesh", "compute_pipeline", "graphics_pipeline", "shader_compute_pipeline", "registered_resource",
@@ -141,7 +141,7 @@ def _template_argument(p_type: str) -> tuple[str, str]:
     return match.group("name"), match.group("argument").split(",")[0]
 
 
-class _RenderTaskDescriber:
+class _RendTaskDescriber:
     """Describes render-task constructors and the authoring interfaces of the params whose fields hold resource ids."""
 
     def __init__(self, p_metadata: Metadata, p_reflect_script: list[str]) -> None:
@@ -192,12 +192,12 @@ class _RenderTaskDescriber:
             return "graph", ""
         if len(parameters) == 2 and parameters[0] == "registered":
             target = _strip(parameters[1])
-            render_object = next((cpp_class for cpp_class in self._classes.values()
+            rend_object = next((cpp_class for cpp_class in self._classes.values()
                                   if _strip(cpp_class.name) == target), None)
-            if render_object is None or _RENDER_OBJECT not in render_object.attribute:
-                raise ValueError(f"The registered resource field '{p_field.name}' names '{parameters[1]}', which is not a reflected WBE_RENDER_OBJECT class.")
+            if rend_object is None or _REND_OBJECT not in rend_object.attribute:
+                raise ValueError(f"The registered resource field '{p_field.name}' names '{parameters[1]}', which is not a reflected WBE_REND_OBJECT class.")
             return "registered", target
-        raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE} or {_RECIPE_RESOURCE}(registered, RenderObjectType).")
+        raise ValueError(f"The field '{p_field.name}' must be {_RECIPE_RESOURCE} or {_RECIPE_RESOURCE}(registered, RendObjectType).")
 
     def _value(self, p_type: str, p_scope: tuple[str, str] | None, p_field: str) -> tuple[dict[str, Any] | None, str]:
         """Describe the resource ids a field value holds, with its authoring Teal type; None and its declared type for a
@@ -255,10 +255,10 @@ class _RenderTaskDescriber:
         return teal_name(p_class)
 
 
-def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect_script: list[str]) -> dict[str, Any]:
-    """Describe the task constructors of render_graph, one for each render task annotated WBE_RENDER_TASK(<method>).
+def teal_rend_tasks(p_metadata: Metadata, p_rend_tasks: list[str], p_reflect_script: list[str]) -> dict[str, Any]:
+    """Describe the task constructors of rend_graph, one for each render task annotated WBE_REND_TASK(<method>).
 
-    A bare WBE_RENDER_TASK registers its task type without a constructor. Params fields annotated WBE_RECIPE_RESOURCE
+    A bare WBE_REND_TASK registers its task type without a constructor. Params fields annotated WBE_RECIPE_RESOURCE
     hold graph resource ids and take resource handles, which the build lowers to the graph id with an identity alias.
     WBE_RECIPE_RESOURCE(registered, T) requires a resource handle for a reflected render object T, whose canonical type
     is recorded for runtime validation.
@@ -267,7 +267,7 @@ def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect
 
     Args:
         p_metadata: The reflection metadata.
-        p_render_tasks: The attributes that make a class a render task.
+        p_rend_tasks: The attributes that make a class a render task.
         p_reflect_script: The attributes that make a type visible to scripts.
 
     Returns:
@@ -275,21 +275,21 @@ def teal_render_tasks(p_metadata: Metadata, p_render_tasks: list[str], p_reflect
         hold resource ids; and `interfaces`, the authoring interfaces of params, each with its `name` and `fields`.
 
     Raises:
-        ValueError: If a constructor is not named by one identifier that is not a Teal keyword, shadows a render_graph function, or
+        ValueError: If a constructor is not named by one identifier that is not a Teal keyword, shadows a rend_graph function, or
             is declared twice, or if the create() or params of its task do not fit a constructor.
     """
-    describer = _RenderTaskDescriber(p_metadata, p_reflect_script)
+    describer = _RendTaskDescriber(p_metadata, p_reflect_script)
     constructors: dict[str, dict[str, Any]] = {}
     for task in p_metadata.classes:
-        parameters = next((task.attribute_parameters[attribute] for attribute in p_render_tasks
+        parameters = next((task.attribute_parameters[attribute] for attribute in p_rend_tasks
                            if attribute in task.attribute_parameters), None)
         if parameters is None:
             continue
         if len(parameters) != 1 or teal_field_name(parameters[0]) != parameters[0]:
-            raise ValueError(f"The render task {task.name} must name its constructor with one identifier, as in WBE_RENDER_TASK(compute).")
+            raise ValueError(f"The render task {task.name} must name its constructor with one identifier, as in WBE_REND_TASK(compute).")
         method = parameters[0]
         if method in _MODULE_MEMBERS:
-            raise ValueError(f"The constructor '{method}' of {task.name} shadows a function of render_graph.")
+            raise ValueError(f"The constructor '{method}' of {task.name} shadows a function of rend_graph.")
         if method in constructors:
             raise ValueError(f"The constructor '{method}' is declared by more than one render task.")
         constructors[method] = describer.constructor(task, method)
@@ -304,5 +304,5 @@ TEAL_FILTERS: dict[str, Callable[..., Any]] = {
     "teal_name": teal_name,
     "teal_field_name": teal_field_name,
     "teal_parent": teal_parent,
-    "teal_render_tasks": teal_render_tasks,
+    "teal_rend_tasks": teal_rend_tasks,
 }

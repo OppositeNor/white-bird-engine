@@ -14,15 +14,15 @@
 */
 #include "utils.slang"
 
-struct ShadowMomentsHorizontalDescriptorIndices {
-    [wbe::descriptor("sampled_image", "shadow_moments")]
+struct ShadowMomentsHorizontalDescIndices {
+    [wbe::desc("sampled_image", "shadow_moments")]
     uint2 shadow_moments_input;
-    [wbe::descriptor("storage_image", "shadow_sat_horizontal")]
+    [wbe::desc("storage_image", "shadow_sat_horizontal")]
     uint2 shadow_moments_horizontal_output;
 };
 
 [vk::push_constant]
-ConstantBuffer<ShadowMomentsHorizontalDescriptorIndices> descriptor_indices;
+ConstantBuffer<ShadowMomentsHorizontalDescIndices> di;
 
 /**
  * @brief Build the horizontal prefix sums for a shadow-moment summed-area table.
@@ -31,9 +31,9 @@ ConstantBuffer<ShadowMomentsHorizontalDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    Texture2D<float2> shadow_moments_input = ResourceDescriptorHeap[descriptor_indices.shadow_moments_input.x];
+    Texture2D<float2> shadow_moments_input = ResourceDescriptorHeap[di.shadow_moments_input.x];
     RWTexture2D<float2> shadow_moments_horizontal_output =
-        ResourceDescriptorHeap[descriptor_indices.shadow_moments_horizontal_output.x];
+        ResourceDescriptorHeap[di.shadow_moments_horizontal_output.x];
     uint width;
     uint height;
     shadow_moments_input.GetDimensions(width, height);

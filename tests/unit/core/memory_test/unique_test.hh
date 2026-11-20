@@ -15,11 +15,11 @@
 #ifndef WBE_FILE_UNIQUE_TEST_HH
 #define WBE_FILE_UNIQUE_TEST_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/unique.hh"
 #include "global/global.hh"
-#include "mock_heap_allocator_aligned.hh"
+#include "mock_heap_alloc_aligned.hh"
 #include "test_global.hh"
 #include <gtest/gtest.h>
 #include <memory>
@@ -51,26 +51,26 @@ protected:
 };
 
 TEST_F(WBEUniqueTest, BasicConstructionAndAccess) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
-    allocator.clear_call_log();
+    WBE::MockHeapAllocAligned alloc(1024);
+    alloc.clear_call_log();
 
     // Create object using allocator directly
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 42);
-    WBE::Unique<Dummy> u(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 42);
+    WBE::Unique<Dummy> u(&alloc, id);
 
     ASSERT_NE(u.get(), nullptr);
     ASSERT_EQ(u.get()->x, 42);
 
     // Verify get was called
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("get"), std::string::npos);
 }
 
 TEST_F(WBEUniqueTest, MoveSemantics) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    WBE::MemID id1 = WBE::create_obj<Dummy>(allocator, 7);
-    WBE::Unique<Dummy> u1(&allocator, id1);
+    WBE::MemID id1 = WBE::create_obj<Dummy>(alloc, 7);
+    WBE::Unique<Dummy> u1(&alloc, id1);
     WBE::Unique<Dummy> u2 = std::move(u1);
 
     // After move, u1 should be null, u2 should have the value
@@ -80,27 +80,27 @@ TEST_F(WBEUniqueTest, MoveSemantics) {
 }
 
 TEST_F(WBEUniqueTest, ResetBehavior) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
-    allocator.clear_call_log();
+    WBE::MockHeapAllocAligned alloc(1024);
+    alloc.clear_call_log();
 
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 123);
-    WBE::Unique<Dummy> u(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 123);
+    WBE::Unique<Dummy> u(&alloc, id);
     ASSERT_NE(u.get(), nullptr);
 
-    allocator.clear_call_log();
+    alloc.clear_call_log();
     u.reset();
 
     // Reset should call deallocate and set to null
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("deallocate"), std::string::npos);
     ASSERT_EQ(u.get(), nullptr);
 }
 
 TEST_F(WBEUniqueTest, ComparisonOperators) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
-    WBE::Unique<Dummy> u1(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 1);
+    WBE::Unique<Dummy> u1(&alloc, id);
     WBE::Unique<Dummy> u2; // Empty unique
 
     ASSERT_FALSE(u1 == nullptr);
@@ -115,25 +115,25 @@ TEST_F(WBEUniqueTest, ComparisonOperators) {
 }
 
 TEST_F(WBEUniqueTest, CallLoggingWithMakeUnique) {
-    WBE::MockHeapAllocatorAligned allocator(4096);
-    allocator.clear_call_log();
+    WBE::MockHeapAllocAligned alloc(4096);
+    alloc.clear_call_log();
 
     // Test static make_unique method
-    auto u = WBE::Unique<Dummy>::make_unique(&allocator, 100);
+    auto u = WBE::Unique<Dummy>::make_unique(&alloc, 100);
     ASSERT_NE(u.get(), nullptr);
     ASSERT_EQ(u.get()->x, 100);
 
     // Verify allocation and get were called
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("allocate"), std::string::npos);
     ASSERT_NE(log.find("get"), std::string::npos);
 }
 
 TEST_F(WBEUniqueTest, ArrowOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 42);
-    WBE::Unique<Dummy> u(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 42);
+    WBE::Unique<Dummy> u(&alloc, id);
 
     // Test non-const arrow operator - should work like get()->x
     ASSERT_EQ(u->x, 42);
@@ -146,10 +146,10 @@ TEST_F(WBEUniqueTest, ArrowOperator) {
 }
 
 TEST_F(WBEUniqueTest, DereferenceOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 123);
-    WBE::Unique<Dummy> u(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 123);
+    WBE::Unique<Dummy> u(&alloc, id);
 
     // Test non-const dereference operator - should work like *get()
     ASSERT_EQ((*u).x, 123);
@@ -162,25 +162,25 @@ TEST_F(WBEUniqueTest, DereferenceOperator) {
 }
 
 TEST_F(WBEUniqueTest, GlobalMakeUniqueFunction) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
-    allocator.clear_call_log();
+    WBE::MockHeapAllocAligned alloc(1024);
+    alloc.clear_call_log();
 
     // Test global make_unique function
-    auto u = WBE::make_unique<Dummy>(&allocator, 99);
+    auto u = WBE::make_unique<Dummy>(&alloc, 99);
     ASSERT_NE(u.get(), nullptr);
     ASSERT_EQ(u.get()->x, 99);
 
     // Verify allocation was called
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("allocate"), std::string::npos);
 }
 
 TEST_F(WBEUniqueTest, MemIDComparisonOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     WBE::Unique<Dummy> empty_unique;
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
-    WBE::Unique<Dummy> valid_unique(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 1);
+    WBE::Unique<Dummy> valid_unique(&alloc, id);
 
     // Test MEM_NULL comparison - empty should equal MEM_NULL, valid should not
     ASSERT_TRUE(empty_unique == WBE::MEM_NULL);
@@ -193,11 +193,11 @@ TEST_F(WBEUniqueTest, MemIDComparisonOperator) {
 }
 
 TEST_F(WBEUniqueTest, VoidPointerComparisonOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     WBE::Unique<Dummy> empty_unique;
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 1);
-    WBE::Unique<Dummy> valid_unique(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 1);
+    WBE::Unique<Dummy> valid_unique(&alloc, id);
 
     // Test void* comparison with nullptr - should work like nullptr comparison
     ASSERT_TRUE(empty_unique == static_cast<void*>(nullptr));
@@ -245,11 +245,11 @@ struct Derived : public Base {
 };
 
 TEST_F(WBEUniqueTest, TemplateConversionConstructor) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Create a Unique<Derived>
-    WBE::MemID derived_id = WBE::create_obj<Derived>(allocator, 42, 84);
-    WBE::Unique<Derived> derived_unique(&allocator, derived_id);
+    WBE::MemID derived_id = WBE::create_obj<Derived>(alloc, 42, 84);
+    WBE::Unique<Derived> derived_unique(&alloc, derived_id);
 
     ASSERT_EQ(derived_unique->value, 42);
     ASSERT_EQ(derived_unique->extra, 84);
@@ -266,11 +266,11 @@ TEST_F(WBEUniqueTest, TemplateConversionConstructor) {
 }
 
 TEST_F(WBEUniqueTest, TemplateConversionAssignmentOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Create a Unique<Derived>
-    WBE::MemID derived_id = WBE::create_obj<Derived>(allocator, 10, 20);
-    WBE::Unique<Derived> derived_unique(&allocator, derived_id);
+    WBE::MemID derived_id = WBE::create_obj<Derived>(alloc, 10, 20);
+    WBE::Unique<Derived> derived_unique(&alloc, derived_id);
 
     // Create an empty Unique<Base>
     WBE::Unique<Base> base_unique;
@@ -286,25 +286,25 @@ TEST_F(WBEUniqueTest, TemplateConversionAssignmentOperator) {
 }
 
 TEST_F(WBEUniqueTest, MoveAssignmentWithExistingObject) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Create two Unique objects
-    WBE::MemID id1 = WBE::create_obj<Dummy>(allocator, 100);
-    WBE::MemID id2 = WBE::create_obj<Dummy>(allocator, 200);
+    WBE::MemID id1 = WBE::create_obj<Dummy>(alloc, 100);
+    WBE::MemID id2 = WBE::create_obj<Dummy>(alloc, 200);
 
-    WBE::Unique<Dummy> u1(&allocator, id1);
-    WBE::Unique<Dummy> u2(&allocator, id2);
+    WBE::Unique<Dummy> u1(&alloc, id1);
+    WBE::Unique<Dummy> u2(&alloc, id2);
 
     ASSERT_EQ(u1->x, 100);
     ASSERT_EQ(u2->x, 200);
 
-    allocator.clear_call_log();
+    alloc.clear_call_log();
 
     // Move assign u2 to u1 (should deallocate u1's old object first)
     u1 = std::move(u2);
 
     // Verify deallocation happened
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("deallocate"), std::string::npos);
 
     // u1 should now have u2's object, u2 should be empty
@@ -313,7 +313,7 @@ TEST_F(WBEUniqueTest, MoveAssignmentWithExistingObject) {
 }
 
 TEST_F(WBEUniqueTest, ArrowOperatorNullAccess) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Test arrow operator on empty unique - should handle null gracefully or crash predictably
     WBE::Unique<Dummy> empty_unique;
@@ -324,7 +324,7 @@ TEST_F(WBEUniqueTest, ArrowOperatorNullAccess) {
 }
 
 TEST_F(WBEUniqueTest, DereferenceOperatorNullAccess) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Test dereference operator on empty unique
     WBE::Unique<Dummy> empty_unique;
@@ -335,11 +335,11 @@ TEST_F(WBEUniqueTest, DereferenceOperatorNullAccess) {
 }
 
 TEST_F(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Test both static and global make_unique functions work identically
-    auto u1 = WBE::Unique<Dummy>::make_unique(&allocator, 111);
-    auto u2 = WBE::make_unique<Dummy>(&allocator, 222);
+    auto u1 = WBE::Unique<Dummy>::make_unique(&alloc, 111);
+    auto u2 = WBE::make_unique<Dummy>(&alloc, 222);
 
     ASSERT_NE(u1.get(), nullptr);
     ASSERT_NE(u2.get(), nullptr);
@@ -352,10 +352,10 @@ TEST_F(WBEUniqueTest, StaticMakeUniqueVsGlobalMakeUnique) {
 }
 
 TEST_F(WBEUniqueTest, MultipleResetCalls) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    WBE::MemID id = WBE::create_obj<Dummy>(allocator, 999);
-    WBE::Unique<Dummy> u(&allocator, id);
+    WBE::MemID id = WBE::create_obj<Dummy>(alloc, 999);
+    WBE::Unique<Dummy> u(&alloc, id);
 
     ASSERT_NE(u.get(), nullptr);
     ASSERT_EQ(u->x, 999);
@@ -374,14 +374,14 @@ TEST_F(WBEUniqueTest, MultipleResetCalls) {
 }
 
 TEST_F(WBEUniqueTest, IsNullMethod_Behavior) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Default constructed should be null
     WBE::Unique<Dummy> empty_unique;
     ASSERT_TRUE(empty_unique.is_null());
 
     // make_unique should produce non-null
-    auto u = WBE::Unique<Dummy>::make_unique(&allocator, 13);
+    auto u = WBE::Unique<Dummy>::make_unique(&alloc, 13);
     ASSERT_FALSE(u.is_null());
 
     // reset should make it null again

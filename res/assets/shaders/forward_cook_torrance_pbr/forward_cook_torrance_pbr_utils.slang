@@ -52,12 +52,12 @@ struct VSOutput {
     float4 light_space_pos  : TEXCOORD5;
 };
 
-struct ForwardLightParamDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "spot_light_info")]
+struct ForwardLightParamDescIndices {
+    [wbe::desc("uniform_buffer", "spot_light_info")]
     uint2 info;
-    [wbe::descriptor("sampled_image", "shadowmap")]
+    [wbe::desc("sampled_image", "shadowmap")]
     uint2 shadowmap;
-    [wbe::descriptor("sampler", "shadow_sampler")]
+    [wbe::desc("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
 };
 

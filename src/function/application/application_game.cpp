@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/application/application_game.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/async/worker.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
@@ -24,9 +24,9 @@
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_dummy/renderer_dummy.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_dummy/renderer_dummy.hh"
+#include "function/rend_vk/renderer_vk.hh"
 #include "function/window/i_window.hh"
 #include "function/window/window_sdl.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -54,8 +54,8 @@ ApplicationGame::ApplicationGame(RendererCapabilities p_renderer_capabilities, R
 
 void ApplicationGame::run() {
     {
-        std::jthread render_thread([this] {
-            run_render();
+        std::jthread rend_thread([this] {
+            run_rend();
         });
         std::jthread logic_thread([this] {
             run_logic();
@@ -68,38 +68,38 @@ void ApplicationGame::run() {
 void ApplicationGame::init() {
     const auto& game_config = GameConfig::get_singleton()->get_config_options();
     // Initialize the deltas into a very small number.
-    render_delta.store(0.0001, std::memory_order_seq_cst);
+    rend_delta.store(0.0001, std::memory_order_seq_cst);
     logic_delta.store(0.0001, std::memory_order_seq_cst);
 
-    render_job_buffer = make_ref<JobBufferRingMPSC>(global_allocator(), global_allocator(), 64);
-    renderer_allocator = make_ref<RenderAllocator>(global_allocator(), game_config.render_mem_pool_size);
+    rend_job_buffer = make_ref<JobBufferRingMPSC>(global_alloc(), global_alloc(), 64);
+    renderer_alloc = make_ref<RendAlloc>(global_alloc(), game_config.rend_mem_pool_size);
     if (input_manager == MEM_NULL) {
-        input_manager = make_ref<InputManagerRegular>(global_allocator());
+        input_manager = make_ref<InputManagerRegular>(global_alloc());
     }
-    window = make_ref<WindowSDL>(global_allocator(), input_manager, get_window_properties_from_game_config_options(game_config));
-    if (game_config.render_api == "vulkan") {
-        renderer = make_ref<RendererVK>(global_allocator(), renderer_allocator.get(), window, render_job_buffer, renderer_capabilities);
-    } else if (game_config.render_api == "dummy") {
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
+    window = make_ref<WindowSDL>(global_alloc(), input_manager, get_window_properties_from_game_config_options(game_config));
+    if (game_config.rend_api == "vulkan") {
+        renderer = make_ref<RendererVK>(global_alloc(), renderer_alloc.get(), window, rend_job_buffer, renderer_capabilities);
+    } else if (game_config.rend_api == "dummy") {
+        renderer = make_ref<RendererDummy>(global_alloc(), renderer_alloc.get(), renderer_capabilities);
     } else {
-        stdout_log(WBE_CHANNEL_RENDER)
-            ->warning(std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.render_api));
-        renderer = make_ref<RendererDummy>(global_allocator(), renderer_allocator.get(), renderer_capabilities);
+        stdout_log(WBE_CHANNEL_REND)
+            ->warning(std::format("Unrecognized renderer: \"{}\", using a dummy renderer.", game_config.rend_api));
+        renderer = make_ref<RendererDummy>(global_alloc(), renderer_alloc.get(), renderer_capabilities);
     }
-    worker = make_ref<Worker>(global_allocator(), 1);
-    audio_renderer = make_ref<AudioRendererMA>(global_allocator());
+    worker = make_ref<Worker>(global_alloc(), 1);
+    audio_renderer = make_ref<AudioRendererMA>(global_alloc());
     ResourceManager::get_singleton()->load_global_resource("res_chunks/global_resources.json");
 }
 
-void ApplicationGame::run_render() {
+void ApplicationGame::run_rend() {
     bool local_should_close = false;
     auto* global_clock = EngineCore::get_singleton()->global_clock;
     double start_time, end_time;
     while (!local_should_close) {
         start_time = global_clock->get_duration();
-        render_update(render_delta.load(std::memory_order_relaxed));
-        window->tick_render();
-        renderer->tick(render_delta.load(std::memory_order_relaxed));
+        rend_update(rend_delta.load(std::memory_order_relaxed));
+        window->tick_rend();
+        renderer->tick(rend_delta.load(std::memory_order_relaxed));
         end_time = global_clock->get_duration();
         const double frame_duration = end_time - start_time;
         const DeltaSettings local_delta_settings = get_delta_settings();
@@ -107,9 +107,9 @@ void ApplicationGame::run_render() {
             if (local_delta_settings.sleep_to_delta && frame_duration < local_delta_settings.fixed_delta) {
                 std::this_thread::sleep_for(std::chrono::duration<double>(local_delta_settings.fixed_delta - frame_duration));
             }
-            render_delta.store(local_delta_settings.fixed_delta, std::memory_order_release);
+            rend_delta.store(local_delta_settings.fixed_delta, std::memory_order_release);
         } else {
-            render_delta.store(frame_duration, std::memory_order_release);
+            rend_delta.store(frame_duration, std::memory_order_release);
         }
         local_should_close = should_close.load(std::memory_order_acquire);
     }
@@ -153,7 +153,7 @@ void ApplicationGame::set_delta_settings(const DeltaSettings& p_delta_settings) 
     delta_settings = p_delta_settings;
     if (p_delta_settings.is_fixed) {
         // The next frames must not observe a measured delta once the delta is fixed.
-        render_delta.store(p_delta_settings.fixed_delta, std::memory_order_release);
+        rend_delta.store(p_delta_settings.fixed_delta, std::memory_order_release);
         logic_delta.store(p_delta_settings.fixed_delta, std::memory_order_release);
     }
 }

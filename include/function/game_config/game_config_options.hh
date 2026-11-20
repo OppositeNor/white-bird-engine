@@ -72,16 +72,16 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
      * optimal one.
      */
     WBE_META(WBE_REFLECT)
-    std::optional<uint32_t> render_device_index;
+    std::optional<uint32_t> rend_device_index;
 
     WBE_META(WBE_REFLECT)
-    std::string render_api;
+    std::string rend_api;
 
     /**
      * @brief Set limit to the rendering fps. 0 stands for unlimited.
      */
     WBE_META(WBE_REFLECT)
-    int32_t limit_render_fps = 0;
+    int32_t limit_rend_fps = 0;
 
     /**
      * @brief Set limit to the logic fps. 0 stands for unlimited.
@@ -102,7 +102,7 @@ struct WBE_META(WBE_CONFIG_OPTION) GameConfigOptions final : public Serializable
      * @brief The size of the render allocator.
      */
     WBE_META(WBE_REFLECT)
-    uint64_t render_mem_pool_size = WBE_KI_B(64);
+    uint64_t rend_mem_pool_size = WBE_KI_B(64);
 };
 
 } // namespace WhiteBirdEngine

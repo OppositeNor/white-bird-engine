@@ -15,11 +15,11 @@
 #ifndef WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 #define WBE_FILE_REF_STRONG_EXCEPTIONS_TEST_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/global.hh"
-#include "mock_heap_allocator_aligned.hh"
+#include "mock_heap_alloc_aligned.hh"
 #include "test_global.hh"
 #include <gtest/gtest.h>
 #include <memory>
@@ -41,13 +41,13 @@ protected:
 };
 
 TEST_F(WBERefStrongExceptionsTest, MemIDOnlyConstructorThrowsOnNonNull) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     // allocate an int to get a non-null MemID
-    WBE::MemID id = WBE::create_obj<int>(allocator, 5);
+    WBE::MemID id = WBE::create_obj<int>(alloc, 5);
     // constructing Ref<int> with a non-MEM_NULL MemID (without allocator) should throw
     ASSERT_THROW({ WBE::Ref<int> r(id); }, std::runtime_error);
     // cleanup
-    WBE::destroy_obj<int>(allocator, id);
+    WBE::destroy_obj<int>(alloc, id);
 }
 
 TEST_F(WBERefStrongExceptionsTest, CompareWithNonNullVoidPointerThrows) {

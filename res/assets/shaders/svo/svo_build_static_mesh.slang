@@ -81,23 +81,23 @@ struct GSOutput {
 // Closed-cell overlap includes surfaces on cell boundaries. This tolerance is in voxel units.
 static const float VOXEL_COVERAGE_EPSILON = 0.0001;
 
-struct SVODescriptorIndices {
-    [wbe::descriptor("storage_buffer", "svo_info")]
+struct SVODescIndices {
+    [wbe::desc("storage_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer")]
     uint2 tree_leaves;
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping")]
     uint2 deferred_list;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODescIndices> di;
 
 /**
  * @brief Transform a mesh vertex for the svo.
@@ -107,13 +107,13 @@ ConstantBuffer<SVODescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
     SVOInfo svo_info = svo_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
 
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     SubmeshData submesh = submeshes[instance.submesh_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
@@ -205,23 +205,23 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  * @brief Allocates a covered cell, queueing the voxel for a retry from the root on contention.
  */
 void allocate_covered_voxel(float3 p_svo_position) {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
     // Trace to the bottom-most node
     SVONodeTraceInfo trace_info = get_svo_root_trace_info(p_svo_position, svo_info[0].max_depth);
     // Try to allocate the node.
 #ifdef WBE_DYNAMIC_BUILD
-    if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, svo_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_dynamic_voxel_allocate_atomic(tree_nodes, tree_leaves, svo_info, trace_info, di.shader_debug_frame_slot)) {
 #else
-    if (!try_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, descriptor_indices.shader_debug_frame_slot)) {
+    if (!try_voxel_allocate(tree_nodes, tree_leaves, svo_info, trace_info, di.shader_debug_frame_slot)) {
 #endif
         // If allocation failed, push this to the deferred list.
         uint new_task_index;
         InterlockedAdd(deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX], 1, new_task_index);
         WBE_SHADER_DEBUG_ASSERT(new_task_index < svo_info[0].max_deferred_task_count,
-            ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, descriptor_indices.shader_debug_frame_slot);
+            ShaderDebugError::SVO_DEFERRED_TASK_INDEX_OVERFLOW, di.shader_debug_frame_slot);
         deferred_list[SVO_DEFERRED_LIST_ENTRY_OFFSET + new_task_index] =
             to_deferred_list_entry(p_svo_position, svo_info[0].max_depth);
     }
@@ -244,7 +244,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;

@@ -16,7 +16,7 @@
 #define WBE_FILE_RESOURCE_SCHEME_DESERIALIZATION_TEST_HH
 
 #include "core/parser/parser_json.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"

@@ -156,7 +156,7 @@ one material table per distinct contract, resolving each texture to its global s
 writing it at the reflected material-field offset. The metadata-only `material_sampler` and `textures` members and the runtime
 `materials` table remain fixed contracts in `utils/utils.slang`; applications may configure only the base variable names for
 `material_textures` and `material_params`, plus the `default_material` resource key. Runtime shaders receive the material
-parameter buffer and sampler through `WBE_DESCRIPTOR` push-data fields and access textures through the global heap.
+parameter buffer and sampler through `WBE_DESC` push-data fields and access textures through the global heap.
 
 `WBE_TEXTURE` and `WBE_VERTEX_INPUT` share the same open-role annotation resolver: both accept one optional string, default to the
 annotated field name, retain exact names for diagnostics, and reject duplicate roles and distinct-name hash collisions. Their
@@ -198,9 +198,9 @@ Scripts live under `res/assets/scripts/teal/` and are declared in `res/assets/sc
 
 ```toml
 [[resources]]
-id = "render_graph_utils.render_graph_utils"
+id = "rend_graph_utils.rend_graph_utils"
 source_type = "script"
-source_file = "assets/scripts/teal/render_graph_utils/render_graph_utils.tl"
+source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl"
 ```
 
 - A script's id is its module name: its path under `scripts/teal/` without its extension, with dots for slashes. ACP does not
@@ -208,13 +208,13 @@ source_file = "assets/scripts/teal/render_graph_utils/render_graph_utils.tl"
   sync.
 - `.lua` sources are copied. `.tl` sources are type-checked and compiled to `<name>.lua` with the vendored Teal compiler; a
   type error fails the build. Teal resolves `require` against the script root and the generated modules in
-  `build/<target>/teal/` (`wbe.d.tl`, `render_graph_utils/render_graph.tl`, and
-  `render_graph_utils/render_graph_tasks.tl`), so a Teal module can require a Lua module only through a `.d.tl` declaration
+  `build/<target>/teal/` (`wbe.d.tl`, `rend_graph_utils/rend_graph.tl`, and
+  `rend_graph_utils/rend_graph_tasks.tl`), so a Teal module can require a Lua module only through a `.d.tl` declaration
   next to it.
 - A generated script module is a resource too. Its `source_file` is relative to `build/<target>/teal/`, where ACP looks
   first, and its entry sets `path` to keep the module's place under `assets/scripts/teal/`.
-- Recipes go in `render_graphs/`; reusable graph parts and helpers go in `render_graph_utils/`, with features in
-  `render_graph_utils/features/`. General script helpers remain in `utils/`.
+- Recipes go in `rend_graphs/`; reusable graph parts and helpers go in `rend_graph_utils/`, with features in
+  `rend_graph_utils/features/`. General script helpers remain in `utils/`.
   Test-only scripts go in `tests/` with `scope = "test_only"`.
 
 At runtime `require` is the only import mechanism: `SMRResourceManager` resolves module ids to script resources, each module

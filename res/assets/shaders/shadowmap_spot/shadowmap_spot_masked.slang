@@ -27,18 +27,18 @@ struct MaskedShadowVSOutput {
     float material_index : TEXCOORD1;
 };
 
-struct MaskedShadowDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "shadow_light_info")]
+struct MaskedShadowDescIndices {
+    [wbe::desc("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
-    [wbe::descriptor("uniform_buffer", "material_params")]
+    [wbe::desc("uniform_buffer", "material_params")]
     uint2 material_params;
-    [wbe::descriptor("sampler", "material_sampler")]
+    [wbe::desc("sampler", "material_sampler")]
     uint2 material_sampler;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<MaskedShadowDescriptorIndices> descriptor_indices;
+ConstantBuffer<MaskedShadowDescIndices> di;
 
 /**
  * @brief Transform a masked mesh vertex and resolve its material identifier.
@@ -48,11 +48,11 @@ ConstantBuffer<MaskedShadowDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
+    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
-    float4 world_position = mul(load_mesh_node(descriptor_indices.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
+    float4 world_position = mul(load_mesh_node(di.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
     MaskedShadowVSOutput output;
     float4 light_view_position =
         software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(light_camera_info.view), world_position);
@@ -65,13 +65,13 @@ MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_
 
 [shader("fragment")]
 float4 fragment_main(MaskedShadowVSOutput p_input) : SV_Target0 {
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
-    uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
-    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
+    uint albedo_desc_index = NonUniformResourceIndex(albedo_index);
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_desc_index];
     float alpha = albedo_texture.Sample(material_sampler, p_input.uv).a;
     if (alpha < 0.5) {
         discard;

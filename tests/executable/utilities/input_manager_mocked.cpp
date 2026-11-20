@@ -67,12 +67,12 @@ std::string_view read_input_sequence_environment() {
 
 } // namespace
 
-InputManagerMocked::InputManagerMocked(HeapAllocatorGlobal* p_allocator)
-    : InputManagerMocked(p_allocator, read_input_sequence_environment()) {
+InputManagerMocked::InputManagerMocked(HeapAllocGlobal* p_alloc)
+    : InputManagerMocked(p_alloc, read_input_sequence_environment()) {
 }
 
-InputManagerMocked::InputManagerMocked(HeapAllocatorGlobal* p_allocator, std::string_view p_input_sequence)
-    : sequence(p_allocator) {
+InputManagerMocked::InputManagerMocked(HeapAllocGlobal* p_alloc, std::string_view p_input_sequence)
+    : sequence(p_alloc) {
     if (p_input_sequence.empty()) {
         return;
     }

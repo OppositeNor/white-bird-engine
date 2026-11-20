@@ -12,9 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
-#include "function/render/render_resource_unit.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
@@ -33,20 +33,20 @@ namespace WhiteBirdEngine {
 
 namespace {
 
-RefRes<RUShader> make_test_shader(StackAllocator& p_allocator, std::string_view p_metadata_path) {
-    MemID shader_memory = p_allocator.allocate(sizeof(RUShader));
-    std::memset(p_allocator.get(shader_memory), 0, sizeof(RUShader));
-    RefRes<RUShader> shader(shader_memory, &p_allocator);
-    MemID variant_memory = p_allocator.allocate(sizeof(RUShaderVariant));
-    std::memset(p_allocator.get(variant_memory), 0, sizeof(RUShaderVariant));
-    RefRes<RUShaderVariant> variant(variant_memory, &p_allocator);
+RefRes<RUShader> make_test_shader(StackAlloc& p_alloc, std::string_view p_metadata_path) {
+    MemID shader_memory = p_alloc.allocate(sizeof(RUShader));
+    std::memset(p_alloc.get(shader_memory), 0, sizeof(RUShader));
+    RefRes<RUShader> shader(shader_memory, &p_alloc);
+    MemID variant_memory = p_alloc.allocate(sizeof(RUShaderVariant));
+    std::memset(p_alloc.get(variant_memory), 0, sizeof(RUShaderVariant));
+    RefRes<RUShaderVariant> variant(variant_memory, &p_alloc);
     variant->key = ShaderVariantResolver().make_key({});
     if (!p_metadata_path.empty()) {
-        MemID path_memory = p_allocator.allocate(p_metadata_path.size() + 1);
-        auto* path_storage = static_cast<char*>(p_allocator.get(path_memory));
+        MemID path_memory = p_alloc.allocate(p_metadata_path.size() + 1);
+        auto* path_storage = static_cast<char*>(p_alloc.get(path_memory));
         std::memcpy(path_storage, p_metadata_path.data(), p_metadata_path.size());
         path_storage[p_metadata_path.size()] = '\0';
-        variant->metadata_path = RefRes<char>(path_memory, &p_allocator);
+        variant->metadata_path = RefRes<char>(path_memory, &p_alloc);
     }
     shader->variants = variant;
     shader->variant_count = 1;
@@ -66,18 +66,18 @@ protected:
     }
 
     std::unique_ptr<Global> global;
-    StackAllocator storage{WBE_KI_B(4)};
+    StackAlloc storage{WBE_KI_B(4)};
 };
 
 TEST_F(WBEShaderMetadataLoaderTest, LoadsMetadataFromResourceRelativePath) {
     const ShaderMetadataLoader loader;
     RefRes<RUShader> shader =
-        make_test_shader(storage, "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json");
+        make_test_shader(storage, "assets/shaders/desc_heap_reflection/desc_heap_reflection.desc_heap_reflection_shader.json");
 
     const ShaderMetadata metadata = loader.load(shader);
 
     const ShaderMetadataQuery query;
-    const ShaderMetadataParameter* push_data = query.find_parameter(metadata, "descriptor_indices");
+    const ShaderMetadataParameter* push_data = query.find_parameter(metadata, "di");
     ASSERT_NE(push_data, nullptr);
     EXPECT_EQ(push_data->binding.kind, "pushConstantBuffer");
     EXPECT_NE(query.find_parameter(metadata, "acceleration_structure"), nullptr);

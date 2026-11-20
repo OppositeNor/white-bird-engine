@@ -64,22 +64,22 @@ struct SpotLightInfoBuffer {
     uint spot_light_count;
 };
 
-struct LightParamDescriptorIndices {
+struct LightParamDescIndices {
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [wbe::descriptor("sampled_image", "shadow_moments[]")]
+    [wbe::desc("sampled_image", "shadow_moments[]")]
 #else
-    [wbe::descriptor("sampled_image", "shadow_moments_sampled[]")]
+    [wbe::desc("sampled_image", "shadow_moments_sampled[]")]
 #endif
     uint2 shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-    [wbe::descriptor("sampled_image", "shadow_sat[]")]
+    [wbe::desc("sampled_image", "shadow_sat[]")]
     uint2 shadow_moments_summed_area_table;
 #endif
-    [wbe::descriptor("sampled_image", "shadowmap_color[]")]
+    [wbe::desc("sampled_image", "shadowmap_color[]")]
     uint2 rsm_flux;
-    [wbe::descriptor("sampled_image", "rsm_normal[]")]
+    [wbe::desc("sampled_image", "rsm_normal[]")]
     uint2 rsm_octa_normal;
-    [wbe::descriptor("sampler", "shadow_sampler")]
+    [wbe::desc("sampler", "shadow_sampler")]
     uint2 shadowmap_sampler;
 };
 
@@ -118,7 +118,7 @@ float3 spot_shadow_texel_world_position(SpotLightInfo p_spot_light_info, float2 
 
 /**
  * @brief One spot light from a spot light table, packed with its shadow-map and RSM resources for easy access.
- * @details Resolves the light parameters and every resource referenced by its LightParamDescriptorIndices once, so passes
+ * @details Resolves the light parameters and every resource referenced by its LightParamDescIndices once, so passes
  * read them through one value. The light table and shadow resources must not be written during the calling pass.
  */
 struct SpotLight {
@@ -159,7 +159,7 @@ struct SpotLight {
      * @param p_light Shadow-resource descriptor indices of the light.
      * @param p_index Index of the light in the spot light table; must be below get_spot_light_count().
      */
-    __init(uint2 p_light_infos, LightParamDescriptorIndices p_light, uint p_index) {
+    __init(uint2 p_light_infos, LightParamDescIndices p_light, uint p_index) {
         info = get_spot_light_info(p_light_infos, p_index);
         index = p_index;
         shadow_moments = ResourceDescriptorHeap[p_light.shadowmap.x];

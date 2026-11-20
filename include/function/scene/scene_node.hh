@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SCENE_NODE_HH
 #define WBE_FILE_SCENE_NODE_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
@@ -118,12 +118,12 @@ public:
      *
      * @return This node's entity component type list.
      */
-    Vector<TypeID, HeapAllocatorDefault> get_component_type_ids();
+    Vector<TypeID, HeapAllocDefault> get_component_type_ids();
 
 private:
     void destroy_entity();
 
-    String<HeapAllocatorDefault> name;
+    String<HeapAllocDefault> name;
     Ref<World> world;
     EntityID entity = entt::null;
 };

@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_REFERENCE_WEAK_HH
 #define WBE_FILE_REFERENCE_WEAK_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "reference_strong.hh"
 #include <atomic>
 #include <concepts>
@@ -37,7 +37,7 @@ namespace WhiteBirdEngine {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocator>
+template <typename T, typename AllocType = HeapAlloc>
 class RefWeak {
     template <typename T1, typename AllocType1>
     friend class RefWeak;
@@ -205,7 +205,7 @@ public:
      * @return True if the reference is NULL, false otherwise.
      */
     bool is_null() const {
-        return !(is_valid()) || control_block->allocator == nullptr || control_block->mem_id == MEM_NULL;
+        return !(is_valid()) || control_block->alloc == nullptr || control_block->mem_id == MEM_NULL;
     }
 
 private:
@@ -239,7 +239,7 @@ private:
         if (weak_ref_count == 1) {
             // Every strong reference holds a hidden weak reference, so the last weak reference is also past the last
             // strong reference: destroy the control block.
-            destroy_obj<ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
+            destroy_obj<ControlBlock>(*(control_block->alloc), control_block->control_block_mem_id);
         }
         control_block = nullptr;
     }

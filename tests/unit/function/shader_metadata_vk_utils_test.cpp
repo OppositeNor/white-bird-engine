@@ -12,15 +12,15 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
-#include "function/render/render_resource_unit.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_role.hh"
 #include "function/render/vertex_input_contract_resolver.hh"
 #include "function/render/vertex_input_requirement.hh"
-#include "function/render_vk/shader_metadata_vk_utils.hh"
-#include "function/render_vk/vertex_input_description_vk.hh"
+#include "function/rend_vk/shader_metadata_vk_utils.hh"
+#include "function/rend_vk/vertex_input_description_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -45,19 +45,19 @@ struct VertexAttributeTestSpec {
     size_t size;
 };
 
-RefRes<char> push_vertex_test_data(StackAllocator& p_allocator, size_t p_size, const void* p_data) {
-    MemID memory = p_allocator.allocate(p_size);
+RefRes<char> push_vertex_test_data(StackAlloc& p_alloc, size_t p_size, const void* p_data) {
+    MemID memory = p_alloc.allocate(p_size);
     if (p_size > 0) {
-        std::memcpy(p_allocator.get(memory), p_data, p_size);
+        std::memcpy(p_alloc.get(memory), p_data, p_size);
     }
-    return RefRes<char>(memory, &p_allocator);
+    return RefRes<char>(memory, &p_alloc);
 }
 
-RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
+RUVertexView make_vertex_test_data(StackAlloc& p_alloc, std::span<const VertexAttributeTestSpec> p_specs, size_t p_stride) {
     std::vector<RUVertexView::Attribute> attributes;
     attributes.reserve(p_specs.size());
     for (const VertexAttributeTestSpec& spec : p_specs) {
-        RefRes<char> role_name = push_vertex_test_data(p_allocator, spec.role.size() + 1, spec.role.data());
+        RefRes<char> role_name = push_vertex_test_data(p_alloc, spec.role.size() + 1, spec.role.data());
         role_name.get()[spec.role.size()] = '\0';
         RUShaderRole role;
         role.name = role_name;
@@ -67,7 +67,7 @@ RUVertexView make_vertex_test_data(StackAllocator& p_allocator, std::span<const 
     RUVertexView result;
     if (!attributes.empty()) {
         result.attributes =
-            push_vertex_test_data(p_allocator, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexView::Attribute>();
+            push_vertex_test_data(p_alloc, attributes.size() * sizeof(attributes[0]), attributes.data()).force_cast<RUVertexView::Attribute>();
     }
     result.attribute_count = attributes.size();
     result.vertex_stride = p_stride;
@@ -117,8 +117,8 @@ ShaderMetadata make_vertex_shader_metadata(std::span<const ShaderMetadataTypeFie
     return metadata;
 }
 
-ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name,
-    std::string_view p_descriptor_type,
+ShaderMetadataTypeField make_desc_heap_field(std::string_view p_name,
+    std::string_view p_desc_type,
     int32_t p_offset,
     std::string_view p_resource_id = {},
     std::string_view p_access = {}) {
@@ -132,10 +132,10 @@ ShaderMetadataTypeField make_descriptor_heap_field(std::string_view p_name,
     field.binding.size = 8;
     field.binding.element_stride = 4;
     ShaderMetadataUserAttribute attribute;
-    attribute.name = "wbe_descriptor";
+    attribute.name = "wbe_desc";
     ShaderMetadataUserAttributeArgument argument;
     argument.kind = "string";
-    argument.string_value = p_descriptor_type;
+    argument.string_value = p_desc_type;
     attribute.arguments.push_back(argument);
     argument.string_value = p_resource_id.empty() ? p_name : p_resource_id;
     attribute.arguments.push_back(argument);
@@ -166,11 +166,11 @@ ShaderMetadataTypeField make_default_push_field(
     return field;
 }
 
-ShaderMetadata make_descriptor_heap_metadata(
+ShaderMetadata make_desc_heap_metadata(
     std::string_view p_stage, std::string_view p_entry_name, std::span<const ShaderMetadataTypeField> p_fields) {
     ShaderMetadata metadata;
     ShaderMetadataParameter push_data;
-    push_data.name = "descriptor_indices";
+    push_data.name = "di";
     push_data.binding.kind = "pushConstantBuffer";
     push_data.type.kind = "constantBuffer";
     push_data.type.fields.assign(p_fields.begin(), p_fields.end());
@@ -185,43 +185,43 @@ ShaderMetadata make_descriptor_heap_metadata(
 
 } // namespace
 
-TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescriptorHeapUint2Fields) {
+TEST(WBEShaderMetadataVKUtilsTest, CollectsExplicitDescHeapUint2Fields) {
     ShaderMetadataTypeField images;
     images.name = "images";
     images.type.kind = "struct";
     images.binding.kind = "uniform";
     images.binding.offset = 8;
     images.binding.size = 16;
-    images.fields.push_back(make_descriptor_heap_field("sampled", "sampled_image", 0));
-    images.fields.push_back(make_descriptor_heap_field("storage", "storage_image", 8));
+    images.fields.push_back(make_desc_heap_field("sampled", "sampled_image", 0));
+    images.fields.push_back(make_desc_heap_field("storage", "storage_image", 8));
     const std::array<ShaderMetadataTypeField, 5> fields{{
-        make_descriptor_heap_field("uniform", "uniform_buffer", 0),
+        make_desc_heap_field("uniform", "uniform_buffer", 0),
         images,
-        make_descriptor_heap_field("storage", "storage_buffer", 24),
-        make_descriptor_heap_field("sampler", "sampler", 32),
-        make_descriptor_heap_field("acceleration_structure", "acceleration_structure", 40),
+        make_desc_heap_field("storage", "storage_buffer", 24),
+        make_desc_heap_field("sampler", "sampler", 32),
+        make_desc_heap_field("acceleration_structure", "acceleration_structure", 40),
     }};
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", fields);
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     EXPECT_EQ(layout.size, 48U);
     EXPECT_EQ(layout.stage_flags, VK_SHADER_STAGE_COMPUTE_BIT);
     ASSERT_EQ(layout.fields.size(), 6U);
     EXPECT_EQ(layout.fields[0].field_path, "uniform");
-    EXPECT_EQ(layout.fields[0].type, ShaderDescriptorHeapTypeVK::UNIFORM_BUFFER);
+    EXPECT_EQ(layout.fields[0].type, ShaderDescHeapTypeVK::UNIFORM_BUFFER);
     EXPECT_EQ(layout.fields[0].resource_id, "uniform");
     EXPECT_EQ(layout.fields[0].offset, 0U);
     EXPECT_EQ(layout.fields[1].field_path, "images.sampled");
-    EXPECT_EQ(layout.fields[1].type, ShaderDescriptorHeapTypeVK::SAMPLED_IMAGE);
+    EXPECT_EQ(layout.fields[1].type, ShaderDescHeapTypeVK::SAMPLED_IMAGE);
     EXPECT_EQ(layout.fields[1].offset, 8U);
     EXPECT_EQ(layout.fields[2].field_path, "images.storage");
-    EXPECT_EQ(layout.fields[2].type, ShaderDescriptorHeapTypeVK::STORAGE_IMAGE);
+    EXPECT_EQ(layout.fields[2].type, ShaderDescHeapTypeVK::STORAGE_IMAGE);
     EXPECT_EQ(layout.fields[2].offset, 16U);
-    EXPECT_EQ(layout.fields[3].type, ShaderDescriptorHeapTypeVK::STORAGE_BUFFER);
-    EXPECT_EQ(layout.fields[4].type, ShaderDescriptorHeapTypeVK::SAMPLER);
+    EXPECT_EQ(layout.fields[3].type, ShaderDescHeapTypeVK::STORAGE_BUFFER);
+    EXPECT_EQ(layout.fields[4].type, ShaderDescHeapTypeVK::SAMPLER);
     EXPECT_EQ(layout.fields[5].field_path, "acceleration_structure");
-    EXPECT_EQ(layout.fields[5].type, ShaderDescriptorHeapTypeVK::ACCELERATION_STRUCTURE);
+    EXPECT_EQ(layout.fields[5].type, ShaderDescHeapTypeVK::ACCELERATION_STRUCTURE);
     EXPECT_EQ(layout.fields[5].offset, 40U);
 }
 
@@ -230,9 +230,9 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsRendererDefaultPushFields) {
         make_default_push_field("elapsed", "time", "float32", 0),
         make_default_push_field("frame_slot", "frame_slot", "uint32", 4),
     }};
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", fields);
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     EXPECT_EQ(layout.size, 8U);
     EXPECT_TRUE(layout.fields.empty());
@@ -252,9 +252,9 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsCustomPushConstantFields) {
         make_default_push_field("scale", "scale", "float32", 8),
         make_default_push_field("frame_slot", "frame_slot", "uint32", 12),
     }};
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", fields);
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     EXPECT_EQ(layout.size, 16U);
     ASSERT_EQ(layout.default_fields.size(), 4U);
@@ -273,43 +273,43 @@ TEST(WBEShaderMetadataVKUtilsTest, CollectsCustomPushConstantFields) {
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedRendererDefaultPushFields) {
     ShaderMetadataTypeField malformed = make_default_push_field("value", "custom", "float64", 0);
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "time", "uint32", 0);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "time", "bool", 0);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "frame_slot", "float32", 0);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "time", "float32", 0);
     malformed.user_attributes[0].arguments.clear();
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
     malformed = make_default_push_field("value", "time", "float32", 0);
     malformed.user_attributes.push_back(malformed.user_attributes[0]);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, RejectsOverlappingDescriptorAndDefaultPushFields) {
+TEST(WBEShaderMetadataVKUtilsTest, RejectsOverlappingDescAndDefaultPushFields) {
     const std::array<ShaderMetadataTypeField, 2> fields{{
-        make_descriptor_heap_field("descriptor", "uniform_buffer", 0),
+        make_desc_heap_field("desc", "uniform_buffer", 0),
         make_default_push_field("time", "time", "float32", 4),
     }};
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", fields);
 
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPaths) {
+TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescStructArraysIntoExplicitPaths) {
     ShaderMetadataTypeField lights;
     lights.name = "lights";
     lights.type.kind = "array";
@@ -318,11 +318,11 @@ TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPath
     lights.binding.offset = 8;
     lights.binding.size = 32;
     lights.binding.element_stride = 16;
-    lights.fields.push_back(make_descriptor_heap_field("info", "uniform_buffer", 0));
-    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 8));
-    ShaderMetadata metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&lights, 1));
+    lights.fields.push_back(make_desc_heap_field("info", "uniform_buffer", 0));
+    lights.fields.push_back(make_desc_heap_field("shadowmap", "sampled_image", 8));
+    ShaderMetadata metadata = make_desc_heap_metadata("fragment", "fragment_main", std::span(&lights, 1));
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "fragment", "fragment_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "fragment", "fragment_main");
 
     EXPECT_EQ(layout.size, 40U);
     ASSERT_EQ(layout.fields.size(), 4U);
@@ -336,14 +336,14 @@ TEST(WBEShaderMetadataVKUtilsTest, ExpandsDescriptorStructArraysIntoExplicitPath
     EXPECT_EQ(layout.fields[3].offset, 32U);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, ResolvesIndexedResourceIdsPerDescriptorStructArrayElement) {
+TEST(WBEShaderMetadataVKUtilsTest, ResolvesIndexedResourceIdsPerDescStructArrayElement) {
     ShaderMetadataTypeField shadow;
     shadow.name = "shadow";
     shadow.type.kind = "struct";
     shadow.binding.kind = "uniform";
     shadow.binding.offset = 8;
     shadow.binding.size = 8;
-    shadow.fields.push_back(make_descriptor_heap_field("moments", "sampled_image", 0, "shadow_moments[]"));
+    shadow.fields.push_back(make_desc_heap_field("moments", "sampled_image", 0, "shadow_moments[]"));
     ShaderMetadataTypeField lights;
     lights.name = "lights";
     lights.type.kind = "array";
@@ -352,12 +352,12 @@ TEST(WBEShaderMetadataVKUtilsTest, ResolvesIndexedResourceIdsPerDescriptorStruct
     lights.binding.offset = 0;
     lights.binding.size = 48;
     lights.binding.element_stride = 24;
-    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]"));
+    lights.fields.push_back(make_desc_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]"));
     lights.fields.push_back(shadow);
-    lights.fields.push_back(make_descriptor_heap_field("sampler", "sampler", 16, "shadow_sampler"));
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&lights, 1));
+    lights.fields.push_back(make_desc_heap_field("sampler", "sampler", 16, "shadow_sampler"));
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&lights, 1));
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     ASSERT_EQ(layout.fields.size(), 6U);
     EXPECT_EQ(layout.fields[0].resource_id, "shadowmap[0]");
@@ -371,11 +371,11 @@ TEST(WBEShaderMetadataVKUtilsTest, ResolvesIndexedResourceIdsPerDescriptorStruct
     EXPECT_EQ(layout.fields[5].resource_id, "shadow_sampler");
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdOutsideDescriptorStructArray) {
-    ShaderMetadataTypeField field = make_descriptor_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]");
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&field, 1));
+TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdOutsideDescStructArray) {
+    ShaderMetadataTypeField field = make_desc_heap_field("shadowmap", "sampled_image", 0, "shadowmap[]");
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&field, 1));
 
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdWithoutName) {
@@ -386,72 +386,72 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsIndexedResourceIdWithoutName) {
     lights.binding.kind = "uniform";
     lights.binding.size = 8;
     lights.binding.element_stride = 8;
-    lights.fields.push_back(make_descriptor_heap_field("shadowmap", "sampled_image", 0, "[]"));
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&lights, 1));
+    lights.fields.push_back(make_desc_heap_field("shadowmap", "sampled_image", 0, "[]"));
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&lights, 1));
 
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, ReturnsEmptyLayoutForDescriptorFreeEntryPoint) {
+TEST(WBEShaderMetadataVKUtilsTest, ReturnsEmptyLayoutForDescFreeEntryPoint) {
     ShaderMetadata metadata;
     ShaderMetadataEntryPoint entry_point;
     entry_point.name = "compute_main";
     entry_point.stage = "compute";
     metadata.entry_points.push_back(entry_point);
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     EXPECT_EQ(layout.size, 0U);
     EXPECT_EQ(layout.stage_flags, 0U);
     EXPECT_TRUE(layout.fields.empty());
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedDescriptorHeapFields) {
-    ShaderMetadataTypeField malformed = make_descriptor_heap_field("value", "sampled_image", 0);
+TEST(WBEShaderMetadataVKUtilsTest, RejectsMalformedDescHeapFields) {
+    ShaderMetadataTypeField malformed = make_desc_heap_field("value", "sampled_image", 0);
     malformed.type.element_count = 1;
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    malformed = make_descriptor_heap_field("value", "unknown", 0);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    malformed = make_desc_heap_field("value", "unknown", 0);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    malformed = make_descriptor_heap_field("value", "sampler", 4);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    malformed = make_desc_heap_field("value", "sampler", 4);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed = make_desc_heap_field("value", "sampler", 0);
     malformed.user_attributes[0].arguments.clear();
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed = make_desc_heap_field("value", "sampler", 0);
     malformed.user_attributes[0].arguments[1].string_value.clear();
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 
-    malformed = make_descriptor_heap_field("value", "sampler", 0);
+    malformed = make_desc_heap_field("value", "sampler", 0);
     malformed.user_attributes.push_back(malformed.user_attributes[0]);
-    metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&malformed, 1));
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsMultiplePushDataParameters) {
-    ShaderMetadataTypeField field = make_descriptor_heap_field("value", "uniform_buffer", 0);
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", std::span(&field, 1));
+    ShaderMetadataTypeField field = make_desc_heap_field("value", "uniform_buffer", 0);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", std::span(&field, 1));
     metadata.parameters.push_back(metadata.parameters[0]);
 
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
+    EXPECT_THROW(collect_shader_desc_heap_layout(metadata, "compute", "compute_main"), std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
-    ShaderMetadataTypeField uniform = make_descriptor_heap_field("uniform", "uniform_buffer", 0);
-    ShaderMetadata vertex_metadata = make_descriptor_heap_metadata("vertex", "vertex_main", std::span(&uniform, 1));
-    ShaderMetadata fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&uniform, 1));
-    ShaderMetadataTypeField sampler = make_descriptor_heap_field("sampler", "sampler", 8);
-    ShaderMetadata geometry_metadata = make_descriptor_heap_metadata("geometry", "geometry_main", std::span(&sampler, 1));
+TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescHeapLayouts) {
+    ShaderMetadataTypeField uniform = make_desc_heap_field("uniform", "uniform_buffer", 0);
+    ShaderMetadata vertex_metadata = make_desc_heap_metadata("vertex", "vertex_main", std::span(&uniform, 1));
+    ShaderMetadata fragment_metadata = make_desc_heap_metadata("fragment", "fragment_main", std::span(&uniform, 1));
+    ShaderMetadataTypeField sampler = make_desc_heap_field("sampler", "sampler", 8);
+    ShaderMetadata geometry_metadata = make_desc_heap_metadata("geometry", "geometry_main", std::span(&sampler, 1));
 
-    ShaderDescriptorHeapLayoutVK layout = collect_graphics_pipeline_descriptor_heap_layout(
+    ShaderDescHeapLayoutVK layout = collect_graphics_pipeline_desc_heap_layout(
         vertex_metadata, "vertex_main", &geometry_metadata, "geometry_main", fragment_metadata, "fragment_main");
 
     EXPECT_EQ(layout.size, 16U);
@@ -461,22 +461,22 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsDescriptorHeapLayouts) {
     EXPECT_EQ(layout.fields[1].field_path, "sampler");
 
     fragment_metadata.parameters[0].type.fields[0].type.element_count = 1;
-    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+    EXPECT_THROW(collect_graphics_pipeline_desc_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 
-    ShaderMetadataTypeField mismatched_resource = make_descriptor_heap_field("uniform", "uniform_buffer", 0, "other");
-    fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&mismatched_resource, 1));
-    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+    ShaderMetadataTypeField mismatched_resource = make_desc_heap_field("uniform", "uniform_buffer", 0, "other");
+    fragment_metadata = make_desc_heap_metadata("fragment", "fragment_main", std::span(&mismatched_resource, 1));
+    EXPECT_THROW(collect_graphics_pipeline_desc_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsRendererDefaultPushFields) {
     ShaderMetadataTypeField time = make_default_push_field("time", "time", "float32", 0);
-    ShaderMetadata vertex_metadata = make_descriptor_heap_metadata("vertex", "vertex_main", std::span(&time, 1));
-    ShaderMetadata fragment_metadata = make_descriptor_heap_metadata("fragment", "fragment_main", std::span(&time, 1));
-    ShaderMetadata geometry_metadata = make_descriptor_heap_metadata("geometry", "geometry_main", std::span(&time, 1));
+    ShaderMetadata vertex_metadata = make_desc_heap_metadata("vertex", "vertex_main", std::span(&time, 1));
+    ShaderMetadata fragment_metadata = make_desc_heap_metadata("fragment", "fragment_main", std::span(&time, 1));
+    ShaderMetadata geometry_metadata = make_desc_heap_metadata("geometry", "geometry_main", std::span(&time, 1));
 
-    ShaderDescriptorHeapLayoutVK layout = collect_graphics_pipeline_descriptor_heap_layout(
+    ShaderDescHeapLayoutVK layout = collect_graphics_pipeline_desc_heap_layout(
         vertex_metadata, "vertex_main", &geometry_metadata, "geometry_main", fragment_metadata, "fragment_main");
 
     EXPECT_EQ(layout.size, 4U);
@@ -484,17 +484,17 @@ TEST(WBEShaderMetadataVKUtilsTest, MergesGraphicsRendererDefaultPushFields) {
     EXPECT_EQ(layout.default_fields[0].value, ShaderDefaultPushValueVK::TIME);
 
     fragment_metadata.parameters[0].type.fields[0].type.scalar_type = "bool";
-    EXPECT_THROW(collect_graphics_pipeline_descriptor_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
+    EXPECT_THROW(collect_graphics_pipeline_desc_heap_layout(vertex_metadata, "vertex_main", nullptr, {}, fragment_metadata, "fragment_main"),
         std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, AllowsMultipleFieldsToUseOneResourceId) {
     const std::array<ShaderMetadataTypeField, 2> fields{{
-        make_descriptor_heap_field("first", "uniform_buffer", 0, "shared"),
-        make_descriptor_heap_field("second", "uniform_buffer", 8, "shared"),
+        make_desc_heap_field("first", "uniform_buffer", 0, "shared"),
+        make_desc_heap_field("second", "uniform_buffer", 8, "shared"),
     }};
-    ShaderDescriptorHeapLayoutVK layout =
-        collect_shader_descriptor_heap_layout(make_descriptor_heap_metadata("compute", "main", fields), "compute", "main");
+    ShaderDescHeapLayoutVK layout =
+        collect_shader_desc_heap_layout(make_desc_heap_metadata("compute", "main", fields), "compute", "main");
     ASSERT_EQ(layout.fields.size(), 2U);
     EXPECT_EQ(layout.fields[0].resource_id, "shared");
     EXPECT_EQ(layout.fields[1].resource_id, "shared");
@@ -524,11 +524,11 @@ TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat)
         {.resource_format = RUVertexAttributeFormat::UINT4, .kind = "vector", .scalar_type = "uint32", .component_count = 4, .size = 16, .vk_format = VK_FORMAT_R32G32B32A32_UINT},
     }};
     for (const FormatCase& format_case : cases) {
-        StackAllocator allocator(WBE_KI_B(8));
+        StackAlloc alloc(WBE_KI_B(8));
         const VertexAttributeTestSpec spec{
             .role = "value", .format = format_case.resource_format, .offset = 0, .size = format_case.size};
         RUVertexView vertex_data =
-            make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), format_case.size);
+            make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&spec, 1), format_case.size);
         const ShaderMetadataTypeField field =
             make_vertex_shader_field("value", "", 3, format_case.kind, format_case.scalar_type, format_case.component_count);
         ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&field, 1));
@@ -543,12 +543,12 @@ TEST(WBEShaderMetadataVKUtilsTest, BuildsEverySupportedDynamicVertexInputFormat)
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, MatchesShaderSubsetAndAllowsExtraResourceAttributes) {
-    StackAllocator allocator(WBE_KI_B(8));
+    StackAlloc alloc(WBE_KI_B(8));
     const std::array<VertexAttributeTestSpec, 2> specs{{
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
     }};
-    RUVertexView vertex_data = make_vertex_test_data(allocator, specs, 20);
+    RUVertexView vertex_data = make_vertex_test_data(alloc, specs, 20);
     const ShaderMetadataTypeField field = make_vertex_shader_field("input_position", "position", 5, "vector", "float32", 3);
     ShaderMetadata metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&field, 1));
 
@@ -561,9 +561,9 @@ TEST(WBEShaderMetadataVKUtilsTest, MatchesShaderSubsetAndAllowsExtraResourceAttr
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, FindsAnnotatedFieldsInNestedVertexStructs) {
-    StackAllocator allocator(WBE_KI_B(8));
+    StackAlloc alloc(WBE_KI_B(8));
     const VertexAttributeTestSpec spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
-    RUVertexView vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&spec, 1), 12);
+    RUVertexView vertex_data = make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&spec, 1), 12);
     ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 2, "vector", "float32", 3);
     ShaderMetadataTypeField nested;
     nested.name = "nested";
@@ -579,12 +579,12 @@ TEST(WBEShaderMetadataVKUtilsTest, FindsAnnotatedFieldsInNestedVertexStructs) {
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
-    StackAllocator allocator(WBE_KI_B(32));
+    StackAlloc alloc(WBE_KI_B(32));
     const std::array<VertexAttributeTestSpec, 2> specs{{
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "uv", .format = RUVertexAttributeFormat::FLOAT2, .offset = 12, .size = 8},
     }};
-    RUVertexView vertex_data = make_vertex_test_data(allocator, specs, 20);
+    RUVertexView vertex_data = make_vertex_test_data(alloc, specs, 20);
 
     ShaderMetadataTypeField missing = make_vertex_shader_field("missing", "missing", 0, "vector", "float32", 3);
     ShaderMetadata missing_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&missing, 1));
@@ -627,14 +627,14 @@ TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidVertexInputContracts) {
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12},
         {.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 12, .size = 12},
     }};
-    RUVertexView duplicate_resource = make_vertex_test_data(allocator, duplicate_specs, 24);
+    RUVertexView duplicate_resource = make_vertex_test_data(alloc, duplicate_specs, 24);
     ShaderMetadataTypeField position = make_vertex_shader_field("position", "", 0, "vector", "float32", 3);
     ShaderMetadata position_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&position, 1));
     EXPECT_THROW(build_vertex_input_description_vk(position_metadata, "vertex_main", single_binding(duplicate_resource)), std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, MatchesRolesAcrossVertexBindingsAndKeepsOnlyReadBindings) {
-    StackAllocator allocator(WBE_KI_B(16));
+    StackAlloc alloc(WBE_KI_B(16));
     const VertexAttributeTestSpec position_spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
     const VertexAttributeTestSpec color_spec{.role = "color", .format = RUVertexAttributeFormat::FLOAT4, .offset = 0, .size = 16};
     const std::array<VertexAttributeTestSpec, 2> joint_specs{{
@@ -642,9 +642,9 @@ TEST(WBEShaderMetadataVKUtilsTest, MatchesRolesAcrossVertexBindingsAndKeepsOnlyR
         {.role = "joint_binding_weights", .format = RUVertexAttributeFormat::FLOAT4, .offset = 16, .size = 16},
     }};
     const std::array<RUVertexView, 3> bindings{
-        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
-        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&color_spec, 1), 16),
-        make_vertex_test_data(allocator, joint_specs, 32),
+        make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
+        make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&color_spec, 1), 16),
+        make_vertex_test_data(alloc, joint_specs, 32),
     };
     // The shader reads the first and last bindings but not the color binding.
     const std::array<ShaderMetadataTypeField, 3> fields{{
@@ -674,47 +674,47 @@ TEST(WBEShaderMetadataVKUtilsTest, MatchesRolesAcrossVertexBindingsAndKeepsOnlyR
     EXPECT_EQ(description.attributes[2].offset, 16U);
 
     const std::array<RUVertexView, 2> duplicated_bindings{
-        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
-        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
+        make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
+        make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
     };
     ShaderMetadata position_metadata = make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&fields[1], 1));
     EXPECT_THROW(build_vertex_input_description_vk(position_metadata, "vertex_main", duplicated_bindings), std::runtime_error);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, BuildsEmptyStateForVertexlessEntry) {
-    StackAllocator allocator(WBE_KI_B(4));
-    RUVertexView vertex_data = make_vertex_test_data(allocator, {}, 0);
+    StackAlloc alloc(WBE_KI_B(4));
+    RUVertexView vertex_data = make_vertex_test_data(alloc, {}, 0);
     ShaderMetadata metadata = make_vertex_shader_metadata({});
     VertexInputDescriptionVK description = build_vertex_input_description_vk(metadata, "vertex_main", single_binding(vertex_data));
     EXPECT_TRUE(description.bindings.empty());
     EXPECT_TRUE(description.attributes.empty());
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, ReflectsDescriptorAccessFromTheOptionalThirdArgument) {
+TEST(WBEShaderMetadataVKUtilsTest, ReflectsDescAccessFromTheOptionalThirdArgument) {
     const std::array<ShaderMetadataTypeField, 6> fields{{
-        make_descriptor_heap_field("uniform", "uniform_buffer", 0),
-        make_descriptor_heap_field("storage_default", "storage_buffer", 8),
-        make_descriptor_heap_field("storage_read", "storage_buffer", 16, {}, "read"),
-        make_descriptor_heap_field("image_write", "storage_image", 24, {}, "write"),
-        make_descriptor_heap_field("image_read_write", "storage_image", 32, {}, "read_write"),
-        make_descriptor_heap_field("sampled_read", "sampled_image", 40, {}, "read"),
+        make_desc_heap_field("uniform", "uniform_buffer", 0),
+        make_desc_heap_field("storage_default", "storage_buffer", 8),
+        make_desc_heap_field("storage_read", "storage_buffer", 16, {}, "read"),
+        make_desc_heap_field("image_write", "storage_image", 24, {}, "write"),
+        make_desc_heap_field("image_read_write", "storage_image", 32, {}, "read_write"),
+        make_desc_heap_field("sampled_read", "sampled_image", 40, {}, "read"),
     }};
-    ShaderMetadata metadata = make_descriptor_heap_metadata("compute", "compute_main", fields);
+    ShaderMetadata metadata = make_desc_heap_metadata("compute", "compute_main", fields);
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(metadata, "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(metadata, "compute", "compute_main");
 
     ASSERT_EQ(layout.fields.size(), 6U);
-    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ);
-    EXPECT_EQ(layout.fields[1].access, ShaderDescriptorAccessVK::READ_WRITE);
-    EXPECT_EQ(layout.fields[2].access, ShaderDescriptorAccessVK::READ);
-    EXPECT_EQ(layout.fields[3].access, ShaderDescriptorAccessVK::WRITE);
-    EXPECT_EQ(layout.fields[4].access, ShaderDescriptorAccessVK::READ_WRITE);
-    EXPECT_EQ(layout.fields[5].access, ShaderDescriptorAccessVK::READ);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescAccessVK::READ);
+    EXPECT_EQ(layout.fields[1].access, ShaderDescAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[2].access, ShaderDescAccessVK::READ);
+    EXPECT_EQ(layout.fields[3].access, ShaderDescAccessVK::WRITE);
+    EXPECT_EQ(layout.fields[4].access, ShaderDescAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[5].access, ShaderDescAccessVK::READ);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, TreatsTheReflectedEmptyAccessDefaultAsOmitted) {
-    ShaderMetadataTypeField storage = make_descriptor_heap_field("storage", "storage_buffer", 0);
-    ShaderMetadataTypeField uniform = make_descriptor_heap_field("uniform", "uniform_buffer", 8);
+    ShaderMetadataTypeField storage = make_desc_heap_field("storage", "storage_buffer", 0);
+    ShaderMetadataTypeField uniform = make_desc_heap_field("uniform", "uniform_buffer", 8);
     for (ShaderMetadataTypeField* field : {&storage, &uniform}) {
         ShaderMetadataUserAttributeArgument empty_access;
         empty_access.kind = "string";
@@ -722,50 +722,50 @@ TEST(WBEShaderMetadataVKUtilsTest, TreatsTheReflectedEmptyAccessDefaultAsOmitted
     }
     const std::array<ShaderMetadataTypeField, 2> fields{{storage, uniform}};
 
-    ShaderDescriptorHeapLayoutVK layout = collect_shader_descriptor_heap_layout(
-        make_descriptor_heap_metadata("compute", "compute_main", fields), "compute", "compute_main");
+    ShaderDescHeapLayoutVK layout = collect_shader_desc_heap_layout(
+        make_desc_heap_metadata("compute", "compute_main", fields), "compute", "compute_main");
 
     ASSERT_EQ(layout.fields.size(), 2U);
-    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
-    EXPECT_EQ(layout.fields[1].access, ShaderDescriptorAccessVK::READ);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[1].access, ShaderDescAccessVK::READ);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidDescriptorAccess) {
-    const std::array<ShaderMetadataTypeField, 1> unknown{{make_descriptor_heap_field("storage", "storage_buffer", 0, {}, "modify")}};
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(
-                     make_descriptor_heap_metadata("compute", "compute_main", unknown), "compute", "compute_main"),
+TEST(WBEShaderMetadataVKUtilsTest, RejectsInvalidDescAccess) {
+    const std::array<ShaderMetadataTypeField, 1> unknown{{make_desc_heap_field("storage", "storage_buffer", 0, {}, "modify")}};
+    EXPECT_THROW(collect_shader_desc_heap_layout(
+                     make_desc_heap_metadata("compute", "compute_main", unknown), "compute", "compute_main"),
         std::runtime_error);
     const std::array<ShaderMetadataTypeField, 1> read_only_write{
-        {make_descriptor_heap_field("sampled", "sampled_image", 0, {}, "write")}};
-    EXPECT_THROW(collect_shader_descriptor_heap_layout(
-                     make_descriptor_heap_metadata("compute", "compute_main", read_only_write), "compute", "compute_main"),
+        {make_desc_heap_field("sampled", "sampled_image", 0, {}, "write")}};
+    EXPECT_THROW(collect_shader_desc_heap_layout(
+                     make_desc_heap_metadata("compute", "compute_main", read_only_write), "compute", "compute_main"),
         std::runtime_error);
 }
 
-TEST(WBEShaderMetadataVKUtilsTest, MergesDescriptorAccessesAcrossGraphicsStages) {
-    const std::array<ShaderMetadataTypeField, 1> vertex_fields{{make_descriptor_heap_field("state", "storage_buffer", 0, {}, "read")}};
+TEST(WBEShaderMetadataVKUtilsTest, MergesDescAccessesAcrossGraphicsStages) {
+    const std::array<ShaderMetadataTypeField, 1> vertex_fields{{make_desc_heap_field("state", "storage_buffer", 0, {}, "read")}};
     const std::array<ShaderMetadataTypeField, 1> fragment_fields{
-        {make_descriptor_heap_field("state", "storage_buffer", 0, {}, "write")}};
-    ShaderMetadata vertex = make_descriptor_heap_metadata("vertex", "vertex_main", vertex_fields);
-    ShaderMetadata fragment = make_descriptor_heap_metadata("fragment", "fragment_main", fragment_fields);
+        {make_desc_heap_field("state", "storage_buffer", 0, {}, "write")}};
+    ShaderMetadata vertex = make_desc_heap_metadata("vertex", "vertex_main", vertex_fields);
+    ShaderMetadata fragment = make_desc_heap_metadata("fragment", "fragment_main", fragment_fields);
 
-    ShaderDescriptorHeapLayoutVK layout =
-        collect_graphics_pipeline_descriptor_heap_layout(vertex, "vertex_main", nullptr, {}, fragment, "fragment_main");
+    ShaderDescHeapLayoutVK layout =
+        collect_graphics_pipeline_desc_heap_layout(vertex, "vertex_main", nullptr, {}, fragment, "fragment_main");
 
     ASSERT_EQ(layout.fields.size(), 1U);
-    EXPECT_EQ(layout.fields[0].access, ShaderDescriptorAccessVK::READ_WRITE);
+    EXPECT_EQ(layout.fields[0].access, ShaderDescAccessVK::READ_WRITE);
 }
 
 TEST(WBEShaderMetadataVKUtilsTest, VertexInputRequirementMatchesLikeTheShaderMetadata) {
-    StackAllocator allocator(WBE_KI_B(16));
+    StackAlloc alloc(WBE_KI_B(16));
     const VertexAttributeTestSpec position_spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
     const std::array<VertexAttributeTestSpec, 2> joint_specs{{
         {.role = "joint_binding_ids", .format = RUVertexAttributeFormat::INT4, .offset = 0, .size = 16},
         {.role = "joint_binding_weights", .format = RUVertexAttributeFormat::FLOAT4, .offset = 16, .size = 16},
     }};
     const std::array<RUVertexView, 2> bindings{
-        make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
-        make_vertex_test_data(allocator, joint_specs, 32),
+        make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12),
+        make_vertex_test_data(alloc, joint_specs, 32),
     };
     const std::array<ShaderMetadataTypeField, 2> fields{{
         make_vertex_shader_field("weights", "joint_binding_weights", 1, "vector", "float32", 4),
@@ -812,9 +812,9 @@ TEST(WBEShaderMetadataVKUtilsTest, VertexInputRequirementSeparatesShaderAndMeshE
                      make_vertex_shader_metadata(std::span<const ShaderMetadataTypeField>(&unsupported, 1)), "vertex_main"),
         std::runtime_error);
 
-    StackAllocator allocator(WBE_KI_B(8));
+    StackAlloc alloc(WBE_KI_B(8));
     const VertexAttributeTestSpec position_spec{.role = "position", .format = RUVertexAttributeFormat::FLOAT3, .offset = 0, .size = 12};
-    const RUVertexView vertex_data = make_vertex_test_data(allocator, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12);
+    const RUVertexView vertex_data = make_vertex_test_data(alloc, std::span<const VertexAttributeTestSpec>(&position_spec, 1), 12);
     VertexInputRequirement missing;
     missing.attributes.push_back(VertexInputRequirement::Attribute{.role = ShaderRole("uv"), .format = RUVertexAttributeFormat::FLOAT2, .location = 0});
     EXPECT_THROW((void)build_vertex_input_description_vk(missing, single_binding(vertex_data)), std::runtime_error);

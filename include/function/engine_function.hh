@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_ENGINE_FUNCTION_HH
 #define WBE_FILE_ENGINE_FUNCTION_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/unique.hh"
 #include "function/event/event_manager.hh"
 #include "function/game_config/game_config.hh"

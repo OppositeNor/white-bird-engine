@@ -1,0 +1,193 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "core/alloc/heap_alloc_pool.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/memory_chunk.hh"
+#include "core/logging/log.hh"
+#include "utils/defs.hh"
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <format>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+namespace WhiteBirdEngine {
+
+HeapAllocPool::~HeapAllocPool() {
+    if (!is_empty()) {
+        stdout_log(WBE_CHANNEL_GLOBAL)->warning("HeapAllocPool not empty during destruction.");
+    }
+    mem_chunk = nullptr;
+}
+
+HeapAllocPool::HeapAllocPool(size_t p_size) : HeapAllocPool(MemoryChunk(p_size), 0, p_size) {
+}
+
+HeapAllocPool::HeapAllocPool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+    : memory_chunk(std::move(p_memory_chunk)), size(p_size) {
+    if (p_size > MAX_TOTAL_SIZE) {
+        throw std::runtime_error(std::format("Failed to create pool: size: {} exceeds maximum: {}.", p_size, MAX_TOTAL_SIZE));
+    }
+    mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
+    idle_list_head = std::make_unique<IdleListNode>();
+    idle_list_head->size = p_size;
+    idle_list_head->next = nullptr;
+    idle_list_head->mem_start = mem_chunk;
+    idle_chunks_count = 1;
+}
+
+MemID HeapAllocPool::allocate(size_t p_size) {
+    if (p_size == 0) {
+        return MEM_NULL;
+    }
+    std::unique_ptr<IdleListNode>* valid_idle_node = &idle_list_head;
+    p_size += HEADER_SIZE;
+    while (*valid_idle_node != nullptr) {
+        if ((*valid_idle_node)->size >= p_size) {
+            void* result = acquire_memory(*valid_idle_node, p_size);
+            *reinterpret_cast<Header*>(result) = p_size;
+            max_data_loc_tracker = std::max(
+                max_data_loc_tracker, reinterpret_cast<uintptr_t>(result) + p_size - reinterpret_cast<uintptr_t>(mem_chunk));
+            return reinterpret_cast<MemID>(result) + HEADER_SIZE;
+        }
+        if ((*valid_idle_node)->next == nullptr) {
+            break;
+        }
+        valid_idle_node = &((*valid_idle_node)->next);
+    }
+    throw std::runtime_error(std::format("Failed to allocate memory: not enough space for memory pool.\n"
+                                         "Trying to allocate: {} bytes.",
+        p_size));
+}
+
+void HeapAllocPool::deallocate(MemID p_mem) {
+    char* data_loc = reinterpret_cast<char*>(p_mem - HEADER_SIZE);
+    size_t data_size = get_allocated_data_size(p_mem);
+    if (idle_list_head == nullptr || idle_list_head->mem_start > data_loc) {
+        insert_free_memory(nullptr, data_loc, data_size);
+        return;
+    }
+    IdleListNode* insert_pos = get_idle_node_before(data_loc).get();
+    insert_free_memory(insert_pos, data_loc, data_size);
+}
+
+void* HeapAllocPool::acquire_memory(std::unique_ptr<IdleListNode>& p_node, size_t p_mem_size) {
+    WBE_DEBUG_ASSERT(p_node->size >= p_mem_size);
+    p_node->size -= p_mem_size;
+    void* mem_start = p_node->mem_start;
+    if (p_node->size == 0) {
+        --idle_chunks_count;
+        if (p_node->next == nullptr) {
+            p_node = nullptr;
+            return mem_start;
+        }
+        p_node->size = p_node->next->size;
+        p_node->mem_start = p_node->next->mem_start;
+        p_node->next = std::move(p_node->next->next);
+    } else {
+        p_node->mem_start += p_mem_size;
+    }
+    return mem_start;
+}
+
+void HeapAllocPool::insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size) {
+    if (idle_list_head == nullptr) {
+        idle_list_head = std::make_unique<IdleListNode>();
+        ++idle_chunks_count;
+        idle_list_head->mem_start = p_insert_start;
+        idle_list_head->size = p_insert_size;
+        return;
+    }
+
+    std::unique_ptr<IdleListNode> insert_node = std::make_unique<IdleListNode>();
+    ++idle_chunks_count;
+    insert_node->mem_start = p_insert_start;
+    insert_node->size = p_insert_size;
+    if (p_node_before_insert == nullptr) {
+        insert_node->next = std::move(idle_list_head);
+        idle_list_head = std::move(insert_node);
+        combine_idle_with_next(idle_list_head.get());
+        return;
+    }
+
+    insert_node->next = std::move(p_node_before_insert->next);
+    p_node_before_insert->next = std::move(insert_node);
+    if (combine_idle_with_next(p_node_before_insert)) {
+        combine_idle_with_next(p_node_before_insert);
+    } else if (p_node_before_insert->next != nullptr) {
+        combine_idle_with_next(p_node_before_insert->next.get());
+    }
+}
+
+bool HeapAllocPool::combine_idle_with_next(IdleListNode* p_node) {
+    WBE_DEBUG_ASSERT(p_node != nullptr);
+    if (p_node->next == nullptr || p_node->mem_start + p_node->size != p_node->next->mem_start) {
+        return false;
+    }
+    p_node->size += p_node->next->size;
+    p_node->next = std::move(p_node->next->next);
+    --idle_chunks_count;
+    return true;
+}
+
+std::unique_ptr<HeapAllocPool::IdleListNode>& HeapAllocPool::get_idle_node_before(void* p_loc) {
+    std::unique_ptr<IdleListNode>* curr = &idle_list_head;
+    while (curr != nullptr) {
+        if ((*curr)->next == nullptr || (*curr)->next->mem_start > p_loc) {
+            return *curr;
+        }
+        curr = &((*curr)->next);
+    }
+    throw std::runtime_error("Unreachable code.");
+}
+
+size_t HeapAllocPool::get_remain_size() const {
+    IdleListNode* node = idle_list_head.get();
+    size_t total = 0;
+    while (node != nullptr) {
+        total += node->size;
+        node = node->next.get();
+    }
+    return total;
+}
+
+HeapAllocPool::operator std::string() const {
+    std::stringstream ss;
+    ss << "{";
+    ss << R"("type":"HeapAllocPool",)";
+    ss << "\"total_size\":" << get_total_size() << ",";
+    ss << "\"free_chunk_layout\":[";
+    IdleListNode* node = idle_list_head.get();
+    bool first = true;
+    while (node != nullptr) {
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+        ss << "{"
+           << "\"begin\":" << (node->mem_start - mem_chunk) << ","
+           << "\"size\":" << node->size << "}";
+        node = node->next.get();
+    }
+    ss << "]";
+    ss << "}";
+    return ss.str();
+}
+
+} // namespace WhiteBirdEngine

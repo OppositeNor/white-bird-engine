@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_SCENE_MANAGER_HH
 #define WBE_FILE_SCENE_MANAGER_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "i_scene_manager.hh"
@@ -44,7 +44,7 @@ public:
      *
      * @param p_scene_map Strong scene references indexed by scene id; ownership is transferred to the manager.
      */
-    SceneManager(Map<std::string, Ref<Scene>, HeapAllocatorGlobal> p_scene_map);
+    SceneManager(Map<std::string, Ref<Scene>, HeapAllocGlobal> p_scene_map);
 
     virtual Ref<Scene> get_current_scene() override;
 
@@ -58,8 +58,8 @@ public:
     virtual void change_scene(std::string_view p_scene_id) override;
 
 private:
-    Map<std::string, Ref<Scene>, HeapAllocatorGlobal> scene_map;
-    String<HeapAllocatorGlobal> current_scene_id;
+    Map<std::string, Ref<Scene>, HeapAllocGlobal> scene_map;
+    String<HeapAllocGlobal> current_scene_id;
     Ref<Scene> current_scene;
 };
 

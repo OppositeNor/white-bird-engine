@@ -15,13 +15,13 @@
 #ifndef WBE_FILE_RESOURCE_POPULATOR_TEST_HH
 #define WBE_FILE_RESOURCE_POPULATOR_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
 #include "core/data/data_value.hh"
 #include "core/engine_core.hh"
 #include "core/parser/parser_json.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_vk_resource_unit_loader.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/rend_vk_resource_unit_loader.hh"
 #include "function/scene/scene_resource_unit.hh"
 #include "function/scene/scene_resource_unit_loader.hh"
 #include "glm/ext/matrix_transform.hpp"
@@ -140,32 +140,32 @@ protected:
     }
 
     std::unique_ptr<MockResourceChunk> create_submesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_mesh) {
+        WBE::StackAlloc& p_stack_alloc, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_mesh) {
         return MockResourceChunk::Builder()
-            .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+            .set_push_data_callback([&p_stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
                     return WBE::MEM_NULL;
                 }
-                WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                std::memcpy(p_stack_allocator.get(mem_id), p_data, p_size);
-                return WBE::RefRes<char>(mem_id, &p_stack_allocator);
+                WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                std::memcpy(p_stack_alloc.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &p_stack_alloc);
             })
             .set_reserve_res_unit_storage_callback(
-                [&p_stack_allocator, &p_captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
+                [&p_stack_alloc, &p_captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &p_stack_alloc);
                     if (p_id == "loaded_mesh") {
                         p_captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
-            .set_create_ref_to_callback([&p_stack_allocator](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+            .set_create_ref_to_callback([&p_stack_alloc](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
                 if (p_key != "loaded_geometry") {
                     return;
                 }
                 constexpr size_t TEST_BINARY_SIZE = 256;
-                WBE::MemID data_mem_id = p_stack_allocator.allocate(TEST_BINARY_SIZE);
-                auto* data = static_cast<char*>(p_stack_allocator.get(data_mem_id));
+                WBE::MemID data_mem_id = p_stack_alloc.allocate(TEST_BINARY_SIZE);
+                auto* data = static_cast<char*>(p_stack_alloc.get(data_mem_id));
                 std::memset(data, 0, TEST_BINARY_SIZE);
                 const std::array<float, 15> vertices{
                     0.0F,
@@ -188,12 +188,12 @@ protected:
                 std::memcpy(data, vertices.data(), sizeof(vertices));
                 std::memcpy(data + sizeof(vertices), indices.data(), sizeof(indices));
 
-                WBE::MemID binary_mem_id = p_stack_allocator.allocate(sizeof(WBE::RUBinary));
-                auto* binary = static_cast<WBE::RUBinary*>(p_stack_allocator.get(binary_mem_id));
+                WBE::MemID binary_mem_id = p_stack_alloc.allocate(sizeof(WBE::RUBinary));
+                auto* binary = static_cast<WBE::RUBinary*>(p_stack_alloc.get(binary_mem_id));
                 std::construct_at(binary);
-                binary->data = WBE::RefRes<char>(data_mem_id, &p_stack_allocator);
+                binary->data = WBE::RefRes<char>(data_mem_id, &p_stack_alloc);
                 binary->size = TEST_BINARY_SIZE;
-                p_assign_ref(WBE::RefRes<char>(binary_mem_id, &p_stack_allocator));
+                p_assign_ref(WBE::RefRes<char>(binary_mem_id, &p_stack_alloc));
             })
             .build(p_stream);
     }
@@ -202,7 +202,7 @@ protected:
     WBE::RUAudio load_audio(const WBE::RUSchemaAudio& p_scheme, std::vector<char>& p_data) {
         WBE::ResourceUnitLoaderAudio loader;
         std::stringstream stream;
-        WBE::StackAllocator stack_allocator(1024);
+        WBE::StackAlloc stack_alloc(1024);
         WBE::RefRes<WBE::RUAudio> captured_audio = WBE::MEM_NULL;
         auto res_chunk = MockResourceChunk::Builder()
                              .set_push_data_callback([&p_data](size_t p_size, const void* p_res) -> WBE::RefRes<char> {
@@ -211,10 +211,10 @@ protected:
                                  return WBE::MEM_NULL;
                              })
                              .set_reserve_res_unit_storage_callback(
-                                 [&captured_audio, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 [&captured_audio, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                      EXPECT_EQ(p_size, sizeof(WBE::RUAudio));
-                                     WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                     captured_audio = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUAudio>();
+                                     WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                     captured_audio = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUAudio>();
                                      return captured_audio.force_cast<char>();
                                  })
                              .build(stream);
@@ -281,11 +281,11 @@ protected:
     }
 
     template <typename T>
-    WBE::RefRes<T> push_test_object(WBE::StackAllocator& p_stack_allocator, const T& p_value) {
-        WBE::MemID mem_id = p_stack_allocator.allocate(sizeof(T));
-        auto* object = static_cast<T*>(p_stack_allocator.get(mem_id));
+    WBE::RefRes<T> push_test_object(WBE::StackAlloc& p_stack_alloc, const T& p_value) {
+        WBE::MemID mem_id = p_stack_alloc.allocate(sizeof(T));
+        auto* object = static_cast<T*>(p_stack_alloc.get(mem_id));
         std::construct_at(object, p_value);
-        return WBE::RefRes<T>(mem_id, &p_stack_allocator);
+        return WBE::RefRes<T>(mem_id, &p_stack_alloc);
     }
 
     // Pack joints in the skeleton binary layout after p_prefix_size zero bytes.
@@ -300,25 +300,25 @@ protected:
         return result;
     }
 
-    WBE::RefRes<WBE::RUBinary> push_test_binary(WBE::StackAllocator& p_stack_allocator, const std::vector<char>& p_data) {
-        WBE::MemID data_mem_id = p_stack_allocator.allocate(p_data.size());
-        std::memcpy(p_stack_allocator.get(data_mem_id), p_data.data(), p_data.size());
+    WBE::RefRes<WBE::RUBinary> push_test_binary(WBE::StackAlloc& p_stack_alloc, const std::vector<char>& p_data) {
+        WBE::MemID data_mem_id = p_stack_alloc.allocate(p_data.size());
+        std::memcpy(p_stack_alloc.get(data_mem_id), p_data.data(), p_data.size());
         WBE::RUBinary binary;
-        binary.data = WBE::RefRes<char>(data_mem_id, &p_stack_allocator);
+        binary.data = WBE::RefRes<char>(data_mem_id, &p_stack_alloc);
         binary.size = p_data.size();
-        return push_test_object(p_stack_allocator, binary);
+        return push_test_object(p_stack_alloc, binary);
     }
 
     // Load a skeleton scheme whose joints reference p_binary under the id "loaded_skeleton_joints".
     WBE::RefRes<WBE::RUSkeleton> load_test_skeleton(
-        WBE::StackAllocator& p_stack_allocator, const WBE::RUSchemaSkeleton& p_scheme, WBE::RefRes<WBE::RUBinary> p_binary) {
+        WBE::StackAlloc& p_stack_alloc, const WBE::RUSchemaSkeleton& p_scheme, WBE::RefRes<WBE::RUBinary> p_binary) {
         std::stringstream stream;
         WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
         auto resource_chunk =
             MockResourceChunk::Builder()
                 .set_reserve_res_unit_storage_callback(
-                    [&p_stack_allocator, &captured_skeleton](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                        WBE::RefRes<char> resource(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+                    [&p_stack_alloc, &captured_skeleton](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                        WBE::RefRes<char> resource(p_stack_alloc.allocate(p_size), &p_stack_alloc);
                         captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
                         return resource;
                     })
@@ -382,10 +382,10 @@ protected:
     }
 
     // Load a texture in place; the caller destroys it with std::destroy_at.
-    static WBE::RefRes<WBE::RUTexture> push_test_texture(WBE::StackAllocator& p_stack_allocator, const WBE::Path& p_path) {
-        WBE::MemID mem_id = p_stack_allocator.allocate(sizeof(WBE::RUTexture));
-        std::construct_at(static_cast<WBE::RUTexture*>(p_stack_allocator.get(mem_id)), p_path.string());
-        return WBE::RefRes<WBE::RUTexture>(mem_id, &p_stack_allocator);
+    static WBE::RefRes<WBE::RUTexture> push_test_texture(WBE::StackAlloc& p_stack_alloc, const WBE::Path& p_path) {
+        WBE::MemID mem_id = p_stack_alloc.allocate(sizeof(WBE::RUTexture));
+        std::construct_at(static_cast<WBE::RUTexture*>(p_stack_alloc.get(mem_id)), p_path.string());
+        return WBE::RefRes<WBE::RUTexture>(mem_id, &p_stack_alloc);
     }
 
     static WBE::RUSchemaSDF make_sdf_scheme() {
@@ -400,14 +400,14 @@ protected:
 
     // Load an SDF scheme whose texture_id resolves to p_texture.
     WBE::RefRes<WBE::RUSDF> load_test_sdf(
-        WBE::StackAllocator& p_stack_allocator, const WBE::RUSchemaSDF& p_scheme, WBE::RefRes<WBE::RUTexture> p_texture) {
+        WBE::StackAlloc& p_stack_alloc, const WBE::RUSchemaSDF& p_scheme, WBE::RefRes<WBE::RUTexture> p_texture) {
         std::stringstream stream;
         WBE::RefRes<WBE::RUSDF> captured_sdf = WBE::MEM_NULL;
         auto resource_chunk =
             MockResourceChunk::Builder()
                 .set_reserve_res_unit_storage_callback(
-                    [&p_stack_allocator, &captured_sdf](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                        WBE::RefRes<char> resource(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+                    [&p_stack_alloc, &captured_sdf](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                        WBE::RefRes<char> resource(p_stack_alloc.allocate(p_size), &p_stack_alloc);
                         captured_sdf = resource.force_cast<WBE::RUSDF>();
                         return resource;
                     })
@@ -423,84 +423,84 @@ protected:
     }
 
     std::unique_ptr<MockResourceChunk> create_static_mesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
+        WBE::StackAlloc& p_stack_alloc, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
         return MockResourceChunk::Builder()
-            .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+            .set_push_data_callback([&p_stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
                     return WBE::MEM_NULL;
                 }
-                WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                std::memcpy(p_stack_allocator.get(mem_id), p_data, p_size);
-                return WBE::RefRes<char>(mem_id, &p_stack_allocator);
+                WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                std::memcpy(p_stack_alloc.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &p_stack_alloc);
             })
             .set_reserve_res_unit_storage_callback(
-                [&p_stack_allocator, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
+                [&p_stack_alloc, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &p_stack_alloc);
                     if (p_id == "loaded_static_mesh") {
                         p_captured_set = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
             .set_create_ref_to_callback(
-                [this, &p_stack_allocator](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                [this, &p_stack_alloc](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
                     if (p_key == "loaded_geometry") {
                         std::array<uint8_t, 64> data{};
                         WBE::RUBinary binary;
-                        binary.data = push_test_object(p_stack_allocator, data).force_cast<char>();
+                        binary.data = push_test_object(p_stack_alloc, data).force_cast<char>();
                         binary.size = data.size();
-                        p_assign_ref(push_test_object(p_stack_allocator, binary).force_cast<char>());
+                        p_assign_ref(push_test_object(p_stack_alloc, binary).force_cast<char>());
                         return;
                     }
                     if (p_key == "loaded_material") {
                         WBE::RUMaterial material;
-                        p_assign_ref(push_test_object(p_stack_allocator, material).force_cast<char>());
+                        p_assign_ref(push_test_object(p_stack_alloc, material).force_cast<char>());
                     }
                 })
             .build(p_stream);
     }
 
     std::unique_ptr<MockResourceChunk> create_split_static_mesh_test_chunk(
-        WBE::StackAllocator& p_stack_allocator, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
+        WBE::StackAlloc& p_stack_alloc, std::ostream& p_stream, WBE::RefRes<WBE::RUMesh3D>& p_captured_set) {
         return MockResourceChunk::Builder()
-            .set_push_data_callback([&p_stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+            .set_push_data_callback([&p_stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
                 if (p_size == 0) {
                     return WBE::MEM_NULL;
                 }
-                WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                std::memcpy(p_stack_allocator.get(mem_id), p_data, p_size);
-                return WBE::RefRes<char>(mem_id, &p_stack_allocator);
+                WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                std::memcpy(p_stack_alloc.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &p_stack_alloc);
             })
             .set_reserve_res_unit_storage_callback(
-                [&p_stack_allocator, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = p_stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &p_stack_allocator);
+                [&p_stack_alloc, &p_captured_set](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = p_stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &p_stack_alloc);
                     if (p_id == "loaded_static_mesh") {
                         p_captured_set = resource.force_cast<WBE::RUMesh3D>();
                     }
                     return resource;
                 })
             .set_create_ref_to_callback(
-                [this, &p_stack_allocator](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
+                [this, &p_stack_alloc](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
                     if (p_key == "loaded_vertices") {
                         std::array<uint8_t, sizeof(float) * 9> data{};
                         WBE::RUBinary binary;
-                        binary.data = push_test_object(p_stack_allocator, data).force_cast<char>();
+                        binary.data = push_test_object(p_stack_alloc, data).force_cast<char>();
                         binary.size = data.size();
-                        p_assign_ref(push_test_object(p_stack_allocator, binary).force_cast<char>());
+                        p_assign_ref(push_test_object(p_stack_alloc, binary).force_cast<char>());
                         return;
                     }
                     if (p_key == "loaded_indices") {
                         std::array<uint8_t, sizeof(uint32_t) * 3> data{};
                         WBE::RUBinary binary;
-                        binary.data = push_test_object(p_stack_allocator, data).force_cast<char>();
+                        binary.data = push_test_object(p_stack_alloc, data).force_cast<char>();
                         binary.size = data.size();
-                        p_assign_ref(push_test_object(p_stack_allocator, binary).force_cast<char>());
+                        p_assign_ref(push_test_object(p_stack_alloc, binary).force_cast<char>());
                         return;
                     }
                     if (p_key == "loaded_material") {
                         WBE::RUMaterial material;
-                        p_assign_ref(push_test_object(p_stack_allocator, material).force_cast<char>());
+                        p_assign_ref(push_test_object(p_stack_alloc, material).force_cast<char>());
                     }
                 })
             .build(p_stream);
@@ -549,10 +549,10 @@ Emoji 测试: 😃🚀✨🌍
 
 class RefResHolder {
 public:
-    RefResHolder() : mem_id(WBE::global_allocator()->allocate(WBE_KI_B(4))), res(mem_id, WBE::global_allocator()) {
+    RefResHolder() : mem_id(WBE::global_alloc()->allocate(WBE_KI_B(4))), res(mem_id, WBE::global_alloc()) {
     }
     ~RefResHolder() {
-        WBE::global_allocator()->deallocate(mem_id);
+        WBE::global_alloc()->deallocate(mem_id);
     }
     RefResHolder(const RefResHolder&) = delete;
     RefResHolder(RefResHolder&&) = delete;
@@ -632,15 +632,15 @@ TEST_F(ResourcePopulatorTest, SupportedResourceTypesUseStaticReadOnlyStorage) {
 
 TEST_F(ResourcePopulatorTest, RayTracingPipelinePopulatesFixedStagesAndOptionalEntries) {
     WBE::ResourceUnitLoaderRayTracingPipeline loader;
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::stringstream stream;
     WBE::RefRes<WBE::RURayTracingPipeline> captured_pipeline;
     std::vector<std::string> created_ref_keys;
 
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
     WBE::RUShader raygen_shader;
     WBE::RUShader miss_shader;
@@ -657,9 +657,9 @@ TEST_F(ResourcePopulatorTest, RayTracingPipelinePopulatesFixedStagesAndOptionalE
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&captured_pipeline, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                             [&captured_pipeline, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 WBE::RefRes<char> saved_resource(mem_id, &stack_alloc);
                                  captured_pipeline = saved_resource.force_cast<WBE::RURayTracingPipeline>();
                                  return saved_resource;
                              }))
@@ -721,10 +721,10 @@ TEST_F(ResourcePopulatorTest, TextureResourceOwnershipContract) {
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshGeometryViewsReferenceSharedBinaryData) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
     WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
     WBE::ResourceUnitLoaderMesh loader;
 
@@ -833,10 +833,10 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
     WBE::ResourceUnitLoaderMesh loader;
 
     for (const FormatCase& format_case : format_cases) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
         scheme.vertex_bindings[0].binary.start = format_case.section_start;
         scheme.vertex_bindings[0].binary.size = format_case.element_size * 3;
@@ -897,10 +897,10 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometrySupportsEveryVertexAttributeFormat)
 TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
     WBE::ResourceUnitLoaderMesh loader;
     auto expect_invalid = [this, &loader](WBE::RUSchemaVertexView p_vertices, WBE::RUSchemaIndexView p_indices) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
         scheme.vertex_bindings = {std::move(p_vertices)};
         scheme.indices = std::move(p_indices);
@@ -996,10 +996,10 @@ TEST_F(ResourcePopulatorTest, SubmeshGeometryRejectsInvalidLayouts) {
 }
 
 TEST_F(ResourcePopulatorTest, SubmeshAABBLoadsIntoSubmesh) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
     WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
     scheme.aabb = {.center = {1.5F, -2.0F, 3.25F}, .width = 4.0F, .height = 5.5F, .depth = 6.5F};
     WBE::ResourceUnitLoaderMesh loader;
@@ -1019,10 +1019,10 @@ TEST_F(ResourcePopulatorTest, SubmeshAABBRejectsInvalidCenter) {
     WBE::ResourceUnitLoaderMesh loader;
     for (const std::vector<float>& center :
         {std::vector<float>{}, std::vector<float>{1.0F, 2.0F}, std::vector<float>{1.0F, 2.0F, 3.0F, 4.0F}}) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D scheme = make_triangle_submesh_scheme();
         scheme.aabb.center = center;
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(scheme)), std::runtime_error);
@@ -1040,10 +1040,10 @@ TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {
         },
     };
     for (const auto& [schema_category, category] : categories) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_static_mesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_static_mesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaMesh3D scheme;
         scheme.id = "loaded_static_mesh";
         scheme.type = "mesh";
@@ -1091,10 +1091,10 @@ TEST_F(ResourcePopulatorTest, MeshLoadsEachCategorySubmeshViewsAndInstances) {
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsSeparateVertexAndIndexBinaries) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-    auto resource_chunk = create_split_static_mesh_test_chunk(stack_allocator, stream, captured_mesh);
+    auto resource_chunk = create_split_static_mesh_test_chunk(stack_alloc, stream, captured_mesh);
     WBE::RUSchemaMesh3D scheme;
     scheme.id = "loaded_static_mesh";
     scheme.type = "mesh";
@@ -1117,14 +1117,14 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSeparateVertexAndIndexBinaries) {
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsEmptyCategories) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
     auto resource_chunk = MockResourceChunk::Builder()
                               .set_reserve_res_unit_storage_callback(
-                                  [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                                  [&stack_alloc, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                      WBE::RefRes<char> resource(mem_id, &stack_alloc);
                                       if (p_id == "empty_mesh") {
                                           captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                                       }
@@ -1149,7 +1149,7 @@ TEST_F(ResourcePopulatorTest, MeshLoadsEmptyCategories) {
 }
 
 TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUSkeleton> captured_skeleton = WBE::MEM_NULL;
     std::vector<std::string> created_ref_keys;
@@ -1162,13 +1162,13 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
         {.parent_index = 0, .bind_local_transform = glm::translate(glm::mat4(1.0F), glm::vec3(3.0F, 0.0F, 0.0F))},
     };
     constexpr size_t JOINTS_START = 8;
-    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_binary(stack_allocator, encode_skeleton_joints(source_joints, JOINTS_START));
+    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_binary(stack_alloc, encode_skeleton_joints(source_joints, JOINTS_START));
     auto resource_chunk =
         MockResourceChunk::Builder()
             .set_reserve_res_unit_storage_callback(
-                [&stack_allocator, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                [&stack_alloc, &captured_skeleton](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_alloc);
                     if (p_id == "loaded_skeleton") {
                         captured_skeleton = resource.force_cast<WBE::RUSkeleton>();
                     }
@@ -1215,11 +1215,11 @@ TEST_F(ResourcePopulatorTest, SkeletonLoadsJointTree) {
 TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointViews) {
     WBE::ResourceUnitLoaderSkeleton loader;
     auto expect_invalid = [&loader](const WBE::RUSchemaSkeleton& p_scheme) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         auto resource_chunk = MockResourceChunk::Builder()
-                                  .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) {
-                                      return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
+                                  .set_reserve_res_unit_storage_callback([&stack_alloc](std::string_view, size_t p_size) {
+                                      return WBE::RefRes<char>(stack_alloc.allocate(p_size), &stack_alloc);
                                   })
                                   .build(stream);
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, p_scheme), std::runtime_error);
@@ -1237,15 +1237,15 @@ TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointViews) {
 
 TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
     auto expect_invalid = [this](std::vector<int32_t> p_parent_indices, size_t p_invalid_joint_index) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::vector<WBE::RUSkeleton::Joint> joints;
         joints.reserve(p_parent_indices.size());
         for (int32_t parent_index : p_parent_indices) {
             joints.push_back({.parent_index = parent_index, .bind_local_transform = glm::mat4(1.0F)});
         }
-        WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_allocator, encode_skeleton_joints(joints, 0));
+        WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_alloc, encode_skeleton_joints(joints, 0));
         WBE::RefRes<WBE::RUSkeleton> skeleton =
-            load_test_skeleton(stack_allocator, make_skeleton_scheme(0, joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
+            load_test_skeleton(stack_alloc, make_skeleton_scheme(0, joints.size() * WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
         ASSERT_NE(skeleton, nullptr);
         for (size_t i = 0; i < p_invalid_joint_index; ++i) {
             EXPECT_NO_THROW(skeleton->get_joint(i));
@@ -1261,45 +1261,45 @@ TEST_F(ResourcePopulatorTest, SkeletonRejectsInvalidJointTrees) {
 }
 
 TEST_F(ResourcePopulatorTest, SkeletonRejectsJointRangeOutsideBinary) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     const std::vector<WBE::RUSkeleton::Joint> joints = {{.parent_index = -1, .bind_local_transform = glm::mat4(1.0F)}};
-    WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_allocator, encode_skeleton_joints(joints, 0));
+    WBE::RefRes<WBE::RUBinary> binary = push_test_binary(stack_alloc, encode_skeleton_joints(joints, 0));
 
     WBE::RefRes<WBE::RUSkeleton> overflowing_skeleton =
-        load_test_skeleton(stack_allocator, make_skeleton_scheme(4, WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
+        load_test_skeleton(stack_alloc, make_skeleton_scheme(4, WBE::RUSkeleton::JOINT_BYTE_SIZE), binary);
     ASSERT_NE(overflowing_skeleton, nullptr);
     EXPECT_THROW(overflowing_skeleton->get_joint(0), std::runtime_error);
 
     WBE::RefRes<WBE::RUSkeleton> unresolved_skeleton =
-        load_test_skeleton(stack_allocator, make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE), WBE::MEM_NULL);
+        load_test_skeleton(stack_alloc, make_skeleton_scheme(0, WBE::RUSkeleton::JOINT_BYTE_SIZE), WBE::MEM_NULL);
     ASSERT_NE(unresolved_skeleton, nullptr);
     EXPECT_THROW(unresolved_skeleton->get_joint(0), std::runtime_error);
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
     std::vector<std::string> created_ref_keys;
     WBE::RUSkeleton skeleton;
     skeleton.joint_count = 2;
-    WBE::RefRes<WBE::RUSkeleton> stored_skeleton = push_test_object(stack_allocator, skeleton);
+    WBE::RefRes<WBE::RUSkeleton> stored_skeleton = push_test_object(stack_alloc, skeleton);
     std::array<uint8_t, 256> binary_data{};
     WBE::RUBinary binary;
-    binary.data = push_test_object(stack_allocator, binary_data).force_cast<char>();
+    binary.data = push_test_object(stack_alloc, binary_data).force_cast<char>();
     binary.size = binary_data.size();
-    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_object(stack_allocator, binary);
+    WBE::RefRes<WBE::RUBinary> stored_binary = push_test_object(stack_alloc, binary);
     auto resource_chunk =
         MockResourceChunk::Builder()
-            .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                return WBE::RefRes<char>(mem_id, &stack_allocator);
+            .set_push_data_callback([&stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                std::memcpy(stack_alloc.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &stack_alloc);
             })
             .set_reserve_res_unit_storage_callback(
-                [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                [&stack_alloc, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_alloc);
                     if (p_id == "loaded_mesh") {
                         captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                     }
@@ -1347,10 +1347,10 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSkeletonReferenceAndJointBindings) {
 }
 
 TEST_F(ResourcePopulatorTest, MeshWithoutSkeletonHasNoSkeletonOrJointBindings) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
     WBE::ResourceUnitLoaderMesh loader;
 
     loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(make_triangle_submesh_scheme()));
@@ -1364,10 +1364,10 @@ TEST_F(ResourcePopulatorTest, MeshWithoutSkeletonHasNoSkeletonOrJointBindings) {
 TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
     WBE::ResourceUnitLoaderMesh loader;
     auto expect_invalid = [this, &loader](std::optional<std::string> p_skeleton_id, WBE::RUSchemaVertexView p_joint_bindings) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
         submesh_scheme.vertex_bindings.push_back(std::move(p_joint_bindings));
         WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(submesh_scheme);
@@ -1407,19 +1407,19 @@ TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSkeletonBindings) {
 }
 
 TEST_F(ResourcePopulatorTest, SDFLoadsTextureReference) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUSDF> captured_sdf = WBE::MEM_NULL;
     std::vector<std::string> created_ref_keys;
     const glm::uvec3 extent(4U, 3U, 2U);
     WBE::RefRes<WBE::RUTexture> stored_texture =
-        push_test_texture(stack_allocator, write_sdf_texture("wbe_sdf_loads_texture.ktx2", extent, KTX_VK_FORMAT_R16_SFLOAT));
+        push_test_texture(stack_alloc, write_sdf_texture("wbe_sdf_loads_texture.ktx2", extent, KTX_VK_FORMAT_R16_SFLOAT));
     auto resource_chunk =
         MockResourceChunk::Builder()
             .set_reserve_res_unit_storage_callback(
-                [&stack_allocator, &captured_sdf](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                [&stack_alloc, &captured_sdf](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_alloc);
                     if (p_id == "loaded_sdf") {
                         captured_sdf = resource.force_cast<WBE::RUSDF>();
                     }
@@ -1468,22 +1468,22 @@ TEST_F(ResourcePopulatorTest, SDFLoadsTextureReference) {
     std::destroy_at(stored_texture.get());
 }
 
-TEST_F(ResourcePopulatorTest, RenderGraphLoadsRecipeReferenceAndParameters) {
-    WBE::StackAllocator stack_allocator(8192);
+TEST_F(ResourcePopulatorTest, RendGraphLoadsRecipeReferenceAndParameters) {
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RURenderGraph> captured_graph = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RURendGraph> captured_graph = WBE::MEM_NULL;
     void* registered_resource = nullptr;
     void (*registered_destructor)(void*) = nullptr;
     std::vector<std::string> created_ref_keys;
-    WBE::RefRes<WBE::RUScript> stored_script(stack_allocator.allocate(sizeof(WBE::RUScript)), &stack_allocator);
+    WBE::RefRes<WBE::RUScript> stored_script(stack_alloc.allocate(sizeof(WBE::RUScript)), &stack_alloc);
     std::construct_at(stored_script.get());
     auto resource_chunk =
         MockResourceChunk::Builder()
             .set_reserve_res_unit_storage_callback(
-                [&stack_allocator, &captured_graph](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
+                [&stack_alloc, &captured_graph](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::RefRes<char> resource(stack_alloc.allocate(p_size), &stack_alloc);
                     if (p_id == "loaded_graph") {
-                        captured_graph = resource.force_cast<WBE::RURenderGraph>();
+                        captured_graph = resource.force_cast<WBE::RURendGraph>();
                     }
                     return resource;
                 })
@@ -1495,7 +1495,7 @@ TEST_F(ResourcePopulatorTest, RenderGraphLoadsRecipeReferenceAndParameters) {
             .set_create_ref_to_callback(
                 [&created_ref_keys, &stored_script](std::function<void(WBE::RefRes<char>)> p_assign_ref, std::string_view p_key) {
                     created_ref_keys.emplace_back(p_key);
-                    if (p_key == "render_graphs.loaded") {
+                    if (p_key == "rend_graphs.loaded") {
                         p_assign_ref(stored_script.force_cast<char>());
                     }
                 })
@@ -1503,19 +1503,19 @@ TEST_F(ResourcePopulatorTest, RenderGraphLoadsRecipeReferenceAndParameters) {
     constexpr std::string_view JSON_BUFFER = R"(
     {
         "id": "loaded_graph",
-        "type": "render_graph",
-        "recipe": "render_graphs.loaded",
+        "type": "rend_graph",
+        "recipe": "rend_graphs.loaded",
         "parameters": {"bloom_blur_pass_count": 8, "summed_area_table": true}
     }
     )";
     WBE::ParserJSON parser;
     parser.parse_from_buffer(JSON_BUFFER);
-    WBE::ResourceUnitLoaderRenderGraph loader;
+    WBE::ResourceUnitLoaderRendGraph loader;
 
     loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
 
     ASSERT_NE(captured_graph, nullptr);
-    EXPECT_EQ(created_ref_keys, std::vector<std::string>{"render_graphs.loaded"});
+    EXPECT_EQ(created_ref_keys, std::vector<std::string>{"rend_graphs.loaded"});
     EXPECT_EQ(captured_graph->recipe, stored_script);
     EXPECT_EQ(captured_graph->parameters.get_value<int64_t>("bloom_blur_pass_count"), 8);
     EXPECT_TRUE(captured_graph->parameters.get_value<bool>("summed_area_table"));
@@ -1525,23 +1525,23 @@ TEST_F(ResourcePopulatorTest, RenderGraphLoadsRecipeReferenceAndParameters) {
     registered_destructor(registered_resource);
 }
 
-TEST_F(ResourcePopulatorTest, RenderGraphDefaultsToEmptyParameters) {
-    WBE::StackAllocator stack_allocator(8192);
+TEST_F(ResourcePopulatorTest, RendGraphDefaultsToEmptyParameters) {
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
-    WBE::RefRes<WBE::RURenderGraph> captured_graph = WBE::MEM_NULL;
+    WBE::RefRes<WBE::RURendGraph> captured_graph = WBE::MEM_NULL;
     auto resource_chunk =
         MockResourceChunk::Builder()
-            .set_reserve_res_unit_storage_callback([&stack_allocator, &captured_graph](std::string_view, size_t p_size) {
-                WBE::RefRes<char> resource(stack_allocator.allocate(p_size), &stack_allocator);
-                captured_graph = resource.force_cast<WBE::RURenderGraph>();
+            .set_reserve_res_unit_storage_callback([&stack_alloc, &captured_graph](std::string_view, size_t p_size) {
+                WBE::RefRes<char> resource(stack_alloc.allocate(p_size), &stack_alloc);
+                captured_graph = resource.force_cast<WBE::RURendGraph>();
                 return resource;
             })
             .build(stream);
-    WBE::RUSchemaRenderGraph scheme;
+    WBE::RUSchemaRendGraph scheme;
     scheme.id = "loaded_graph";
-    scheme.type = "render_graph";
-    scheme.recipe = "render_graphs.loaded";
-    WBE::ResourceUnitLoaderRenderGraph loader;
+    scheme.type = "rend_graph";
+    scheme.recipe = "rend_graphs.loaded";
+    WBE::ResourceUnitLoaderRendGraph loader;
 
     loader.populate_scheme(*resource_chunk, scheme);
 
@@ -1551,28 +1551,28 @@ TEST_F(ResourcePopulatorTest, RenderGraphDefaultsToEmptyParameters) {
     std::destroy_at(captured_graph.get());
 }
 
-TEST_F(ResourcePopulatorTest, RenderGraphRejectsInvalidDefinitions) {
-    WBE::ResourceUnitLoaderRenderGraph loader;
-    auto make_chunk = [](WBE::StackAllocator& p_stack_allocator, std::stringstream& p_stream) {
+TEST_F(ResourcePopulatorTest, RendGraphRejectsInvalidDefinitions) {
+    WBE::ResourceUnitLoaderRendGraph loader;
+    auto make_chunk = [](WBE::StackAlloc& p_stack_alloc, std::stringstream& p_stream) {
         return MockResourceChunk::Builder()
-            .set_reserve_res_unit_storage_callback([&p_stack_allocator](std::string_view, size_t p_size) {
-                return WBE::RefRes<char>(p_stack_allocator.allocate(p_size), &p_stack_allocator);
+            .set_reserve_res_unit_storage_callback([&p_stack_alloc](std::string_view, size_t p_size) {
+                return WBE::RefRes<char>(p_stack_alloc.allocate(p_size), &p_stack_alloc);
             })
             .build(p_stream);
     };
-    auto expect_invalid = [&loader, &make_chunk](const WBE::RUSchemaRenderGraph& p_scheme) {
-        WBE::StackAllocator stack_allocator(8192);
+    auto expect_invalid = [&loader, &make_chunk](const WBE::RUSchemaRendGraph& p_scheme) {
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
-        auto resource_chunk = make_chunk(stack_allocator, stream);
+        auto resource_chunk = make_chunk(stack_alloc, stream);
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, p_scheme), std::runtime_error);
     };
-    WBE::RUSchemaRenderGraph scheme;
+    WBE::RUSchemaRendGraph scheme;
     scheme.id = "loaded_graph";
-    scheme.type = "render_graph";
+    scheme.type = "rend_graph";
     expect_invalid(scheme);
     scheme.recipe = std::string("render\0graphs", 13);
     expect_invalid(scheme);
-    scheme.recipe = "render_graphs.loaded";
+    scheme.recipe = "rend_graphs.loaded";
     scheme.parameters = WBE::DataValue::make_list();
     expect_invalid(scheme);
     scheme.parameters = WBE::DataValue::make_integer(4);
@@ -1580,23 +1580,23 @@ TEST_F(ResourcePopulatorTest, RenderGraphRejectsInvalidDefinitions) {
 
     // The recipe key is required.
     WBE::ParserJSON parser;
-    parser.parse_from_buffer(R"({"id": "loaded_graph", "type": "render_graph"})");
-    WBE::StackAllocator stack_allocator(8192);
+    parser.parse_from_buffer(R"({"id": "loaded_graph", "type": "rend_graph"})");
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
-    auto resource_chunk = make_chunk(stack_allocator, stream);
+    auto resource_chunk = make_chunk(stack_alloc, stream);
     EXPECT_THROW(loader.populate_scheme_from_data(*resource_chunk, parser.get_data()), std::runtime_error);
     EXPECT_EQ(loader.get_supported_resource_types().size(), 1U);
-    EXPECT_EQ(loader.get_supported_resource_types()[0], "render_graph");
+    EXPECT_EQ(loader.get_supported_resource_types()[0], "rend_graph");
 }
 
 TEST_F(ResourcePopulatorTest, SDFRejectsInvalidSchemes) {
     WBE::ResourceUnitLoaderSDF loader;
     auto expect_invalid = [&loader](const WBE::RUSchemaSDF& p_scheme) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         auto resource_chunk = MockResourceChunk::Builder()
-                                  .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) {
-                                      return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
+                                  .set_reserve_res_unit_storage_callback([&stack_alloc](std::string_view, size_t p_size) {
+                                      return WBE::RefRes<char>(stack_alloc.allocate(p_size), &stack_alloc);
                                   })
                                   .build(stream);
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, p_scheme), std::runtime_error);
@@ -1614,45 +1614,45 @@ TEST_F(ResourcePopulatorTest, SDFRejectsInvalidSchemes) {
 }
 
 TEST_F(ResourcePopulatorTest, SDFRejectsInvalidTextures) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
 
-    WBE::RefRes<WBE::RUSDF> unresolved_sdf = load_test_sdf(stack_allocator, make_sdf_scheme(), WBE::MEM_NULL);
+    WBE::RefRes<WBE::RUSDF> unresolved_sdf = load_test_sdf(stack_alloc, make_sdf_scheme(), WBE::MEM_NULL);
     ASSERT_NE(unresolved_sdf, nullptr);
     EXPECT_THROW((void)unresolved_sdf->get_extent(), std::runtime_error);
     EXPECT_THROW((void)unresolved_sdf->get_sample(glm::uvec3(0U)), std::runtime_error);
 
-    WBE::RefRes<WBE::RUTexture> flat_texture = push_test_texture(stack_allocator,
+    WBE::RefRes<WBE::RUTexture> flat_texture = push_test_texture(stack_alloc,
         write_sdf_texture("wbe_sdf_rejects_flat_texture.ktx2", glm::uvec3(2U, 2U, 1U), KTX_VK_FORMAT_R16_SFLOAT, 2));
-    WBE::RefRes<WBE::RUSDF> flat_sdf = load_test_sdf(stack_allocator, make_sdf_scheme(), flat_texture);
+    WBE::RefRes<WBE::RUSDF> flat_sdf = load_test_sdf(stack_alloc, make_sdf_scheme(), flat_texture);
     ASSERT_NE(flat_sdf, nullptr);
     EXPECT_THROW((void)flat_sdf->get_extent(), std::runtime_error);
     std::destroy_at(flat_texture.get());
 
     WBE::RefRes<WBE::RUTexture> float_texture = push_test_texture(
-        stack_allocator, write_sdf_texture("wbe_sdf_rejects_float_texture.ktx2", glm::uvec3(2U), KTX_VK_FORMAT_R32_SFLOAT));
-    WBE::RefRes<WBE::RUSDF> float_sdf = load_test_sdf(stack_allocator, make_sdf_scheme(), float_texture);
+        stack_alloc, write_sdf_texture("wbe_sdf_rejects_float_texture.ktx2", glm::uvec3(2U), KTX_VK_FORMAT_R32_SFLOAT));
+    WBE::RefRes<WBE::RUSDF> float_sdf = load_test_sdf(stack_alloc, make_sdf_scheme(), float_texture);
     ASSERT_NE(float_sdf, nullptr);
     EXPECT_THROW((void)float_sdf->get_sample(glm::uvec3(0U)), std::runtime_error);
     std::destroy_at(float_texture.get());
 }
 
 TEST_F(ResourcePopulatorTest, MeshLoadsSDFReference) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
     std::vector<std::string> created_ref_keys;
-    WBE::RefRes<WBE::RUSDF> stored_sdf = push_test_object(stack_allocator, WBE::RUSDF{});
+    WBE::RefRes<WBE::RUSDF> stored_sdf = push_test_object(stack_alloc, WBE::RUSDF{});
     auto resource_chunk =
         MockResourceChunk::Builder()
-            .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                return WBE::RefRes<char>(mem_id, &stack_allocator);
+            .set_push_data_callback([&stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                std::memcpy(stack_alloc.get(mem_id), p_data, p_size);
+                return WBE::RefRes<char>(mem_id, &stack_alloc);
             })
             .set_reserve_res_unit_storage_callback(
-                [&stack_allocator, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                [&stack_alloc, &captured_mesh](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> resource(mem_id, &stack_alloc);
                     if (p_id == "loaded_mesh") {
                         captured_mesh = resource.force_cast<WBE::RUMesh3D>();
                     }
@@ -1681,10 +1681,10 @@ TEST_F(ResourcePopulatorTest, MeshLoadsSDFReference) {
 TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSDFId) {
     WBE::ResourceUnitLoaderMesh loader;
     for (const std::string& sdf_id : {std::string(), std::string("loaded\0sdf", 10)}) {
-        WBE::StackAllocator stack_allocator(8192);
+        WBE::StackAlloc stack_alloc(8192);
         std::stringstream stream;
         WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-        auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+        auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
         WBE::RUSchemaMesh3D scheme = make_single_submesh_mesh_scheme(make_triangle_submesh_scheme());
         scheme.sdf_id = sdf_id;
         EXPECT_THROW(loader.populate_scheme(*resource_chunk, scheme), std::runtime_error);
@@ -1692,30 +1692,30 @@ TEST_F(ResourcePopulatorTest, MeshRejectsInvalidSDFId) {
 }
 
 TEST_F(ResourcePopulatorTest, MeshRejectsSubmeshWithoutVertexBindings) {
-    WBE::StackAllocator stack_allocator(8192);
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMesh3D> captured_mesh = WBE::MEM_NULL;
-    auto resource_chunk = create_submesh_test_chunk(stack_allocator, stream, captured_mesh);
+    auto resource_chunk = create_submesh_test_chunk(stack_alloc, stream, captured_mesh);
     WBE::RUSchemaSubmesh3D submesh_scheme = make_triangle_submesh_scheme();
     submesh_scheme.vertex_bindings.clear();
     WBE::ResourceUnitLoaderMesh loader;
     EXPECT_THROW(loader.populate_scheme(*resource_chunk, make_single_submesh_mesh_scheme(submesh_scheme)), std::runtime_error);
 }
 
-TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
-    WBE::StackAllocator stack_allocator(8192);
+TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRendId) {
+    WBE::StackAlloc stack_alloc(8192);
     std::stringstream stream;
     WBE::RefRes<WBE::RUWorld> captured_world = WBE::MEM_NULL;
     auto resource_chunk = MockResourceChunk::Builder()
-                              .set_push_data_callback([&stack_allocator](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
-                                  WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                  std::memcpy(stack_allocator.get(mem_id), p_data, p_size);
-                                  return WBE::RefRes<char>(mem_id, &stack_allocator);
+                              .set_push_data_callback([&stack_alloc](size_t p_size, const void* p_data) -> WBE::RefRes<char> {
+                                  WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                  std::memcpy(stack_alloc.get(mem_id), p_data, p_size);
+                                  return WBE::RefRes<char>(mem_id, &stack_alloc);
                               })
                               .set_reserve_res_unit_storage_callback(
-                                  [&stack_allocator, &captured_world](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      WBE::RefRes<char> resource(mem_id, &stack_allocator);
+                                  [&stack_alloc, &captured_world](std::string_view p_id, size_t p_size) -> WBE::RefRes<char> {
+                                      WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                      WBE::RefRes<char> resource(mem_id, &stack_alloc);
                                       if (p_id == "test_world") {
                                           captured_world = resource.force_cast<WBE::RUWorld>();
                                       }
@@ -1727,7 +1727,7 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
             "id": "test_world",
             "type": "world",
             "static_component": {
-                "static_mesh_render": "model_cube_static.mesh"
+                "static_mesh_rend": "model_cube_static.mesh"
             }
         }
     )";
@@ -1738,11 +1738,11 @@ TEST_F(ResourcePopulatorTest, WorldLoadsStaticMeshRenderId) {
     loader.populate_scheme_from_data(*resource_chunk, parser.get_data());
 
     ASSERT_NE(captured_world, nullptr);
-    ASSERT_NE(captured_world->static_component.static_mesh_render, nullptr);
-    EXPECT_STREQ(captured_world->static_component.static_mesh_render.get(), "model_cube_static.mesh");
+    ASSERT_NE(captured_world->static_component.static_mesh_rend, nullptr);
+    EXPECT_STREQ(captured_world->static_component.static_mesh_rend.get(), "model_cube_static.mesh");
 }
 
-TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticMeshRenderId) {
+TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticMeshRendId) {
     std::stringstream stream;
     auto resource_chunk = MockResourceChunk::Builder().build(stream);
     WBE::RUSchemaWorld scheme;
@@ -1755,7 +1755,7 @@ TEST_F(ResourcePopulatorTest, WorldRejectsEmptyStaticMeshRenderId) {
 
 TEST_F(ResourcePopulatorTest, EmplaceResUnitRegistersDestructorForNonTrivialResourceUnit) {
     std::stringstream stream;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     void* registered_resource = nullptr;
     void (*registered_destructor)(void*) = nullptr;
     int construct_count = 0;
@@ -1763,9 +1763,9 @@ TEST_F(ResourcePopulatorTest, EmplaceResUnitRegistersDestructorForNonTrivialReso
 
     auto res_chunk =
         MockResourceChunk::Builder()
-            .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                return WBE::RefRes<char>(mem_id, &stack_allocator);
+            .set_reserve_res_unit_storage_callback([&stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                return WBE::RefRes<char>(mem_id, &stack_alloc);
             })
             .set_register_res_unit_destructor_callback(
                 [&registered_resource, &registered_destructor](void* p_resource, void (*p_destructor)(void*)) {
@@ -1793,14 +1793,14 @@ TEST_F(ResourcePopulatorTest, EmplaceResUnitRegistersDestructorForNonTrivialReso
 
 TEST_F(ResourcePopulatorTest, EmplaceResUnitSkipsDestructorRegistrationForTrivialResourceUnit) {
     std::stringstream stream;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     int register_destructor_count = 0;
 
     auto res_chunk =
         MockResourceChunk::Builder()
-            .set_reserve_res_unit_storage_callback([&stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                return WBE::RefRes<char>(mem_id, &stack_allocator);
+            .set_reserve_res_unit_storage_callback([&stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                return WBE::RefRes<char>(mem_id, &stack_alloc);
             })
             .set_register_res_unit_destructor_callback([&register_destructor_count](void*, void (*)(void*)) {
                 ++register_destructor_count;
@@ -1817,11 +1817,11 @@ TEST_F(ResourcePopulatorTest, EmplaceResUnitSkipsDestructorRegistrationForTrivia
 }
 
 TEST_F(ResourcePopulatorTest, ResourceChunkLoadFileDestroysNonTrivialResourceUnitsInReverseOrder) {
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::vector<int> destroy_order;
 
     {
-        WBE::ResourceChunkLoadFile resource_chunk("res_chunks/empty_resource_chunk.json", stack_allocator);
+        WBE::ResourceChunkLoadFile resource_chunk("res_chunks/empty_resource_chunk.json", stack_alloc);
         auto first_resource = resource_chunk.emplace_res_unit<ResourceUnitLoaderTestSupport::OrderedDestroyTestResourceUnit>(
             "destroy_order_first", &destroy_order, 1);
         auto second_resource = resource_chunk.emplace_res_unit<ResourceUnitLoaderTestSupport::OrderedDestroyTestResourceUnit>(
@@ -1841,7 +1841,7 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
     WBE::ResourceUnitLoaderText loader;
     std::stringstream ss;
     std::string text_content_storage;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     WBE::RefRes<WBE::RUText> captured_ru_text = WBE::MEM_NULL;
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
@@ -1852,10 +1852,10 @@ TEST_F(ResourcePopulatorTest, TextResourceGeneral) {
                                  return WBE::MEM_NULL;
                              }))
                          .set_reserve_res_unit_storage_callback(
-                             [&captured_ru_text, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                             [&captured_ru_text, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUText));
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 captured_ru_text = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUText>();
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 captured_ru_text = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUText>();
                                  return captured_ru_text.force_cast<char>();
                              })
                          .build(ss);
@@ -1869,7 +1869,7 @@ TEST_F(ResourcePopulatorTest, ScriptResourceGeneral) {
     WBE::ResourceUnitLoaderScript loader;
     std::stringstream ss;
     std::string source_storage;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     WBE::RefRes<WBE::RUScript> captured_ru_script = WBE::MEM_NULL;
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(
@@ -1879,10 +1879,10 @@ TEST_F(ResourcePopulatorTest, ScriptResourceGeneral) {
                                  return WBE::MEM_NULL;
                              }))
                          .set_reserve_res_unit_storage_callback(
-                             [&captured_ru_script, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                             [&captured_ru_script, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUScript));
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 captured_ru_script = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUScript>();
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 captured_ru_script = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUScript>();
                                  return captured_ru_script.force_cast<char>();
                              })
                          .build(ss);
@@ -1910,7 +1910,7 @@ TEST_F(ResourcePopulatorTest, ScriptSchemeRequiresPath) {
 TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
     WBE::ResourceUnitLoaderBinary loader;
     std::stringstream ss;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     std::vector<uint8_t> binary_data_storage;
     WBE::RefRes<WBE::RUBinary> captured_ru_binary = WBE::MEM_NULL;
     WBE::RUSchemaBinary binary_scheme;
@@ -1922,10 +1922,10 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
                              return WBE::MEM_NULL;
                          })
                          .set_reserve_res_unit_storage_callback(
-                             [&captured_ru_binary, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                             [&captured_ru_binary, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUBinary));
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 captured_ru_binary = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUBinary>();
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 captured_ru_binary = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUBinary>();
                                  return captured_ru_binary.force_cast<char>();
                              })
                          .build(ss);
@@ -1942,7 +1942,7 @@ TEST_F(ResourcePopulatorTest, BinaryReousrceGeneral) {
 TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
     WBE::ResourceUnitLoaderImage loader;
     std::stringstream ss;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     std::vector<char> image_data_storage;
     WBE::RefRes<WBE::RUImage> captured_ru_image = WBE::MEM_NULL;
     WBE::RUSchemaImage image_scheme;
@@ -1956,10 +1956,10 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
                                  return WBE::MEM_NULL;
                              }))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&captured_ru_image, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                             [&captured_ru_image, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUImage));
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 captured_ru_image = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUImage>();
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 captured_ru_image = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUImage>();
                                  return captured_ru_image.force_cast<char>();
                              }))
                          .build(ss);
@@ -1983,7 +1983,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceGeneral) {
 TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
     WBE::ResourceUnitLoaderImage loader;
     std::stringstream ss;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     std::vector<char> image_data_storage;
     WBE::RefRes<WBE::RUImage> captured_ru_image = WBE::MEM_NULL;
     WBE::RUSchemaImage image_scheme;
@@ -1996,10 +1996,10 @@ TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
                                  return WBE::MEM_NULL;
                              }))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&captured_ru_image, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                             [&captured_ru_image, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                  EXPECT_EQ(p_size, sizeof(WBE::RUImage));
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 captured_ru_image = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUImage>();
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 captured_ru_image = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUImage>();
                                  return captured_ru_image.force_cast<char>();
                              }))
                          .build(ss);
@@ -2011,7 +2011,7 @@ TEST_F(ResourcePopulatorTest, ImageResourceDefaultColorSpace) {
 TEST_F(ResourcePopulatorTest, TextureResourceGeneral) {
     WBE::ResourceUnitLoaderTexture loader;
     std::stringstream stream;
-    WBE::StackAllocator stack_allocator(1024);
+    WBE::StackAlloc stack_alloc(1024);
     WBE::RefRes<WBE::RUTexture> captured_texture = WBE::MEM_NULL;
     void* destructor_resource = nullptr;
     void (*destructor)(void*) = nullptr;
@@ -2019,10 +2019,10 @@ TEST_F(ResourcePopulatorTest, TextureResourceGeneral) {
     texture_scheme.path = "assets/textures/default_albedo.ktx2";
     auto resource_chunk = MockResourceChunk::Builder()
                               .set_reserve_res_unit_storage_callback(
-                                  [&captured_texture, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                  [&captured_texture, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
                                       EXPECT_EQ(p_size, sizeof(WBE::RUTexture));
-                                      WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                      captured_texture = WBE::RefRes<char>(mem_id, &stack_allocator).force_cast<WBE::RUTexture>();
+                                      WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                      captured_texture = WBE::RefRes<char>(mem_id, &stack_alloc).force_cast<WBE::RUTexture>();
                                       return captured_texture.force_cast<char>();
                                   })
                               .set_register_res_unit_destructor_callback(
@@ -2155,15 +2155,15 @@ TEST_F(ResourcePopulatorTest, FontResourceGeneral) {
 
 TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
     WBE::ResourceUnitLoaderMaterial loader;
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMaterial> captured_material;
     std::vector<std::string> created_ref_keys;
 
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
 
     std::array<std::byte, sizeof(WBE::RUTexture)> referenced_texture{};
@@ -2176,9 +2176,9 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
         MockResourceChunk::Builder()
             .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
             .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                [&captured_material, &stack_allocator](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                [&captured_material, &stack_alloc](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> saved_resource(mem_id, &stack_alloc);
                     if (p_res_key == "test_material") {
                         captured_material = saved_resource.force_cast<WBE::RUMaterial>();
                     }
@@ -2234,22 +2234,22 @@ TEST_F(ResourcePopulatorTest, MaterialResourceGeneral) {
 
 TEST_F(ResourcePopulatorTest, MaterialPipelineVariant) {
     WBE::ResourceUnitLoaderMaterial loader;
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::stringstream stream;
     WBE::RefRes<WBE::RUMaterial> captured_material;
 
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
 
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&captured_material, &stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                             [&captured_material, &stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 WBE::RefRes<char> saved_resource(mem_id, &stack_alloc);
                                  captured_material = saved_resource.force_cast<WBE::RUMaterial>();
                                  return saved_resource;
                              }))
@@ -2269,18 +2269,18 @@ TEST_F(ResourcePopulatorTest, MaterialPipelineVariant) {
 
 TEST_F(ResourcePopulatorTest, ShaderRejectsVariantsSharingAMacroCombination) {
     WBE::ResourceUnitLoaderShader loader;
-    WBE::StackAllocator stack_allocator(256 * 1024);
+    WBE::StackAlloc stack_alloc(256 * 1024);
     std::stringstream stream;
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                                 return WBE::RefRes<char>(stack_allocator.allocate(p_size), &stack_allocator);
+                             [&stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 return WBE::RefRes<char>(stack_alloc.allocate(p_size), &stack_alloc);
                              }))
                          .build(stream);
     constexpr std::string_view JSON_BUFFER = R"(
@@ -2291,13 +2291,13 @@ TEST_F(ResourcePopulatorTest, ShaderRejectsVariantsSharingAMacroCombination) {
         "variants": [
             {
                 "macros": [{ "macro": "WBE_TEST_VARIANT", "value": "1" }],
-                "path": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.spv",
-                "metadata": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json"
+                "path": "assets/shaders/desc_heap_reflection/desc_heap_reflection.desc_heap_reflection_shader.spv",
+                "metadata": "assets/shaders/desc_heap_reflection/desc_heap_reflection.desc_heap_reflection_shader.json"
             },
             {
                 "macros": [{ "macro": "WBE_TEST_VARIANT", "value": "1" }],
-                "path": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.spv",
-                "metadata": "assets/shaders/descriptor_heap_reflection/descriptor_heap_reflection.descriptor_heap_reflection_shader.json"
+                "path": "assets/shaders/desc_heap_reflection/desc_heap_reflection.desc_heap_reflection_shader.spv",
+                "metadata": "assets/shaders/desc_heap_reflection/desc_heap_reflection.desc_heap_reflection_shader.json"
             }
         ]
     }
@@ -2310,15 +2310,15 @@ TEST_F(ResourcePopulatorTest, ShaderRejectsVariantsSharingAMacroCombination) {
 
 TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
     WBE::ResourceUnitLoaderGraphicsPipeline loader;
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::stringstream stream;
     WBE::RefRes<WBE::RUGraphicsPipeline> captured_pipeline;
     std::vector<std::string> created_ref_keys;
 
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
 
     WBE::RUShader vertex_shader;
@@ -2334,9 +2334,9 @@ TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
         MockResourceChunk::Builder()
             .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
             .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                [&captured_pipeline, &stack_allocator](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
-                    WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                    WBE::RefRes<char> saved_resource(mem_id, &stack_allocator);
+                [&captured_pipeline, &stack_alloc](std::string_view p_res_key, size_t p_size) -> WBE::RefRes<char> {
+                    WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                    WBE::RefRes<char> saved_resource(mem_id, &stack_alloc);
                     if (p_res_key == "test_pipeline") {
                         captured_pipeline = saved_resource.force_cast<WBE::RUGraphicsPipeline>();
                     }
@@ -2392,21 +2392,21 @@ TEST_F(ResourcePopulatorTest, GraphicsPipelineResourceGeneral) {
 
 TEST_F(ResourcePopulatorTest, MaterialTextureSlotValidation) {
     WBE::ResourceUnitLoaderMaterial loader;
-    WBE::StackAllocator stack_allocator(64 * 1024);
+    WBE::StackAlloc stack_alloc(64 * 1024);
     std::stringstream stream;
 
-    auto push_to_stack = [&stack_allocator](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
-        WBE::MemID mem_id = stack_allocator.allocate(p_res_size);
-        std::memcpy(stack_allocator.get(mem_id), p_res, p_res_size);
-        return WBE::RefRes<char>(mem_id, &stack_allocator);
+    auto push_to_stack = [&stack_alloc](size_t p_res_size, const void* p_res) -> WBE::RefRes<char> {
+        WBE::MemID mem_id = stack_alloc.allocate(p_res_size);
+        std::memcpy(stack_alloc.get(mem_id), p_res, p_res_size);
+        return WBE::RefRes<char>(mem_id, &stack_alloc);
     };
 
     auto res_chunk = MockResourceChunk::Builder()
                          .set_push_data_callback(std::function<WBE::RefRes<char>(size_t, const void*)>(push_to_stack))
                          .set_reserve_res_unit_storage_callback(std::function<WBE::RefRes<char>(std::string_view, size_t)>(
-                             [&stack_allocator](std::string_view, size_t p_size) -> WBE::RefRes<char> {
-                                 WBE::MemID mem_id = stack_allocator.allocate(p_size);
-                                 return WBE::RefRes<char>(mem_id, &stack_allocator);
+                             [&stack_alloc](std::string_view, size_t p_size) -> WBE::RefRes<char> {
+                                 WBE::MemID mem_id = stack_alloc.allocate(p_size);
+                                 return WBE::RefRes<char>(mem_id, &stack_alloc);
                              }))
                          .build(stream);
 

@@ -19,23 +19,23 @@
 // Variants: WBE_SVO_DEBUG_DRAW_SOLID draws each voxel's shaded faces, shrunk by SOLID_VOXEL_SCALE so the borders between
 // voxels show, instead of its edges; WBE_SVO_DEBUG_DRAW_OCCUPANCY colors each voxel by its injected occupancy.
 
-struct SVODebugDrawDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+struct SVODebugDrawDescIndices {
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [wbe::descriptor("uniform_buffer", "svo_debug_draw_settings")]
+    [wbe::desc("uniform_buffer", "svo_debug_draw_settings")]
     uint2 settings;
-    [wbe::descriptor("storage_buffer", "svo_debug_draw_node_list", "read")]
+    [wbe::desc("storage_buffer", "svo_debug_draw_node_list", "read")]
     uint2 node_list;
 #if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
-    [wbe::descriptor("storage_buffer", "svogi_occupancy_buffer", "read")]
+    [wbe::desc("storage_buffer", "svogi_occupancy_buffer", "read")]
     uint2 occupancy;
 #endif
 
-    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
@@ -56,7 +56,7 @@ struct SVODebugDrawVertexOutput {
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODebugDrawDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODebugDrawDescIndices> di;
 
 // The edge length of a solid voxel relative to its cell.
 static const float SOLID_VOXEL_SCALE = 0.85;
@@ -87,13 +87,13 @@ float3 face_normal(uint p_face) {
  */
 [shader("vertex")]
 SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[descriptor_indices.settings.x];
-    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[descriptor_indices.node_list.x];
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[di.settings.x];
+    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
+    uint frame_slot = di.shader_debug_frame_slot;
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
     uint corner_index = p_vertex_id & 7;
@@ -136,7 +136,7 @@ SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint 
     float3 color = float3(1.0);
 #if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
     if (!is_bounds) {
-        StructuredBuffer<float> occupancy = ResourceDescriptorHeap[descriptor_indices.occupancy.x];
+        StructuredBuffer<float> occupancy = ResourceDescriptorHeap[di.occupancy.x];
         // The gray level is the occupancy: black for empty, white for full.
         color = float3(saturate(occupancy[data_index]));
     }

@@ -15,24 +15,24 @@
 #include "utils/utils.slang"
 #include "dedup/dedup_large_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "keys", "read")] uint2 keys;
-    [wbe::descriptor("storage_buffer", "marks", "read")] uint2 marks;
-    [wbe::descriptor("storage_buffer", "unique_keys", "write")] uint2 unique_keys;
+struct DescIndices {
+    [wbe::desc("storage_buffer", "keys", "read")] uint2 keys;
+    [wbe::desc("storage_buffer", "marks", "read")] uint2 marks;
+    [wbe::desc("storage_buffer", "unique_keys", "write")] uint2 unique_keys;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 // Scatters the first key of every value in the sorted keys to the unique keys; see dedup_large_scatter(). The marks must
 // hold their inclusive prefix sum. Must be dispatched with the per-key dispatch.
 [shader("compute")]
 [numthreads(WBE_DEDUP_LARGE_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
-    CountedBuffer<uint> keys = CountedBuffer<uint>(descriptor_indices.keys, frame_slot);
-    CountedBuffer<uint> marks = CountedBuffer<uint>(descriptor_indices.marks, frame_slot);
-    CountedBuffer<uint> unique_keys = CountedBuffer<uint>(descriptor_indices.unique_keys, frame_slot);
+    uint frame_slot = di.shader_debug_frame_slot;
+    CountedBuffer<uint> keys = CountedBuffer<uint>(di.keys, frame_slot);
+    CountedBuffer<uint> marks = CountedBuffer<uint>(di.marks, frame_slot);
+    CountedBuffer<uint> unique_keys = CountedBuffer<uint>(di.unique_keys, frame_slot);
     dedup_large_scatter(keys, marks, unique_keys, p_dispatch_thread_id.x);
 }

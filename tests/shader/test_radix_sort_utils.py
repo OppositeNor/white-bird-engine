@@ -22,7 +22,7 @@ RANDOM_SEED = 20251003
 BUCKET_SIZE = 256
 BUCKET_MASK = BUCKET_SIZE - 1
 # Initial histogram values stay small enough that adding every count cannot overflow a counter.
-INITIAL_COUNT_LIMIT = 1 << 20
+INIT_COUNT_LIMIT = 1 << 20
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 # A (data start, data count) range of the data buffer.
@@ -35,7 +35,7 @@ def rng() -> np.random.Generator:
 
 
 def run_histogram(p_device: spy.Device, p_load_kernel: KernelLoader, p_element_type: str, p_data: np.ndarray,
-        p_initial_histogram: np.ndarray, p_first_range: DataRange, p_second_range: DataRange, p_workgroup_size: int,
+        p_init_histogram: np.ndarray, p_first_range: DataRange, p_second_range: DataRange, p_workgroup_size: int,
         p_bit_region: int) -> np.ndarray:
     kernel = p_load_kernel("radix_sort_histogram.slang", {"ELEMENT_TYPE": p_element_type,
         "KERNEL_WORKGROUP_SIZE": p_workgroup_size, "FIRST_DATA_START": p_first_range[0],
@@ -44,7 +44,7 @@ def run_histogram(p_device: spy.Device, p_load_kernel: KernelLoader, p_element_t
     usage = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
     data_buffer = p_device.create_buffer(element_count=len(p_data), struct_size=4, usage=usage, data=p_data)
     histogram_buffer = p_device.create_buffer(element_count=BUCKET_SIZE, struct_size=4, usage=usage,
-        data=p_initial_histogram)
+        data=p_init_histogram)
     kernel.dispatch(thread_count=[p_workgroup_size, 1, 1], vars={"data": data_buffer, "histogram": histogram_buffer})
     return histogram_buffer.to_numpy().view(np.uint32)
 
@@ -55,8 +55,8 @@ def histogram_reference(p_data: np.ndarray, p_range: DataRange, p_bit_region: in
         minlength=BUCKET_SIZE).astype(np.uint32)
 
 
-def random_initial_histogram(p_rng: np.random.Generator) -> np.ndarray:
-    return p_rng.integers(0, INITIAL_COUNT_LIMIT, BUCKET_SIZE, dtype=np.uint32)
+def random_init_histogram(p_rng: np.random.Generator) -> np.ndarray:
+    return p_rng.integers(0, INIT_COUNT_LIMIT, BUCKET_SIZE, dtype=np.uint32)
 
 
 ELEMENT_TYPES = [("uint", np.uint32), ("int", np.int32)]
@@ -87,7 +87,7 @@ def test_workgroup_scope_radix_sort_histogram(device: spy.Device, load_kernel: K
     # Elements outside the counted range are kept so that reading past either end changes the histogram. The second
     # call counts an empty range and must leave the histogram unchanged.
     data = rng.integers(0, 2 ** 32, p_data_start + p_data_count + 64, dtype=np.uint32).view(p_numpy_type)
-    initial = random_initial_histogram(rng)
+    initial = random_init_histogram(rng)
     data_range = (p_data_start, p_data_count)
     result = run_histogram(device, load_kernel, p_element_type, data, initial, data_range, (0, 0), p_workgroup_size,
         p_bit_region)
@@ -110,7 +110,7 @@ def test_workgroup_scope_radix_sort_histogram_incremental(device: spy.Device, lo
         rng: np.random.Generator, p_first_range: DataRange, p_second_range: DataRange, p_workgroup_size: int) -> None:
     data_end = max(p_first_range[0] + p_first_range[1], p_second_range[0] + p_second_range[1])
     data = rng.integers(0, 2 ** 32, data_end + 64, dtype=np.uint32)
-    initial = random_initial_histogram(rng)
+    initial = random_init_histogram(rng)
     result = run_histogram(device, load_kernel, "uint", data, initial, p_first_range, p_second_range, p_workgroup_size,
         8)
     expected = initial + histogram_reference(data, p_first_range, 8) + histogram_reference(data, p_second_range, 8)

@@ -155,14 +155,14 @@ private:
 
     template <typename SerializableType>
     static Unique<Serializable> create_serializable_object_impl(const DataValue& p_data) {
-        Unique<SerializableType> serializable = make_unique<SerializableType>(global_allocator());
+        Unique<SerializableType> serializable = make_unique<SerializableType>(global_alloc());
         SerializableSD<SerializableType>::deserialize(p_data, *serializable);
         return serializable;
     }
 
     template <typename SerializableType>
     static Ref<Serializable> create_serializable_object_ref_impl(const DataValue& p_data) {
-        Ref<SerializableType> serializable = make_ref<SerializableType>(global_allocator());
+        Ref<SerializableType> serializable = make_ref<SerializableType>(global_alloc());
         SerializableSD<SerializableType>::deserialize(p_data, *serializable);
         return serializable;
     }

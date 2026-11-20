@@ -15,19 +15,19 @@
 #include "utils/utils.slang"
 #include "svo/svo_utils.slang"
 
-struct SVOResetDescriptorIndices {
-    [wbe::descriptor("storage_buffer", "svo_info")]
+struct SVOResetDescIndices {
+    [wbe::desc("storage_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
     uint2 deferred_list_ping;
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list_pong;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVOResetDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVOResetDescIndices> di;
 
 /**
  * @brief Resets mutable SVO state before construction begins.
@@ -35,14 +35,14 @@ ConstantBuffer<SVOResetDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
 
     svo_info[0].node_count = 8;
     svo_info[0].leaves_count = 0;
     svo_info[0].data_count = 8;
-    RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[descriptor_indices.deferred_list_ping.x];
-    RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[descriptor_indices.deferred_list_pong.x];
+    RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[di.deferred_list_ping.x];
+    RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[di.deferred_list_pong.x];
     deferred_list_ping[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
     deferred_list_pong[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
 

@@ -16,7 +16,7 @@
 #define WBE_FILE_PIXEL_SORTING_RECIPE_CONTEXT_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
@@ -34,7 +34,7 @@ enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortOrientation : uint8_t {
 
 /**
  * @class PixelSortingRecipeContext
- * @brief The context of the render_graphs.pixel_sorting recipe; see ApplicationVulkanPixelSortingTest. Copyable and movable.
+ * @brief The context of the rend_graphs.pixel_sorting recipe; see ApplicationVulkanPixelSortingTest. Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) PixelSortingRecipeContext : public RendRecipeContextVK {
     /**

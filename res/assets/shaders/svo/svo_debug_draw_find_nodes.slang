@@ -25,25 +25,25 @@ struct DrawIndexedIndirectCommand {
     uint first_instance;
 };
 
-struct SVODebugDrawFindNodesDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+struct SVODebugDrawFindNodesDescIndices {
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [wbe::descriptor("uniform_buffer", "svo_debug_draw_settings")]
+    [wbe::desc("uniform_buffer", "svo_debug_draw_settings")]
     uint2 settings;
-    [wbe::descriptor("storage_buffer", "svo_debug_draw_indirect_buffer")]
+    [wbe::desc("storage_buffer", "svo_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
-    [wbe::descriptor("storage_buffer", "svo_debug_draw_node_list", "write")]
+    [wbe::desc("storage_buffer", "svo_debug_draw_node_list", "write")]
     uint2 node_list;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODebugDrawFindNodesDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODebugDrawFindNodesDescIndices> di;
 
 bool has_children(SVONode p_node) {
     SVONode::ChildrenState state = p_node.get_children_state();
@@ -63,13 +63,13 @@ bool has_children(SVONode p_node) {
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint p_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[descriptor_indices.settings.x];
-    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
-    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[descriptor_indices.node_list.x];
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[di.settings.x];
+    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[di.indirect_draw.x];
+    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
+    uint frame_slot = di.shader_debug_frame_slot;
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
     uint target_depth = settings.depth + 1;

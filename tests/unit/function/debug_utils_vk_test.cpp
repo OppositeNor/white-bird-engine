@@ -12,10 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/debug_utils_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
+#include "core/alloc/i_alloc.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/debug_utils_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <gtest/gtest.h>
@@ -53,22 +53,22 @@ class WBEDebugUtilsVKTest : public ::testing::Test {
 protected:
     virtual void SetUp() override {
         recorded_object_name() = RecordedObjectName{};
-        render_data.logic_device = reinterpret_cast<VkDevice>(uintptr_t{0x10});
-        render_data.set_debug_utils_object_name = &record_object_name;
+        rend_data.logic_device = reinterpret_cast<VkDevice>(uintptr_t{0x10});
+        rend_data.set_debug_utils_object_name = &record_object_name;
     }
 
-    RenderAllocator allocator{WBE_KI_B(16)};
-    RenderContextVK render_data{&allocator};
+    RendAlloc alloc{WBE_KI_B(16)};
+    RendContextVK rend_data{&alloc};
 };
 
 } // namespace
 
 TEST_F(WBEDebugUtilsVKTest, NamesObjectsThroughTheExtensionCommand) {
     const auto buffer = reinterpret_cast<VkBuffer>(uintptr_t{0x1234});
-    set_debug_object_name_vk(&render_data, VK_OBJECT_TYPE_BUFFER, buffer, std::string_view("sponza.nodes_and_more").substr(0, 11));
+    set_debug_object_name_vk(&rend_data, VK_OBJECT_TYPE_BUFFER, buffer, std::string_view("sponza.nodes_and_more").substr(0, 11));
     const RecordedObjectName& recorded = recorded_object_name();
     ASSERT_EQ(recorded.call_count, 1);
-    EXPECT_EQ(recorded.device, render_data.logic_device);
+    EXPECT_EQ(recorded.device, rend_data.logic_device);
     EXPECT_EQ(recorded.type, VK_OBJECT_TYPE_BUFFER);
     EXPECT_EQ(recorded.handle, uint64_t{0x1234});
     // A substring view is passed NUL-terminated.
@@ -76,11 +76,11 @@ TEST_F(WBEDebugUtilsVKTest, NamesObjectsThroughTheExtensionCommand) {
 }
 
 TEST_F(WBEDebugUtilsVKTest, DoesNothingWithoutTheExtensionOrAHandleOrAName) {
-    set_debug_object_name_vk(&render_data, VK_OBJECT_TYPE_BUFFER, VK_NULL_HANDLE, "named");
-    set_debug_object_name_vk(&render_data, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<VkBuffer>(uintptr_t{1}), "");
+    set_debug_object_name_vk(&rend_data, VK_OBJECT_TYPE_BUFFER, VK_NULL_HANDLE, "named");
+    set_debug_object_name_vk(&rend_data, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<VkBuffer>(uintptr_t{1}), "");
     set_debug_object_name_vk(nullptr, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<VkBuffer>(uintptr_t{1}), "named");
-    render_data.set_debug_utils_object_name = nullptr;
-    set_debug_object_name_vk(&render_data, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<VkBuffer>(uintptr_t{1}), "named");
+    rend_data.set_debug_utils_object_name = nullptr;
+    set_debug_object_name_vk(&rend_data, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<VkBuffer>(uintptr_t{1}), "named");
     EXPECT_EQ(recorded_object_name().call_count, 0);
 }
 

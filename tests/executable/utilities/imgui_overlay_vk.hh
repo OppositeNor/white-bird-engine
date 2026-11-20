@@ -16,9 +16,9 @@
 #define WBE_FILE_IMGUI_OVERLAY_VK_HH
 
 #include "SDL_events.h"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/engine_core.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
 #include <mutex>
 #include <vulkan/vulkan_core.h>
 
@@ -29,7 +29,7 @@ namespace WhiteBirdEngine {
  * @brief Executable-test Dear ImGui overlay drawn by the Vulkan renderer.
  *
  * The overlay owns the Dear ImGui context and its Vulkan backend. The backend allocates its descriptor sets from the
- * DescriptorSetPluginVK pool, so the renderer must be created with RendererCapabilities::descriptor_set. The overlay
+ * DescSetPluginVK pool, so the renderer must be created with RendererCapabilities::desc_set. The overlay
  * receives window input by watching SDL events: the watch runs on the thread that pumps window events and only queues them;
  * begin_frame() feeds them to Dear ImGui on the rendering thread.
  *
@@ -86,11 +86,11 @@ public:
     void record(VkCommandBuffer p_command_buffer);
 
 private:
-    const RenderContextVK* render_data = nullptr;
+    const RendContextVK* rend_data = nullptr;
     VkFormat color_format = VK_FORMAT_UNDEFINED;
     std::mutex event_mutex;
-    Vector<SDL_Event, HeapAllocatorGlobal> pending_events;
-    Vector<SDL_Event, HeapAllocatorGlobal> frame_events;
+    Vector<SDL_Event, HeapAllocGlobal> pending_events;
+    Vector<SDL_Event, HeapAllocGlobal> frame_events;
 
     static int on_sdl_event(void* p_user_data, SDL_Event* p_event);
     void process_event(const SDL_Event& p_event);

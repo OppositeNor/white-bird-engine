@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/ecs/components.hh"
 #include "function/ecs/systems.hh"
@@ -95,7 +95,7 @@ class WBEWorldSystemTest : public ::testing::Test {
 protected:
     virtual void SetUp() override {
         global = WBE::make_test_global();
-        world = WBE::make_ref<WBE::World>(global->engine_core->pool_allocator, global->engine_core->pool_allocator);
+        world = WBE::make_ref<WBE::World>(global->engine_core->pool_alloc, global->engine_core->pool_alloc);
     }
 
     virtual void TearDown() override {
@@ -110,7 +110,7 @@ protected:
 class WBEDriverSystemTest : public WBEWorldSystemTest {
 protected:
     WBE::Ref<WBE::SceneNode> add_driver(DriverState* p_state) {
-        auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_allocator, world);
+        auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_alloc, world);
         world->get_entities().emplace<WBE::ComponentDriver>(node->get_entity(),
             WBE::ComponentDriver{
                 .setup = driver_setup,
@@ -150,7 +150,7 @@ TEST_F(WBEDriverSystemTest, RunsEveryDriverLifecycleCallback) {
 }
 
 TEST_F(WBEDriverSystemTest, SkipsNullCallbacks) {
-    auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_allocator, world);
+    auto node = WBE::make_ref<WBE::SceneNode>(global->engine_core->pool_alloc, world);
     world->get_entities().emplace<WBE::ComponentDriver>(node->get_entity());
 
     EXPECT_NO_THROW(WBE::system_driver_setup(*world));

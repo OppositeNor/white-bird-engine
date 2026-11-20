@@ -24,21 +24,21 @@
  */
 
 /** Descriptor indices of the two mip levels used by one max-downsample pass. */
-struct MaxDownsampleDescriptorIndices {
+struct MaxDownsampleDescIndices {
     /** Previous mip level, read with texel loads. */
-    [wbe::descriptor("sampled_image", "max_downsample_source")] uint2 source;
+    [wbe::desc("sampled_image", "max_downsample_source")] uint2 source;
     /** Generated mip level. */
-    [wbe::descriptor("storage_image", "max_downsample_destination", "write")] uint2 destination;
+    [wbe::desc("storage_image", "max_downsample_destination", "write")] uint2 destination;
 };
 
 [vk::push_constant]
-ConstantBuffer<MaxDownsampleDescriptorIndices> descriptor_indices;
+ConstantBuffer<MaxDownsampleDescIndices> di;
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    Texture2D<float4> source = ResourceDescriptorHeap[descriptor_indices.source.x];
-    RWTexture2D<float4> destination = ResourceDescriptorHeap[descriptor_indices.destination.x];
+    Texture2D<float4> source = ResourceDescriptorHeap[di.source.x];
+    RWTexture2D<float4> destination = ResourceDescriptorHeap[di.destination.x];
     uint2 destination_extent;
     destination.GetDimensions(destination_extent.x, destination_extent.y);
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);

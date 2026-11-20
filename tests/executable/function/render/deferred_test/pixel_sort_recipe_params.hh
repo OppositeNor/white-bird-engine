@@ -16,8 +16,8 @@
 #define WBE_FILE_PIXEL_SORT_RECIPE_PARAMS_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "recipe_feature_params.hh"
 #include <cstdint>
 #include <string>
@@ -49,7 +49,7 @@ enum class WBE_META(WBE_REFLECT_SCRIPT) PixelSortScope : uint32_t {
 
 /**
  * @class PixelSortRecipeParams
- * @brief The parameters of the render_graph_utils.features.pixel_sort recipe module; see PixelSort::configure_recipe().
+ * @brief The parameters of the rend_graph_utils.features.pixel_sort recipe module; see PixelSort::configure_recipe().
  * @details Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) PixelSortRecipeParams : public RecipeFeatureParams {

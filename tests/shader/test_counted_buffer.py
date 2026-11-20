@@ -56,18 +56,18 @@ def element_byte_size(p_element_type: str) -> int:
 @pytest.mark.parametrize("p_element_type", ELEMENT_TYPES)
 def test_counted_buffer_atomic_expand(device: spy.Device, load_kernel: KernelLoader, p_element_type: str) -> None:
     thread_count = 4 * WORKGROUP_SIZE
-    initial_size = 3
+    init_size = 3
     counts = np.arange(thread_count) % 3 + 1
-    capacity = initial_size + int(counts.sum())
+    capacity = init_size + int(counts.sum())
     byte_size = element_byte_size(p_element_type)
-    buffer = make_counted_buffer(device, p_element_type, [initial_size * byte_size, 11, 22, 33], capacity, 0xFFFFFFFF)
+    buffer = make_counted_buffer(device, p_element_type, [init_size * byte_size, 11, 22, 33], capacity, 0xFFFFFFFF)
     load_kernel("counted_buffer_operations.slang", {"ELEMENT_TYPE": p_element_type, "KERNEL_PASS": 0}).dispatch(
         thread_count=[thread_count, 1, 1], vars={"data": buffer, "results": create_results(device, 1)})
 
     header, elements = read_counted_buffer(buffer, p_element_type)
     np.testing.assert_array_equal(header, [capacity * byte_size, 11, 22, 33])
-    np.testing.assert_array_equal(elements[:initial_size], 0xFFFFFFFF)
-    reserved = elements[initial_size:]
+    np.testing.assert_array_equal(elements[:init_size], 0xFFFFFFFF)
+    reserved = elements[init_size:]
     # Every component of an element holds the id of the invocation that reserved it.
     np.testing.assert_array_equal(reserved, np.repeat(reserved[:, :1], reserved.shape[1], axis=1))
     np.testing.assert_array_equal(np.bincount(reserved[:, 0], minlength=thread_count), counts)
@@ -97,19 +97,19 @@ def test_counted_buffer_try_atomic_expand(device: spy.Device, load_kernel: Kerne
 @pytest.mark.parametrize("p_element_type", ELEMENT_TYPES)
 def test_counted_buffer_operations(device: spy.Device, load_kernel: KernelLoader, p_element_type: str) -> None:
     capacity = 16
-    initial_size = 5
+    init_size = 5
     byte_size = element_byte_size(p_element_type)
-    buffer = make_counted_buffer(device, p_element_type, [initial_size * byte_size, 11, 22, 33], capacity)
+    buffer = make_counted_buffer(device, p_element_type, [init_size * byte_size, 11, 22, 33], capacity)
     results = create_results(device, 11)
     load_kernel("counted_buffer_operations.slang", {"ELEMENT_TYPE": p_element_type, "KERNEL_PASS": 2}).dispatch(
         thread_count=[1, 1, 1], vars={"data": buffer, "results": results})
 
     np.testing.assert_array_equal(results.to_numpy().view(np.uint32),
-        [capacity, initial_size, 11, 22, 33, 4 * HEADER_WORD_NUM + byte_size, initial_size, initial_size + 2,
-            initial_size + 5, 77, (initial_size + 5) * byte_size])
+        [capacity, init_size, 11, 22, 33, 4 * HEADER_WORD_NUM + byte_size, init_size, init_size + 2,
+            init_size + 5, 77, (init_size + 5) * byte_size])
     header, elements = read_counted_buffer(buffer, p_element_type)
-    np.testing.assert_array_equal(header, [(initial_size + 5) * byte_size, 11, 0x1234, 33])
-    np.testing.assert_array_equal(elements[initial_size + 2], 77)
+    np.testing.assert_array_equal(header, [(init_size + 5) * byte_size, 11, 0x1234, 33])
+    np.testing.assert_array_equal(elements[init_size + 2], 77)
 
 
 def test_counted_buffer_views_share_the_byte_size(device: spy.Device, load_kernel: KernelLoader) -> None:

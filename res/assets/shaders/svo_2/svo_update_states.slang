@@ -18,21 +18,21 @@
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
  */
-struct SVOUpdateStatesDescriptorIndices {
+struct SVOUpdateStatesDescIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 tree_nodes;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVOUpdateStatesDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVOUpdateStatesDescIndices> di;
 
 /**
  * @brief Publishes completed allocations between construction passes.
@@ -42,12 +42,12 @@ ConstantBuffer<SVOUpdateStatesDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
+    ConstantBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
     uint node_index = p_dispatch_thread_id.x;
     if (node_index >= tree_info.node_count) {
         return;
     }
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
+    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.tree_nodes.x];
     uint children_data = nodes[node_index].children_data;
     if ((children_data >> SVO_CHILDREN_STATE_SHIFT) != uint(SVONode::ChildrenState::ALLOCATING)) {
         return;

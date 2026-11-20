@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/scene/world.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
@@ -25,9 +25,9 @@
 
 namespace WhiteBirdEngine {
 
-World::World(HeapAllocatorDefault* p_allocator)
-    : allocator(p_allocator), component_lists(p_allocator), scene_nodes(p_allocator), render_graph_resource_key(p_allocator),
-      render_graph_instance_key(p_allocator) {
+World::World(HeapAllocDefault* p_alloc)
+    : alloc(p_alloc), component_lists(p_alloc), scene_nodes(p_alloc), rend_graph_resource_key(p_alloc),
+      rend_graph_instance_key(p_alloc) {
 }
 
 World::~World() = default;
@@ -44,9 +44,9 @@ entt::sparse_set* World::get_component_list(TypeID p_component_type_id) {
     return component_list;
 }
 
-Vector<TypeID, HeapAllocatorDefault> World::get_component_type_ids(EntityID p_entity) {
+Vector<TypeID, HeapAllocDefault> World::get_component_type_ids(EntityID p_entity) {
     cache_component_lists();
-    Vector<TypeID, HeapAllocatorDefault> component_type_ids(allocator);
+    Vector<TypeID, HeapAllocDefault> component_type_ids(alloc);
     for (const auto& [component_type_id, component_list] : component_lists) {
         if (component_list->contains(p_entity)) {
             component_type_ids.push_back(component_type_id);
@@ -71,19 +71,19 @@ Ref<SceneNode> World::get_scene_node(EntityID p_entity) {
     return iter->second.lock();
 }
 
-void World::set_render_graph_resource_key(std::string_view p_resource_key) {
-    render_graph_resource_key.assign(p_resource_key);
+void World::set_rend_graph_resource_key(std::string_view p_resource_key) {
+    rend_graph_resource_key.assign(p_resource_key);
 }
 
-void World::set_render_graph_instance_key(std::string_view p_instance_key) {
-    render_graph_instance_key.assign(p_instance_key);
+void World::set_rend_graph_instance_key(std::string_view p_instance_key) {
+    rend_graph_instance_key.assign(p_instance_key);
 }
 
-std::string_view World::get_render_graph_instance_key() const {
-    if (render_graph_instance_key.empty()) {
-        return render_graph_resource_key;
+std::string_view World::get_rend_graph_instance_key() const {
+    if (rend_graph_instance_key.empty()) {
+        return rend_graph_resource_key;
     }
-    return render_graph_instance_key;
+    return rend_graph_instance_key;
 }
 
 void World::cache_component_lists() {

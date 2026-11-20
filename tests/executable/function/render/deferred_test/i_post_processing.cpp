@@ -14,17 +14,17 @@
 */
 #include "i_post_processing.hh"
 #include "function/event/event_manager.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/rt_toggle_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/rt_toggle_vk.hh"
 #include <stdexcept>
 #include <string_view>
 #include <vulkan/vulkan_core.h>
 
 namespace WhiteBirdEngine {
 
-IPostProcessing::IPostProcessing(RenderAllocator* p_allocator, std::string_view p_toggle_event_id)
-    : allocator(p_allocator), toggle_event_id(p_toggle_event_id) {
-    if (allocator == nullptr) {
+IPostProcessing::IPostProcessing(RendAlloc* p_alloc, std::string_view p_toggle_event_id)
+    : alloc(p_alloc), toggle_event_id(p_toggle_event_id) {
+    if (alloc == nullptr) {
         throw std::runtime_error("Failed to create a post-processing effect: allocator is null.");
     }
     if (toggle_event_id.empty()) {

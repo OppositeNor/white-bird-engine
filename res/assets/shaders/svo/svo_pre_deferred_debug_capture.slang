@@ -23,21 +23,21 @@ struct DrawIndexedIndirectCommand {
     uint first_instance;
 };
 
-struct SVOPreDeferredDebugCaptureDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+struct SVOPreDeferredDebugCaptureDescIndices {
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "read")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping", "read")]
     uint2 deferred_list;
-    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_info_buffer")]
+    [wbe::desc("storage_buffer", "svo_pre_deferred_debug_info_buffer")]
     uint2 captured_svo_info;
-    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_list_buffer")]
+    [wbe::desc("storage_buffer", "svo_pre_deferred_debug_list_buffer")]
     uint2 captured_deferred_list;
-    [wbe::descriptor("storage_buffer", "svo_pre_deferred_debug_draw_indirect_buffer")]
+    [wbe::desc("storage_buffer", "svo_pre_deferred_debug_draw_indirect_buffer")]
     uint2 indirect_draw;
 };
 
 [vk::push_constant]
-ConstantBuffer<SVOPreDeferredDebugCaptureDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVOPreDeferredDebugCaptureDescIndices> di;
 
 /**
  * @brief Captures the SVO state produced by the raster passes before deferred propagation changes it.
@@ -45,12 +45,12 @@ ConstantBuffer<SVOPreDeferredDebugCaptureDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
-    RWStructuredBuffer<SVOInfo> captured_svo_info = ResourceDescriptorHeap[descriptor_indices.captured_svo_info.x];
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
+    RWStructuredBuffer<SVOInfo> captured_svo_info = ResourceDescriptorHeap[di.captured_svo_info.x];
     RWStructuredBuffer<uint> captured_deferred_list =
-        ResourceDescriptorHeap[descriptor_indices.captured_deferred_list.x];
-    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[descriptor_indices.indirect_draw.x];
+        ResourceDescriptorHeap[di.captured_deferred_list.x];
+    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[di.indirect_draw.x];
 
     SVOInfo info = svo_info;
     uint deferred_task_count = deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX];

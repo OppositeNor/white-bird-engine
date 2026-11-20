@@ -21,8 +21,8 @@ string, list, and key-sorted map. JSON, TOML, and script backends only convert t
 | Reject unknown keys | add `WBE_STRICT_DESERIALIZATION` to a static-serializable class |
 | Name-based enum conversion | `WBE_META(WBE_REFLECT_ENUM)` on the enum; `WBE_META(WBE_REFLECT_ENUM_IGNORE)` on enumerators to skip |
 | Visible to Lua/Teal scripts | add `WBE_REFLECT_SCRIPT` (class or enum); it also makes the type static-serializable or a reflected enum |
-| A render-graph task type usable by recipes | `WBE_RENDER_TASK(<method>)` with `WBE_SERIALIZATION_ALIASES(recipe_type_name)` (see below) |
-| Command-line configuration | `WBE_CLA_CONFIGURATION` |
+| A render-graph task type usable by recipes | `WBE_REND_TASK(<method>)` with `WBE_SERIALIZATION_ALIASES(recipe_type_name)` (see below) |
+| Command-line configuration | `WBE_CLA_CONFIG` |
 | `TypeUUID<T>` only | any `WBE_META(...)` on a class |
 
 Category membership is configured in `gen_info` in `build_config.py`, not in the metaparser. Preserve established patterns
@@ -85,16 +85,16 @@ in-range declared integer.
 
 ## Render tasks
 
-A `WBE_RENDER_TASK` class declares
-`WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const TParams&, const RendGraphContextVK&)`,
-where `TParams` is a strict, script-reflected params struct. The generated `render_task_registry.gen.cpp` implements
-`RenderTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
+A `WBE_REND_TASK` class declares
+`WBE_META(WBE_REFLECT) static Unique<IRendTaskVK> create(const RendContextVK*, const TParams&, const RendGraphContextVK&)`,
+where `TParams` is a strict, script-reflected params struct. The generated `rend_task_registry.gen.cpp` implements
+`RendTaskRegistryVK` from these declarations; a missing `create` is a build `#error` and a wrong signature fails a
 `static_assert`. An optional static `prepare_graph(...)` hook runs when the task is added. Each alias is a `type`
-name recipes can use. `WBE_RENDER_TASK(<method>)` also generates the recipe constructor `graph.<method>(params,
+name recipes can use. `WBE_REND_TASK(<method>)` also generates the recipe constructor `graph.<method>(params,
 options?)`, which uses the first alias; mark params fields that hold resource ids `WBE_RECIPE_RESOURCE` (graph resources,
-which the build binds to themselves) or `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the
+which the build binds to themselves) or `WBE_RECIPE_RESOURCE(registered, <RendObjectType>)` (keys registered on the
 graph) so that it accepts resource handles, and only handles, there. See
-`include/function/render_vk/render_task_registry_vk.hh` and `docs/renderer_vk/render_graph.md`.
+`include/function/rend_vk/rend_task_registry_vk.hh` and `docs/renderer_vk/rend_graph.md`.
 
 ## Script types and Teal declarations
 
@@ -113,7 +113,7 @@ python validation.py -t debug -- --gtest_filter='WBEDeserializer*:WBESerializerT
 ```
 
 For render-task, params, or Teal changes, add
-`:WBERenderTaskRegistryVK*:WBERendResourceParamsVKTest*:WBETealDeclarationsTest*:WBERendGraphScriptVK*`; for `DataValue` or
+`:WBERendTaskRegistryVK*:WBERendResourceParamsVKTest*:WBETealDeclarationsTest*:WBERendGraphScriptVK*`; for `DataValue` or
 parser changes, add `:ParserJSONTest*:ParserTOMLTest*`. The wrapper runs the full suite afterward. Do not run lint.
 
 ## Advanced work

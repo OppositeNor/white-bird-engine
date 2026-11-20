@@ -15,10 +15,10 @@
 #ifndef WBE_FILE_REF_STRONG_TEST_HH
 #define WBE_FILE_REF_STRONG_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "global/global.hh"
-#include "mock_heap_allocator_aligned.hh"
+#include "mock_heap_alloc_aligned.hh"
 #include "test_global.hh"
 #include <cstdint>
 #include <cstdlib>
@@ -44,26 +44,26 @@ protected:
 };
 
 TEST_F(WBERefStrongTest, Allocation) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
-        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 0);
-        ASSERT_FALSE(allocator.is_empty());
+        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&alloc, 0);
+        ASSERT_FALSE(alloc.is_empty());
         ASSERT_EQ(*ref, 0);
         *ref = 1;
         ASSERT_EQ(*ref, 1);
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
     {
         WBE::Ref<int> ref;
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 TEST_F(WBERefStrongTest, CopyMove) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
-        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&allocator, 3);
-        ASSERT_FALSE(allocator.is_empty());
+        WBE::Ref<int> ref = WBE::Ref<int>::make_ref(&alloc, 3);
+        ASSERT_FALSE(alloc.is_empty());
         ASSERT_EQ(*ref, 3);
         WBE::Ref<int> ref_copy = ref;
         ASSERT_EQ(*ref_copy, 3);
@@ -78,11 +78,11 @@ TEST_F(WBERefStrongTest, CopyMove) {
         ASSERT_EQ(*ref_move, 2);
         ASSERT_EQ(*ref_copy, 2);
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 TEST_F(WBERefStrongTest, ConstructDestruct) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     int test_val = 0;
     class TestClass {
     public:
@@ -97,14 +97,14 @@ TEST_F(WBERefStrongTest, ConstructDestruct) {
     {
         WBE::Ref<TestClass> ref;
         ASSERT_EQ(test_val, 0);
-        ref = WBE::Ref<TestClass>::make_ref(&allocator, &test_val);
+        ref = WBE::Ref<TestClass>::make_ref(&alloc, &test_val);
         ASSERT_EQ(test_val, 1);
         {
             ASSERT_EQ(test_val, 1);
         }
         ASSERT_EQ(test_val, 1);
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
     ASSERT_EQ(test_val, 100);
 }
 
@@ -129,28 +129,28 @@ TEST_F(WBERefStrongTest, DynamicDispatch) {
             num = 2;
         }
     };
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
-        WBE::Ref<A> ref = WBE::Ref<A>::make_ref(&allocator);
+        WBE::Ref<A> ref = WBE::Ref<A>::make_ref(&alloc);
         ASSERT_EQ(ref->num, 0);
         ref->func();
         ASSERT_EQ(ref->num, 1);
-        WBE::Ref<A> ref_b = WBE::Ref<B>::make_ref(&allocator);
+        WBE::Ref<A> ref_b = WBE::Ref<B>::make_ref(&alloc);
         ASSERT_EQ(ref_b->num, 0);
         ref_b->func();
         ASSERT_EQ(ref_b->num, 2);
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 TEST_F(WBERefStrongTest, NullReference) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
-    WBE::Ref<int> ref(&allocator, WBE::MEM_NULL);
+    WBE::MockHeapAllocAligned alloc(1024);
+    WBE::Ref<int> ref(&alloc, WBE::MEM_NULL);
     ASSERT_EQ(ref, nullptr);
     ASSERT_EQ(ref, (void*)nullptr);
     ASSERT_EQ(ref, WBE::MEM_NULL);
     ASSERT_EQ(ref.get(), nullptr);
-    ref = WBE::Ref<int>::make_ref(&allocator, 5);
+    ref = WBE::Ref<int>::make_ref(&alloc, 5);
     ASSERT_NE(ref, nullptr);
     ASSERT_NE(ref, (void*)nullptr);
     ASSERT_NE(ref, WBE::MEM_NULL);
@@ -174,7 +174,7 @@ inline int test_val2 = 0;
 
 inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass> p_ref2, uint32_t p_iteration_count) {
     std::vector<WBE::Ref<TestClass>> refs;
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     refs.reserve(5);
     for (uint32_t i = 0; i < 5; ++i) {
         if (rand() & 0x1) {
@@ -196,7 +196,7 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
             } else {
                 int val = 3;
                 {
-                    WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&allocator, &val);
+                    WBE::Ref<TestClass> ref = WBE::Ref<TestClass>::make_ref(&alloc, &val);
                     ASSERT_EQ(val, 4);
                 }
                 ASSERT_EQ(val, -1);
@@ -210,10 +210,10 @@ inline void multithread_ref_test(WBE::Ref<TestClass> p_ref1, WBE::Ref<TestClass>
 TEST_F(WBERefStrongTest, Multithread) {
     ASSERT_EQ(test_val1, 0);
     ASSERT_EQ(test_val2, 0);
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
-        WBE::Ref<TestClass> ref1 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val1);
-        WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&allocator, &test_val2);
+        WBE::Ref<TestClass> ref1 = WBE::Ref<TestClass>::make_ref(&alloc, &test_val1);
+        WBE::Ref<TestClass> ref2 = WBE::Ref<TestClass>::make_ref(&alloc, &test_val2);
         ASSERT_EQ(test_val1, 1);
         ASSERT_EQ(test_val2, 1);
         std::thread thread1(multithread_ref_test, ref1, ref2, 300000);
@@ -232,7 +232,7 @@ TEST_F(WBERefStrongTest, Multithread) {
 }
 
 TEST_F(WBERefStrongTest, DynamicCastRef) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Test classes for polymorphic casting
     class BaseClass {
@@ -268,7 +268,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test successful downcast (Base -> Derived)
     {
-        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&alloc);
         dynamic_cast<DerivedClass*>(base_ref.get())->derived_value = 999;
 
         WBE::Ref<DerivedClass> derived_ref = base_ref.dynamic_cast_ref<DerivedClass>();
@@ -283,7 +283,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test successful upcast (Derived -> Base)
     {
-        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&alloc);
         derived_ref->derived_value = 777;
 
         WBE::Ref<BaseClass> base_ref = derived_ref.dynamic_cast_ref<BaseClass>();
@@ -297,7 +297,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test failed downcast (Base -> wrong Derived)
     {
-        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<DerivedClass>::make_ref(&alloc);
 
         WBE::Ref<AnotherClass> another_ref = base_ref.dynamic_cast_ref<AnotherClass>();
         ASSERT_EQ(another_ref, nullptr);
@@ -316,7 +316,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test cast between unrelated types (should fail)
     {
-        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<DerivedClass> derived_ref = WBE::Ref<DerivedClass>::make_ref(&alloc);
 
         WBE::Ref<UnrelatedClass> unrelated_ref = derived_ref.dynamic_cast_ref<UnrelatedClass>();
         ASSERT_EQ(unrelated_ref, nullptr);
@@ -325,7 +325,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test side cast (Derived1 -> Derived2 through common base)
     {
-        WBE::Ref<BaseClass> base_ref = WBE::Ref<AnotherClass>::make_ref(&allocator);
+        WBE::Ref<BaseClass> base_ref = WBE::Ref<AnotherClass>::make_ref(&alloc);
         dynamic_cast<AnotherClass*>(base_ref.get())->another_value = 555;
 
         // This should fail since AnotherClass is not DerivedClass
@@ -341,7 +341,7 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
 
     // Test reference counting is preserved after casting
     {
-        WBE::Ref<BaseClass> base_ref1 = WBE::Ref<DerivedClass>::make_ref(&allocator);
+        WBE::Ref<BaseClass> base_ref1 = WBE::Ref<DerivedClass>::make_ref(&alloc);
         WBE::Ref<BaseClass> base_ref2 = base_ref1; // Create another reference
 
         WBE::Ref<DerivedClass> derived_ref = base_ref1.dynamic_cast_ref<DerivedClass>();
@@ -358,23 +358,23 @@ TEST_F(WBERefStrongTest, DynamicCastRef) {
         ASSERT_EQ(base_ref2.get(), derived_ref.get());
     }
 
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 TEST_F(WBERefStrongTest, IsNullMethod_BasicBehavior) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
         // Default constructed reference should be null
         WBE::Ref<int> default_ref;
         ASSERT_TRUE(default_ref.is_null());
 
         // Reference constructed with MEM_NULL via allocator should be null
-        WBE::Ref<int> null_ref(&allocator, WBE::MEM_NULL);
+        WBE::Ref<int> null_ref(&alloc, WBE::MEM_NULL);
         ASSERT_TRUE(null_ref.is_null());
         ASSERT_EQ(null_ref.get(), nullptr);
 
         // make_ref should produce a non-null reference
-        WBE::Ref<int> valid_ref = WBE::Ref<int>::make_ref(&allocator, 42);
+        WBE::Ref<int> valid_ref = WBE::Ref<int>::make_ref(&alloc, 42);
         ASSERT_FALSE(valid_ref.is_null());
         ASSERT_NE(valid_ref.get(), nullptr);
 
@@ -382,14 +382,14 @@ TEST_F(WBERefStrongTest, IsNullMethod_BasicBehavior) {
         valid_ref = nullptr;
         ASSERT_TRUE(valid_ref.is_null());
     }
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 TEST_F(WBERefStrongTest, IsNullMethod_MoveAndLifetime) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     {
         // Move semantics: moved-from reference becomes null
-        WBE::Ref<int> a = WBE::Ref<int>::make_ref(&allocator, 7);
+        WBE::Ref<int> a = WBE::Ref<int>::make_ref(&alloc, 7);
         WBE::Ref<int> b = std::move(a);
         ASSERT_TRUE(a.is_null());
         ASSERT_FALSE(b.is_null());
@@ -399,7 +399,7 @@ TEST_F(WBERefStrongTest, IsNullMethod_MoveAndLifetime) {
         ASSERT_TRUE(b.is_null());
     }
 
-    ASSERT_TRUE(allocator.is_empty());
+    ASSERT_TRUE(alloc.is_empty());
 }
 
 #endif

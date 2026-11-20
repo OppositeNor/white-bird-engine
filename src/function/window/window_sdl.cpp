@@ -66,7 +66,7 @@ WindowSDL::~WindowSDL() {
     SDL_Quit();
 }
 
-void WindowSDL::tick_render() {
+void WindowSDL::tick_rend() {
     // Do nothing.
 }
 

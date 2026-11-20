@@ -15,14 +15,14 @@
 #include "utils/utils.slang"
 #include "sort/radix_sort_uint2_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
-    [wbe::descriptor("storage_buffer", "histogram_buffer", "write")] uint2 histogram_buffer;
+struct DescIndices {
+    [wbe::desc("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
+    [wbe::desc("storage_buffer", "histogram_buffer", "write")] uint2 histogram_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 
@@ -31,9 +31,9 @@ groupshared uint histogram[WBE_RADIX_SORT_BUCKET_COUNT];
 [shader("compute")]
 [numthreads(WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
-    CountedBuffer<uint2> input_buffer = CountedBuffer<uint2>(descriptor_indices.input_buffer, frame_slot);
-    RWStructuredBuffer<uint> histogram_buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
+    uint frame_slot = di.shader_debug_frame_slot;
+    CountedBuffer<uint2> input_buffer = CountedBuffer<uint2>(di.input_buffer, frame_slot);
+    RWStructuredBuffer<uint> histogram_buffer = ResourceDescriptorHeap[di.histogram_buffer.x];
     radix_sort_uint2_histogram(input_buffer, histogram_buffer, histogram, p_group_id.x, p_group_thread_id.x,
         WBE_RADIX_HISTOGRAM_BIT_REGION);
 }

@@ -15,9 +15,9 @@
 #ifndef WBE_FILE_REF_RAW_TEST_HH
 #define WBE_FILE_REF_RAW_TEST_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_raw.hh"
-#include "mock_heap_allocator_aligned.hh"
+#include "mock_heap_alloc_aligned.hh"
 #include <functional>
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -55,12 +55,12 @@ TEST(WBERefRawTest, DefaultConstruction) {
 }
 
 TEST(WBERefRawTest, StaticNewRefCreation) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
     // Test static new_ref method
-    using OwningRef = WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned, true>;
-    auto ref = OwningRef::new_ref(&allocator, 42);
+    using OwningRef = WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned, true>;
+    auto ref = OwningRef::new_ref(&alloc, 42);
 
     ASSERT_NE(ref.get(), nullptr);
     ASSERT_EQ(ref->value, 42);
@@ -73,11 +73,11 @@ TEST(WBERefRawTest, StaticNewRefCreation) {
 }
 
 TEST(WBERefRawTest, GlobalNewRefCreation) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
     // Test global new_ref function
-    auto ref = WBE::new_ref<TestObject>(&allocator, 123);
+    auto ref = WBE::new_ref<TestObject>(&alloc, 123);
 
     ASSERT_NE(ref.get(), nullptr);
     ASSERT_EQ(ref->value, 123);
@@ -88,22 +88,22 @@ TEST(WBERefRawTest, GlobalNewRefCreation) {
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
-TEST(WBERefRawTest, NullAllocatorThrows) {
+TEST(WBERefRawTest, NullAllocThrows) {
     TestObject::instance_count = 0;
 
     // Test that null allocator throws exception
     ASSERT_THROW(WBE::RefRaw<TestObject>::new_ref(nullptr, 42), std::runtime_error);
-    ASSERT_THROW((WBE::new_ref<TestObject>(static_cast<WBE::MockHeapAllocatorAligned*>(nullptr), 42)), std::runtime_error);
+    ASSERT_THROW((WBE::new_ref<TestObject>(static_cast<WBE::MockHeapAllocAligned*>(nullptr), 42)), std::runtime_error);
 
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
 TEST(WBERefRawTest, CopyConstructor) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 99);
-    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> ref2(ref1); // Copy constructor
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 99);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned> ref2(ref1); // Copy constructor
 
     ASSERT_EQ(ref1.get(), ref2.get());
     ASSERT_EQ(ref1->value, ref2->value);
@@ -122,10 +122,10 @@ TEST(WBERefRawTest, CopyConstructor) {
 }
 
 TEST(WBERefRawTest, MoveConstructor) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 88);
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 88);
     TestObject* original_ptr = ref1.get();
 
     decltype(ref1) ref2(std::move(ref1)); // Move constructor
@@ -140,11 +140,11 @@ TEST(WBERefRawTest, MoveConstructor) {
 }
 
 TEST(WBERefRawTest, CopyAssignment) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 55);
-    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> ref2;
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 55);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned> ref2;
 
     ASSERT_EQ(ref2.get(), nullptr);
 
@@ -159,10 +159,10 @@ TEST(WBERefRawTest, CopyAssignment) {
 }
 
 TEST(WBERefRawTest, MoveAssignment) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 66);
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 66);
     TestObject* original_ptr = ref1.get();
     decltype(ref1) ref2;
 
@@ -178,10 +178,10 @@ TEST(WBERefRawTest, MoveAssignment) {
 }
 
 TEST(WBERefRawTest, ArrowOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref = WBE::new_ref<TestObject>(&allocator, 100);
+    auto ref = WBE::new_ref<TestObject>(&alloc, 100);
 
     // Test non-const arrow operator
     ASSERT_EQ(ref->value, 100);
@@ -197,10 +197,10 @@ TEST(WBERefRawTest, ArrowOperator) {
 }
 
 TEST(WBERefRawTest, DereferenceOperator) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref = WBE::new_ref<TestObject>(&allocator, 300);
+    auto ref = WBE::new_ref<TestObject>(&alloc, 300);
 
     // Test non-const dereference operator
     ASSERT_EQ((*ref).value, 300);
@@ -216,13 +216,13 @@ TEST(WBERefRawTest, DereferenceOperator) {
 }
 
 TEST(WBERefRawTest, GetMethod) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
     WBE::RefRaw<TestObject> empty_ref;
     ASSERT_EQ(empty_ref.get(), nullptr);
 
-    auto ref = WBE::new_ref<TestObject>(&allocator, 500);
+    auto ref = WBE::new_ref<TestObject>(&alloc, 500);
     TestObject* ptr = ref.get();
     ASSERT_NE(ptr, nullptr);
     ASSERT_EQ(ptr->value, 500);
@@ -238,13 +238,13 @@ TEST(WBERefRawTest, GetMethod) {
 }
 
 TEST(WBERefRawTest, EqualityOperators) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
     WBE::RefRaw<TestObject> empty_ref1;
     WBE::RefRaw<TestObject> empty_ref2;
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 111);
-    auto ref2 = WBE::new_ref<TestObject>(&allocator, 222);
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 111);
+    auto ref2 = WBE::new_ref<TestObject>(&alloc, 222);
     auto ref1_copy = ref1; // Copy of ref1
 
     // Test equality between empty references
@@ -277,7 +277,7 @@ TEST(WBERefRawTest, EqualityOperators) {
 }
 
 TEST(WBERefRawTest, ComparisonExceptions) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
     WBE::RefRaw<TestObject> ref;
@@ -293,22 +293,22 @@ TEST(WBERefRawTest, ComparisonExceptions) {
     ASSERT_EQ(TestObject::instance_count, 0);
 }
 
-TEST(WBERefRawTest, LessOperatorOrdersByAllocatorThenMemID) {
-    WBE::MockHeapAllocatorAligned allocator1(1024);
-    WBE::MockHeapAllocatorAligned allocator2(1024);
-    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> lower_mem_id_ref(1, &allocator1);
-    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> higher_mem_id_ref(2, &allocator1);
-    WBE::RefRaw<TestObject, WBE::MockHeapAllocatorAligned> other_allocator_ref(0, &allocator2);
+TEST(WBERefRawTest, LessOperatorOrdersByAllocThenMemID) {
+    WBE::MockHeapAllocAligned alloc1(1024);
+    WBE::MockHeapAllocAligned alloc2(1024);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned> lower_mem_id_ref(1, &alloc1);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned> higher_mem_id_ref(2, &alloc1);
+    WBE::RefRaw<TestObject, WBE::MockHeapAllocAligned> other_alloc_ref(0, &alloc2);
 
     ASSERT_TRUE(lower_mem_id_ref < higher_mem_id_ref);
     ASSERT_FALSE(higher_mem_id_ref < lower_mem_id_ref);
     ASSERT_FALSE(lower_mem_id_ref < lower_mem_id_ref);
 
-    const void* allocator1_address = static_cast<const void*>(&allocator1);
-    const void* allocator2_address = static_cast<const void*>(&allocator2);
+    const void* alloc1_address = static_cast<const void*>(&alloc1);
+    const void* alloc2_address = static_cast<const void*>(&alloc2);
     std::less<> address_less;
-    ASSERT_EQ(lower_mem_id_ref < other_allocator_ref, address_less(allocator1_address, allocator2_address));
-    ASSERT_EQ(other_allocator_ref < lower_mem_id_ref, address_less(allocator2_address, allocator1_address));
+    ASSERT_EQ(lower_mem_id_ref < other_alloc_ref, address_less(alloc1_address, alloc2_address));
+    ASSERT_EQ(other_alloc_ref < lower_mem_id_ref, address_less(alloc2_address, alloc1_address));
 }
 
 // Helper classes for template conversion testing
@@ -326,10 +326,10 @@ struct DerivedClass : public BaseClass {
 };
 
 TEST(WBERefRawTest, TemplateConversionConstructor) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
     // Create RefRaw<DerivedClass>
-    auto derived_ref = WBE::new_ref<DerivedClass>(&allocator, 10, 20);
+    auto derived_ref = WBE::new_ref<DerivedClass>(&alloc, 10, 20);
     ASSERT_EQ(derived_ref->base_value, 10);
     ASSERT_EQ(derived_ref->derived_value, 20);
 
@@ -347,9 +347,9 @@ TEST(WBERefRawTest, TemplateConversionConstructor) {
 }
 
 TEST(WBERefRawTest, TemplateConversionMoveConstructor) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    auto derived_ref = WBE::new_ref<DerivedClass>(&allocator, 40, 50);
+    auto derived_ref = WBE::new_ref<DerivedClass>(&alloc, 40, 50);
     DerivedClass* original_ptr = derived_ref.get();
 
     // Move convert to RefRaw<BaseClass>
@@ -363,9 +363,9 @@ TEST(WBERefRawTest, TemplateConversionMoveConstructor) {
 }
 
 TEST(WBERefRawTest, TemplateConversionAssignment) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    auto derived_ref = WBE::new_ref<DerivedClass>(&allocator, 60, 70);
+    auto derived_ref = WBE::new_ref<DerivedClass>(&alloc, 60, 70);
     WBE::RefRaw<BaseClass> base_ref;
 
     ASSERT_EQ(base_ref.get(), nullptr);
@@ -381,9 +381,9 @@ TEST(WBERefRawTest, TemplateConversionAssignment) {
 }
 
 TEST(WBERefRawTest, TemplateConversionMoveAssignment) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
 
-    auto derived_ref = WBE::new_ref<DerivedClass>(&allocator, 80, 90);
+    auto derived_ref = WBE::new_ref<DerivedClass>(&alloc, 80, 90);
     WBE::RefRaw<BaseClass> base_ref;
 
     // Move assign derived to base
@@ -397,19 +397,19 @@ TEST(WBERefRawTest, TemplateConversionMoveAssignment) {
 }
 
 TEST(WBERefRawTest, ManualResourceManagement) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
-    allocator.clear_call_log();
+    alloc.clear_call_log();
 
     // Create reference
-    auto ref = WBE::new_ref<TestObject>(&allocator, 999);
+    auto ref = WBE::new_ref<TestObject>(&alloc, 999);
     ASSERT_EQ(TestObject::instance_count, 1);
 
     // Verify allocation happened
-    std::string log = allocator.get_call_log();
+    std::string log = alloc.get_call_log();
     ASSERT_NE(log.find("allocate"), std::string::npos);
 
-    allocator.clear_call_log();
+    alloc.clear_call_log();
 
     // Manual deletion
     WBE::delete_ref(std::move(ref));
@@ -417,15 +417,15 @@ TEST(WBERefRawTest, ManualResourceManagement) {
     ASSERT_EQ(ref.get(), nullptr); // Reference should be nulled
 
     // Verify deallocation happened
-    log = allocator.get_call_log();
+    log = alloc.get_call_log();
     ASSERT_NE(log.find("deallocate"), std::string::npos);
 }
 
 TEST(WBERefRawTest, MultipleReferencesToSameObject) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     TestObject::instance_count = 0;
 
-    auto ref1 = WBE::new_ref<TestObject>(&allocator, 777);
+    auto ref1 = WBE::new_ref<TestObject>(&alloc, 777);
     auto ref2 = ref1; // Copy - both point to same object
     auto ref3 = ref1; // Another copy
 
@@ -445,7 +445,7 @@ TEST(WBERefRawTest, MultipleReferencesToSameObject) {
     // ref2 and ref3 are now dangling - this is the manual management aspect
 }
 
-TEST(WBERefRawTest, GetMethodWithNullAllocator) {
+TEST(WBERefRawTest, GetMethodWithNullAlloc) {
     WBE::RefRaw<TestObject> empty_ref;
 
     // Test that get() returns nullptr for empty reference (all indices)
@@ -457,13 +457,13 @@ TEST(WBERefRawTest, GetMethodWithNullAllocator) {
 }
 
 TEST(WBERefRawTest, IsNullMethod_BasicBehavior) {
-    WBE::MockHeapAllocatorAligned allocator(1024);
+    WBE::MockHeapAllocAligned alloc(1024);
     // Default constructed should be null
     WBE::RefRaw<TestObject> default_ref;
     ASSERT_TRUE(default_ref.is_null());
 
     // After creating with allocator, should not be null
-    auto r = WBE::new_ref<TestObject>(&allocator, 11);
+    auto r = WBE::new_ref<TestObject>(&alloc, 11);
     ASSERT_FALSE(r.is_null());
     ASSERT_NE(r.get(), nullptr);
 

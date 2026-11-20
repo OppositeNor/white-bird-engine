@@ -37,7 +37,7 @@ _FORMATS = {"rgb", "srgb", "bc5", "bc7", "sbc7"}
 class TextureCompilerPyKTX(TextureCompiler):
     """Compile raster images to upload-ready KTX2 files using pyktx/libktx."""
 
-    _encoder_initialization_lock = Lock()
+    _encoder_init_lock = Lock()
     _encoder_initialized = False
 
     def __init__(self, p_native_library_dir: Path, p_python_package_dir: Path) -> None:
@@ -45,7 +45,7 @@ class TextureCompilerPyKTX(TextureCompiler):
         self._python_package_dir = p_python_package_dir
         self._native_library: Any = None
         self._dynamic_library_directory: Any = None
-        self._initialization_lock = Lock()
+        self._init_lock = Lock()
         self._pyktx: Any = None
 
     def _load_native_library(self) -> None:
@@ -67,7 +67,7 @@ class TextureCompilerPyKTX(TextureCompiler):
 
     def load_pyktx(self) -> Any:
         """Load libktx and the pyktx module once, and return the module. Thread-safe."""
-        with self._initialization_lock:
+        with self._init_lock:
             if self._pyktx is not None:
                 return self._pyktx
             self._load_native_library()
@@ -85,7 +85,7 @@ class TextureCompilerPyKTX(TextureCompiler):
     def _compress_basis(cls, p_texture: Any, p_parameters: Any) -> None:
         # libktx's first compression initializes shared encoder state without its own guard.
         if not cls._encoder_initialized:
-            with cls._encoder_initialization_lock:
+            with cls._encoder_init_lock:
                 if not cls._encoder_initialized:
                     p_texture.compress_basis(p_parameters)
                     cls._encoder_initialized = True

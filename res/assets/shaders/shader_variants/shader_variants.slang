@@ -17,10 +17,10 @@
 // Test-only compute shader enumerating macro variants: WBE_SHADER_VARIANT_SCALE selects a scale, and the optional
 // WBE_SHADER_VARIANT_EXTRA adds an input buffer, so the variants differ in their reflected parameters.
 struct ShaderVariantIndices {
-    [wbe::descriptor("storage_buffer", "output_buffer", "write")]
+    [wbe::desc("storage_buffer", "output_buffer", "write")]
     uint2 output_buffer;
 #ifdef WBE_SHADER_VARIANT_EXTRA
-    [wbe::descriptor("storage_buffer", "extra_buffer", "read")]
+    [wbe::desc("storage_buffer", "extra_buffer", "read")]
     uint2 extra_buffer;
 #endif
 };

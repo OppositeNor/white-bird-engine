@@ -167,13 +167,13 @@ dependency_build_info = {
 gen_info = {
     "static_labels" : [
         "WBE_CHANNEL",
-        "WBE_RENDER_OBJECT_TYPE",
-        "WBE_RENDER_TASK",
+        "WBE_REND_OBJECT_TYPE",
+        "WBE_REND_TASK",
     ],
     "dynamic_labels" : [
         "WBE_CHANNEL",
-        "WBE_RENDER_RESOURCE",
-        "WBE_RENDER_TASK",
+        "WBE_REND_RESOURCE",
+        "WBE_REND_TASK",
         "WBE_RESOURCE_UNIT",
     ],
     "static_serializables" : [
@@ -184,16 +184,16 @@ gen_info = {
         "WBE_SERIALIZABLE",
         "WBE_CONFIG_OPTION",
     ],
-    "cla_configurations" : [
-        "WBE_CLA_CONFIGURATION",
+    "cla_configs" : [
+        "WBE_CLA_CONFIG",
     ],
     # Serializables whose deserialization rejects keys that are not fields or field aliases of the class or its bases.
     "strict_deserializations" : [
         "WBE_STRICT_DESERIALIZATION",
     ],
-    # Classes registered in RenderTaskRegistryVK; see include/function/render_vk/render_task_registry_vk.hh.
-    "render_tasks" : [
-        "WBE_RENDER_TASK",
+    # Classes registered in RendTaskRegistryVK; see include/function/rend_vk/rend_task_registry_vk.hh.
+    "rend_tasks" : [
+        "WBE_REND_TASK",
     ],
     # Enums given an EnumReflection specialization; see include/core/reflection/enum_reflection.hh.
     "reflected_enums" : [

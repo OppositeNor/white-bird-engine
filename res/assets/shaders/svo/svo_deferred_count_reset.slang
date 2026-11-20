@@ -15,18 +15,18 @@
 #include "utils/utils.slang"
 #include "svo/svo_utils.slang"
 
-struct SVODeferredCountResetDescriptorIndices {
+struct SVODeferredCountResetDescIndices {
 #ifdef WBE_RESET_PING_COUNT
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
     uint2 deferred_list;
 #else
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list;
 #endif
 };
 
 [vk::push_constant]
-ConstantBuffer<SVODeferredCountResetDescriptorIndices> descriptor_indices;
+ConstantBuffer<SVODeferredCountResetDescIndices> di;
 
 /**
  * @brief Clears the deferred-list count selected by the shader variant.
@@ -34,6 +34,6 @@ ConstantBuffer<SVODeferredCountResetDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[descriptor_indices.deferred_list.x];
+    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
     deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
 }

@@ -14,19 +14,19 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 
-struct CombineLightingDescriptorIndices {
-    [wbe::descriptor("sampled_image", "gbuffer_rma")]
+struct CombineLightingDescIndices {
+    [wbe::desc("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [wbe::descriptor("sampled_image", "direct_lighting")]
+    [wbe::desc("sampled_image", "direct_lighting")]
     uint2 direct_lighting;
-    [wbe::descriptor("sampled_image", "indirect_lighting")]
+    [wbe::desc("sampled_image", "indirect_lighting")]
     uint2 indirect_lighting;
-    [wbe::descriptor("storage_image", "result_image")]
+    [wbe::desc("storage_image", "result_image")]
     uint2 result_image;
 };
 
 [vk::push_constant]
-ConstantBuffer<CombineLightingDescriptorIndices> descriptor_indices;
+ConstantBuffer<CombineLightingDescIndices> di;
 
 /**
  * @brief Combine direct lighting with indirect lighting attenuated by the G-buffer ambient occlusion.
@@ -36,10 +36,10 @@ ConstantBuffer<CombineLightingDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
-    Texture2D<float4> direct_lighting = ResourceDescriptorHeap[descriptor_indices.direct_lighting.x];
-    Texture2D<float4> indirect_lighting = ResourceDescriptorHeap[descriptor_indices.indirect_lighting.x];
-    RWTexture2D<float4> result_image = ResourceDescriptorHeap[descriptor_indices.result_image.x];
+    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[di.gbuffer_rma.x];
+    Texture2D<float4> direct_lighting = ResourceDescriptorHeap[di.direct_lighting.x];
+    Texture2D<float4> indirect_lighting = ResourceDescriptorHeap[di.indirect_lighting.x];
+    RWTexture2D<float4> result_image = ResourceDescriptorHeap[di.result_image.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);

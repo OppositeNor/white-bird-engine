@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/render/vertex_attribute_format_info.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>

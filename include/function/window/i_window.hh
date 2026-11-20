@@ -81,7 +81,7 @@ public:
     /**
      * @brief Called every render tick.
      */
-    virtual void tick_render() = 0;
+    virtual void tick_rend() = 0;
 
     /**
      * @brief Called every logic tick.

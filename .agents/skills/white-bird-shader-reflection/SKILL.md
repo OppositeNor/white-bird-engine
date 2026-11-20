@@ -6,7 +6,7 @@ description: Use and extend White Bird Engine's Slang shader-reflection pipeline
 # White Bird Shader Reflection
 
 Use the backend-neutral reflection model (`function/render`) for inspection and contracts, and keep Vulkan translation in
-`function/render_vk`. Keep resource acquisition, metadata loading, and querying separate.
+`function/rend_vk`. Keep resource acquisition, metadata loading, and querying separate.
 
 The Vulkan path is descriptor-heap based: shaders receive heap indices in a single push-data block and access the
 renderer-owned global heaps. There are no descriptor sets, binding numbers, or bindless spaces.
@@ -38,9 +38,9 @@ duplicated; `resolve_entry_point` allows an omitted name only when the stage has
 - Vertex inputs: `VertexInputContractResolver` with `wbe::vertex_input`.
 - Material textures: `MaterialTextureContractResolver` with `wbe::texture`.
 - Mesh node layout: `MeshNodeContractResolver` (`NodeData` stride and transform offsets from the global `mesh` parameter).
-- Descriptor-heap push-data layout: `collect_shader_descriptor_heap_layout()` /
-  `collect_graphics_pipeline_descriptor_heap_layout()` in `function/render_vk/shader_metadata_vk_utils.hh`.
-- Binding at record time: the task-owned `PipelineDescriptorBindingsVK`; it is driven by pipeline-run tasks, not called
+- Descriptor-heap push-data layout: `collect_shader_desc_heap_layout()` /
+  `collect_graphics_pipeline_desc_heap_layout()` in `function/rend_vk/shader_metadata_vk_utils.hh`.
+- Binding at record time: the task-owned `PipelineDescBindingsVK`; it is driven by pipeline-run tasks, not called
   by hand.
 
 ## Write shader contracts
@@ -49,16 +49,16 @@ Descriptor fields are aligned `uint2` values in the entry point's single push-da
 
 ```slang
 struct PushData {
-    [wbe::descriptor("uniform_buffer", "camera_info")]
+    [wbe::desc("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    [wbe::descriptor("storage_buffer", "lights", "read")]
+    [wbe::desc("storage_buffer", "lights", "read")]
     uint2 lights;
     [wbe::push_constant("time")]
     float time;
 };
 ```
 
-- `wbe::descriptor("TYPE", "resource_id", "ACCESS")`: `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`,
+- `wbe::desc("TYPE", "resource_id", "ACCESS")`: `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`,
   `storage_image`, `sampler`, or `acceleration_structure`; the resource id is required; `ACCESS` (`read`, `write`,
   `read_write`) is optional and storage resources default to `read_write`, so annotate read-only ones with `read`. The
   resource id is the graph resource name (or a task-local name mapped with `RendTaskDescVK::alias()`), never a heap index.
@@ -71,7 +71,7 @@ struct PushData {
 - Do not introduce a closed texture-role enum or branch on concrete roles such as `albedo`, `normal`, or `rma`. An attribute
   with no explicit role uses the field name.
 
-Mesh draws use `MeshDescriptorIndices` from `utils.slang` (`mesh_submeshes`, `mesh_nodes`, `mesh_instances`, and
+Mesh draws use `MeshDescIndices` from `utils.slang` (`mesh_submeshes`, `mesh_nodes`, `mesh_instances`, and
 `mesh_transform` under `WBE_MESH_TRANSFORM`), plus `material_params` / `material_sampler`. `RTGraphicsDrawMeshVK` aliases the
 ids the pipeline declares to the drawn mesh's members.
 
@@ -93,7 +93,7 @@ Render objects and Vulkan helpers are rendering-thread-confined. Route cross-thr
 python validation.py -t debug -- --gtest_filter='WBEShaderMetadataVKTest*:WBEShaderMetadataVKUtilsTest*'
 ```
 
-Add `WBEPipelineDescriptorBindingsVKTest*` for binding or push-constant changes, `WBEMaterialTextureContractResolverTest*`
+Add `WBEPipelineDescBindingsVKTest*` for binding or push-constant changes, `WBEMaterialTextureContractResolverTest*`
 and `WBEMeshMaterialResourceBuilderVKTest*` for materials, `WBEMeshNodeContractResolverTest*` for mesh nodes, and
 `WBEShaderRoleFieldResolverTest*` for role parsing. The wrapper then runs the full unit suite and the slangpy shader tests.
 Do not run lint.

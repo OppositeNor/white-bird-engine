@@ -18,11 +18,11 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/i_render_object.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/render/i_resource_description.hh"
 #include "function/render/i_resource_registrator.hh"
 #include "function/render/rd_typed.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "utils/utils.hh"
 #include <format>
 #include <stdexcept>
@@ -52,11 +52,11 @@ public:
     RRTyped& operator=(const RRTyped&) = delete;
     RRTyped& operator=(RRTyped&&) noexcept = delete;
 
-    virtual Ref<IRenderObject> compile(IRenderGraph& p_graph, std::string_view p_key, const IResourceDescription& p_description) override {
+    virtual Ref<IRendObject> compile(IRendGraph& p_graph, std::string_view p_key, const IResourceDescription& p_description) override {
         if (p_description.get_type_uuid() != get_description_type_uuid()) {
             throw std::runtime_error(std::format("Failed to register resource '{}': the description has the wrong type for its registrator.", p_key));
         }
-        Ref<IRenderObject> result = compile_typed(p_graph, p_key, static_cast<const RDTyped<TParams>&>(p_description).params);
+        Ref<IRendObject> result = compile_typed(p_graph, p_key, static_cast<const RDTyped<TParams>&>(p_description).params);
         if (result == MEM_NULL) {
             throw std::runtime_error(std::format("Failed to register resource '{}': the registrator compiled no object.", p_key));
         }
@@ -76,16 +76,16 @@ protected:
     /**
      * @brief Deserialize TParams into an RDTyped<TParams>, for deserialize_description().
      */
-    static Unique<IResourceDescription> typed_deserialize_description(const DataValue& p_description, RenderAllocator* p_allocator) {
+    static Unique<IResourceDescription> typed_deserialize_description(const DataValue& p_description, RendAlloc* p_alloc) {
         TParams params{};
         SerializableSD<TParams>::deserialize(p_description, params);
-        return make_unique<RDTyped<TParams>>(p_allocator, std::move(params));
+        return make_unique<RDTyped<TParams>>(p_alloc, std::move(params));
     }
 
     /**
      * @brief Compile the render object of a description; see IResourceRegistrator::compile().
      */
-    virtual Ref<IRenderObject> compile_typed(IRenderGraph& p_graph, std::string_view p_key, const TParams& p_params) = 0;
+    virtual Ref<IRendObject> compile_typed(IRendGraph& p_graph, std::string_view p_key, const TParams& p_params) = 0;
 };
 
 } // namespace WhiteBirdEngine

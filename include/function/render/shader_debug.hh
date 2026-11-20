@@ -29,7 +29,7 @@ inline constexpr size_t SHADER_DEBUG_FRAME_WORD_COUNT = SHADER_DEBUG_FRAME_ENTRY
 /** Number of bytes in one frame's shader-debug region. */
 inline constexpr size_t SHADER_DEBUG_FRAME_BYTE_SIZE = SHADER_DEBUG_FRAME_WORD_COUNT * sizeof(uint32_t);
 /** Shader-visible descriptor-heap index reserved for the shader-debug buffer. */
-inline constexpr uint32_t SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
+inline constexpr uint32_t SHADER_DEBUG_DESC_INDEX = 0;
 
 /**
  * @enum ShaderDebugError

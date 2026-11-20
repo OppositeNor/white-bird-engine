@@ -100,7 +100,7 @@ def _resolve_pointee(value, mem_id, allocator):
     if resolved is None:
         resolved = _mem_id_as_void_pointer(mem_id)
     if resolved is None:
-        resolved = _call_allocator_get(mem_id, allocator)
+        resolved = _call_alloc_get(mem_id, allocator)
     if resolved is None:
         return None
 
@@ -114,40 +114,40 @@ def _resolve_pointee(value, mem_id, allocator):
         return resolved
 
 
-def _call_allocator_get(mem_id, allocator):
+def _call_alloc_get(mem_id, allocator):
     try:
         allocator_type = allocator.type.target().strip_typedefs()
-        allocator_address = _to_int(allocator)
+        alloc_address = _to_int(allocator)
         mem_id_value = _to_int(mem_id)
-        expression = f"(({allocator_type}*){allocator_address})->try_get((WhiteBirdEngine::MemID){mem_id_value})"
+        expression = f"(({allocator_type}*){alloc_address})->try_get((WhiteBirdEngine::MemID){mem_id_value})"
         return gdb.parse_and_eval(expression)
     except (gdb.error, RuntimeError):
         return None
 
 
 def _resolve_fixed_size_pool_pointee(mem_id, allocator):
-    allocator_value = _dynamic_allocator_value(allocator)
-    if allocator_value is None or "HeapAllocatorFixedSizePool" not in str(allocator_value.type):
+    alloc_value = _dynamic_alloc_value(allocator)
+    if alloc_value is None or "HeapAllocFixedSizePool" not in str(alloc_value.type):
         return None
 
     try:
         internal_id = _to_int(mem_id)
-        max_obj = _to_int(allocator_value["max_obj"])
+        max_obj = _to_int(alloc_value["max_obj"])
         if internal_id == _MEM_NULL or internal_id > max_obj:
             return _null_void_pointer()
 
-        data_index = _to_int((allocator_value["index_chunk_start"] + internal_id - 1).dereference())
+        data_index = _to_int((alloc_value["index_chunk_start"] + internal_id - 1).dereference())
         if data_index == _MEM_NULL:
             return _null_void_pointer()
 
-        element_size = _to_int(allocator_value["element_size"])
+        element_size = _to_int(alloc_value["element_size"])
         offset = (data_index - 1) * element_size
-        return (allocator_value["mem_chunk"] + offset).cast(gdb.lookup_type("void").pointer())
+        return (alloc_value["mem_chunk"] + offset).cast(gdb.lookup_type("void").pointer())
     except (gdb.error, RuntimeError, TypeError, ValueError):
         return None
 
 
-def _dynamic_allocator_value(allocator):
+def _dynamic_alloc_value(allocator):
     try:
         dynamic_type = allocator.dereference().dynamic_type.strip_typedefs()
         return allocator.cast(dynamic_type.pointer()).dereference()

@@ -13,12 +13,12 @@
    without entering the runtime shader. Slang's JSON is normalized into the snake-case schema of
    `include/function/render/shader_metadata.hh`.
 4. The loader stores the SPIR-V words and metadata path in `RUShader`; pipeline resources carry stage entry names
-   (`src/function/render_vk/render_vk_resource_unit_loader.cpp`).
+   (`src/function/rend_vk/rend_vk_resource_unit_loader.cpp`).
 5. `ShaderMetadataLoader::load` resolves `RUShader::metadata_path`, parses the JSON, and deserializes `ShaderMetadata`.
 6. Backend-neutral resolvers consume metadata. Pipeline compilers (`graphics_pipeline_compiler_vk.cpp`,
    `compute_pipeline_compiler_vk.cpp`) collect the descriptor-heap layout into `ROPipelineVK`; `pipeline_compiler_vk.cpp`
    only compiles and caches `ROShaderVK`. Ray-tracing pipelines get no reflected layout.
-7. At graph build, a pipeline-run task's `PipelineDescriptorBindingsVK::bind_resources()` looks up each field's resource id
+7. At graph build, a pipeline-run task's `PipelineDescBindingsVK::bind_resources()` looks up each field's resource id
    through the task resource map and checks the graph resource's type UUID. `append_accesses()` reports the reflected
    accesses (samplers excluded). `push()` resolves the current frame slot, writes indices and push constants, and pushes the
    block.
@@ -39,14 +39,14 @@ Compiled fixtures in tests are parsed directly from `test_env/res/assets/shaders
 
 ## Vulkan descriptor-heap support
 
-`src/function/render_vk/shader_metadata_vk_utils.cpp` parses `wbe::descriptor` types through
-`EnumReflection<ShaderDescriptorHeapTypeVK>` (canonical names with lowercase aliases). Each annotation takes two or three
+`src/function/rend_vk/shader_metadata_vk_utils.cpp` parses `wbe::desc` types through
+`EnumReflection<ShaderDescHeapTypeVK>` (canonical names with lowercase aliases). Each annotation takes two or three
 string arguments: type, non-empty resource id, optional access. It must mark an aligned eight-byte `uint2` in the entry
 point's only push-data parameter. The walker flattens nested structs and fixed-size struct arrays into paths such as
 `lights[0].shadowmap`; paths identify layout fields, while binding uses resource ids.
 
 Rejected with `std::runtime_error`: fewer than two arguments, unknown types, `write` on read-only types, misaligned or
-overlapping fields, duplicate paths, more than one push-data parameter, a field carrying both `wbe::descriptor` and
+overlapping fields, duplicate paths, more than one push-data parameter, a field carrying both `wbe::desc` and
 `wbe::push_constant`, an indexed resource id outside a struct array, or a bare `[]`. A descriptor-free entry point yields an
 empty layout. Graphics stages merge when equal paths agree on type, resource id, and offset; differing accesses combine to
 `read_write`.
@@ -54,10 +54,10 @@ empty layout. Graphics stages merge when equal paths agree on type, resource id,
 At record time an undeclared graph resource throws ("Render graph resource was not declared"), and an unresolved or null
 slot throws at `push()`. Buffer bindings name a complete `ROBufferVK`; subranges are not supported.
 
-`DescriptorHeapAllocatorVK` is generic (`create_heap`, `allocate_arena`, `allocate_descriptor`, `bind_heaps`).
-`RendererVK::create_descriptor_heap_allocator()` defines the arenas: buffers (index 0 reserved for the shader-debug buffer),
+`DescHeapAllocVK` is generic (`create_heap`, `allocate_arena`, `allocate_desc`, `bind_heaps`).
+`RendererVK::create_desc_heap_alloc()` defines the arenas: buffers (index 0 reserved for the shader-debug buffer),
 sampled images, and storage images in the resource heap, and samplers in the sampler heap. Plugins add arenas;
-`RayTracingPluginVK::configure_descriptor_heaps()` appends an acceleration-structure arena to the resource heap with the
+`RayTracingPluginVK::configure_desc_heaps()` appends an acceleration-structure arena to the resource heap with the
 device-reported acceleration-structure descriptor size as stride (at most `bufferDescriptorSize`, aligned to
 `bufferDescriptorAlignment`). Arena indices are `byte_offset / stride + i`. `ROBufferVK`, `ROImageViewVK`, `ROSamplerVK`, and
 `ROAccelerationStructureVK` lazily own their descriptor indices and defer release for frames in flight. The render graph
@@ -67,7 +67,7 @@ binds both heaps on every task command buffer.
 
 All are declared in `res/assets/shaders/utils/utils.slang`.
 
-### `wbe::descriptor`
+### `wbe::desc`
 
 See above. Per-array-instance ids: an id ending in `[]` becomes `<name>[i]` for element `i` of the nearest enclosing
 descriptor struct array; multiple fields may share one id.
@@ -75,8 +75,8 @@ descriptor struct array; multiple fields may share one id.
 Ray tracing keeps the metadata declaration and runtime index distinct:
 
 ```slang
-struct DescriptorIndices {
-    [wbe::descriptor("acceleration_structure", "acceleration_structure")]
+struct DescIndices {
+    [wbe::desc("acceleration_structure", "acceleration_structure")]
     uint2 scene;
 };
 
@@ -85,14 +85,14 @@ RaytracingAccelerationStructure scene_acceleration_structure;
 #endif
 ```
 
-Files: `shader_metadata_vk_utils.{hh,cpp}`, `pipeline_descriptor_bindings_vk.{hh,cpp}`, `descriptor_heap_allocator_vk.cpp`,
-`ray_tracing_plugin_vk.cpp`, `ro_acceleration_structure_vk.hh`, fixture `res/assets/shaders/descriptor_heap_reflection`.
+Files: `shader_metadata_vk_utils.{hh,cpp}`, `pipeline_desc_bindings_vk.{hh,cpp}`, `desc_heap_alloc_vk.cpp`,
+`ray_tracing_plugin_vk.cpp`, `ro_acceleration_structure_vk.hh`, fixture `res/assets/shaders/desc_heap_reflection`.
 
 ### `wbe::push_constant`
 
 Marks a four-byte scalar in the push-data block. `"time"` requires `float` (renderer time, `double` → `float`);
 `"frame_slot"` requires `uint`. Other identifiers are custom `uint`, `int`, or `float` constants
-(`ShaderDefaultPushValueVK::CUSTOM`), recorded in `ShaderDescriptorHeapLayoutVK::default_fields`. Compute tasks
+(`ShaderDefaultPushValueVK::CUSTOM`), recorded in `ShaderDescHeapLayoutVK::default_fields`. Compute tasks
 (`RTRunComputePipelineVK`, `RTRunComputePipelineIndirectVK`, `RTRunComputePipelinesSequentialVK` with a per-entry overload,
 `RTPingPongVK`) expose `set_push_constant()` (throws on an undeclared name or type mismatch) and `try_set_push_constant()`
 (returns `bool`); values persist across pushes. Their recipe params take a `push_constants` table of identifier → number.
@@ -126,7 +126,7 @@ material tables are built lazily per distinct contract by `MeshResourcesVK::acqu
 
 ### Mesh contract
 
-`MeshDescriptorIndices` uses `mesh_submeshes`, `mesh_nodes`, `mesh_instances`, and `mesh_transform` (only with
+`MeshDescIndices` uses `mesh_submeshes`, `mesh_nodes`, `mesh_instances`, and `mesh_transform` (only with
 `WBE_MESH_TRANSFORM`), with the reflection-only `MeshContractMetadata`. C++ names them `REND_RES_MESH_SUBMESHES`,
 `_NODES`, `_INSTANCES`, `_TRANSFORM`, `_MATERIAL_PARAMS`, and `_MATERIAL_SAMPLER` (`mesh_resources_vk.hh`).
 `RTGraphicsDrawMeshVK` aliases only the ids the pipeline declares and throws when `mesh_transform` is declared without
@@ -150,9 +150,9 @@ Trace the exact raw Slang JSON first; do not infer layout from Slang source alon
    behavior matters, a compiled fixture under `res/assets/shaders` reached from `res/res_chunks` (`scope = "test_only"`).
 4. Put semantic validation in a backend-neutral resolver; use `ShaderMetadataQuery` for uniqueness and
    `ShaderRoleFieldResolver` for roles.
-5. For a Vulkan descriptor, extend `ShaderDescriptorHeapTypeVK` and the field handling in `shader_metadata_vk_utils.cpp`,
+5. For a Vulkan descriptor, extend `ShaderDescHeapTypeVK` and the field handling in `shader_metadata_vk_utils.cpp`,
    preserving alignment, overlap, path, resource-id, stage-merge, and array rules, and the binding / access logic in
-   `pipeline_descriptor_bindings_vk.cpp`.
+   `pipeline_desc_bindings_vk.cpp`.
 6. Add resolver tests for invalid type, layout, duplicate, missing-pair, and cross-stage mismatch cases.
 
 Do not branch generic propagation on concrete texture roles, move backend descriptor concepts into `function/render`, or
@@ -170,8 +170,8 @@ catch engine exceptions.
 ## Fixtures and tests
 
 - Fixtures: `reflection_attributes`, `forward_cook_torrance_pbr` (material layout, mesh storage buffers, mesh nodes),
-  `vertex_input_attributes`, `descriptor_heap_reflection`, `deferred_gbuffer` (masked entry).
-- `shader_metadata_vk_test.cpp`, `shader_metadata_vk_utils_test.cpp`, `pipeline_descriptor_bindings_vk_test.cpp`,
+  `vertex_input_attributes`, `desc_heap_reflection`, `deferred_gbuffer` (masked entry).
+- `shader_metadata_vk_test.cpp`, `shader_metadata_vk_utils_test.cpp`, `pipeline_desc_bindings_vk_test.cpp`,
   `shader_role_field_resolver_test.cpp`, `material_texture_contract_resolver_test.cpp`,
   `mesh_node_contract_resolver_test.cpp`, mesh material resource builder tests, all under `tests/unit/function/`.
 - `tests/shader/test_*.py` with kernels in `tests/shader/kernels/`: slangpy tests of shader utility functions, run by

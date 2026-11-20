@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_CORE_UTILS_HH
 #define WBE_FILE_CORE_UTILS_HH
 
-#include "core/allocator/heap_allocator_atomic_size_classified.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc_atomic_size_classified.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "utils/defs.hh"
@@ -173,7 +173,7 @@ RefWeak<T> requires_valid(std::string_view p_name, RefWeak<T> p_ref) {
     return p_ref;
 }
 
-using HeapAllocatorDefault = HeapAllocatorAtomicSizeClassified;
+using HeapAllocDefault = HeapAllocAtomicSizeClassified;
 
 } // namespace WhiteBirdEngine
 

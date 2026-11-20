@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_JOB_BUFFER_RING_SPSC_HH
 #define WBE_FILE_JOB_BUFFER_RING_SPSC_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "job_buffer.hh"
 #include "utils/defs.hh"
@@ -45,10 +45,10 @@ public:
     /**
      * @brief Constructor.
      *
-     * @param p_allocator The allocator this buffer uses.
+     * @param p_alloc The allocator this buffer uses.
      * @param p_buffer_size The size of the buffer.
      */
-    JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size);
+    JobBufferRingSPSC(HeapAllocDefault* p_alloc, size_t p_buffer_size);
 
     std::function<void()> retrieve_job(bool p_block = false);
     std::future<void> add_job(std::function<void()> p_job);
@@ -58,9 +58,9 @@ public:
     }
 
 private:
-    HeapAllocatorDefault* allocator;
+    HeapAllocDefault* alloc;
     std::counting_semaphore<> semaphore{0};
-    Vector<std::function<void()>, HeapAllocatorDefault> buffer;
+    Vector<std::function<void()>, HeapAllocDefault> buffer;
     WBE_NO_FALSE_SHARING std::atomic<size_t> head;
     WBE_NO_FALSE_SHARING std::atomic<size_t> tail;
 };

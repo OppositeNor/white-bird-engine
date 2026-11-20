@@ -85,32 +85,32 @@ static const float VOXEL_COVERAGE_EPSILON = 0.0001;
 /**
  * @brief Reflected descriptor-heap bindings for this construction stage.
  */
-struct OctreeBuildDescriptorIndices {
+struct OctreeBuildDescIndices {
     /**
      * @brief Descriptor-heap reference to the full view of the texture the pass writes through the per-level views.
      * @details Unused by the shader; it declares that the pass writes every mip level, so render graphs order the
      * readers of the full view after it. Declared first, so a first write moves every mip level into the unified layout.
      */
 #ifdef WBE_DYNAMIC_BUILD
-    [wbe::descriptor("storage_image", "octree_dynamic", "write")]
+    [wbe::desc("storage_image", "octree_dynamic", "write")]
 #else
-    [wbe::descriptor("storage_image", "octree_static", "write")]
+    [wbe::desc("storage_image", "octree_static", "write")]
 #endif
     uint2 texture;
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [wbe::descriptor("storage_buffer", "octree_info", "read")]
+    [wbe::desc("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
     /**
      * @brief Storage views of the texture's mip levels.
      */
     OctreeHeapLevelStorage storage;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<OctreeBuildDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeBuildDescIndices> di;
 
 /**
  * @brief Transform a mesh vertex into the octree's unit cube.
@@ -120,12 +120,12 @@ ConstantBuffer<OctreeBuildDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
+    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[di.octree_info.x];
     OctreeInfo octree_info = octree_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
 
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
 
     VSOutput output;
@@ -228,7 +228,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
+    StructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[di.octree_info.x];
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;
     uint vertical_axis = depth_axis == 2 ? 1 : 2;
@@ -236,5 +236,5 @@ void fragment_main(GSOutput p_input) {
     voxel[horizontal_axis] = cell.x;
     voxel[vertical_axis] = cell.y;
     voxel[depth_axis] = uint(clamp(floor(p_input.plane_depth), float(p_input.depth_bounds.x), float(p_input.depth_bounds.y)));
-    write_octree_ancestors(descriptor_indices.storage, voxel, 0, octree_info[0].max_depth, OCTREE_OCCUPIED);
+    write_octree_ancestors(di.storage, voxel, 0, octree_info[0].max_depth, OCTREE_OCCUPIED);
 }

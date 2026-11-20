@@ -14,7 +14,7 @@
 */
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -56,32 +56,32 @@ TEST(WBEROBufferVKBuilderTest, SetPropertiesRejectsInvalidSizes) {
     EXPECT_THROW(builder.set_properties(std::numeric_limits<size_t>::max(), 2, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT), std::runtime_error);
 }
 
-TEST(WBEROBufferVKBuilderTest, InitialDataOwnsSourceBytes) {
+TEST(WBEROBufferVKBuilderTest, InitDataOwnsSourceBytes) {
     std::array<uint8_t, 4> data{1, 2, 3, 4};
     ROBufferVK::Builder builder;
 
-    builder.initial_data(std::span<const uint8_t>(data));
+    builder.init_data(std::span<const uint8_t>(data));
     data[0] = 9;
 
     EXPECT_EQ(builder.size, data.size());
     EXPECT_EQ(WBE_REQUIRED(builder.domain), DeviceDomain::HOST_DEVICE);
-    EXPECT_EQ(builder.initial_data_bytes, (std::vector<uint8_t>{1, 2, 3, 4}));
+    EXPECT_EQ(builder.init_data_bytes, (std::vector<uint8_t>{1, 2, 3, 4}));
 }
 
-TEST(WBEROBufferVKBuilderTest, DeviceInitialDataAddsTransferDestinationUsage) {
+TEST(WBEROBufferVKBuilderTest, DeviceInitDataAddsTransferDestinationUsage) {
     const std::array<uint8_t, 2> data{5, 6};
     ROBufferVK::Builder builder;
 
-    builder.initial_data(std::span<const uint8_t>(data), DeviceDomain::DEVICE);
+    builder.init_data(std::span<const uint8_t>(data), DeviceDomain::DEVICE);
 
     ASSERT_TRUE(builder.usage.has_value());
     EXPECT_NE(WBE_REQUIRED(builder.usage) & VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0U);
 }
 
-TEST(WBEROBufferVKBuilderTest, InitialDataRejectsEmptySpan) {
+TEST(WBEROBufferVKBuilderTest, InitDataRejectsEmptySpan) {
     ROBufferVK::Builder builder;
 
-    EXPECT_THROW(builder.initial_data(std::span<const uint8_t>()), std::runtime_error);
+    EXPECT_THROW(builder.init_data(std::span<const uint8_t>()), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

@@ -20,18 +20,18 @@ ParameterBlock<MaterialTextureContractMetadata> material_textures;
 ParameterBlock<MeshContractMetadata> mesh;
 #endif
 
-struct DeferredGBufferDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
+struct DeferredGBufferDescIndices {
+    [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
-    [wbe::descriptor("uniform_buffer", "material_params")]
+    [wbe::desc("uniform_buffer", "material_params")]
     uint2 material_params;
-    [wbe::descriptor("sampler", "material_sampler")]
+    [wbe::desc("sampler", "material_sampler")]
     uint2 material_sampler;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<DeferredGBufferDescriptorIndices> descriptor_indices;
+ConstantBuffer<DeferredGBufferDescIndices> di;
 
 /**
  * @brief Transform a mesh vertex for the deferred G-buffer pass.
@@ -41,11 +41,11 @@ ConstantBuffer<DeferredGBufferDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     SubmeshData submesh = submeshes[instance.submesh_index];
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
@@ -89,21 +89,21 @@ struct GBufferOutput {
  */
 static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     GBufferOutput output;
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
 
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
     uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
     uint rma_index = uint(active_material.rma_index >= 0 ? active_material.rma_index : 0);
-    uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
-    uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
-    uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
+    uint albedo_desc_index = NonUniformResourceIndex(albedo_index);
+    uint normal_desc_index = NonUniformResourceIndex(normal_index);
+    uint rma_desc_index = NonUniformResourceIndex(rma_index);
 
-    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
-    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_descriptor_index];
-    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_descriptor_index];
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_desc_index];
+    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_desc_index];
+    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_desc_index];
     float4 albedo_sample = albedo_texture.Sample(material_sampler, p_input.uv);
     if (p_masked && albedo_sample.a < 0.5) {
         discard;

@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_VERTEX_INPUT_CONTRACT_RESOLVER_HH
 #define WBE_FILE_VERTEX_INPUT_CONTRACT_RESOLVER_HH
 
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/vertex_input_contract.hh"
 #include "function/render/vertex_input_requirement.hh"

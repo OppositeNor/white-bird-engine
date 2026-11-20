@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_UNIQUE_HH
 #define WBE_FILE_UNIQUE_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/subobject_offset.hh"
 #include "utils/defs.hh"
 #include <concepts>
@@ -35,7 +35,7 @@ namespace WhiteBirdEngine {
  *
  * @tparam T The type of the instance.
  */
-template <typename T, typename AllocType = HeapAllocator>
+template <typename T, typename AllocType = HeapAlloc>
 class Unique {
     template <typename T1, typename AllocType1>
     friend class Unique;
@@ -45,7 +45,7 @@ class Unique {
     friend struct ::std::hash<Unique<T, AllocType>>;
 
 public:
-    Unique() : mem_id(MEM_NULL), allocator(nullptr) {
+    Unique() : mem_id(MEM_NULL), alloc(nullptr) {
     }
     ~Unique() {
         reset();
@@ -53,7 +53,7 @@ public:
     // Unique is not copyable.
     Unique(const Unique&) = delete;
     Unique(Unique&& p_other) noexcept
-        : mem_id(p_other.mem_id), allocator(p_other.allocator), object_offset(p_other.object_offset) {
+        : mem_id(p_other.mem_id), alloc(p_other.alloc), object_offset(p_other.object_offset) {
         p_other.mem_id = MEM_NULL;
     }
     Unique& operator=(const Unique&) = delete;
@@ -63,7 +63,7 @@ public:
         }
         reset();
         mem_id = p_other.mem_id;
-        allocator = p_other.allocator;
+        alloc = p_other.alloc;
         object_offset = p_other.object_offset;
         p_other.mem_id = MEM_NULL;
         return *this;
@@ -72,7 +72,7 @@ public:
     template <typename T1, typename AllocType1>
         requires std::convertible_to<T1*, T*> && std::convertible_to<AllocType1*, AllocType*>
     Unique(Unique<T1, AllocType1>&& p_other)
-        : mem_id(p_other.mem_id), allocator(p_other.allocator),
+        : mem_id(p_other.mem_id), alloc(p_other.alloc),
           object_offset(get_converted_subobject_offset<T>(p_other.get(), p_other.object_offset)) {
         p_other.mem_id = MEM_NULL;
     }
@@ -82,13 +82,13 @@ public:
         std::ptrdiff_t offset = get_converted_subobject_offset<T>(p_other.get(), p_other.object_offset);
         reset();
         mem_id = p_other.mem_id;
-        allocator = p_other.allocator;
+        alloc = p_other.alloc;
         object_offset = offset;
         p_other.mem_id = MEM_NULL;
         return *this;
     }
 
-    Unique(AllocType* p_allocator, MemID p_mem_id) : mem_id(p_mem_id), allocator(p_allocator) {
+    Unique(AllocType* p_alloc, MemID p_mem_id) : mem_id(p_mem_id), alloc(p_alloc) {
     }
 
     Unique(MemID p_mem_id) : Unique() {
@@ -101,14 +101,14 @@ public:
      * @brief Create a unique instance.
      *
      * @tparam Args The arguments of the constructor.
-     * @param p_allocator The allocator that this instance is going to be
+     * @param p_alloc The allocator that this instance is going to be
      * allocated.
      * @param p_args The arguments.
      * @return The unique instnace.
      */
     template <typename... Args>
-    static Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
-        return Unique(p_allocator, create_obj<T>(*p_allocator, std::forward<Args>(p_args)...));
+    static Unique<T> make_unique(AllocType* p_alloc, Args&&... p_args) {
+        return Unique(p_alloc, create_obj<T>(*p_alloc, std::forward<Args>(p_args)...));
     }
 
     /**
@@ -144,7 +144,7 @@ public:
         }
         // Destroy through the viewed subobject, but free the whole allocation.
         get_object()->~T();
-        allocator->deallocate(mem_id);
+        alloc->deallocate(mem_id);
         mem_id = MEM_NULL;
         object_offset = 0;
     }
@@ -189,17 +189,17 @@ public:
      * @return True if is NULL, false otherwise.
      */
     bool is_null() const {
-        return allocator == nullptr || mem_id == MEM_NULL;
+        return alloc == nullptr || mem_id == MEM_NULL;
     }
 
 private:
     T* get_object() const {
-        WBE_DEBUG_ASSERT(allocator != nullptr);
-        return apply_subobject_offset<T>(allocator->get(mem_id), object_offset);
+        WBE_DEBUG_ASSERT(alloc != nullptr);
+        return apply_subobject_offset<T>(alloc->get(mem_id), object_offset);
     }
 
     MemID mem_id;
-    AllocType* allocator;
+    AllocType* alloc;
     std::ptrdiff_t object_offset = 0;
 };
 
@@ -208,15 +208,15 @@ private:
  *
  * @tparam T The type that is created.
  * @tparam Args The arguments of the constructor.
- * @param p_allocator The allocator that this instance is going to be allocated.
+ * @param p_alloc The allocator that this instance is going to be allocated.
  * @param p_args The arguments.
  * @return The unique instnace.
  */
-template <typename T, typename AllocType = HeapAllocator, typename... Args>
-Unique<T> make_unique(AllocType* p_allocator, Args&&... p_args) {
-    WBE_DEBUG_ASSERT(p_allocator != nullptr);
-    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
-    return Unique<T>(p_allocator, id);
+template <typename T, typename AllocType = HeapAlloc, typename... Args>
+Unique<T> make_unique(AllocType* p_alloc, Args&&... p_args) {
+    WBE_DEBUG_ASSERT(p_alloc != nullptr);
+    MemID id = create_obj<T>(*p_alloc, std::forward<Args>(p_args)...);
+    return Unique<T>(p_alloc, id);
 }
 
 } // namespace WhiteBirdEngine
@@ -235,7 +235,7 @@ struct hash<::WhiteBirdEngine::Unique<T, AllocType>> { // NOLINT
         if (p_unique.is_null()) {
             return WhiteBirdEngine::MEM_NULL;
         }
-        return std::hash<AllocType*>{}(p_unique.allocator) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.mem_id);
+        return std::hash<AllocType*>{}(p_unique.alloc) ^ std::hash<::WhiteBirdEngine::MemID>{}(p_unique.mem_id);
     }
 };
 

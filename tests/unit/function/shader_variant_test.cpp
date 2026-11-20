@@ -13,13 +13,13 @@
    limitations under the License.
 */
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_macro_value.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
 #include "function/render/shader_variant_resolver.hh"
-#include "function/render_vk/render_vk_resource_unit_loader.hh"
+#include "function/rend_vk/rend_vk_resource_unit_loader.hh"
 #include "global/global.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -110,7 +110,7 @@ protected:
         register_renderer_vk_resource_unit_loaders();
         ResourceManager* resource_manager = ResourceManager::get_singleton();
         resource_manager->register_chunk(
-            make_ref<ResourceChunkLoadFile>(global_allocator(), "res_chunks/shader_variants.json", resource_manager->get_allocator()));
+            make_ref<ResourceChunkLoadFile>(global_alloc(), "res_chunks/shader_variants.json", resource_manager->get_allocator()));
         shader = resource_manager->get_resource<RUShader>("shader_variants_shader");
     }
 

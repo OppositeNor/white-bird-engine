@@ -13,5 +13,5 @@
    limitations under the License.
 */
 // NOLINTBEGIN
-#include "stl_allocator_test.hh"
+#include "stl_alloc_test.hh"
 // NOLINTEND

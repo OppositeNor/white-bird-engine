@@ -34,7 +34,7 @@ EngineCore::~EngineCore() {
     delete label_manager;
     delete profiling_manager;
     delete file_system;
-    delete pool_allocator;
+    delete pool_alloc;
     delete stdio_logging_manager;
     delete engine_config;
     delete global_clock;
@@ -44,19 +44,19 @@ EngineCore::~EngineCore() {
 EngineCore::EngineCore(uint32_t p_argc, char* p_argv[]) {
     global_clock = new Clock();
     file_system = new FileSystem();
-    initialize(p_argc, p_argv);
+    init(p_argc, p_argv);
 }
 
 EngineCore::EngineCore(uint32_t p_argc, char* p_argv[], const Path& p_root_dir) {
     global_clock = new Clock();
     file_system = new FileSystem(p_root_dir);
-    initialize(p_argc, p_argv);
+    init(p_argc, p_argv);
 }
 
-void EngineCore::initialize(uint32_t p_argc, char* p_argv[]) {
+void EngineCore::init(uint32_t p_argc, char* p_argv[]) {
     engine_config = new EngineConfig((file_system->get_config_directory() / "engine_config.toml"), p_argc, p_argv);
     const EngineConfigOptions& config_options = engine_config->get_config_options();
-    pool_allocator = new HeapAllocatorGlobal(HeapAllocatorGlobal::make_default_size_classes(
+    pool_alloc = new HeapAllocGlobal(HeapAllocGlobal::make_default_size_classes(
         config_options.global_mem_small_pool_size, config_options.global_mem_medium_pool_size, config_options.global_mem_large_pool_size));
     stdio_logging_manager = new LoggingManager<LogStream, std::ostream>(std::cout);
     profiling_manager = new ProfilingManager();

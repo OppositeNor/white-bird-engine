@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_INPUT_MANAGER_MOCKED_HH
 #define WBE_FILE_INPUT_MANAGER_MOCKED_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/engine_core.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/input_manager_regular.hh"
@@ -57,16 +57,16 @@ public:
     /**
      * @brief Reads and validates the input sequence from INPUT_SEQUENCE_ENVIRONMENT_VARIABLE.
      *
-     * @param p_allocator Allocator for the parsed sequence. Must outlive this object.
+     * @param p_alloc Allocator for the parsed sequence. Must outlive this object.
      */
-    explicit InputManagerMocked(HeapAllocatorGlobal* p_allocator);
+    explicit InputManagerMocked(HeapAllocGlobal* p_alloc);
     /**
      * @brief Validates and stores an explicit input sequence, ignoring the environment.
      *
-     * @param p_allocator Allocator for the parsed sequence. Must outlive this object.
+     * @param p_alloc Allocator for the parsed sequence. Must outlive this object.
      * @param p_input_sequence JSON input sequence in the class's documented format. Empty replays nothing.
      */
-    InputManagerMocked(HeapAllocatorGlobal* p_allocator, std::string_view p_input_sequence);
+    InputManagerMocked(HeapAllocGlobal* p_alloc, std::string_view p_input_sequence);
     virtual ~InputManagerMocked() override = default;
     InputManagerMocked(const InputManagerMocked&) = delete;
     InputManagerMocked(InputManagerMocked&&) noexcept = delete;
@@ -95,7 +95,7 @@ private:
     bool update_current_entry(Clock::time_point p_now) const;
 
     mutable std::mutex sequence_mutex;
-    mutable Vector<SequenceEntry, HeapAllocatorGlobal> sequence;
+    mutable Vector<SequenceEntry, HeapAllocGlobal> sequence;
     mutable size_t current_entry_index = 0;
     // When the current entry's delay began; unset until the first status query.
     mutable std::optional<Clock::time_point> current_entry_start;

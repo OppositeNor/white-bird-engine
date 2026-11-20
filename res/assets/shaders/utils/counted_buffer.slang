@@ -57,11 +57,11 @@ struct CountedBuffer<T> {
 
     /**
      * @brief View the buffer at a descriptor-heap index, laid out as a counted buffer.
-     * @param p_descriptor Descriptor-heap reference to the buffer, as declared with wbe::descriptor; x is the heap index.
+     * @param p_desc Descriptor-heap reference to the buffer, as declared with wbe::descriptor; x is the heap index.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
-    __init(uint2 p_descriptor, uint p_frame_slot) {
-        buffer = ResourceDescriptorHeap[p_descriptor.x];
+    __init(uint2 p_desc, uint p_frame_slot) {
+        buffer = ResourceDescriptorHeap[p_desc.x];
         frame_slot = p_frame_slot;
     }
 

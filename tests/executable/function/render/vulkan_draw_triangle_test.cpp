@@ -17,14 +17,14 @@
 #include "core/memory/reference_strong.hh"
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/render_graph_bindings_function_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/rend_graph_bindings_function_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
-#include "render_test.hh"
+#include "rend_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstdlib>
@@ -35,21 +35,21 @@
 
 namespace WBE = WhiteBirdEngine;
 
-// The render graph definition, res/assets/render_graphs/render_graphs.toml, whose recipe is render_graphs.draw_triangle.
-inline constexpr std::string_view DRAW_TRIANGLE_RENDER_GRAPH = "draw_triangle_graph";
+// The render graph definition, res/assets/rend_graphs/rend_graphs.toml, whose recipe is rend_graphs.draw_triangle.
+inline constexpr std::string_view DRAW_TRIANGLE_REND_GRAPH = "draw_triangle_graph";
 
 class ApplicationVulkanDrawPipelineTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawPipelineTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {
     }
 
     virtual void logic_update(double p_delta) override {
     }
 
-    virtual void render_update(double /*p_delta*/) override {
+    virtual void rend_update(double /*p_delta*/) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
+        WBE::on_exec_test_rend(*renderer, renderer->get_rend_context()->current_frame);
     }
 
     void setup_graphics_pipeline() {
@@ -59,17 +59,17 @@ public:
             throw std::runtime_error("Failed to setup draw triangle test: expected exactly one opaque triangle submesh.");
         }
         // The recipe registers the mesh and the pipeline and imports only the swap chain, which the renderer supplies.
-        render_graph = WBE::acquire_test_render_graph(*WBE::RendererVK::get_singleton(),
-            DRAW_TRIANGLE_RENDER_GRAPH,
-            WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(), DRAW_TRIANGLE_RENDER_GRAPH));
+        rend_graph = WBE::acquire_test_rend_graph(*WBE::RendererVK::get_singleton(),
+            DRAW_TRIANGLE_REND_GRAPH,
+            WBE::make_ref<WBE::RendGraphBindingsFunctionVK>(WBE::global_alloc(), DRAW_TRIANGLE_REND_GRAPH));
     }
 
     void release_graphics_pipeline() {
-        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
+        WBE::release_test_rend_graph(*WBE::RendererVK::get_singleton(), rend_graph);
     }
 
 private:
-    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    WBE::Ref<WBE::RendGraphVK> rend_graph;
 };
 
 int main(int p_argc, char* p_argv[]) {
@@ -82,8 +82,8 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_graphics_pipeline();
             game_application.run();
             game_application.release_graphics_pipeline();
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_alloc->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
                 WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
                     ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));

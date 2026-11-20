@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_OCTREE_HH
 #define WBE_FILE_OCTREE_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "glm/common.hpp"
@@ -98,14 +98,14 @@ public:
 
     /**
      * @brief Create an empty tree with an allocated root node.
-     * @param p_allocator Allocator that must outlive the tree and returned node references.
+     * @param p_alloc Allocator that must outlive the tree and returned node references.
      * @throws std::runtime_error If the allocator is null.
      */
-    explicit Octree(HeapAllocator* p_allocator) : allocator(p_allocator) {
-        if (allocator == nullptr) {
+    explicit Octree(HeapAlloc* p_alloc) : alloc(p_alloc) {
+        if (alloc == nullptr) {
             throw std::runtime_error("Octree requires a non-null allocator.");
         }
-        root = make_ref<OctreeNode>(allocator);
+        root = make_ref<OctreeNode>(alloc);
     }
 
     /**
@@ -154,7 +154,7 @@ public:
             auto subregion = get_subregion(position);
             auto child = current->children[subregion];
             if (child == MEM_NULL) {
-                child = make_ref<OctreeNode>(allocator);
+                child = make_ref<OctreeNode>(alloc);
                 child->parent = current;
                 current->children[subregion] = child;
             }
@@ -187,7 +187,7 @@ public:
     }
 
 private:
-    HeapAllocator* allocator = nullptr;
+    HeapAlloc* alloc = nullptr;
     Ref<OctreeNode> root;
     void check_position(glm::vec3 p_position) const {
         if (!std::isfinite(p_position.x) || !std::isfinite(p_position.y) || !std::isfinite(p_position.z) || p_position.x < 0.0F ||

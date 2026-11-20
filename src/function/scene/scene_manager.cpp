@@ -13,8 +13,8 @@
    limitations under the License.
 */
 #include "function/scene/scene_manager.hh"
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/scene/scene.hh"
@@ -25,8 +25,8 @@
 
 namespace WhiteBirdEngine {
 
-SceneManager::SceneManager(Map<std::string, Ref<Scene>, HeapAllocatorGlobal> p_scene_map)
-    : scene_map(std::move(p_scene_map)), current_scene_id(global_allocator()) {
+SceneManager::SceneManager(Map<std::string, Ref<Scene>, HeapAllocGlobal> p_scene_map)
+    : scene_map(std::move(p_scene_map)), current_scene_id(global_alloc()) {
 }
 
 SceneManager::~SceneManager() {

@@ -15,13 +15,13 @@
 #ifndef WBE_FILE_SCENE_HH
 #define WBE_FILE_SCENE_HH
 
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/i_render_graph.hh"
-#include "function/render/i_render_graph_bindings.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_graph_bindings.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <cstddef>
 #include <cstdint>
@@ -39,9 +39,9 @@ class World;
  * @class Scene
  * @brief Orchestrates the lifecycle and active render state of a set of worlds.
  *
- * Each world names a render graph definition and an instance key (World::get_render_graph_resource_key() and
- * World::get_render_graph_instance_key()). Setup acquires one graph instance per distinct definition and instance key, with
- * the bindings supplied for it (add_render_graph_bindings()), so the worlds sharing a pair share its instance; scenes share
+ * Each world names a render graph definition and an instance key (World::get_rend_graph_resource_key() and
+ * World::get_rend_graph_instance_key()). Setup acquires one graph instance per distinct definition and instance key, with
+ * the bindings supplied for it (add_rend_graph_bindings()), so the worlds sharing a pair share its instance; scenes share
  * an instance only when they supply the same bindings object. The scene owns the graph handles in a rendering-thread state
  * that it never touches directly: acquisitions, activations, and releases are queued through IRenderer::add_job() in
  * order, and their futures are observed so that their failures are rethrown by the next update(), teardown(), or setup().
@@ -57,11 +57,11 @@ public:
     /**
      * @brief Construct an empty scene.
      *
-     * @param p_allocator Allocator used by scene-owned containers and strings.
+     * @param p_alloc Allocator used by scene-owned containers and strings.
      * @param p_renderer Renderer receiving graph lifecycle and world render state.
      * @param p_resource_manifest_key Resource manifest associated with this scene.
      */
-    Scene(HeapAllocatorDefault* p_allocator, Ref<IRenderer> p_renderer, std::string_view p_resource_manifest_key = {});
+    Scene(HeapAllocDefault* p_alloc, Ref<IRenderer> p_renderer, std::string_view p_resource_manifest_key = {});
     ~Scene();
     Scene(const Scene&) = delete;
     Scene(Scene&&) noexcept = delete;
@@ -126,7 +126,7 @@ public:
      * @throws std::runtime_error If the scene is set up, p_resource_key is empty, p_bindings is null, or the definition and
      * instance key already have bindings.
      */
-    void add_render_graph_bindings(std::string_view p_resource_key, Ref<IRenderGraphBindings> p_bindings);
+    void add_rend_graph_bindings(std::string_view p_resource_key, Ref<IRendGraphBindings> p_bindings);
 
     /**
      * @brief Queue the acquisition of every world's render graph instance and run every driver setup callback.
@@ -168,11 +168,11 @@ private:
     };
 
     // The rendering-thread state of the scene; only queued render operations access it.
-    struct RenderState {
-        explicit RenderState(HeapAllocatorDefault* p_allocator) : graphs(p_allocator) {
+    struct RendState {
+        explicit RendState(HeapAllocDefault* p_alloc) : graphs(p_alloc) {
         }
-        // The acquired instances, keyed by RenderGraphInstanceCache::make_cache_key().
-        Map<std::string, Ref<IRenderGraph>, HeapAllocatorDefault> graphs;
+        // The acquired instances, keyed by RendGraphInstanceCache::make_cache_key().
+        Map<std::string, Ref<IRendGraph>, HeapAllocDefault> graphs;
     };
 
     // The definition key of a world's graph, or empty, and the cache key of its instance.
@@ -182,18 +182,18 @@ private:
     };
 
     WorldGraph get_world_graph(size_t p_world_index) const;
-    void queue_render_operation(std::function<void()> p_operation);
-    void observe_render_operations(bool p_wait);
+    void queue_rend_operation(std::function<void()> p_operation);
+    void observe_rend_operations(bool p_wait);
 
-    HeapAllocatorDefault* allocator;
+    HeapAllocDefault* alloc;
     Ref<IRenderer> renderer;
-    Vector<Ref<World>, HeapAllocatorDefault> worlds;
-    String<HeapAllocatorDefault> resource_manifest_key;
-    // Bindings supplied with add_render_graph_bindings(), keyed by RenderGraphInstanceCache::make_cache_key().
-    Map<std::string, Ref<IRenderGraphBindings>, HeapAllocatorDefault> render_graph_bindings;
-    Ref<RenderState> render_state;
+    Vector<Ref<World>, HeapAllocDefault> worlds;
+    String<HeapAllocDefault> resource_manifest_key;
+    // Bindings supplied with add_rend_graph_bindings(), keyed by RendGraphInstanceCache::make_cache_key().
+    Map<std::string, Ref<IRendGraphBindings>, HeapAllocDefault> rend_graph_bindings;
+    Ref<RendState> rend_state;
     // Futures of the queued render operations that have not been observed yet.
-    Vector<std::future<void>, HeapAllocatorDefault> pending_render_operations;
+    Vector<std::future<void>, HeapAllocDefault> pending_rend_operations;
     // The cache key of the instance last queued for activation, or empty.
     std::string activated_instance;
     size_t active_world_index = 0;

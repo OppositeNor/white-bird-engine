@@ -56,10 +56,10 @@ def main() -> int:
     if not hasattr(signal, 'SIGTERM') or os.name != 'posix':
         parser.error('This helper requires a POSIX platform: clean shutdown relies on SDL turning SIGTERM into SDL_QUIT')
     root = args.repo.resolve()
-    binary = root / 'build' / args.target / 'bin/wbe_render_test_vulkan_draw_sponza_deferred_test'
+    binary = root / 'build' / args.target / 'bin/wbe_rend_test_vulkan_draw_sponza_deferred_test'
     if not binary.is_file():
         parser.error(f'Build the executable first: {binary}')
-    parent = (args.output_dir or root / 'build/render_checks').resolve()
+    parent = (args.output_dir or root / 'build/rend_checks').resolve()
     parent.mkdir(parents=True, exist_ok=True)
     reconstruct_tag = '_reconstruct' if args.full_scene_reconstruct else ''
     output = Path(tempfile.mkdtemp(prefix=f'svo{args.svo}{reconstruct_tag}_{args.mode}_', dir=parent))
@@ -85,7 +85,7 @@ def main() -> int:
     with log_path.open('w') as log:
         process = subprocess.Popen(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT,
                                    preexec_fn=(lambda: os.sched_setaffinity(0, cpus)) if cpus else None)
-        print(f'RenderCheck: PID {process.pid}; artifacts: {output}', flush=True)
+        print(f'RendCheck: PID {process.pid}; artifacts: {output}', flush=True)
 
         def log_text() -> str:
             return log_path.read_text(errors='replace')
@@ -142,7 +142,7 @@ def main() -> int:
             result['clean_exit'] = True
         except (RuntimeError, subprocess.SubprocessError, OSError, KeyboardInterrupt) as error:
             result['error'] = str(error) or type(error).__name__
-            print(f'RenderCheck: FAILED: {result["error"]}', flush=True)
+            print(f'RendCheck: FAILED: {result["error"]}', flush=True)
         finally:
             if process.poll() is None:
                 # Forced cleanup is not a successful shutdown. Never leave an owned GPU process behind.
@@ -151,7 +151,7 @@ def main() -> int:
             result['exit_code'] = process.returncode
             result['elapsed_seconds'] = round(time.monotonic() - started, 3)
             (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
-    print(f'RenderCheck: clean_exit={result["clean_exit"]}; result: {output / "result.json"}', flush=True)
+    print(f'RendCheck: clean_exit={result["clean_exit"]}; result: {output / "result.json"}', flush=True)
     return 0 if result['clean_exit'] else 1
 
 

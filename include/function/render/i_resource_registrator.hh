@@ -18,23 +18,23 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
-#include "function/render/i_render_object.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/render/i_resource_description.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "utils/utils.hh"
 #include <string_view>
 
 namespace WhiteBirdEngine {
 
-class IRenderGraph;
+class IRendGraph;
 
 /**
  * @class IResourceRegistrator
  * @brief Compiles the resources of one description type registered on a render graph. Neither copyable nor movable.
  *
- * A render graph maps each description type to one registrator (IRenderGraph::add_resource_registrator()), the way the
+ * A render graph maps each description type to one registrator (IRendGraph::add_resource_registrator()), the way the
  * ResourceManager maps a resource schema type to its loader. The registrator owns the compile step: loading the source resources its
- * description names, compiling them (through the GlobalRenderCache, so graphs share compiled objects), and returning the
+ * description names, compiling them (through the GlobalRendCache, so graphs share compiled objects), and returning the
  * object the graph keeps under the registration key. Called on the rendering thread.
  */
 class IResourceRegistrator {
@@ -54,11 +54,11 @@ public:
      * @brief Deserialize a description written by a script.
      *
      * @param p_description The serialized parameters.
-     * @param p_allocator The allocator of the description.
+     * @param p_alloc The allocator of the description.
      * @return The description.
      * @throws std::runtime_error If p_description is not a valid description of this registrator's type.
      */
-    virtual Unique<IResourceDescription> deserialize_description(const DataValue& p_description, RenderAllocator* p_allocator) const = 0;
+    virtual Unique<IResourceDescription> deserialize_description(const DataValue& p_description, RendAlloc* p_alloc) const = 0;
 
     /**
      * @brief Compile the render object a description describes.
@@ -69,7 +69,7 @@ public:
      * @return The compiled object, never null.
      * @throws std::runtime_error If the description has another type, a source resource is missing, or compiling fails.
      */
-    virtual Ref<IRenderObject> compile(IRenderGraph& p_graph, std::string_view p_key, const IResourceDescription& p_description) = 0;
+    virtual Ref<IRendObject> compile(IRendGraph& p_graph, std::string_view p_key, const IResourceDescription& p_description) = 0;
 
 protected:
     IResourceRegistrator() = default;

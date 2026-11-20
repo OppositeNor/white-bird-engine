@@ -16,16 +16,16 @@
 #define WBE_FILE_SHADOWED_MESH_RECIPE_CONTEXT_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/rend_recipe_extent_2d_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_recipe_extent_2d_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 
 namespace WhiteBirdEngine {
 
 /**
  * @class ShadowedMeshRecipeContext
- * @brief The context of the forward-shaded recipes with one shadow-casting spot light, render_graphs.draw_cube and
- * render_graphs.draw_sponza. Copyable and movable.
+ * @brief The context of the forward-shaded recipes with one shadow-casting spot light, rend_graphs.draw_cube and
+ * rend_graphs.draw_sponza. Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) ShadowedMeshRecipeContext : public RendRecipeContextVK {
     /**

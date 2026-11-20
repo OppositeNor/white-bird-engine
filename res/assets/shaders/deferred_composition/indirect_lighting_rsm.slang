@@ -14,39 +14,39 @@
 */
 #include "deferred_composition/deferred_composition_utils.slang"
 
-struct IndirectLightingDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "composition_camera_info")]
+struct IndirectLightingDescIndices {
+    [wbe::desc("uniform_buffer", "composition_camera_info")]
     uint2 camera_info;
-    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
+    [wbe::desc("storage_buffer", "spot_light_infos", "read")]
     uint2 light_infos;
-    LightParamDescriptorIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
-    [wbe::descriptor("sampled_image", "gbuffer_albedo")]
+    LightParamDescIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
+    [wbe::desc("sampled_image", "gbuffer_albedo")]
     uint2 gbuffer_albedo;
-    [wbe::descriptor("sampled_image", "gbuffer_normal")]
+    [wbe::desc("sampled_image", "gbuffer_normal")]
     uint2 gbuffer_octa_normal;
-    [wbe::descriptor("sampled_image", "gbuffer_rma")]
+    [wbe::desc("sampled_image", "gbuffer_rma")]
     uint2 gbuffer_rma;
-    [wbe::descriptor("sampled_image", "gbuffer_depth")]
+    [wbe::desc("sampled_image", "gbuffer_depth")]
     uint2 gbuffer_depth;
-    [wbe::descriptor("sampler", "gbuffer_sampler")]
+    [wbe::desc("sampler", "gbuffer_sampler")]
     uint2 gbuffer_sampler;
-    [wbe::descriptor("storage_image", "indirect_lighting")]
+    [wbe::desc("storage_image", "indirect_lighting")]
     uint2 indirect_lighting_output;
 };
 
 [vk::push_constant]
-ConstantBuffer<IndirectLightingDescriptorIndices> descriptor_indices;
+ConstantBuffer<IndirectLightingDescIndices> di;
 
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[descriptor_indices.gbuffer_albedo.x];
-    Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[descriptor_indices.gbuffer_octa_normal.x];
-    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[descriptor_indices.gbuffer_rma.x];
-    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[descriptor_indices.gbuffer_depth.x];
-    SamplerState gbuffer_sampler = SamplerDescriptorHeap[descriptor_indices.gbuffer_sampler.x];
-    RWTexture2D<float4> indirect_lighting_output = ResourceDescriptorHeap[descriptor_indices.indirect_lighting_output.x];
+    ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[di.gbuffer_albedo.x];
+    Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[di.gbuffer_octa_normal.x];
+    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[di.gbuffer_rma.x];
+    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[di.gbuffer_depth.x];
+    SamplerState gbuffer_sampler = SamplerDescriptorHeap[di.gbuffer_sampler.x];
+    RWTexture2D<float4> indirect_lighting_output = ResourceDescriptorHeap[di.indirect_lighting_output.x];
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);
@@ -68,9 +68,9 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     float metallic = clamp(rma_flags.g, 0.0, 1.0);
     float3 world_pos = world_position_from_depth(uv, depth, WBE_SOFTWARE_MATRIX_ROWS(camera_info.inv_view_proj));
     float3 indirect_irradiance = float3(0.0);
-    uint spot_light_count = get_spot_light_count(descriptor_indices.light_infos);
+    uint spot_light_count = get_spot_light_count(di.light_infos);
     for (uint spot_light_index = 0; spot_light_index < spot_light_count; ++spot_light_index) {
-        SpotLight spot_light = SpotLight(descriptor_indices.light_infos, descriptor_indices.lights[spot_light_index], spot_light_index);
+        SpotLight spot_light = SpotLight(di.light_infos, di.lights[spot_light_index], spot_light_index);
         indirect_irradiance += compute_rsm_indirect(spot_light, uv, world_pos, normal);
     }
     float3 indirect_lighting = ((1.0 - metallic) * base_color / WBE_PI) * indirect_irradiance;

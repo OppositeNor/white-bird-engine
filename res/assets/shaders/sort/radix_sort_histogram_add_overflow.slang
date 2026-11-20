@@ -15,12 +15,12 @@
 #include "utils/utils.slang"
 #include "sort/radix_sort_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
+struct DescIndices {
+    [wbe::desc("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 // One invocation per bucket.
 #define WORKGROUP_SIZE WBE_RADIX_SORT_BUCKET_COUNT
@@ -32,7 +32,7 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[descriptor_indices.histogram_buffer.x];
+    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[di.histogram_buffer.x];
     uint sub_histogram_num = buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX];
     uint overflow_start = buffer[WBE_RADIX_SORT_OVERFLOW_START_INDEX];
     uint lane_start = buffer[WBE_RADIX_SORT_LANE_START_INDEX];

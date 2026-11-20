@@ -16,7 +16,7 @@
 #define WBE_FILE_VOXEL_DEBUG_VIEW_TOGGLES_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/rend_graph_recipe_params_vk.hh"
+#include "function/rend_vk/rend_graph_recipe_params_vk.hh"
 
 namespace WhiteBirdEngine {
 

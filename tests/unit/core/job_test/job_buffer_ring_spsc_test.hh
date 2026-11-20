@@ -19,9 +19,9 @@
 #include "core/job/job_buffer_ring_spsc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_dummy/renderer_dummy.hh"
-#include "function/render_software/renderer_software.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_dummy/renderer_dummy.hh"
+#include "function/rend_software/renderer_software.hh"
 #include "global/global.hh"
 #include "job_test_utils.hh"
 #include "test_global.hh"
@@ -52,8 +52,8 @@ protected:
     std::unique_ptr<WBE::Global> global;
 
     // Helper to get allocator from global
-    WBE::HeapAllocatorDefault* get_allocator() {
-        return global->engine_core->pool_allocator;
+    WBE::HeapAllocDefault* get_allocator() {
+        return global->engine_core->pool_alloc;
     }
 };
 
@@ -492,8 +492,8 @@ TEST_F(WBEJobBufferRingSPSCTest, StressTestManyOperations) {
 TEST_F(WBEJobBufferRingSPSCTest, NoOpHandlersReturnReadyHandles) {
     {
         WBE::RendererCapabilities capabilities{.ray_tracing = true};
-        WBE::RenderAllocator render_allocator(WBE_MI_B(1));
-        WBE::RendererDummy dummy_renderer(&render_allocator, capabilities);
+        WBE::RendAlloc rend_alloc(WBE_MI_B(1));
+        WBE::RendererDummy dummy_renderer(&rend_alloc, capabilities);
 
         std::future<void> dummy_handle = dummy_renderer.add_job([] {
         });
@@ -501,8 +501,8 @@ TEST_F(WBEJobBufferRingSPSCTest, NoOpHandlersReturnReadyHandles) {
     }
 
     WBE::RendererCapabilities software_capabilities{.ray_tracing = true};
-    auto software_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(1));
-    WBE::RendererSoftware software_renderer(software_allocator, software_capabilities);
+    auto software_alloc = WBE::make_ref<WBE::RendAlloc>(get_allocator(), WBE_MI_B(1));
+    WBE::RendererSoftware software_renderer(software_alloc, software_capabilities);
 
     std::future<void> software_handle = software_renderer.add_job([] {
     });

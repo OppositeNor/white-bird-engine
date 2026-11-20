@@ -12,13 +12,13 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/rt_run_compute_pipelines_sequential_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipeline_indirect_vk.hh"
-#include "function/render_vk/rt_run_graphics_pipelines_sequential_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/ro_compute_pipeline_vk.hh"
+#include "function/rend_vk/rt_run_compute_pipelines_sequential_vk.hh"
+#include "function/rend_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/rend_vk/rt_run_graphics_pipelines_sequential_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -28,8 +28,8 @@
 namespace WhiteBirdEngine {
 
 TEST(WBERunPipelinesSequentialVKTest, ComputeDispatchAddsPipelineAndGroupCount) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RTRunComputePipelinesSequentialVK::Dispatch dispatch(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RTRunComputePipelinesSequentialVK::Dispatch dispatch(&alloc);
     Ref<ROComputePipelineVK> pipeline = MEM_NULL;
     const VkExtent3D group_count{.width = 4, .height = 3, .depth = 2};
 
@@ -44,11 +44,11 @@ TEST(WBERunPipelinesSequentialVKTest, ComputeDispatchAddsPipelineAndGroupCount) 
 }
 
 TEST(WBERunPipelinesSequentialVKTest, GraphicsSequenceKeepsRegularAndIndirectDispatchTypes) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RTRunGraphicsPipelinesSequentialVK::Sequence sequence(&allocator);
-    RTRunGraphicsPipelinesSequentialVK::RegularDispatch regular_dispatch(&allocator);
-    regular_dispatch.render_extent = {.width = 1280, .height = 720};
-    RTRunGraphicsPipelinesSequentialVK::IndirectDispatch indirect_dispatch(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RTRunGraphicsPipelinesSequentialVK::Sequence sequence(&alloc);
+    RTRunGraphicsPipelinesSequentialVK::RegularDispatch regular_dispatch(&alloc);
+    regular_dispatch.rend_extent = {.width = 1280, .height = 720};
+    RTRunGraphicsPipelinesSequentialVK::IndirectDispatch indirect_dispatch(&alloc);
     indirect_dispatch.vertex_buffer_ids = {"vertices"};
     indirect_dispatch.vertex_buffer_offsets = {0};
     indirect_dispatch.index_buffer_id = "indices";

@@ -85,14 +85,14 @@ std::any ResourceUnitLoaderWorld::populate_scheme_ptr(IResourceChunk& p_res_chun
     if (typed_scheme == nullptr) {
         throw std::runtime_error("Failed to populate world resource unit: expected world scheme but got type " + p_scheme.type + ".");
     }
-    const std::string& static_mesh_render = typed_scheme->static_component.static_mesh_render;
-    if (static_mesh_render.empty()) {
+    const std::string& static_mesh_rend = typed_scheme->static_component.static_mesh_rend;
+    if (static_mesh_rend.empty()) {
         throw std::runtime_error("Failed to populate world resource unit " + typed_scheme->id +
-                                 ": static_component.static_mesh_render must not be empty.");
+                                 ": static_component.static_mesh_rend must not be empty.");
     }
     RUWorld resource_unit;
-    resource_unit.static_component.static_mesh_render =
-        p_res_chunk.push_data(static_mesh_render.size() + 1, static_mesh_render.c_str());
+    resource_unit.static_component.static_mesh_rend =
+        p_res_chunk.push_data(static_mesh_rend.size() + 1, static_mesh_rend.c_str());
     return p_res_chunk.push_res_unit(typed_scheme->id, resource_unit).force_cast<RUWorld>();
 }
 

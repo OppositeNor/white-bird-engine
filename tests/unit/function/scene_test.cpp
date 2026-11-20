@@ -12,23 +12,23 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/engine_core.hh"
 #include "core/job/job_handler.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
-#include "fake_render_graph.hh"
+#include "fake_rend_graph.hh"
 #include "function/ecs/components.hh"
 #include "function/function_utils.hh"
-#include "function/render/global_render_cache.hh"
-#include "function/render/i_render_graph.hh"
-#include "function/render/i_render_graph_bindings.hh"
+#include "function/render/global_rend_cache.hh"
+#include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_graph_bindings.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_defs.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/scene/scene.hh"
 #include "function/scene/scene_manager.hh"
 #include "function/scene/scene_node.hh"
@@ -116,17 +116,17 @@ void scene_driver_teardown(WBE::Ref<WBE::SceneNode> p_self) {
     }
 }
 
-class RecordingBindings final : public WBE::IRenderGraphBindings {
+class RecordingBindings final : public WBE::IRendGraphBindings {
 public:
-    explicit RecordingBindings(std::string_view p_instance_key) : WBE::IRenderGraphBindings(p_instance_key) {
+    explicit RecordingBindings(std::string_view p_instance_key) : WBE::IRendGraphBindings(p_instance_key) {
     }
 };
 
 // Records render operations as text and runs jobs at once, or when run_jobs() is called while jobs are deferred.
 class RecordingRenderer final : public WBE::IRenderer {
 public:
-    explicit RecordingRenderer(WBE::RenderAllocator* p_allocator)
-        : allocator(p_allocator), render_cache(WBE::make_ref<WBE::GlobalRenderCache>(p_allocator, p_allocator)) {
+    explicit RecordingRenderer(WBE::RendAlloc* p_alloc)
+        : alloc(p_alloc), rend_cache(WBE::make_ref<WBE::GlobalRendCache>(p_alloc, p_alloc)) {
     }
 
     virtual uint32_t get_worker_nums() override {
@@ -137,23 +137,23 @@ public:
         (void)p_delta;
     }
 
-    virtual WBE::Ref<WBE::GlobalRenderCache> get_global_render_cache() override {
-        return render_cache;
+    virtual WBE::Ref<WBE::GlobalRendCache> get_global_rend_cache() override {
+        return rend_cache;
     }
 
-    virtual WBE::Ref<WBE::IRenderGraph> acquire_render_graph(
-        std::string_view p_resource_key, WBE::Ref<WBE::IRenderGraphBindings> p_bindings) override {
+    virtual WBE::Ref<WBE::IRendGraph> acquire_rend_graph(
+        std::string_view p_resource_key, WBE::Ref<WBE::IRendGraphBindings> p_bindings) override {
         events.push_back(std::format("acquire {} {}", p_resource_key, p_bindings->get_instance_key()));
         if (fail_acquisition) {
             throw std::runtime_error("acquisition failed");
         }
-        WBE::Ref<WBE::FakeRenderGraph> graph = WBE::make_ref<WBE::FakeRenderGraph>(allocator, allocator, p_bindings);
+        WBE::Ref<WBE::FakeRendGraph> graph = WBE::make_ref<WBE::FakeRendGraph>(alloc, alloc, p_bindings);
         acquired_graphs.emplace_back(graph);
         return graph;
     }
 
-    virtual void activate_render_graph(WBE::Ref<WBE::IRenderGraph> p_graph) override {
-        const auto acquired = std::ranges::find_if(acquired_graphs, [&p_graph](WBE::RefWeak<WBE::IRenderGraph>& p_acquired) {
+    virtual void activate_rend_graph(WBE::Ref<WBE::IRendGraph> p_graph) override {
+        const auto acquired = std::ranges::find_if(acquired_graphs, [&p_graph](WBE::RefWeak<WBE::IRendGraph>& p_acquired) {
             return p_acquired.lock() == p_graph;
         });
         events.push_back(std::format("activate {}", acquired - acquired_graphs.begin()));
@@ -179,14 +179,14 @@ public:
 
     // The number of acquired graphs some owner still holds.
     size_t count_live_graphs() {
-        return static_cast<size_t>(std::ranges::count_if(acquired_graphs, [](WBE::RefWeak<WBE::IRenderGraph>& p_graph) {
+        return static_cast<size_t>(std::ranges::count_if(acquired_graphs, [](WBE::RefWeak<WBE::IRendGraph>& p_graph) {
             return p_graph.lock() != WBE::MEM_NULL;
         }));
     }
 
     std::vector<std::string> events;
-    std::vector<WBE::RefWeak<WBE::IRenderGraph>> acquired_graphs;
-    WBE::Ref<WBE::IRenderGraph> active_graph;
+    std::vector<WBE::RefWeak<WBE::IRendGraph>> acquired_graphs;
+    WBE::Ref<WBE::IRendGraph> active_graph;
     bool fail_acquisition = false;
     bool defer_jobs = false;
 
@@ -200,8 +200,8 @@ private:
         }
     }
 
-    WBE::RenderAllocator* allocator;
-    WBE::Ref<WBE::GlobalRenderCache> render_cache;
+    WBE::RendAlloc* alloc;
+    WBE::Ref<WBE::GlobalRendCache> rend_cache;
     std::vector<std::pair<std::function<void()>, std::promise<void>>> deferred_jobs;
 };
 
@@ -215,8 +215,8 @@ protected:
         global.reset();
     }
 
-    WBE::HeapAllocatorDefault* get_allocator() {
-        return global->engine_core->pool_allocator;
+    WBE::HeapAllocDefault* get_allocator() {
+        return global->engine_core->pool_alloc;
     }
 
     std::unique_ptr<WBE::Global> global;
@@ -224,7 +224,7 @@ protected:
 
 } // namespace
 
-TEST_F(WBEWorldTest, WorldExposesAllocatorAndEntityRegistry) {
+TEST_F(WBEWorldTest, WorldExposesAllocAndEntityRegistry) {
     WBE::World world(get_allocator());
 
     WBE::EntityID entity = world.get_entities().create();
@@ -233,19 +233,19 @@ TEST_F(WBEWorldTest, WorldExposesAllocatorAndEntityRegistry) {
     EXPECT_TRUE(world.get_entities().valid(entity));
 }
 
-TEST_F(WBEWorldTest, WorldOwnsRenderGraphResourceKey) {
+TEST_F(WBEWorldTest, WorldOwnsRendGraphResourceKey) {
     WBE::World world(get_allocator());
 
-    EXPECT_TRUE(world.get_render_graph_resource_key().empty());
+    EXPECT_TRUE(world.get_rend_graph_resource_key().empty());
 
-    world.set_render_graph_resource_key("main_graph");
+    world.set_rend_graph_resource_key("main_graph");
 
-    EXPECT_EQ(world.get_render_graph_resource_key(), "main_graph");
+    EXPECT_EQ(world.get_rend_graph_resource_key(), "main_graph");
 }
 
 TEST_F(WBEWorldTest, WorldOwnsStaticMeshReference) {
     WBE::World world(get_allocator());
-    WBE::StackAllocator storage(WBE_KI_B(1));
+    WBE::StackAlloc storage(WBE_KI_B(1));
     WBE::RefRes<WBE::RUMesh3D> mesh(storage.allocate(sizeof(WBE::RUMesh3D)), &storage);
 
     world.set_static_mesh(mesh);
@@ -280,8 +280,8 @@ TEST_F(WBEWorldTest, WorldReturnsComponentTypeIdsAttachedToEntity) {
     world.get_entities().emplace<WBE::ComponentLabel>(first_entity);
     world.get_entities().emplace<WBE::ComponentLabel>(second_entity);
 
-    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> first_component_type_ids = world.get_component_type_ids(first_entity);
-    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> second_component_type_ids = world.get_component_type_ids(second_entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocDefault> first_component_type_ids = world.get_component_type_ids(first_entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocDefault> second_component_type_ids = world.get_component_type_ids(second_entity);
 
     EXPECT_NE(std::find(first_component_type_ids.begin(), first_component_type_ids.end(), transform_type_id),
         first_component_type_ids.end());
@@ -297,7 +297,7 @@ TEST_F(WBEWorldTest, WorldReturnsEmptyComponentTypeIdsForEntityWithoutComponents
     WBE::World world(get_allocator());
     WBE::EntityID entity = world.get_entities().create();
 
-    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> component_type_ids = world.get_component_type_ids(entity);
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocDefault> component_type_ids = world.get_component_type_ids(entity);
 
     EXPECT_TRUE(component_type_ids.empty());
 }
@@ -346,7 +346,7 @@ TEST_F(WBEWorldTest, SceneNodeUsesWorldComponentListsForComponentState) {
 
     EXPECT_TRUE(node->has_component(transform_type_id));
     EXPECT_NE(world->get_component_list(transform_type_id), nullptr);
-    WBE::Vector<WBE::TypeID, WBE::HeapAllocatorDefault> component_type_ids = node->get_component_type_ids();
+    WBE::Vector<WBE::TypeID, WBE::HeapAllocDefault> component_type_ids = node->get_component_type_ids();
     EXPECT_NE(std::find(component_type_ids.begin(), component_type_ids.end(), transform_type_id), component_type_ids.end());
 
     node->remove_component(transform_type_id);
@@ -419,25 +419,25 @@ TEST_F(WBEWorldTest, SceneNodeHierarchyIsTrackedByComponent) {
 
 namespace {
 
-WBE::Ref<WBE::IRenderGraphBindings> make_bindings(std::string_view p_instance_key) {
-    return WBE::make_ref<RecordingBindings>(WBE::global_allocator(), p_instance_key);
+WBE::Ref<WBE::IRendGraphBindings> make_bindings(std::string_view p_instance_key) {
+    return WBE::make_ref<RecordingBindings>(WBE::global_alloc(), p_instance_key);
 }
 
 } // namespace
 
 TEST_F(WBEWorldTest, WorldInstanceKeyDefaultsToTheDefinitionKey) {
     WBE::World world(get_allocator());
-    world.set_render_graph_resource_key("main_graph");
-    EXPECT_EQ(world.get_render_graph_instance_key(), "main_graph");
-    world.set_render_graph_instance_key("left");
-    EXPECT_EQ(world.get_render_graph_instance_key(), "left");
-    world.set_render_graph_instance_key("");
-    EXPECT_EQ(world.get_render_graph_instance_key(), "main_graph");
+    world.set_rend_graph_resource_key("main_graph");
+    EXPECT_EQ(world.get_rend_graph_instance_key(), "main_graph");
+    world.set_rend_graph_instance_key("left");
+    EXPECT_EQ(world.get_rend_graph_instance_key(), "left");
+    world.set_rend_graph_instance_key("");
+    EXPECT_EQ(world.get_rend_graph_instance_key(), "main_graph");
 }
 
-TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRenderGraphInstances) {
-    auto render_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(4));
-    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), render_allocator.get());
+TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRendGraphInstances) {
+    auto rend_alloc = WBE::make_ref<WBE::RendAlloc>(get_allocator(), WBE_MI_B(4));
+    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), rend_alloc.get());
     auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer, "res_chunks/test_scene.json");
     auto first_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
     auto second_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
@@ -446,8 +446,8 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRenderGraphInstance
     auto first_node = WBE::make_ref<WBE::SceneNode>(get_allocator(), first_world);
     auto second_node = WBE::make_ref<WBE::SceneNode>(get_allocator(), second_world);
 
-    first_world->set_render_graph_resource_key("main_graph");
-    second_world->set_render_graph_resource_key("main_graph");
+    first_world->set_rend_graph_resource_key("main_graph");
+    second_world->set_rend_graph_resource_key("main_graph");
     first_world->get_entities().emplace<WBE::ComponentDriver>(first_node->get_entity(),
         WBE::ComponentDriver{
             .setup = scene_driver_setup,
@@ -467,7 +467,7 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRenderGraphInstance
     scene->add_world(first_world);
     scene->add_world(second_world);
     scene->set_active_world(1);
-    scene->add_render_graph_bindings("main_graph", make_bindings("main_graph"));
+    scene->add_rend_graph_bindings("main_graph", make_bindings("main_graph"));
 
     EXPECT_EQ(scene->get_resource_manifest_key(), "res_chunks/test_scene.json");
     EXPECT_EQ(scene->get_world_count(), 2);
@@ -485,7 +485,7 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRenderGraphInstance
     EXPECT_EQ(renderer->events, (std::vector<std::string>{"acquire main_graph main_graph", "activate 0"}));
     // Teardown releases the scene's handle, while the renderer's activation keeps the graph alive.
     EXPECT_EQ(renderer->count_live_graphs(), 1U);
-    renderer->activate_render_graph(WBE::MEM_NULL);
+    renderer->activate_rend_graph(WBE::MEM_NULL);
     EXPECT_EQ(renderer->count_live_graphs(), 0U);
     for (const SceneDriverState* state : {&first_state, &second_state}) {
         EXPECT_EQ(state->setup_count, 1);
@@ -499,8 +499,8 @@ TEST_F(WBEWorldTest, SceneOrchestratesWorldLifecycleAndSharesRenderGraphInstance
 }
 
 TEST_F(WBEWorldTest, SceneAcquiresOneInstancePerDefinitionAndInstanceKey) {
-    auto render_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(4));
-    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), render_allocator.get());
+    auto rend_alloc = WBE::make_ref<WBE::RendAlloc>(get_allocator(), WBE_MI_B(4));
+    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), rend_alloc.get());
     auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer);
     const std::array<std::pair<std::string_view, std::string_view>, 4> world_graphs{{
         {"main_graph", ""},
@@ -510,22 +510,22 @@ TEST_F(WBEWorldTest, SceneAcquiresOneInstancePerDefinitionAndInstanceKey) {
     }};
     for (const auto& [resource_key, instance_key] : world_graphs) {
         auto world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
-        world->set_render_graph_resource_key(resource_key);
-        world->set_render_graph_instance_key(instance_key);
+        world->set_rend_graph_resource_key(resource_key);
+        world->set_rend_graph_instance_key(instance_key);
         scene->add_world(world);
     }
-    scene->add_render_graph_bindings("main_graph", make_bindings("main_graph"));
-    EXPECT_THROW(scene->add_render_graph_bindings("main_graph", make_bindings("main_graph")), std::runtime_error);
-    EXPECT_THROW(scene->add_render_graph_bindings("", make_bindings("main_graph")), std::runtime_error);
-    EXPECT_THROW(scene->add_render_graph_bindings("main_graph", WBE::MEM_NULL), std::runtime_error);
+    scene->add_rend_graph_bindings("main_graph", make_bindings("main_graph"));
+    EXPECT_THROW(scene->add_rend_graph_bindings("main_graph", make_bindings("main_graph")), std::runtime_error);
+    EXPECT_THROW(scene->add_rend_graph_bindings("", make_bindings("main_graph")), std::runtime_error);
+    EXPECT_THROW(scene->add_rend_graph_bindings("main_graph", WBE::MEM_NULL), std::runtime_error);
     // The "left" instance has no bindings yet, so setup acquires nothing.
     EXPECT_THROW(scene->setup(), std::runtime_error);
     EXPECT_TRUE(renderer->events.empty());
-    scene->add_render_graph_bindings("main_graph", make_bindings("left"));
+    scene->add_rend_graph_bindings("main_graph", make_bindings("left"));
 
     scene->setup();
     // Bindings are fixed while the scene is set up.
-    EXPECT_THROW(scene->add_render_graph_bindings("main_graph", make_bindings("right")), std::runtime_error);
+    EXPECT_THROW(scene->add_rend_graph_bindings("main_graph", make_bindings("right")), std::runtime_error);
     scene->ready();
     scene->set_active_world(1);
     scene->update(0.0);
@@ -544,14 +544,14 @@ TEST_F(WBEWorldTest, SceneAcquiresOneInstancePerDefinitionAndInstanceKey) {
     EXPECT_EQ(renderer->count_live_graphs(), 1U);
 }
 
-TEST_F(WBEWorldTest, SceneQueuesRenderOperationsInOrderAndRethrowsTheirFailures) {
-    auto render_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(4));
-    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), render_allocator.get());
+TEST_F(WBEWorldTest, SceneQueuesRendOperationsInOrderAndRethrowsTheirFailures) {
+    auto rend_alloc = WBE::make_ref<WBE::RendAlloc>(get_allocator(), WBE_MI_B(4));
+    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), rend_alloc.get());
     auto scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer);
     auto world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
-    world->set_render_graph_resource_key("main_graph");
+    world->set_rend_graph_resource_key("main_graph");
     scene->add_world(world);
-    scene->add_render_graph_bindings("main_graph", make_bindings("main_graph"));
+    scene->add_rend_graph_bindings("main_graph", make_bindings("main_graph"));
 
     renderer->defer_jobs = true;
     scene->setup();
@@ -564,7 +564,7 @@ TEST_F(WBEWorldTest, SceneQueuesRenderOperationsInOrderAndRethrowsTheirFailures)
     renderer->defer_jobs = false;
     scene->update(0.0);
     scene->teardown();
-    renderer->activate_render_graph(WBE::MEM_NULL);
+    renderer->activate_rend_graph(WBE::MEM_NULL);
 
     // A failed acquisition reaches the scene through its future, and the activation queued after it fails too.
     renderer->events.clear();
@@ -580,8 +580,8 @@ TEST_F(WBEWorldTest, SceneQueuesRenderOperationsInOrderAndRethrowsTheirFailures)
 }
 
 TEST_F(WBEWorldTest, SceneManagerTransitionsScenesInLifecycleOrder) {
-    auto render_allocator = WBE::make_ref<WBE::RenderAllocator>(get_allocator(), WBE_MI_B(4));
-    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), render_allocator.get());
+    auto rend_alloc = WBE::make_ref<WBE::RendAlloc>(get_allocator(), WBE_MI_B(4));
+    auto renderer = WBE::make_ref<RecordingRenderer>(get_allocator(), rend_alloc.get());
     auto first_scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer);
     auto second_scene = WBE::make_ref<WBE::Scene>(get_allocator(), get_allocator(), renderer);
     auto first_world = WBE::make_ref<WBE::World>(get_allocator(), get_allocator());
@@ -592,8 +592,8 @@ TEST_F(WBEWorldTest, SceneManagerTransitionsScenesInLifecycleOrder) {
     SceneDriverState first_state{.events = &events, .label = "first"};
     SceneDriverState second_state{.events = &events, .label = "second"};
 
-    first_world->set_render_graph_resource_key("first_graph");
-    second_world->set_render_graph_resource_key("second_graph");
+    first_world->set_rend_graph_resource_key("first_graph");
+    second_world->set_rend_graph_resource_key("second_graph");
     first_world->get_entities().emplace<WBE::ComponentDriver>(first_node->get_entity(),
         WBE::ComponentDriver{
             .setup = scene_driver_setup,
@@ -610,10 +610,10 @@ TEST_F(WBEWorldTest, SceneManagerTransitionsScenesInLifecycleOrder) {
         });
     first_scene->add_world(first_world);
     second_scene->add_world(second_world);
-    first_scene->add_render_graph_bindings("first_graph", make_bindings("first_graph"));
-    second_scene->add_render_graph_bindings("second_graph", make_bindings("second_graph"));
+    first_scene->add_rend_graph_bindings("first_graph", make_bindings("first_graph"));
+    second_scene->add_rend_graph_bindings("second_graph", make_bindings("second_graph"));
 
-    WBE::Map<std::string, WBE::Ref<WBE::Scene>, WBE::HeapAllocatorGlobal> scenes(get_allocator());
+    WBE::Map<std::string, WBE::Ref<WBE::Scene>, WBE::HeapAllocGlobal> scenes(get_allocator());
     scenes.emplace("first", first_scene);
     scenes.emplace("second", second_scene);
     {

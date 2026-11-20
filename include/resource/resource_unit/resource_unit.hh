@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_RESOURCE_UNIT_HH
 #define WBE_FILE_RESOURCE_UNIT_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_raw.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable.hh"
@@ -54,7 +54,7 @@ template <typename T>
 concept ResourceUnitConcept = IS_RESOURCE_UNIT<T>;
 
 template <typename T>
-using RefRes = RefRaw<T, IAllocator, false>;
+using RefRes = RefRaw<T, IAlloc, false>;
 
 /**
  * @class ResourceSchema

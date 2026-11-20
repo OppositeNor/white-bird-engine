@@ -12,9 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/render_vk/rend_graph_resource_diff_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/rend_vk/rend_graph_resource_diff_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_vk_defs.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <string>
@@ -55,15 +55,15 @@ RendResSignatureVK import_signature(const void* p_identity) {
 class WBERendGraphResourceDiffVKTest : public ::testing::Test {
 protected:
     RendResRebuildActionVK action_of(std::string_view p_resource_id) const {
-        const RendGraphResourceDiffVK::Actions actions = RendGraphResourceDiffVK::plan(previous, next, &allocator);
+        const RendGraphResourceDiffVK::Actions actions = RendGraphResourceDiffVK::plan(previous, next, &alloc);
         const auto action = actions.find(p_resource_id);
         EXPECT_NE(action, actions.end()) << p_resource_id;
         return action->second;
     }
 
-    mutable RenderAllocator allocator{WBE_KI_B(64)};
-    RendGraphResourceDiffVK::Signatures previous{&allocator};
-    RendGraphResourceDiffVK::Signatures next{&allocator};
+    mutable RendAlloc alloc{WBE_KI_B(64)};
+    RendGraphResourceDiffVK::Signatures previous{&alloc};
+    RendGraphResourceDiffVK::Signatures next{&alloc};
 };
 
 } // namespace
@@ -76,10 +76,10 @@ TEST_F(WBERendGraphResourceDiffVKTest, NewIdsAreCreatedAndUnchangedOnesKept) {
     EXPECT_EQ(action_of("added"), RendResRebuildActionVK::CREATE);
     // Ids missing from the next build are not planned; the graph releases them.
     previous.emplace("removed", buffer_signature(16));
-    EXPECT_EQ(RendGraphResourceDiffVK::plan(previous, next, &allocator).count("removed"), 0U);
+    EXPECT_EQ(RendGraphResourceDiffVK::plan(previous, next, &alloc).count("removed"), 0U);
 }
 
-TEST_F(WBERendGraphResourceDiffVKTest, ConfigurationChangesRecreateInPlace) {
+TEST_F(WBERendGraphResourceDiffVKTest, ConfigChangesRecreateInPlace) {
     previous.emplace("buffer", buffer_signature(64));
     next.emplace("buffer", buffer_signature(128));
     previous.emplace("image", image_signature(8));

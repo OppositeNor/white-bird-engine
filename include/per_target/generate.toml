@@ -69,9 +69,9 @@ metadata = ".metadata"
 
 [[generate]]
 out_dir = "${build_dir}/generated/include/generated"
-output_name = "cla_configuration.gen.hh"
-template = "cla_configuration.hh.jinja"
+output_name = "cla_config.gen.hh"
+template = "cla_config.hh.jinja"
 
 [generate.data]
 metadata = ".metadata"
-cla_configurations = ".cla_configurations"
+cla_configs = ".cla_configs"

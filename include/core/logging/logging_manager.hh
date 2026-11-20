@@ -15,8 +15,8 @@
 #ifndef __LOGGING_MANAGER_HH__
 #define __LOGGING_MANAGER_HH__
 
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
 #include "core/logging/log.hh"
 #include "utils/defs.hh"
 #include "utils/interface/i_singleton.hh"
@@ -44,19 +44,19 @@ public:
      *
      * @param p_channel_argument The argument to input to the constructor of the
      * log object.
-     * @param p_log_allocator_size The argument to input to the constructor of
+     * @param p_log_alloc_size The argument to input to the constructor of
      * the log object.
      */
-    LoggingManager(T& p_channel_argument, size_t p_log_allocator_size = WBE_KI_B(1))
-        : ISingleton<LoggingManager>(), channel_argument(&p_channel_argument), log_allocator(p_log_allocator_size) {
+    LoggingManager(T& p_channel_argument, size_t p_log_alloc_size = WBE_KI_B(1))
+        : ISingleton<LoggingManager>(), channel_argument(&p_channel_argument), log_alloc(p_log_alloc_size) {
     }
 
     virtual ~LoggingManager() override {
         size_t channel_logs_size = channel_logs.size();
         for (uint32_t i = 0; i < channel_logs_size; ++i) {
-            pop_stack_obj<LogType>(log_allocator);
+            pop_stack_obj<LogType>(log_alloc);
         }
-        log_allocator.clear();
+        log_alloc.clear();
     }
 
     LoggingManager(const LoggingManager&) = delete;
@@ -75,18 +75,18 @@ public:
             std::shared_lock lock(channel_logs_mutex);
             auto channel = channel_logs.find(p_channel_id);
             if (channel != channel_logs.end()) {
-                return log_allocator.get_obj<ILog>(channel->second);
+                return log_alloc.get_obj<ILog>(channel->second);
             }
         }
         {
             std::unique_lock lock(channel_logs_mutex);
             auto channel = channel_logs.find(p_channel_id);
             if (channel != channel_logs.end()) {
-                return log_allocator.get_obj<ILog>(channel->second);
+                return log_alloc.get_obj<ILog>(channel->second);
             }
-            MemID result = create_stack_obj<LogType>(log_allocator, p_channel_id, *channel_argument);
+            MemID result = create_stack_obj<LogType>(log_alloc, p_channel_id, *channel_argument);
             channel_logs[p_channel_id] = result;
-            return log_allocator.get_obj<ILog>(result);
+            return log_alloc.get_obj<ILog>(result);
         }
     }
 
@@ -95,7 +95,7 @@ private:
     std::unordered_map<ChannelID, MemID> channel_logs;
 
     T* channel_argument;
-    StackAllocator log_allocator;
+    StackAlloc log_alloc;
 };
 
 } // namespace WhiteBirdEngine

@@ -17,30 +17,30 @@
 /**
  * @brief Descriptor-heap resources used by incremental maintenance.
  */
-struct DynamicDescriptorIndices {
+struct DynamicDescIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [wbe::descriptor("storage_buffer", "svo_info")]
+    [wbe::desc("storage_buffer", "svo_info")]
     uint2 info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_ping", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
     uint2 deferred_list_ping;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
-    [wbe::descriptor("storage_buffer", "svo_deferred_list_pong", "write")]
+    [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
     uint2 deferred_list_pong;
 };
 [vk::push_constant]
-ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
+ConstantBuffer<DynamicDescIndices> di;
 
 /**
  * @brief Restores static parents and discards the previous frame's dynamic allocation ranges.
@@ -50,8 +50,8 @@ ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<SVOInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
+    RWStructuredBuffer<SVOInfo> info = ResourceDescriptorHeap[di.info.x];
+    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.nodes.x];
     uint index = p_id.x;
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
@@ -65,8 +65,8 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     if (index == 0) {
         info[0].dynamic_node_count = 0;
         info[0].dynamic_leaves_count = 0;
-        RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[descriptor_indices.deferred_list_ping.x];
-        RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[descriptor_indices.deferred_list_pong.x];
+        RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[di.deferred_list_ping.x];
+        RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[di.deferred_list_pong.x];
         deferred_list_ping[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
         deferred_list_pong[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
     }

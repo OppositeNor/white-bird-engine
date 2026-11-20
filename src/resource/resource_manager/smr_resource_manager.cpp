@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "resource/resource_manager/smr_resource_manager.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"

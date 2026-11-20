@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_ENGINE_RESOURCE_HH
 #define WBE_FILE_ENGINE_RESOURCE_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/unique.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "utils/interface/i_singleton.hh"

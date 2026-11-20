@@ -16,8 +16,8 @@
 -- script backend; see WBERendGraphScriptVKResourceTest.
 
 local type wbe = require("wbe")
-local graph = require("render_graph_utils.render_graph_utils")
-local svo_3 = require("render_graph_utils.svo_3")
+local graph = require("rend_graph_utils.rend_graph_utils")
+local svo_3 = require("rend_graph_utils.svo_3")
 
 local exports = {}
 

@@ -19,9 +19,9 @@ from build_script.reflection.attribute_parser import parse_metadata_attributes
 class AttributeParserTest(unittest.TestCase):
     def test_separates_names_from_parameters(self) -> None:
         attributes, parameters, aliases = parse_metadata_attributes(
-            "WBE, WBE_REFLECT, WBE_RENDER_TASK(compute), CUSTOM_EMPTY()")
-        self.assertEqual(attributes, ["WBE", "WBE_REFLECT", "WBE_RENDER_TASK", "CUSTOM_EMPTY"])
-        self.assertEqual(parameters, {"WBE_RENDER_TASK": ["compute"], "CUSTOM_EMPTY": []})
+            "WBE, WBE_REFLECT, WBE_REND_TASK(compute), CUSTOM_EMPTY()")
+        self.assertEqual(attributes, ["WBE", "WBE_REFLECT", "WBE_REND_TASK", "CUSTOM_EMPTY"])
+        self.assertEqual(parameters, {"WBE_REND_TASK": ["compute"], "CUSTOM_EMPTY": []})
         self.assertEqual(aliases, [])
 
     def test_keeps_nested_and_quoted_commas_in_their_parameter(self) -> None:

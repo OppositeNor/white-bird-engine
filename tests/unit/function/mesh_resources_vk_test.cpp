@@ -12,9 +12,9 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
+#include "core/alloc/i_alloc.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/mesh_resources_vk.hh"
 #include "utils/defs.hh"
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -22,9 +22,9 @@
 namespace WhiteBirdEngine {
 
 TEST(WBEMeshResourcesVKTest, StartsWithIndependentEmptyResources) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
-    MeshResourcesVK resources(&render_data);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
+    MeshResourcesVK resources(&rend_data);
 
     EXPECT_EQ(resources.get_vertex_buffer_count(), 0U);
     EXPECT_THROW(resources.acquire_vertex_buffer(0), std::runtime_error);

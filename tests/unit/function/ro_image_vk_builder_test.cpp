@@ -14,10 +14,10 @@
 */
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/ro_image_vk.hh"
+#include "function/rend_vk/ro_image_view_vk.hh"
 #include <stdexcept>
 #include <gtest/gtest.h>
 #include <vulkan/vulkan_core.h>
@@ -25,17 +25,17 @@
 namespace WhiteBirdEngine {
 
 TEST(WBEROImageVKBuilderTest, DefaultViewRejectsUnavailableImageFormat) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
-    ROImageVK image(&render_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
+    ROImageVK image(&rend_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
 
     EXPECT_THROW(image.get_image_view_ref(), std::runtime_error);
 }
 
 TEST(WBEROImageVKBuilderTest, ExplicitViewRejectsInvalidSubresourceRanges) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
-    ROImageVK image(&render_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
+    ROImageVK image(&rend_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
     VkImageSubresourceRange range{
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 1, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
 
@@ -48,9 +48,9 @@ TEST(WBEROImageVKBuilderTest, ExplicitViewRejectsInvalidSubresourceRanges) {
 }
 
 TEST(WBEROImageVKBuilderTest, ExplicitViewRequiresSharedImageOwnership) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
-    ROImageVK image(&render_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
+    ROImageVK image(&rend_data, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED);
     const VkImageSubresourceRange range{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .baseMipLevel = 0,
         .levelCount = VK_REMAINING_MIP_LEVELS,

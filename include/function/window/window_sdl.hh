@@ -42,7 +42,7 @@ public:
     virtual WindowType get_window_type() const override {
         return window_type;
     }
-    virtual void tick_render() override;
+    virtual void tick_rend() override;
     virtual void tick_logic() override;
     virtual void get_size_in_pixels(uint32_t& p_width, uint32_t& p_height) override;
     virtual void resize(uint32_t p_width, uint32_t p_height) override;

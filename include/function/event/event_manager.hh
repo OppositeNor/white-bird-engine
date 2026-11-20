@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_EVENT_MANAGER_HH
 #define WBE_FILE_EVENT_MANAGER_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/event/event_registration.hh"
@@ -64,10 +64,10 @@ public:
     EventManager() = delete;
     /**
      * @brief Construct an empty event table.
-     * @param p_allocator Thread-safe allocator for the table and its callbacks; it must outlive the manager.
-     * @throws std::runtime_error If another EventManager exists or p_allocator is null.
+     * @param p_alloc Thread-safe allocator for the table and its callbacks; it must outlive the manager.
+     * @throws std::runtime_error If another EventManager exists or p_alloc is null.
      */
-    explicit EventManager(HeapAllocatorDefault* p_allocator);
+    explicit EventManager(HeapAllocDefault* p_alloc);
     /**
      * @brief Destroy the table. Every registration it issued must already be destroyed or reset.
      */
@@ -144,7 +144,7 @@ private:
 
     struct Listener {
         Listener() = delete;
-        explicit Listener(HeapAllocatorDefault* p_allocator) : executing_threads(p_allocator) {
+        explicit Listener(HeapAllocDefault* p_alloc) : executing_threads(p_alloc) {
         }
         ~Listener() = default;
         Listener(const Listener&) = delete;
@@ -161,16 +161,16 @@ private:
         // Cleared by unsubscribe() before it waits for running invocations.
         bool is_active = true;
         // One entry per running invocation, naming the thread it runs on.
-        Vector<std::thread::id, HeapAllocatorDefault> executing_threads;
+        Vector<std::thread::id, HeapAllocDefault> executing_threads;
     };
 
     // Records one invocation in its listener for the guard's lifetime, unless the listener is already unsubscribed.
     class InvocationGuard;
 
-    using ListenerRef = Ref<Listener, HeapAllocatorDefault>;
-    using ListenerList = Vector<ListenerRef, HeapAllocatorDefault>;
+    using ListenerRef = Ref<Listener, HeapAllocDefault>;
+    using ListenerList = Vector<ListenerRef, HeapAllocDefault>;
     // Immutable once published; subscribe() and unsubscribe() replace the whole list, so emit() iterates a stable copy.
-    using ListenerListRef = Ref<ListenerList, HeapAllocatorDefault>;
+    using ListenerListRef = Ref<ListenerList, HeapAllocDefault>;
 
     static std::string make_event_key(std::string_view p_event_id, std::type_index p_payload_type);
     EventSubscriptionID subscribe_erased(std::string p_event_key, ErasedCallback p_callback);
@@ -179,10 +179,10 @@ private:
     void emit_erased(const std::string& p_event_key, const void* p_payload) const;
     size_t get_subscriber_count_erased(const std::string& p_event_key) const;
 
-    HeapAllocatorDefault* allocator;
+    HeapAllocDefault* alloc;
     mutable std::shared_mutex table_mutex;
-    HashMap<std::string, ListenerListRef, HeapAllocatorDefault> listeners_by_event;
-    HashMap<EventSubscriptionID, std::string, HeapAllocatorDefault> event_by_subscription;
+    HashMap<std::string, ListenerListRef, HeapAllocDefault> listeners_by_event;
+    HashMap<EventSubscriptionID, std::string, HeapAllocDefault> event_by_subscription;
     std::atomic<EventSubscriptionID> next_subscription_id = 1;
 
     inline static EventManager* singleton = nullptr;

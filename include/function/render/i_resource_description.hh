@@ -17,14 +17,14 @@
 
 #include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "utils/utils.hh"
 
 namespace WhiteBirdEngine {
 
 /**
  * @class IResourceDescription
- * @brief Describes one resource to register on a render graph (IRenderGraph::register_resource()).
+ * @brief Describes one resource to register on a render graph (IRendGraph::register_resource()).
  *
  * A description is a value: it names the source resources (by ResourceManager key) and the compile options, and the
  * resource registrator of its kind turns it into a render object. Two descriptions that compare equal compile to
@@ -49,10 +49,10 @@ public:
     /**
      * @brief Copy the description.
      *
-     * @param p_allocator The allocator of the copy.
+     * @param p_alloc The allocator of the copy.
      * @return The copy.
      */
-    virtual Unique<IResourceDescription> clone(RenderAllocator* p_allocator) const = 0;
+    virtual Unique<IResourceDescription> clone(RendAlloc* p_alloc) const = 0;
 
     /**
      * @brief Serialize the description's parameters, as a script would write them.

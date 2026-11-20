@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/async/worker.hh"
 #include "core/data/data_value.hh"
 #include "core/engine_core.hh"
@@ -23,23 +23,23 @@
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/i_render_graph_bindings_vk.hh"
-#include "function/render_vk/rend_graph_script_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_bindings_function_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_object_container_vk.hh"
-#include "function/render_vk/render_targets_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/texture_compiler_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/i_rend_graph_bindings_vk.hh"
+#include "function/rend_vk/rend_graph_script_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_bindings_function_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/rend_vk/rend_targets_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
+#include "function/rend_vk/ro_image_view_vk.hh"
+#include "function/rend_vk/ro_image_vk.hh"
+#include "function/rend_vk/texture_compiler_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "glm/gtc/packing.hpp"
 #include "global/global.hh"
 #include "imgui.h"
@@ -47,7 +47,7 @@
 #include "input_manager_mocked.hh"
 #include "pixel_sorting_recipe_context.hh"
 #include "platform/file_system/path.hh"
-#include "render_test.hh"
+#include "rend_test.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"
@@ -200,23 +200,23 @@ public:
         : WBE::ApplicationGame(
               WBE::RendererCapabilities{
                   .timestamp_query = WBE::exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
-                  .descriptor_set = true,
+                  .desc_set = true,
               },
-              WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+              WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {
     }
 
     virtual void logic_update(double p_delta) override {
     }
 
-    virtual void render_update(double p_delta) override {
+    virtual void rend_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
+        WBE::on_exec_test_rend(*renderer, renderer->get_rend_context()->current_frame);
         poll_captures();
         if (recording) {
             record_frame();
         }
         if (ui_orientation != built_orientation) {
-            rebuild_render_graph();
+            rebuild_rend_graph();
         }
         imgui_overlay->begin_frame(p_delta);
         draw_parameter_window(p_delta);
@@ -226,7 +226,7 @@ public:
     /**
      * @brief Set the sort metric range of the sorted pixels.
      *
-     * Before setup_render_graph(), the range becomes the initial contrast buffer content; afterwards the contrast is
+     * Before setup_rend_graph(), the range becomes the initial contrast buffer content; afterwards the contrast is
      * updated through a render job. Must be called from the logic thread.
      *
      * @param p_min_metric The smallest sort metric of a sorted pixel.
@@ -240,11 +240,11 @@ public:
         }
         contrast.min_metric = p_min_metric;
         contrast.max_metric = p_max_metric;
-        if (!render_graph_built) {
+        if (!rend_graph_built) {
             return;
         }
         // The rendering thread owns the buffer, so the update runs as a render job.
-        add_render_job([this, p_min_metric, p_max_metric] {
+        add_rend_job([this, p_min_metric, p_max_metric] {
             ui_contrast.min_metric = p_min_metric;
             ui_contrast.max_metric = p_max_metric;
             contrast_buffer->update_buffer(&ui_contrast, sizeof(PixelSortContrastGPU));
@@ -254,7 +254,7 @@ public:
     /**
      * @brief Set the gamma the post-processing pass raises every color channel to.
      *
-     * Before setup_render_graph(), the gamma becomes the initial parameter buffer content; afterwards the gamma is updated
+     * Before setup_rend_graph(), the gamma becomes the initial parameter buffer content; afterwards the gamma is updated
      * through a render job. Must be called from the logic thread.
      *
      * @param p_gamma The exponent every color channel is raised to.
@@ -265,11 +265,11 @@ public:
             throw std::runtime_error(std::format("Invalid pixel sorting post-processing gamma {}: it must be positive.", p_gamma));
         }
         post_processing_params.gamma = p_gamma;
-        if (!render_graph_built) {
+        if (!rend_graph_built) {
             return;
         }
         // The rendering thread owns the buffer, so the update runs as a render job.
-        add_render_job([this, p_gamma] {
+        add_rend_job([this, p_gamma] {
             ui_post_processing_params.gamma = p_gamma;
             post_processing_params_buffer->update_buffer(&ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
         });
@@ -278,17 +278,17 @@ public:
     /**
      * @brief Set whether the columns or the rows of the image are sorted.
      *
-     * Before setup_render_graph(), the orientation selects the initial render graph; afterwards the graph is rebuilt for it
+     * Before setup_rend_graph(), the orientation selects the initial render graph; afterwards the graph is rebuilt for it
      * through a render job. Must be called from the logic thread.
      *
      * @param p_orientation The lines of the image to sort.
      */
     void set_orientation(PixelSortOrientation p_orientation) {
         orientation = p_orientation;
-        if (!render_graph_built) {
+        if (!rend_graph_built) {
             return;
         }
-        add_render_job([this, p_orientation] {
+        add_rend_job([this, p_orientation] {
             ui_orientation = p_orientation;
         });
     }
@@ -300,11 +300,11 @@ public:
      *
      * @throws std::runtime_error If a resource is missing, the image is too large to sort, or the graph cannot be built.
      */
-    void setup_render_graph() {
+    void setup_rend_graph() {
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* render_context = renderer->get_render_context();
+        const auto* rend_context = renderer->get_rend_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
-        imgui_overlay = WBE::make_unique<WBE::ImGuiOverlayVK>(WBE::global_allocator(), renderer);
+        imgui_overlay = WBE::make_unique<WBE::ImGuiOverlayVK>(WBE::global_alloc(), renderer);
 
         auto texture_resource = resource_manager->get_resource<WBE::RUTexture>(REND_RES_PIXEL_SORT_SOURCE);
         if (texture_resource == nullptr) {
@@ -312,7 +312,7 @@ public:
         }
         // The recipe imports the source image; its extent sizes the graph, so the view is compiled before the graph exists.
         source_view =
-            WBE::TextureCompilerVK(render_context, renderer->get_global_render_cache().get()).compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
+            WBE::TextureCompilerVK(rend_context, renderer->get_global_rend_cache().get()).compile_texture_view(REND_RES_PIXEL_SORT_SOURCE, texture_resource);
 
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const uint64_t element_count = static_cast<uint64_t>(source_extent.width) * source_extent.height;
@@ -332,21 +332,21 @@ public:
         contrast_buffer = create_uniform_buffer(REND_RES_PIXEL_SORT_CONTRAST, &ui_contrast, sizeof(PixelSortContrastGPU));
         post_processing_params_buffer = create_uniform_buffer(
             REND_RES_PIXEL_SORTING_POST_PROCESSING_PARAMS, &ui_post_processing_params, sizeof(PixelSortingPostProcessingParamsGPU));
-        build_render_graph(orientation);
-        render_graph_built = true;
+        build_rend_graph(orientation);
+        rend_graph_built = true;
     }
 
     /**
      * @brief Release the render graph; call after run().
      */
-    void release_render_graph() {
+    void release_rend_graph() {
         result_image = WBE::MEM_NULL;
-        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
+        WBE::release_test_rend_graph(*WBE::RendererVK::get_singleton(), rend_graph);
     }
 
 private:
-    // The render graph definition, whose recipe is render_graphs.pixel_sorting.
-    static constexpr std::string_view PIXEL_SORTING_RENDER_GRAPH = "pixel_sorting_graph";
+    // The render graph definition, whose recipe is rend_graphs.pixel_sorting.
+    static constexpr std::string_view PIXEL_SORTING_REND_GRAPH = "pixel_sorting_graph";
 
     /**
      * @brief Switch to the render graph instance for the orientation selected on the rendering thread.
@@ -354,8 +354,8 @@ private:
      * Must be called on the rendering thread, outside of the renderer tick, which waits for each frame, so the previous
      * instance can be released at once.
      */
-    void rebuild_render_graph() {
-        build_render_graph(ui_orientation);
+    void rebuild_rend_graph() {
+        build_rend_graph(ui_orientation);
     }
 
     /**
@@ -367,7 +367,7 @@ private:
      * @param p_orientation The lines of the image to sort.
      * @throws std::runtime_error If a sorted line is too long for the 16-bit pixel sort mask, or the recipe fails to build.
      */
-    void build_render_graph(PixelSortOrientation p_orientation) {
+    void build_rend_graph(PixelSortOrientation p_orientation) {
         auto* renderer = WBE::RendererVK::get_singleton();
         const VkExtent3D source_extent = source_view->fields().image->fields().extent;
         const bool vertical = p_orientation == PixelSortOrientation::VERTICAL;
@@ -378,16 +378,16 @@ private:
                 "Failed to build the pixel sorting graph: a {}-pixel line is too long for the 16-bit pixel sort mask.", line_length));
         }
         // The graph re-runs the recipe whenever it rebuilds, such as after the first-frame swap chain resize.
-        render_graph = WBE::acquire_test_render_graph(*renderer, PIXEL_SORTING_RENDER_GRAPH, make_bindings(vertical));
-        result_image = render_graph->acquire_resource(PIXEL_SORTING_OUTPUT_IMAGE_EXPORT);
+        rend_graph = WBE::acquire_test_rend_graph(*renderer, PIXEL_SORTING_REND_GRAPH, make_bindings(vertical));
+        result_image = rend_graph->acquire_resource(PIXEL_SORTING_OUTPUT_IMAGE_EXPORT);
         built_orientation = p_orientation;
     }
 
-    // The parameters configured on the logic thread before setup_render_graph().
+    // The parameters configured on the logic thread before setup_rend_graph().
     PixelSortContrastGPU contrast;
     PixelSortOrientation orientation = PixelSortOrientation::VERTICAL;
-    // Whether setup_render_graph() has run; afterwards the configuration is forwarded to the rendering thread.
-    bool render_graph_built = false;
+    // Whether setup_rend_graph() has run; afterwards the configuration is forwarded to the rendering thread.
+    bool rend_graph_built = false;
     // The source image, shared by every graph built for an orientation.
     WBE::Ref<WBE::ROImageViewVK> source_view;
     // The orientation selected in the parameter window, and the one the current graph sorts; owned by the rendering
@@ -407,9 +407,9 @@ private:
     // Destroyed before the renderer, after the rendering thread has stopped.
     WBE::Unique<WBE::ImGuiOverlayVK> imgui_overlay;
     // The active render graph instance.
-    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    WBE::Ref<WBE::RendGraphVK> rend_graph;
     // Graph-owned container of the post-processed result image, the content of the screenshots.
-    WBE::Ref<WBE::RenderObjectContainerVK> result_image;
+    WBE::Ref<WBE::RendObjectContainerVK> result_image;
     // A frame capture whose result image readback has not completed yet.
     struct PendingCapture {
         std::future<std::vector<uint8_t>> readback;
@@ -519,7 +519,7 @@ private:
             PendingCapture capture = std::move(capture_readbacks.front());
             capture_readbacks.pop_front();
             std::vector<uint8_t> result_data = capture.readback.get();
-            const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_render_context()->swap_chain_format);
+            const bool encode_srgb = is_srgb_format(WBE::RendererVK::get_singleton()->get_rend_context()->swap_chain_format);
             // Converting and encoding a full-size image takes long enough to stall a frame, so a worker does it.
             capture_writes.push_back(WBE::Worker::get_singleton()->submit_task(
                 [result_data = std::move(result_data), extent = capture.extent, encode_srgb, path = std::move(capture.path)] {
@@ -606,11 +606,11 @@ private:
      * @param p_vertical Whether the columns, rather than the rows, are sorted.
      * @return The bindings, whose instance key names the orientation.
      */
-    WBE::Ref<WBE::IRenderGraphBindingsVK> make_bindings(bool p_vertical) {
-        auto* render_allocator = get_renderer_allocator().get();
-        return WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
+    WBE::Ref<WBE::IRendGraphBindingsVK> make_bindings(bool p_vertical) {
+        auto* rend_alloc = get_renderer_alloc().get();
+        return WBE::make_ref<WBE::RendGraphBindingsFunctionVK>(WBE::global_alloc(),
             p_vertical ? "vertical" : "horizontal",
-            [this, render_allocator, p_vertical](const WBE::RenderContextVK& p_render_context, const WBE::RendRecipeContextVK& p_recipe_context) {
+            [this, rend_alloc, p_vertical](const WBE::RendContextVK& p_rend_context, const WBE::RendRecipeContextVK& p_recipe_context) {
                 const VkExtent3D source_extent = source_view->fields().image->fields().extent;
                 WBE::PixelSortingRecipeContext recipe_context;
                 static_cast<WBE::RendRecipeContextVK&>(recipe_context) = p_recipe_context;
@@ -618,12 +618,12 @@ private:
                 recipe_context.source_height = source_extent.height;
                 recipe_context.orientation = p_vertical ? WBE::PixelSortOrientation::VERTICAL : WBE::PixelSortOrientation::HORIZONTAL;
                 // The ImGui overlay is owned by the application, so the recipe imports its task.
-                WBE::RendTaskDescVK imgui_task_desc(render_allocator);
+                WBE::RendTaskDescVK imgui_task_desc(rend_alloc);
                 imgui_task_desc.task_id = RT_DRAW_IMGUI;
-                imgui_task_desc.alias(WBE::RenderTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
-                imgui_task_desc.factory = [this, render_allocator, render_context = &p_render_context](
+                imgui_task_desc.alias(WBE::RendTargetsVK::color_id(0), WBE::REND_RES_SWAP_CHAIN);
+                imgui_task_desc.factory = [this, rend_alloc, rend_context = &p_rend_context](
                                               const WBE::RendGraphContextVK& /*p_context*/) {
-                    return WBE::make_unique<WBE::RTImGuiVK>(render_allocator, render_context, imgui_overlay.get());
+                    return WBE::make_unique<WBE::RTImGuiVK>(rend_alloc, rend_context, imgui_overlay.get());
                 };
                 WBE::RendGraphPreparedBindingsVK result;
                 result.context = WBE::RendGraphScriptVK::serialize_context(recipe_context);
@@ -644,12 +644,12 @@ private:
      */
     static WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(std::string_view p_key, const void* p_data, size_t p_size) {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::Ref<WBE::ROBufferVK> buffer = renderer->get_render_context()->create_buffer(WBE::ROBufferVK::Builder()
-                .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
+        WBE::Ref<WBE::ROBufferVK> buffer = renderer->get_rend_context()->create_buffer(WBE::ROBufferVK::Builder()
+                .init_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
                 .set_size(p_size)
                 .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
-        renderer->get_global_render_cache()->insert(p_key, buffer);
+        renderer->get_global_rend_cache()->insert(p_key, buffer);
         return buffer;
     }
 };
@@ -661,10 +661,10 @@ int main(int p_argc, char* p_argv[]) {
         ApplicationVulkanPixelSortingTest game_application;
         {
             WBE_START_PROFILE(WBE::WBE_CHANNEL_GLOBAL, "Main profiler");
-            game_application.setup_render_graph();
+            game_application.setup_rend_graph();
             game_application.run();
-            game_application.release_render_graph();
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
+            game_application.release_rend_graph();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
             WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)->message(std::format("Renderer allocator max used: {}", renderer_alloc_max));
         }
     }

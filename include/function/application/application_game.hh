@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_APPLICATION_GAME_HH
 #define WBE_FILE_APPLICATION_GAME_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/async/worker.hh"
 #include "core/job/job_buffer_ring_mpsc.hh"
 #include "core/memory/reference_strong.hh"
@@ -24,7 +24,7 @@
 #include "function/game_config/game_config_options.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "function/window/i_window.hh"
 #include "utils/defs.hh"
 #include <atomic>
@@ -59,12 +59,12 @@ public:
      * @brief Run the render and logic threads until the window closes, then drain the renderer's queued jobs.
      *
      * The jobs run after both threads have stopped and before the application is destroyed. Afterwards the renderer refuses
-     * new jobs, so add_render_job() throws.
+     * new jobs, so add_rend_job() throws.
      */
     virtual void run() override;
 
-    virtual double get_render_delta() const override {
-        return render_delta.load(std::memory_order_acquire);
+    virtual double get_rend_delta() const override {
+        return rend_delta.load(std::memory_order_acquire);
     }
 
     virtual double get_logic_delta() const override {
@@ -80,8 +80,8 @@ public:
      *
      * @return The allocator for the renderer.
      */
-    Ref<RenderAllocator> get_renderer_allocator() const {
-        return renderer_allocator;
+    Ref<RendAlloc> get_renderer_alloc() const {
+        return renderer_alloc;
     }
 
     /**
@@ -114,28 +114,28 @@ public:
     /**
      * @brief Add a job for the renderer.
      */
-    std::future<void> add_render_job(std::function<void()> p_job) {
+    std::future<void> add_rend_job(std::function<void()> p_job) {
         return renderer->add_job(std::move(p_job));
     }
 
 private:
-    Ref<RenderAllocator> renderer_allocator;
+    Ref<RendAlloc> renderer_alloc;
     RendererCapabilities renderer_capabilities;
     Ref<IInputManager> input_manager;
     Ref<IWindow> window;
 
     void init();
-    void run_render();
+    void run_rend();
     void run_logic();
 
-    WBE_NO_FALSE_SHARING std::atomic<double> render_delta;
+    WBE_NO_FALSE_SHARING std::atomic<double> rend_delta;
     WBE_NO_FALSE_SHARING std::atomic<double> logic_delta;
     WBE_NO_FALSE_SHARING std::atomic<bool> should_close;
     mutable std::mutex delta_settings_mutex;
     DeltaSettings delta_settings;
 
 protected:
-    Ref<JobBufferRingMPSC> render_job_buffer;
+    Ref<JobBufferRingMPSC> rend_job_buffer;
     Ref<IRenderer> renderer;
     Ref<AudioRenderer> audio_renderer;
     Ref<Worker> worker;

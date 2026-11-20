@@ -59,22 +59,22 @@ TEST(WBETealDeclarationsTest, DeclaresTheScriptTypesOfTheTestExecutablesInTestTa
     EXPECT_NE(declarations.find("        variant: SVORecipeVariant\n"), std::string::npos);
 }
 
-TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks) {
-    const std::string declarations = read_declarations("render_graph_utils/render_graph.tl");
-    const std::string constructors = read_declarations("render_graph_utils/render_graph_tasks.tl");
+TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRendTasks) {
+    const std::string declarations = read_declarations("rend_graph_utils/rend_graph.tl");
+    const std::string constructors = read_declarations("rend_graph_utils/rend_graph_tasks.tl");
     // The shared API owns the authoring types and module functions; the installer depends only on those declarations.
     // There is no graph instance: tasks are free-standing like resources.
     EXPECT_NE(declarations.find("    record Resource\n"), std::string::npos);
     EXPECT_NE(declarations.find("    record Task\n"), std::string::npos);
-    EXPECT_NE(declarations.find("    record BuildDescriptor\n"), std::string::npos);
+    EXPECT_NE(declarations.find("    record BuildDesc\n"), std::string::npos);
     EXPECT_EQ(declarations.find("    record Graph\n"), std::string::npos);
-    EXPECT_EQ(declarations.find("require(\"render_graph_utils.render_graph_utils\")"), std::string::npos);
-    EXPECT_NE(constructors.find("local type render_graph = require(\"render_graph_utils.render_graph\")"), std::string::npos);
-    EXPECT_EQ(constructors.find("require(\"render_graph_utils.render_graph_utils\")"), std::string::npos);
-    // WBE_RENDER_TASK(<method>) names a constructor, which creates the task type of the class's first serialization alias.
+    EXPECT_EQ(declarations.find("require(\"rend_graph_utils.rend_graph_utils\")"), std::string::npos);
+    EXPECT_NE(constructors.find("local type rend_graph = require(\"rend_graph_utils.rend_graph\")"), std::string::npos);
+    EXPECT_EQ(constructors.find("require(\"rend_graph_utils.rend_graph_utils\")"), std::string::npos);
+    // WBE_REND_TASK(<method>) names a constructor, which creates the task type of the class's first serialization alias.
     EXPECT_NE(declarations.find("    compute: function(params: RTParamsRunComputePipelineVK, options?: TaskOptions): Task\n"),
         std::string::npos);
-    EXPECT_NE(constructors.find("module.compute = function(params: any, options?: render_graph.TaskOptions)"), std::string::npos);
+    EXPECT_NE(constructors.find("module.compute = function(params: any, options?: rend_graph.TaskOptions)"), std::string::npos);
     EXPECT_NE(constructors.find("make_task(\"run_compute_pipeline\", params, options, compute_fields)"), std::string::npos);
     // Resource-bearing params are generated directly in the shared API without per-task aliases or generic bindings.
     EXPECT_NE(declarations.find("    draw_mesh: function(params: RTParamsGraphicsDrawMeshVK, options?: TaskOptions): Task\n"),
@@ -95,7 +95,7 @@ TEST(WBETealDeclarationsTest, GeneratesTheGraphConstructorsOfTheNamedRenderTasks
     // Every WBE_RECIPE_RESOURCE field without parameters names a graph resource.
     EXPECT_NE(constructors.find("{ name = \"indirect_buffer\", kind = \"resource\", scope = \"graph\" }"), std::string::npos);
     EXPECT_EQ(constructors.find("task_local"), std::string::npos);
-    // A bare WBE_RENDER_TASK registers its task type without a constructor.
+    // A bare WBE_REND_TASK registers its task type without a constructor.
     EXPECT_EQ(declarations.find("max_downsample"), std::string::npos);
     EXPECT_EQ(declarations.find("registry_probe"), std::string::npos);
     EXPECT_EQ(constructors.find("max_downsample"), std::string::npos);

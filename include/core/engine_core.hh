@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_ENGINE_CORE_HH
 #define WBE_FILE_ENGINE_CORE_HH
 
-#include "core/allocator/stack_allocator.hh"
+#include "core/alloc/stack_alloc.hh"
 #include "core/clock/clock.hh"
 #include "core/core_utils.hh"
 #include "core/engine_config/engine_config.hh"
@@ -29,7 +29,7 @@
 
 namespace WhiteBirdEngine {
 
-using HeapAllocatorGlobal = HeapAllocatorDefault;
+using HeapAllocGlobal = HeapAllocDefault;
 
 /**
  * @class EngineCore
@@ -89,7 +89,7 @@ public:
     /**
      * @brief Global pool allocator.
      */
-    HeapAllocatorGlobal* pool_allocator = nullptr;
+    HeapAllocGlobal* pool_alloc = nullptr;
     /**
      * @brief Manager for logs.
      */
@@ -112,7 +112,7 @@ public:
     class SerializableFactory* serializable_factory = nullptr;
 
 private:
-    void initialize(uint32_t p_argc, char* p_argv[]);
+    void init(uint32_t p_argc, char* p_argv[]);
     inline static EngineCore* singleton;
 };
 
@@ -121,8 +121,8 @@ private:
  *
  * @return The global allocator;
  */
-inline HeapAllocatorGlobal* global_allocator() {
-    return EngineCore::get_singleton()->pool_allocator;
+inline HeapAllocGlobal* global_alloc() {
+    return EngineCore::get_singleton()->pool_alloc;
 }
 
 } // namespace WhiteBirdEngine

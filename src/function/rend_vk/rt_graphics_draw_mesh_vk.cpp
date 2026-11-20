@@ -1,0 +1,341 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#include "function/rend_vk/rt_graphics_draw_mesh_vk.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stl_alloc.hh"
+#include "core/data/data_value.hh"
+#include "core/memory/reference_strong.hh"
+#include "core/memory/unique.hh"
+#include "function/render/i_rend_graph.hh"
+#include "function/render/material_texture_contract.hh"
+#include "function/render/rd_typed.hh"
+#include "function/render/rend_defs.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/i_bindable_rend_resource_vk.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/mesh_draw_batch_vk.hh"
+#include "function/rend_vk/mesh_resources_vk.hh"
+#include "function/rend_vk/rd_params_mesh_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_task_create_utils_vk.hh"
+#include "function/rend_vk/ro_graphics_pipeline_vk.hh"
+#include "function/rend_vk/rt_params_clear_value_vk.hh"
+#include "function/rend_vk/rt_params_graphics_draw_mesh_vk.hh"
+#include "function/rend_vk/rt_run_graphics_pipeline_indirect_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
+#include "generated/enum_reflection.gen.hh"
+#include "generated/serializables_sd.gen.hh"
+#include "generated/type_uuid.gen.hh"
+#include "utils/defs.hh"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <vulkan/vulkan_core.h>
+
+namespace WhiteBirdEngine {
+
+namespace {
+
+constexpr std::string_view TASK_NAME = "RTGraphicsDrawMeshVK";
+
+std::string mesh_member(const RTParamsGraphicsDrawMeshVK& p_params, std::string_view p_member) {
+    return IBindableRendResourceVK::make_member_resource_id(p_params.mesh, p_member);
+}
+
+bool pipeline_declares(const ROGraphicsPipelineVK& p_pipeline, std::string_view p_resource_id) {
+    return std::ranges::any_of(p_pipeline.get_desc_layout().fields, [p_resource_id](const auto& p_field) {
+        return p_field.resource_id == p_resource_id;
+    });
+}
+
+void validate_parts(const RTParamsGraphicsDrawMeshVK& p_params) {
+    if (p_params.parts.empty()) {
+        throw std::runtime_error(std::format("{}: at least one mesh part is required.", TASK_NAME));
+    }
+    for (size_t i = 0; i < p_params.parts.size(); ++i) {
+        if (std::find(p_params.parts.begin(), p_params.parts.begin() + static_cast<std::ptrdiff_t>(i), p_params.parts[i]) !=
+            p_params.parts.begin() + static_cast<std::ptrdiff_t>(i)) {
+            throw std::runtime_error(std::format("{}: mesh part '{}' is listed more than once.",
+                TASK_NAME,
+                EnumReflection<MeshPartVK>::enum_to_string(p_params.parts[i])));
+        }
+    }
+}
+
+// A compiled pipeline and the material pipeline variant it draws.
+struct VariantPipelineVK {
+    std::string variant;
+    std::string pipeline_key;
+    Ref<ROGraphicsPipelineVK> pipeline;
+};
+
+// Read the pipeline map: every variant the task draws and the key of the pipeline that draws it.
+Vector<std::pair<std::string, std::string>, RendAlloc> read_variant_pipeline_keys(
+    RendAlloc* p_alloc, const RTParamsGraphicsDrawMeshVK& p_params) {
+    const DataValue& pipelines = p_params.pipeline;
+    if (pipelines.get_kind() != DataValueKind::MAP) {
+        throw std::runtime_error(std::format("{}: pipeline must map pipeline variants to pipeline keys.", TASK_NAME));
+    }
+    if (pipelines.as_map().empty()) {
+        throw std::runtime_error(std::format("{}: pipeline must map at least one pipeline variant.", TASK_NAME));
+    }
+    Vector<std::pair<std::string, std::string>, RendAlloc> result(p_alloc);
+    for (const auto& [variant, pipeline_key] : pipelines.as_map()) {
+        if (variant.empty()) {
+            throw std::runtime_error(std::format("{}: pipeline has an empty pipeline variant.", TASK_NAME));
+        }
+        if (!pipeline_key.is_string()) {
+            throw std::runtime_error(std::format("{}: pipeline variant '{}' must map to a pipeline key string.", TASK_NAME, variant));
+        }
+        if (pipeline_key.as_string().empty()) {
+            throw std::runtime_error(std::format("{}: pipeline variant '{}' maps to an empty pipeline key.", TASK_NAME, variant));
+        }
+        result.emplace_back(variant, pipeline_key.as_string());
+    }
+    return result;
+}
+
+Vector<VariantPipelineVK, RendAlloc> acquire_variant_pipelines(
+    const RendContextVK* p_rend_data, const IRendGraph* p_rend_graph, const RTParamsGraphicsDrawMeshVK& p_params) {
+    Vector<VariantPipelineVK, RendAlloc> result(p_rend_data->alloc);
+    for (auto& [variant, pipeline_key] : read_variant_pipeline_keys(p_rend_data->alloc, p_params)) {
+        Ref<ROGraphicsPipelineVK> pipeline = acquire_task_graphics_pipeline_vk(p_rend_graph, TASK_NAME, pipeline_key);
+        result.push_back({.variant = std::move(variant), .pipeline_key = std::move(pipeline_key), .pipeline = std::move(pipeline)});
+    }
+    return result;
+}
+
+const VariantPipelineVK& find_variant_pipeline(const Vector<VariantPipelineVK, RendAlloc>& p_pipelines,
+    const RTParamsGraphicsDrawMeshVK& p_params,
+    MeshPartVK p_part,
+    std::string_view p_variant) {
+    auto found = std::ranges::find_if(p_pipelines, [p_variant](const VariantPipelineVK& p_pipeline) {
+        return p_pipeline.variant == p_variant;
+    });
+    if (found == p_pipelines.end()) {
+        throw std::runtime_error(std::format("{}: mesh '{}' draws {} submeshes of pipeline variant '{}', but no pipeline is mapped to it.",
+            TASK_NAME,
+            p_params.mesh,
+            EnumReflection<MeshPartVK>::enum_to_string(p_part),
+            p_variant));
+    }
+    return *found;
+}
+
+const VariantPipelineVK* find_declaring_pipeline(
+    const Vector<VariantPipelineVK, RendAlloc>& p_pipelines, std::string_view p_resource_id) {
+    auto found = std::ranges::find_if(p_pipelines, [p_resource_id](const VariantPipelineVK& p_pipeline) {
+        return pipeline_declares(*p_pipeline.pipeline, p_resource_id);
+    });
+    return found == p_pipelines.end() ? nullptr : &*found;
+}
+
+// The material texture contract shared by every pipeline that reads the material table; the table is aliased once per task.
+const MaterialTextureContract& resolve_shared_material_contract(const Vector<VariantPipelineVK, RendAlloc>& p_pipelines) {
+    const VariantPipelineVK* first = nullptr;
+    for (const VariantPipelineVK& pipeline : p_pipelines) {
+        if (!pipeline_declares(*pipeline.pipeline, REND_RES_MESH_MATERIAL_PARAMS)) {
+            continue;
+        }
+        if (!pipeline.pipeline->get_material_texture_contract().has_value()) {
+            throw std::runtime_error(std::format(
+                "{}: pipeline '{}' reads a material table but declares no material texture contract.", TASK_NAME, pipeline.pipeline_key));
+        }
+        if (first == nullptr) {
+            first = &pipeline;
+            continue;
+        }
+        if (!first->pipeline->get_material_texture_contract()->matches(*pipeline.pipeline->get_material_texture_contract())) {
+            throw std::runtime_error(std::format("{}: pipelines '{}' and '{}' read material tables with different material texture contracts.",
+                TASK_NAME,
+                first->pipeline_key,
+                pipeline.pipeline_key));
+        }
+    }
+    WBE_DEBUG_ASSERT(first != nullptr);
+    return *first->pipeline->get_material_texture_contract();
+}
+
+Ref<MeshResourcesVK> acquire_registered_mesh(const IRendGraph* p_rend_graph, std::string_view p_mesh_key) {
+    if (p_rend_graph == nullptr) {
+        throw std::runtime_error(
+            std::format("{}: the task is not on a render graph, so mesh '{}' cannot be resolved.", TASK_NAME, p_mesh_key));
+    }
+    Ref<MeshResourcesVK> mesh = p_rend_graph->try_acquire_registered<MeshResourcesVK>(p_mesh_key);
+    if (mesh == MEM_NULL) {
+        throw std::runtime_error(std::format("{}: no mesh is registered on the render graph under '{}'; add the task with add_to_graph() or RendTaskRegistryVK::add_task().",
+            TASK_NAME,
+            p_mesh_key));
+    }
+    return mesh;
+}
+
+} // namespace
+
+RTGraphicsDrawMeshVK::RTGraphicsDrawMeshVK(Unique<RTRunGraphicsPipelineIndirectVK> p_draw) : draw(std::move(p_draw)) {
+    if (draw.is_null()) {
+        throw std::runtime_error(std::format("{}: the indirect draw is null.", TASK_NAME));
+    }
+}
+
+Unique<IRendTaskVK> RTGraphicsDrawMeshVK::create(const RendContextVK* p_rend_data,
+    IRendGraph* p_rend_graph,
+    const RTParamsGraphicsDrawMeshVK& p_params,
+    const RendGraphContextVK& p_context) {
+    validate_parts(p_params);
+    const Vector<VariantPipelineVK, RendAlloc> pipelines = acquire_variant_pipelines(p_rend_data, p_rend_graph, p_params);
+    Ref<MeshResourcesVK> mesh = acquire_registered_mesh(p_rend_graph, p_params.mesh);
+    for (const VariantPipelineVK& pipeline : pipelines) {
+        if (pipeline.pipeline->get_mesh_node_contract().has_value()) {
+            MeshResourcesVK::validate_node_contract(*pipeline.pipeline->get_mesh_node_contract());
+        }
+    }
+
+    RTRunGraphicsPipelineIndirectVK::Builder builder(p_rend_data->alloc);
+    for (size_t i = 0; i < mesh->get_vertex_buffer_count(); ++i) {
+        builder.add_vertex_buffer(mesh_member(p_params, MeshResourcesVK::get_vertex_buffer_member(i)));
+    }
+    builder.set_index_buffer(mesh_member(p_params, MeshResourcesVK::INDICES));
+    for (MeshPartVK part : p_params.parts) {
+        if (mesh->acquire_draw_commands(part) == MEM_NULL || mesh->get_draw_batch_count(part) == 0) {
+            throw std::runtime_error(std::format(
+                "{}: mesh '{}' has no {} submeshes.", TASK_NAME, p_params.mesh, EnumReflection<MeshPartVK>::enum_to_string(part)));
+        }
+        const uint32_t indirect_buffer_index =
+            builder.add_indirect_buffer(mesh_member(p_params, MeshResourcesVK::get_draw_commands_member(part)));
+        for (size_t batch_index = 0; batch_index < mesh->get_draw_batch_count(part); ++batch_index) {
+            const MeshDrawBatchVK& source = mesh->get_draw_batch(part, batch_index);
+            const VariantPipelineVK& pipeline = find_variant_pipeline(pipelines, p_params, part, source.pipeline_variant);
+            RTRunGraphicsPipelineIndirectVK::PipelineBatch batch;
+            batch.graphics_pipeline = pipeline.pipeline;
+            batch.indirect_buffer_index = indirect_buffer_index;
+            batch.first_draw = source.first_draw;
+            batch.draw_count = source.draw_count;
+            batch.vertex_input = source.resolve_vertex_input(pipeline.pipeline->get_vertex_input_requirement(), batch.vertex_buffers);
+            builder.add_pipeline_batch(std::move(batch));
+        }
+    }
+    std::vector<VkClearValue> clear_values;
+    clear_values.reserve(p_params.clear_values.size());
+    for (const RTParamsClearValueVK& clear_value : p_params.clear_values) {
+        clear_values.push_back(clear_value.to_vk());
+    }
+    builder.set_rend_extent(p_params.rend_extent.resolve(p_context))
+        .set_clear_values(clear_values)
+        .set_color_load_op(to_vk_attachment_load_op(p_params.color_load_op))
+        .set_depth_load_op(to_vk_attachment_load_op(p_params.depth_load_op));
+    return make_unique<RTGraphicsDrawMeshVK>(p_rend_data->alloc, builder.create_unique(p_rend_data));
+}
+
+void RTGraphicsDrawMeshVK::prepare_graph(
+    RendGraphDescVK& p_graph, RendTaskDescVK& p_task, const RTParamsGraphicsDrawMeshVK& p_params, const RendContextVK* p_rend_data) {
+    validate_parts(p_params);
+    IRendGraph& rend_graph = p_graph.get_rend_graph();
+    Vector<VariantPipelineVK, RendAlloc> pipelines = acquire_variant_pipelines(p_rend_data, &rend_graph, p_params);
+    // A mesh nobody registered is registered from the mesh resource of the same key, with the default compile options.
+    if (!rend_graph.contains_registered_resource(p_params.mesh)) {
+        rend_graph.register_resource(p_params.mesh, RDTyped<RDParamsMeshVK>(RDParamsMeshVK{.mesh = p_params.mesh}));
+    }
+    Ref<MeshResourcesVK> mesh = acquire_registered_mesh(&rend_graph, p_params.mesh);
+    if (!p_graph.contains_resource(mesh_member(p_params, MeshResourcesVK::INDICES))) {
+        p_graph.add_resource(p_params.mesh, *mesh);
+    }
+
+    // Aliases are per task, so each one covers every pipeline that declares the shader id.
+    const auto alias_declared = [&p_task, &pipelines](std::string_view p_shader_id, std::string_view p_graph_id) {
+        if (find_declaring_pipeline(pipelines, p_shader_id) != nullptr) {
+            p_task.alias(p_shader_id, p_graph_id);
+        }
+    };
+    // The fixed-function buffers are named by their graph ids, which the task binds to themselves.
+    const auto bind_directly = [&p_task](const std::string& p_graph_id) {
+        p_task.alias(p_graph_id, p_graph_id);
+    };
+    for (size_t i = 0; i < mesh->get_vertex_buffer_count(); ++i) {
+        bind_directly(mesh_member(p_params, MeshResourcesVK::get_vertex_buffer_member(i)));
+    }
+    bind_directly(mesh_member(p_params, MeshResourcesVK::INDICES));
+    for (MeshPartVK part : p_params.parts) {
+        bind_directly(mesh_member(p_params, MeshResourcesVK::get_draw_commands_member(part)));
+    }
+    alias_declared(REND_RES_MESH_SUBMESHES, mesh_member(p_params, MeshResourcesVK::SUBMESHES));
+    alias_declared(REND_RES_MESH_NODES, mesh_member(p_params, MeshResourcesVK::NODES));
+    alias_declared(REND_RES_MESH_INSTANCES, mesh_member(p_params, MeshResourcesVK::INSTANCES));
+    alias_declared(REND_RES_MESH_MATERIAL_SAMPLER, mesh_member(p_params, MeshResourcesVK::MATERIAL_SAMPLER));
+    if (const VariantPipelineVK* transform_reader = find_declaring_pipeline(pipelines, REND_RES_MESH_TRANSFORM);
+        transform_reader != nullptr) {
+        if (!p_params.transform.has_value() || p_params.transform->empty()) {
+            throw std::runtime_error(std::format("{}: pipeline '{}' reads the whole-mesh transform, but no transform resource is set.",
+                TASK_NAME,
+                transform_reader->pipeline_key));
+        }
+        p_task.alias(REND_RES_MESH_TRANSFORM, *p_params.transform);
+    }
+    if (find_declaring_pipeline(pipelines, REND_RES_MESH_MATERIAL_PARAMS) != nullptr) {
+        const size_t table_index = mesh->acquire_material_table(resolve_shared_material_contract(pipelines));
+        const std::string table_id = mesh_member(p_params, MeshResourcesVK::get_material_params_member(table_index));
+        if (!p_graph.contains_resource(table_id)) {
+            mesh->acquire_material_params(table_index)->bind(p_graph, table_id);
+        }
+        p_task.alias(REND_RES_MESH_MATERIAL_PARAMS, table_id);
+    }
+    if (p_task.factory == nullptr) {
+        throw std::runtime_error(std::format("{}: task '{}' has no factory to prepare.", TASK_NAME, p_task.task_id));
+    }
+    // The GlobalRendCache holds compiled objects weakly; the task descriptor keeps the ones create() looks up alive.
+    p_task.factory = [factory = std::move(p_task.factory), pipelines = std::move(pipelines), mesh](const RendGraphContextVK& p_context) {
+        return factory(p_context);
+    };
+}
+
+RendTaskDescVK& RTGraphicsDrawMeshVK::add_to_graph(
+    RendGraphDescVK& p_graph, std::string_view p_task_id, const RTParamsGraphicsDrawMeshVK& p_params, const RendContextVK* p_rend_data) {
+    if (std::ranges::any_of(p_graph.tasks, [p_task_id](const RendTaskDescVK& p_task) {
+            return p_task.task_id == p_task_id;
+        })) {
+        throw std::runtime_error(std::format("{}: the graph already has a task with id '{}'.", TASK_NAME, p_task_id));
+    }
+    RendTaskDescVK task(
+        p_graph.alloc, p_task_id, [p_rend_data, rend_graph = p_graph.rend_graph, p_params](const RendGraphContextVK& p_context) {
+            return create(p_rend_data, rend_graph, p_params, p_context);
+        });
+    prepare_graph(p_graph, task, p_params, p_rend_data);
+    p_graph.add_task(std::move(task));
+    return p_graph.get_task(p_task_id);
+}
+
+void RTGraphicsDrawMeshVK::append_accesses(
+    Vector<ResAccessVK, RendAlloc>& p_reads, Vector<ResAccessVK, RendAlloc>& p_writes) const {
+    draw->append_accesses(p_reads, p_writes);
+}
+
+void RTGraphicsDrawMeshVK::bind_resources(const RendResViewVK& p_resources) {
+    draw->bind_resources(p_resources);
+}
+
+void RTGraphicsDrawMeshVK::record(VkCommandBuffer p_command_buffer, double p_delta) {
+    draw->record(p_command_buffer, p_delta);
+}
+
+} // namespace WhiteBirdEngine

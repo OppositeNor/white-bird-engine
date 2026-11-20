@@ -28,19 +28,19 @@ struct PixelSortingPostProcessingParams {
 };
 
 /** Descriptor indices of the resources used by the post-processing pass. */
-struct PixelSortingPostProcessingDescriptorIndices {
+struct PixelSortingPostProcessingDescIndices {
     /** The pixel-sorted image, from write_sorted_pixels. */
-    [wbe::descriptor("sampled_image", "pixel_sort_destination")] uint2 sorted_image;
+    [wbe::desc("sampled_image", "pixel_sort_destination")] uint2 sorted_image;
     /** Clamp-to-edge sampler for filtered reads of the sorted image. */
-    [wbe::descriptor("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
+    [wbe::desc("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
     /** The parameters of the post-processing effects. */
-    [wbe::descriptor("uniform_buffer", "pixel_sorting_post_processing_params")] uint2 params;
+    [wbe::desc("uniform_buffer", "pixel_sorting_post_processing_params")] uint2 params;
     /** Image receiving the post-processed pixels; must have the extent of sorted_image. */
-    [wbe::descriptor("storage_image", "pixel_sorting_post_processing_output", "write")] uint2 output;
+    [wbe::desc("storage_image", "pixel_sorting_post_processing_output", "write")] uint2 output;
 };
 
 [vk::push_constant]
-ConstantBuffer<PixelSortingPostProcessingDescriptorIndices> descriptor_indices;
+ConstantBuffer<PixelSortingPostProcessingDescIndices> di;
 
 /**
  * @brief Compute the post-processed color of one pixel.
@@ -64,10 +64,10 @@ float4 post_process(Texture2D<float4> p_sorted_image,
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    Texture2D<float4> sorted_image = ResourceDescriptorHeap[descriptor_indices.sorted_image.x];
-    SamplerState sorted_sampler = SamplerDescriptorHeap[descriptor_indices.sorted_sampler.x];
-    ConstantBuffer<PixelSortingPostProcessingParams> params = ResourceDescriptorHeap[descriptor_indices.params.x];
-    RWTexture2D<float4> output = ResourceDescriptorHeap[descriptor_indices.output.x];
+    Texture2D<float4> sorted_image = ResourceDescriptorHeap[di.sorted_image.x];
+    SamplerState sorted_sampler = SamplerDescriptorHeap[di.sorted_sampler.x];
+    ConstantBuffer<PixelSortingPostProcessingParams> params = ResourceDescriptorHeap[di.params.x];
+    RWTexture2D<float4> output = ResourceDescriptorHeap[di.output.x];
     uint2 extent;
     sorted_image.GetDimensions(extent.x, extent.y);
     uint2 pixel = p_dispatch_thread_id.xy;

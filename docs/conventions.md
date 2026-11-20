@@ -39,8 +39,10 @@ Render objects and renderer-backend helpers are confined to the rendering thread
 - `snake_case` for files, functions, variables, and members; `PascalCase` for types; `UPPER_SNAKE` for macros.
 - Function parameters are prefixed with `p_`.
 - Derived implementations carry their interface's abbreviation as a prefix (`ROImageVK`, `RTRunComputePipelineVK`).
-- No abbreviations unless universally known. `rma` is the accepted abbreviation and texture role for the roughness,
-  metallic, and ambient-occlusion channel pack.
+- No abbreviations outside the allowed list in `AGENTS.md` (for example `init`, `info`, `config`, `desc`, `alloc`,
+  `Rend` for Render inside compound names such as `RendRes`, while `render` on its own stays spelled out, and, in
+  Slang only, `di` for the push-constant descriptor indices). New names must use the allowed abbreviation. `rma` is the accepted abbreviation and texture role for the roughness, metallic, and ambient-occlusion
+  channel pack.
 - All engine code lives in the single named namespace `WhiteBirdEngine`.
 
 ## Data and build

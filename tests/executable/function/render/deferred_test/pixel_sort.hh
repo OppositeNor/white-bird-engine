@@ -17,11 +17,11 @@
 
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
 #include "i_post_processing.hh"
 #include "pixel_sort_recipe_params.hh"
 #include <cstdint>
@@ -70,7 +70,7 @@ struct PixelSortSettings {
  * @details Copies the color image, counts the masked pixels of every sorted line, turns the counts into the range of
  * every line in a key buffer, registers the masked pixels into those ranges, radix sorts the keys in 4 passes of 8 bits, and
  * writes every masked pixel back from the sorted key at its registered index (see the pixel_sort and sort shaders). The
- * Lua module render_graph_utils.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
+ * Lua module rend_graph_utils.features.pixel_sort adds those tasks and their graph-owned resources to a recipe, so every
  * graph the effect is added to allocates its own; the feature module registers the pipelines they reference, and the effect owns the contrast
  * buffer every graph imports. Neither copyable nor movable.
  */
@@ -84,7 +84,7 @@ public:
     PixelSort() = delete;
     /**
      * @brief Create the effect; its feature module registers the compute pipelines on each graph.
-     * @param p_allocator Allocator of the effect's pipelines and tasks; must outlive the effect.
+     * @param p_alloc Allocator of the effect's pipelines and tasks; must outlive the effect.
      * @param p_renderer The renderer; must outlive the effect.
      * @param p_extent Factory of the extent of the color images the effect is applied to. Every graph the effect is added to
      * evaluates it against its render graph context, and resizes the effect's resources and dispatches with it.
@@ -93,7 +93,7 @@ public:
      * @throws std::runtime_error If a shader resource is missing, p_extent is null, or p_settings is invalid (see
      * set_settings()). Graphs throw the same extent errors when a later context yields an invalid extent.
      */
-    PixelSort(RenderAllocator* p_allocator,
+    PixelSort(RendAlloc* p_alloc,
         RendererVK* p_renderer,
         std::function<VkExtent2D(const RendGraphContextVK&)> p_extent,
         VkFormat p_color_format,
@@ -109,7 +109,7 @@ public:
     }
 
     /**
-     * @brief Describe the effect to the render_graph_utils.features.pixel_sort module, and supply the contrast buffer.
+     * @brief Describe the effect to the rend_graph_utils.features.pixel_sort module, and supply the contrast buffer.
      *
      * Writes the current direction, scope, color format, queue family, toggle event, and enabled state.
      */
@@ -128,7 +128,7 @@ public:
      * @brief Change the configuration of the effect.
      *
      * A changed direction or scope changes the effect's pipelines, resources, and dispatches: every graph the effect was
-     * added to must then be rebuilt with RenderGraphVK::rebuild() before it executes again. The metric, range, and scope
+     * added to must then be rebuilt with RendGraphVK::rebuild() before it executes again. The metric, range, and scope
      * reach the shaders once upload_settings() writes them to the contrast buffer.
      *
      * @param p_settings The new configuration.

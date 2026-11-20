@@ -14,14 +14,14 @@
 */
 #include "core/parser/parser_json.hh"
 #include "function/render/mesh_node_contract.hh"
-#include "function/render_vk/mesh_gpu_data_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
+#include "function/rend_vk/mesh_gpu_data_vk.hh"
+#include "function/rend_vk/mesh_resources_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
 #include "core/data/data_value.hh"
-#include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rt_graphics_draw_mesh_vk.hh"
-#include "function/render_vk/rt_params_graphics_draw_mesh_vk.hh"
+#include "function/rend_vk/rend_task_registry_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rt_graphics_draw_mesh_vk.hh"
+#include "function/rend_vk/rt_params_graphics_draw_mesh_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "utils/defs.hh"
@@ -44,9 +44,9 @@ RTParamsGraphicsDrawMeshVK parse_draw_mesh_params(std::string_view p_json) {
     return result;
 }
 
-std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const RenderContextVK* p_render_data) {
+std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const RendContextVK* p_rend_data) {
     try {
-        (void)RTGraphicsDrawMeshVK::create(p_render_data, nullptr, p_params, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
+        (void)RTGraphicsDrawMeshVK::create(p_rend_data, nullptr, p_params, RendGraphContextVK{.swap_chain_extent = {.width = 64, .height = 64}});
     } catch (const std::runtime_error& p_error) {
         return p_error.what();
     }
@@ -56,8 +56,8 @@ std::string create_error(const RTParamsGraphicsDrawMeshVK& p_params, const Rende
 } // namespace
 
 TEST(WBERTGraphicsDrawMeshVKTest, IsRegisteredUnderItsNameAndAlias) {
-    EXPECT_TRUE(RenderTaskRegistryVK::contains("RTGraphicsDrawMeshVK"));
-    EXPECT_TRUE(RenderTaskRegistryVK::contains("graphics_draw_mesh"));
+    EXPECT_TRUE(RendTaskRegistryVK::contains("RTGraphicsDrawMeshVK"));
+    EXPECT_TRUE(RendTaskRegistryVK::contains("graphics_draw_mesh"));
 }
 
 TEST(WBERTGraphicsDrawMeshVKTest, ParametersNamePartsByAlias) {
@@ -74,38 +74,38 @@ TEST(WBERTGraphicsDrawMeshVKTest, ParametersNamePartsByAlias) {
 }
 
 TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPartsBeforeLookingUpResources) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     RTParamsGraphicsDrawMeshVK params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"default": "p"}, "parts": []})");
-    EXPECT_NE(create_error(params, &render_data).find("at least one mesh part"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("at least one mesh part"), std::string::npos);
     params.parts = {MeshPartVK::OPAQUE, MeshPartVK::MASKED, MeshPartVK::OPAQUE};
-    EXPECT_NE(create_error(params, &render_data).find("'OPAQUE' is listed more than once"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("'OPAQUE' is listed more than once"), std::string::npos);
     params.parts = {MeshPartVK::MASKED};
-    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("is not on a render graph"), std::string::npos);
 }
 
 TEST(WBERTGraphicsDrawMeshVKTest, CreateValidatesPipelineVariantsBeforeLookingUpResources) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     RTParamsGraphicsDrawMeshVK params =
         parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"default": "p", "tinted": "p_tinted"}, "parts": ["opaque"]})");
     ASSERT_TRUE(params.pipeline.get_kind() == DataValueKind::MAP);
     ASSERT_EQ(params.pipeline.as_map().size(), 2U);
     EXPECT_EQ(params.pipeline.get_value<std::string>("default"), "p");
     EXPECT_EQ(params.pipeline.get_value<std::string>("tinted"), "p_tinted");
-    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("is not on a render graph"), std::string::npos);
     // A task may draw only materials of other variants.
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"tinted": "p_tinted"}, "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("is not on a render graph"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("is not on a render graph"), std::string::npos);
 
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": "p", "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("must map pipeline variants to pipeline keys"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("must map pipeline variants to pipeline keys"), std::string::npos);
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {}, "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("must map at least one pipeline variant"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("must map at least one pipeline variant"), std::string::npos);
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"tinted": 3}, "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("must map to a pipeline key string"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("must map to a pipeline key string"), std::string::npos);
     params = parse_draw_mesh_params(R"({"mesh": "m", "pipeline": {"tinted": ""}, "parts": ["opaque"]})");
-    EXPECT_NE(create_error(params, &render_data).find("maps to an empty pipeline key"), std::string::npos);
+    EXPECT_NE(create_error(params, &rend_data).find("maps to an empty pipeline key"), std::string::npos);
 
     const DataValue single = RTParamsGraphicsDrawMeshVK::make_default_pipeline("p");
     ASSERT_EQ(single.as_map().size(), 1U);
@@ -119,9 +119,9 @@ TEST(WBEMeshResourcesVKTest, NamesPartsAndMaterialTables) {
     EXPECT_EQ(MeshResourcesVK::get_draw_commands_member(MeshPartVK::DOUBLE_SIDED), MeshResourcesVK::OPAQUE_DOUBLE_SIDED_DRAW_BATCHES);
     EXPECT_EQ(MeshResourcesVK::get_material_params_member(2), "material_params.2");
 
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
-    const MeshResourcesVK resources(&render_data);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
+    const MeshResourcesVK resources(&rend_data);
     for (MeshPartVK part : {MeshPartVK::OPAQUE, MeshPartVK::MASKED, MeshPartVK::DOUBLE_SIDED}) {
         EXPECT_EQ(resources.acquire_draw_commands(part), MEM_NULL);
         EXPECT_EQ(resources.get_draw_batch_count(part), 0U);

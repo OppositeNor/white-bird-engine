@@ -1,0 +1,212 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#ifndef WBE_FILE_STACK_ALLOC_HH
+#define WBE_FILE_STACK_ALLOC_HH
+
+#include "i_alloc.hh"
+#include "memory_chunk.hh"
+#include "utils/defs.hh"
+#include "utils/utils.hh"
+#include <cstddef>
+#include <cstring>
+#include <format>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+namespace WhiteBirdEngine {
+
+template <>
+struct AllocTrait<class StackAlloc> {
+    WBE_TRAIT(AllocTrait<StackAlloc>);
+    static constexpr AllocType TYPE = AllocType::STACK_ALLOC;
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = true;
+    static constexpr bool IS_ALIGNABLE = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+    static constexpr bool WILL_ADDR_MOVE = false;
+
+    WBE_TRAIT_REQUIRES(AllocTraitConcept);
+};
+
+/**
+ * @class StackAlloc
+ * @brief Stack style allocation. Can only allocate and deallocate from the top
+ * of the stack.
+ * @todo Test
+ */
+class StackAlloc final : public IAlloc {
+public:
+    StackAlloc() : StackAlloc(1024) {
+    }
+    virtual ~StackAlloc() override = default;
+    StackAlloc(const StackAlloc&) = delete;
+    StackAlloc(StackAlloc&&) = delete;
+    StackAlloc& operator=(const StackAlloc&) = delete;
+    StackAlloc& operator=(StackAlloc&&) = delete;
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_size The size of the allocated buffer in bytes.
+     */
+    StackAlloc(size_t p_size) : StackAlloc(MemoryChunk(p_size), 0, p_size) {
+    }
+
+    /**
+     * @brief Constructor using a range inside a memory chunk.
+     *
+     * @param p_memory_chunk The memory chunk to reference.
+     * @param p_start_offset The stack start offset in the memory chunk.
+     * @param p_size The size occupied by this stack.
+     */
+    StackAlloc(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size)
+        : total_size(p_size), stack_pointer(0), memory_chunk(std::move(p_memory_chunk)) {
+        mem_chunk = memory_chunk.get_occupied_start(p_start_offset, p_size);
+        std::memset(mem_chunk, 0, p_size);
+    }
+
+    /**
+     * @brief Allocate memory with a specified size.
+     *
+     * @param p_size The size of the memory to be allocated in bytes.
+     * @return
+     */
+    MemID allocate(size_t p_size) {
+        void* result = mem_chunk + stack_pointer;
+        stack_pointer += get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+        if (stack_pointer > total_size) {
+            // Decrease it back or else operator std::string is going to output weird numbers.
+            stack_pointer -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+            throw std::runtime_error(std::format("Failed to allocate memory: not enough space.\nTrying to allocate: {} bytes.\nPool status: {}",
+                p_size,
+                static_cast<std::string>(*this)));
+        }
+        return reinterpret_cast<MemID>(result);
+    }
+
+    /**
+     * @brief Get the pointer pointing to the memory with a specified memory id.
+     *
+     * @param p_id The ID of the memory to get.
+     */
+    void* get(MemID p_id) {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) >= mem_chunk);
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) <= (mem_chunk + stack_pointer));
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    /**
+     * @brief Get the pointer pointing to the memory with a specified memory id.
+     *
+     * @param p_id The ID of the memory to get.
+     */
+    virtual void* get(MemID p_id) const override {
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk + stack_pointer));
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    /**
+     * @brief Get the pointer pointing to the object with a specified memory id.
+     *
+     * @tparam T The type of the object.
+     * @param p_id The memory ID.
+     * @return The pointer to the object.
+     */
+    template <typename T>
+    T* get_obj(MemID p_id) const {
+        WBE_DEBUG_ASSERT(reinterpret_cast<void*>(p_id) < (mem_chunk + stack_pointer));
+        return reinterpret_cast<T*>(p_id);
+    }
+
+    /**
+     * @brief Pop the last element out from the stack.
+     *
+     * @return The pointer to the deallocated object.
+     */
+    void* pop_stack(size_t p_size) {
+        stack_pointer -= get_align_size(p_size, WBE_DEFAULT_ALIGNMENT);
+        return mem_chunk + stack_pointer;
+    }
+
+    /**
+     * @brief Clear the allocator.
+     */
+    void clear() {
+        stack_pointer = 0;
+    }
+
+    /**
+     * @brief Get the size of the allocator buffer.
+     *
+     * @return The size of the buffer.
+     */
+    size_t get_alloc_size() const {
+        return stack_pointer;
+    }
+
+    /**
+     * @brief Get the total size of the allocator.
+     *
+     * @return
+     */
+    size_t get_total_size() const {
+        return total_size;
+    }
+
+    operator std::string() const {
+        std::stringstream ss;
+        ss << R"({"type":"StackAlloc","total_size":)" << total_size << R"(,"stack_pointer":)" << stack_pointer
+           << R"(,"available":)" << total_size - stack_pointer << "}";
+        return ss.str();
+    }
+
+private:
+    size_t total_size;
+    size_t stack_pointer;
+    MemoryChunk memory_chunk;
+    char* mem_chunk;
+};
+
+template <typename T, typename... Args>
+MemID create_stack_obj(StackAlloc& p_alloc, Args&&... p_args) {
+    MemID result = p_alloc.allocate(sizeof(T));
+    new (p_alloc.get(result)) T(std::forward<Args>(p_args)...);
+    return result;
+}
+
+template <typename T>
+void pop_stack_obj(StackAlloc& p_alloc) {
+    static_cast<T*>(p_alloc.pop_stack(sizeof(T)))->~T();
+}
+
+template <typename T>
+void pop_stack_obj_array(StackAlloc& p_alloc, size_t p_num) {
+    T* head = static_cast<T*>(p_alloc.get(p_num));
+    for (; p_num > 0; --p_num) {
+        head->~T();
+    }
+    p_alloc.pop_stack(p_num * sizeof(T));
+}
+
+} // namespace WhiteBirdEngine
+
+#endif

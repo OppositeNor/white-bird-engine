@@ -20,11 +20,11 @@ namespace WBE = WhiteBirdEngine;
 class ApplicationVulkanDrawFur final : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawFur()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {
 
     }
 
-    virtual void render_update(double p_delta) override {
+    virtual void rend_update(double p_delta) override {
         // TODO
     };
 

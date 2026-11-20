@@ -17,10 +17,10 @@
 
 #include "core/data/data_value.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/rd_params_mesh_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/rend_recipe_extent_2d_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/rend_vk/rd_params_mesh_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_recipe_extent_2d_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "voxel_debug_view_toggles.hh"
 #include <cstdint>
 #include <string>
@@ -82,8 +82,8 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeFormats {
 
 /**
  * @class DeferredRecipeParameters
- * @brief The static parameters of the render_graphs.deferred recipe, set by each deferred render graph definition in
- * res/assets/render_graphs/render_graphs.toml. Copyable and movable.
+ * @brief The static parameters of the rend_graphs.deferred recipe, set by each deferred render graph definition in
+ * res/assets/rend_graphs/rend_graphs.toml. Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeParameters {
     /**
@@ -100,7 +100,7 @@ struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeParameters {
 
 /**
  * @class DeferredRecipeContext
- * @brief The context of the render_graphs.deferred recipe; see ApplicationVulkanDeferredPBRTest. Copyable and movable.
+ * @brief The context of the rend_graphs.deferred recipe; see ApplicationVulkanDeferredPBRTest. Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) DeferredRecipeContext : public RendRecipeContextVK {
     /**

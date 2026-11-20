@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_RESOURCE_MANAGER_HH
 #define WBE_FILE_RESOURCE_MANAGER_HH
 
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -143,7 +143,7 @@ public:
      */
     template <typename T>
     T* get_res_by_memid(MemID p_memid) {
-        return stack_allocator.get_obj<T>(p_memid);
+        return stack_alloc.get_obj<T>(p_memid);
     }
 
     /**
@@ -155,12 +155,12 @@ public:
         return singleton;
     }
 
-    const StackAllocator& get_allocator() const {
-        return stack_allocator;
+    const StackAlloc& get_allocator() const {
+        return stack_alloc;
     }
 
-    StackAllocator& get_allocator() {
-        return stack_allocator;
+    StackAlloc& get_allocator() {
+        return stack_alloc;
     }
 
     ResourceChunkID global_res_chunk() const {
@@ -193,7 +193,7 @@ private:
     ResourceChunkID global_res_chunk_id = RES_CHUNK_NULL;
     std::vector<Ref<IResourceChunk>> resource_chunks;
     std::flat_map<std::string, Ref<IResourceUnitLoader>> resource_unit_loaders;
-    StackAllocator stack_allocator;
+    StackAlloc stack_alloc;
 
     Ref<IResourceChunk> find_resource_chunk_containing_resource(std::string_view p_id) const;
 

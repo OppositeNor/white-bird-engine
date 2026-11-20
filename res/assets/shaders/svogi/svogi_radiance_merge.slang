@@ -15,14 +15,14 @@
 
 #include "utils/utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
+struct DescIndices {
+    [wbe::desc("storage_buffer", "spot_light_infos", "read")]
     uint2 radiance_key_buffer;
-    [wbe::descriptor("storage_buffer", "spot_light_infos", "read")]
+    [wbe::desc("storage_buffer", "spot_light_infos", "read")]
     uint2 radiance_buffer;
-    [wbe::descriptor("storage_buffer", "spot_light_infos", "write")]
+    [wbe::desc("storage_buffer", "spot_light_infos", "write")]
     uint2 radiance_buffer_merged;
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;

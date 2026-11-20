@@ -29,14 +29,14 @@ struct ShadowVSOutput {
 /**
  * @brief Constant buffer providing the spot light's view and projection matrices.
  */
-struct ShadowDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "shadow_light_info")]
+struct ShadowDescIndices {
+    [wbe::desc("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<ShadowDescriptorIndices> descriptor_indices;
+ConstantBuffer<ShadowDescIndices> di;
 
 /**
  * @brief Transform a mesh vertex into spot-light clip space.
@@ -46,10 +46,10 @@ ConstantBuffer<ShadowDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
     InstanceData instance = instances[p_instance_id];
-    float4 world_position = mul(load_mesh_node(descriptor_indices.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
+    float4 world_position = mul(load_mesh_node(di.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
     ShadowVSOutput output;
     float4 light_view_position =
         software_mul_float4x4_vector(WBE_SOFTWARE_MATRIX_ROWS(light_camera_info.view), world_position);

@@ -16,29 +16,29 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
-#include "fake_render_graph.hh"
+#include "fake_rend_graph.hh"
 #include "function/event/event_manager.hh"
-#include "function/render/i_render_graph.hh"
-#include "function/render/i_render_object.hh"
+#include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/render/i_resource_description.hh"
 #include "function/render/i_resource_registrator.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "function/render/rr_typed.hh"
-#include "function/render_vk/i_bindable_render_resource_vk.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/rt_multiplexer_vk.hh"
-#include "function/render_vk/rt_toggle_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
+#include "function/rend_vk/i_bindable_rend_resource_vk.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rt_multiplexer_vk.hh"
+#include "function/rend_vk/rt_toggle_vk.hh"
+#include "function/rend_vk/rt_triggered_vk.hh"
 #include "generated/serializables_sd.gen.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
 #include "rend_recipe_registration_test_params.hh"
-#include "render_task_registry_vk_test_tasks.hh"
+#include "rend_task_registry_vk_test_tasks.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -57,7 +57,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 // An import that binds one bare resource entry, so recipes can be built without GPU objects.
-class TestRecipeImportVK final : public IBindableRenderResourceVK {
+class TestRecipeImportVK final : public IBindableRendResourceVK {
 public:
     TestRecipeImportVK() = default;
     virtual ~TestRecipeImportVK() override = default;
@@ -74,9 +74,9 @@ public:
 std::string build_error(const RendGraphRecipeBuilderVK& p_builder,
     std::string_view p_recipe,
     const RendGraphRecipeImportsVK& p_imports,
-    const RenderContextVK* p_render_data) {
+    const RendContextVK* p_rend_data) {
     try {
-        (void)p_builder.build(ParserJSON::read(p_recipe), p_imports, p_render_data, nullptr);
+        (void)p_builder.build(ParserJSON::read(p_recipe), p_imports, p_rend_data, nullptr);
     } catch (const std::runtime_error& p_error) {
         return p_error.what();
     }
@@ -85,8 +85,8 @@ std::string build_error(const RendGraphRecipeBuilderVK& p_builder,
 
 class WBERendGraphRecipeBuilderVKTest : public ::testing::Test {
 protected:
-    RenderAllocator allocator{WBE_KI_B(256)};
-    RenderContextVK render_data{&allocator};
+    RendAlloc alloc{WBE_KI_B(256)};
+    RendContextVK rend_data{&alloc};
     RendGraphRecipeBuilderVK builder;
     TestRecipeImportVK camera;
 };
@@ -111,7 +111,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsImportsResourcesTasksAliasesAndEdg
         ]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
 
     EXPECT_TRUE(graph.contains_resource("camera"));
@@ -143,12 +143,12 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsImportsResourcesTasksAliasesAndEdg
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RequiresDeclaredImportsToMatchSuppliedOnes) {
     RendGraphRecipeImportsVK imports;
-    EXPECT_NE(build_error(builder, R"({"imports": ["camera"]})", imports, &render_data).find("imports[0] 'camera' is neither supplied nor registered"),
+    EXPECT_NE(build_error(builder, R"({"imports": ["camera"]})", imports, &rend_data).find("imports[0] 'camera' is neither supplied nor registered"),
         std::string::npos);
     imports.add("camera", camera);
-    EXPECT_NE(build_error(builder, R"({"imports": []})", imports, &render_data).find("supplied import 'camera' is not declared"),
+    EXPECT_NE(build_error(builder, R"({"imports": []})", imports, &rend_data).find("supplied import 'camera' is not declared"),
         std::string::npos);
-    EXPECT_NE(build_error(builder, R"({"imports": ["camera", "camera"]})", imports, &render_data).find("listed more than once"),
+    EXPECT_NE(build_error(builder, R"({"imports": ["camera", "camera"]})", imports, &rend_data).find("listed more than once"),
         std::string::npos);
     EXPECT_THROW(imports.add("camera", camera), std::runtime_error);
     EXPECT_THROW(imports.add("", camera), std::runtime_error);
@@ -156,16 +156,16 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RequiresDeclaredImportsToMatchSuppliedOn
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedResourcesWithTheirLocation) {
     const RendGraphRecipeImportsVK imports;
-    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "both", "buffer": {"size": 4}, "sampler": {}}]})", imports, &render_data)
+    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "both", "buffer": {"size": 4}, "sampler": {}}]})", imports, &rend_data)
                   .find("resources[0] 'both' must set exactly one"),
         std::string::npos);
-    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "none"}]})", imports, &render_data).find("resources[0] 'none' must set exactly one"),
+    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "none"}]})", imports, &rend_data).find("resources[0] 'none' must set exactly one"),
         std::string::npos);
-    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "x", "sampler": {}}, {"id": "x", "sampler": {}}]})", imports, &render_data)
+    EXPECT_NE(build_error(builder, R"({"resources": [{"id": "x", "sampler": {}}, {"id": "x", "sampler": {}}]})", imports, &rend_data)
                   .find("resources[1] 'x' repeats"),
         std::string::npos);
     // Strict recipe structs reject unknown keys.
-    EXPECT_THROW((void)builder.build(ParserJSON::read(R"({"resource": []})"), imports, &render_data, nullptr), std::runtime_error);
+    EXPECT_THROW((void)builder.build(ParserJSON::read(R"({"resource": []})"), imports, &rend_data, nullptr), std::runtime_error);
 }
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedTasksWithTheirLocation) {
@@ -173,28 +173,28 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedTasksWithTheirLocation) 
     EXPECT_NE(build_error(builder,
                   R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}}, {"id": "a", "type": "registry_probe", "params": {"label": "y"}}]})",
                   imports,
-                  &render_data)
+                  &rend_data)
                   .find("tasks[1] 'a' repeats"),
         std::string::npos);
     EXPECT_NE(build_error(builder,
                   R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "connect": [{"to": "b", "resource": "r"}]}]})",
                   imports,
-                  &render_data)
+                  &rend_data)
                   .find("tasks[0] 'a' connect[0] targets the unknown task 'b'"),
         std::string::npos);
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "aliases": {"input": 3}}]})", imports, &render_data)
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "aliases": {"input": 3}}]})", imports, &rend_data)
                   .find("tasks[0] 'a' alias 'input'"),
         std::string::npos);
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "missing_task"}]})", imports, &render_data).find("unknown render task type"),
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "missing_task"}]})", imports, &rend_data).find("unknown render task type"),
         std::string::npos);
 }
 
 namespace {
 
 // A supplied task with a caller-side alias, standing in for a task only C++ can build.
-RendTaskDescVK make_supplied_task(RenderAllocator* p_allocator, std::string_view p_task_id) {
-    RendTaskDescVK task(p_allocator, p_task_id, [](const RendGraphContextVK& /*p_context*/) {
-        return Unique<IRenderTaskVK>();
+RendTaskDescVK make_supplied_task(RendAlloc* p_alloc, std::string_view p_task_id) {
+    RendTaskDescVK task(p_alloc, p_task_id, [](const RendGraphContextVK& /*p_context*/) {
+        return Unique<IRendTaskVK>();
     });
     task.alias("target", "camera");
     return task;
@@ -204,7 +204,7 @@ RendTaskDescVK make_supplied_task(RenderAllocator* p_allocator, std::string_view
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, ImportsSuppliedTasksAndConnectsThem) {
     RendGraphRecipeImportsVK imports;
-    imports.add("camera", camera).add_task(make_supplied_task(&allocator, "overlay"));
+    imports.add("camera", camera).add_task(make_supplied_task(&alloc, "overlay"));
     const RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
         "imports": ["camera"],
         "tasks": [
@@ -214,7 +214,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, ImportsSuppliedTasksAndConnectsThem) {
         ]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
 
     ASSERT_EQ(graph.tasks.size(), 3U);
@@ -232,25 +232,25 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, ImportsSuppliedTasksAndConnectsThem) {
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RequiresImportedTasksToMatchSuppliedOnes) {
     RendGraphRecipeImportsVK imports;
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "overlay", "import": true}]})", imports, &render_data).find("tasks[0] 'overlay' is imported but not supplied"),
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "overlay", "import": true}]})", imports, &rend_data).find("tasks[0] 'overlay' is imported but not supplied"),
         std::string::npos);
-    imports.add_task(make_supplied_task(&allocator, "overlay"));
-    EXPECT_NE(build_error(builder, R"({"tasks": []})", imports, &render_data).find("supplied task 'overlay' is not imported"),
+    imports.add_task(make_supplied_task(&alloc, "overlay"));
+    EXPECT_NE(build_error(builder, R"({"tasks": []})", imports, &rend_data).find("supplied task 'overlay' is not imported"),
         std::string::npos);
     // An imported id cannot also be a recipe task.
     EXPECT_NE(build_error(builder,
                   R"({"tasks": [{"id": "overlay", "import": true}, {"id": "overlay", "type": "registry_probe", "params": {"label": "a"}}]})",
                   imports,
-                  &render_data)
+                  &rend_data)
                   .find("tasks[1] 'overlay' repeats a task id"),
         std::string::npos);
-    EXPECT_THROW(imports.add_task(make_supplied_task(&allocator, "overlay")), std::runtime_error);
-    EXPECT_THROW(imports.add_task(make_supplied_task(&allocator, "")), std::runtime_error);
+    EXPECT_THROW(imports.add_task(make_supplied_task(&alloc, "overlay")), std::runtime_error);
+    EXPECT_THROW(imports.add_task(make_supplied_task(&alloc, "")), std::runtime_error);
 }
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsImportedTasksThatConfigureThemselves) {
     RendGraphRecipeImportsVK imports;
-    imports.add_task(make_supplied_task(&allocator, "overlay"));
+    imports.add_task(make_supplied_task(&alloc, "overlay"));
     for (const auto& [field, message] : {
              std::pair<std::string_view, std::string_view>{R"("type": "registry_probe")", "cannot set a type"},
              {R"("params": {"label": "a"})", "cannot set params"},
@@ -258,23 +258,23 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsImportedTasksThatConfigureThemsel
              {R"("toggle": {"event": "redraw"})", "cannot set a toggle"},
          }) {
         const std::string recipe = std::format(R"({{"tasks": [{{"id": "overlay", "import": true, {}}}]}})", field);
-        EXPECT_NE(build_error(builder, recipe, imports, &render_data).find(message), std::string::npos) << field;
+        EXPECT_NE(build_error(builder, recipe, imports, &rend_data).find(message), std::string::npos) << field;
     }
     // A task that is not imported must name a type.
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "draw"}]})", RendGraphRecipeImportsVK{}, &render_data).find("tasks[0] 'draw' sets no type"),
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "draw"}]})", RendGraphRecipeImportsVK{}, &rend_data).find("tasks[0] 'draw' sets no type"),
         std::string::npos);
 }
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, ImportedTasksTakeTheRecipesAliasesAndResolveTheRestToThemselves) {
     RendGraphRecipeImportsVK imports;
-    imports.add("camera", camera).add_task(make_supplied_task(&allocator, "overlay"));
+    imports.add("camera", camera).add_task(make_supplied_task(&alloc, "overlay"));
     RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
         "imports": ["camera"],
         "resources": [{"id": "buffer-0000abcd", "name": "frame", "buffer": {"size": 16}}],
         "tasks": [{"id": "overlay", "import": true, "aliases": {"frame": "buffer-0000abcd"}}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
     const RendTaskDescVK& overlay = graph.get_task("overlay");
     EXPECT_EQ(overlay.resource_map.resolve("frame"), "buffer-0000abcd");
@@ -282,7 +282,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, ImportedTasksTakeTheRecipesAliasesAndRes
     EXPECT_EQ(overlay.resource_map.resolve("target"), "camera");
     EXPECT_EQ(overlay.resource_map.resolve("unmapped"), "unmapped");
     // A supplied task's alias and the recipe's alias of the same identifier conflict.
-    EXPECT_NE(build_error(builder, R"({"imports": ["camera"], "tasks": [{"id": "overlay", "import": true, "aliases": {"target": "camera"}}]})", imports, &render_data)
+    EXPECT_NE(build_error(builder, R"({"imports": ["camera"], "tasks": [{"id": "overlay", "import": true, "aliases": {"target": "camera"}}]})", imports, &rend_data)
                   .find("mapped more than once"),
         std::string::npos);
 }
@@ -294,7 +294,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, RecipeTasksMustBindEveryResourceTheyUse)
                    "aliases": {"input": "buffer-0000abcd", "buffer-0000abcd": "buffer-0000abcd"}}]
     })"),
         RendGraphRecipeImportsVK{},
-        &render_data,
+        &rend_data,
         nullptr);
     const RendTaskDescVK& draw = graph.get_task("draw");
     EXPECT_EQ(draw.resource_map.resolve("input"), "buffer-0000abcd");
@@ -319,7 +319,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, NamesResourcesAndExportsThem) {
         "exports": {"output": "image-0000abcd"}
     })"),
         RendGraphRecipeImportsVK{},
-        &render_data,
+        &rend_data,
         nullptr);
     ASSERT_EQ(graph.debug_names.size(), 1U);
     EXPECT_EQ(graph.debug_names.find("image-0000abcd")->second, "color");
@@ -329,7 +329,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, NamesResourcesAndExportsThem) {
     EXPECT_NE(build_error(builder,
                   R"({"tasks": [{"id": "post", "subgraph": {"resources": [{"id": "scratch", "buffer": {"size": 16}}], "exports": {"scratch": "scratch"}}}]})",
                   RendGraphRecipeImportsVK{},
-                  &render_data)
+                  &rend_data)
                   .find("only the outermost recipe exports"),
         std::string::npos);
 }
@@ -355,7 +355,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, NamesTasksAndNestsSubgraphNames) {
         ]
     })"),
         RendGraphRecipeImportsVK{},
-        &render_data,
+        &rend_data,
         nullptr);
     // A task's name becomes its debug name; an unnamed one has none, so diagnostics show its id.
     EXPECT_EQ(graph.get_task("compute-0000abcd").debug_name, "lighting");
@@ -373,7 +373,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, NamesTasksAndNestsSubgraphNames) {
 
 TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsSubgraphTasksWithTheirPortsImportsAndSuppliedTasks) {
     RendGraphRecipeImportsVK imports;
-    imports.add("camera", camera).add_task(make_supplied_task(&allocator, "overlay"));
+    imports.add("camera", camera).add_task(make_supplied_task(&alloc, "overlay"));
     RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
         "imports": ["camera"],
         "tasks": [
@@ -392,7 +392,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsSubgraphTasksWithTheirPortsImports
         ]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
 
     ASSERT_EQ(graph.tasks.size(), 4U);
@@ -418,7 +418,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTest, BuildsSubgraphTasksWithTheirPortsImports
 TEST_F(WBERendGraphRecipeBuilderVKTest, RejectsMalformedSubgraphsWithTheirLocation) {
     const RendGraphRecipeImportsVK imports;
     const auto error = [&](std::string_view p_recipe) {
-        return build_error(builder, p_recipe, imports, &render_data);
+        return build_error(builder, p_recipe, imports, &rend_data);
     };
     EXPECT_NE(error(R"({"ports": ["color"], "tasks": []})").find("only a subgraph's nested recipe declares ports"), std::string::npos);
     EXPECT_NE(error(R"({"tasks": [{"id": "post", "type": "registry_probe", "subgraph": {"tasks": []}}]})").find("tasks[0] 'post' is a subgraph"),
@@ -455,15 +455,15 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsTriggeredTasks) {
                    "trigger": {"event": "recipe.rebuild", "activate": true}}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
-    const Unique<IRenderTaskVK> task = graph.get_task("rebuild").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> task = graph.get_task("rebuild").factory(RendGraphContextVK{});
     const auto* triggered = dynamic_cast<const RTTriggeredVK*>(task.get());
     ASSERT_NE(triggered, nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTTriggeredVK::Command>("recipe.rebuild"), 1U);
 }
 
-TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsToggledTasksInTheirInitialState) {
+TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsToggledTasksInTheirInitState) {
     const RendGraphRecipeImportsVK imports;
     RendGraphDescVK graph = builder.build(ParserJSON::read(R"({
         "tasks": [
@@ -472,10 +472,10 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsToggledTasksInTheirInitialSt
         ]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
-    const Unique<IRenderTaskVK> effect = graph.get_task("effect").factory(RendGraphContextVK{});
-    const Unique<IRenderTaskVK> off = graph.get_task("off").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> effect = graph.get_task("effect").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> off = graph.get_task("off").factory(RendGraphContextVK{});
     const auto* effect_toggle = dynamic_cast<const RTToggleVK*>(effect.get());
     const auto* off_toggle = dynamic_cast<const RTToggleVK*>(off.get());
     ASSERT_NE(effect_toggle, nullptr);
@@ -485,7 +485,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, WrapsToggledTasksInTheirInitialSt
     // Both follow commands under their shared event.
     EventManager::get_singleton()->emit("recipe.effect", RTToggleVK::Command::enable());
     EXPECT_TRUE(off_toggle->is_enabled());
-    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "toggle": {"event": ""}}]})", imports, &render_data)
+    EXPECT_NE(build_error(builder, R"({"tasks": [{"id": "a", "type": "registry_probe", "params": {"label": "x"}, "toggle": {"event": ""}}]})", imports, &rend_data)
                   .find("tasks[0] 'a' toggle event is empty"),
         std::string::npos);
 }
@@ -497,9 +497,9 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, TogglesGateTriggeredTasks) {
                    "trigger": {"event": "recipe.capture"}, "toggle": {"event": "recipe.capture_allowed", "enabled": true}}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
-    const Unique<IRenderTaskVK> task = graph.get_task("capture").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> task = graph.get_task("capture").factory(RendGraphContextVK{});
     // The toggle is the outer wrapper; the triggered task inside it still subscribes to its own event.
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(task.get()), nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.capture_allowed"), 1U);
@@ -515,10 +515,10 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, SubgraphGatingWrapsEveryTaskOfThe
         ]}}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
-    const Unique<IRenderTaskVK> first = graph.get_task("post.first").factory(RendGraphContextVK{});
-    const Unique<IRenderTaskVK> second = graph.get_task("post.nested.second").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> first = graph.get_task("post.first").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> second = graph.get_task("post.nested.second").factory(RendGraphContextVK{});
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(first.get()), nullptr);
     EXPECT_NE(dynamic_cast<const RTToggleVK*>(second.get()), nullptr);
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTToggleVK::Command>("recipe.post"), 2U);
@@ -532,10 +532,10 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, BuildsMultiplexersOnTheSelectedBr
                                 {"type": "registry_probe", "params": {"label": "debug"}}]}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
     ASSERT_EQ(graph.tasks.size(), 1U);
-    const Unique<IRenderTaskVK> task = graph.get_task("lighting").factory(RendGraphContextVK{});
+    const Unique<IRendTaskVK> task = graph.get_task("lighting").factory(RendGraphContextVK{});
     const auto* multiplexer = dynamic_cast<const RTMultiplexerVK*>(task.get());
     ASSERT_NE(multiplexer, nullptr);
     EXPECT_EQ(multiplexer->get_branch_count(), 2U);
@@ -553,7 +553,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, MultiplexerBranchesShareTheirPrep
                                 {"type": "registry_preparing_probe", "params": {"label": "shared"}}]}]
     })"),
         imports,
-        &render_data,
+        &rend_data,
         nullptr);
     EXPECT_EQ(graph.get_task("pair").resource_map.resolve(RTRegistryPreparingProbeVK::INPUT_ID), "shared.prepared");
     EXPECT_TRUE(graph.contains_resource("shared.prepared"));
@@ -562,7 +562,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, MultiplexerBranchesShareTheirPrep
                    "branches": [{"type": "registry_preparing_probe", "params": {"label": "a"}},
                                 {"type": "registry_preparing_probe", "params": {"label": "b"}}]}]})",
                   imports,
-                  &render_data)
+                  &rend_data)
                   .find("is mapped to both 'a.prepared' and 'b.prepared'"),
         std::string::npos);
 }
@@ -570,7 +570,7 @@ TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, MultiplexerBranchesShareTheirPrep
 TEST_F(WBERendGraphRecipeBuilderVKTriggerTest, RejectsMalformedMultiplexers) {
     const RendGraphRecipeImportsVK imports;
     const auto error = [&](std::string_view p_recipe) {
-        return build_error(builder, p_recipe, imports, &render_data);
+        return build_error(builder, p_recipe, imports, &rend_data);
     };
     EXPECT_NE(
         error(R"({"tasks": [{"id": "m", "type": "registry_probe", "params": {"label": "x"}, "select": {"event": "e"}}]})").find("tasks[0] 'm' sets a select but no branches"),
@@ -602,7 +602,7 @@ namespace WhiteBirdEngine {
 namespace {
 
 // A registered object that binds one bare resource entry, like TestRecipeImportVK.
-class TestRegisteredBindableVK final : public IRenderObject, public IBindableRenderResourceVK {
+class TestRegisteredBindableVK final : public IRendObject, public IBindableRendResourceVK {
 public:
     TestRegisteredBindableVK() = default;
     virtual ~TestRegisteredBindableVK() override = default;
@@ -627,8 +627,8 @@ protected:
 // The registrator of RendRecipeRegistrationTestParams; it records the keys it compiles, in order.
 class TestBindableRegistratorVK final : public RRTyped<RendRecipeRegistrationTestParams> {
 public:
-    TestBindableRegistratorVK(RenderAllocator* p_allocator, std::vector<std::string>* p_order)
-        : allocator(p_allocator), order(p_order) {
+    TestBindableRegistratorVK(RendAlloc* p_alloc, std::vector<std::string>* p_order)
+        : alloc(p_alloc), order(p_order) {
     }
     virtual ~TestBindableRegistratorVK() override = default;
     TestBindableRegistratorVK(const TestBindableRegistratorVK&) = delete;
@@ -639,27 +639,27 @@ public:
     virtual TypeID get_description_type_uuid() const override {
         return typed_description_type_uuid();
     }
-    virtual Unique<IResourceDescription> deserialize_description(const DataValue& p_description, RenderAllocator* p_allocator) const override {
-        return typed_deserialize_description(p_description, p_allocator);
+    virtual Unique<IResourceDescription> deserialize_description(const DataValue& p_description, RendAlloc* p_alloc) const override {
+        return typed_deserialize_description(p_description, p_alloc);
     }
 
 protected:
-    virtual Ref<IRenderObject> compile_typed(
-        IRenderGraph& /*p_graph*/, std::string_view p_key, const RendRecipeRegistrationTestParams& /*p_params*/) override {
+    virtual Ref<IRendObject> compile_typed(
+        IRendGraph& /*p_graph*/, std::string_view p_key, const RendRecipeRegistrationTestParams& /*p_params*/) override {
         order->emplace_back(p_key);
-        return make_ref<TestRegisteredBindableVK>(allocator);
+        return make_ref<TestRegisteredBindableVK>(alloc);
     }
 
 private:
-    RenderAllocator* allocator;
+    RendAlloc* alloc;
     std::vector<std::string>* order;
 };
 
 // The type id the recipes name is resolved through the TypeUUIDManager the Global owns.
 class WBERendGraphRecipeBuilderVKRegistrationTest : public ::testing::Test {
 protected:
-    WBERendGraphRecipeBuilderVKRegistrationTest() : render_graph(&allocator) {
-        render_graph.add_resource_registrator(make_unique<TestBindableRegistratorVK>(&allocator, &allocator, &order));
+    WBERendGraphRecipeBuilderVKRegistrationTest() : rend_graph(&alloc) {
+        rend_graph.add_resource_registrator(make_unique<TestBindableRegistratorVK>(&alloc, &alloc, &order));
     }
 
     virtual void SetUp() override {
@@ -670,9 +670,9 @@ protected:
         global.reset();
     }
 
-    RenderAllocator allocator{WBE_KI_B(256)};
-    RenderContextVK render_data{&allocator};
-    FakeRenderGraph render_graph;
+    RendAlloc alloc{WBE_KI_B(256)};
+    RendContextVK rend_data{&alloc};
+    FakeRendGraph rend_graph;
     std::vector<std::string> order;
     std::unique_ptr<Global> global;
 };
@@ -691,13 +691,13 @@ TEST_F(WBERendGraphRecipeBuilderVKRegistrationTest, AppliesRegistrationsInOrderA
         ]
     })"),
         RendGraphRecipeImportsVK{},
-        &render_data,
-        &render_graph);
-    EXPECT_EQ(graph.render_graph, &render_graph);
+        &rend_data,
+        &rend_graph);
+    EXPECT_EQ(graph.rend_graph, &rend_graph);
     EXPECT_TRUE(graph.contains_resource("texture"));
     EXPECT_FALSE(graph.contains_resource("unused"));
     EXPECT_EQ(order, (std::vector<std::string>{"texture", "unused"}));
-    EXPECT_TRUE(render_graph.contains_registered_resource("unused"));
+    EXPECT_TRUE(rend_graph.contains_registered_resource("unused"));
 }
 
 TEST_F(WBERendGraphRecipeBuilderVKRegistrationTest, RepeatedBuildsReuseRegistrations) {
@@ -706,15 +706,15 @@ TEST_F(WBERendGraphRecipeBuilderVKRegistrationTest, RepeatedBuildsReuseRegistrat
         "imports": ["texture"],
         "tasks": [{"id": "first", "type": "registry_probe", "params": {"label": "a"}, "aliases": {"input": "texture"}}]
     })");
-    (void)RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data, &render_graph);
-    (void)RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &render_data, &render_graph);
+    (void)RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &rend_data, &rend_graph);
+    (void)RendGraphRecipeBuilderVK().build(recipe, RendGraphRecipeImportsVK{}, &rend_data, &rend_graph);
     EXPECT_EQ(order.size(), 1U);
 }
 
 TEST_F(WBERendGraphRecipeBuilderVKRegistrationTest, RejectsInvalidRegistrations) {
-    const auto error = [this](std::string_view p_recipe, IRenderGraph* p_render_graph) {
+    const auto error = [this](std::string_view p_recipe, IRendGraph* p_rend_graph) {
         try {
-            (void)RendGraphRecipeBuilderVK().build(ParserJSON::read(p_recipe), RendGraphRecipeImportsVK{}, &render_data, p_render_graph);
+            (void)RendGraphRecipeBuilderVK().build(ParserJSON::read(p_recipe), RendGraphRecipeImportsVK{}, &rend_data, p_rend_graph);
         } catch (const std::runtime_error& p_error) {
             return std::string(p_error.what());
         }
@@ -723,21 +723,21 @@ TEST_F(WBERendGraphRecipeBuilderVKRegistrationTest, RejectsInvalidRegistrations)
     EXPECT_NE(error(R"({"registrations": [{"key": "texture", "type": "RendRecipeRegistrationTestParams", "description": {"value": "a"}}]})", nullptr)
                   .find("registrations[0] 'texture' needs a render graph"),
         std::string::npos);
-    EXPECT_NE(error(R"({"registrations": [{"key": "texture", "type": "MissingParams", "description": {}}]})", &render_graph).find("Type with name 'MissingParams' not registered"),
+    EXPECT_NE(error(R"({"registrations": [{"key": "texture", "type": "MissingParams", "description": {}}]})", &rend_graph).find("Type with name 'MissingParams' not registered"),
         std::string::npos);
     // A reflected type that no registrator accepts.
-    EXPECT_NE(error(R"({"registrations": [{"key": "texture", "type": "RDParamsMeshVK", "description": {"mesh": "m"}}]})", &render_graph)
+    EXPECT_NE(error(R"({"registrations": [{"key": "texture", "type": "RDParamsMeshVK", "description": {"mesh": "m"}}]})", &rend_graph)
                   .find("no registrator is installed for description type"),
         std::string::npos);
     // The registrator deserializes strictly.
     EXPECT_FALSE(error(R"({"registrations": [{"key": "texture", "type": "RendRecipeRegistrationTestParams", "description": {"wrong": 1}}]})",
-        &render_graph)
+        &rend_graph)
             .empty());
-    EXPECT_NE(error(R"({"imports": ["absent"]})", &render_graph).find("imports[0] 'absent' is neither supplied nor registered"),
+    EXPECT_NE(error(R"({"imports": ["absent"]})", &rend_graph).find("imports[0] 'absent' is neither supplied nor registered"),
         std::string::npos);
     // The description is required.
     EXPECT_FALSE(
-        error(R"({"registrations": [{"key": "texture", "type": "RendRecipeRegistrationTestParams"}]})", &render_graph).empty());
+        error(R"({"registrations": [{"key": "texture", "type": "RendRecipeRegistrationTestParams"}]})", &rend_graph).empty());
 }
 
 } // namespace WhiteBirdEngine

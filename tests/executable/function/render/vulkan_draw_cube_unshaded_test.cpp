@@ -19,21 +19,21 @@
 #include "core/profiling/profiler.hh"
 #include "function/application/application_game.hh"
 #include "function/function_utils.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/i_render_graph_bindings_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_bindings_function_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/i_rend_graph_bindings_vk.hh"
+#include "function/rend_vk/mesh_compiler_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_bindings_function_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/trigonometric.hpp"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
-#include "render_test.hh"
+#include "rend_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -51,40 +51,40 @@
 namespace WBE = WhiteBirdEngine;
 
 static constexpr std::string_view REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER = "camera_info";
-// The render graph definition, whose recipe is render_graphs.draw_cube_unshaded.
-static constexpr std::string_view DRAW_CUBE_UNSHADED_RENDER_GRAPH = "draw_cube_unshaded_graph";
+// The render graph definition, whose recipe is rend_graphs.draw_cube_unshaded.
+static constexpr std::string_view DRAW_CUBE_UNSHADED_REND_GRAPH = "draw_cube_unshaded_graph";
 
 class ApplicationVulkanDrawCubeUnshadedTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawCubeUnshadedTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {
     }
 
     virtual void logic_update(double /* p_delta */) override {
         WBE::on_exec_test_logic(*get_window());
     }
 
-    virtual void render_update(double p_delta) override {
+    virtual void rend_update(double p_delta) override {
         auto* renderer = WBE::RendererVK::get_singleton();
-        WBE::on_exec_test_render(*renderer, renderer->get_render_context()->current_frame);
+        WBE::on_exec_test_rend(*renderer, renderer->get_rend_context()->current_frame);
         camera_info.view = glm::rotate(camera_info.view, static_cast<float>(p_delta), glm::vec3(0.0F, 1.0F, 0.0F));
         camera_info_ubo->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     }
 
     void setup_graphics_pipeline() {
         auto* renderer = WBE::RendererVK::get_singleton();
-        const auto* render_context = renderer->get_render_context();
+        const auto* rend_context = renderer->get_rend_context();
         auto* resource_manager = WBE::ResourceManager::get_singleton();
 
         auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
-            WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
+            WBE::global_alloc(), "assets/models/models.json", resource_manager->get_allocator());
         resource_manager->register_chunk(resource_chunk);
         WBE::RefRes<WBE::RUMesh3D> cube_mesh = resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh");
         if (cube_mesh == nullptr) {
             throw std::runtime_error("Failed to setup draw cube unshaded test: static mesh resource was not found.");
         }
 
-        aspect_ratio = render_context->swap_chain_aspect_ratio;
+        aspect_ratio = rend_context->swap_chain_aspect_ratio;
         camera_info = CameraInfoGPU{
             // Look at the origin from (2,2,2)
             .view = glm::lookAt(glm::vec3(2.0F, 2.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
@@ -93,18 +93,18 @@ public:
         // Inverse the y value since Vulkan makes y axis points downwards.
         camera_info.proj[1][1] *= -1;
         // Recipes cannot set initial data, so the application owns the camera buffer and the recipe imports it.
-        camera_info_ubo = render_context->create_buffer(WBE::ROBufferVK::Builder()
-                .initial_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
+        camera_info_ubo = rend_context->create_buffer(WBE::ROBufferVK::Builder()
+                .init_data(&camera_info, sizeof(CameraInfoGPU), WBE::DeviceDomain::HOST_DEVICE)
                 .set_size(sizeof(CameraInfoGPU))
                 .set_domain(WBE::DeviceDomain::HOST_DEVICE)
                 .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
         // The recipe registers the mesh and the pipeline on the graph; its draw task imports the mesh buffers itself.
-        render_graph = WBE::acquire_test_render_graph(*renderer,
-            DRAW_CUBE_UNSHADED_RENDER_GRAPH,
-            WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
-                DRAW_CUBE_UNSHADED_RENDER_GRAPH,
+        rend_graph = WBE::acquire_test_rend_graph(*renderer,
+            DRAW_CUBE_UNSHADED_REND_GRAPH,
+            WBE::make_ref<WBE::RendGraphBindingsFunctionVK>(WBE::global_alloc(),
+                DRAW_CUBE_UNSHADED_REND_GRAPH,
                 [camera_info_ubo = camera_info_ubo](
-                    const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
+                    const WBE::RendContextVK& /*p_rend_context*/, const WBE::RendRecipeContextVK& /*p_recipe_context*/) {
                     WBE::RendGraphPreparedBindingsVK result;
                     result.imports.add(REND_RES_TEST_DRAW_CUBE_UNSHADED_CAMERA_INFO_BUFFER, *camera_info_ubo);
                     return result;
@@ -112,11 +112,11 @@ public:
     }
 
     void release_graphics_pipeline() {
-        WBE::release_test_render_graph(*WBE::RendererVK::get_singleton(), render_graph);
+        WBE::release_test_rend_graph(*WBE::RendererVK::get_singleton(), rend_graph);
     }
 
 private:
-    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    WBE::Ref<WBE::RendGraphVK> rend_graph;
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     CameraInfoGPU camera_info{};
     float aspect_ratio = 1.0F;
@@ -132,8 +132,8 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_graphics_pipeline();
             game_application.run();
             game_application.release_graphics_pipeline();
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_alloc->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
                 WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
                     ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));

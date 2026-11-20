@@ -16,10 +16,10 @@
 #define WBE_FILE_ENTITY_DRAW_DATA_HH
 
 #include "core/memory/reference_strong.hh"
-#include "function/render_vk/i_bindable_render_resource_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/roc_multislots_vk.hh"
+#include "function/rend_vk/i_bindable_rend_resource_vk.hh"
+#include "function/rend_vk/mesh_resources_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/roc_multislots_vk.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include <string_view>
 
@@ -33,7 +33,7 @@ namespace WhiteBirdEngine {
  * its transform. Draws of an entity bind REND_RES_MESH_TRANSFORM to `<entity key>.transform` and the other mesh ids to the
  * mesh's key. The transform lives in one buffer per frame in flight. Neither copyable nor movable; rendering thread only.
  */
-class EntityDrawData final : public IBindableRenderResourceVK {
+class EntityDrawData final : public IBindableRendResourceVK {
 public:
     /** Member name of the per-frame whole-mesh transform. */
     static constexpr std::string_view TRANSFORM = "transform";
@@ -47,9 +47,9 @@ public:
 
     /**
      * @brief Place p_mesh at the identity transform.
-     * @throws std::runtime_error If p_render_data or p_mesh is null.
+     * @throws std::runtime_error If p_rend_data or p_mesh is null.
      */
-    EntityDrawData(const RenderContextVK* p_render_data, Ref<MeshResourcesVK> p_mesh);
+    EntityDrawData(const RendContextVK* p_rend_data, Ref<MeshResourcesVK> p_mesh);
 
     /** @brief Acquire the drawn mesh. */
     Ref<MeshResourcesVK> acquire_mesh() const {

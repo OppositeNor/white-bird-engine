@@ -36,14 +36,14 @@ its rendered content changes.
 | `WBE_STRICT_DESERIALIZATION` | strict_deserializations | strict `deserialize`; effective only with a static-serializable category |
 | `WBE_REFLECT_ENUM` / `WBE_REFLECT_ENUM_IGNORE` | reflected_enums | `EnumReflection<E>` and enum `SerializableSD` |
 | `WBE_REFLECT_SCRIPT` | reflect_script | Teal declaration plus SD/Access or `EnumReflection` |
-| `WBE_RENDER_TASK`, `WBE_RENDER_TASK(<method>)` | render_tasks | `render_task_registry.gen.cpp`; with a method, its recipe constructor in `build/<target>/teal/render_graph_utils/render_graph_tasks.tl` |
-| `WBE_CLA_CONFIGURATION` | cla_configurations | `CLAConfiguration<T>` |
+| `WBE_REND_TASK`, `WBE_REND_TASK(<method>)` | rend_tasks | `rend_task_registry.gen.cpp`; with a method, its recipe constructor in `build/<target>/teal/rend_graph_utils/rend_graph_tasks.tl` |
+| `WBE_CLA_CONFIG` | cla_configs | `CLAConfig<T>` |
 | `WBE_LABEL(name, CATEGORY)` | static/dynamic labels | `LabelName<hash>`, `LabelManager` |
 | any annotated class | — | `TypeUUID<T>`, `TypeUUIDManager` (enums excluded) |
 
 Field and method annotations: `WBE_REFLECT`, `WBE_REFLECT_REQUIRED`, `WBE_SERIALIZATION_ALIASES(...)`, and on render-task
 params fields that hold resource ids, a bare `WBE_RECIPE_RESOURCE` (graph resources) or
-`WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` (keys registered on the graph). An attribute is a
+`WBE_RECIPE_RESOURCE(registered, <RendObjectType>)` (keys registered on the graph). An attribute is a
 bare name or `NAME(<parameters>)`; reflection records the trimmed parameters by attribute name. Assignment syntax is an
 error. Methods are recorded for every consumer, but only the render-task registry and the recipe constructors use them
 today (both read `create`).
@@ -72,9 +72,9 @@ replaced by the reflection attribute named by its data **key** (the `gen_info` l
 | `serializable_factory.gen.hh` | `serializable_factory.hh.jinja` | `include/per_target/` |
 | `label_manager.gen.hh` | `label_manager.hh.jinja` | `include/per_target/` |
 | `type_uuid.gen.hh` | `type_uuid.hh.jinja` | `include/per_target/` |
-| `cla_configuration.gen.hh` | `cla_configuration.hh.jinja` | `include/per_target/` |
+| `cla_config.gen.hh` | `cla_config.hh.jinja` | `include/per_target/` |
 | `serializable_impl.gen.cpp` | `serializable_impl.cpp.jinja` | `src/generated/` |
-| `render_task_registry.gen.cpp` | `render_task_registry.cpp.jinja` | `src/generated/` |
+| `rend_task_registry.gen.cpp` | `rend_task_registry.cpp.jinja` | `src/generated/` |
 | `build/<target>/teal/wbe.d.tl` | `teal_types.d.tl.jinja` | `src/generated/` |
 | `tlconfig.lua` (repo root, gitignored) | `tlconfig.lua.jinja` | `src/generated/` |
 | `executable_test.gen.cmake` | `executable_test.cmake.jinja` | `tests/executable/function/render/` |
@@ -150,15 +150,15 @@ metadata, keep generated includes sufficient for every emitted type spelling, an
 
 - `tests/unit/core/reflection_test/reflection_test_data.hh`: inheritance (multiple, diamond), required fields, aliases,
   static and strict types, reflected methods, enums.
-- `include/function/render_vk/rt_params_run_compute_pipeline_vk.hh` and `rt_run_compute_pipeline_vk.hh`: params struct and
+- `include/function/rend_vk/rt_params_run_compute_pipeline_vk.hh` and `rt_run_compute_pipeline_vk.hh`: params struct and
   render task.
-- `include/function/render_vk/mesh_resources_vk.hh`: script enum with lowercase aliases.
-- `include/function/render_vk/vulkan_enums_vk.hh`, `rend_*_params_vk.hh`: reflected Vulkan enums and resource params.
+- `include/function/rend_vk/mesh_resources_vk.hh`: script enum with lowercase aliases.
+- `include/function/rend_vk/vulkan_enums_vk.hh`, `rend_*_params_vk.hh`: reflected Vulkan enums and resource params.
 - `tests/executable/function/render/pixel_sorting_recipe_context.hh`: script context deriving from `RendRecipeContextVK`.
 - `include/core/engine_config/engine_config_options.hh`: config option with CLA configuration.
 - Tests: `tests/unit/core/reflection_test/` (aggregated by `reflection_test.cpp`), `tests/unit/core/script_test/`,
   `tests/unit/core/parser_test/`, `tests/unit/function/teal_declarations_test.cpp`,
-  `render_task_registry_vk_test.cpp`, `render_task_registry_vk_builtin_test.cpp`, `rend_resource_params_vk_test.cpp`,
+  `rend_task_registry_vk_test.cpp`, `rend_task_registry_vk_builtin_test.cpp`, `rend_resource_params_vk_test.cpp`,
   `rend_graph_script_vk_test.cpp`.
 
 ## Invariants

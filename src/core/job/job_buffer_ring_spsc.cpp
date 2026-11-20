@@ -26,8 +26,8 @@
 
 namespace WhiteBirdEngine {
 
-JobBufferRingSPSC::JobBufferRingSPSC(HeapAllocatorDefault* p_allocator, size_t p_buffer_size)
-    : allocator(p_allocator), buffer(p_allocator), head(0), tail(0) {
+JobBufferRingSPSC::JobBufferRingSPSC(HeapAllocDefault* p_alloc, size_t p_buffer_size)
+    : alloc(p_alloc), buffer(p_alloc), head(0), tail(0) {
     if (p_buffer_size <= 1) {
         throw std::runtime_error("Buffer has to be at least size 2.");
     }
@@ -54,7 +54,7 @@ std::future<void> JobBufferRingSPSC::add_job(std::function<void()> p_job) {
         throw std::runtime_error("Buffer overflow.");
     }
 
-    Ref<std::promise<void>> completion_promise = make_ref<std::promise<void>>(allocator);
+    Ref<std::promise<void>> completion_promise = make_ref<std::promise<void>>(alloc);
     std::future<void> completion_future = completion_promise->get_future();
     buffer[head_l] = [job = std::move(p_job), completion_promise]() mutable {
         try {

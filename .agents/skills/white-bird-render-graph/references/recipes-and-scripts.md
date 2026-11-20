@@ -2,18 +2,18 @@
 
 ## Flow
 
-1. A `render_graph` resource (`RURenderGraph`) names the recipe and its static `parameters`. For each build of an instance,
+1. A `rend_graph` resource (`RURendGraph`) names the recipe and its static `parameters`. For each build of an instance,
    its bindings' `prepare()` returns the serialized context and a `RendGraphRecipeImportsVK` with every resource
    (`add(name, bindable)`) and native task (`add_task(RendTaskDescVK)`) owned outside the graph; the graph adds the swap
    chain when the recipe imports it and the bindings do not.
 2. `RendGraphScriptVK::run(script, context, parameters)` runs the recipe in a fresh sandboxed `SBLua` and returns its table
    as a `DataValue`. `require` resolves other script resources through `SMRResourceManager`.
-3. `RendGraphRecipeBuilderVK().build(recipe, imports, render_context, &graph)` returns a `RendGraphDescVK` bound to the
+3. `RendGraphRecipeBuilderVK().build(recipe, imports, rend_context, &graph)` returns a `RendGraphDescVK` bound to the
    graph. It first applies the recipe's `registrations` to the graph, then adds tasks through
-   `RenderTaskRegistryVK::add_task()` (which runs the type's `prepare_graph`), wraps a `trigger` first and a `toggle`
+   `RendTaskRegistryVK::add_task()` (which runs the type's `prepare_graph`), wraps a `trigger` first and a `toggle`
    outermost, copies imported tasks, and builds subgraphs. A declared-but-missing or supplied-but-undeclared import or task
    is an error.
-4. `RenderGraphVK::build_from_recipe()` runs these steps for the first build and every rebuild. Nothing is added to the
+4. `RendGraphVK::build_from_recipe()` runs these steps for the first build and every rebuild. Nothing is added to the
    descriptor in C++: whatever the application owns and a shader names (the deferred test's acceleration structure and
    dynamic mesh entities) is a declared import.
 
@@ -21,12 +21,12 @@ Recipes only build descriptors; they never touch render objects.
 
 ## The graph API
 
-`local graph = require("render_graph_utils.render_graph_utils")` gives the implementation. There is no graph object: the
+`local graph = require("rend_graph_utils.rend_graph_utils")` gives the implementation. There is no graph object: the
 module's functions make free-standing resource and task handles, and `graph.build()` emits what the listed tasks reach.
-The module also exposes the types `graph.Resource`, `graph.Task`, the descriptor interfaces (`graph.BufferDescriptor`,
-`graph.ImageDescriptor`, `graph.ImageViewDescriptor`, `graph.SamplerDescriptor`), and the handle-accepting params
+The module also exposes the types `graph.Resource`, `graph.Task`, the descriptor interfaces (`graph.BufferDesc`,
+`graph.ImageDesc`, `graph.ImageViewDesc`, `graph.SamplerDesc`), and the handle-accepting params
 interfaces `graph.RTParams<Name>VK`. For types only, import the generated declarations with
-`local type graph = require("render_graph_utils.render_graph")`.
+`local type graph = require("rend_graph_utils.rend_graph")`.
 
 ### Resources
 
@@ -34,7 +34,7 @@ interfaces `graph.RTParams<Name>VK`. For types only, import the generated declar
 | --- | --- |
 | `graph.buffer{ name?, usage, size, ... }`, `graph.storage_buffer{ name?, size, ... }` | Graph-owned buffer (`RendBufferParamsVK`); `storage_buffer` sets usage `buffer_storage` |
 | `graph.image{ name?, usage, format, extent?, ... }`, `graph.storage_image{ name?, format, extent?, ... }` | Graph-owned image (`RendImageParamsVK`; an omitted extent follows the swap chain); `storage_image` sets usage `image_read_write` |
-| `image:view()`, `image:view(descriptor)`, `graph.image_view(image, descriptor?)` | View; `:view()` caches the default view, which takes the image's name; a descriptor (`RendImageViewParamsVK` plus `name`) selects a mip, layer, or aspect range |
+| `image:view()`, `image:view(desc)`, `graph.image_view(image, desc?)` | View; `:view()` caches the default view, which takes the image's name; a descriptor (`RendImageViewParamsVK` plus `name`) selects a mip, layer, or aspect range |
 | `graph.clamp_to_edge_sampler{ name?, ... }` | Graph-owned sampler (`RendSamplerParamsVK`) |
 | `graph.import(id)` | A resource C++ supplies under `id` through `RendGraphRecipeImportsVK`; handles of one id denote one import |
 | `import:member(name)` | The member `<id>.<name>` of an imported composite (a mesh entity's transform, an acceleration structure's `top_level`) |
@@ -63,7 +63,7 @@ local transform = graph.import(entity_id):member(context.dynamic_mesh_transform_
 
 ### Tasks
 
-The typed constructors are generated from task classes annotated `WBE_RENDER_TASK(<method>)` (see the table in
+The typed constructors are generated from task classes annotated `WBE_REND_TASK(<method>)` (see the table in
 [system-and-usage.md](system-and-usage.md#built-in-task-types)). Each is `graph.<method>(params, options?)`, where
 `options` is `{ name?, bindings?, trigger?, toggle? }`, and returns a `graph.Task`. Params type-check against
 `graph.RTParams<Name>VK`, which accepts handles, and only handles, in the fields marked `WBE_RECIPE_RESOURCE`. Params and
@@ -85,11 +85,11 @@ local write_pixels = graph.compute({
 - `name` is the task's debug name (`RendTaskDescVK::debug_name`), which profiles and diagnostics show; the build generates
   task ids, `<type>-<8 hex>` like resource ids.
 - Every name a task's shaders reflect or its render targets use is bound explicitly, imports included. Recipe tasks' maps
-  are strict (`RenderTaskResourceMap::require_bindings()`), so an unbound name fails; nothing matches a resource by id. A
+  are strict (`RendTaskResourceMap::require_bindings()`), so an unbound name fails; nothing matches a resource by id. A
   handle in a params resource field is bound by the build.
 - `task:bind(name, resource)` adds a binding; a name binds once per task, and different tasks may reuse it.
-- `task:color_target(index, resource)` and `task:depth_target(resource)` bind `render_target_colors[<index>]` and
-  `render_target_depth`.
+- `task:color_target(index, resource)` and `task:depth_target(resource)` bind `rend_target_colors[<index>]` and
+  `rend_target_depth`.
 - A `compute_sequential` dispatch's `bindings` (and `graph.indirect_dispatch(pipeline, buffer, offset, bindings?)`) map the
   names of that dispatch's pipeline to handles, so dispatches of one task can bind one shader name differently (the radix
   sort's passes alternate between its key buffers). Dispatch bindings belong to one dispatch; task bindings to the task.
@@ -125,7 +125,7 @@ the Lua/C++ boundary. A task listed twice, or an edge to an unlisted task, fails
 - `tasks`: `{ id, name, type, params, aliases, connect = { { to, resource } }, trigger, toggle, branches, select, subgraph,
   ports }`, where `aliases` is the task's bindings (the C++ `RendTaskDescVK::alias()` map). Imported tasks carry `id`,
   `import = true`, `aliases`, and `connect`.
-- `exports`: export names to resource ids, which `RenderGraphVK::acquire_resource(<export name>)` takes, so C++ reaches a
+- `exports`: export names to resource ids, which `RendGraphVK::acquire_resource(<export name>)` takes, so C++ reaches a
   resource whose generated id it does not know. Only the outermost recipe exports.
 
 Params are strictly deserialized: unknown keys fail. Enums serialize as canonical names; compare
@@ -183,12 +183,12 @@ local build_acceleration_structure = graph.import_task("build_mesh_acceleration_
     :bind("top_level_acceleration_structure", graph.import("mesh_acceleration_structure"):member("top_level"))
 local draw_imgui = graph.import_task("draw_imgui")
 ```
- Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_render_graph.cpp`,
+ Examples: `tests/executable/utilities/rt_imgui_vk.hh`, `deferred_rend_graph.cpp`,
 `vulkan_pixel_sorting_test.cpp`.
 
 ## Feature subgraph modules
 
-A reusable recipe part lives in `render_graph_utils/features/` and exports `subgraph(name, params, target)`. It names its
+A reusable recipe part lives in `rend_graph_utils/features/` and exports `subgraph(name, params, target)`. It names its
 ports with `graph.port(<port>)`, declares its own resources and tasks, and returns
 `graph.subgraph{ name = name, tasks = { ... }, ports = { <port> = <enclosing resource> }, trigger?, toggle? }`, a task the
 recipe lists in its build and connects like any task. The port map binds every port to an enclosing resource; tasks inside
@@ -211,42 +211,42 @@ Its C++ side provides `configure_recipe(DataValue&, RendGraphRecipeImportsVK&)`,
 supplies its resources and C++ tasks. The recipe calls `require(params.module).subgraph(name, params, target)`.
 
 Examples: `features/pixel_sort.tl` with `deferred_test/pixel_sort.{hh,cpp}`, `features/voxel_svo.tl` and
-`features/voxel_octree.tl` with the deferred test's voxel features, and `render_graphs/deferred.tl`.
+`features/voxel_octree.tl` with the deferred test's voxel features, and `rend_graphs/deferred.tl`.
 
 ## Adding a task type
 
-1. Write `include/function/render_vk/rt_params_<name>_vk.hh` with
+1. Write `include/function/rend_vk/rt_params_<name>_vk.hh` with
    `struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT_SCRIPT) RTParams<Name>VK`; mark required
    fields `WBE_REFLECT_REQUIRED`. Mark fields that hold ids so the constructor takes handles (only handles) there:
    a bare `WBE_RECIPE_RESOURCE` for graph resources, which the build binds to themselves, and
-   `WBE_RECIPE_RESOURCE(registered, <RenderObjectType>)` for keys registered on the graph such as pipelines and meshes (the
-   type must be a `WBE_RENDER_OBJECT` class). Values that are not resources, such as event ids, stay plain fields. Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.
-2. Mark the task `WBE_META(WBE_RENDER_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))`, or with a bare
-   `WBE_RENDER_TASK` to register it without a recipe constructor, and declare
-   `WBE_META(WBE_REFLECT) static Unique<IRenderTaskVK> create(const RenderContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`,
-   or `create(const RenderContextVK*, IRenderGraph*, const RTParams<Name>VK&, const RendGraphContextVK&)` when it resolves
+   `WBE_RECIPE_RESOURCE(registered, <RendObjectType>)` for keys registered on the graph such as pipelines and meshes (the
+   type must be a `WBE_REND_OBJECT` class). Values that are not resources, such as event ids, stay plain fields. Such a field is a `std::string`, optional or in a vector, or a `DataValue` map.
+2. Mark the task `WBE_META(WBE_REND_TASK(<method>), WBE_SERIALIZATION_ALIASES(<name>))`, or with a bare
+   `WBE_REND_TASK` to register it without a recipe constructor, and declare
+   `WBE_META(WBE_REFLECT) static Unique<IRendTaskVK> create(const RendContextVK*, const RTParams<Name>VK&, const RendGraphContextVK&)`,
+   or `create(const RendContextVK*, IRendGraph*, const RTParams<Name>VK&, const RendGraphContextVK&)` when it resolves
    registered resources such as pipelines.
-   Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const RenderContextVK*)` if
+   Add `static void prepare_graph(RendGraphDescVK&, RendTaskDescVK&, const RTParams<Name>VK&, const RendContextVK*)` if
    the task must add imports or aliases.
-3. Use `render_task_create_utils_vk.hh` (`acquire_task_compute_pipeline_vk`, `acquire_task_graphics_pipeline_vk`,
+3. Use `rend_task_create_utils_vk.hh` (`acquire_task_compute_pipeline_vk`, `acquire_task_graphics_pipeline_vk`,
    `resolve_task_push_constants_vk`) in `create()`.
-4. Rebuild. `render_task_registry.gen.cpp` registers the class name and aliases; a missing `create` or duplicate name fails
+4. Rebuild. `rend_task_registry.gen.cpp` registers the class name and aliases; a missing `create` or duplicate name fails
    the build. The params struct appears in `wbe.d.tl`, its handle-accepting interface in the generated
-   `render_graph_utils.render_graph`, and the `graph.<method>()` constructor, which creates the type `<name>`, in the
-   generated `render_graph_utils.render_graph_tasks`.
+   `rend_graph_utils.rend_graph`, and the `graph.<method>()` constructor, which creates the type `<name>`, in the
+   generated `rend_graph_utils.rend_graph_tasks`.
 
 Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.hh` (standard), `rt_graphics_draw_mesh_vk.hh`
-(with `prepare_graph`), and `tests/unit/function/render_task_registry_vk_test_tasks.hh` (test probes).
+(with `prepare_graph`), and `tests/unit/function/rend_task_registry_vk_test_tasks.hh` (test probes).
 
 ## Scripts and Teal
 
 - Sources live under `res/assets/scripts/teal/` and are `script` resources declared in `lua_scripts.toml`: recipes in
-  `render_graphs/` (`deferred.tl`, `draw_cube_unshaded.tl`, `pixel_sorting.tl`), features in `render_graph_utils/features/`,
-  graph helpers in `render_graph_utils/` (`render_graph_utils.tl`, `sort.tl`, `large_prefix_scan.tl`, `dedup_large.tl`,
+  `rend_graphs/` (`deferred.tl`, `draw_cube_unshaded.tl`, `pixel_sorting.tl`), features in `rend_graph_utils/features/`,
+  graph helpers in `rend_graph_utils/` (`rend_graph_utils.tl`, `sort.tl`, `large_prefix_scan.tl`, `dedup_large.tl`,
   `svo_3.tl`), and general helpers in `utils/` (`math.tl`). Test-only scripts under `tests/` use `scope = "test_only"`.
 - A script's resource id is its module name: path under `scripts/teal/` without extension, dots for slashes. Keep them in
   sync so `require` resolves the same module at runtime and in the editor.
-- Reflection generates `render_graph_utils.render_graph` (declarations) and `render_graph_utils.render_graph_tasks`
+- Reflection generates `rend_graph_utils.rend_graph` (declarations) and `rend_graph_utils.rend_graph_tasks`
   (constructor installer) into `build/<target>/teal/`; their manifest entries give `source_file` relative to that directory.
 - `ACPCompilerScript` copies `.lua` sources and type-checks and compiles `.tl` sources with the vendored compiler; a type
   error fails the build. A Teal module requires a Lua module only through a `.d.tl` declaration next to it.
@@ -255,7 +255,7 @@ Examples: `rt_full_memory_barrier_vk.hh` (simple), `rt_run_compute_pipeline_vk.h
 - `require` is the only import mechanism; modules load once per backend and cyclic requires fail. New import sources are
   `IScriptModuleResolver`s whose `try_resolve()` must not throw.
 
-`render_graph_utils.sort` provides `radix_sort_buffers({ name?, max_element_count, key_type? })`, which declares the
+`rend_graph_utils.sort` provides `radix_sort_buffers({ name?, max_element_count, key_type? })`, which declares the
 sort's buffers (named `<name>.keys` and so on), and `radix_sort_task(buffers, { name?, queue_family?, begin_bit?, end_bit?
 })`, for `uint` keys or `uint2` keys ordered by `x` then `y`, sorted by every bit or by a bit range of an even number of
 8-bit digits (bits `[32, 64)` of `uint2` keys sort by `x` and carry `y` as a payload, which
@@ -268,6 +268,6 @@ longer `compute_sequential` task. `large_prefix_scan` and `dedup_large` likewise
 - `tests/unit/function/rend_graph_recipe_builder_vk_test.cpp`: imports, tasks, subgraphs, triggers, toggles.
 - `rend_graph_script_vk_test.cpp`: runs `tests.teal_recipe`, `tests.teal_graph_api`, and the shipped recipes with their
   features.
-- `render_task_registry_vk_test.cpp`, `render_task_registry_vk_builtin_test.cpp`: registration, params, push constants.
+- `rend_task_registry_vk_test.cpp`, `rend_task_registry_vk_builtin_test.cpp`: registration, params, push constants.
 - `rt_triggered_vk_test.cpp`, `rt_toggle_vk_test.cpp`, `rt_graphics_draw_mesh_vk_test.cpp`, `teal_declarations_test.cpp`.
-- `tests/build_script/reflection/test_teal_render_tasks.py`: constructor and params-interface generation.
+- `tests/build_script/reflection/test_teal_rend_tasks.py`: constructor and params-interface generation.

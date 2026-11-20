@@ -23,12 +23,12 @@ serializables = ".serializables"
 
 [[generate]]
 out_dir = "${build_dir}/generated/src"
-output_name = "render_task_registry.gen.cpp"
-template = "render_task_registry.cpp.jinja"
+output_name = "rend_task_registry.gen.cpp"
+template = "rend_task_registry.cpp.jinja"
 
 [generate.data]
 metadata = ".metadata"
-render_tasks = ".render_tasks"
+rend_tasks = ".rend_tasks"
 
 [[generate]]
 out_dir = "${build_dir}/teal"
@@ -40,23 +40,23 @@ metadata = ".metadata"
 reflect_script = ".reflect_script"
 
 [[generate]]
-out_dir = "${build_dir}/teal/render_graph_utils"
-output_name = "render_graph.tl"
-template = "teal_render_graph.tl.jinja"
+out_dir = "${build_dir}/teal/rend_graph_utils"
+output_name = "rend_graph.tl"
+template = "teal_rend_graph.tl.jinja"
 
 [generate.data]
 metadata = ".metadata"
-render_tasks = ".render_tasks"
+rend_tasks = ".rend_tasks"
 reflect_script = ".reflect_script"
 
 [[generate]]
-out_dir = "${build_dir}/teal/render_graph_utils"
-output_name = "render_graph_tasks.tl"
-template = "teal_render_graph_tasks.tl.jinja"
+out_dir = "${build_dir}/teal/rend_graph_utils"
+output_name = "rend_graph_tasks.tl"
+template = "teal_rend_graph_tasks.tl.jinja"
 
 [generate.data]
 metadata = ".metadata"
-render_tasks = ".render_tasks"
+rend_tasks = ".rend_tasks"
 reflect_script = ".reflect_script"
 
 [[generate]]

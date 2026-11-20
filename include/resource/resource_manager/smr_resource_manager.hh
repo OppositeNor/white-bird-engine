@@ -25,8 +25,8 @@ namespace WhiteBirdEngine {
  * @class SMRResourceManager
  * @brief Resolves imported script modules to the `script` resources of the ResourceManager singleton.
  *
- * A module name is the resource key of its script, so `require("render_graph_utils.render_graph_utils")` loads the script
- * resource `render_graph_utils.render_graph_utils`. The resolved source is chunk-owned and stays valid while the chunk is
+ * A module name is the resource key of its script, so `require("rend_graph_utils.rend_graph_utils")` loads the script
+ * resource `rend_graph_utils.rend_graph_utils`. The resolved source is chunk-owned and stays valid while the chunk is
  * registered. The name must not belong to a resource of another type. Stateless; neither copyable nor movable, like every
  * IScriptModuleResolver.
  */

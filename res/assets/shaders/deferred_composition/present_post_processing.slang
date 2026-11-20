@@ -19,23 +19,23 @@ VSOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID) {
     return build_fullscreen_triangle(p_vertex_id);
 }
 
-struct PresentPostProcessingDescriptorIndices {
-    [wbe::descriptor("sampled_image", "result_image")]
+struct PresentPostProcessingDescIndices {
+    [wbe::desc("sampled_image", "result_image")]
     uint2 result_image;
-    [wbe::descriptor("sampled_image", "bloom_ping")]
+    [wbe::desc("sampled_image", "bloom_ping")]
     uint2 bloom_image;
-    [wbe::descriptor("sampler", "bloom_sampler")]
+    [wbe::desc("sampler", "bloom_sampler")]
     uint2 result_sampler;
 };
 
 [vk::push_constant]
-ConstantBuffer<PresentPostProcessingDescriptorIndices> descriptor_indices;
+ConstantBuffer<PresentPostProcessingDescIndices> di;
 
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
-    Texture2D<float4> result_image = ResourceDescriptorHeap[descriptor_indices.result_image.x];
-    Texture2D<float4> bloom_image = ResourceDescriptorHeap[descriptor_indices.bloom_image.x];
-    SamplerState result_sampler = SamplerDescriptorHeap[descriptor_indices.result_sampler.x];
+    Texture2D<float4> result_image = ResourceDescriptorHeap[di.result_image.x];
+    Texture2D<float4> bloom_image = ResourceDescriptorHeap[di.bloom_image.x];
+    SamplerState result_sampler = SamplerDescriptorHeap[di.result_sampler.x];
     float3 color = result_image.SampleLevel(result_sampler, p_input.uv, 0.0).rgb;
     color += bloom_image.SampleLevel(result_sampler, p_input.uv, 0.0).rgb;
     color = color / sqrt(color * color + 1.5);

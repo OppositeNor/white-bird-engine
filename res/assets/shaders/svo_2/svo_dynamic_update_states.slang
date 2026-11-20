@@ -17,20 +17,20 @@
 /**
  * @brief Descriptor-heap resources used by incremental maintenance.
  */
-struct DynamicDescriptorIndices {
+struct DynamicDescIndices {
     /**
      * @brief Descriptor-heap reference to svo_info.
      */
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
-    [wbe::descriptor("storage_buffer", "svo_node_buffer")]
+    [wbe::desc("storage_buffer", "svo_node_buffer")]
     uint2 nodes;
 };
 [vk::push_constant]
-ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
+ConstantBuffer<DynamicDescIndices> di;
 
 /**
  * @brief Publishes initialized dynamic child blocks at a pass boundary.
@@ -38,8 +38,8 @@ ConstantBuffer<DynamicDescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> info = ResourceDescriptorHeap[descriptor_indices.info.x];
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[descriptor_indices.nodes.x];
+    ConstantBuffer<SVOInfo> info = ResourceDescriptorHeap[di.info.x];
+    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.nodes.x];
     uint index = p_id.x;
     // The node buffer holds the static nodes followed by the dynamic nodes.
     if (index >= info.node_count + info.dynamic_node_count) {

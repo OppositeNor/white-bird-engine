@@ -18,9 +18,9 @@
 #include "SDL_mouse.h"
 #include "SDL_video.h"
 #include "core/engine_core.hh"
-#include "function/render_vk/descriptor_set_plugin_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
+#include "function/rend_vk/desc_set_plugin_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
 #include <SDL_vulkan.h>
@@ -134,11 +134,11 @@ void scale_mouse_position(SDL_Window* p_window, int32_t& p_x, int32_t& p_y) {
 } // namespace
 
 ImGuiOverlayVK::ImGuiOverlayVK(RendererVK* p_renderer)
-    : render_data(p_renderer->get_render_context()), color_format(render_data->swap_chain_format),
-      pending_events(global_allocator()), frame_events(global_allocator()) {
-    auto* descriptor_set_plugin = DescriptorSetPluginVK::get_singleton();
-    if (descriptor_set_plugin == nullptr) {
-        throw std::runtime_error("ImGuiOverlayVK: the renderer must be created with RendererCapabilities::descriptor_set.");
+    : rend_data(p_renderer->get_rend_context()), color_format(rend_data->swap_chain_format),
+      pending_events(global_alloc()), frame_events(global_alloc()) {
+    auto* desc_set_plugin = DescSetPluginVK::get_singleton();
+    if (desc_set_plugin == nullptr) {
+        throw std::runtime_error("ImGuiOverlayVK: the renderer must be created with RendererCapabilities::desc_set.");
     }
     if (ImGui::GetCurrentContext() != nullptr) {
         throw std::runtime_error("ImGuiOverlayVK: another Dear ImGui context already exists.");
@@ -153,21 +153,21 @@ ImGuiOverlayVK::ImGuiOverlayVK(RendererVK* p_renderer)
 
     ImGui_ImplVulkan_InitInfo init_info{};
     init_info.ApiVersion = RendererVK::VULKAN_API_VERSION;
-    init_info.Instance = descriptor_set_plugin->get_instance();
-    init_info.PhysicalDevice = render_data->physical_device;
-    init_info.Device = render_data->logic_device;
-    init_info.QueueFamily = render_data->graphics_queue_family_index;
-    init_info.Queue = render_data->graphics_queue;
-    init_info.DescriptorPool = descriptor_set_plugin->get_descriptor_pool();
+    init_info.Instance = desc_set_plugin->get_instance();
+    init_info.PhysicalDevice = rend_data->physical_device;
+    init_info.Device = rend_data->logic_device;
+    init_info.QueueFamily = rend_data->graphics_queue_family_index;
+    init_info.Queue = rend_data->graphics_queue;
+    init_info.DescriptorPool = desc_set_plugin->get_desc_pool();
     init_info.MinImageCount = IMGUI_MIN_IMAGE_COUNT;
     // The backend cycles its vertex buffers over ImageCount frames, so it must cover every frame in flight.
-    init_info.ImageCount = std::max({IMGUI_MIN_IMAGE_COUNT, render_data->swap_chain_images_count, render_data->frames_in_flight});
+    init_info.ImageCount = std::max({IMGUI_MIN_IMAGE_COUNT, rend_data->swap_chain_images_count, rend_data->frames_in_flight});
     init_info.UseDynamicRendering = true;
     init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &color_format;
-    init_info.Allocator = render_data->allocation_callbacks;
+    init_info.Allocator = rend_data->allocation_callbacks;
     init_info.CheckVkResultFn = check_imgui_vulkan_result;
     if (!ImGui_ImplVulkan_Init(&init_info)) {
         ImGui::DestroyContext();
@@ -179,7 +179,7 @@ ImGuiOverlayVK::ImGuiOverlayVK(RendererVK* p_renderer)
 ImGuiOverlayVK::~ImGuiOverlayVK() {
     SDL_DelEventWatch(&ImGuiOverlayVK::on_sdl_event, this);
     // The backend destroys buffers and textures that recorded frames may still use.
-    vkDeviceWaitIdle(render_data->logic_device);
+    vkDeviceWaitIdle(rend_data->logic_device);
     ImGui_ImplVulkan_Shutdown();
     ImGui::DestroyContext();
 }
@@ -194,8 +194,8 @@ void ImGuiOverlayVK::begin_frame(double p_delta) {
     }
     frame_events.clear();
     ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(static_cast<float>(render_data->swap_chain_extent.width),
-        static_cast<float>(render_data->swap_chain_extent.height));
+    io.DisplaySize = ImVec2(static_cast<float>(rend_data->swap_chain_extent.width),
+        static_cast<float>(rend_data->swap_chain_extent.height));
     io.DeltaTime = std::max(static_cast<float>(p_delta), IMGUI_MIN_DELTA_TIME);
     ImGui_ImplVulkan_NewFrame();
     ImGui::NewFrame();

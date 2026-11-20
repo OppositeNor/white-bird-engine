@@ -18,13 +18,13 @@
 #include "core/reflection/reflection_defs.hh"
 #include "core/reflection/serializable_sd.hh"
 #include "function/function_utils.hh"
-#include "function/render_vk/rend_buffer_params_vk.hh"
-#include "function/render_vk/rend_image_params_vk.hh"
-#include "function/render_vk/rend_image_view_params_vk.hh"
-#include "function/render_vk/rend_sampler_params_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/rend_vk/rend_buffer_params_vk.hh"
+#include "function/rend_vk/rend_image_params_vk.hh"
+#include "function/rend_vk/rend_image_view_params_vk.hh"
+#include "function/rend_vk/rend_sampler_params_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "generated/enum_reflection.gen.hh"
 #include "generated/serializables_sd.gen.hh"
 #include <gtest/gtest.h>
@@ -48,7 +48,7 @@ TParams parse_resource_params(std::string_view p_json) {
 } // namespace
 
 TEST(WBERendResourceParamsVKTest, EngineEnumsAreReflected) {
-    EXPECT_EQ(EnumReflection<RendResPrimaryUsageVK>::string_to_enum("image_render_target"), RendResPrimaryUsageVK::IMAGE_RENDER_TARGET);
+    EXPECT_EQ(EnumReflection<RendResPrimaryUsageVK>::string_to_enum("image_rend_target"), RendResPrimaryUsageVK::IMAGE_REND_TARGET);
     EXPECT_EQ(EnumReflection<RendResPrimaryUsageVK>::enum_to_string(RendResPrimaryUsageVK::BUFFER_INDIRECT), "BUFFER_INDIRECT");
     EXPECT_EQ(EnumReflection<DeviceDomain>::string_to_enum("host_device"), DeviceDomain::HOST_DEVICE);
 }
@@ -82,9 +82,9 @@ TEST(WBERendResourceParamsVKTest, BufferParamsConvert) {
 TEST(WBERendResourceParamsVKTest, ImageParamsFollowTheSwapChainUnlessFixed) {
     const RendGraphContextVK context{.swap_chain_extent = {.width = 800, .height = 600}};
     const RendImageParamsVK scaled = parse_resource_params<RendImageParamsVK>(
-        R"({"usage": "image_render_target", "format": "r16g16b16a16_sfloat", "extent": {"swap_chain_scale": 0.5}, "additional_usage": ["transfer_src"], "mip_levels": 3})");
+        R"({"usage": "image_rend_target", "format": "r16g16b16a16_sfloat", "extent": {"swap_chain_scale": 0.5}, "additional_usage": ["transfer_src"], "mip_levels": 3})");
     const RendImageDescVK desc = scaled.to_desc(context);
-    EXPECT_EQ(desc.usage, RendResPrimaryUsageVK::IMAGE_RENDER_TARGET);
+    EXPECT_EQ(desc.usage, RendResPrimaryUsageVK::IMAGE_REND_TARGET);
     EXPECT_EQ(desc.format, VK_FORMAT_R16G16B16A16_SFLOAT);
     EXPECT_EQ(desc.extent.width, 400U);
     EXPECT_EQ(desc.extent.height, 300U);
@@ -122,7 +122,7 @@ TEST(WBERendResourceParamsVKTest, ImageViewParamsKeepUnsetFieldsDerived) {
     EXPECT_THROW((void)parse_resource_params<RendImageViewParamsVK>(R"({"aspect_mask": []})").to_desc(), std::runtime_error);
 }
 
-TEST(WBERendResourceParamsVKTest, SamplerParamsDefaultToTheDescriptorDefaults) {
+TEST(WBERendResourceParamsVKTest, SamplerParamsDefaultToTheDescDefaults) {
     EXPECT_EQ(parse_resource_params<RendSamplerParamsVK>("{}").to_desc(), RendSamplerDescVK{});
     const RendSamplerDescVK shadow = parse_resource_params<RendSamplerParamsVK>(
         R"({"min_filter": "nearest", "address_mode_u": "clamp_to_border", "compare_op": "less", "max_anisotropy": 8, "border_color": "FLOAT_OPAQUE_WHITE"})")

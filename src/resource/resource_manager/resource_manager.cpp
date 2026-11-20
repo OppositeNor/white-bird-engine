@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "resource/resource_manager/resource_manager.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "resource/resource_chunk/i_resource_chunk.hh"
@@ -27,27 +27,27 @@
 
 namespace WhiteBirdEngine {
 
-ResourceManager::ResourceManager(size_t p_alloc_size) : stack_allocator(p_alloc_size) {
+ResourceManager::ResourceManager(size_t p_alloc_size) : stack_alloc(p_alloc_size) {
     singleton = this;
     // Default resources that are supported by the resource layer.
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderTexture>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderScript>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_allocator()));
-    add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_allocator()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderAudio>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderBinary>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderFont>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderImage>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderTexture>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderScript>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderText>(global_alloc()));
+    add_resource_unit_loader(make_ref<ResourceUnitLoaderVideo>(global_alloc()));
 }
 
 void ResourceManager::load_global_resource(std::string_view p_global_res_path) {
-    global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile>(global_allocator(), p_global_res_path, stack_allocator));
+    global_res_chunk_id = register_chunk(make_ref<ResourceChunkLoadFile>(global_alloc(), p_global_res_path, stack_alloc));
 }
 
 ResourceManager::~ResourceManager() {
     singleton = nullptr;
     resource_chunks.clear();
-    stack_allocator.clear();
+    stack_alloc.clear();
 }
 
 Ref<IResourceChunk> ResourceManager::find_resource_chunk_containing_resource(std::string_view p_id) const {

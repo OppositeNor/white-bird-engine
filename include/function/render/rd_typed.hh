@@ -19,7 +19,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/serializable_sd.hh"
 #include "function/render/i_resource_description.hh"
-#include "function/render/render_defs.hh"
+#include "function/render/rend_defs.hh"
 #include "utils/utils.hh"
 #include <utility>
 
@@ -66,8 +66,8 @@ public:
         return static_cast<const RDTyped&>(p_other).params == params;
     }
 
-    virtual Unique<IResourceDescription> clone(RenderAllocator* p_allocator) const override {
-        return make_unique<RDTyped>(p_allocator, params);
+    virtual Unique<IResourceDescription> clone(RendAlloc* p_alloc) const override {
+        return make_unique<RDTyped>(p_alloc, params);
     }
 
     virtual DataValue serialize() const override {

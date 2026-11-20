@@ -15,12 +15,12 @@
 #ifndef WBE_FILE_WORLD_HH
 #define WBE_FILE_WORLD_HH
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/reference_weak.hh"
 #include "function/function_utils.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
 #include <entt/entt.hpp>
@@ -42,9 +42,9 @@ public:
     /**
      * @brief Construct an empty world.
      *
-     * @param p_allocator Allocator used by world-owned containers and strings.
+     * @param p_alloc Allocator used by world-owned containers and strings.
      */
-    World(HeapAllocatorDefault* p_allocator);
+    World(HeapAllocDefault* p_alloc);
     ~World();
     World(const World&) = delete;
     World(World&&) noexcept = delete;
@@ -56,8 +56,8 @@ public:
      *
      * @return The allocator used by the world.
      */
-    HeapAllocatorDefault* get_allocator() {
-        return allocator;
+    HeapAllocDefault* get_allocator() {
+        return alloc;
     }
 
     /**
@@ -65,8 +65,8 @@ public:
      *
      * @return The allocator used by the world.
      */
-    const HeapAllocatorDefault* get_allocator() const {
-        return allocator;
+    const HeapAllocDefault* get_allocator() const {
+        return alloc;
     }
 
     /**
@@ -101,7 +101,7 @@ public:
      * @param p_entity The entity to inspect.
      * @return The component type ids attached to the entity.
      */
-    Vector<TypeID, HeapAllocatorDefault> get_component_type_ids(EntityID p_entity);
+    Vector<TypeID, HeapAllocDefault> get_component_type_ids(EntityID p_entity);
 
     /**
      * @brief Register a scene node for entity lookup.
@@ -126,19 +126,19 @@ public:
     Ref<SceneNode> get_scene_node(EntityID p_entity);
 
     /**
-     * @brief Set the resource key of the world's render graph definition (RURenderGraph).
+     * @brief Set the resource key of the world's render graph definition (RURendGraph).
      *
      * @param p_resource_key The render graph definition key to associate with the world, or empty for no graph.
      */
-    void set_render_graph_resource_key(std::string_view p_resource_key);
+    void set_rend_graph_resource_key(std::string_view p_resource_key);
 
     /**
      * @brief Get the resource key of the world's render graph.
      *
      * @return The render graph resource key, or an empty view when no graph is set.
      */
-    std::string_view get_render_graph_resource_key() const {
-        return render_graph_resource_key;
+    std::string_view get_rend_graph_resource_key() const {
+        return rend_graph_resource_key;
     }
 
     /**
@@ -147,14 +147,14 @@ public:
      *
      * @param p_instance_key The instance key, or empty to use the definition key.
      */
-    void set_render_graph_instance_key(std::string_view p_instance_key);
+    void set_rend_graph_instance_key(std::string_view p_instance_key);
 
     /**
      * @brief Get the instance key of the world's render graph.
      *
      * @return The instance key, or the definition key when none was set.
      */
-    std::string_view get_render_graph_instance_key() const;
+    std::string_view get_rend_graph_instance_key() const;
 
     /**
      * @brief Set the non-owning static mesh resource rendered by the world.
@@ -177,12 +177,12 @@ public:
 private:
     void cache_component_lists();
 
-    HeapAllocatorDefault* allocator;
+    HeapAllocDefault* alloc;
     entt::registry entities;
-    HashMap<TypeID, entt::sparse_set*, HeapAllocatorDefault> component_lists;
-    HashMap<EntityID, RefWeak<SceneNode>, HeapAllocatorDefault> scene_nodes;
-    String<HeapAllocatorDefault> render_graph_resource_key;
-    String<HeapAllocatorDefault> render_graph_instance_key;
+    HashMap<TypeID, entt::sparse_set*, HeapAllocDefault> component_lists;
+    HashMap<EntityID, RefWeak<SceneNode>, HeapAllocDefault> scene_nodes;
+    String<HeapAllocDefault> rend_graph_resource_key;
+    String<HeapAllocDefault> rend_graph_instance_key;
     RefRes<RUMesh3D> static_mesh;
 };
 

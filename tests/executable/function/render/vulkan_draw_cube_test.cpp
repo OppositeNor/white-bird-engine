@@ -12,7 +12,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/engine_core.hh"
 #include "core/logging/log.hh"
 #include "core/memory/reference_strong.hh"
@@ -22,23 +22,23 @@
 #include "function/function_utils.hh"
 #include "function/input_manager/i_input_manager.hh"
 #include "function/input_manager/key_codes.hh"
-#include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/i_render_graph_bindings_vk.hh"
-#include "function/render_vk/rend_graph_script_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_bindings_function_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/vulkan_enums_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/i_rend_graph_bindings_vk.hh"
+#include "function/rend_vk/rend_graph_script_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_bindings_function_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
+#include "function/rend_vk/ro_image_vk.hh"
+#include "function/rend_vk/vulkan_enums_vk.hh"
 #include "glm/geometric.hpp"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
 #include "platform/file_system/path.hh"
-#include "render_test.hh"
+#include "rend_test.hh"
 #include "resource/resource_chunk/resource_chunk_load_file.hh"
 #include "resource/resource_manager/resource_manager.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -68,35 +68,35 @@ constexpr std::string_view SHADOW_LIGHT_INFO_BUFFER = "shadow_light_info";
 constexpr std::string_view CAMERA_INFO_BUFFER = "camera_info";
 constexpr std::string_view SPOT_LIGHT_INFO_BUFFER = "spot_light_info";
 constexpr std::string_view SPOT_LIGHT_COUNT_BUFFER = "spot_light_count";
-// The render graph definition, whose recipe is render_graphs.draw_cube.
-constexpr std::string_view DRAW_CUBE_RENDER_GRAPH = "draw_cube_graph";
+// The render graph definition, whose recipe is rend_graphs.draw_cube.
+constexpr std::string_view DRAW_CUBE_REND_GRAPH = "draw_cube_graph";
 
 } // namespace
 
 class ApplicationVulkanDrawCubeTest : public WBE::ApplicationGame {
 public:
     ApplicationVulkanDrawCubeTest()
-        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_allocator(), WBE::global_allocator())) {
+        : WBE::ApplicationGame({}, WBE::make_ref<WBE::InputManagerMocked>(WBE::global_alloc(), WBE::global_alloc())) {
     }
 
     virtual void logic_update(double p_delta) override;
-    virtual void render_update(double p_delta) override;
+    virtual void rend_update(double p_delta) override;
 
     void setup_draw_task();
     void release_draw_task();
 
 private:
-    void setup_render_context();
+    void setup_rend_context();
     void load_resources();
     void setup_spot_light();
     void create_buffers();
     WBE::Ref<WBE::ROBufferVK> create_uniform_buffer(const void* p_data, size_t p_size) const;
-    void acquire_draw_cube_render_graph();
+    void acquire_draw_cube_rend_graph();
 
     WBE::RendererVK* renderer_vk = nullptr;
-    const WBE::RenderContextVK* render_context = nullptr;
-    WBE::RenderAllocator* render_allocator = nullptr;
-    WBE::Ref<WBE::RenderGraphVK> render_graph;
+    const WBE::RendContextVK* rend_context = nullptr;
+    WBE::RendAlloc* rend_alloc = nullptr;
+    WBE::Ref<WBE::RendGraphVK> rend_graph;
     // The uniform buffers the recipe imports. The camera buffer is updated from the logic thread through render jobs.
     WBE::Ref<WBE::ROBufferVK> camera_info_ubo;
     WBE::Ref<WBE::ROBufferVK> spot_light_info_ubo;
@@ -120,8 +120,8 @@ int main(int p_argc, char* p_argv[]) {
             game_application.setup_draw_task();
             game_application.run();
             game_application.release_draw_task();
-            size_t renderer_alloc_max = game_application.get_renderer_allocator()->get_internal_fragmentation_tracker();
-            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_allocator->get_internal_fragmentation_tracker();
+            size_t renderer_alloc_max = game_application.get_renderer_alloc()->get_internal_fragmentation_tracker();
+            auto global_alloc_max_by_arena = WBE::EngineCore::get_singleton()->pool_alloc->get_internal_fragmentation_tracker();
             for (size_t arena_index = 0; arena_index < global_alloc_max_by_arena.size(); ++arena_index) {
                 WBE::stdout_log(WBE::WBE_CHANNEL_DEBUG)
                     ->message(std::format("Global allocator arena {} max used: {}", arena_index, global_alloc_max_by_arena[arena_index]));
@@ -188,38 +188,38 @@ void ApplicationVulkanDrawCubeTest::logic_update(double p_delta) {
         return;
     }
     CameraInfoGPU camera_info = make_camera_info_gpu(camera_component);
-    add_render_job([camera_info, camera_info_buffer] {
+    add_rend_job([camera_info, camera_info_buffer] {
         camera_info_buffer->update_buffer(&camera_info, sizeof(CameraInfoGPU));
     });
 }
 
-void ApplicationVulkanDrawCubeTest::render_update(double /* p_delta */) {
-    WBE::on_exec_test_render(*renderer_vk, render_context->current_frame);
+void ApplicationVulkanDrawCubeTest::rend_update(double /* p_delta */) {
+    WBE::on_exec_test_rend(*renderer_vk, rend_context->current_frame);
 }
 
 void ApplicationVulkanDrawCubeTest::setup_draw_task() {
-    setup_render_context();
+    setup_rend_context();
     load_resources();
     setup_spot_light();
     create_buffers();
-    acquire_draw_cube_render_graph();
+    acquire_draw_cube_rend_graph();
 }
 
 void ApplicationVulkanDrawCubeTest::release_draw_task() {
-    WBE::release_test_render_graph(*renderer_vk, render_graph);
+    WBE::release_test_rend_graph(*renderer_vk, rend_graph);
 }
 
-void ApplicationVulkanDrawCubeTest::setup_render_context() {
+void ApplicationVulkanDrawCubeTest::setup_rend_context() {
     renderer_vk = WBE::RendererVK::get_singleton();
-    render_context = renderer_vk->get_render_context();
-    render_allocator = get_renderer_allocator().get();
-    camera_component = make_default_test_camera_component(render_context->swap_chain_aspect_ratio);
+    rend_context = renderer_vk->get_rend_context();
+    rend_alloc = get_renderer_alloc().get();
+    camera_component = make_default_test_camera_component(rend_context->swap_chain_aspect_ratio);
 }
 
 void ApplicationVulkanDrawCubeTest::load_resources() {
     auto* resource_manager = WBE::ResourceManager::get_singleton();
     auto resource_chunk = WBE::make_ref<WBE::ResourceChunkLoadFile>(
-        WBE::global_allocator(), "assets/models/models.json", resource_manager->get_allocator());
+        WBE::global_alloc(), "assets/models/models.json", resource_manager->get_allocator());
     resource_manager->register_chunk(resource_chunk);
     if (resource_manager->get_resource<WBE::RUMesh3D>("model_cube_static.mesh") == WBE::MEM_NULL) {
         throw std::runtime_error("Failed to setup draw cube test: static mesh resource was not found.");
@@ -235,8 +235,8 @@ void ApplicationVulkanDrawCubeTest::setup_spot_light() {
 }
 
 WBE::Ref<WBE::ROBufferVK> ApplicationVulkanDrawCubeTest::create_uniform_buffer(const void* p_data, size_t p_size) const {
-    return render_context->create_buffer(WBE::ROBufferVK::Builder()
-            .initial_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
+    return rend_context->create_buffer(WBE::ROBufferVK::Builder()
+            .init_data(p_data, p_size, WBE::DeviceDomain::HOST_DEVICE)
             .set_size(p_size)
             .set_domain(WBE::DeviceDomain::HOST_DEVICE)
             .add_usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
@@ -253,13 +253,13 @@ void ApplicationVulkanDrawCubeTest::create_buffers() {
     spot_light_count_ubo = create_uniform_buffer(&spot_light_count, sizeof(spot_light_count));
 }
 
-void ApplicationVulkanDrawCubeTest::acquire_draw_cube_render_graph() {
+void ApplicationVulkanDrawCubeTest::acquire_draw_cube_rend_graph() {
     // The recipe registers the mesh and the pipelines and declares the shadow map; the application supplies its buffers.
-    render_graph = WBE::acquire_test_render_graph(*renderer_vk,
-        DRAW_CUBE_RENDER_GRAPH,
-        WBE::make_ref<WBE::RenderGraphBindingsFunctionVK>(WBE::global_allocator(),
-            DRAW_CUBE_RENDER_GRAPH,
-            [this](const WBE::RenderContextVK& /*p_render_context*/, const WBE::RendRecipeContextVK& p_recipe_context) {
+    rend_graph = WBE::acquire_test_rend_graph(*renderer_vk,
+        DRAW_CUBE_REND_GRAPH,
+        WBE::make_ref<WBE::RendGraphBindingsFunctionVK>(WBE::global_alloc(),
+            DRAW_CUBE_REND_GRAPH,
+            [this](const WBE::RendContextVK& /*p_rend_context*/, const WBE::RendRecipeContextVK& p_recipe_context) {
                 WBE::ShadowedMeshRecipeContext context;
                 static_cast<WBE::RendRecipeContextVK&>(context) = p_recipe_context;
                 context.shadow_extent = {.width = shadow_extent.width, .height = shadow_extent.height};

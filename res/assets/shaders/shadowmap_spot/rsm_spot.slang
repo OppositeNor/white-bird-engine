@@ -31,18 +31,18 @@ struct RSMVSOutput {
     float material_index : TEXCOORD5;
 };
 
-struct RSMDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "shadow_light_info")]
+struct RSMDescIndices {
+    [wbe::desc("uniform_buffer", "shadow_light_info")]
     uint2 light_camera_info;
-    [wbe::descriptor("uniform_buffer", "material_params")]
+    [wbe::desc("uniform_buffer", "material_params")]
     uint2 material_params;
-    [wbe::descriptor("sampler", "material_sampler")]
+    [wbe::desc("sampler", "material_sampler")]
     uint2 material_sampler;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<RSMDescriptorIndices> descriptor_indices;
+ConstantBuffer<RSMDescIndices> di;
 
 struct RSMFragmentOutput {
     float4 flux : SV_Target0;
@@ -51,7 +51,7 @@ struct RSMFragmentOutput {
 };
 
 float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p_base_color, float p_metallic) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
     float3 to_light = light_camera_info.position - p_world_position;
     float light_distance = length(to_light);
     float3 light_direction = to_light / max(light_distance, 0.0001);
@@ -75,11 +75,11 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
  */
 [shader("vertex")]
 RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[descriptor_indices.mesh.submeshes.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     float3x3 direction_transform = (float3x3)node.transform;
 
@@ -101,21 +101,21 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
  * @brief Shades a reflective shadow-map fragment, reversing back-face lighting normals when requested.
  */
 RSMFragmentOutput shade_fragment(RSMVSOutput p_input, bool p_front_face) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[descriptor_indices.light_camera_info.x];
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[descriptor_indices.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[descriptor_indices.material_sampler.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
+    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);
     uint normal_index = uint(active_material.normal_index >= 0 ? active_material.normal_index : 0);
     uint rma_index = uint(active_material.rma_index >= 0 ? active_material.rma_index : 0);
-    uint albedo_descriptor_index = NonUniformResourceIndex(albedo_index);
-    uint normal_descriptor_index = NonUniformResourceIndex(normal_index);
-    uint rma_descriptor_index = NonUniformResourceIndex(rma_index);
+    uint albedo_desc_index = NonUniformResourceIndex(albedo_index);
+    uint normal_desc_index = NonUniformResourceIndex(normal_index);
+    uint rma_desc_index = NonUniformResourceIndex(rma_index);
 
-    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_descriptor_index];
-    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_descriptor_index];
-    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_descriptor_index];
+    Texture2D<float4> albedo_texture = ResourceDescriptorHeap[albedo_desc_index];
+    Texture2D<float4> normal_texture = ResourceDescriptorHeap[normal_desc_index];
+    Texture2D<float4> rma_texture = ResourceDescriptorHeap[rma_desc_index];
     float4 albedo_sample = albedo_texture.Sample(material_sampler, p_input.uv);
     float2 sampled_normal = normal_texture.Sample(material_sampler, p_input.uv).rg;
     float3 rma = rma_texture.Sample(material_sampler, p_input.uv).rgb;

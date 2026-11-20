@@ -13,16 +13,16 @@
    limitations under the License.
 */
 
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/memory/unique.hh"
 #include "function/event/event_manager.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/rt_multiplexer_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rt_multiplexer_vk.hh"
 #include "global/global.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
@@ -42,7 +42,7 @@ struct MultiplexerProbeState {
     int destructions = 0;
 };
 
-class RTMultiplexerProbeVK final : public IRenderTaskVK {
+class RTMultiplexerProbeVK final : public IRendTaskVK {
 public:
     RTMultiplexerProbeVK() = delete;
     RTMultiplexerProbeVK(MultiplexerProbeState& p_state, std::string p_resource_id, QueueFamilyVK p_queue_family = QueueFamilyVK::COMPUTE_1)
@@ -58,7 +58,7 @@ public:
     virtual QueueFamilyVK queue_family() const override {
         return family;
     }
-    virtual void append_accesses(Vector<ResAccessVK, RenderAllocator>& p_reads, Vector<ResAccessVK, RenderAllocator>& p_writes) const override {
+    virtual void append_accesses(Vector<ResAccessVK, RendAlloc>& p_reads, Vector<ResAccessVK, RendAlloc>& p_writes) const override {
         p_reads.emplace_back("input", RendResUsageVK::STORAGE_BUFFER);
         p_writes.emplace_back(resource_id, RendResUsageVK::STORAGE_IMAGE);
     }
@@ -75,15 +75,15 @@ private:
     QueueFamilyVK family;
 };
 
-Vector<Unique<IRenderTaskVK>, RenderAllocator> make_branches(
-    RenderAllocator& p_allocator, MultiplexerProbeState& p_first, MultiplexerProbeState& p_second) {
-    Vector<Unique<IRenderTaskVK>, RenderAllocator> branches(&p_allocator);
-    branches.push_back(make_unique<RTMultiplexerProbeVK>(&p_allocator, p_first, "first_output"));
-    branches.push_back(make_unique<RTMultiplexerProbeVK>(&p_allocator, p_second, "second_output"));
+Vector<Unique<IRendTaskVK>, RendAlloc> make_branches(
+    RendAlloc& p_alloc, MultiplexerProbeState& p_first, MultiplexerProbeState& p_second) {
+    Vector<Unique<IRendTaskVK>, RendAlloc> branches(&p_alloc);
+    branches.push_back(make_unique<RTMultiplexerProbeVK>(&p_alloc, p_first, "first_output"));
+    branches.push_back(make_unique<RTMultiplexerProbeVK>(&p_alloc, p_second, "second_output"));
     return branches;
 }
 
-void record_frames(IRenderTaskVK& p_task, int p_frames) {
+void record_frames(IRendTaskVK& p_task, int p_frames) {
     for (int frame = 0; frame < p_frames; ++frame) {
         p_task.record(VK_NULL_HANDLE, 0.0);
     }
@@ -106,10 +106,10 @@ protected:
 } // namespace
 
 TEST(WBERTMultiplexerVKTest, RecordsOnlyTheSelectedBranch) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
-    RTMultiplexerVK multiplexer(make_branches(allocator, first, second));
+    RTMultiplexerVK multiplexer(make_branches(alloc, first, second));
     EXPECT_EQ(multiplexer.get_branch(), 0U);
     EXPECT_EQ(multiplexer.get_branch_count(), 2U);
     record_frames(multiplexer, 2);
@@ -122,31 +122,31 @@ TEST(WBERTMultiplexerVKTest, RecordsOnlyTheSelectedBranch) {
 }
 
 TEST(WBERTMultiplexerVKTest, StartsOnTheConstructedBranch) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
-    RTMultiplexerVK multiplexer(make_branches(allocator, first, second), 1U);
+    RTMultiplexerVK multiplexer(make_branches(alloc, first, second), 1U);
     record_frames(multiplexer, 1);
     EXPECT_EQ(first.recordings, 0);
     EXPECT_EQ(second.recordings, 1);
 }
 
 TEST(WBERTMultiplexerVKTest, ReportsAndBindsEveryBranchAndOwnsThem) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
     {
-        RTMultiplexerVK multiplexer(make_branches(allocator, first, second));
+        RTMultiplexerVK multiplexer(make_branches(alloc, first, second));
         EXPECT_EQ(multiplexer.queue_family(), QueueFamilyVK::COMPUTE_1);
-        Vector<ResAccessVK, RenderAllocator> reads(&allocator);
-        Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+        Vector<ResAccessVK, RendAlloc> reads(&alloc);
+        Vector<ResAccessVK, RendAlloc> writes(&alloc);
         multiplexer.append_accesses(reads, writes);
         // The unselected branch's accesses are reported too, so the graph orders the node for either branch.
         EXPECT_EQ(reads.size(), 2U);
         ASSERT_EQ(writes.size(), 2U);
         EXPECT_EQ(writes[0].res_id, "first_output");
         EXPECT_EQ(writes[1].res_id, "second_output");
-        Map<std::string, Ref<RendResVK>, RenderAllocator> resources(&allocator);
+        Map<std::string, Ref<RendResVK>, RendAlloc> resources(&alloc);
         multiplexer.bind_resources(RendResViewVK(&resources));
         EXPECT_EQ(first.bindings, 1);
         EXPECT_EQ(second.bindings, 1);
@@ -156,37 +156,37 @@ TEST(WBERTMultiplexerVKTest, ReportsAndBindsEveryBranchAndOwnsThem) {
 }
 
 TEST(WBERTMultiplexerVKTest, RejectsAnOutOfRangeBranch) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
-    EXPECT_THROW(RTMultiplexerVK(make_branches(allocator, first, second), 2U), std::runtime_error);
-    RTMultiplexerVK multiplexer(make_branches(allocator, first, second));
+    EXPECT_THROW(RTMultiplexerVK(make_branches(alloc, first, second), 2U), std::runtime_error);
+    RTMultiplexerVK multiplexer(make_branches(alloc, first, second));
     EXPECT_THROW(multiplexer.set_branch(2), std::runtime_error);
     EXPECT_EQ(multiplexer.get_branch(), 0U);
 }
 
 TEST(WBERTMultiplexerVKTest, RejectsInvalidBranches) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState state;
-    EXPECT_THROW(RTMultiplexerVK(Vector<Unique<IRenderTaskVK>, RenderAllocator>(&allocator)), std::runtime_error);
-    Vector<Unique<IRenderTaskVK>, RenderAllocator> with_null(&allocator);
-    with_null.push_back(make_unique<RTMultiplexerProbeVK>(&allocator, state, "output"));
+    EXPECT_THROW(RTMultiplexerVK(Vector<Unique<IRendTaskVK>, RendAlloc>(&alloc)), std::runtime_error);
+    Vector<Unique<IRendTaskVK>, RendAlloc> with_null(&alloc);
+    with_null.push_back(make_unique<RTMultiplexerProbeVK>(&alloc, state, "output"));
     with_null.emplace_back();
     EXPECT_THROW(RTMultiplexerVK(std::move(with_null)), std::runtime_error);
-    Vector<Unique<IRenderTaskVK>, RenderAllocator> mixed_queues(&allocator);
-    mixed_queues.push_back(make_unique<RTMultiplexerProbeVK>(&allocator, state, "output"));
-    mixed_queues.push_back(make_unique<RTMultiplexerProbeVK>(&allocator, state, "output", QueueFamilyVK::GRAPHICS));
+    Vector<Unique<IRendTaskVK>, RendAlloc> mixed_queues(&alloc);
+    mixed_queues.push_back(make_unique<RTMultiplexerProbeVK>(&alloc, state, "output"));
+    mixed_queues.push_back(make_unique<RTMultiplexerProbeVK>(&alloc, state, "output", QueueFamilyVK::GRAPHICS));
     EXPECT_THROW(RTMultiplexerVK(std::move(mixed_queues)), std::runtime_error);
 }
 
 TEST_F(WBERTMultiplexerVKEventTest, CommandsSelectTheBranchOfEveryTaskSharingTheId) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
     MultiplexerProbeState third;
     MultiplexerProbeState fourth;
-    RTMultiplexerVK multiplexer(make_branches(allocator, first, second), "probe.select");
-    RTMultiplexerVK other(make_branches(allocator, third, fourth), "probe.select");
+    RTMultiplexerVK multiplexer(make_branches(alloc, first, second), "probe.select");
+    RTMultiplexerVK other(make_branches(alloc, third, fourth), "probe.select");
     EventManager::get_singleton()->emit("probe.select", RTMultiplexerVK::Command{.branch = 1});
     EXPECT_EQ(multiplexer.get_branch(), 1U);
     EXPECT_EQ(other.get_branch(), 1U);
@@ -196,66 +196,66 @@ TEST_F(WBERTMultiplexerVKEventTest, CommandsSelectTheBranchOfEveryTaskSharingThe
 }
 
 TEST_F(WBERTMultiplexerVKEventTest, DestroyingTheTaskEndsTheSubscription) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
     {
-        RTMultiplexerVK multiplexer(make_branches(allocator, first, second), "probe.destroyed");
+        RTMultiplexerVK multiplexer(make_branches(alloc, first, second), "probe.destroyed");
         EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTMultiplexerVK::Command>("probe.destroyed"), 1U);
     }
     EXPECT_EQ(EventManager::get_singleton()->get_subscriber_count<RTMultiplexerVK::Command>("probe.destroyed"), 0U);
-    EXPECT_THROW(RTMultiplexerVK(make_branches(allocator, first, second), std::string_view()), std::runtime_error);
+    EXPECT_THROW(RTMultiplexerVK(make_branches(alloc, first, second), std::string_view()), std::runtime_error);
 }
 
 TEST_F(WBERTMultiplexerVKEventTest, CombinedFactoriesCreateMultiplexersOnTheGivenBranch) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     MultiplexerProbeState first;
     MultiplexerProbeState second;
-    Vector<RendTaskFactoryVK, RenderAllocator> factories(&allocator);
-    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-        return make_unique<RTMultiplexerProbeVK>(&allocator, first, "first_output");
+    Vector<RendTaskFactoryVK, RendAlloc> factories(&alloc);
+    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+        return make_unique<RTMultiplexerProbeVK>(&alloc, first, "first_output");
     });
-    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-        return make_unique<RTMultiplexerProbeVK>(&allocator, second, "second_output");
+    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+        return make_unique<RTMultiplexerProbeVK>(&alloc, second, "second_output");
     });
-    const RendTaskFactoryVK factory = RTMultiplexerVK::combine_factories(factories, "probe.combined", &render_data, 1);
-    Unique<IRenderTaskVK> task = factory(RendGraphContextVK{});
+    const RendTaskFactoryVK factory = RTMultiplexerVK::combine_factories(factories, "probe.combined", &rend_data, 1);
+    Unique<IRendTaskVK> task = factory(RendGraphContextVK{});
     auto* multiplexer = dynamic_cast<RTMultiplexerVK*>(task.get());
     ASSERT_NE(multiplexer, nullptr);
     EXPECT_EQ(multiplexer->get_branch(), 1U);
     EventManager::get_singleton()->emit("probe.combined", RTMultiplexerVK::Command{.branch = 0});
     EXPECT_EQ(multiplexer->get_branch(), 0U);
     // A rebuild evaluates the factory again; the new multiplexer starts on the combined branch, not the last commanded one.
-    Unique<IRenderTaskVK> rebuilt = factory(RendGraphContextVK{});
+    Unique<IRendTaskVK> rebuilt = factory(RendGraphContextVK{});
     EXPECT_EQ(dynamic_cast<RTMultiplexerVK*>(rebuilt.get())->get_branch(), 1U);
 }
 
 TEST_F(WBERTMultiplexerVKEventTest, CombineFactoriesRejectsInvalidInputs) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     MultiplexerProbeState state;
-    Vector<RendTaskFactoryVK, RenderAllocator> factories(&allocator);
-    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRenderTaskVK> {
-        return make_unique<RTMultiplexerProbeVK>(&allocator, state, "output");
+    Vector<RendTaskFactoryVK, RendAlloc> factories(&alloc);
+    factories.push_back([&](const RendGraphContextVK&) -> Unique<IRendTaskVK> {
+        return make_unique<RTMultiplexerProbeVK>(&alloc, state, "output");
     });
-    EXPECT_THROW(RTMultiplexerVK::combine_factories(Vector<RendTaskFactoryVK, RenderAllocator>(&allocator), "probe.invalid", &render_data),
+    EXPECT_THROW(RTMultiplexerVK::combine_factories(Vector<RendTaskFactoryVK, RendAlloc>(&alloc), "probe.invalid", &rend_data),
         std::runtime_error);
-    EXPECT_THROW(RTMultiplexerVK::combine_factories(factories, "probe.invalid", &render_data, 1), std::runtime_error);
-    EXPECT_THROW(RTMultiplexerVK::combine_factories(factories, "", &render_data), std::runtime_error);
+    EXPECT_THROW(RTMultiplexerVK::combine_factories(factories, "probe.invalid", &rend_data, 1), std::runtime_error);
+    EXPECT_THROW(RTMultiplexerVK::combine_factories(factories, "", &rend_data), std::runtime_error);
     EXPECT_THROW(RTMultiplexerVK::combine_factories(factories, "probe.invalid", nullptr), std::runtime_error);
-    Vector<RendTaskFactoryVK, RenderAllocator> with_empty(&allocator);
+    Vector<RendTaskFactoryVK, RendAlloc> with_empty(&alloc);
     with_empty.emplace_back();
-    EXPECT_THROW(RTMultiplexerVK::combine_factories(with_empty, "probe.invalid", &render_data), std::runtime_error);
+    EXPECT_THROW(RTMultiplexerVK::combine_factories(with_empty, "probe.invalid", &rend_data), std::runtime_error);
 }
 
 // Runs without a test global, so no EventManager exists.
 TEST(WBERTMultiplexerVKStandaloneTest, EventModeRequiresEventManager) {
-    RenderAllocator allocator(WBE_KI_B(64));
+    RendAlloc alloc(WBE_KI_B(64));
     MultiplexerProbeState first;
     MultiplexerProbeState second;
     ASSERT_EQ(EventManager::get_singleton(), nullptr);
-    EXPECT_THROW(RTMultiplexerVK(make_branches(allocator, first, second), "probe.no_manager"), std::runtime_error);
+    EXPECT_THROW(RTMultiplexerVK(make_branches(alloc, first, second), "probe.no_manager"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

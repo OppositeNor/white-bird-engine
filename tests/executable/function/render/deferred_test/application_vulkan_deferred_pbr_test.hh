@@ -15,41 +15,41 @@
 #ifndef WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 #define WBE_FILE_APPLICATION_VULKAN_DEFERRED_PBR_TEST_HH
 
-#include "../render_test.hh"
-#include "core/allocator/i_allocator.hh"
+#include "../rend_test.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/engine_core.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "deferred_recipe_context.hh"
-#include "dynamic_mesh_render_feature.hh"
+#include "dynamic_mesh_rend_feature.hh"
 #include "function/application/application_game.hh"
 #include "function/ecs/components.hh"
 #include "function/event/event_registration.hh"
 #include "function/render/i_renderer.hh"
-#include "function/render/render_defs.hh"
-#include "function/render/render_resource_unit.hh"
-#include "function/render_vk/compute_pipeline_compiler_vk.hh"
-#include "function/render_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/render_vk/i_render_graph_bindings_vk.hh"
-#include "function/render_vk/mesh_acceleration_structure_vk.hh"
-#include "function/render_vk/mesh_compiler_vk.hh"
-#include "function/render_vk/mesh_resources_vk.hh"
-#include "function/render_vk/rd_params_mesh_vk.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/rend_recipe_context_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_graph_descriptor_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/renderer_vk.hh"
-#include "function/render_vk/ro_buffer_vk.hh"
-#include "function/render_vk/ro_compute_pipeline_vk.hh"
-#include "function/render_vk/ro_graphics_pipeline_vk.hh"
-#include "function/render_vk/ro_image_view_vk.hh"
-#include "function/render_vk/ro_image_vk.hh"
-#include "function/render_vk/roc_multislots_vk.hh"
-#include "function/render_vk/rt_cpu_in_flight_acquire_vk.hh"
-#include "i_voxel_render_feature.hh"
+#include "function/render/rend_defs.hh"
+#include "function/render/rend_resource_unit.hh"
+#include "function/rend_vk/compute_pipeline_compiler_vk.hh"
+#include "function/rend_vk/graphics_pipeline_compiler_vk.hh"
+#include "function/rend_vk/i_rend_graph_bindings_vk.hh"
+#include "function/rend_vk/mesh_acceleration_structure_vk.hh"
+#include "function/rend_vk/mesh_compiler_vk.hh"
+#include "function/rend_vk/mesh_resources_vk.hh"
+#include "function/rend_vk/rd_params_mesh_vk.hh"
+#include "function/rend_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/rend_vk/rend_recipe_context_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_graph_desc_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/renderer_vk.hh"
+#include "function/rend_vk/ro_buffer_vk.hh"
+#include "function/rend_vk/ro_compute_pipeline_vk.hh"
+#include "function/rend_vk/ro_graphics_pipeline_vk.hh"
+#include "function/rend_vk/ro_image_view_vk.hh"
+#include "function/rend_vk/ro_image_vk.hh"
+#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/rend_vk/rt_cpu_in_flight_acquire_vk.hh"
+#include "i_voxel_rend_feature.hh"
 #include "imgui_overlay_vk.hh"
 #include "input_manager_mocked.hh"
 #include "pixel_sort.hh"
@@ -88,13 +88,13 @@ public:
                   .ray_query = exec_test_requested("WBE_EXEC_TEST_RAY_TRACING"),
                   .timestamp_query = exec_test_requested("WBE_EXEC_TEST_TIMESTAMP_QUERY"),
                   // The Dear ImGui backend of the configuration window allocates classic descriptor sets.
-                  .descriptor_set = true,
+                  .desc_set = true,
               },
-              make_ref<InputManagerMocked>(global_allocator(), global_allocator())) {
+              make_ref<InputManagerMocked>(global_alloc(), global_alloc())) {
     }
 
     virtual void logic_update(double p_delta) override;
-    virtual void render_update(double p_delta) override;
+    virtual void rend_update(double p_delta) override;
 
     /**
      * @brief Creates the deferred-rendering resources and acquires the render graphs.
@@ -121,9 +121,9 @@ private:
     // only by the next tick, so the bound must leave room for it and at least one submitted frame.
     static constexpr uint32_t FRAME_SEQUENCE_MAX_PENDING_FRAMES = 8;
     static_assert(FRAME_SEQUENCE_MAX_PENDING_FRAMES >= 2U);
-    // The render graph definitions of res/assets/render_graphs/render_graphs.toml, whose recipe is render_graphs.deferred,
-    // indexed like deferred_render_graphs: the mipmap and the summed-area table graph.
-    static constexpr std::array<std::string_view, 2> DEFERRED_RENDER_GRAPHS = {
+    // The render graph definitions of res/assets/rend_graphs/rend_graphs.toml, whose recipe is rend_graphs.deferred,
+    // indexed like deferred_rend_graphs: the mipmap and the summed-area table graph.
+    static constexpr std::array<std::string_view, 2> DEFERRED_REND_GRAPHS = {
         "deferred_mipmap_graph",
         "deferred_summed_area_table_graph",
     };
@@ -143,7 +143,7 @@ private:
     static constexpr std::string_view TOP_LEVEL_ACCELERATION_STRUCTURE = "top_level_acceleration_structure";
     static constexpr std::string_view RT_ACQUIRE_FRAME_SEQUENCE = "acquire_frame_sequence";
     // Event ids of the RTTriggeredVK::Command that drives each graph's on-demand tasks, indexed like
-    // deferred_render_graphs. Each graph has its own ids so a request never arms the inactive graph.
+    // deferred_rend_graphs. Each graph has its own ids so a request never arms the inactive graph.
     static constexpr std::array<std::string_view, 2> BLOOM_ACQUIRE_EVENT_IDS = {
         "deferred_pbr_test.mipmap.bloom_acquire",
         "deferred_pbr_test.summed_area_table.bloom_acquire",
@@ -189,13 +189,13 @@ private:
     };
 
     void control(double p_delta);
-    void update_descriptors();
+    void update_descs();
     // Draw the configuration window, whose controls mirror the toggle shortcut keys. Runs on the rendering thread.
-    void draw_configuration_window();
+    void draw_config_window();
     // Draw the pixel sort options and apply their changes to both deferred graphs. Runs on the rendering thread.
     void draw_pixel_sort_options();
 
-    void setup_render_context();
+    void setup_rend_context();
     void load_resources();
     void setup_static_scene_resources();
     void setup_spot_light();
@@ -206,13 +206,13 @@ private:
     // Advance the spot light the light controls move, as the T key does.
     void select_next_controlled_spot_light();
     void create_lighting_buffers();
-    void write_dynamic_camera_descriptors();
-    void write_dynamic_light_descriptors();
+    void write_dynamic_camera_descs();
+    void write_dynamic_light_descs();
     // Acquire the instance of the mipmap or the summed-area table definition, with bindings that call
     // prepare_deferred_bindings().
-    void acquire_deferred_render_graph(bool p_use_summed_area_table);
+    void acquire_deferred_rend_graph(bool p_use_summed_area_table);
     // Log the warm acquisition and explicit rebuild times of both graphs. Runs before the application runs.
-    void measure_render_graph_operations();
+    void measure_rend_graph_operations();
     // Log the mean frame time between render updates of frames [120, 1120). Runs on the rendering thread.
     void measure_frame_time();
     // The context and imports of one build of a deferred graph, including the voxel and post-processing features' parts.
@@ -252,25 +252,25 @@ private:
     void write_frame_sequence_frame(RTCPUInFlightAcquireVK::AcquiredImage p_image);
     bool is_frame_sequence_in_progress() const;
 
-    Unique<DynamicMeshRenderFeature> dynamic_mesh;
+    Unique<DynamicMeshRendFeature> dynamic_mesh;
     double dynamic_mesh_time = 0.0;
     // The SVO or octree selected by WBE_SVO_IMPLEMENTATION.
-    Unique<IVoxelRenderFeature> voxel_structure;
+    Unique<IVoxelRendFeature> voxel_structure;
     // Applied in place to the result image after lighting composition; toggled with the 1 key.
     Unique<PixelSort> post_processing;
     // The mipmap and the summed-area table graph, indexed by whether they filter shadows with the summed-area table, and
     // the bindings they were acquired with.
-    std::array<Ref<RenderGraphVK>, 2> deferred_render_graphs;
-    std::array<Ref<IRenderGraphBindingsVK>, 2> deferred_render_graph_bindings;
-    // Whether WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS=1 asked to log the render graphs' creation, acquisition, rebuild, and
+    std::array<Ref<RendGraphVK>, 2> deferred_rend_graphs;
+    std::array<Ref<IRendGraphBindingsVK>, 2> deferred_rend_graph_bindings;
+    // Whether WBE_EXEC_TEST_MEASURE_REND_GRAPHS=1 asked to log the render graphs' creation, acquisition, rebuild, and
     // steady-state frame times. The frame time state is owned by the rendering thread.
-    bool measure_render_graphs = exec_test_requested("WBE_EXEC_TEST_MEASURE_RENDER_GRAPHS");
+    bool measure_rend_graphs = exec_test_requested("WBE_EXEC_TEST_MEASURE_REND_GRAPHS");
     uint64_t measured_frame_count = 0;
     double measured_frame_seconds = 0.0;
-    std::chrono::steady_clock::time_point last_render_update;
+    std::chrono::steady_clock::time_point last_rend_update;
     RendererVK* renderer_vk = nullptr;
-    const RenderContextVK* render_context = nullptr;
-    RenderAllocator* render_allocator = nullptr;
+    const RendContextVK* rend_context = nullptr;
+    RendAlloc* rend_alloc = nullptr;
     // The static scene mesh; the ResourceManager owns it.
     RefRes<RUMesh3D> sponza_mesh;
     // The static scene mesh's description, which the recipe registers on both graphs under STATIC_MESH_KEY; the voxel
@@ -293,7 +293,7 @@ private:
     VkExtent2D shadow_extent{};
     uint32_t shadow_mipmap_level_count = 1;
     VkExtent2D bloom_extent{};
-    // Input-thread mailbox; render_update forwards requests to the active graph's wrapper.
+    // Input-thread mailbox; rend_update forwards requests to the active graph's wrapper.
     std::atomic_bool bloom_acquire_requested = false;
     // Rendering-thread mailbox of the configuration window's bloom button; control() handles it like a B key press.
     std::atomic_bool bloom_acquire_button_pressed = false;
@@ -309,12 +309,12 @@ private:
     int frame_sequence_frame_count_input = 60;
     bool frame_sequence_recording = false;
     bool frame_sequence_requested = false;
-    bool render_graph_switch_key_was_down = false;
+    bool rend_graph_switch_key_was_down = false;
     bool spot_light_switch_key_was_down = false;
     bool voxel_debug_view_key_was_down = false;
     bool frame_capture_key_was_down = false;
     bool post_processing_key_was_down = false;
-    // Input-thread mailbox; render_update applies it to the post-processing between frames.
+    // Input-thread mailbox; rend_update applies it to the post-processing between frames.
     std::atomic_bool post_processing_requested = false;
     std::atomic_bool frame_capture_requested = false;
     std::atomic<bool> summed_area_table_requested = false;

@@ -15,8 +15,8 @@
 #ifndef WBE_FILE_REFERENCE_STRONG_HH
 #define WBE_FILE_REFERENCE_STRONG_HH
 
-#include "core/allocator/heap_allocator.hh"
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/heap_alloc.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/subobject_offset.hh"
 #include "utils/defs.hh"
 #include <atomic>
@@ -43,10 +43,10 @@ struct RefControlBlock {
      * @brief Destroys the object and frees its allocation. Captured with the type the object was created as, so the
      * last reference destroys that type whatever type it views.
      */
-    using DestroyObjectFunction = void (*)(void* p_allocator, MemID p_mem_id);
+    using DestroyObjectFunction = void (*)(void* p_alloc, MemID p_mem_id);
 
-    RefControlBlock(AllocType* p_allocator, MemID p_mem_id, DestroyObjectFunction p_destroy_object)
-        : mem_id(p_mem_id), allocator(p_allocator), destroy_object(p_destroy_object) {
+    RefControlBlock(AllocType* p_alloc, MemID p_mem_id, DestroyObjectFunction p_destroy_object)
+        : mem_id(p_mem_id), alloc(p_alloc), destroy_object(p_destroy_object) {
         weak_ref_counter.store(0, std::memory_order_release);
         strong_ref_counter.store(0, std::memory_order_release);
     }
@@ -62,7 +62,7 @@ struct RefControlBlock {
     /**
      * @brief The allocator of both the object and this control block.
      */
-    AllocType* allocator;
+    AllocType* alloc;
     /**
      * @brief Destroys the object as the type it was created as.
      */
@@ -87,7 +87,7 @@ struct RefControlBlock {
  * @tparam T The type of the resource.
  * @tparam AllocType The type of the allocator.
  */
-template <typename T, typename AllocType = HeapAllocator>
+template <typename T, typename AllocType = HeapAlloc>
 class Ref {
     template <typename T1, typename AllocType1>
     friend class Ref;
@@ -214,13 +214,13 @@ public:
      *
      * The object is destroyed as T when the last reference is released.
      *
-     * @param p_allocator The allocator that allocated the memory for memory ID.
+     * @param p_alloc The allocator that allocated the memory for memory ID.
      * @param p_mem_id The memory ID.
      */
-    Ref(AllocType* p_allocator, MemID p_mem_id) {
-        WBE_DEBUG_ASSERT(p_allocator != nullptr);
-        MemID control_block_mem_id = create_obj<ControlBlock>(*p_allocator, p_allocator, p_mem_id, &destroy_created_object);
-        control_block = p_allocator->template get_obj<ControlBlock>(control_block_mem_id);
+    Ref(AllocType* p_alloc, MemID p_mem_id) {
+        WBE_DEBUG_ASSERT(p_alloc != nullptr);
+        MemID control_block_mem_id = create_obj<ControlBlock>(*p_alloc, p_alloc, p_mem_id, &destroy_created_object);
+        control_block = p_alloc->template get_obj<ControlBlock>(control_block_mem_id);
         control_block->control_block_mem_id = control_block_mem_id;
         ref();
     }
@@ -229,13 +229,13 @@ public:
      * @brief Make a reference with given constructor arguments. Same as the free make_ref().
      *
      * @tparam Args The argument types of the constructor.
-     * @param p_allocator The allocator to allocate the object.
+     * @param p_alloc The allocator to allocate the object.
      * @param p_args The arguments of the constructor.
      * @return The created reference.
-     * @throws std::runtime_error If p_allocator is nullptr.
+     * @throws std::runtime_error If p_alloc is nullptr.
      */
     template <typename... Args>
-    static Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args);
+    static Ref<T, AllocType> make_ref(AllocType* p_alloc, Args&&... p_args);
 
     /**
      * @brief Get the resource pointer.
@@ -279,7 +279,7 @@ public:
         if (casted_ptr == nullptr) {
             return Ref<T1, AllocType>();
         }
-        void* allocation = control_block->allocator->get(control_block->mem_id);
+        void* allocation = control_block->alloc->get(control_block->mem_id);
         return Ref<T1, AllocType>(control_block, get_address_offset(allocation, casted_ptr));
     }
 
@@ -394,14 +394,14 @@ private:
         return get_converted_subobject_offset<T>(p_other.get_object(), p_other.object_offset);
     }
 
-    static void destroy_created_object(void* p_allocator, MemID p_mem_id) {
-        destroy_obj<T>(*static_cast<AllocType*>(p_allocator), p_mem_id);
+    static void destroy_created_object(void* p_alloc, MemID p_mem_id) {
+        destroy_obj<T>(*static_cast<AllocType*>(p_alloc), p_mem_id);
     }
 
     T* get_object() const {
         WBE_DEBUG_ASSERT(control_block != nullptr);
-        WBE_DEBUG_ASSERT(control_block->allocator != nullptr);
-        return apply_subobject_offset<T>(control_block->allocator->get(control_block->mem_id), object_offset);
+        WBE_DEBUG_ASSERT(control_block->alloc != nullptr);
+        return apply_subobject_offset<T>(control_block->alloc->get(control_block->mem_id), object_offset);
     }
 
     void ref() const {
@@ -421,7 +421,7 @@ private:
         if (control_block->strong_ref_counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
             // If all the references of the control block is freed, destroy the
             // object.
-            control_block->destroy_object(control_block->allocator, control_block->mem_id);
+            control_block->destroy_object(control_block->alloc, control_block->mem_id);
         }
         // Dereference the hidden weak reference.
         weak_deref();
@@ -432,7 +432,7 @@ private:
         if (weak_ref_count == 1) {
             // Every strong reference holds a hidden weak reference, so the last weak reference is also past the last
             // strong reference: destroy the control block.
-            destroy_obj<ControlBlock>(*(control_block->allocator), control_block->control_block_mem_id);
+            destroy_obj<ControlBlock>(*(control_block->alloc), control_block->control_block_mem_id);
         }
         control_block = nullptr;
     }
@@ -449,18 +449,18 @@ concept ThisRefAsignable = requires(T* p_ins, Ref<T> p_ref) { p_ins->set_ref_of_
  *
  * @tparam T The type that is created.
  * @tparam Args The argument types of the constructor.
- * @param p_allocator The allocator to allocate the object.
+ * @param p_alloc The allocator to allocate the object.
  * @param p_args The arguments of the constructor.
  * @return The created reference.
- * @throws std::runtime_error If p_allocator is nullptr.
+ * @throws std::runtime_error If p_alloc is nullptr.
  */
-template <typename T, typename AllocType = HeapAllocator, typename... Args>
-Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
-    if (p_allocator == nullptr) {
+template <typename T, typename AllocType = HeapAlloc, typename... Args>
+Ref<T, AllocType> make_ref(AllocType* p_alloc, Args&&... p_args) {
+    if (p_alloc == nullptr) {
         throw std::runtime_error("Allocator cannot be nullptr.");
     }
-    MemID id = create_obj<T>(*p_allocator, std::forward<Args>(p_args)...);
-    Ref<T, AllocType> result(p_allocator, id);
+    MemID id = create_obj<T>(*p_alloc, std::forward<Args>(p_args)...);
+    Ref<T, AllocType> result(p_alloc, id);
     if constexpr (ThisRefAsignable<T>) {
         result->set_ref_of_this(result);
     }
@@ -469,8 +469,8 @@ Ref<T, AllocType> make_ref(AllocType* p_allocator, Args&&... p_args) {
 
 template <typename T, typename AllocType>
 template <typename... Args>
-Ref<T, AllocType> Ref<T, AllocType>::make_ref(AllocType* p_allocator, Args&&... p_args) {
-    return WhiteBirdEngine::make_ref<T, AllocType>(p_allocator, std::forward<Args>(p_args)...);
+Ref<T, AllocType> Ref<T, AllocType>::make_ref(AllocType* p_alloc, Args&&... p_args) {
+    return WhiteBirdEngine::make_ref<T, AllocType>(p_alloc, std::forward<Args>(p_args)...);
 }
 
 } // namespace WhiteBirdEngine
@@ -490,7 +490,7 @@ struct hash<::WhiteBirdEngine::Ref<T, AllocType>> { // NOLINT
             return WhiteBirdEngine::MEM_NULL;
         }
         WBE_DEBUG_ASSERT(p_ref.control_block != nullptr);
-        return std::hash<AllocType*>{}(p_ref.control_block->allocator) ^
+        return std::hash<AllocType*>{}(p_ref.control_block->alloc) ^
                std::hash<::WhiteBirdEngine::MemID>{}(p_ref.control_block->mem_id);
     }
 };

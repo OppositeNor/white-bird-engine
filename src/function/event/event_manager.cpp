@@ -71,9 +71,9 @@ private:
     bool is_entered = false;
 };
 
-EventManager::EventManager(HeapAllocatorDefault* p_allocator)
-    : allocator(p_allocator), listeners_by_event(p_allocator), event_by_subscription(p_allocator) {
-    if (allocator == nullptr) {
+EventManager::EventManager(HeapAllocDefault* p_alloc)
+    : alloc(p_alloc), listeners_by_event(p_alloc), event_by_subscription(p_alloc) {
+    if (alloc == nullptr) {
         throw std::runtime_error("Failed to construct event manager: the allocator is null.");
     }
     singleton = this;
@@ -93,12 +93,12 @@ std::string EventManager::make_event_key(std::string_view p_event_id, std::type_
 
 EventSubscriptionID EventManager::subscribe_erased(std::string p_event_key, ErasedCallback p_callback) {
     const EventSubscriptionID subscription_id = next_subscription_id.fetch_add(1, std::memory_order_relaxed);
-    ListenerRef listener = make_ref<Listener>(allocator, allocator);
+    ListenerRef listener = make_ref<Listener>(alloc, alloc);
     listener->id = subscription_id;
     listener->callback = std::move(p_callback);
 
     std::unique_lock lock(table_mutex);
-    ListenerListRef updated_listeners = make_ref<ListenerList>(allocator, allocator);
+    ListenerListRef updated_listeners = make_ref<ListenerList>(alloc, alloc);
     auto existing = listeners_by_event.find(p_event_key);
     if (existing != listeners_by_event.end()) {
         updated_listeners->reserve(existing->second->size() + 1);
@@ -122,7 +122,7 @@ void EventManager::unsubscribe(EventSubscriptionID p_subscription) {
         auto listeners = listeners_by_event.find(subscription->second);
         event_by_subscription.erase(subscription);
         WBE_DEBUG_ASSERT(listeners != listeners_by_event.end());
-        ListenerListRef remaining_listeners = make_ref<ListenerList>(allocator, allocator);
+        ListenerListRef remaining_listeners = make_ref<ListenerList>(alloc, alloc);
         remaining_listeners->reserve(listeners->second->size());
         for (const ListenerRef& listener : *listeners->second) {
             if (listener->id == p_subscription) {

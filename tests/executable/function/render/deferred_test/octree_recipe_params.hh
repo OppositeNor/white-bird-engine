@@ -16,7 +16,7 @@
 #define WBE_FILE_OCTREE_RECIPE_PARAMS_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render_vk/rend_graph_recipe_params_vk.hh"
+#include "function/rend_vk/rend_graph_recipe_params_vk.hh"
 #include "recipe_feature_params.hh"
 #include <cstdint>
 #include <optional>
@@ -48,8 +48,8 @@ struct WBE_META(WBE_REFLECT_SCRIPT) OctreeGroupCount {
 
 /**
  * @class OctreeRecipeParams
- * @brief The parameters of the render_graph_utils.features.voxel_octree recipe module; see
- * VoxelRenderFeatureOctree::configure_recipe(). Copyable and movable.
+ * @brief The parameters of the rend_graph_utils.features.voxel_octree recipe module; see
+ * VoxelRendFeatureOctree::configure_recipe(). Copyable and movable.
  */
 struct WBE_META(WBE_REFLECT_SCRIPT) OctreeRecipeParams : public RecipeFeatureParams {
     /**

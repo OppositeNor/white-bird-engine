@@ -261,9 +261,9 @@ TEST(WBEShaderMetadataVKTest, LoadsUserAttributesFromCompiledSlangMetadata) {
     EXPECT_EQ(entry_point.parameters[0].user_attributes[0].arguments[0].integer_value, 7);
 }
 
-TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlangMetadata) {
+TEST(WBEShaderMetadataVKTest, LoadsExplicitDescHeapIndicesFromCompiledSlangMetadata) {
     ParserJSON parser;
-    parser.parse((Path("test_env/res/assets/shaders/descriptor_heap_reflection") / "descriptor_heap_reflection.descriptor_heap_reflection_shader.json"));
+    parser.parse((Path("test_env/res/assets/shaders/desc_heap_reflection") / "desc_heap_reflection.desc_heap_reflection_shader.json"));
     ShaderMetadata metadata;
     metadata.deserialize(parser.get_data());
 
@@ -273,10 +273,10 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(acceleration_structure->type.kind, "resource");
     EXPECT_EQ(acceleration_structure->type.scalar_type, "accelerationStructure");
 
-    const ShaderMetadataParameter* push_data_pointer = query.find_parameter(metadata, "descriptor_indices");
+    const ShaderMetadataParameter* push_data_pointer = query.find_parameter(metadata, "di");
     ASSERT_NE(push_data_pointer, nullptr);
     const ShaderMetadataParameter& push_data = *push_data_pointer;
-    EXPECT_EQ(push_data.name, "descriptor_indices");
+    EXPECT_EQ(push_data.name, "di");
     EXPECT_EQ(push_data.binding.kind, "pushConstantBuffer");
     EXPECT_EQ(push_data.type.kind, "constantBuffer");
     ASSERT_EQ(push_data.type.fields.size(), 7U);
@@ -289,7 +289,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(uniform_buffer.binding.offset, 0);
     EXPECT_EQ(uniform_buffer.binding.size, 8);
     ASSERT_EQ(uniform_buffer.user_attributes.size(), 1U);
-    EXPECT_EQ(uniform_buffer.user_attributes[0].name, "wbe_descriptor");
+    EXPECT_EQ(uniform_buffer.user_attributes[0].name, "wbe_desc");
     // Slang reflects the default value of the omitted access argument.
     ASSERT_EQ(uniform_buffer.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(uniform_buffer.user_attributes[0].arguments[0].string_value, "uniform_buffer");
@@ -324,7 +324,7 @@ TEST(WBEShaderMetadataVKTest, LoadsExplicitDescriptorHeapIndicesFromCompiledSlan
     EXPECT_EQ(acceleration_structure_index.binding.offset, 48);
     EXPECT_EQ(acceleration_structure_index.binding.size, 8);
     ASSERT_EQ(acceleration_structure_index.user_attributes.size(), 1U);
-    EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "wbe_descriptor");
+    EXPECT_EQ(acceleration_structure_index.user_attributes[0].name, "wbe_desc");
     ASSERT_EQ(acceleration_structure_index.user_attributes[0].arguments.size(), 3U);
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[0].string_value, "acceleration_structure");
     EXPECT_EQ(acceleration_structure_index.user_attributes[0].arguments[1].string_value, "acceleration_structure");
@@ -381,7 +381,7 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) 
     metadata.deserialize(parser.get_data());
 
     auto parameter = std::ranges::find_if(metadata.parameters, [](const ShaderMetadataParameter& p_parameter) {
-        return p_parameter.name == "descriptor_indices";
+        return p_parameter.name == "di";
     });
     ASSERT_NE(parameter, metadata.parameters.end());
     EXPECT_EQ(parameter->type.kind, "constantBuffer");
@@ -406,7 +406,7 @@ TEST(WBEShaderMetadataVKTest, LoadsMeshStorageBuffersFromCompiledSlangMetadata) 
         EXPECT_EQ(field.binding.kind, "uniform");
         EXPECT_EQ(field.binding.offset, static_cast<int32_t>(i * sizeof(uint32_t) * 2));
         ASSERT_EQ(field.user_attributes.size(), 1U);
-        EXPECT_EQ(field.user_attributes[0].name, "wbe_descriptor");
+        EXPECT_EQ(field.user_attributes[0].name, "wbe_desc");
         ASSERT_EQ(field.user_attributes[0].arguments.size(), 3U);
         EXPECT_EQ(field.user_attributes[0].arguments[0].string_value, "storage_buffer");
         EXPECT_EQ(field.user_attributes[0].arguments[1].string_value, expected_resource_ids[i]);

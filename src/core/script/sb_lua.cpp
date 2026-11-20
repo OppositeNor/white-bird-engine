@@ -82,7 +82,7 @@ private:
 
 // Opens the sandbox libraries, creates the module table, and installs the `require` function passed as the only
 // argument; run under lua_pcall so allocation failures are reported.
-int initialize_state(lua_State* p_state) {
+int init_state(lua_State* p_state) {
     luaL_openselectedlibs(p_state, LUA_GLIBK | LUA_STRLIBK | LUA_TABLIBK | LUA_MATHLIBK | LUA_UTF8LIBK, 0);
     lua_newtable(p_state);
     lua_rawsetp(p_state, LUA_REGISTRYINDEX, &MODULES_REGISTRY_KEY);
@@ -285,7 +285,7 @@ SBLua::SBLua(const ScriptSandboxConfig& p_config) : config(p_config) {
         throw std::runtime_error("Failed to create Lua state: out of memory.");
     }
     lua_atpanic(state, &report_panic);
-    lua_pushcfunction(state, &initialize_state);
+    lua_pushcfunction(state, &init_state);
     lua_pushcfunction(state, &SBLua::require_module);
     if (lua_pcall(state, 1, 0, 0) != LUA_OK) {
         const std::string message = get_error_message(state);

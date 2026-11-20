@@ -51,7 +51,7 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC) RUSchemaWorldStaticComponent {
      * @brief Non-empty resource id of the static mesh rendered by the world.
      */
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
-    std::string static_mesh_render;
+    std::string static_mesh_rend;
 };
 
 /**
@@ -103,7 +103,7 @@ struct RUPrefab : public ResourceUnit {};
  */
 struct RUWorldStaticComponent {
     /** Chunk-owned, non-empty, NUL-terminated resource id of the static mesh rendered by the world. */
-    RefRes<char> static_mesh_render;
+    RefRes<char> static_mesh_rend;
 };
 
 /**

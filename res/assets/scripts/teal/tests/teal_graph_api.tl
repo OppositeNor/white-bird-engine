@@ -14,7 +14,7 @@
 
 -- Exercise the typed task constructors through both the ACP type checker and the script backend.
 local type wbe = require("wbe")
-local graph = require("render_graph_utils.render_graph_utils")
+local graph = require("rend_graph_utils.rend_graph_utils")
 
 local exports = {}
 

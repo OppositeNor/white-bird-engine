@@ -14,8 +14,8 @@
 */
 #ifndef WBE_FILE_RESOURCE_CHUNK_LOADER_HH
 #define WBE_FILE_RESOURCE_CHUNK_LOADER_HH
-#include "core/allocator/i_allocator.hh"
-#include "core/allocator/stack_allocator.hh"
+#include "core/alloc/i_alloc.hh"
+#include "core/alloc/stack_alloc.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
 #include "core/parser/parser_json.hh"
@@ -57,7 +57,7 @@ public:
         for (const auto& resource_destructor : std::views::reverse(resource_destructors)) {
             resource_destructor.destroy(resource_destructor.resource);
         }
-        allocator->pop_stack(total_size);
+        alloc->pop_stack(total_size);
     }
     ResourceChunkLoadFile(const ResourceChunkLoadFile&) = delete;
     ResourceChunkLoadFile(ResourceChunkLoadFile&&) = delete;
@@ -70,7 +70,7 @@ public:
      * @param p_path The resource path to the resource file.
      * @param p_parser The parser to get resource from.
      */
-    ResourceChunkLoadFile(std::string_view p_path, StackAllocator& p_allocator);
+    ResourceChunkLoadFile(std::string_view p_path, StackAlloc& p_alloc);
 
     virtual RefRes<char> get_resource(std::string_view p_id) const override {
         return resource_map.at(std::string(p_id));
@@ -86,10 +86,10 @@ public:
 
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) override {
         total_size += p_res_size;
-        MemID result_mem_id = allocator->allocate(p_res_size);
-        auto* copy_to = allocator->get(result_mem_id);
+        MemID result_mem_id = alloc->allocate(p_res_size);
+        auto* copy_to = alloc->get(result_mem_id);
         memcpy(copy_to, p_res, p_res_size);
-        RefRes<char> result(result_mem_id, allocator);
+        RefRes<char> result(result_mem_id, alloc);
         return result;
     }
 
@@ -98,11 +98,11 @@ public:
     }
 
     virtual void* get_data(MemID p_mem_id) override {
-        return allocator->get(p_mem_id);
+        return alloc->get(p_mem_id);
     }
 
     virtual const void* get_data(MemID p_mem_id) const override {
-        return allocator->get(p_mem_id);
+        return alloc->get(p_mem_id);
     }
 
     virtual bool contains(std::string_view p_res_key) const override {
@@ -137,14 +137,14 @@ protected:
         char* resource_key = nullptr;
         if (!p_res_key.empty()) {
             total_size += p_res_key.size() + 1;
-            MemID resource_key_mem_id = allocator->allocate(p_res_key.size() + 1);
-            resource_key = allocator->get_obj<char>(resource_key_mem_id);
+            MemID resource_key_mem_id = alloc->allocate(p_res_key.size() + 1);
+            resource_key = alloc->get_obj<char>(resource_key_mem_id);
             memcpy(resource_key, p_res_key.data(), p_res_key.size() + 1);
             resource_key[p_res_key.size()] = '\0';
         }
         total_size += p_size;
-        MemID result_mem_id = allocator->allocate(p_size);
-        RefRes<char> result(result_mem_id, allocator);
+        MemID result_mem_id = alloc->allocate(p_size);
+        RefRes<char> result(result_mem_id, alloc);
         if (!p_res_key.empty()) {
             resource_map[std::string(p_res_key)] = result;
         }
@@ -170,7 +170,7 @@ private:
     std::unordered_map<std::string, RefRes<char>, TransparentStrHash, TransparentEqual> resource_map;
     std::vector<ResourceReference> ref_map;
     std::vector<ResourceDestructor> resource_destructors;
-    StackAllocator* allocator;
+    StackAlloc* alloc;
 
     void resolve_load_resource(std::vector<std::string>& p_included_pathes, std::string_view p_res_chunk_path);
 
@@ -240,8 +240,8 @@ inline void ResourceChunkLoadFile::resolve_load_resource(std::vector<std::string
     p_included_pathes.pop_back();
 }
 
-inline ResourceChunkLoadFile::ResourceChunkLoadFile(std::string_view p_path, StackAllocator& p_allocator) {
-    allocator = &p_allocator;
+inline ResourceChunkLoadFile::ResourceChunkLoadFile(std::string_view p_path, StackAlloc& p_alloc) {
+    alloc = &p_alloc;
     std::vector<std::string> included_pathes;
     resolve_load_resource(included_pathes, p_path);
     resolve_refs();

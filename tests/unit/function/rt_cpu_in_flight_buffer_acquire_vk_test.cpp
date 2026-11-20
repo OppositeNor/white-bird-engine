@@ -12,18 +12,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/data/data_value.hh"
 #include "core/memory/unique.hh"
 #include "function/event/event_manager.hh"
 #include "function/event/event_registration.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/i_render_task_vk.hh"
-#include "function/render_vk/render_context_vk.hh"
-#include "function/render_vk/render_graph_context_vk.hh"
-#include "function/render_vk/render_task_registry_vk.hh"
-#include "function/render_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
-#include "function/render_vk/rt_triggered_vk.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/i_rend_task_vk.hh"
+#include "function/rend_vk/rend_context_vk.hh"
+#include "function/rend_vk/rend_graph_context_vk.hh"
+#include "function/rend_vk/rend_task_registry_vk.hh"
+#include "function/rend_vk/rt_cpu_in_flight_buffer_acquire_vk.hh"
+#include "function/rend_vk/rt_triggered_vk.hh"
 #include "global/global.hh"
 #include "test_global.hh"
 #include "utils/defs.hh"
@@ -62,15 +62,15 @@ protected:
 } // namespace
 
 TEST_F(WBERTCPUInFlightBufferAcquireVKTest, DirectRecordRequiresBoundSource) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     std::atomic<int> acquisitions = 0;
     const EventRegistration registration = count_acquisitions(acquisitions);
-    RTCPUInFlightBufferAcquireVK task(&render_data, "source_buffer", "source_buffer_event");
+    RTCPUInFlightBufferAcquireVK task(&rend_data, "source_buffer", "source_buffer_event");
 
     ASSERT_EQ(task.queue_family(), QueueFamilyVK::GRAPHICS);
-    Vector<ResAccessVK, RenderAllocator> reads(&allocator);
-    Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+    Vector<ResAccessVK, RendAlloc> reads(&alloc);
+    Vector<ResAccessVK, RendAlloc> writes(&alloc);
     task.append_accesses(reads, writes);
     ASSERT_EQ(reads.size(), 1U);
     EXPECT_EQ(reads[0].res_id, "source_buffer");
@@ -82,20 +82,20 @@ TEST_F(WBERTCPUInFlightBufferAcquireVKTest, DirectRecordRequiresBoundSource) {
 }
 
 TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RejectsInvalidInputs) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
 
     EXPECT_THROW(RTCPUInFlightBufferAcquireVK(nullptr, "source_buffer", "source_buffer_event"), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "", "source_buffer_event"), std::runtime_error);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "source_buffer", ""), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&rend_data, "", "source_buffer_event"), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&rend_data, "source_buffer", ""), std::runtime_error);
 }
 
 TEST_F(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUntilActivated) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     std::atomic<int> acquisitions = 0;
     const EventRegistration registration = count_acquisitions(acquisitions);
-    RTTriggeredVK task(make_unique<RTCPUInFlightBufferAcquireVK>(&allocator, &render_data, "source_buffer", "source_buffer_event"));
+    RTTriggeredVK task(make_unique<RTCPUInFlightBufferAcquireVK>(&alloc, &rend_data, "source_buffer", "source_buffer_event"));
     EXPECT_NO_THROW(task.record(VK_NULL_HANDLE, 0.0));
     task.trigger();
     EXPECT_THROW(task.record(VK_NULL_HANDLE, 0.0), std::runtime_error);
@@ -104,32 +104,32 @@ TEST_F(WBERTCPUInFlightBufferAcquireVKTest, TriggeredAcquireSkipsUnboundSourceUn
 }
 
 TEST_F(WBERTCPUInFlightBufferAcquireVKTest, RegistryCreatesTaskFromParameters) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     DataValue params;
     params.set_entry("buffer", DataValue::make_string("source_buffer"));
     params.set_entry("event", DataValue::make_string("source_buffer_event"));
     for (std::string_view task_type : {"RTCPUInFlightBufferAcquireVK", "cpu_acquire_buffer"}) {
-        const Unique<IRenderTaskVK> task =
-            RenderTaskRegistryVK::create_factory(task_type, params, &render_data)(RendGraphContextVK{});
+        const Unique<IRendTaskVK> task =
+            RendTaskRegistryVK::create_factory(task_type, params, &rend_data)(RendGraphContextVK{});
         ASSERT_NE(dynamic_cast<const RTCPUInFlightBufferAcquireVK*>(task.get()), nullptr) << task_type;
-        Vector<ResAccessVK, RenderAllocator> reads(&allocator);
-        Vector<ResAccessVK, RenderAllocator> writes(&allocator);
+        Vector<ResAccessVK, RendAlloc> reads(&alloc);
+        Vector<ResAccessVK, RendAlloc> writes(&alloc);
         task->append_accesses(reads, writes);
         ASSERT_EQ(reads.size(), 1U);
         EXPECT_EQ(reads[0].res_id, "source_buffer");
         EXPECT_EQ(reads[0].usage, RendResUsageVK::TRANSFER_SRC);
     }
     // The resource id is required.
-    EXPECT_THROW(RenderTaskRegistryVK::create_factory("cpu_acquire_buffer", DataValue::make_map(), &render_data), std::runtime_error);
+    EXPECT_THROW(RendTaskRegistryVK::create_factory("cpu_acquire_buffer", DataValue::make_map(), &rend_data), std::runtime_error);
 }
 
 // Runs without a test global, so no EventManager exists.
 TEST(WBERTCPUInFlightBufferAcquireVKStandaloneTest, RequiresEventManager) {
-    RenderAllocator allocator(WBE_KI_B(64));
-    RenderContextVK render_data(&allocator);
+    RendAlloc alloc(WBE_KI_B(64));
+    RendContextVK rend_data(&alloc);
     ASSERT_EQ(EventManager::get_singleton(), nullptr);
-    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&render_data, "source_buffer", "source_buffer_event"), std::runtime_error);
+    EXPECT_THROW(RTCPUInFlightBufferAcquireVK(&rend_data, "source_buffer", "source_buffer_event"), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

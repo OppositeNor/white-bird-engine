@@ -49,7 +49,7 @@ enum class ShaderDebugError {
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */
-static const uint WBE_SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
+static const uint WBE_SHADER_DEBUG_DESC_INDEX = 0;
 
 #ifdef WBE_SHADER_DEBUG
 /**
@@ -58,7 +58,7 @@ static const uint WBE_SHADER_DEBUG_DESCRIPTOR_INDEX = 0;
  * @param p_frame_slot Renderer frame slot whose independent report region receives the error.
  */
 void report_shader_debug_error(ShaderDebugError p_error, uint p_frame_slot) {
-    RWStructuredBuffer<uint> debug_buffer = ResourceDescriptorHeap[WBE_SHADER_DEBUG_DESCRIPTOR_INDEX];
+    RWStructuredBuffer<uint> debug_buffer = ResourceDescriptorHeap[WBE_SHADER_DEBUG_DESC_INDEX];
     static const uint FRAME_ENTRY_CAPACITY = 512;
     static const uint FRAME_WORD_COUNT = FRAME_ENTRY_CAPACITY + 2;
     uint frame_offset = p_frame_slot * FRAME_WORD_COUNT;
@@ -88,9 +88,9 @@ struct wbe_vertex_inputAttribute {
 
 /** Marks a push-data uint2 as an index into one descriptor-heap arena. */
 [__AttributeUsage(_AttributeTargets.Var)]
-struct wbe_descriptorAttribute {
+struct wbe_descAttribute {
     /** Descriptor category interpreted by the Vulkan pipeline compiler. */
-    string descriptor_type;
+    string desc_type;
     /** Logical render-graph resource identifier resolved by the owning task. */
     string resource_id;
     /**
@@ -277,18 +277,18 @@ struct MeshContractMetadata {
 /**
  * @brief Mesh storage buffers matching the renderer's mesh binding contract.
  */
-struct MeshDescriptorIndices {
-    [wbe::descriptor("storage_buffer", "mesh_submeshes", "read")]
+struct MeshDescIndices {
+    [wbe::desc("storage_buffer", "mesh_submeshes", "read")]
     uint2 submeshes;
     /** Instance-local transforms, relative to the mesh transform. */
-    [wbe::descriptor("storage_buffer", "mesh_nodes", "read")]
+    [wbe::desc("storage_buffer", "mesh_nodes", "read")]
     uint2 nodes;
-    [wbe::descriptor("storage_buffer", "mesh_instances", "read")]
+    [wbe::desc("storage_buffer", "mesh_instances", "read")]
     uint2 instances;
 #ifdef WBE_MESH_TRANSFORM
     /** One NodeData holding the whole mesh's transform and normal transform. Only declared by shader variants that
      * define WBE_MESH_TRANSFORM, i.e. variants drawing placed (entity) meshes. */
-    [wbe::descriptor("storage_buffer", "mesh_transform", "read")]
+    [wbe::desc("storage_buffer", "mesh_transform", "read")]
     uint2 transform;
 #endif
 };
@@ -299,7 +299,7 @@ struct MeshDescriptorIndices {
  * @param p_mesh Mesh descriptor indices of the drawn mesh.
  * @param p_node_index Index into the mesh's node table, from InstanceData::node_index.
  */
-NodeData load_mesh_node(MeshDescriptorIndices p_mesh, uint p_node_index) {
+NodeData load_mesh_node(MeshDescIndices p_mesh, uint p_node_index) {
     StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[p_mesh.nodes.x];
     NodeData local_node = nodes[p_node_index];
 #ifdef WBE_MESH_TRANSFORM

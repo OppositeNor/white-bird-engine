@@ -1,0 +1,174 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#ifndef WBE_FILE_HEAP_ALLOC_ALIGNED_POOL_HH
+#define WBE_FILE_HEAP_ALLOC_ALIGNED_POOL_HH
+
+#include "core/alloc/heap_alloc_aligned.hh"
+#include "core/alloc/i_alloc.hh"
+#include "memory_chunk.hh"
+#include "utils/defs.hh"
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+
+namespace WhiteBirdEngine {
+
+template <>
+struct AllocTrait<class HeapAllocAlignedPool> final : public AllocTrait<HeapAllocAligned> {
+    WBE_TRAIT(AllocTrait<HeapAllocAlignedPool>);
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = false;
+    static constexpr bool WILL_ADDR_MOVE = false;
+
+    WBE_TRAIT_REQUIRES(AllocTraitConcept);
+};
+
+/**
+ * @class HeapAllocAlignedPool
+ * @brief Heap allocator pool with memory alignment support.
+ *
+ * @todo Test
+ */
+class HeapAllocAlignedPool final : public HeapAllocAligned {
+public:
+    HeapAllocAlignedPool() : HeapAllocAlignedPool(WBE_KI_B(64UL)) {
+    }
+    virtual ~HeapAllocAlignedPool() override;
+    HeapAllocAlignedPool(const HeapAllocAlignedPool&) = delete;
+    HeapAllocAlignedPool(HeapAllocAlignedPool&&) = delete;
+    HeapAllocAlignedPool& operator=(const HeapAllocAlignedPool&) = delete;
+    HeapAllocAlignedPool& operator=(HeapAllocAlignedPool&&) = delete;
+
+    using Header = uint64_t;
+
+    /**
+     * @brief The size of the allocated memory header.
+     */
+    static constexpr size_t HEADER_SIZE = WBE_DEFAULT_ALIGNMENT;
+
+    /**
+     * @brief The maximum total size that the allocator can contain.
+     */
+    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_size The total size of the pool.
+     */
+    HeapAllocAlignedPool(size_t p_size);
+
+    /**
+     * @brief Constructor using a range inside a memory chunk.
+     *
+     * @param p_memory_chunk The memory chunk to reference.
+     * @param p_start_offset The pool start offset in the memory chunk.
+     * @param p_size The size occupied by this pool.
+     */
+    HeapAllocAlignedPool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size);
+
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
+
+    virtual void deallocate(MemID p_mem) override;
+
+    virtual void* get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual void* try_get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual bool is_empty() const override {
+        return idle_list_head != nullptr && idle_list_head->size == size;
+    }
+
+    virtual void clear() override {
+        idle_list_head = std::make_unique<IdleListNode>();
+        idle_list_head->size = size;
+        idle_list_head->mem_start = mem_chunk;
+        idle_list_head->next = nullptr;
+    }
+
+    virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
+    }
+
+    /**
+     * @brief Get the total size of the pool.
+     *
+     * @return The total size of the pool.
+     */
+    size_t get_total_size() const {
+        return size;
+    }
+
+    /**
+     * @brief Get the total size of the free chunkes.
+     *
+     * @return The total size of the free chunks.
+     */
+    size_t get_remain_size() const;
+
+    /**
+     * @brief Check if a memory id belongs in this pool.
+     *
+     * @param p_mem_id The memory ID to check.
+     * @return True if it belongs to this pool, false otherwise.
+     */
+    bool is_in_pool(MemID p_mem_id) const;
+
+    virtual operator std::string() const override;
+
+    size_t get_internal_fragmentation_tracker() const {
+        return internal_fragmentation_tracker;
+    }
+
+private:
+    struct IdleListNode {
+        size_t size = 0;
+        char* mem_start = nullptr;
+        std::unique_ptr<IdleListNode> next = nullptr;
+    };
+
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    bool combine_idle_with_next(IdleListNode* p_node);
+    std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
+
+    MemoryChunk memory_chunk;
+    size_t size;
+    char* mem_chunk;
+    uint32_t idle_chunks_count;
+    std::unique_ptr<IdleListNode> idle_list_head;
+
+    size_t internal_fragmentation_tracker = 0;
+};
+
+} // namespace WhiteBirdEngine
+
+#endif

@@ -70,7 +70,7 @@ public:
      *
      * @return The difference between pair of render frames.
      */
-    virtual double get_render_delta() const = 0;
+    virtual double get_rend_delta() const = 0;
 
     /**
      * @brief Get the difference between pair of logic frames.
@@ -103,7 +103,7 @@ public:
      *
      * @param p_delta The delta time since last render frame.
      */
-    virtual void render_update(double p_delta) {};
+    virtual void rend_update(double p_delta) {};
 
     /**
      * @brief The function called every logic frame.

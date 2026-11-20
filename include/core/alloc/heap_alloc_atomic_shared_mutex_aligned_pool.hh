@@ -1,0 +1,184 @@
+/* Copyright 2025 OppositeNor
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+#ifndef WBE_FILE_HEAP_ALLOC_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_HH
+#define WBE_FILE_HEAP_ALLOC_ATOMIC_SHARED_MUTEX_ALIGNED_POOL_HH
+
+#include "boost/thread/pthread/shared_mutex.hpp"
+#include "core/alloc/heap_alloc_aligned.hh"
+#include "core/alloc/i_alloc.hh"
+#include "memory_chunk.hh"
+#include "utils/defs.hh"
+#include <boost/thread/lock_types.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+
+namespace WhiteBirdEngine {
+
+template <>
+struct AllocTrait<class HeapAllocAtomicSharedMutexAlignedPool> final : public AllocTrait<HeapAllocAligned> {
+    WBE_TRAIT(AllocTrait<HeapAllocAtomicSharedMutexAlignedPool>);
+    static constexpr bool IS_POOL = true;
+    static constexpr bool IS_GURANTEED_CONTINUOUS = false;
+    static constexpr bool IS_LIMITED_SIZE = true;
+    static constexpr bool IS_ALLOC_FIXED_SIZE = false;
+    static constexpr bool IS_ATOMIC = true;
+    static constexpr bool WILL_ADDR_MOVE = false;
+
+    WBE_TRAIT_REQUIRES(AllocTraitConcept);
+};
+
+/**
+ * @class HeapAllocAtomicSharedMutexAlignedPool
+ * @brief Heap allocator aligned pool atomic version.
+ *
+ */
+class HeapAllocAtomicSharedMutexAlignedPool final : public HeapAllocAligned {
+public:
+    HeapAllocAtomicSharedMutexAlignedPool() : HeapAllocAtomicSharedMutexAlignedPool(WBE_KI_B(64)) {
+    }
+    virtual ~HeapAllocAtomicSharedMutexAlignedPool() override;
+    HeapAllocAtomicSharedMutexAlignedPool(const HeapAllocAtomicSharedMutexAlignedPool&) = delete;
+    HeapAllocAtomicSharedMutexAlignedPool(HeapAllocAtomicSharedMutexAlignedPool&&) noexcept = delete;
+    HeapAllocAtomicSharedMutexAlignedPool& operator=(const HeapAllocAtomicSharedMutexAlignedPool&) = delete;
+    HeapAllocAtomicSharedMutexAlignedPool& operator=(HeapAllocAtomicSharedMutexAlignedPool&&) noexcept = delete;
+
+    using Header = uint64_t;
+
+    /**
+     * @brief The size of the allocated memory header.
+     */
+    static constexpr size_t HEADER_SIZE = WBE_DEFAULT_ALIGNMENT;
+
+    /**
+     * @brief The maximum total size that the allocator can contain.
+     */
+    static constexpr size_t MAX_TOTAL_SIZE = std::numeric_limits<Header>::max() >> 4;
+
+    /**
+     * @brief Constructor.
+     *
+     * @param p_size The total size of the pool.
+     */
+    HeapAllocAtomicSharedMutexAlignedPool(size_t p_size);
+
+    /**
+     * @brief Constructor using a range inside a memory chunk.
+     *
+     * @param p_memory_chunk The memory chunk to reference.
+     * @param p_start_offset The pool start offset in the memory chunk.
+     * @param p_size The size occupied by this pool.
+     */
+    HeapAllocAtomicSharedMutexAlignedPool(MemoryChunk p_memory_chunk, size_t p_start_offset, size_t p_size);
+
+    virtual MemID allocate(size_t p_size, size_t p_alignment = WBE_DEFAULT_ALIGNMENT) override;
+
+    virtual void deallocate(MemID p_mem) override;
+
+    virtual void* get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        WBE_DEBUG_ASSERT(is_in_pool(p_id));
+        // getting the resource is not protected by a lock. The user should
+        // protect a resource's use from allocation and deallocation by
+        // themselves.
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual void* try_get(MemID p_id) const override {
+        if (p_id == MEM_NULL) {
+            return nullptr;
+        }
+        return reinterpret_cast<void*>(p_id);
+    }
+
+    virtual bool is_empty() const override {
+        boost::shared_lock lock(mutex);
+        return is_empty_unguarded();
+    }
+
+    virtual void clear() override {
+        boost::unique_lock lock(mutex);
+        idle_list_head = std::make_unique<IdleListNode>();
+        idle_list_head->size = size;
+        idle_list_head->mem_start = mem_chunk;
+        idle_list_head->next = nullptr;
+    }
+
+    virtual size_t get_allocated_data_size(MemID p_mem_id) const override {
+        boost::shared_lock lock(mutex);
+        return *reinterpret_cast<Header*>((p_mem_id - HEADER_SIZE)) & MAX_TOTAL_SIZE;
+    }
+
+    size_t get_total_size() const {
+        boost::shared_lock lock(mutex);
+        return size;
+    }
+
+    size_t get_remain_size() const;
+
+    /**
+     * @brief Is the memory ID in this pool
+     *
+     * @param p_mem_id The memory ID to check.
+     * @return True if the memory ID belongs to this pool, false otherwise.
+     */
+    bool is_in_pool(MemID p_mem_id) const {
+        boost::shared_lock lock(mutex);
+        bool result = unguard_is_in_pool(p_mem_id);
+        return result;
+    }
+
+    virtual operator std::string() const override;
+
+    size_t get_internal_fragmentation_tracker() const {
+        boost::shared_lock lock(mutex);
+        return internal_fragmentation_tracker;
+    }
+
+private:
+    bool is_empty_unguarded() const {
+        return idle_list_head != nullptr && idle_list_head->size == size;
+    }
+
+    struct IdleListNode { // NOLINT
+        size_t size;
+        char* mem_start;
+        std::unique_ptr<IdleListNode> next = nullptr;
+    };
+
+    bool unguard_is_in_pool(MemID p_mem_id) const;
+
+    void* acquire_memory(std::unique_ptr<IdleListNode>& p_node, char* p_mem_start, size_t p_mem_size);
+    void insert_free_memory(IdleListNode* p_node_before_insert, char* p_insert_start, size_t p_insert_size);
+    bool combine_idle_with_next(IdleListNode* p_node);
+    std::unique_ptr<IdleListNode>& get_idle_node_before(void* p_loc);
+
+    MemoryChunk memory_chunk;
+    size_t size;
+    char* mem_chunk;
+    uint32_t idle_chunks_count;
+    std::unique_ptr<IdleListNode> idle_list_head;
+
+    size_t internal_fragmentation_tracker = 0;
+    mutable boost::shared_mutex mutex;
+};
+
+} // namespace WhiteBirdEngine
+
+#endif

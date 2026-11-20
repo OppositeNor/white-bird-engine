@@ -16,10 +16,10 @@
 #define WBE_FILE_I_POST_PROCESSING_HH
 
 #include "core/data/data_value.hh"
-#include "function/render/render_defs.hh"
-#include "function/render_vk/rend_graph_recipe_builder_vk.hh"
-#include "function/render_vk/render_graph_vk.hh"
-#include "function/render_vk/render_vk_defs.hh"
+#include "function/render/rend_defs.hh"
+#include "function/rend_vk/rend_graph_recipe_builder_vk.hh"
+#include "function/rend_vk/rend_graph_vk.hh"
+#include "function/rend_vk/rend_vk_defs.hh"
 #include <string>
 #include <string_view>
 
@@ -40,11 +40,11 @@ public:
     IPostProcessing() = delete;
     /**
      * @brief Constructor.
-     * @param p_allocator Allocator of the effect's tasks; must outlive the effect.
+     * @param p_alloc Allocator of the effect's tasks; must outlive the effect.
      * @param p_toggle_event_id Event id the effect's tasks receive RTToggleVK::Command events under; non-empty.
-     * @throws std::runtime_error If p_allocator is null or p_toggle_event_id is empty.
+     * @throws std::runtime_error If p_alloc is null or p_toggle_event_id is empty.
      */
-    IPostProcessing(RenderAllocator* p_allocator, std::string_view p_toggle_event_id);
+    IPostProcessing(RendAlloc* p_alloc, std::string_view p_toggle_event_id);
     virtual ~IPostProcessing() = default;
     IPostProcessing(const IPostProcessing&) = delete;
     IPostProcessing(IPostProcessing&&) = delete;
@@ -93,12 +93,12 @@ protected:
     /**
      * @brief Get the allocator of the effect's tasks.
      */
-    RenderAllocator* get_allocator() const {
-        return allocator;
+    RendAlloc* get_allocator() const {
+        return alloc;
     }
 
 private:
-    RenderAllocator* allocator = nullptr;
+    RendAlloc* alloc = nullptr;
     std::string toggle_event_id;
     bool enabled = false;
 };

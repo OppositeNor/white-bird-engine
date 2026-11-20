@@ -27,29 +27,29 @@
 /**
  * @brief Reflected descriptor-heap bindings of the debug draws.
  */
-struct OctreeDebugDrawDescriptorIndices {
+struct OctreeDebugDrawDescIndices {
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
-    [wbe::descriptor("storage_buffer", "octree_info", "read")]
+    [wbe::desc("storage_buffer", "octree_info", "read")]
     uint2 octree_info;
 #ifdef WBE_OCTREE_DEBUG_NODES
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_node_list", "read")]
+    [wbe::desc("storage_buffer", "octree_debug_node_list", "read")]
     uint2 node_list;
 #else
     /**
      * @brief Descriptor-heap reference to octree_debug_leaf_masks.
      */
-    [wbe::descriptor("storage_buffer", "octree_debug_leaf_masks", "read")]
+    [wbe::desc("storage_buffer", "octree_debug_leaf_masks", "read")]
     uint2 leaf_masks;
 #endif
     /**
      * @brief Descriptor-heap reference to the G-buffer camera.
      */
-    [wbe::descriptor("uniform_buffer", "gbuffer_camera_info")]
+    [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
     uint2 camera_info;
 };
 
@@ -68,7 +68,7 @@ struct OctreeDebugDrawVertexOutput {
 };
 
 [vk::push_constant]
-ConstantBuffer<OctreeDebugDrawDescriptorIndices> descriptor_indices;
+ConstantBuffer<OctreeDebugDrawDescIndices> di;
 
 /**
  * @brief Produces one of the eight corners of a leaf, a node, or the octree bounds without a vertex buffer.
@@ -76,15 +76,15 @@ ConstantBuffer<OctreeDebugDrawDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 OctreeDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[descriptor_indices.octree_info.x];
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
+    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[di.octree_info.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
     OctreeInfo info = octree_info_buffer[0];
 
     uint3 corner = get_octree_debug_cube_corner(p_vertex_id);
     float3 world_position;
     float4 color = float4(1.0);
 #ifdef WBE_OCTREE_DEBUG_NODES
-    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[descriptor_indices.node_list.x];
+    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
     uint level;
     uint3 node = get_octree_debug_node_entry(node_list[OCTREE_DEBUG_NODE_LIST_ENTRY_OFFSET + p_instance_id], level);
     world_position = get_octree_texel_corner(info, level, node, corner);
@@ -95,7 +95,7 @@ OctreeDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, ui
     uint3 grid_extent = get_octree_debug_subgrid_grid_extent(info.max_depth);
     uint subgrid_index = p_instance_id / OCTREE_DEBUG_SUBGRID_LEAF_COUNT;
     if (subgrid_index < grid_extent.x * grid_extent.y * grid_extent.z) {
-        StructuredBuffer<OctreeDebugSubgridMask> leaf_masks = ResourceDescriptorHeap[descriptor_indices.leaf_masks.x];
+        StructuredBuffer<OctreeDebugSubgridMask> leaf_masks = ResourceDescriptorHeap[di.leaf_masks.x];
         uint local_index = get_octree_debug_set_bit(leaf_masks[subgrid_index], p_instance_id % OCTREE_DEBUG_SUBGRID_LEAF_COUNT);
         uint3 voxel = get_octree_debug_subgrid(subgrid_index, grid_extent) * OCTREE_DEBUG_SUBGRID_EXTENT +
             get_octree_debug_subgrid_leaf(local_index);

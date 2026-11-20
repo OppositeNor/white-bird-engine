@@ -28,7 +28,7 @@ _HEADER = r'''
 #define WBE_ATTR(...) __attribute__((annotate(#__VA_ARGS__)))
 #define WBE_META(...) WBE_ATTR(WBE, __VA_ARGS__)
 namespace WhiteBirdEngine {
-struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_RENDER_TASK(compute),
+struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_REND_TASK(compute),
                 CUSTOM(factory(1, {2, 3}), "a, [b]"), WBE_SERIALIZATION_ALIASES(LegacyExample)) Example {
     WBE_META(WBE_REFLECT, RESOURCE_REF(buffer), WBE_SERIALIZATION_ALIASES(old_value))
     int value;
@@ -74,8 +74,8 @@ class MetaparserAttributesTest(unittest.TestCase):
                 parser.export()
 
             example, empty = sink.metadata.classes
-            self.assertIn("WBE_RENDER_TASK", example.attribute)
-            self.assertEqual(example.attribute_parameters["WBE_RENDER_TASK"], ["compute"])
+            self.assertIn("WBE_REND_TASK", example.attribute)
+            self.assertEqual(example.attribute_parameters["WBE_REND_TASK"], ["compute"])
             self.assertEqual(example.attribute_parameters["CUSTOM"], ['factory(1, {2, 3})', '"a, [b]"'])
             self.assertEqual(example.aliases, ["LegacyExample"])
             self.assertEqual(example.fields[0].attribute_parameters["RESOURCE_REF"], ["buffer"])

@@ -23,20 +23,20 @@
 #include "pixel_sort/pixel_sort_utils.slang"
 
 /** Descriptor indices of the resources used by the column prefix sum pass. */
-struct PrefixSumPixelSortColumnsDescriptorIndices {
+struct PrefixSumPixelSortColumnsDescIndices {
     /** Buffer holding the mask count of every line, summed in place. */
-    [wbe::descriptor("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
+    [wbe::desc("storage_buffer", "pixel_sort_column_offsets", "read_write")] uint2 column_offsets;
 };
 
 [vk::push_constant]
-ConstantBuffer<PrefixSumPixelSortColumnsDescriptorIndices> descriptor_indices;
+ConstantBuffer<PrefixSumPixelSortColumnsDescIndices> di;
 
 groupshared uint prefix_sum_scratch[64];
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[descriptor_indices.column_offsets.x];
+    RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[di.column_offsets.x];
     uint column_count = column_offsets[0];
     workgroup_general_prefix_scan<uint, Add<uint>, 64>(column_offsets, WBE_PIXEL_SORT_COLUMN_OFFSETS_START, column_count,
         p_group_thread_id.x, prefix_sum_scratch);

@@ -14,7 +14,7 @@
 */
 #include "function/render/shader_metadata_loader.hh"
 #include "core/parser/parser_json.hh"
-#include "function/render/render_resource_unit.hh"
+#include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_metadata.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "resource/resource_utils.hh"

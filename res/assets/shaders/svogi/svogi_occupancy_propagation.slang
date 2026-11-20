@@ -15,14 +15,14 @@
 
 #include "svogi/svogi_utils.slang"
 
-struct DescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "svo_info")]
+struct DescIndices {
+    [wbe::desc("uniform_buffer", "svo_info")]
     uint2 svo_info;
-    [wbe::descriptor("storage_buffer", "svo_node_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
     uint2 tree_nodes;
-    [wbe::descriptor("storage_buffer", "svo_leaf_buffer", "read")]
+    [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
     uint2 tree_leaves;
-    [wbe::descriptor("storage_buffer", "atlas", "read_write")]
+    [wbe::desc("storage_buffer", "atlas", "read_write")]
     uint2 atlas;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
@@ -34,7 +34,7 @@ struct DescriptorIndices {
 };
 
 [vk::push_constant]
-ConstantBuffer<DescriptorIndices> descriptor_indices;
+ConstantBuffer<DescIndices> di;
 
 // Propagates the occupancy one level up the tree, from the nodes at child_depth to their parents. The occupancy injection
 // writes the leaves and their parents at depth max_depth - 1, so this pass is dispatched once for each child_depth from
@@ -42,14 +42,14 @@ ConstantBuffer<DescriptorIndices> descriptor_indices;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint p_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[descriptor_indices.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[descriptor_indices.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[descriptor_indices.tree_leaves.x];
-    RWStructuredBuffer<float> occupancy = ResourceDescriptorHeap[descriptor_indices.atlas.x];
-    uint frame_slot = descriptor_indices.shader_debug_frame_slot;
+    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    RWStructuredBuffer<float> occupancy = ResourceDescriptorHeap[di.atlas.x];
+    uint frame_slot = di.shader_debug_frame_slot;
 
     SVOWriteBuffer<float> svo_occupancy =
         SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), occupancy);
     // Nodes are allocated in blocks of eight siblings, so the invocation of a block is responsible for their parent.
-    propagate_svo_occupancy(svo_occupancy, p_thread_id * 8, descriptor_indices.child_depth, frame_slot);
+    propagate_svo_occupancy(svo_occupancy, p_thread_id * 8, di.child_depth, frame_slot);
 }

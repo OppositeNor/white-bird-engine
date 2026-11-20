@@ -43,14 +43,14 @@ struct Vertex3DUnshadedInput {
 /**
  * @brief Constant buffer providing the per-frame view and projection matrices.
  */
-struct DrawCubeUnshadedDescriptorIndices {
-    [wbe::descriptor("uniform_buffer", "camera_info")]
+struct DrawCubeUnshadedDescIndices {
+    [wbe::desc("uniform_buffer", "camera_info")]
     uint2 camera_info;
-    MeshDescriptorIndices mesh;
+    MeshDescIndices mesh;
 };
 
 [vk::push_constant]
-ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
+ConstantBuffer<DrawCubeUnshadedDescIndices> di;
 
 /**
  * @brief Transform an unshaded mesh vertex into clip space.
@@ -60,10 +60,10 @@ ConstantBuffer<DrawCubeUnshadedDescriptorIndices> descriptor_indices;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[descriptor_indices.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[descriptor_indices.mesh.instances.x];
+    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
     InstanceData instance = instances[p_instance_id];
-    NodeData node = load_mesh_node(descriptor_indices.mesh, instance.node_index);
+    NodeData node = load_mesh_node(di.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
     VSOutput output;
     float4 view_position =

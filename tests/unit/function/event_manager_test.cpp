@@ -62,8 +62,8 @@ protected:
         global.reset();
     }
 
-    HeapAllocatorDefault* get_allocator() {
-        return global->engine_core->pool_allocator;
+    HeapAllocDefault* get_allocator() {
+        return global->engine_core->pool_alloc;
     }
 
     // The test global owns the singleton; every test gets a fresh one with its own global.
@@ -133,7 +133,7 @@ TEST_F(WBEEventManagerTest, RejectsEmptyEventId) {
 }
 
 // Runs without a test global, so no other EventManager exists.
-TEST(WBEEventManagerStandaloneTest, RejectsNullAllocator) {
+TEST(WBEEventManagerStandaloneTest, RejectsNullAlloc) {
     EXPECT_THROW(EventManager(nullptr), std::runtime_error);
     EXPECT_EQ(EventManager::get_singleton(), nullptr);
 }

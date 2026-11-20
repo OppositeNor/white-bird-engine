@@ -15,7 +15,7 @@
 #ifndef WBE_FILE_I_RESOURCE_CHUNK_HH
 #define WBE_FILE_I_RESOURCE_CHUNK_HH
 
-#include "core/allocator/i_allocator.hh"
+#include "core/alloc/i_alloc.hh"
 #include "core/memory/unique.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
@@ -91,7 +91,7 @@ public:
      *
      * @param p_res_size The size of the resource to push to.
      * @param p_res The pointer to the resource to be pushed into the chunk.
-     * @param p_allocator The allocator to allocate memory.
+     * @param p_alloc The allocator to allocate memory.
      * @return The result memory id.
      */
     virtual RefRes<char> push_data(size_t p_res_size, const void* p_res) = 0;

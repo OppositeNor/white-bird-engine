@@ -13,7 +13,7 @@
    limitations under the License.
 */
 #include "function/scene/scene_node.hh"
-#include "core/allocator/stl_allocator.hh"
+#include "core/alloc/stl_alloc.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
@@ -68,7 +68,7 @@ bool SceneNode::has_component(TypeID p_component_type_id) {
     return component_list != nullptr && component_list->contains(entity);
 }
 
-Vector<TypeID, HeapAllocatorDefault> SceneNode::get_component_type_ids() {
+Vector<TypeID, HeapAllocDefault> SceneNode::get_component_type_ids() {
     return world->get_component_type_ids(entity);
 }
 
