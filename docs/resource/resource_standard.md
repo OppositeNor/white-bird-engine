@@ -23,12 +23,12 @@ after checking that the manifest declares a top-level resource with that id, so 
 resource is checked at build time and always comes with its include.
 
 Manifests outside `res/res_chunks/` are processed only when a root chunk manifest reaches them through `require`. Every
-manifest must return a table with a `resources` array.
+manifest must return an array of resources.
 
 ## Manifest Layout
 
-A manifest is a Lua chunk that returns the manifest table: an optional `scope` and the `resources` array, one table per
-resource. Nested resources are tables in resource fields.
+A manifest is a Lua chunk that returns its array of resources, one table per resource. Nested resources are tables in
+resource fields.
 
 ACP evaluates manifests in a sandbox that exposes only the pure standard library (`string`, `table`, `math` without
 `random`, `utf8`, and the base functions without `load`, `dofile`, or `require` of arbitrary modules); there is no `io`,
@@ -45,32 +45,30 @@ integers and floats stay floats.
 local scripts = require("assets.scripts.teal.lua_scripts")
 
 return {
-    resources = {
-        {
-            id = "example_shader",
-            source_type = "shader",
-            src = "assets/shaders/example.slang",
-        },
-        {
-            id = "example_graph",
-            type = "rend_graph",
-            recipe = scripts.id("rend_graphs.draw_triangle"),
-        },
+    {
+        id = "example_shader",
+        source_type = "shader",
+        src = "assets/shaders/example.slang",
+    },
+    {
+        id = "example_graph",
+        type = "rend_graph",
+        recipe = scripts.id("rend_graphs.draw_triangle"),
     },
 }
 ```
 
-A manifest with no resources still returns `resources = {}`. Lua tables cannot hold nil; omit optional fields instead.
+A manifest with no resources returns `{}`. Lua tables cannot hold nil; omit optional fields instead.
 
 ## Resource Scope
 
-The optional `scope` field accepts `global` or `test_only`. The default is `global`.
+A scope is `global` or `test_only`. The default is `global`.
 Global resources are compiled into both deployment and test outputs. Test-only resources are
 compiled only when tests are enabled. ACP validates scope values, filters entries before
 compilation, and omits `scope` from runtime index files.
 
-Set `scope` on an individual resource entry, or on a whole manifest when all its resources
-and the manifests it requires are test-only. A test-only manifest is skipped for deployment. A global
+Set the `scope` field of an individual resource entry, or call `scope("test_only")` in a manifest when all its
+resources and the manifests it requires are test-only; a manifest calls `scope()` at most once. A test-only manifest is skipped for deployment. A global
 manifest may require a test-only manifest; ACP removes that include from deployment output.
 For a nested resource, keep it in the same scope as its containing resource.
 
@@ -122,15 +120,13 @@ absent name selects the default variant. The runtime variant table is sorted by 
 
 ```lua
 return {
-    resources = {
-        {
-            id = "example_shader",
-            source_type = "shader",
-            src = "assets/shaders/example.slang",
-            variants = {
-                { name = "default" },
-                { name = "mesh_transform", values = { { name = "WBE_MESH_TRANSFORM", value = "1" } } },
-            },
+    {
+        id = "example_shader",
+        source_type = "shader",
+        src = "assets/shaders/example.slang",
+        variants = {
+            { name = "default" },
+            { name = "mesh_transform", values = { { name = "WBE_MESH_TRANSFORM", value = "1" } } },
         },
     },
 }
@@ -150,15 +146,13 @@ Material resources fill shader-defined texture slots:
 
 ```lua
 return {
-    resources = {
-        {
-            id = "example_material",
-            type = "material",
-            textures = {
-                { texture_role = "albedo", texture_id = "example_albedo" },
-                { texture_role = "normal", texture_id = "example_normal" },
-                { texture_role = "rma", texture_id = "example_rma" },
-            },
+    {
+        id = "example_material",
+        type = "material",
+        textures = {
+            { texture_role = "albedo", texture_id = "example_albedo" },
+            { texture_role = "normal", texture_id = "example_normal" },
+            { texture_role = "rma", texture_id = "example_rma" },
         },
     },
 }
@@ -240,12 +234,10 @@ Scripts live under `res/assets/scripts/teal/` and are declared in `res/assets/sc
 
 ```lua
 return {
-    resources = {
-        {
-            id = "rend_graph_utils.rend_graph_utils",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl",
-        },
+    {
+        id = "rend_graph_utils.rend_graph_utils",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl",
     },
 }
 ```

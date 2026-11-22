@@ -12,20 +12,18 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "draw_triangle_shader",
-            source_type = "shader",
-            src = "assets/shaders/draw_triangle/draw_triangle.slang",
-        },
-        {
-            id = "draw_triangle_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "draw_triangle_shader",
-            fragment_stage_id = "draw_triangle_shader",
-            depth_test = false,
-            depth_write = false,
-            color_blend = false,
-        },
+    {
+        id = "draw_triangle_shader",
+        source_type = "shader",
+        src = "assets/shaders/draw_triangle/draw_triangle.slang",
+    },
+    {
+        id = "draw_triangle_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "draw_triangle_shader",
+        fragment_stage_id = "draw_triangle_shader",
+        depth_test = false,
+        depth_write = false,
+        color_blend = false,
     },
 }

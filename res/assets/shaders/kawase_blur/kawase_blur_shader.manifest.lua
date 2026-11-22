@@ -12,16 +12,14 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "kawase_blur_shader",
-            source_type = "shader",
-            src = "assets/shaders/kawase_blur/kawase_blur.slang",
-            -- Without the macro the blur writes pong; with it, ping.
-            variants = {
-                { name = "default" },
-                { name = "write_ping", values = { { name = "WBE_KAWASE_BLUR_WRITE_PING", value = "1" } } },
-            },
+    {
+        id = "kawase_blur_shader",
+        source_type = "shader",
+        src = "assets/shaders/kawase_blur/kawase_blur.slang",
+        -- Without the macro the blur writes pong; with it, ping.
+        variants = {
+            { name = "default" },
+            { name = "write_ping", values = { { name = "WBE_KAWASE_BLUR_WRITE_PING", value = "1" } } },
         },
     },
 }

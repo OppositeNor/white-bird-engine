@@ -12,21 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "draw_skinned_mesh_shader",
-            source_type = "shader",
-            src = "assets/shaders/draw_skinned_mesh/draw_skinned_mesh.slang",
-        },
-        {
-            id = "draw_skinned_mesh_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "draw_skinned_mesh_shader",
-            fragment_stage_id = "draw_skinned_mesh_shader",
-            depth_test = false,
-            depth_write = false,
-            color_blend = false,
-            cull_backfaces = false,
-        },
+    {
+        id = "draw_skinned_mesh_shader",
+        source_type = "shader",
+        src = "assets/shaders/draw_skinned_mesh/draw_skinned_mesh.slang",
+    },
+    {
+        id = "draw_skinned_mesh_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "draw_skinned_mesh_shader",
+        fragment_stage_id = "draw_skinned_mesh_shader",
+        depth_test = false,
+        depth_write = false,
+        color_blend = false,
+        cull_backfaces = false,
     },
 }

@@ -12,43 +12,41 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "default_material",
-            type = "material",
-            textures = {
-                {
-                    texture_role = "normal",
-                    texture = {
-                        source_type = "image_texture",
-                        src = "assets/images/default_normal.png",
-                        dst = "assets/textures/default_normal.ktx2",
-                        source_format = "rgb",
-                        target_format = "bc5",
-                        generate_mipmap = true,
-                    },
+    {
+        id = "default_material",
+        type = "material",
+        textures = {
+            {
+                texture_role = "normal",
+                texture = {
+                    source_type = "image_texture",
+                    src = "assets/images/default_normal.png",
+                    dst = "assets/textures/default_normal.ktx2",
+                    source_format = "rgb",
+                    target_format = "bc5",
+                    generate_mipmap = true,
                 },
-                {
-                    texture_role = "albedo",
-                    texture = {
-                        source_type = "image_texture",
-                        src = "assets/images/default_albedo.png",
-                        dst = "assets/textures/default_albedo.ktx2",
-                        source_format = "srgb",
-                        target_format = "bc7",
-                        generate_mipmap = true,
-                    },
+            },
+            {
+                texture_role = "albedo",
+                texture = {
+                    source_type = "image_texture",
+                    src = "assets/images/default_albedo.png",
+                    dst = "assets/textures/default_albedo.ktx2",
+                    source_format = "srgb",
+                    target_format = "bc7",
+                    generate_mipmap = true,
                 },
-                {
-                    texture_role = "rma",
-                    texture = {
-                        source_type = "image_texture",
-                        src = "assets/images/default_rma.png",
-                        dst = "assets/textures/default_rma.ktx2",
-                        source_format = "rgb",
-                        target_format = "bc7",
-                        generate_mipmap = true,
-                    },
+            },
+            {
+                texture_role = "rma",
+                texture = {
+                    source_type = "image_texture",
+                    src = "assets/images/default_rma.png",
+                    dst = "assets/textures/default_rma.ktx2",
+                    source_format = "rgb",
+                    target_format = "bc7",
+                    generate_mipmap = true,
                 },
             },
         },

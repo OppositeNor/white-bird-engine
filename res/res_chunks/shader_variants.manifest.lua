@@ -11,29 +11,28 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
+scope("test_only")
+
 return {
-    scope = "test_only",
-    resources = {
-        {
-            id = "shader_variants_shader",
-            source_type = "shader",
-            src = "assets/shaders/shader_variants/shader_variants.slang",
-            variants = {
-                { name = "scale_1", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "1" } } },
-                {
-                    name = "scale_1_extra",
-                    values = {
-                        { name = "WBE_SHADER_VARIANT_SCALE", value = "1" },
-                        { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
-                    },
+    {
+        id = "shader_variants_shader",
+        source_type = "shader",
+        src = "assets/shaders/shader_variants/shader_variants.slang",
+        variants = {
+            { name = "scale_1", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "1" } } },
+            {
+                name = "scale_1_extra",
+                values = {
+                    { name = "WBE_SHADER_VARIANT_SCALE", value = "1" },
+                    { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
                 },
-                { name = "scale_2", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "2" } }, default = true },
-                {
-                    name = "scale_2_extra",
-                    values = {
-                        { name = "WBE_SHADER_VARIANT_SCALE", value = "2" },
-                        { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
-                    },
+            },
+            { name = "scale_2", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "2" } }, default = true },
+            {
+                name = "scale_2_extra",
+                values = {
+                    { name = "WBE_SHADER_VARIANT_SCALE", value = "2" },
+                    { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
                 },
             },
         },

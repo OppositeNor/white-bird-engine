@@ -12,27 +12,25 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "svo_3_gather_leaves",
-            source_type = "shader",
-            src = "assets/shaders/svo_3/svo_gather_leaves.slang",
-        },
-        {
-            id = "svo_3_gather_leaves_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "svo_3_gather_leaves",
-            geometry_stage_id = "svo_3_gather_leaves",
-            fragment_stage_id = "svo_3_gather_leaves",
-            depth_test = false,
-            depth_write = false,
-            cull_backfaces = false,
-            conservative_rasterization = false,
-        },
-        {
-            id = "svo_3_prepare_leaves_shader",
-            source_type = "shader",
-            src = "assets/shaders/svo_3/svo_3_prepare_leaves.slang",
-        },
+    {
+        id = "svo_3_gather_leaves",
+        source_type = "shader",
+        src = "assets/shaders/svo_3/svo_gather_leaves.slang",
+    },
+    {
+        id = "svo_3_gather_leaves_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "svo_3_gather_leaves",
+        geometry_stage_id = "svo_3_gather_leaves",
+        fragment_stage_id = "svo_3_gather_leaves",
+        depth_test = false,
+        depth_write = false,
+        cull_backfaces = false,
+        conservative_rasterization = false,
+    },
+    {
+        id = "svo_3_prepare_leaves_shader",
+        source_type = "shader",
+        src = "assets/shaders/svo_3/svo_3_prepare_leaves.slang",
     },
 }

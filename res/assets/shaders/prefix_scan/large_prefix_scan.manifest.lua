@@ -25,7 +25,7 @@ local function scan_variants()
     }
 end
 
-local resources = {
+return {
     {
         id = "large_prefix_scan_prepare_dispatch",
         source_type = "shader",
@@ -57,4 +57,3 @@ local resources = {
         variants = scan_variants(),
     },
 }
-return { resources = resources }

@@ -11,13 +11,12 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
+scope("test_only")
+
 return {
-    scope = "test_only",
-    resources = {
-        {
-            id = "desc_heap_reflection_shader",
-            source_type = "shader",
-            src = "assets/shaders/desc_heap_reflection/desc_heap_reflection.slang",
-        },
+    {
+        id = "desc_heap_reflection_shader",
+        source_type = "shader",
+        src = "assets/shaders/desc_heap_reflection/desc_heap_reflection.slang",
     },
 }

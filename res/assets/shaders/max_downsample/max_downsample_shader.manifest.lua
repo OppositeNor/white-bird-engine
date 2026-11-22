@@ -12,11 +12,9 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "max_downsample_shader",
-            source_type = "shader",
-            src = "assets/shaders/max_downsample/max_downsample.slang",
-        },
+    {
+        id = "max_downsample_shader",
+        source_type = "shader",
+        src = "assets/shaders/max_downsample/max_downsample.slang",
     },
 }

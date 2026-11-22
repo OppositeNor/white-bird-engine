@@ -14,130 +14,128 @@
 -- Scripts. A script's resource id is its module name: its path under assets/scripts/teal, without the extension and
 -- with dots for slashes, so that `require("rend_graph_utils.rend_graph_utils")` finds both the resource and, in the editor, the file.
 return {
-    resources = {
-        {
-            id = "utils.math",
-            source_type = "script",
-            source_file = "assets/scripts/teal/utils/math.tl",
-        },
-        {
-            id = "rend_graph_utils.rend_graph_utils",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl",
-        },
-        -- Shared declarations generated from the graph API and reflected render-task parameters.
-        {
-            id = "rend_graph_utils.rend_graph",
-            source_type = "script",
-            source_file = "rend_graph_utils/rend_graph.tl",
-            path = "assets/scripts/teal/rend_graph_utils/rend_graph.lua",
-        },
-        -- Reflection generates this module into build/<target>/teal (templates/teal_rend_graph_tasks.tl.jinja), so its source
-        -- file is relative to that directory.
-        {
-            id = "rend_graph_utils.rend_graph_tasks",
-            source_type = "script",
-            source_file = "rend_graph_utils/rend_graph_tasks.tl",
-            path = "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua",
-        },
-        {
-            id = "rend_graph_utils.sort",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/sort.tl",
-        },
-        {
-            id = "rend_graph_utils.large_prefix_scan",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/large_prefix_scan.tl",
-        },
-        {
-            id = "rend_graph_utils.dedup_large",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/dedup_large.tl",
-        },
-        {
-            id = "rend_graph_utils.svo_3",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/svo_3.tl",
-        },
-        {
-            id = "rend_graphs.draw_triangle",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_triangle.tl",
-        },
-        {
-            id = "rend_graphs.draw_cube",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_cube.tl",
-        },
-        {
-            id = "rend_graphs.draw_sponza",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_sponza.tl",
-        },
-        {
-            id = "rend_graphs.draw_skinned_mesh",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_skinned_mesh.tl",
-        },
-        {
-            id = "rend_graphs.draw_cube_unshaded",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_cube_unshaded.tl",
-        },
-        {
-            id = "rend_graphs.draw_material_variants",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/draw_material_variants.tl",
-        },
-        {
-            id = "rend_graphs.pixel_sorting",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/pixel_sorting.tl",
-        },
-        {
-            id = "rend_graphs.deferred",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graphs/deferred.tl",
-        },
-        {
-            id = "rend_graph_utils.features.pixel_sort",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/features/pixel_sort.tl",
-        },
-        {
-            id = "rend_graph_utils.features.voxel_svo",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/features/voxel_svo.tl",
-        },
-        {
-            id = "rend_graph_utils.features.voxel_octree",
-            source_type = "script",
-            source_file = "assets/scripts/teal/rend_graph_utils/features/voxel_octree.tl",
-        },
-        {
-            id = "tests.teal_math",
-            source_type = "script",
-            source_file = "assets/scripts/teal/tests/teal_math.tl",
-            scope = "test_only",
-        },
-        {
-            id = "tests.teal_recipe",
-            source_type = "script",
-            source_file = "assets/scripts/teal/tests/teal_recipe.tl",
-            scope = "test_only",
-        },
-        {
-            id = "tests.teal_graph_api",
-            source_type = "script",
-            source_file = "assets/scripts/teal/tests/teal_graph_api.tl",
-            scope = "test_only",
-        },
-        {
-            id = "tests.teal_svo_3",
-            source_type = "script",
-            source_file = "assets/scripts/teal/tests/teal_svo_3.tl",
-            scope = "test_only",
-        },
+    {
+        id = "utils.math",
+        source_type = "script",
+        source_file = "assets/scripts/teal/utils/math.tl",
+    },
+    {
+        id = "rend_graph_utils.rend_graph_utils",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/rend_graph_utils.tl",
+    },
+    -- Shared declarations generated from the graph API and reflected render-task parameters.
+    {
+        id = "rend_graph_utils.rend_graph",
+        source_type = "script",
+        source_file = "rend_graph_utils/rend_graph.tl",
+        path = "assets/scripts/teal/rend_graph_utils/rend_graph.lua",
+    },
+    -- Reflection generates this module into build/<target>/teal (templates/teal_rend_graph_tasks.tl.jinja), so its source
+    -- file is relative to that directory.
+    {
+        id = "rend_graph_utils.rend_graph_tasks",
+        source_type = "script",
+        source_file = "rend_graph_utils/rend_graph_tasks.tl",
+        path = "assets/scripts/teal/rend_graph_utils/rend_graph_tasks.lua",
+    },
+    {
+        id = "rend_graph_utils.sort",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/sort.tl",
+    },
+    {
+        id = "rend_graph_utils.large_prefix_scan",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/large_prefix_scan.tl",
+    },
+    {
+        id = "rend_graph_utils.dedup_large",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/dedup_large.tl",
+    },
+    {
+        id = "rend_graph_utils.svo_3",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/svo_3.tl",
+    },
+    {
+        id = "rend_graphs.draw_triangle",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_triangle.tl",
+    },
+    {
+        id = "rend_graphs.draw_cube",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_cube.tl",
+    },
+    {
+        id = "rend_graphs.draw_sponza",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_sponza.tl",
+    },
+    {
+        id = "rend_graphs.draw_skinned_mesh",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_skinned_mesh.tl",
+    },
+    {
+        id = "rend_graphs.draw_cube_unshaded",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_cube_unshaded.tl",
+    },
+    {
+        id = "rend_graphs.draw_material_variants",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/draw_material_variants.tl",
+    },
+    {
+        id = "rend_graphs.pixel_sorting",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/pixel_sorting.tl",
+    },
+    {
+        id = "rend_graphs.deferred",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graphs/deferred.tl",
+    },
+    {
+        id = "rend_graph_utils.features.pixel_sort",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/features/pixel_sort.tl",
+    },
+    {
+        id = "rend_graph_utils.features.voxel_svo",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/features/voxel_svo.tl",
+    },
+    {
+        id = "rend_graph_utils.features.voxel_octree",
+        source_type = "script",
+        source_file = "assets/scripts/teal/rend_graph_utils/features/voxel_octree.tl",
+    },
+    {
+        id = "tests.teal_math",
+        source_type = "script",
+        source_file = "assets/scripts/teal/tests/teal_math.tl",
+        scope = "test_only",
+    },
+    {
+        id = "tests.teal_recipe",
+        source_type = "script",
+        source_file = "assets/scripts/teal/tests/teal_recipe.tl",
+        scope = "test_only",
+    },
+    {
+        id = "tests.teal_graph_api",
+        source_type = "script",
+        source_file = "assets/scripts/teal/tests/teal_graph_api.tl",
+        scope = "test_only",
+    },
+    {
+        id = "tests.teal_svo_3",
+        source_type = "script",
+        source_file = "assets/scripts/teal/tests/teal_svo_3.tl",
+        scope = "test_only",
     },
 }

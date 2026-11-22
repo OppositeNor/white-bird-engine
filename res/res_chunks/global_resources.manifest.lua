@@ -22,6 +22,4 @@ require("assets.shaders.svogi.svogi")
 require("assets.materials.default_material")
 require("res_chunks.test_global_resources")
 
-return {
-    resources = {},
-}
+return {}

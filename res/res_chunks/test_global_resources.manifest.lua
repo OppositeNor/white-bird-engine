@@ -11,6 +11,7 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
+scope("test_only")
 
 require("assets.meshes.triangle")
 require("assets.images.test_images")
@@ -34,17 +35,14 @@ require("assets.scripts.teal.lua_scripts")
 require("assets.rend_graphs.rend_graphs")
 
 return {
-    scope = "test_only",
-    resources = {
-        {
-            id = "test_text",
-            source_type = "text",
-            source_file = "test_text_files/test_file_utf8.txt",
-        },
-        {
-            id = "test_script",
-            source_type = "script",
-            source_file = "test_scripts/test_script.lua",
-        },
+    {
+        id = "test_text",
+        source_type = "text",
+        source_file = "test_text_files/test_file_utf8.txt",
+    },
+    {
+        id = "test_script",
+        source_type = "script",
+        source_file = "test_scripts/test_script.lua",
     },
 }

@@ -25,7 +25,7 @@ MANIFEST_HELPER_PACKAGE = "manifest_utils"
 # change another's, and require loads helper modules through the host's resolver, once per loader, and hands every other
 # name to the host's manifest require.
 _SANDBOX_SOURCE = r"""
-local resolve_module, require_manifest = ...
+local resolve_module, require_manifest, set_scope = ...
 local load = load
 
 local function copy(source, excluded)
@@ -60,6 +60,7 @@ local function make_environment(require_function)
         environment[name] = copy(library)
     end
     environment.require = require_function
+    environment.scope = set_scope
     environment._G = environment
     return environment
 end
@@ -112,7 +113,7 @@ class ManifestRecord:
     """An evaluated manifest.
 
     Attributes:
-        data: The converted table the manifest returns.
+        data: The manifest's ``resources`` array, the converted value it returns, and its ``scope`` when it sets one.
         includes: Resource-root-relative paths of the manifests it requires, in the order of their first require.
         resource_ids: The ids of its top-level resources.
     """
@@ -124,7 +125,8 @@ class ManifestRecord:
 class LuaManifestLoader:
     """Evaluates resource manifests written in Lua in a sandbox, as the plain data the ACP processes.
 
-    A manifest ``<path>.manifest.lua`` is a Lua chunk returning a table with ``resources`` and optionally ``scope``. The
+    A manifest ``<path>.manifest.lua`` is a Lua chunk returning its array of resources. Calling ``scope(<scope>)`` sets
+    the manifest's scope, which also applies to the manifests it requires. The
     sandbox exposes only the pure standard library: no ``io``, ``os``, ``debug``, ``package``, ``load``, ``dofile``,
     ``math.random``, or ``string.dump``, so evaluating a manifest is deterministic.
 
@@ -154,8 +156,9 @@ class LuaManifestLoader:
         self._records: dict[str, ManifestRecord] = {}
         self._evaluating: list[str] = []
         self._pending_includes: dict[str, list[str]] = {}
+        self._pending_scopes: dict[str, Any] = {}
         self._lua = lupa.lua55.LuaRuntime(unpack_returned_tuples=True, register_eval=False, register_builtins=False)
-        self._run = self._lua.execute(_SANDBOX_SOURCE, self._resolve_module, self._require_manifest)
+        self._run = self._lua.execute(_SANDBOX_SOURCE, self._resolve_module, self._require_manifest, self._set_scope)
 
     def evaluate(self, manifest_rel_path: str) -> ManifestRecord:
         """Evaluate a manifest, and every manifest it requires, once.
@@ -185,14 +188,24 @@ class LuaManifestLoader:
         finally:
             self._evaluating.pop()
             includes = self._pending_includes.pop(manifest_rel_path)
-        data = self._to_python(result, manifest_rel_path, "<manifest>")
-        if not isinstance(data, dict) or not isinstance(data.get("resources"), list):
-            raise RuntimeError(f"WBEACP: Manifest {manifest_rel_path} must return a table with a resources array.")
-        resource_ids = {resource["id"] for resource in data["resources"]
+            scope = self._pending_scopes.pop(manifest_rel_path, None)
+        resources = self._to_python(result, manifest_rel_path, "<manifest>")
+        if not isinstance(resources, list):
+            raise RuntimeError(f"WBEACP: Manifest {manifest_rel_path} must return an array of resources.")
+        data: dict[str, Any] = {"resources": resources}
+        if scope is not None:
+            data["scope"] = scope
+        resource_ids = {resource["id"] for resource in resources
                         if isinstance(resource, dict) and isinstance(resource.get("id"), str)}
         record = ManifestRecord(data=data, includes=includes, resource_ids=resource_ids)
         self._records[manifest_rel_path] = record
         return record
+
+    def _set_scope(self, scope: Any) -> None:
+        manifest_rel_path = self._evaluating[-1]
+        if manifest_rel_path in self._pending_scopes:
+            raise RuntimeError(f"WBEACP: Manifest {manifest_rel_path} sets its scope more than once.")
+        self._pending_scopes[manifest_rel_path] = scope
 
     def _require_manifest(self, name: str) -> Any:
         requirer = self._evaluating[-1]

@@ -12,18 +12,16 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "test_sine_stereo",
-            source_type = "audio",
-            source_file = "assets/audio/test_sine_stereo.wav",
-            is_stream = false,
-        },
-        {
-            id = "test_sine_mono_stream",
-            source_type = "audio",
-            source_file = "assets/audio/test_sine_mono.ogg",
-            is_stream = true,
-        },
+    {
+        id = "test_sine_stereo",
+        source_type = "audio",
+        source_file = "assets/audio/test_sine_stereo.wav",
+        is_stream = false,
+    },
+    {
+        id = "test_sine_mono_stream",
+        source_type = "audio",
+        source_file = "assets/audio/test_sine_mono.ogg",
+        is_stream = true,
     },
 }

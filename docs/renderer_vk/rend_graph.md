@@ -11,13 +11,11 @@ engine's are in `res/assets/rend_graphs/rend_graphs.manifest.lua`. It is immutab
 
 ```lua
 return {
-    resources = {
-        {
-            id = "scene_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.scene",
-            parameters = { bloom_blur_pass_count = 8 },
-        },
+    {
+        id = "scene_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.scene",
+        parameters = { bloom_blur_pass_count = 8 },
     },
 }
 ```

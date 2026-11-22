@@ -11,13 +11,12 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
+scope("test_only")
+
 return {
-    scope = "test_only",
-    resources = {
-        {
-            id = "reflection_attributes_shader",
-            source_type = "shader",
-            src = "assets/shaders/reflection_attributes/reflection_attributes.slang",
-        },
+    {
+        id = "reflection_attributes_shader",
+        source_type = "shader",
+        src = "assets/shaders/reflection_attributes/reflection_attributes.slang",
     },
 }

@@ -15,54 +15,52 @@
 -- and the recipe's static `parameters`; applications acquire instances of a definition with their runtime bindings
 -- (IRenderer::acquire_rend_graph()).
 return {
-    resources = {
-        {
-            id = "draw_triangle_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_triangle",
-        },
-        {
-            id = "draw_cube_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_cube",
-        },
-        {
-            id = "draw_cube_unshaded_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_cube_unshaded",
-        },
-        {
-            id = "draw_material_variants_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_material_variants",
-        },
-        {
-            id = "draw_sponza_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_sponza",
-        },
-        {
-            id = "draw_skinned_mesh_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.draw_skinned_mesh",
-        },
-        {
-            id = "pixel_sorting_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.pixel_sorting",
-        },
-        -- The deferred test's two graphs differ only in how they filter shadows.
-        {
-            id = "deferred_mipmap_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.deferred",
-            parameters = { summed_area_table = false, bloom_blur_pass_count = 4 },
-        },
-        {
-            id = "deferred_summed_area_table_graph",
-            type = "rend_graph",
-            recipe = "rend_graphs.deferred",
-            parameters = { summed_area_table = true, bloom_blur_pass_count = 4 },
-        },
+    {
+        id = "draw_triangle_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_triangle",
+    },
+    {
+        id = "draw_cube_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_cube",
+    },
+    {
+        id = "draw_cube_unshaded_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_cube_unshaded",
+    },
+    {
+        id = "draw_material_variants_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_material_variants",
+    },
+    {
+        id = "draw_sponza_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_sponza",
+    },
+    {
+        id = "draw_skinned_mesh_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.draw_skinned_mesh",
+    },
+    {
+        id = "pixel_sorting_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.pixel_sorting",
+    },
+    -- The deferred test's two graphs differ only in how they filter shadows.
+    {
+        id = "deferred_mipmap_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.deferred",
+        parameters = { summed_area_table = false, bloom_blur_pass_count = 4 },
+    },
+    {
+        id = "deferred_summed_area_table_graph",
+        type = "rend_graph",
+        recipe = "rend_graphs.deferred",
+        parameters = { summed_area_table = true, bloom_blur_pass_count = 4 },
     },
 }

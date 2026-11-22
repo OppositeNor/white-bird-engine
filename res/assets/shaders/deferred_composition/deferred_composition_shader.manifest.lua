@@ -12,54 +12,52 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "shadow_moments_summed_area_table_horizontal_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.slang",
+    {
+        id = "shadow_moments_summed_area_table_horizontal_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.slang",
+    },
+    {
+        id = "shadow_moments_summed_area_table_vertical_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.slang",
+    },
+    {
+        id = "direct_lighting_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/direct_lighting.slang",
+        -- WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS filters the shadow moments through their summed-area table.
+        variants = {
+            { name = "default" },
+            { name = "summed_area_table_shadow_moments", values = { { name = "WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS", value = "1" } } },
         },
-        {
-            id = "shadow_moments_summed_area_table_vertical_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.slang",
+    },
+    {
+        id = "indirect_lighting_rsm_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
+        -- WBE_VOXEL_DEBUG_VIEW outputs the voxel debug view instead of the indirect lighting.
+        variants = {
+            { name = "default" },
+            { name = "voxel_debug_view", values = { { name = "WBE_VOXEL_DEBUG_VIEW", value = "1" } } },
         },
-        {
-            id = "direct_lighting_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/direct_lighting.slang",
-            -- WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS filters the shadow moments through their summed-area table.
-            variants = {
-                { name = "default" },
-                { name = "summed_area_table_shadow_moments", values = { { name = "WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS", value = "1" } } },
-            },
-        },
-        {
-            id = "indirect_lighting_rsm_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
-            -- WBE_VOXEL_DEBUG_VIEW outputs the voxel debug view instead of the indirect lighting.
-            variants = {
-                { name = "default" },
-                { name = "voxel_debug_view", values = { { name = "WBE_VOXEL_DEBUG_VIEW", value = "1" } } },
-            },
-        },
-        {
-            id = "combine_lighting_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/combine_lighting.slang",
-        },
-        {
-            id = "present_post_processing_shader",
-            source_type = "shader",
-            src = "assets/shaders/deferred_composition/present_post_processing.slang",
-        },
-        {
-            id = "present_post_processing",
-            type = "graphics_pipeline",
-            vertex_stage_id = "present_post_processing_shader",
-            fragment_stage_id = "present_post_processing_shader",
-            depth_test = false,
-            depth_write = false,
-        },
+    },
+    {
+        id = "combine_lighting_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/combine_lighting.slang",
+    },
+    {
+        id = "present_post_processing_shader",
+        source_type = "shader",
+        src = "assets/shaders/deferred_composition/present_post_processing.slang",
+    },
+    {
+        id = "present_post_processing",
+        type = "graphics_pipeline",
+        vertex_stage_id = "present_post_processing_shader",
+        fragment_stage_id = "present_post_processing_shader",
+        depth_test = false,
+        depth_write = false,
     },
 }

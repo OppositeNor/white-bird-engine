@@ -356,8 +356,8 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 
 ## Resource Pipeline / ACP
 
-- ACP source manifests are Lua chunks named `<name>.manifest.lua` that `return` the manifest table (`resources` and an optional
-  `scope`); there are no TOML manifests. `LuaManifestLoader` (`build_script/resource/acp/manifest_loader_lua.py`)
+- ACP source manifests are Lua chunks named `<name>.manifest.lua` that `return` their array of resources, and may call
+  `scope(<scope>)` once to set the manifest's scope; there are no TOML manifests. `LuaManifestLoader` (`build_script/resource/acp/manifest_loader_lua.py`)
   evaluates them in a sandbox with only the pure standard library (no `io`, `os`, `debug`, `package`, `load`, `dofile`,
   `math.random`, or `string.dump`), so evaluation is deterministic; compute declarations with ordinary Lua instead of
   copying them. ACP output stays JSON: source `<path>.manifest.lua` is emitted as runtime `<path>.json`, and runtime code
@@ -375,8 +375,8 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - ACP root manifest discovery starts only from `res/res_chunks/**/*.manifest.lua`.
 - Do not make ACP scan every manifest under a resource tree.
 - Manifest files outside `res_chunks` are processed only when a root chunk manifest reaches them through `require`, and
-  only the `require` calls that run count. Every manifest must return a `resources` array.
-- `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest to skip everything it requires, or on an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
+  only the `require` calls that run count. Every manifest must return an array of resources.
+- `scope` defaults to `global`. `global` resources compile for both deployment and tests; `test_only` resources compile only with tests enabled. Scope may be set on a manifest with `scope(<scope>)`, which also skips everything it requires, or as the `scope` field of an individual resource. ACP validates scopes, filters before compiling, and removes scope from runtime manifests.
 - `wbe-utils-model-compiler` owns final mesh and material resource shaping. Keep `acp_compiler_model.py` limited to ACP path/schema
   adaptation; do not normalize compiled material textures in the ACP adapter.
 - Mesh SDFs (`sdf_config` on `model`, `static_geometry`, and `mesh`) are emitted by the model compiler's `MeshSDFBuilder`

@@ -12,20 +12,18 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "main_pipeline_shader",
-            source_type = "shader",
-            src = "assets/shaders/main_pipeline/main_pipeline.slang",
-        },
-        {
-            id = "main_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "main_pipeline_shader",
-            fragment_stage_id = "main_pipeline_shader",
-            depth_test = true,
-            depth_write = true,
-            color_blend = false,
-        },
+    {
+        id = "main_pipeline_shader",
+        source_type = "shader",
+        src = "assets/shaders/main_pipeline/main_pipeline.slang",
+    },
+    {
+        id = "main_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "main_pipeline_shader",
+        fragment_stage_id = "main_pipeline_shader",
+        depth_test = true,
+        depth_write = true,
+        color_blend = false,
     },
 }

@@ -12,32 +12,30 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "draw_cube_unshaded_shader",
-            source_type = "shader",
-            src = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.slang",
-        },
-        {
-            id = "draw_cube_unshaded_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "draw_cube_unshaded_shader",
-            fragment_stage_id = "draw_cube_unshaded_shader",
-            fragment_stage_entry = "fragment_main",
-            depth_test = false,
-            depth_write = false,
-            color_blend = false,
-        },
-        -- Draws materials of the "tinted" pipeline variant (rend_graphs.draw_material_variants).
-        {
-            id = "draw_cube_unshaded_tinted_pipeline",
-            type = "graphics_pipeline",
-            vertex_stage_id = "draw_cube_unshaded_shader",
-            fragment_stage_id = "draw_cube_unshaded_shader",
-            fragment_stage_entry = "fragment_tinted_main",
-            depth_test = false,
-            depth_write = false,
-            color_blend = false,
-        },
+    {
+        id = "draw_cube_unshaded_shader",
+        source_type = "shader",
+        src = "assets/shaders/draw_cube_unshaded/draw_cube_unshaded.slang",
+    },
+    {
+        id = "draw_cube_unshaded_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "draw_cube_unshaded_shader",
+        fragment_stage_id = "draw_cube_unshaded_shader",
+        fragment_stage_entry = "fragment_main",
+        depth_test = false,
+        depth_write = false,
+        color_blend = false,
+    },
+    -- Draws materials of the "tinted" pipeline variant (rend_graphs.draw_material_variants).
+    {
+        id = "draw_cube_unshaded_tinted_pipeline",
+        type = "graphics_pipeline",
+        vertex_stage_id = "draw_cube_unshaded_shader",
+        fragment_stage_id = "draw_cube_unshaded_shader",
+        fragment_stage_entry = "fragment_tinted_main",
+        depth_test = false,
+        depth_write = false,
+        color_blend = false,
     },
 }

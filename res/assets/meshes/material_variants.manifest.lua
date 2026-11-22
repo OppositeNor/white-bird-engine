@@ -11,54 +11,52 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
+-- The compiled cube's geometry split into two submeshes that share its binaries: the first three faces use a material of the
+-- default pipeline variant and the last three a material of the "tinted" variant, so one draw task draws them with two
+-- pipelines.
 return {
-    -- The compiled cube's geometry split into two submeshes that share its binaries: the first three faces use a material of the
-    -- default pipeline variant and the last three a material of the "tinted" variant, so one draw task draws them with two
-    -- pipelines.
-    resources = {
-        {
-            id = "material_variants.tinted_material",
-            type = "material",
-            textures = {},
-            pipeline_variant = "tinted",
-        },
-        {
-            id = "material_variants.cube",
-            source_type = "mesh",
-            submeshes = {
-                {
-                    material_id = "model_cube_static.material.Cube",
-                    aabb = { center = { 0.0, 0.0, 0.0 }, width = 2.0, height = 2.0, depth = 2.0 },
-                    indices = { binary = { binary_id = "model_cube_static.indices", start = 0, size = 72 } },
-                    vertex_bindings = {
-                        {
-                            binary = { binary_id = "model_cube_static.vertices", start = 0, size = 1344 },
-                            stride = 56,
-                            attributes = {
-                                { offset = 0, role = "position", type = "vec3" },
-                                { offset = 12, role = "normal", type = "vec3" },
-                                { offset = 24, role = "tangent", type = "vec3" },
-                                { offset = 36, role = "bitangent", type = "vec3" },
-                                { offset = 48, role = "uv", type = "vec2" },
-                            },
+    {
+        id = "material_variants.tinted_material",
+        type = "material",
+        textures = {},
+        pipeline_variant = "tinted",
+    },
+    {
+        id = "material_variants.cube",
+        source_type = "mesh",
+        submeshes = {
+            {
+                material_id = "model_cube_static.material.Cube",
+                aabb = { center = { 0.0, 0.0, 0.0 }, width = 2.0, height = 2.0, depth = 2.0 },
+                indices = { binary = { binary_id = "model_cube_static.indices", start = 0, size = 72 } },
+                vertex_bindings = {
+                    {
+                        binary = { binary_id = "model_cube_static.vertices", start = 0, size = 1344 },
+                        stride = 56,
+                        attributes = {
+                            { offset = 0, role = "position", type = "vec3" },
+                            { offset = 12, role = "normal", type = "vec3" },
+                            { offset = 24, role = "tangent", type = "vec3" },
+                            { offset = 36, role = "bitangent", type = "vec3" },
+                            { offset = 48, role = "uv", type = "vec2" },
                         },
                     },
                 },
-                {
-                    material_id = "material_variants.tinted_material",
-                    aabb = { center = { 0.0, 0.0, 0.0 }, width = 2.0, height = 2.0, depth = 2.0 },
-                    indices = { binary = { binary_id = "model_cube_static.indices", start = 72, size = 72 } },
-                    vertex_bindings = {
-                        {
-                            binary = { binary_id = "model_cube_static.vertices", start = 0, size = 1344 },
-                            stride = 56,
-                            attributes = {
-                                { offset = 0, role = "position", type = "vec3" },
-                                { offset = 12, role = "normal", type = "vec3" },
-                                { offset = 24, role = "tangent", type = "vec3" },
-                                { offset = 36, role = "bitangent", type = "vec3" },
-                                { offset = 48, role = "uv", type = "vec2" },
-                            },
+            },
+            {
+                material_id = "material_variants.tinted_material",
+                aabb = { center = { 0.0, 0.0, 0.0 }, width = 2.0, height = 2.0, depth = 2.0 },
+                indices = { binary = { binary_id = "model_cube_static.indices", start = 72, size = 72 } },
+                vertex_bindings = {
+                    {
+                        binary = { binary_id = "model_cube_static.vertices", start = 0, size = 1344 },
+                        stride = 56,
+                        attributes = {
+                            { offset = 0, role = "position", type = "vec3" },
+                            { offset = 12, role = "normal", type = "vec3" },
+                            { offset = 24, role = "tangent", type = "vec3" },
+                            { offset = 36, role = "bitangent", type = "vec3" },
+                            { offset = 48, role = "uv", type = "vec2" },
                         },
                     },
                 },

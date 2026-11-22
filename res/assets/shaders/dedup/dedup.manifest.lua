@@ -12,21 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "dedup_large_prepare_dispatch",
-            source_type = "shader",
-            src = "assets/shaders/dedup/dedup_large_prepare_dispatch.slang",
-        },
-        {
-            id = "dedup_large_mark",
-            source_type = "shader",
-            src = "assets/shaders/dedup/dedup_large_mark.slang",
-        },
-        {
-            id = "dedup_large_scatter",
-            source_type = "shader",
-            src = "assets/shaders/dedup/dedup_large_scatter.slang",
-        },
+    {
+        id = "dedup_large_prepare_dispatch",
+        source_type = "shader",
+        src = "assets/shaders/dedup/dedup_large_prepare_dispatch.slang",
+    },
+    {
+        id = "dedup_large_mark",
+        source_type = "shader",
+        src = "assets/shaders/dedup/dedup_large_mark.slang",
+    },
+    {
+        id = "dedup_large_scatter",
+        source_type = "shader",
+        src = "assets/shaders/dedup/dedup_large_scatter.slang",
     },
 }

@@ -12,68 +12,66 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "model_cube",
-            source_type = "model",
-            source_file = "assets/models/Cube/glTF/Cube.gltf",
-            combine_nodes = true,
-            texture_output_dir = "assets/textures",
-            texture_config = {
-                default = { target_format = "bc7", generate_mipmap = true },
-                roles = { normal = { target_format = "bc5", generate_mipmap = true } },
-            },
+    {
+        id = "model_cube",
+        source_type = "model",
+        source_file = "assets/models/Cube/glTF/Cube.gltf",
+        combine_nodes = true,
+        texture_output_dir = "assets/textures",
+        texture_config = {
+            default = { target_format = "bc7", generate_mipmap = true },
+            roles = { normal = { target_format = "bc5", generate_mipmap = true } },
         },
-        {
-            id = "model_cube_static",
-            source_type = "static_geometry",
-            source_files = { "assets/models/Cube/glTF/Cube.gltf" },
-            texture_output_dir = "assets/textures",
-            texture_config = {
-                default = { target_format = "bc7", generate_mipmap = true },
-                roles = { normal = { target_format = "bc5", generate_mipmap = true } },
-            },
+    },
+    {
+        id = "model_cube_static",
+        source_type = "static_geometry",
+        source_files = { "assets/models/Cube/glTF/Cube.gltf" },
+        texture_output_dir = "assets/textures",
+        texture_config = {
+            default = { target_format = "bc7", generate_mipmap = true },
+            roles = { normal = { target_format = "bc5", generate_mipmap = true } },
         },
-        {
-            id = "sponza",
-            source_type = "static_geometry",
-            source_files = { "assets/models/Sponza/glTF/Sponza.gltf" },
-            texture_output_dir = "assets/textures",
-            texture_config = {
-                default = { target_format = "bc7", generate_mipmap = true },
-                roles = { normal = { target_format = "bc5", generate_mipmap = true } },
-            },
+    },
+    {
+        id = "sponza",
+        source_type = "static_geometry",
+        source_files = { "assets/models/Sponza/glTF/Sponza.gltf" },
+        texture_output_dir = "assets/textures",
+        texture_config = {
+            default = { target_format = "bc7", generate_mipmap = true },
+            roles = { normal = { target_format = "bc5", generate_mipmap = true } },
         },
-        {
-            id = "intel_sponza",
-            source_type = "static_geometry",
-            source_files = { "assets/models/IntelSponza/NewSponza_Main_glTF_003.gltf" },
-            texture_output_dir = "assets/textures",
-            texture_config = {
-                default = { target_format = "bc7", generate_mipmap = true },
-                roles = { normal = { target_format = "bc5", generate_mipmap = true } },
-            },
+    },
+    {
+        id = "intel_sponza",
+        source_type = "static_geometry",
+        source_files = { "assets/models/IntelSponza/NewSponza_Main_glTF_003.gltf" },
+        texture_output_dir = "assets/textures",
+        texture_config = {
+            default = { target_format = "bc7", generate_mipmap = true },
+            roles = { normal = { target_format = "bc5", generate_mipmap = true } },
         },
-        {
-            id = "intel_sponza_with_curtains",
-            source_type = "static_geometry",
-            source_files = {
-                "assets/models/IntelSponza/NewSponza_Main_glTF_003.gltf",
-                "assets/models/IntelSponzaCurtains/NewSponza_Curtains_glTF.gltf",
-            },
-            texture_output_dir = "assets/textures",
-            texture_config = {
-                default = { target_format = "bc7", generate_mipmap = true },
-                roles = { normal = { target_format = "bc5", generate_mipmap = true } },
-            },
+    },
+    {
+        id = "intel_sponza_with_curtains",
+        source_type = "static_geometry",
+        source_files = {
+            "assets/models/IntelSponza/NewSponza_Main_glTF_003.gltf",
+            "assets/models/IntelSponzaCurtains/NewSponza_Curtains_glTF.gltf",
         },
-        {
-            id = "model_simple_skin",
-            source_type = "model",
-            source_file = "assets/models/SimpleSkin/glTF/SimpleSkin.gltf",
-            combine_nodes = true,
-            texture_output_dir = "assets/textures",
-            texture_config = { default = { target_format = "bc7", generate_mipmap = true } },
+        texture_output_dir = "assets/textures",
+        texture_config = {
+            default = { target_format = "bc7", generate_mipmap = true },
+            roles = { normal = { target_format = "bc5", generate_mipmap = true } },
         },
+    },
+    {
+        id = "model_simple_skin",
+        source_type = "model",
+        source_file = "assets/models/SimpleSkin/glTF/SimpleSkin.gltf",
+        combine_nodes = true,
+        texture_output_dir = "assets/textures",
+        texture_config = { default = { target_format = "bc7", generate_mipmap = true } },
     },
 }

@@ -12,11 +12,9 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "bloom_shader_extract",
-            source_type = "shader",
-            src = "assets/shaders/bloom/bloom_extract.slang",
-        },
+    {
+        id = "bloom_shader_extract",
+        source_type = "shader",
+        src = "assets/shaders/bloom/bloom_extract.slang",
     },
 }

@@ -12,21 +12,19 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "svogi_occupancy_injection",
-            source_type = "shader",
-            src = "assets/shaders/svogi/svogi_occupancy_injection.slang",
-        },
-        {
-            id = "svogi_radiance_injection",
-            source_type = "shader",
-            src = "assets/shaders/svogi/svogi_radiance_injection.slang",
-        },
-        {
-            id = "svogi_occupancy_propagation",
-            source_type = "shader",
-            src = "assets/shaders/svogi/svogi_occupancy_propagation.slang",
-        },
+    {
+        id = "svogi_occupancy_injection",
+        source_type = "shader",
+        src = "assets/shaders/svogi/svogi_occupancy_injection.slang",
+    },
+    {
+        id = "svogi_radiance_injection",
+        source_type = "shader",
+        src = "assets/shaders/svogi/svogi_radiance_injection.slang",
+    },
+    {
+        id = "svogi_occupancy_propagation",
+        source_type = "shader",
+        src = "assets/shaders/svogi/svogi_occupancy_propagation.slang",
     },
 }

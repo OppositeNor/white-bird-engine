@@ -148,7 +148,7 @@ Trace the exact raw Slang JSON first; do not infer layout from Slang source alon
 1. Normalize the new property in the narrowest helper of `acp_compiler_shader.py`.
 2. If runtime consumers need it, add a serializable field in `shader_metadata.hh`; let the build regenerate serialization.
 3. Cover deserialization in `tests/unit/function/shader_metadata_vk_test.cpp` with a small normalized JSON and, when Slang
-   behavior matters, a compiled fixture under `res/assets/shaders` reached from `res/res_chunks` (`scope = "test_only"`).
+   behavior matters, a compiled fixture under `res/assets/shaders` reached from a `res/res_chunks` manifest that calls `scope("test_only")`.
 4. Put semantic validation in a backend-neutral resolver; use `ShaderMetadataQuery` for uniqueness and
    `ShaderRoleFieldResolver` for roles.
 5. For a Vulkan descriptor, extend `ShaderDescHeapTypeVK` and the field handling in `shader_metadata_vk_utils.cpp`,

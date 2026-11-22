@@ -12,289 +12,287 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 return {
-    resources = {
-        {
-            id = "radix_sort_histogram_workgroup_process_0_8",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
-                },
+    {
+        id = "radix_sort_histogram_workgroup_process_0_8",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
             },
         },
-        {
-            id = "radix_sort_histogram_workgroup_process_8_16",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
-                },
+    },
+    {
+        id = "radix_sort_histogram_workgroup_process_8_16",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
             },
         },
-        {
-            id = "radix_sort_histogram_workgroup_process_16_24",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
-                },
+    },
+    {
+        id = "radix_sort_histogram_workgroup_process_16_24",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
             },
         },
-        {
-            id = "radix_sort_histogram_workgroup_process_24_32",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
-                },
+    },
+    {
+        id = "radix_sort_histogram_workgroup_process_24_32",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
             },
         },
-        {
-            id = "radix_sort_histogram_prefix_sum",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_prefix_sum.slang",
-        },
-        {
-            id = "radix_sort_histogram_overflow_prefix_sum",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.slang",
-        },
-        {
-            id = "radix_sort_histogram_add_overflow",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_histogram_add_overflow.slang",
-        },
-        {
-            id = "radix_sort_prepare_dispatch",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_prepare_dispatch.slang",
-        },
-        {
-            id = "radix_sort_scatter_0_8",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
-                },
+    },
+    {
+        id = "radix_sort_histogram_prefix_sum",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_prefix_sum.slang",
+    },
+    {
+        id = "radix_sort_histogram_overflow_prefix_sum",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.slang",
+    },
+    {
+        id = "radix_sort_histogram_add_overflow",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_histogram_add_overflow.slang",
+    },
+    {
+        id = "radix_sort_prepare_dispatch",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_prepare_dispatch.slang",
+    },
+    {
+        id = "radix_sort_scatter_0_8",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
             },
         },
-        {
-            id = "radix_sort_scatter_8_16",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
-                },
+    },
+    {
+        id = "radix_sort_scatter_8_16",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
             },
         },
-        {
-            id = "radix_sort_scatter_16_24",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
-                },
+    },
+    {
+        id = "radix_sort_scatter_16_24",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
             },
         },
-        {
-            id = "radix_sort_scatter_24_32",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
-                },
+    },
+    {
+        id = "radix_sort_scatter_24_32",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_0_8",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_0_8",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_8_16",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_8_16",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_16_24",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_16_24",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_24_32",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_24_32",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_32_40",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "32" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_32_40",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "32" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_40_48",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "40" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_40_48",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "40" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_48_56",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "48" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_48_56",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "48" } },
             },
         },
-        {
-            id = "radix_sort_uint2_histogram_workgroup_process_56_64",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "56" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_histogram_workgroup_process_56_64",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "56" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_0_8",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_0_8",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "0" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_8_16",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_8_16",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "8" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_16_24",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_16_24",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "16" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_24_32",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_24_32",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "24" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_32_40",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "32" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_32_40",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "32" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_40_48",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "40" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_40_48",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "40" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_48_56",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "48" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_48_56",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "48" } },
             },
         },
-        {
-            id = "radix_sort_uint2_scatter_56_64",
-            source_type = "shader",
-            src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
-            variants = {
-                {
-                    name = "default",
-                    values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "56" } },
-                },
+    },
+    {
+        id = "radix_sort_uint2_scatter_56_64",
+        source_type = "shader",
+        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        variants = {
+            {
+                name = "default",
+                values = { { name = "WBE_RADIX_HISTOGRAM_BIT_REGION", value = "56" } },
             },
         },
     },
