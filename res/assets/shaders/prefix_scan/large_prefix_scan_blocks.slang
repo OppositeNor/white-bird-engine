@@ -24,7 +24,7 @@ struct DescIndices {
 [vk::push_constant]
 ConstantBuffer<DescIndices> di;
 
-groupshared uint block[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE];
+groupshared WBE_PREFIX_SCAN_TYPE block[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE];
 
 // First pass of the large prefix scan; see large_prefix_scan_blocks(). Must be dispatched with one workgroup per block.
 [shader("compute")]

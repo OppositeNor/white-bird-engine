@@ -22,7 +22,7 @@ struct DescIndices {
 [vk::push_constant]
 ConstantBuffer<DescIndices> di;
 
-groupshared uint section_totals[WBE_LARGE_PREFIX_SCAN_SECTION_NUM];
+groupshared WBE_PREFIX_SCAN_TYPE section_totals[WBE_LARGE_PREFIX_SCAN_SECTION_NUM];
 
 // Third pass of the large prefix scan; see large_prefix_scan_totals(). Must be dispatched with exactly one workgroup.
 [shader("compute")]

@@ -27,7 +27,7 @@ struct DescIndices {
 [vk::push_constant]
 ConstantBuffer<DescIndices> di;
 
-groupshared uint scratch[WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE];
+groupshared WBE_PREFIX_SCAN_TYPE scratch[WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE];
 
 // Second pass of the large prefix scan; see large_prefix_scan_sections(). Must be dispatched with exactly
 // WBE_LARGE_PREFIX_SCAN_SECTION_NUM workgroups.
