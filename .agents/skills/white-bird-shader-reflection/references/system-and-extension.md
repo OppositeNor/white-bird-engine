@@ -2,13 +2,14 @@
 
 ## Pipeline map
 
-1. A shader entry in an ACP manifest supplies `src`, and optionally `stage` and `entry` (both or neither) and `macros`
-   (`{ name, value? }`), which select shader variants. Its SPIR-V and metadata outputs are derived next to the source as
-   `<source stem>.<id>.spv` and `.json`; declaring `dst` or `metadata` is an error.
+1. A shader entry in an ACP manifest supplies `src`, and optionally `stage` and `entry` (both or neither) and `variants`
+   (`{ name, values = { { name, value }, ... }, default? }`, each compiled separately and selected by name; see
+   `docs/resource/resource_standard.md`). Its SPIR-V and metadata outputs are derived next to the source as
+   `<source stem>.<id>[.<variant name>].spv` and `.json`.
 2. `build_script/resource/acp/acp_compiler_shader.py` runs `slangc` from `PATH` with profile
    `spirv_1_6+spvDescriptorHeapEXT+vk_mem_model` (shaders under `sort/` or `pixel_sort/` temporarily omit `vk_mem_model`),
    include paths `res/assets/shaders` and `res/assets/shaders/utils`, `-DWBE_SHADER_DEBUG` when the target enables shader
-   debug, `-g3` when tests are generated, and the resource's macros. Output is validated with `spirv-val`.
+   debug, `-g3` when tests are generated, and the variant's macros. Output is validated with `spirv-val`.
 3. A second temporary compile with `WBE_REFLECTION_METADATA=1` lets reflection-only declarations contribute metadata
    without entering the runtime shader. Slang's JSON is normalized into the snake-case schema of
    `include/function/render/shader_metadata.hh`.

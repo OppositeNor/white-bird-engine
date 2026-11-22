@@ -39,7 +39,10 @@ return {
             source_type = "shader",
             src = "assets/shaders/svo/svo_deferred_count_reset.slang",
             -- Without the macro the reset clears the pong count; with it, the ping count.
-            macros = { { macro = "WBE_RESET_PING_COUNT", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "reset_ping_count", values = { { name = "WBE_RESET_PING_COUNT", value = "1" } } },
+            },
         },
         {
             id = "svo_build_deferred_propagation_pong_write_shader",
@@ -50,15 +53,22 @@ return {
             id = "svo_build_deferred_propagation_ping_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
-            macros = { { macro = "WBE_USE_PING_WRITE", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_USE_PING_WRITE", value = "1" } },
+                },
+            },
         },
         {
             id = "svo_dynamic_build_static_mesh",
             source_type = "shader",
             src = "assets/shaders/svo/svo_build_static_mesh.slang",
-            macros = {
-                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
-                { macro = "WBE_MESH_TRANSFORM", options = { "1" } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_DYNAMIC_BUILD", value = "1" }, { name = "WBE_MESH_TRANSFORM", value = "1" } },
+                },
             },
         },
         {
@@ -75,15 +85,22 @@ return {
             id = "svo_dynamic_build_deferred_propagation_pong_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
-            macros = { { macro = "WBE_DYNAMIC_BUILD", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_DYNAMIC_BUILD", value = "1" } },
+                },
+            },
         },
         {
             id = "svo_dynamic_build_deferred_propagation_ping_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
-            macros = {
-                { macro = "WBE_USE_PING_WRITE", options = { "1" } },
-                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_USE_PING_WRITE", value = "1" }, { name = "WBE_DYNAMIC_BUILD", value = "1" } },
+                },
             },
         },
         {
@@ -106,9 +123,17 @@ return {
             source_type = "shader",
             src = "assets/shaders/svo/svo_debug_draw.slang",
             -- WBE_SVO_DEBUG_DRAW_SOLID draws shaded faces instead of edges; WBE_SVO_DEBUG_DRAW_OCCUPANCY colors by occupancy.
-            macros = {
-                { macro = "WBE_SVO_DEBUG_DRAW_SOLID", options = { "1" }, optional = true },
-                { macro = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", options = { "1" }, optional = true },
+            variants = {
+                { name = "default" },
+                { name = "solid", values = { { name = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" } } },
+                { name = "occupancy", values = { { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" } } },
+                {
+                    name = "solid_occupancy",
+                    values = {
+                        { name = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" },
+                        { name = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" },
+                    },
+                },
             },
         },
         {
@@ -125,9 +150,9 @@ return {
             id = "svo_debug_draw_solid_pipeline",
             type = "graphics_pipeline",
             vertex_stage_id = "svo_debug_draw_shader",
-            vertex_stage_variant = { { macro = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" } },
+            vertex_stage_variant = "solid",
             fragment_stage_id = "svo_debug_draw_shader",
-            fragment_stage_variant = { { macro = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" } },
+            fragment_stage_variant = "solid",
             depth_test = true,
             depth_write = true,
             cull_backfaces = false,
@@ -137,9 +162,9 @@ return {
             id = "svo_debug_draw_occupancy_pipeline",
             type = "graphics_pipeline",
             vertex_stage_id = "svo_debug_draw_shader",
-            vertex_stage_variant = { { macro = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" } },
+            vertex_stage_variant = "occupancy",
             fragment_stage_id = "svo_debug_draw_shader",
-            fragment_stage_variant = { { macro = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" } },
+            fragment_stage_variant = "occupancy",
             depth_test = true,
             depth_write = false,
             cull_backfaces = false,
@@ -149,15 +174,9 @@ return {
             id = "svo_debug_draw_solid_occupancy_pipeline",
             type = "graphics_pipeline",
             vertex_stage_id = "svo_debug_draw_shader",
-            vertex_stage_variant = {
-                { macro = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" },
-                { macro = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" },
-            },
+            vertex_stage_variant = "solid_occupancy",
             fragment_stage_id = "svo_debug_draw_shader",
-            fragment_stage_variant = {
-                { macro = "WBE_SVO_DEBUG_DRAW_OCCUPANCY", value = "1" },
-                { macro = "WBE_SVO_DEBUG_DRAW_SOLID", value = "1" },
-            },
+            fragment_stage_variant = "solid_occupancy",
             depth_test = true,
             depth_write = true,
             cull_backfaces = false,

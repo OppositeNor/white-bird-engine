@@ -28,14 +28,20 @@ return {
             source_type = "shader",
             src = "assets/shaders/deferred_composition/direct_lighting.slang",
             -- WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS filters the shadow moments through their summed-area table.
-            macros = { { macro = "WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "summed_area_table_shadow_moments", values = { { name = "WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS", value = "1" } } },
+            },
         },
         {
             id = "indirect_lighting_rsm_shader",
             source_type = "shader",
             src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
             -- WBE_VOXEL_DEBUG_VIEW outputs the voxel debug view instead of the indirect lighting.
-            macros = { { macro = "WBE_VOXEL_DEBUG_VIEW", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "voxel_debug_view", values = { { name = "WBE_VOXEL_DEBUG_VIEW", value = "1" } } },
+            },
         },
         {
             id = "combine_lighting_shader",

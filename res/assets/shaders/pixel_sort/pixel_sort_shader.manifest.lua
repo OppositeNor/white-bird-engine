@@ -22,13 +22,23 @@ return {
             id = "count_pixel_sort_mask_vertical_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "0" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "0" } },
+                },
+            },
         },
         {
             id = "count_pixel_sort_mask_horizontal_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "1" } },
+                },
+            },
         },
         {
             id = "prefix_sum_pixel_sort_columns_shader",
@@ -39,25 +49,45 @@ return {
             id = "register_pixel_sort_keys_vertical_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "0" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "0" } },
+                },
+            },
         },
         {
             id = "register_pixel_sort_keys_horizontal_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "1" } },
+                },
+            },
         },
         {
             id = "write_sorted_pixels_vertical_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/write_sorted_pixels.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "0" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "0" } },
+                },
+            },
         },
         {
             id = "write_sorted_pixels_horizontal_shader",
             source_type = "shader",
             src = "assets/shaders/pixel_sort/write_sorted_pixels.slang",
-            macros = { { macro = "WBE_PIXEL_SORT_HORIZONTAL", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_PIXEL_SORT_HORIZONTAL", value = "1" } },
+                },
+            },
         },
         {
             id = "pixel_sorting_post_processing_shader",

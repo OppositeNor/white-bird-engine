@@ -457,20 +457,13 @@ function graph.graphics_pipeline(resource_key: string, resource_description?: wb
     return registered_resource(resource_key, "WhiteBirdEngine::ROGraphicsPipelineVK", registration)
 end
 
--- A compute pipeline compiled from a variant of the shader shader_key. Without a variant (the shader's default variant)
--- it is registered under shader_key; with one, under shader_key followed by its macro values sorted by macro,
--- `<shader_key>[<macro>=<value>,...]`, so the variants of one shader are distinct registrations.
-function graph.shader_compute_pipeline(shader_key: string, variant?: {wbe.ShaderMacroValue}): graph.Resource
-    if variant == nil or #variant == 0 then
+-- A compute pipeline compiled from a variant of the shader shader_key. The default variant is registered under
+-- shader_key, and a named one under `<shader_key>[<variant>]`, so the variants of one shader are distinct registrations.
+function graph.shader_compute_pipeline(shader_key: string, variant?: string): graph.Resource
+    if variant == nil or variant == "" then
         return graph.compute_pipeline(shader_key, { shader = shader_key })
     end
-    local definitions: {string} = {}
-    for _, macro_value in ipairs(variant) do
-        definitions[#definitions + 1] = macro_value.macro .. "=" .. macro_value.value
-    end
-    table.sort(definitions)
-    local key = shader_key .. "[" .. table.concat(definitions, ",") .. "]"
-    return graph.compute_pipeline(key, { shader = shader_key, variant = variant })
+    return graph.compute_pipeline(shader_key .. "[" .. variant .. "]", { shader = shader_key, variant = variant })
 end
 
 -- A resource of a custom description type, registered under resource_key: type_name is the reflected name of the

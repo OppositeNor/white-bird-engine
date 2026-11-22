@@ -18,7 +18,6 @@
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
-#include "function/render/shader_variant_resolver.hh"
 #include "global/global.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "test_global.hh"
@@ -40,7 +39,9 @@ RefRes<RUShader> make_test_shader(StackAlloc& p_alloc, std::string_view p_metada
     MemID variant_memory = p_alloc.allocate(sizeof(RUShaderVariant));
     std::memset(p_alloc.get(variant_memory), 0, sizeof(RUShaderVariant));
     RefRes<RUShaderVariant> variant(variant_memory, &p_alloc);
-    variant->key = ShaderVariantResolver().make_key({});
+    MemID name_memory = p_alloc.allocate(sizeof("default"));
+    std::memcpy(p_alloc.get(name_memory), "default", sizeof("default"));
+    variant->name = RefRes<char>(name_memory, &p_alloc);
     if (!p_metadata_path.empty()) {
         MemID path_memory = p_alloc.allocate(p_metadata_path.size() + 1);
         auto* path_storage = static_cast<char*>(p_alloc.get(path_memory));

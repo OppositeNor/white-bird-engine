@@ -14,7 +14,6 @@
 */
 #include "core/memory/reference_strong.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/render/shader_macro_value.hh"
 #include "function/render/shader_metadata.hh"
 #include "function/render/shader_metadata_loader.hh"
 #include "function/render/shader_metadata_query.hh"
@@ -31,22 +30,21 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace WhiteBirdEngine {
 
 namespace {
 
-const std::vector<ShaderMacroDeclaration> DECLARATIONS = {
-    ShaderMacroDeclaration{.macro = "SCALE", .options = {"1", "2"}, .optional = false},
-    ShaderMacroDeclaration{.macro = "EXTRA", .options = {"1"}, .optional = true},
-    ShaderMacroDeclaration{.macro = "FIXED", .options = {"7"}, .optional = false},
-};
-
 struct TestVariant {
-    HashCode key = 0;
+    std::string_view name;
     int value = 0;
 };
+
+std::string_view get_test_variant_name(const TestVariant& p_variant) {
+    return p_variant.name;
+}
 
 bool has_field(const ShaderMetadataParameter& p_parameter, std::string_view p_name) {
     return std::ranges::any_of(p_parameter.type.fields, [p_name](const ShaderMetadataTypeField& p_field) {
@@ -56,51 +54,16 @@ bool has_field(const ShaderMetadataParameter& p_parameter, std::string_view p_na
 
 } // namespace
 
-TEST(WBEShaderVariantResolverTest, KeysFollowTheChainedHashOfSortedMacros) {
+TEST(WBEShaderVariantResolverTest, FindsVariantsByNameAndEmptyNamesAsTheDefault) {
     const ShaderVariantResolver resolver;
-    HashCode expected = dynam_hash(std::string_view("A"));
-    expected = dynam_hash_append(expected, "=");
-    expected = dynam_hash_append(expected, "1");
-    expected = dynam_hash_append(expected, ",");
-    expected = dynam_hash_append(expected, "B");
-    expected = dynam_hash_append(expected, "=");
-    expected = dynam_hash_append(expected, "2");
+    const std::vector<TestVariant> variants = {{.name = "a", .value = 1}, {.name = "b", .value = 2}, {.name = "c", .value = 3}};
+    const std::span<const TestVariant> table(variants);
 
-    EXPECT_EQ(resolver.make_key({{.macro = "B", .value = "2"}, {.macro = "A", .value = "1"}}), expected);
-    EXPECT_EQ(resolver.make_key({{.macro = "A", .value = "1"}, {.macro = "B", .value = "2"}}), expected);
-    EXPECT_EQ(resolver.make_key({}), dynam_hash(std::string_view()));
-}
-
-TEST(WBEShaderVariantResolverTest, FillsOptionalAndSingleOptionDefaults) {
-    const ShaderVariantResolver resolver;
-
-    EXPECT_EQ(resolver.resolve_key(DECLARATIONS, {{.macro = "SCALE", .value = "2"}}),
-        resolver.make_key({{.macro = "SCALE", .value = "2"}, {.macro = "FIXED", .value = "7"}}));
-    EXPECT_EQ(resolver.resolve_key(DECLARATIONS, {{.macro = "EXTRA", .value = "1"}, {.macro = "SCALE", .value = "1"}}),
-        resolver.make_key({{.macro = "SCALE", .value = "1"}, {.macro = "EXTRA", .value = "1"}, {.macro = "FIXED", .value = "7"}}));
-    EXPECT_EQ(resolver.resolve_key({}, {}), resolver.make_key({}));
-}
-
-TEST(WBEShaderVariantResolverTest, RejectsInvalidSelections) {
-    const ShaderVariantResolver resolver;
-
-    // SCALE has several options, so it must be selected.
-    EXPECT_THROW((void)resolver.resolve_key(DECLARATIONS, {}), std::runtime_error);
-    EXPECT_THROW((void)resolver.resolve_key(DECLARATIONS, {{.macro = "SCALE", .value = "1"}, {.macro = "UNKNOWN", .value = "1"}}),
-        std::runtime_error);
-    EXPECT_THROW((void)resolver.resolve_key(DECLARATIONS, {{.macro = "SCALE", .value = "3"}}), std::runtime_error);
-    EXPECT_THROW((void)resolver.resolve_key(DECLARATIONS, {{.macro = "SCALE", .value = "1"}, {.macro = "SCALE", .value = "2"}}),
-        std::runtime_error);
-}
-
-TEST(WBEShaderVariantResolverTest, FindsKeysByBinarySearch) {
-    const ShaderVariantResolver resolver;
-    const std::vector<TestVariant> variants = {{.key = 3, .value = 30}, {.key = 5, .value = 50}, {.key = 9, .value = 90}};
-
-    EXPECT_EQ(resolver.find(std::span<const TestVariant>(variants), 5, "test").value, 50);
-    EXPECT_EQ(resolver.find(std::span<const TestVariant>(variants), 9, "test").value, 90);
-    EXPECT_THROW((void)resolver.find(std::span<const TestVariant>(variants), 4, "test"), std::runtime_error);
-    EXPECT_THROW((void)resolver.find(std::span<const TestVariant>(variants), 10, "test"), std::runtime_error);
+    EXPECT_EQ(resolver.find(table, 1, "a", get_test_variant_name, "test").value, 1);
+    EXPECT_EQ(resolver.find(table, 1, "c", get_test_variant_name, "test").value, 3);
+    EXPECT_EQ(resolver.find(table, 1, "", get_test_variant_name, "test").value, 2);
+    EXPECT_THROW((void)resolver.find(table, 1, "d", get_test_variant_name, "test"), std::runtime_error);
+    EXPECT_THROW((void)resolver.find(table, 1, "0", get_test_variant_name, "test"), std::runtime_error);
 }
 
 class WBEShaderVariantResourceTest : public ::testing::Test {
@@ -123,49 +86,37 @@ protected:
     RefRes<RUShader> shader;
 };
 
-TEST_F(WBEShaderVariantResourceTest, LoadsEveryMacroCombinationSortedByKey) {
+TEST_F(WBEShaderVariantResourceTest, LoadsEveryVariantSortedByName) {
     ASSERT_NE(shader, nullptr);
-    // SCALE in {1, 2} times EXTRA in {undefined, 1}.
     ASSERT_EQ(shader->variant_count, 4);
     std::span<const RUShaderVariant> variants = shader->get_variants();
-    for (size_t i = 1; i < variants.size(); ++i) {
-        EXPECT_LT(variants[i - 1].key, variants[i].key);
-    }
+    EXPECT_STREQ(variants[0].name.get(), "scale_1");
+    EXPECT_STREQ(variants[1].name.get(), "scale_1_extra");
+    EXPECT_STREQ(variants[2].name.get(), "scale_2");
+    EXPECT_STREQ(variants[3].name.get(), "scale_2_extra");
     for (const RUShaderVariant& variant : variants) {
         EXPECT_NE(variant.data, nullptr);
         EXPECT_GT(variant.size, 0);
     }
-    const std::vector<ShaderMacroDeclaration> declarations = shader->get_macro_declarations();
-    ASSERT_EQ(declarations.size(), 2);
-    EXPECT_EQ(declarations[0].macro, "WBE_SHADER_VARIANT_SCALE");
-    EXPECT_EQ(declarations[0].options, (std::vector<std::string>{"1", "2"}));
-    EXPECT_FALSE(declarations[0].optional);
-    EXPECT_EQ(declarations[1].macro, "WBE_SHADER_VARIANT_EXTRA");
-    EXPECT_TRUE(declarations[1].optional);
 }
 
-TEST_F(WBEShaderVariantResourceTest, SelectsVariantsByMacroValues) {
+TEST_F(WBEShaderVariantResourceTest, SelectsVariantsByName) {
     ASSERT_NE(shader, nullptr);
-    const RUShaderVariant& scale_1 = shader->get_variant({{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "1"}});
-    const RUShaderVariant& scale_2 = shader->get_variant({{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "2"}});
-    const RUShaderVariant& scale_2_extra = shader->get_variant(
-        {{.macro = "WBE_SHADER_VARIANT_EXTRA", .value = "1"}, {.macro = "WBE_SHADER_VARIANT_SCALE", .value = "2"}});
+    const RUShaderVariant& scale_1 = shader->get_variant("scale_1");
+    const RUShaderVariant& scale_2 = shader->get_variant("scale_2");
 
-    EXPECT_NE(&scale_1, &scale_2);
-    EXPECT_NE(&scale_2, &scale_2_extra);
-    EXPECT_EQ(&scale_2_extra,
-        &shader->get_variant({{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "2"}, {.macro = "WBE_SHADER_VARIANT_EXTRA", .value = "1"}}));
-    // The scale has two options, so the default selection names no variant.
-    EXPECT_THROW((void)shader->get_variant(), std::runtime_error);
-    EXPECT_THROW((void)shader->get_variant({{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "3"}}), std::runtime_error);
+    EXPECT_STREQ(scale_1.name.get(), "scale_1");
+    EXPECT_STREQ(scale_2.name.get(), "scale_2");
+    // scale_2 carries the default tag, though it is not the first variant.
+    EXPECT_EQ(&shader->get_variant(), &scale_2);
+    EXPECT_THROW((void)shader->get_variant("scale_3"), std::runtime_error);
 }
 
 TEST_F(WBEShaderVariantResourceTest, LoadsMetadataOfTheSelectedVariant) {
     ASSERT_NE(shader, nullptr);
     const ShaderMetadataQuery query;
-    const ShaderMetadata plain = ShaderMetadataLoader().load(shader, {{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "1"}});
-    const ShaderMetadata extra = ShaderMetadataLoader().load(
-        shader, {{.macro = "WBE_SHADER_VARIANT_SCALE", .value = "1"}, {.macro = "WBE_SHADER_VARIANT_EXTRA", .value = "1"}});
+    const ShaderMetadata plain = ShaderMetadataLoader().load(shader, "scale_1");
+    const ShaderMetadata extra = ShaderMetadataLoader().load(shader, "scale_1_extra");
 
     const ShaderMetadataParameter* plain_indices = query.find_parameter(plain, "shader_variant_indices");
     const ShaderMetadataParameter* extra_indices = query.find_parameter(extra, "shader_variant_indices");

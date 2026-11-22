@@ -20,7 +20,6 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_pipeline_vk.hh"
-#include "function/render/shader_macro_value.hh"
 #include "function/rend_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 #include <string>
@@ -48,8 +47,8 @@ struct ComputePipelineDescVK {
         std::string entry_function = "main";
         /** Shader instance. */
         Ref<ROShaderVK> shader;
-        /** Macro values selecting the shader's variant; empty selects the default variant. */
-        std::vector<ShaderMacroValue> variant;
+        /** Name of the shader's variant; empty selects the default variant. */
+        std::string variant;
     };
 
     // Compute shader stage.
@@ -60,13 +59,13 @@ struct ComputePipelineDescVK {
      *
      * @param p_shader The shader instance.
      * @param p_entry_function The shader entry function.
-     * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
+     * @param p_variant Name of the shader's variant; empty selects the default variant.
      * @return *this.
      */
     ComputePipelineDescVK& set_shader_stage(Ref<ROShaderVK> p_shader,
         std::string_view p_entry_function = "main",
-        const std::vector<ShaderMacroValue>& p_variant = {}) {
-        shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = p_variant};
+        std::string_view p_variant = {}) {
+        shader_stage = ShaderStage{.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = std::string(p_variant)};
         return *this;
     }
 

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
 import json
 import os
 from pathlib import Path
@@ -44,12 +43,6 @@ class ACPCompilerShader(ACPCompiler):
             res_dir: Path, res_output_dir: Path) -> list[ManifestResource]:
         result = dict(resource)
         result.setdefault("type", self._get_source_resource_type(result) or "shader")
-        for derived_field in ("dst", "path", "metadata", "variants"):
-            if derived_field in result:
-                raise RuntimeError(
-                    f"Shader resource must not declare {derived_field}; its outputs are derived from src and id in "
-                    f"{manifest_path}: {resource}."
-                )
         source_rel_path = result.get("src")
         if not isinstance(source_rel_path, str) or not source_rel_path:
             raise RuntimeError(
@@ -74,141 +67,103 @@ class ACPCompilerShader(ACPCompiler):
             raise RuntimeError(
                 f"Shader resource entry must be a string in {manifest_path}: {resource}."
             )
-        macro_declarations = self._read_macro_declarations(result, manifest_path)
+        declared_variants = self._read_variants(result, manifest_path)
         source_file_path, source_rel = self._resolve_resource_file_path(source_rel_path, manifest_path, res_dir)
         variants: list[dict[str, Any]] = []
-        variant_macro_lists = self._enumerate_variants(macro_declarations)
-        for variant_index, variant_macros in enumerate(variant_macro_lists):
+        for name, values, is_default in declared_variants:
             dst_rel, metadata_rel = self._get_output_files(
-                source_rel, resource_id, variant_index if len(variant_macro_lists) > 1 else None
+                source_rel, resource_id, name if len(declared_variants) > 1 else None
             )
-            macro_definitions = [f"{macro}={value}" for macro, value in variant_macros]
+            macro_definitions = [f"{macro}={value}" for macro, value in values]
             self._compile_resource(
                 source_file_path, dst_rel, metadata_rel, res_output_dir, stage, entry, macro_definitions
             )
             variants.append({
-                "macros": [{"macro": macro, "value": value} for macro, value in variant_macros],
+                "name": name,
                 "path": dst_rel.as_posix(),
                 "metadata": metadata_rel.as_posix(),
+                "is_default": is_default,
             })
-        result["macros"] = macro_declarations
         result["variants"] = variants
         result.pop(SOURCE_RESOURCE_TYPE_KEY, None)
         result.pop("src", None)
         return [result]
 
     def _get_output_files(self, source_rel: Path, resource_id: str,
-                          variant_index: int | None) -> tuple[Path, Path]:
-        """Get the compiled SPIR-V and reflection metadata files of one macro variant of a shader resource.
+                          variant_name: str | None) -> tuple[Path, Path]:
+        """Get the compiled SPIR-V and reflection metadata files of one variant of a shader resource.
 
-        Both sit next to the source as <source stem>.<resource id>, followed by .<variant index> when the resource has
+        Both sit next to the source as <source stem>.<resource id>, followed by .<variant name> when the resource has
         several variants, so resources sharing a source, which differ in id, and the variants of one resource never
         share an output.
 
         Args:
             source_rel: The source file, relative to the resource directory.
             resource_id: The shader resource's id.
-            variant_index: The variant's index in the resource's variant list, or None for a single-variant resource.
+            variant_name: The variant's name, or None for a single-variant resource.
 
         Returns:
             The SPIR-V and metadata files, relative to the output resource directory.
         """
         output_name = f"{source_rel.stem}.{resource_id}"
-        if variant_index is not None:
-            output_name = f"{output_name}.{variant_index}"
+        if variant_name is not None:
+            output_name = f"{output_name}.{variant_name}"
         output_base = source_rel.with_name(output_name)
         return output_base.with_name(f"{output_base.name}.spv"), output_base.with_name(f"{output_base.name}.json")
 
-    def _read_macro_declarations(self, resource: ManifestResource, manifest_path: Path) -> list[dict[str, Any]]:
-        """Read and validate the macro declarations of a shader resource.
+    def _read_variants(self, resource: ManifestResource,
+                       manifest_path: Path) -> list[tuple[str, list[tuple[str, str]], bool]]:
+        """Read the variants of a shader resource.
 
-        Each declaration is `{ macro, options, optional }`: the macro takes one of `options` in every variant, or is
-        also left undefined in some when `optional` is true.
+        Each variant is `{ name, values, default }`: `values` lists the `{ name, value }` macro definitions it compiles
+        with, and `default` marks the variant an empty selection names. Without a default, the first variant is the
+        default. A resource without variants has one, named `default`, defining no macros.
 
         Args:
             resource: The shader resource.
             manifest_path: The manifest declaring it, for diagnostics.
 
         Returns:
-            The normalized declarations, each with `macro`, `options`, and `optional`.
+            One (name, macro definitions, is default) entry per variant, in declaration order.
         """
-        raw_macros = resource.get("macros")
-        if raw_macros is None:
-            return []
-        if not isinstance(raw_macros, list):
-            raise RuntimeError(
-                f"Shader resource macros must be an array in {manifest_path}: {resource}."
-            )
+        raw_variants = resource.get("variants")
+        if raw_variants is None:
+            return [("default", [], True)]
 
-        declarations: list[dict[str, Any]] = []
+        variants: list[tuple[str, list[tuple[str, str]], bool]] = []
         names: set[str] = set()
-        for raw_macro in raw_macros:
-            if not isinstance(raw_macro, dict):
-                raise RuntimeError(
-                    f"Shader resource macro entries must be objects in {manifest_path}: {resource}."
-                )
-            unknown_keys = set(raw_macro.keys()) - {"macro", "options", "optional"}
-            if unknown_keys:
-                raise RuntimeError(
-                    f"Shader resource macro entry has unknown keys {sorted(unknown_keys)}; expected macro, options, "
-                    f"and optional in {manifest_path}: {resource}."
-                )
-            name = raw_macro.get("macro")
+        default_index: int | None = None
+        for raw_variant in raw_variants:
+            name = raw_variant.get("name")
             if not isinstance(name, str) or not name:
                 raise RuntimeError(
-                    f"Shader resource macro name must be a non-empty string in {manifest_path}: {resource}."
+                    f"Shader resource variant name must be a non-empty string in {manifest_path}: {resource}."
                 )
             if name in names:
                 raise RuntimeError(
-                    f"Shader resource macro '{name}' is duplicated in {manifest_path}: {resource}."
+                    f"Shader resource variant '{name}' is declared more than once in {manifest_path}: {resource}."
                 )
             names.add(name)
-            options = raw_macro.get("options")
-            if not isinstance(options, list):
-                raise RuntimeError(
-                    f"Shader resource macro '{name}' options must be an array in {manifest_path}: {resource}."
-                )
-            if not options:
-                raise RuntimeError(
-                    f"Shader resource macro '{name}' options must not be empty in {manifest_path}: {resource}."
-                )
-            for option in options:
-                if not isinstance(option, str):
+            if raw_variant.get("default", False):
+                if default_index is not None:
                     raise RuntimeError(
-                        f"Shader resource macro '{name}' options must be strings in {manifest_path}: {resource}."
+                        f"Shader resource declares more than one default variant in {manifest_path}: {resource}."
                     )
-            if len(set(options)) != len(options):
-                raise RuntimeError(
-                    f"Shader resource macro '{name}' options must be unique in {manifest_path}: {resource}."
-                )
-            optional = raw_macro.get("optional", False)
-            if not isinstance(optional, bool):
-                raise RuntimeError(
-                    f"Shader resource macro '{name}' optional must be a boolean in {manifest_path}: {resource}."
-                )
-            declarations.append({"macro": name, "options": list(options), "optional": optional})
-        return declarations
+                default_index = len(variants)
+            values: list[tuple[str, str]] = []
+            for raw_value in raw_variant.get("values", []):
+                macro = raw_value["name"]
+                if any(macro == defined for defined, _ in values):
+                    raise RuntimeError(
+                        f"Shader resource variant '{name}' defines macro '{macro}' more than once in "
+                        f"{manifest_path}: {resource}."
+                    )
+                values.append((macro, raw_value["value"]))
+            variants.append((name, values, False))
 
-    def _enumerate_variants(self, macro_declarations: list[dict[str, Any]]) -> list[list[tuple[str, str]]]:
-        """Enumerate every macro combination of a shader resource.
-
-        Args:
-            macro_declarations: The resource's normalized macro declarations.
-
-        Returns:
-            One list per variant of the (macro, value) pairs it defines, sorted by macro name; macros a variant
-            leaves undefined are absent.
-        """
-        sorted_declarations = sorted(macro_declarations, key=lambda declaration: declaration["macro"])
-        choices: list[list[tuple[str, str] | None]] = []
-        for declaration in sorted_declarations:
-            macro_choices: list[tuple[str, str] | None] = [
-                (declaration["macro"], option) for option in declaration["options"]
-            ]
-            if declaration["optional"]:
-                macro_choices.insert(0, None)
-            choices.append(macro_choices)
-        return [[pair for pair in combination if pair is not None] for combination in itertools.product(*choices)]
+        if default_index is None:
+            default_index = 0
+        return [(name, values, index == default_index) for index, (name, values, _) in enumerate(variants)]
 
     def _compile_resource(self, source_file_path: Path, destination_rel_path: Path,
                           metadata_rel_path: Path, res_output_dir: Path,

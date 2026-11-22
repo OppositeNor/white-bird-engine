@@ -47,15 +47,18 @@ return {
             source_type = "shader",
             src = "assets/shaders/shadowmap_spot/rsm_spot.slang",
             -- WBE_MESH_TRANSFORM applies the entity's mesh transform, for placed meshes.
-            macros = { { macro = "WBE_MESH_TRANSFORM", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "mesh_transform", values = { { name = "WBE_MESH_TRANSFORM", value = "1" } } },
+            },
         },
         {
             id = "rsm_spot_dynamic",
             type = "graphics_pipeline",
             vertex_stage_id = "rsm_spot_shader",
-            vertex_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            vertex_stage_variant = "mesh_transform",
             fragment_stage_id = "rsm_spot_shader",
-            fragment_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            fragment_stage_variant = "mesh_transform",
             fragment_stage_entry = "fragment_main",
             depth_test = true,
             depth_write = true,

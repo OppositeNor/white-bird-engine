@@ -31,10 +31,8 @@ ConstantBuffer<DescIndices> di;
 void main() {
     uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> keys = CountedBuffer<uint>(di.keys, frame_slot);
-    RWStructuredBuffer<uint> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
     uint key_count = keys.size();
     keys.set_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX, radix_sort_local_sort_num(key_count));
-    dispatch_buffer[0] = dedup_large_group_num(key_count);
-    dispatch_buffer[1] = 1;
-    dispatch_buffer[2] = 1;
+    dispatch_buffer[0] = DispatchIndirectCommand(dedup_large_group_num(key_count));
 }

@@ -42,7 +42,7 @@ ComputePipelineCompilerVK::ComputePipelineCompilerVK(const ComputePipelineCompil
 }
 
 ComputePipelineCompilerVK::CompileResult ComputePipelineCompilerVK::compile(
-    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource, const std::vector<ShaderMacroValue>& p_variant) {
+    std::string_view p_resource_key, RefRes<RUShader> p_shader_resource, std::string_view p_variant) {
     if (p_shader_resource == nullptr || p_shader_resource->resource_key == nullptr) {
         throw std::runtime_error("Failed to compile compute pipeline: shader resource key was not propagated.");
     }
@@ -60,7 +60,7 @@ Ref<ROComputePipelineVK> ComputePipelineCompilerVK::compile_compute_pipeline(
     std::string_view p_resource_key,
     Ref<ROShaderVK> p_compute_shader,
     std::string_view p_compute_entry,
-    const std::vector<ShaderMacroValue>& p_variant) {
+    std::string_view p_variant) {
     ROComputePipelineVK::Builder pipeline_builder;
     pipeline_builder.set_shader_stage(p_compute_shader, p_compute_entry, p_variant);
     Ref<ROComputePipelineVK> compute_pipeline = context.rend_data->create_compute_pipeline(pipeline_builder);

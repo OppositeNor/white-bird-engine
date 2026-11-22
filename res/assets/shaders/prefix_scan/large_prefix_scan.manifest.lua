@@ -11,36 +11,50 @@
 -- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
-return {
-    resources = {
+-- The default variant scans uint with Add; the segmented one scans SegmentedWrapper<float3x3> with SegmentedPrefix.
+local function scan_variants()
+    return {
+        { name = "default" },
         {
-            id = "large_prefix_scan_prepare_dispatch",
-            source_type = "shader",
-            src = "assets/shaders/prefix_scan/large_prefix_scan_prepare_dispatch.slang",
-            macros = {
-                { macro = "WBE_LARGE_PREFIX_SCAN_ELEMENT_TYPE", options = { "SegmentedWrapper<float3x3>" } },
-                { macro = "WBE_LARGE_PREFIX_SCAN_OPERATOR", options = { "SegmentedPrefix<float3x3, Add<float3x3>>" } },
+            name = "segmented",
+            values = {
+                { name = "WBE_PREFIX_SCAN_TYPE", value = "SegmentedWrapper<float3x3>" },
+                { name = "WBE_PREFIX_SCAN_OPERATION", value = "SegmentedPrefix<float3x3, Add<float3x3>>" },
             },
         },
-        {
-            id = "large_prefix_scan_blocks",
-            source_type = "shader",
-            src = "assets/shaders/prefix_scan/large_prefix_scan_blocks.slang",
-        },
-        {
-            id = "large_prefix_scan_sections",
-            source_type = "shader",
-            src = "assets/shaders/prefix_scan/large_prefix_scan_sections.slang",
-        },
-        {
-            id = "large_prefix_scan_totals",
-            source_type = "shader",
-            src = "assets/shaders/prefix_scan/large_prefix_scan_totals.slang",
-        },
-        {
-            id = "large_prefix_scan_add",
-            source_type = "shader",
-            src = "assets/shaders/prefix_scan/large_prefix_scan_add.slang",
-        },
+    }
+end
+
+local resources = {
+    {
+        id = "large_prefix_scan_prepare_dispatch",
+        source_type = "shader",
+        src = "assets/shaders/prefix_scan/large_prefix_scan_prepare_dispatch.slang",
+        variants = scan_variants(),
+    },
+    {
+        id = "large_prefix_scan_blocks",
+        source_type = "shader",
+        src = "assets/shaders/prefix_scan/large_prefix_scan_blocks.slang",
+        variants = scan_variants(),
+    },
+    {
+        id = "large_prefix_scan_sections",
+        source_type = "shader",
+        src = "assets/shaders/prefix_scan/large_prefix_scan_sections.slang",
+        variants = scan_variants(),
+    },
+    {
+        id = "large_prefix_scan_totals",
+        source_type = "shader",
+        src = "assets/shaders/prefix_scan/large_prefix_scan_totals.slang",
+        variants = scan_variants(),
+    },
+    {
+        id = "large_prefix_scan_add",
+        source_type = "shader",
+        src = "assets/shaders/prefix_scan/large_prefix_scan_add.slang",
+        variants = scan_variants(),
     },
 }
+return { resources = resources }

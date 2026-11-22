@@ -106,26 +106,31 @@ The engine loads `audio`, `binary`, `font`, `image`, `texture`, `text`, `script`
 ## Shader Resources
 
 - `src`: source shader file in `res`.
+- `variants`: optional array of the variants the source compiles to, each compiled separately. A variant is
+  `{ name = "<name>", values = { { name = "<MACRO>", value = "<value>" }, ... }, default = true? }`; names are unique in
+  the shader, and each macro takes one value in a variant. At most one variant sets `default`; without one, the first
+  variant is the default. Without `variants`, the shader has one variant, `default`, defining no macros.
 - The compiled SPIR-V and the reflection metadata are written next to the source as `<source stem>.<id>.spv` and
-  `<source stem>.<id>.json`, and emitted as the runtime `path` and `metadata`; `assets/shaders/example.slang` with id
-  `example_shader` compiles to `assets/shaders/example.example_shader.spv`. Since ids are unique, variants of one source
-  never share an output. Declaring `dst` or `metadata` is a build error.
-- `macros`: optional compile-time Slang macro definitions. Each entry requires a non-empty `name` and may provide a string
-  `value`.
+  `<source stem>.<id>.json`, followed by `.<variant name>` before the extension when the shader has several variants,
+  and emitted as each runtime variant's `path` and `metadata`; `assets/shaders/example.slang` with id `example_shader`
+  compiles to `assets/shaders/example.example_shader.spv`.
 - `stage` and `entry`: optional Slang stage and entry-point name; declare both or neither. Without them, every
   `[shader(...)]` entry point in the module is compiled.
 
-Shader macros are compile-only and are not emitted into the runtime manifest. They select shader variants, such as the
-`WBE_MESH_TRANSFORM` variants of mesh shaders:
+Pipelines and compute-pipeline descriptions select a variant by name (for example `vertex_stage_variant`); an empty or
+absent name selects the default variant. The runtime variant table is sorted by name.
 
 ```lua
 return {
     resources = {
         {
-            id = "example_shader_variant",
+            id = "example_shader",
             source_type = "shader",
             src = "assets/shaders/example.slang",
-            macros = { { name = "WBE_MACRO_1" }, { name = "WBE_MACRO_2", value = "1" } },
+            variants = {
+                { name = "default" },
+                { name = "mesh_transform", values = { { name = "WBE_MESH_TRANSFORM", value = "1" } } },
+            },
         },
     },
 }

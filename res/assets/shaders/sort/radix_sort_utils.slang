@@ -48,10 +48,10 @@
 #define WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM 16
 #define WBE_RADIX_SORT_SCAN_ENTRY_NUM (WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM * WBE_RADIX_SORT_BUCKET_COUNT)
 
-// The dispatch buffer holds two VkDispatchIndirectCommand: the local sort dispatch, used by the histogram, overflow
-// addition, and scatter passes, then the histogram prefix scan dispatch.
-#define WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START 0
-#define WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START 3
+// The dispatch buffer holds two DispatchIndirectCommand: the local sort dispatch, used by the histogram, overflow
+// addition, and scatter passes, then the histogram prefix scan dispatch. These are command indices, not uint indices.
+#define WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX 0
+#define WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX 1
 
 /**
  * @brief Get the number of local sorts, and so of sub-histograms, of a radix sort pass.

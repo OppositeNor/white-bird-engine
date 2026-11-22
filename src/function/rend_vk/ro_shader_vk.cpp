@@ -48,9 +48,9 @@ TypeID ROShaderVK::get_type_uuid() const {
 }
 
 ShaderDescVK& ShaderDescVK::set_code(std::span<const uint32_t> p_code) {
-    macro_declarations.clear();
+    default_variant_index = 0;
     variants = std::vector<Variant>{
-        Variant{.key = ShaderVariantResolver().make_key({}), .code = std::vector<uint32_t>(p_code.begin(), p_code.end())}};
+        Variant{.name = "default", .code = std::vector<uint32_t>(p_code.begin(), p_code.end())}};
     return *this;
 }
 
@@ -68,9 +68,9 @@ ShaderDescVK& ShaderDescVK::set_code(RefRes<RUShader> p_resource) {
         if (variant.data == nullptr) {
             throw std::runtime_error("Failed to set shader code: shader resource variant is missing binary data.");
         }
-        resource_variants.push_back(Variant{.key = variant.key, .code = std::vector<uint32_t>(variant.data.get(), variant.data.get() + variant.size)});
+        resource_variants.push_back(Variant{.name = variant.name.get(), .code = std::vector<uint32_t>(variant.data.get(), variant.data.get() + variant.size)});
     }
-    macro_declarations = p_resource->get_macro_declarations();
+    default_variant_index = p_resource->default_variant_index;
     variants = std::move(resource_variants);
     return *this;
 }
@@ -111,10 +111,14 @@ VkShaderModule ROShaderVK::get_shader_module() const {
     return get_variant({});
 }
 
-VkShaderModule ROShaderVK::get_variant(const std::vector<ShaderMacroValue>& p_selection) const {
-    ShaderVariantResolver resolver;
-    HashCode key = resolver.resolve_key(macro_declarations, p_selection);
-    return resolver.find(std::span<const VariantModule>(variant_modules), key, "shader object").module;
+VkShaderModule ROShaderVK::get_variant(std::string_view p_name) const {
+    return ShaderVariantResolver()
+        .find(std::span<const VariantModule>(variant_modules), default_variant_index, p_name,
+            [](const VariantModule& p_variant) {
+                return std::string_view(p_variant.name);
+            },
+            "shader object")
+        .module;
 }
 
 ROShaderVK::~ROShaderVK() {
@@ -133,13 +137,16 @@ void ROShaderVK::init(const Builder& p_builder) {
     if (variants.empty()) {
         throw std::runtime_error("Failed to create shader: the description has no variants.");
     }
-    macro_declarations = p_builder.macro_declarations;
+    default_variant_index = p_builder.default_variant_index;
+    if (default_variant_index >= variants.size()) {
+        throw std::runtime_error("Failed to create shader: the default variant index is out of range.");
+    }
     variant_modules.reserve(variants.size());
     for (const ShaderDescVK::Variant& variant : variants) {
-        if (!variant_modules.empty() && variant_modules.back().key >= variant.key) {
-            throw std::runtime_error("Failed to create shader: variants must be sorted by unique key.");
+        if (!variant_modules.empty() && variant_modules.back().name >= variant.name) {
+            throw std::runtime_error("Failed to create shader: variants must be sorted by unique name.");
         }
-        variant_modules.push_back(VariantModule{.key = variant.key, .module = ShaderDescVK::create_vk_object(rend_data, variant)});
+        variant_modules.push_back(VariantModule{.name = variant.name, .module = ShaderDescVK::create_vk_object(rend_data, variant)});
     }
 }
 

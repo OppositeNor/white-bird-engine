@@ -111,6 +111,31 @@ struct wbe_push_constantAttribute {
 };
 
 /**
+ * @brief The workgroup counts of one indirect compute dispatch, laid out as VkDispatchIndirectCommand.
+ * @details Its stride in a storage buffer is 12 bytes, so the byte offset of command i is 12 * i.
+ */
+struct DispatchIndirectCommand {
+    /** The workgroup count in X. */
+    uint x;
+    /** The workgroup count in Y. */
+    uint y;
+    /** The workgroup count in Z. */
+    uint z;
+
+    /**
+     * @brief Create a dispatch command.
+     * @param p_x The workgroup count in X.
+     * @param p_y The workgroup count in Y.
+     * @param p_z The workgroup count in Z.
+     */
+    __init(uint p_x, uint p_y = 1, uint p_z = 1) {
+        x = p_x;
+        y = p_y;
+        z = p_z;
+    }
+};
+
+/**
  * @brief The input data from the vertex buffer
  */
 struct Vertex3DTexturedInput {

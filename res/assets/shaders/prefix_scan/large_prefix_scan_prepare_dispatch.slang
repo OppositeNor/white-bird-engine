@@ -34,8 +34,6 @@ ConstantBuffer<DescIndices> di;
 void main() {
     CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer =
         CountedBuffer<WBE_PREFIX_SCAN_TYPE>(di.data_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<uint> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
-    dispatch_buffer[0] = large_prefix_scan_block_num(data_buffer.size());
-    dispatch_buffer[1] = 1;
-    dispatch_buffer[2] = 1;
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    dispatch_buffer[0] = DispatchIndirectCommand(large_prefix_scan_block_num(data_buffer.size()));
 }

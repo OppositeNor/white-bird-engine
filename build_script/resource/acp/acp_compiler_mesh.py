@@ -50,7 +50,6 @@ class ACPCompilerMesh(ACPCompiler):
         "uint", "uvec2", "uvec3", "uvec4",
     }
     _JOINT_BINDING_TYPES = {"joint_binding_ids": "ivec4", "joint_binding_weights": "vec4"}
-    _LEGACY_VERTEX_FIELDS = ("vertices", "joint_bindings")
 
     def __init__(self, p_sdf_compiler: SDFCompiler) -> None:
         self._mesh_sdf_builder = MeshSDFBuilder(p_sdf_compiler)
@@ -133,11 +132,6 @@ class ACPCompilerMesh(ACPCompiler):
         return result
 
     def _compile_submesh(self, resource: ManifestResource, manifest_path: Path, res_output_dir: Path) -> list[ManifestResource]:
-        for legacy_field in self._LEGACY_VERTEX_FIELDS:
-            if legacy_field in resource:
-                raise RuntimeError(
-                    f"ACPCompilerMesh: submesh field '{legacy_field}' is no longer supported; declare vertex views in vertex_bindings in {manifest_path}."
-                )
         has_inline_vertices = "vertices_data" in resource
         has_inline_indices = "indices_data" in resource
         has_runtime_geometry = "vertex_bindings" in resource or "indices" in resource

@@ -16,7 +16,6 @@
 #define WBE_FILE_SHADER_METADATA_LOADER_HH
 
 #include "function/render/rend_resource_unit.hh"
-#include "function/render/shader_macro_value.hh"
 #include "function/render/shader_metadata.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include <vector>
@@ -57,11 +56,10 @@ public:
     /**
      * @brief Load and deserialize normalized metadata belonging to a variant of a shader resource.
      * @param p_shader The shader resource.
-     * @param p_variant Macro values selecting the variant; empty selects the default variant (see
-     * ShaderVariantResolver::resolve_key()).
-     * @throws std::runtime_error When the shader, variant selection, metadata path, or metadata file is invalid.
+     * @param p_variant Name of the variant; empty selects the default variant.
+     * @throws std::runtime_error When the shader, variant name, metadata path, or metadata file is invalid.
      */
-    ShaderMetadata load(RefRes<RUShader> p_shader, const std::vector<ShaderMacroValue>& p_variant = {}) const;
+    ShaderMetadata load(RefRes<RUShader> p_shader, std::string_view p_variant = {}) const;
 };
 
 } // namespace WhiteBirdEngine

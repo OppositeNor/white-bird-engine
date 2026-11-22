@@ -28,7 +28,10 @@ groupshared uint section_totals[WBE_LARGE_PREFIX_SCAN_SECTION_NUM];
 [shader("compute")]
 [numthreads(WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<uint> sections_buffer = ResourceDescriptorHeap[di.sections_buffer.x];
-    // TODO: Generalize to all types
-    large_prefix_scan_totals<uint, Add<uint>>(sections_buffer, p_group_thread_id.x, section_totals);
+    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = ResourceDescriptorHeap[di.sections_buffer.x];
+    large_prefix_scan_totals<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
+        sections_buffer,
+        p_group_thread_id.x,
+        section_totals
+    );
 }

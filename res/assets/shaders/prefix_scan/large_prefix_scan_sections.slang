@@ -42,5 +42,6 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
         sections_buffer,
         p_group_id.x,
         p_group_thread_id.x,
-        scratch);
+        scratch
+    );
 }

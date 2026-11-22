@@ -441,31 +441,6 @@ float RUSDF::get_sample(const glm::uvec3& p_coordinate) const {
     return glm::unpackHalf1x16(half_sample);
 }
 
-std::vector<ShaderMacroValue> RUShaderVariantSelection::to_selection() const {
-    std::vector<ShaderMacroValue> selection;
-    selection.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        const RUShaderMacroValue& value = values.get()[i];
-        selection.push_back(ShaderMacroValue{.macro = value.macro.get(), .value = value.value.get()});
-    }
-    return selection;
-}
-
-std::vector<ShaderMacroDeclaration> RUShader::get_macro_declarations() const {
-    std::vector<ShaderMacroDeclaration> declarations;
-    declarations.reserve(macro_count);
-    for (size_t i = 0; i < macro_count; ++i) {
-        const RUShaderMacro& macro = macros.get()[i];
-        ShaderMacroDeclaration declaration{.macro = macro.macro.get(), .options = {}, .optional = macro.optional};
-        declaration.options.reserve(macro.option_count);
-        for (size_t j = 0; j < macro.option_count; ++j) {
-            declaration.options.emplace_back(macro.options.get()[j].get());
-        }
-        declarations.push_back(std::move(declaration));
-    }
-    return declarations;
-}
-
 std::span<const RUShaderVariant> RUShader::get_variants() const {
     if (variant_count == 0) {
         throw std::runtime_error("Failed to access shader variants: the shader resource has no variants.");
@@ -473,11 +448,12 @@ std::span<const RUShaderVariant> RUShader::get_variants() const {
     return {variants.get(), variant_count};
 }
 
-const RUShaderVariant& RUShader::get_variant(const std::vector<ShaderMacroValue>& p_selection) const {
-    ShaderVariantResolver resolver;
-    std::vector<ShaderMacroDeclaration> declarations = get_macro_declarations();
-    HashCode key = resolver.resolve_key(declarations, p_selection);
-    return resolver.find(get_variants(), key, resource_key != nullptr ? std::string_view(resource_key) : std::string_view("shader resource"));
+const RUShaderVariant& RUShader::get_variant(std::string_view p_name) const {
+    return ShaderVariantResolver().find(get_variants(), default_variant_index, p_name,
+        [](const RUShaderVariant& p_variant) {
+            return std::string_view(p_variant.name.get());
+        },
+        resource_key != nullptr ? std::string_view(resource_key) : std::string_view("shader resource"));
 }
 
 } // namespace WhiteBirdEngine

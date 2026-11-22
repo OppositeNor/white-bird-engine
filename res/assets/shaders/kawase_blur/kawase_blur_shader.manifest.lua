@@ -18,7 +18,10 @@ return {
             source_type = "shader",
             src = "assets/shaders/kawase_blur/kawase_blur.slang",
             -- Without the macro the blur writes pong; with it, ping.
-            macros = { { macro = "WBE_KAWASE_BLUR_WRITE_PING", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "write_ping", values = { { name = "WBE_KAWASE_BLUR_WRITE_PING", value = "1" } } },
+            },
         },
     },
 }

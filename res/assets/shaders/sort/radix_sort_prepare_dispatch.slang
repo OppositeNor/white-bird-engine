@@ -25,22 +25,18 @@ struct DescIndices {
 ConstantBuffer<DescIndices> di;
 
 // Writes the indirect dispatches of a radix sort from the local sort count in the header of the key buffer: the local
-// sort dispatch, with one workgroup per local sort, at WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START, and the histogram prefix
+// sort dispatch, with one workgroup per local sort, at WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX, and the histogram prefix
 // scan dispatch, with one workgroup per WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM local sorts, at
-// WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START. The element count does not change between the passes, so every pass uses the
+// WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX. The element count does not change between the passes, so every pass uses the
 // same dispatches. Must be dispatched with exactly one workgroup.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
     CountedBuffer<uint> keys =
         CountedBuffer<uint>(di.input_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<uint> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
     uint local_sort_num = keys.get_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX);
-    dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START + 0] = local_sort_num;
-    dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START + 1] = 1;
-    dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_START + 2] = 1;
-    dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START + 0] =
-        (local_sort_num + WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM - 1) / WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM;
-    dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START + 1] = 1;
-    dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_START + 2] = 1;
+    dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX] = DispatchIndirectCommand(local_sort_num);
+    dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX] = DispatchIndirectCommand(
+        (local_sort_num + WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM - 1) / WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM);
 }

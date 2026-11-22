@@ -18,9 +18,23 @@ return {
             id = "shader_variants_shader",
             source_type = "shader",
             src = "assets/shaders/shader_variants/shader_variants.slang",
-            macros = {
-                { macro = "WBE_SHADER_VARIANT_SCALE", options = { "1", "2" } },
-                { macro = "WBE_SHADER_VARIANT_EXTRA", options = { "1" }, optional = true },
+            variants = {
+                { name = "scale_1", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "1" } } },
+                {
+                    name = "scale_1_extra",
+                    values = {
+                        { name = "WBE_SHADER_VARIANT_SCALE", value = "1" },
+                        { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
+                    },
+                },
+                { name = "scale_2", values = { { name = "WBE_SHADER_VARIANT_SCALE", value = "2" } }, default = true },
+                {
+                    name = "scale_2_extra",
+                    values = {
+                        { name = "WBE_SHADER_VARIANT_SCALE", value = "2" },
+                        { name = "WBE_SHADER_VARIANT_EXTRA", value = "1" },
+                    },
+                },
             },
         },
     },

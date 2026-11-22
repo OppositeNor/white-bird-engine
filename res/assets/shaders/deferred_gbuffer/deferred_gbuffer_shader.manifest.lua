@@ -18,15 +18,18 @@ return {
             source_type = "shader",
             src = "assets/shaders/deferred_gbuffer/deferred_gbuffer.slang",
             -- WBE_MESH_TRANSFORM declares the per-mesh transform used by dynamic meshes.
-            macros = { { macro = "WBE_MESH_TRANSFORM", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "mesh_transform", values = { { name = "WBE_MESH_TRANSFORM", value = "1" } } },
+            },
         },
         {
             id = "deferred_gbuffer_dynamic",
             type = "graphics_pipeline",
             vertex_stage_id = "deferred_gbuffer_shader",
-            vertex_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            vertex_stage_variant = "mesh_transform",
             fragment_stage_id = "deferred_gbuffer_shader",
-            fragment_stage_variant = { { macro = "WBE_MESH_TRANSFORM", value = "1" } },
+            fragment_stage_variant = "mesh_transform",
             fragment_stage_entry = "fragment_main",
             depth_test = true,
             depth_write = true,

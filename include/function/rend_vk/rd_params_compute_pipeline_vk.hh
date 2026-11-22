@@ -16,7 +16,6 @@
 #define WBE_FILE_RD_PARAMS_COMPUTE_PIPELINE_VK_HH
 
 #include "core/reflection/reflection_defs.hh"
-#include "function/render/shader_macro_value.hh"
 #include <string>
 #include <vector>
 
@@ -36,10 +35,10 @@ struct WBE_META(WBE_SERIALIZABLE_STATIC, WBE_STRICT_DESERIALIZATION, WBE_REFLECT
     WBE_META(WBE_REFLECT, WBE_REFLECT_REQUIRED)
     std::string shader;
     /**
-     * @brief Macro values selecting the shader's variant; empty selects the default variant.
+     * @brief Name of the shader's variant; empty selects the default variant.
      */
     WBE_META(WBE_REFLECT)
-    std::vector<ShaderMacroValue> variant;
+    std::string variant;
 
     bool operator==(const RDParamsComputePipelineVK&) const = default;
 };

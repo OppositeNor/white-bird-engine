@@ -24,7 +24,6 @@
 #include "function/render/vertex_input_requirement.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_pipeline_vk.hh"
-#include "function/render/shader_macro_value.hh"
 #include "function/rend_vk/ro_shader_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -62,9 +61,9 @@ public:
                 // Shader instance.
                 Ref<ROShaderVK> shader;
                 /**
-                 * @brief Macro values selecting the shader's variant; empty selects the default variant.
+                 * @brief Name of the shader's variant; empty selects the default variant.
                  */
-                std::vector<ShaderMacroValue> variant;
+                std::string variant;
             };
             // The vertex shader stage.
             Required<ShaderStage> vertex_shader;
@@ -79,13 +78,13 @@ public:
              *
              * @param p_shader The shader instance.
              * @param p_entry_function The shader entry function.
-             * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
+             * @param p_variant Name of the shader's variant; empty selects the default variant.
              * @return *this
              */
             ShaderConfig& set_vertex_shader(Ref<ROShaderVK> p_shader,
                 std::string_view p_entry_function = "main",
-                const std::vector<ShaderMacroValue>& p_variant = {}) {
-                vertex_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = p_variant};
+                std::string_view p_variant = {}) {
+                vertex_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = std::string(p_variant)};
                 return *this;
             }
 
@@ -94,13 +93,13 @@ public:
              *
              * @param p_shader The shader instance.
              * @param p_entry_function The shader entry function.
-             * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
+             * @param p_variant Name of the shader's variant; empty selects the default variant.
              * @return *this
              */
             ShaderConfig& set_fragment_shader(Ref<ROShaderVK> p_shader,
                 std::string_view p_entry_function = "main",
-                const std::vector<ShaderMacroValue>& p_variant = {}) {
-                fragment_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = p_variant};
+                std::string_view p_variant = {}) {
+                fragment_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = std::string(p_variant)};
                 return *this;
             }
 
@@ -109,13 +108,13 @@ public:
              *
              * @param p_shader The shader instance.
              * @param p_entry_function The shader entry function.
-             * @param p_variant Macro values selecting the shader's variant; empty selects the default variant.
+             * @param p_variant Name of the shader's variant; empty selects the default variant.
              * @return *this
              */
             ShaderConfig& set_geometry_shader(Ref<ROShaderVK> p_shader,
                 std::string_view p_entry_function = "main",
-                const std::vector<ShaderMacroValue>& p_variant = {}) {
-                geometry_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = p_variant};
+                std::string_view p_variant = {}) {
+                geometry_shader = {.entry_function = std::string(p_entry_function), .shader = p_shader, .variant = std::string(p_variant)};
                 return *this;
             }
 
@@ -127,16 +126,16 @@ public:
              * @param p_vertex_entry_function The vertex shader entry function.
              * @param p_fragment_entry_function The fragment shader entry
              * function.
-             * @param p_vertex_variant Macro values selecting the vertex shader's variant.
-             * @param p_fragment_variant Macro values selecting the fragment shader's variant.
+             * @param p_vertex_variant Name of the vertex shader's variant.
+             * @param p_fragment_variant Name of the fragment shader's variant.
              * @return *this.
              */
             ShaderConfig& set_shaders(Ref<ROShaderVK> p_vertex_shader,
                 Ref<ROShaderVK> p_fragment_shader,
                 std::string_view p_vertex_entry_function = "main",
                 std::string_view p_fragment_entry_function = "main",
-                const std::vector<ShaderMacroValue>& p_vertex_variant = {},
-                const std::vector<ShaderMacroValue>& p_fragment_variant = {}) {
+                std::string_view p_vertex_variant = {},
+                std::string_view p_fragment_variant = {}) {
                 set_vertex_shader(p_vertex_shader, p_vertex_entry_function, p_vertex_variant);
                 set_fragment_shader(p_fragment_shader, p_fragment_entry_function, p_fragment_variant);
                 return *this;

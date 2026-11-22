@@ -45,7 +45,12 @@ return {
             id = "svo_2_build_deferred_propagation_ping_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
-            macros = { { macro = "WBE_USE_PING_WRITE", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_USE_PING_WRITE", value = "1" } },
+                },
+            },
         },
         {
             id = "svo_2_update_states_shader",
@@ -58,9 +63,11 @@ return {
             src = "assets/shaders/svo_2/svo_build_static_mesh.slang",
             depth_test = false,
             cull_backfaces = false,
-            macros = {
-                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
-                { macro = "WBE_MESH_TRANSFORM", options = { "1" } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_DYNAMIC_BUILD", value = "1" }, { name = "WBE_MESH_TRANSFORM", value = "1" } },
+                },
             },
         },
         {
@@ -78,15 +85,22 @@ return {
             id = "svo_2_dynamic_build_deferred_propagation_pong_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
-            macros = { { macro = "WBE_DYNAMIC_BUILD", options = { "1" } } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_DYNAMIC_BUILD", value = "1" } },
+                },
+            },
         },
         {
             id = "svo_2_dynamic_build_deferred_propagation_ping_write_shader",
             source_type = "shader",
             src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
-            macros = {
-                { macro = "WBE_USE_PING_WRITE", options = { "1" } },
-                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_USE_PING_WRITE", value = "1" }, { name = "WBE_DYNAMIC_BUILD", value = "1" } },
+                },
             },
         },
         {

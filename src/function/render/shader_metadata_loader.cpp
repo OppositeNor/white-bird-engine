@@ -22,7 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-ShaderMetadata ShaderMetadataLoader::load(RefRes<RUShader> p_shader, const std::vector<ShaderMacroValue>& p_variant) const {
+ShaderMetadata ShaderMetadataLoader::load(RefRes<RUShader> p_shader, std::string_view p_variant) const {
     if (p_shader == nullptr) {
         throw std::runtime_error("Failed to load shader metadata: shader resource is missing.");
     }

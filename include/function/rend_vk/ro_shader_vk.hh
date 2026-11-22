@@ -20,8 +20,6 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/render/shader_macro_value.hh"
-#include "function/render/shader_variant_resolver.hh"
 #include "function/rend_vk/i_rend_object_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -29,6 +27,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 #include <vulkan/vulkan_core.h>
@@ -46,29 +45,29 @@ struct ShaderDescVK {
     friend ROShaderVK;
     /**
      * @class Variant
-     * @brief SPIR-V words of one macro variant.
+     * @brief SPIR-V words of one variant.
      */
     struct Variant {
         /**
-         * @brief The variant's key (ShaderVariantResolver::make_key()).
+         * @brief The variant's name.
          */
-        HashCode key = 0;
+        std::string name;
         /**
          * @brief The variant's SPIR-V words.
          */
         std::vector<uint32_t> code;
     };
     /**
-     * @brief The macros the variants enumerate; empty for a shader without macros.
+     * @brief The index of the default variant in variants.
      */
-    std::vector<ShaderMacroDeclaration> macro_declarations;
+    size_t default_variant_index = 0;
     /**
-     * @brief The variants, sorted by unique key.
+     * @brief The variants, sorted by unique name.
      */
     Required<std::vector<Variant>> variants;
 
     /**
-     * @brief Set the source code of a shader without macros, as its only variant.
+     * @brief Set the source code of a shader with one variant.
      */
     ShaderDescVK& set_code(std::span<const uint32_t> p_code);
 
@@ -100,7 +99,7 @@ private:
 
 /**
  * @class ROShaderVK
- * @brief Shader class for Vulkan. Holds one shader module per macro variant of its source, all created eagerly.
+ * @brief Shader class for Vulkan. Holds one shader module per variant of its source, all created eagerly.
  *
  */
 class WBE_META(WBE_REND_OBJECT) ROShaderVK final : public IRendObjectVK {
@@ -118,8 +117,6 @@ public:
     ROShaderVK& operator=(ROShaderVK&&) = delete;
 
     virtual TypeID get_type_uuid() const override;
-
-    virtual void apply_debug_name(std::string_view p_name) override;
 
     /**
      * @brief Constructor.
@@ -144,30 +141,32 @@ public:
     ROShaderVK(const RendContextVK* p_rend_context, RefRes<RUShader> p_resource);
 
     /**
-     * @brief Get the shader module of the variant defining no macros beyond the defaults; same as get_variant({}).
+     * @brief Get the shader module of the default variant; same as get_variant({}).
      *
      * @return The shader module.
-     * @throws std::runtime_error When the empty selection names no variant.
      */
     VkShaderModule get_shader_module() const;
 
     /**
-     * @brief Get the shader module of the variant a macro selection names, by binary search.
+     * @brief Get the shader module of a variant by name, by binary search.
      *
-     * @param p_selection The selected macro values; see ShaderVariantResolver::resolve_key() for the defaults of the
-     * macros it leaves out.
+     * @param p_name The variant's name; empty selects the default variant.
      * @return The variant's shader module, owned by this object.
-     * @throws std::runtime_error When the selection is invalid or names no variant.
+     * @throws std::runtime_error When no variant has the name.
      */
-    VkShaderModule get_variant(const std::vector<ShaderMacroValue>& p_selection = {}) const;
+    VkShaderModule get_variant(std::string_view p_name = {}) const;
+
+protected:
+
+    virtual void apply_debug_name(std::string_view p_name) override;
 
 private:
     struct VariantModule {
-        HashCode key = 0;
+        std::string name;
         VkShaderModule module = VK_NULL_HANDLE;
     };
-    std::vector<ShaderMacroDeclaration> macro_declarations;
-    // Sorted by key.
+    size_t default_variant_index = 0;
+    // Sorted by name.
     std::vector<VariantModule> variant_modules;
 
     void init(const Builder& p_builder);

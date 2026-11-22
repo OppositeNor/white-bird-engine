@@ -33,9 +33,11 @@ return {
             id = "octree_dynamic_build_static_mesh",
             source_type = "shader",
             src = "assets/shaders/octree/octree_build_static_mesh.slang",
-            macros = {
-                { macro = "WBE_DYNAMIC_BUILD", options = { "1" } },
-                { macro = "WBE_MESH_TRANSFORM", options = { "1" } },
+            variants = {
+                {
+                    name = "default",
+                    values = { { name = "WBE_DYNAMIC_BUILD", value = "1" }, { name = "WBE_MESH_TRANSFORM", value = "1" } },
+                },
             },
         },
         {
@@ -63,7 +65,10 @@ return {
             source_type = "shader",
             src = "assets/shaders/octree/octree_debug_draw.slang",
             -- WBE_OCTREE_DEBUG_NODES draws the octree nodes instead of the leaves.
-            macros = { { macro = "WBE_OCTREE_DEBUG_NODES", options = { "1" }, optional = true } },
+            variants = {
+                { name = "default" },
+                { name = "nodes", values = { { name = "WBE_OCTREE_DEBUG_NODES", value = "1" } } },
+            },
         },
         {
             id = "octree_debug_draw_pipeline",
@@ -78,9 +83,9 @@ return {
             id = "octree_debug_node_draw_pipeline",
             type = "graphics_pipeline",
             vertex_stage_id = "octree_debug_draw_shader",
-            vertex_stage_variant = { { macro = "WBE_OCTREE_DEBUG_NODES", value = "1" } },
+            vertex_stage_variant = "nodes",
             fragment_stage_id = "octree_debug_draw_shader",
-            fragment_stage_variant = { { macro = "WBE_OCTREE_DEBUG_NODES", value = "1" } },
+            fragment_stage_variant = "nodes",
             depth_test = true,
             depth_write = false,
             cull_backfaces = false,
