@@ -49,17 +49,7 @@ void IBindableRendResourceVK::bind_rend_object(
 
 void IBindableRendResourceVK::bind_container(
     RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObjectContainer> p_container) {
-    if (p_resource_id.empty()) {
-        throw std::runtime_error("Failed to bind render resource: resource id is empty.");
-    }
-    if (p_container == MEM_NULL) {
-        throw std::runtime_error(std::format("Failed to bind render resource '{}': container is null.", p_resource_id));
-    }
-    p_graph.add_resource(RendResVK{
-        .res_id = std::string(p_resource_id),
-        .res_type_id = p_container->get_resource_type_id(),
-        .container = std::move(p_container),
-    });
+    p_graph.add_resource(p_resource_id, std::move(p_container));
 }
 
 void IBindableRendResourceVK::bind_resource_list(

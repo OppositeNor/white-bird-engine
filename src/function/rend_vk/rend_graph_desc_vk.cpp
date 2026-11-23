@@ -15,13 +15,11 @@
 #include "function/rend_vk/rend_graph_desc_vk.hh"
 #include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
-#include "core/memory/unique.hh"
 #include "function/render/i_rend_graph.hh"
 #include "function/render/i_rend_task.hh"
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_task_resource_map.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
-#include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
 #include "function/render/i_rend_object_container.hh"
@@ -80,6 +78,14 @@ public:
         return std::string(p_id);
     }
 
+    // Renames edges declared inside the scope to the ids their tasks and resources have outside it.
+    void rename_edges(Vector<RendResEdgeDescVK, RendAlloc>& p_edges, std::string_view p_subgraph_id) const {
+        for (RendResEdgeDescVK& edge : p_edges) {
+            edge.next_task_id = task_id(edge.next_task_id, p_subgraph_id);
+            edge.res_id = resource_id(edge.res_id);
+        }
+    }
+
     Vector<RendTaskResourceMap::ScopeBinding, RendAlloc> bindings(RendAlloc* p_alloc) const {
         Vector<RendTaskResourceMap::ScopeBinding, RendAlloc> result(p_alloc);
         for (size_t i = 0; i < resource_sources.size(); ++i) {
@@ -110,6 +116,185 @@ bool is_same_import(const RendResVK& p_left, const RendResVK& p_right) {
     const Ref<ROCSingle> left = p_left.container.dynamic_cast_ref<ROCSingle>();
     const Ref<ROCSingle> right = p_right.container.dynamic_cast_ref<ROCSingle>();
     return left != MEM_NULL && right != MEM_NULL && left->get().get() == right->get().get();
+}
+
+// The debug name of a resource, task, or subgraph nested under a subgraph name: its own debug name, or its id when it
+// has none.
+std::string nested_debug_name(std::string_view p_name_prefix, std::string_view p_debug_name, std::string_view p_id) {
+    return std::format("{}.{}", p_name_prefix, p_debug_name.empty() ? p_id : p_debug_name);
+}
+
+// Checks that a subgraph id is not empty and is not the id of a task or subgraph of the enclosing graph.
+void validate_subgraph_id(const RendGraphDescVK& p_graph, std::string_view p_subgraph_id) {
+    if (p_subgraph_id.empty()) {
+        throw std::runtime_error("Failed to add render graph subgraph: the subgraph id is empty.");
+    }
+    const auto has_task = std::ranges::any_of(p_graph.tasks, [p_subgraph_id](const RendTaskDescVK& p_task) {
+        return p_task.task_id == p_subgraph_id;
+    });
+    const auto has_subgraph = std::ranges::any_of(p_graph.subgraphs, [p_subgraph_id](const RendSubgraphVK& p_record) {
+        return p_record.subgraph_id == p_subgraph_id;
+    });
+    if (has_task || has_subgraph) {
+        throw std::runtime_error(
+            std::format("Failed to add render graph subgraph '{}': a task or subgraph already has the id.", p_subgraph_id));
+    }
+}
+
+// Checks that a subgraph exports nothing; only the outermost graph exports.
+void validate_subgraph_exports(const RendGraphDescVK& p_inner, std::string_view p_subgraph_id) {
+    if (!p_inner.exports.empty()) {
+        throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it exports '{}'; only the outermost graph exports resources.",
+            p_subgraph_id,
+            p_inner.exports.begin()->first));
+    }
+}
+
+// Checks that every port is bound exactly once to a non-empty resource of the enclosing graph, that every binding names a
+// port, and that no port shadows what the subgraph declares or imports.
+void validate_subgraph_ports(const RendSubgraphDescVK& p_subgraph,
+    std::span<const RendSubgraphPortBindingVK> p_ports,
+    std::string_view p_subgraph_id) {
+    for (const RendSubgraphPortBindingVK& binding : p_ports) {
+        if (std::ranges::find(p_subgraph.ports, binding.port) == p_subgraph.ports.end()) {
+            throw std::runtime_error(
+                std::format("Failed to add render graph subgraph '{}': it has no port '{}'.", p_subgraph_id, binding.port));
+        }
+        if (binding.resource.empty()) {
+            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': port '{}' is bound to an empty resource id.",
+                p_subgraph_id,
+                binding.port));
+        }
+    }
+    for (const std::string& port : p_subgraph.ports) {
+        const auto count = std::ranges::count_if(p_ports, [&port](const RendSubgraphPortBindingVK& p_binding) {
+            return p_binding.port == port;
+        });
+        if (count != 1) {
+            throw std::runtime_error(std::format(
+                "Failed to add render graph subgraph '{}': port '{}' is bound {} times instead of once.", p_subgraph_id, port, count));
+        }
+        if (p_subgraph.graph.contains_resource(port)) {
+            throw std::runtime_error(std::format(
+                "Failed to add render graph subgraph '{}': port '{}' names a resource the subgraph declares or imports.", p_subgraph_id, port));
+        }
+    }
+}
+
+// Builds the scope of a subgraph: its ports map to their bound resources, its declared resources to prefixed ids, and its
+// tasks and nested subgraphs are its local ids.
+SubgraphScope make_subgraph_scope(RendAlloc* p_alloc,
+    std::string_view p_subgraph_id,
+    const RendGraphDescVK& p_inner,
+    std::span<const RendSubgraphPortBindingVK> p_ports) {
+    SubgraphScope scope(p_alloc, p_subgraph_id);
+    for (const RendSubgraphPortBindingVK& binding : p_ports) {
+        scope.add_resource(binding.port, std::string(binding.resource));
+    }
+    const auto add_owned = [&scope](const auto& p_declarations) {
+        for (const auto& declaration : p_declarations) {
+            scope.add_resource(declaration.res_id, scope.prefixed(declaration.res_id));
+        }
+    };
+    add_owned(p_inner.buffers);
+    add_owned(p_inner.images);
+    add_owned(p_inner.image_views);
+    add_owned(p_inner.samplers);
+    for (const RendTaskDescVK& task : p_inner.tasks) {
+        scope.add_local_id(task.task_id);
+    }
+    for (const RendSubgraphVK& nested : p_inner.subgraphs) {
+        scope.add_local_id(nested.subgraph_id);
+    }
+    return scope;
+}
+
+// Adds a subgraph's imports to the enclosing graph; one it already imports under the same id must be the same resource.
+void merge_subgraph_imports(RendGraphDescVK& p_outer, const RendGraphDescVK& p_inner, std::string_view p_subgraph_id) {
+    for (const RendResVK& resource : p_inner.resources) {
+        const auto existing = std::ranges::find_if(p_outer.resources, [&resource](const RendResVK& p_resource) {
+            return p_resource.res_id == resource.res_id;
+        });
+        if (existing == p_outer.resources.end()) {
+            if (p_outer.contains_resource(resource.res_id)) {
+                throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph declares.",
+                    p_subgraph_id,
+                    resource.res_id));
+            }
+            p_outer.resources.push_back(resource);
+            continue;
+        }
+        if (!is_same_import(*existing, resource)) {
+            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph imports as another resource.",
+                p_subgraph_id,
+                resource.res_id));
+        }
+    }
+}
+
+// Adds a subgraph's graph-owned resource declarations to the enclosing graph under their prefixed ids.
+void add_subgraph_declarations(RendGraphDescVK& p_outer, const RendGraphDescVK& p_inner, const SubgraphScope& p_scope) {
+    for (const RendBufferDeclVK& buffer : p_inner.buffers) {
+        p_outer.buffers.push_back({.res_id = p_scope.prefixed(buffer.res_id), .factory = buffer.factory});
+    }
+    for (const RendImageDeclVK& image : p_inner.images) {
+        p_outer.images.push_back({.res_id = p_scope.prefixed(image.res_id), .factory = image.factory});
+    }
+    for (const RendImageViewDeclVK& view : p_inner.image_views) {
+        p_outer.image_views.push_back(
+            {.res_id = p_scope.prefixed(view.res_id), .image_id = p_scope.resource_id(view.image_id), .factory = view.factory});
+    }
+    for (const RendSamplerDeclVK& sampler : p_inner.samplers) {
+        p_outer.samplers.push_back({.res_id = p_scope.prefixed(sampler.res_id), .factory = sampler.factory});
+    }
+}
+
+// Adds a subgraph's resource debug names to the enclosing graph, nested under the subgraph's name.
+void add_subgraph_debug_names(RendGraphDescVK& p_outer,
+    const RendGraphDescVK& p_inner,
+    const SubgraphScope& p_scope,
+    std::string_view p_name_prefix) {
+    for (const auto& [resource_id, debug_name] : p_inner.debug_names) {
+        p_outer.debug_names.insert_or_assign(
+            p_scope.prefixed(resource_id), nested_debug_name(p_name_prefix, debug_name, resource_id));
+    }
+}
+
+// Adds a subgraph's tasks to the enclosing graph, renamed into its scope, and records them as members of p_record.
+void add_subgraph_tasks(RendGraphDescVK& p_outer,
+    const RendGraphDescVK& p_inner,
+    const SubgraphScope& p_scope,
+    std::string_view p_name_prefix,
+    std::string_view p_subgraph_id,
+    RendSubgraphVK& p_record) {
+    const Vector<RendTaskResourceMap::ScopeBinding, RendAlloc> bindings = p_scope.bindings(p_outer.alloc);
+    for (const RendTaskDescVK& inner_task : p_inner.tasks) {
+        RendTaskDescVK task = inner_task;
+        task.task_id = p_scope.prefixed(inner_task.task_id);
+        task.debug_name = nested_debug_name(p_name_prefix, inner_task.debug_name, inner_task.task_id);
+        p_scope.rename_edges(task.next, p_subgraph_id);
+        task.resource_map.enclose(bindings);
+        p_record.members.push_back(task.task_id);
+        p_outer.tasks.push_back(std::move(task));
+    }
+}
+
+// Adds a subgraph's nested subgraph records to the enclosing graph, renamed into its scope.
+void add_nested_subgraphs(RendGraphDescVK& p_outer,
+    const RendGraphDescVK& p_inner,
+    const SubgraphScope& p_scope,
+    std::string_view p_name_prefix,
+    std::string_view p_subgraph_id) {
+    for (const RendSubgraphVK& inner_record : p_inner.subgraphs) {
+        RendSubgraphVK nested = inner_record;
+        nested.subgraph_id = p_scope.prefixed(inner_record.subgraph_id);
+        nested.debug_name = nested_debug_name(p_name_prefix, inner_record.debug_name, inner_record.subgraph_id);
+        for (RendTaskID& member : nested.members) {
+            member = p_scope.prefixed(member);
+        }
+        p_scope.rename_edges(nested.next, p_subgraph_id);
+        p_outer.subgraphs.push_back(std::move(nested));
+    }
 }
 
 } // namespace
@@ -185,141 +370,21 @@ RendSubgraphDescVK& RendSubgraphDescVK::add_port(std::string_view p_port) {
 
 RendSubgraphVK& RendGraphDescVK::add_subgraph(
     std::string_view p_subgraph_id, const RendSubgraphDescVK& p_subgraph, std::span<const RendSubgraphPortBindingVK> p_ports) {
-    if (p_subgraph_id.empty()) {
-        throw std::runtime_error("Failed to add render graph subgraph: the subgraph id is empty.");
-    }
-    const auto has_task = std::ranges::any_of(tasks, [p_subgraph_id](const RendTaskDescVK& p_task) {
-        return p_task.task_id == p_subgraph_id;
-    });
-    const auto has_subgraph = std::ranges::any_of(subgraphs, [p_subgraph_id](const RendSubgraphVK& p_record) {
-        return p_record.subgraph_id == p_subgraph_id;
-    });
-    if (has_task || has_subgraph) {
-        throw std::runtime_error(
-            std::format("Failed to add render graph subgraph '{}': a task or subgraph already has the id.", p_subgraph_id));
-    }
+    validate_subgraph_id(*this, p_subgraph_id);
     const RendGraphDescVK& inner = p_subgraph.graph;
-    if (!inner.exports.empty()) {
-        throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it exports '{}'; only the outermost graph exports resources.",
-            p_subgraph_id,
-            inner.exports.begin()->first));
-    }
-    SubgraphScope scope(alloc, p_subgraph_id);
-
-    // Ports name resources of this graph; they must not shadow what the subgraph declares or imports.
-    for (const RendSubgraphPortBindingVK& binding : p_ports) {
-        if (std::ranges::find(p_subgraph.ports, binding.port) == p_subgraph.ports.end()) {
-            throw std::runtime_error(
-                std::format("Failed to add render graph subgraph '{}': it has no port '{}'.", p_subgraph_id, binding.port));
-        }
-        if (binding.resource.empty()) {
-            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': port '{}' is bound to an empty resource id.",
-                p_subgraph_id,
-                binding.port));
-        }
-    }
-    for (const std::string& port : p_subgraph.ports) {
-        const auto count = std::ranges::count_if(p_ports, [&port](const RendSubgraphPortBindingVK& p_binding) {
-            return p_binding.port == port;
-        });
-        if (count != 1) {
-            throw std::runtime_error(std::format(
-                "Failed to add render graph subgraph '{}': port '{}' is bound {} times instead of once.", p_subgraph_id, port, count));
-        }
-        if (inner.contains_resource(port)) {
-            throw std::runtime_error(std::format(
-                "Failed to add render graph subgraph '{}': port '{}' names a resource the subgraph declares or imports.", p_subgraph_id, port));
-        }
-    }
-    for (const RendSubgraphPortBindingVK& binding : p_ports) {
-        scope.add_resource(binding.port, std::string(binding.resource));
-    }
-    const auto add_owned = [&scope](const auto& p_declarations) {
-        for (const auto& declaration : p_declarations) {
-            scope.add_resource(declaration.res_id, scope.prefixed(declaration.res_id));
-        }
-    };
-    add_owned(inner.buffers);
-    add_owned(inner.images);
-    add_owned(inner.image_views);
-    add_owned(inner.samplers);
-    for (const RendTaskDescVK& task : inner.tasks) {
-        scope.add_local_id(task.task_id);
-    }
-    for (const RendSubgraphVK& nested : inner.subgraphs) {
-        scope.add_local_id(nested.subgraph_id);
-    }
-    const auto rename_edges = [&scope, p_subgraph_id](Vector<RendResEdgeDescVK, RendAlloc>& p_edges) {
-        for (RendResEdgeDescVK& edge : p_edges) {
-            edge.next_task_id = scope.task_id(edge.next_task_id, p_subgraph_id);
-            edge.res_id = scope.resource_id(edge.res_id);
-        }
-    };
-
-    // The subgraph's imports are imports of this graph.
-    for (const RendResVK& resource : inner.resources) {
-        const auto existing = std::ranges::find_if(resources, [&resource](const RendResVK& p_resource) {
-            return p_resource.res_id == resource.res_id;
-        });
-        if (existing == resources.end()) {
-            if (contains_resource(resource.res_id)) {
-                throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph declares.",
-                    p_subgraph_id,
-                    resource.res_id));
-            }
-            resources.push_back(resource);
-            continue;
-        }
-        if (!is_same_import(*existing, resource)) {
-            throw std::runtime_error(std::format("Failed to add render graph subgraph '{}': it imports '{}', which the graph imports as another resource.",
-                p_subgraph_id,
-                resource.res_id));
-        }
-    }
-    for (const RendBufferDeclVK& buffer : inner.buffers) {
-        buffers.push_back({.res_id = scope.prefixed(buffer.res_id), .factory = buffer.factory});
-    }
-    for (const RendImageDeclVK& image : inner.images) {
-        images.push_back({.res_id = scope.prefixed(image.res_id), .factory = image.factory});
-    }
-    for (const RendImageViewDeclVK& view : inner.image_views) {
-        image_views.push_back(
-            {.res_id = scope.prefixed(view.res_id), .image_id = scope.resource_id(view.image_id), .factory = view.factory});
-    }
-    for (const RendSamplerDeclVK& sampler : inner.samplers) {
-        samplers.push_back({.res_id = scope.prefixed(sampler.res_id), .factory = sampler.factory});
-    }
+    validate_subgraph_exports(inner, p_subgraph_id);
+    validate_subgraph_ports(p_subgraph, p_ports, p_subgraph_id);
+    const SubgraphScope scope = make_subgraph_scope(alloc, p_subgraph_id, inner, p_ports);
+    merge_subgraph_imports(*this, inner, p_subgraph_id);
+    add_subgraph_declarations(*this, inner, scope);
     // Debug names nest under the subgraph's name, as ids nest under its id.
     const std::string name_prefix = p_subgraph.debug_name.empty() ? std::string(p_subgraph_id) : p_subgraph.debug_name;
-    const auto nested_name = [&name_prefix](std::string_view p_debug_name, std::string_view p_id) {
-        return std::format("{}.{}", name_prefix, p_debug_name.empty() ? p_id : p_debug_name);
-    };
-    for (const auto& [resource_id, debug_name] : inner.debug_names) {
-        debug_names.insert_or_assign(scope.prefixed(resource_id), nested_name(debug_name, resource_id));
-    }
+    add_subgraph_debug_names(*this, inner, scope, name_prefix);
 
     RendSubgraphVK record(alloc, p_subgraph_id);
     record.debug_name = p_subgraph.debug_name;
-    const Vector<RendTaskResourceMap::ScopeBinding, RendAlloc> bindings = scope.bindings(alloc);
-    for (const RendTaskDescVK& inner_task : inner.tasks) {
-        RendTaskDescVK task = inner_task;
-        task.task_id = scope.prefixed(inner_task.task_id);
-        task.debug_name = nested_name(inner_task.debug_name, inner_task.task_id);
-        rename_edges(task.next);
-        task.resource_map.enclose(bindings);
-        record.members.push_back(task.task_id);
-        tasks.push_back(std::move(task));
-    }
-    for (const RendSubgraphVK& inner_record : inner.subgraphs) {
-        RendSubgraphVK nested = inner_record;
-        nested.subgraph_id = scope.prefixed(inner_record.subgraph_id);
-        nested.debug_name = nested_name(inner_record.debug_name, inner_record.subgraph_id);
-        for (RendTaskID& member : nested.members) {
-            member = scope.prefixed(member);
-        }
-        rename_edges(nested.next);
-        subgraphs.push_back(std::move(nested));
-    }
+    add_subgraph_tasks(*this, inner, scope, name_prefix, p_subgraph_id, record);
+    add_nested_subgraphs(*this, inner, scope, name_prefix, p_subgraph_id);
     subgraphs.push_back(std::move(record));
     return subgraphs.back();
 }
@@ -354,8 +419,18 @@ RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, c
 }
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<IRendObjectContainer> p_container) {
-    IBindableRendResourceVK::bind_container(*this, p_resource_id, std::move(p_container));
-    return *this;
+    if (p_resource_id.empty()) {
+        throw std::runtime_error("Failed to bind render resource: resource id is empty.");
+    }
+    if (p_container == MEM_NULL) {
+        throw std::runtime_error(std::format("Failed to bind render resource '{}': container is null.", p_resource_id));
+    }
+    const RendResTID type_id = p_container->get_resource_type_id();
+    return add_resource(RendResVK{
+        .res_id = std::string(p_resource_id),
+        .res_type_id = type_id,
+        .container = std::move(p_container),
+    });
 }
 
 bool RendGraphDescVK::contains_resource(std::string_view p_resource_id) const {
