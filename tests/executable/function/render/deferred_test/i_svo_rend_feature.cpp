@@ -17,6 +17,7 @@
 #include "core/data/data_value.hh"
 #include "core/memory/reference_strong.hh"
 #include "dynamic_mesh_rend_feature.hh"
+#include "function/render/gpu_vector.hh"
 #include "function/render/rend_resource_unit.hh"
 #include "function/rend_vk/graphics_pipeline_compiler_vk.hh"
 #include "function/rend_vk/mesh_resources_vk.hh"
@@ -183,7 +184,7 @@ void ISVORendFeature::configure_recipe(
         .pre_deferred_debug_info = sizeof(SVOInfo),
         .pre_deferred_debug_list = sizeof(uint32_t) * SVO_MAX_DEFERRED_TASK_COUNT,
         .occupancy = sizeof(float) * SVO_MAX_DATA_COUNT,
-        .radiance_index = COUNTED_BUFFER_HEADER_BYTE_SIZE + SVOGI_RADIANCE_INDEX_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
+        .radiance_index = GPUVector<std::array<uint32_t, 2>>::HEADER_SIZE + SVOGI_RADIANCE_INDEX_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
         .radiance_staged = SVOGI_RADIANCE_STAGED_BYTE_SIZE * SVOGI_RADIANCE_ENTRY_COUNT,
         .debug_draw_node_list = sizeof(uint32_t) * SVO_MAX_NODE_COUNT,
     };

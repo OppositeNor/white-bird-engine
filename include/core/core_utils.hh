@@ -73,7 +73,7 @@ protected:
      * @throws std::runtime_error If the instance was not created with make_ref() or is being destroyed.
      */
     Ref<T> acquire_this_ref() const {
-        Ref<T> result = const_cast<RefWeak<T>&>(this_ref).lock();
+        Ref<T> result = const_cast<RefWeak<T>&>(this_ref).lock(); // NOLINT
         if (result == MEM_NULL) {
             throw std::runtime_error("Instance is not owned by a Ref.");
         }

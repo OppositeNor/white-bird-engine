@@ -67,7 +67,7 @@ Ref<ROBuffer> require_buffer_resource(Ref<IRendObject> p_resource, uint32_t p_sl
 } // namespace
 
 ROCMultislots::ROCMultislots(RendAlloc* p_alloc, uint32_t p_slot_count, Factory p_factory, bool p_flush)
-    : alloc(p_alloc), factory(std::move(p_factory)), flush(p_flush),
+    : factory(std::move(p_factory)), flush(p_flush),
       resources(create_slot_resources(p_alloc, p_slot_count)),
       applied_generations(create_applied_generations(p_alloc, p_slot_count)), pending_buffer_data(p_alloc) {
     if (factory == nullptr) {

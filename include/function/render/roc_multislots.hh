@@ -23,7 +23,6 @@
 #include "function/render/i_rend_object_container.hh"
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 
 namespace WhiteBirdEngine {
 
@@ -108,7 +107,6 @@ public:
 private:
     void synchronize(uint32_t p_slot) const;
 
-    RendAlloc* alloc = nullptr;
     Factory factory;
     bool flush = true;
     Vector<Ref<IRendObject>, RendAlloc> resources;

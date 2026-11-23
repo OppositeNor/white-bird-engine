@@ -181,8 +181,6 @@ private:
     static constexpr size_t SVOGI_MAX_SPOT_LIGHT_COUNT = 4;
     static constexpr size_t SVOGI_RADIANCE_ENTRY_COUNT =
         size_t{SVOGI_RADIANCE_SAMPLE_EXTENT} * SVOGI_RADIANCE_SAMPLE_EXTENT * SVOGI_MAX_SPOT_LIGHT_COUNT;
-    // WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE in utils/counted_buffer.slang.
-    static constexpr size_t COUNTED_BUFFER_HEADER_BYTE_SIZE = 16;
     // A uint2 (key, entry) pair.
     static constexpr size_t SVOGI_RADIANCE_INDEX_BYTE_SIZE = sizeof(uint32_t) * 2;
     // The std430 stride of SegmentedWrapper<float3x3>: three 16-byte matrix rows and the segment flag, padded to 16 bytes.
