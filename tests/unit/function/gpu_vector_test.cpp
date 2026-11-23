@@ -18,10 +18,15 @@
 #include "function/render/rend_defs.hh"
 #include "function/render/ro_buffer.hh"
 #include "utils/utils.hh"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <iterator>
+#include <numeric>
+#include <ranges>
+#include <span>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -298,6 +303,77 @@ TEST_F(WBEGPUVectorTest, MoveTransfersBufferAndElements) {
     EXPECT_EQ(destination.get(0), 5U);
     EXPECT_EQ(destination.get_buffer().get(), static_cast<ROBuffer*>(buffer.get()));
     EXPECT_EQ(buffer->stored_byte_size(), sizeof(uint32_t));
+}
+
+static_assert(std::ranges::contiguous_range<GPUVector<uint32_t>>);
+static_assert(std::ranges::contiguous_range<const GPUVector<uint32_t>>);
+
+TEST_F(WBEGPUVectorTest, RangeForVisitsEveryElementInOrder) {
+    GPUVector<uint32_t> vector(make_buffer(bytes_for<uint32_t>(4)));
+    vector.push_back(1U);
+    vector.push_back(2U);
+    vector.push_back(3U);
+
+    std::vector<uint32_t> visited;
+    for (uint32_t element : vector) {
+        visited.push_back(element);
+    }
+
+    EXPECT_EQ(visited, (std::vector<uint32_t>{1, 2, 3}));
+    EXPECT_EQ(std::distance(vector.begin(), vector.end()), 3);
+}
+
+TEST_F(WBEGPUVectorTest, IteratorsWriteIntoMappedMemory) {
+    Ref<ROBufferHostTest> buffer = make_buffer(bytes_for<uint32_t>(3));
+    GPUVector<uint32_t> vector(buffer);
+    vector.push_back(3U);
+    vector.push_back(1U);
+    vector.push_back(2U);
+
+    std::ranges::sort(vector);
+    for (uint32_t& element : vector) {
+        element *= 10U;
+    }
+
+    EXPECT_EQ(buffer->elements<uint32_t>()[0], 10U);
+    EXPECT_EQ(buffer->elements<uint32_t>()[1], 20U);
+    EXPECT_EQ(buffer->elements<uint32_t>()[2], 30U);
+}
+
+TEST_F(WBEGPUVectorTest, ConstVectorIteratesReadOnly) {
+    GPUVector<uint32_t> vector(make_buffer(bytes_for<uint32_t>(4)));
+    vector.push_back(4U);
+    vector.push_back(5U);
+    const GPUVector<uint32_t>& const_vector = vector;
+
+    static_assert(std::is_same_v<decltype(const_vector.begin()), const uint32_t*>);
+    EXPECT_EQ(std::accumulate(const_vector.begin(), const_vector.end(), 0U), 9U);
+}
+
+TEST_F(WBEGPUVectorTest, SpanViewsTheElements) {
+    GPUVector<TestElement> vector(make_buffer(bytes_for<TestElement>(2)));
+    vector.push_back(TestElement{.a = 7, .b = 0.5F});
+
+    std::span<TestElement> elements(vector);
+
+    ASSERT_EQ(elements.size(), 1U);
+    EXPECT_EQ(elements[0], (TestElement{.a = 7, .b = 0.5F}));
+}
+
+TEST_F(WBEGPUVectorTest, EmptyVectorHasEqualBeginAndEnd) {
+    GPUVector<uint32_t> vector(make_buffer(bytes_for<uint32_t>(2)));
+
+    EXPECT_EQ(vector.begin(), vector.end());
+}
+
+TEST_F(WBEGPUVectorTest, IterationThrowsWithoutHostMapping) {
+    GPUVector<uint32_t> vector(make_buffer(bytes_for<uint32_t>(2), false));
+    const GPUVector<uint32_t>& const_vector = vector;
+
+    EXPECT_THROW(static_cast<void>(vector.begin()), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(vector.end()), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(const_vector.begin()), std::runtime_error);
+    EXPECT_THROW(static_cast<void>(const_vector.end()), std::runtime_error);
 }
 
 } // namespace WhiteBirdEngine

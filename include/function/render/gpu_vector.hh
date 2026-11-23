@@ -43,6 +43,10 @@ namespace WhiteBirdEngine {
  * visible, the size and elements are unavailable to the CPU: every operation that needs them fails with NOT_VISIBLE, and
  * only capacity() and get_buffer() work.
  *
+ * The vector is a contiguous range: begin() and end() are pointers into the mapping, so it works with range-for,
+ * std::ranges algorithms, and std::span. end() reads the size when it is called; an iteration does not see elements added
+ * or removed after it.
+ *
  * Movable, not copyable; a moved-from vector holds no buffer and must only be destroyed or assigned. Confined to the
  * rendering thread, like its buffer.
  *
@@ -60,6 +64,19 @@ public:
     static constexpr size_t HEADER_SIZE = 16;
 
     static_assert(alignof(T) <= HEADER_SIZE, "GPUVector elements must not need more than 16-byte alignment.");
+
+    /**
+     * @brief The element type.
+     */
+    using value_type = T; // NOLINT
+    /**
+     * @brief Mutable iterator: a pointer into the buffer's mapping.
+     */
+    using iterator = T*; // NOLINT
+    /**
+     * @brief Read-only iterator: a pointer into the buffer's mapping.
+     */
+    using const_iterator = const T*; // NOLINT
 
     /**
      * @enum Failure
@@ -289,6 +306,46 @@ public:
     }
 
     /**
+     * @brief Get an iterator to the first element.
+     *
+     * @return The first element's address in the buffer's mapping.
+     * @throws std::runtime_error If the buffer is not host visible.
+     */
+    iterator begin() {
+        return require_data();
+    }
+
+    /**
+     * @brief Get an iterator past the last element.
+     *
+     * @return The address after the last element in the buffer's mapping.
+     * @throws std::runtime_error If the buffer is not host visible.
+     */
+    iterator end() {
+        return require_data() + size();
+    }
+
+    /**
+     * @brief Get an iterator to the first element.
+     *
+     * @return The first element's address in the buffer's mapping.
+     * @throws std::runtime_error If the buffer is not host visible.
+     */
+    const_iterator begin() const {
+        return require_data();
+    }
+
+    /**
+     * @brief Get an iterator past the last element.
+     *
+     * @return The address after the last element in the buffer's mapping.
+     * @throws std::runtime_error If the buffer is not host visible.
+     */
+    const_iterator end() const {
+        return require_data() + size();
+    }
+
+    /**
      * @brief Get the buffer the size and elements are stored in.
      *
      * @return The buffer.
@@ -307,6 +364,13 @@ public:
     }
 
 private:
+    T* require_data() const {
+        if (!byte_size.has_value()) {
+            throw std::runtime_error("Failed to iterate GPU vector: the buffer is not host visible.");
+        }
+        return data;
+    }
+
     // Requires a host-visible buffer and a size within the capacity, whose byte size therefore fits in uint32_t.
     void store_size(uint32_t p_size) {
         WBE_DEBUG_ASSERT(byte_size.has_value());
