@@ -19,7 +19,7 @@
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
 #include "function/rend_vk/mesh_resources_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "glm/ext/matrix_float4x4.hpp"
 #include <string_view>
 
@@ -74,7 +74,7 @@ public:
 
 private:
     Ref<MeshResourcesVK> mesh;
-    Ref<ROCMultislotsVK> transform_buffers;
+    Ref<ROCMultislots> transform_buffers;
     glm::mat4 transform{1.0F};
 };
 

@@ -13,7 +13,8 @@
    limitations under the License.
 */
 #include "function/rend_vk/ro_pipeline_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "core/core_utils.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/shader_metadata_vk_utils.hh"
 #include <stdexcept>
@@ -21,7 +22,7 @@
 
 namespace WhiteBirdEngine {
 
-ROPipelineVK::ROPipelineVK(const RendContextVK* p_rend_data) : IRendObjectVK(p_rend_data) {
+ROPipelineVK::ROPipelineVK(const RendContextVK* p_rend_data) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
 }
 
 ROPipelineVK::~ROPipelineVK() {

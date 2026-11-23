@@ -22,7 +22,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rt_params_generate_mipmaps_vk.hh"
 #include <cstdint>
@@ -101,8 +101,8 @@ private:
     const RendContextVK* rend_data = nullptr;
     std::string source_view_id;
     std::string mip_chain_view_id;
-    Ref<RendObjectContainerVK> source_view_container;
-    Ref<RendObjectContainerVK> mip_chain_view_container;
+    Ref<IRendObjectContainer> source_view_container;
+    Ref<IRendObjectContainer> mip_chain_view_container;
     VkExtent2D base_extent{};
     uint32_t mipmap_level_count = 1;
     uint32_t downsample_rate = 2;

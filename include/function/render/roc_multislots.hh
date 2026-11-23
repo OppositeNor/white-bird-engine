@@ -12,16 +12,15 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_ROC_MULTISLOTS_VK_HH
-#define WBE_FILE_ROC_MULTISLOTS_VK_HH
+#ifndef WBE_FILE_ROC_MULTISLOTS_HH
+#define WBE_FILE_ROC_MULTISLOTS_HH
 
 #include "core/alloc/stl_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_rend_object.hh"
 #include "function/render/rend_defs.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/debug_data.hh"
+#include "function/render/i_rend_object_container.hh"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -29,19 +28,19 @@
 namespace WhiteBirdEngine {
 
 /**
- * @class ROCMultislotsVK
- * @brief Container that resolves a different render object for each configured slot.
+ * @class ROCMultislots
+ * @brief Container that resolves a different render object for each configured slot. Neither copyable nor movable.
  *
  * This general-purpose container is widely used to hold per-frame resources, with one slot for each frame in flight.
  */
-class ROCMultislotsVK final : public RendObjectContainerVK {
+class ROCMultislots final : public IRendObjectContainer {
 public:
-    ROCMultislotsVK() = delete;
-    virtual ~ROCMultislotsVK() override = default;
-    ROCMultislotsVK(const ROCMultislotsVK&) = delete;
-    ROCMultislotsVK(ROCMultislotsVK&&) noexcept = delete;
-    ROCMultislotsVK& operator=(const ROCMultislotsVK&) = delete;
-    ROCMultislotsVK& operator=(ROCMultislotsVK&&) noexcept = delete;
+    ROCMultislots() = delete;
+    virtual ~ROCMultislots() override = default;
+    ROCMultislots(const ROCMultislots&) = delete;
+    ROCMultislots(ROCMultislots&&) noexcept = delete;
+    ROCMultislots& operator=(const ROCMultislots&) = delete;
+    ROCMultislots& operator=(ROCMultislots&&) noexcept = delete;
 
     /**
      * @brief Create and populate an explicit number of slots.
@@ -51,7 +50,7 @@ public:
      * @param p_flush Whether published buffer updates are applied lazily when each slot is resolved.
      * @throws std::runtime_error If p_alloc or p_factory is null, p_slot_count is zero, or p_factory returns null.
      */
-    ROCMultislotsVK(RendAlloc* p_alloc, uint32_t p_slot_count, Factory p_factory, bool p_flush = true);
+    ROCMultislots(RendAlloc* p_alloc, uint32_t p_slot_count, Factory p_factory, bool p_flush = true);
 
     /**
      * @brief Resolve the first slot.
@@ -66,8 +65,8 @@ public:
     virtual Ref<IRendObject> get() const override;
     virtual Ref<IRendObject> get(uint32_t p_slot) override;
     virtual Ref<IRendObject> get(uint32_t p_slot) const override;
-    virtual DebugDataRows desc_debug_data() const override;
-    virtual void set(uint32_t p_slot, Ref<IRendObjectVK> p_resource) override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
+    virtual void set(uint32_t p_slot, Ref<IRendObject> p_resource) override;
 
     /**
      * @brief Release the resource retained for one slot.
@@ -81,11 +80,7 @@ public:
      */
     virtual void clear() override;
 
-    /**
-     * @brief Get the number of configured slots.
-     * @return Slot count.
-     */
-    uint32_t get_slot_count() const;
+    virtual uint32_t get_slot_count() const override;
 
     /**
      * @brief Replace the render object of every slot with a new one from the factory.
@@ -106,6 +101,7 @@ public:
      * @param p_data Bytes to copy into each slot's buffer.
      * @param p_dst_offset Destination offset in each buffer.
      * @param p_size Number of bytes to copy.
+     * @throws std::runtime_error If the data is empty, or a slot that applies it holds no ROBuffer.
      */
     void publish_buffer_update(const void* p_data, size_t p_dst_offset, size_t p_size);
 
@@ -115,7 +111,7 @@ private:
     RendAlloc* alloc = nullptr;
     Factory factory;
     bool flush = true;
-    Vector<Ref<IRendObjectVK>, RendAlloc> resources;
+    Vector<Ref<IRendObject>, RendAlloc> resources;
     mutable Vector<uint64_t, RendAlloc> applied_generations;
     Vector<uint8_t, RendAlloc> pending_buffer_data;
     uint64_t update_generation = 0;

@@ -25,7 +25,7 @@
 #include "function/rend_vk/pipeline_desc_bindings_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_targets_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_graphics_pipeline_vk.hh"
@@ -221,12 +221,12 @@ private:
     Vector<std::string, RendAlloc> vertex_buffer_ids;
     std::string index_buffer_id;
     Vector<std::string, RendAlloc> indirect_buffer_ids;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> vertex_buffer_containers;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> vertex_buffer_containers;
     // Per-record scratch storage for the buffers and offsets bound by one batch, sized for the largest batch.
     Vector<VkBuffer, RendAlloc> bound_vertex_buffers;
     Vector<VkDeviceSize, RendAlloc> bound_vertex_buffer_offsets;
-    Ref<RendObjectContainerVK> index_buffer_container;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> indirect_buffer_containers;
+    Ref<IRendObjectContainer> index_buffer_container;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> indirect_buffer_containers;
     Vector<Unique<PipelineDescBindingsVK>, RendAlloc> desc_bindings;
 
     void init_desc_bindings();

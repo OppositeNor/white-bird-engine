@@ -15,7 +15,8 @@
 #ifndef WBE_FILE_RO_PIPELINE_VK_HH
 #define WBE_FILE_RO_PIPELINE_VK_HH
 
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/shader_metadata_vk_utils.hh"
 #include <vulkan/vulkan_core.h>
@@ -29,7 +30,7 @@ class ComputePipelineCompilerVK;
  * @class ROPipelineVK
  * @brief Shared Vulkan pipeline runtime ownership.
  */
-class ROPipelineVK : public IRendObjectVK {
+class ROPipelineVK : public IRendObject {
 public:
     ROPipelineVK() = delete;
     virtual ~ROPipelineVK() override;
@@ -55,6 +56,11 @@ public:
     }
 
 protected:
+    /**
+     * @brief The base render data.
+     */
+    const RendContextVK* rend_data = nullptr;
+
     /**
      * @brief Construct shared runtime state.
      * @param p_rend_data Base Vulkan render data.

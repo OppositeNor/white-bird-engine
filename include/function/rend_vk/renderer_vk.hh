@@ -35,7 +35,7 @@
 #include "function/rend_vk/ro_fense_vk.hh"
 #include "function/rend_vk/ro_image_view_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/semaphore_vk.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
@@ -207,7 +207,7 @@ public:
      * @return The renderer-owned swap-chain image-view container.
      * @throws std::runtime_error If the renderer has no swap-chain image-view container.
      */
-    Ref<ROCMultislotsVK> acquire_swap_chain_image_view_container() const;
+    Ref<ROCMultislots> acquire_swap_chain_image_view_container() const;
 
     /**
      * @brief Register a task to be called after a number of frames. This could
@@ -280,7 +280,7 @@ private:
     VkCommandPool compute_command_pool = VK_NULL_HANDLE;
 
     Unique<DescHeapAllocVK> desc_heap_alloc;
-    Ref<ROCMultislotsVK> swap_chain_image_view_container;
+    Ref<ROCMultislots> swap_chain_image_view_container;
     Ref<ROBufferVK> shader_debug_buffer;
 
     Vector<Ref<ROFenseVK>, AllocType> in_flight_fences;

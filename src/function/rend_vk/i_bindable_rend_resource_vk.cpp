@@ -15,11 +15,11 @@
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/rend_vk/rend_resource_list_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_graph_desc_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/i_rend_object_container.hh"
+#include "function/render/roc_single.hh"
 #include <format>
 #include <stdexcept>
 #include <string>
@@ -33,7 +33,7 @@ std::string IBindableRendResourceVK::make_member_resource_id(std::string_view p_
 }
 
 void IBindableRendResourceVK::bind_rend_object(
-    RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObjectVK> p_resource) {
+    RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObject> p_resource) {
     if (p_resource == MEM_NULL) {
         throw std::runtime_error(std::format("Failed to bind render resource '{}': render object is null.", p_resource_id));
     }
@@ -42,13 +42,13 @@ void IBindableRendResourceVK::bind_rend_object(
         p_resource->set_debug_name(p_resource_id);
     }
     // The container keeps resolving the imported object; recreating it rebinds the same object.
-    bind_container(p_graph, p_resource_id, make_ref<ROCSingleVK>(p_graph.alloc, [resource = std::move(p_resource)](uint32_t /*p_slot*/) {
+    bind_container(p_graph, p_resource_id, make_ref<ROCSingle>(p_graph.alloc, [resource = std::move(p_resource)](uint32_t /*p_slot*/) -> Ref<IRendObject> {
         return resource;
     }));
 }
 
 void IBindableRendResourceVK::bind_container(
-    RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<RendObjectContainerVK> p_container) {
+    RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObjectContainer> p_container) {
     if (p_resource_id.empty()) {
         throw std::runtime_error("Failed to bind render resource: resource id is empty.");
     }

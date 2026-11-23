@@ -25,7 +25,7 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rt_params_cpu_in_flight_acquire_vk.hh"
 #include <cstdint>
 #include <future>
@@ -122,7 +122,7 @@ private:
     std::string image_view_id;
     std::string event_id;
     EventManager* event_manager = nullptr;
-    Ref<RendObjectContainerVK> image_view_container;
+    Ref<IRendObjectContainer> image_view_container;
     Vector<std::future<void>, RendAlloc> pending_acquisitions;
 };
 

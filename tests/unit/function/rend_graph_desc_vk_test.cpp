@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/alloc/i_alloc.hh"
+#include "core/core_utils.hh"
 #include "core/alloc/stl_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
@@ -27,8 +28,7 @@
 #include "function/rend_vk/rend_graph_vk.hh"
 #include "function/rend_vk/rend_resource_list_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_single.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -72,10 +72,9 @@ private:
 };
 
 /** @brief Minimal render object that fills the container used to test container binding. */
-class TestContainerResourceVK final : public IRendObjectVK {
+class TestContainerResourceVK final : public IRendObject {
 public:
-    explicit TestContainerResourceVK(const RendContextVK* p_rend_data) : IRendObjectVK(p_rend_data) {
-    }
+    TestContainerResourceVK() = default;
     virtual ~TestContainerResourceVK() override = default;
     TestContainerResourceVK(const TestContainerResourceVK&) = delete;
     TestContainerResourceVK(TestContainerResourceVK&&) noexcept = delete;
@@ -262,15 +261,11 @@ TEST(WBERendGraphDescVKTest, IncompleteMeshResourcesRefuseToBind) {
     EXPECT_TRUE(desc.resources.empty());
 }
 
-TEST(WBERendGraphDescVKTest, ContainerNotOwnedByRefRefusesToBindItself) {
+TEST(WBERendGraphDescVKTest, NullContainerRefusesToBind) {
     RendAlloc alloc(WBE_KI_B(64));
     RendGraphDescVK desc(&alloc);
-    RendContextVK rend_data(&alloc);
-    ROCMultislotsVK container(&alloc, 1, [&alloc, &rend_data](uint32_t /*p_slot*/) {
-        return make_ref<TestContainerResourceVK>(&alloc, &rend_data).dynamic_cast_ref<IRendObjectVK>();
-    });
 
-    EXPECT_THROW(desc.add_resource("container", container), std::runtime_error);
+    EXPECT_THROW(desc.add_resource("container", Ref<IRendObjectContainer>(MEM_NULL)), std::runtime_error);
     EXPECT_TRUE(desc.resources.empty());
 }
 
@@ -283,9 +278,9 @@ RendTaskDescVK make_empty_task(RendAlloc* p_alloc, std::string_view p_task_id) {
     });
 }
 
-Ref<ROCSingleVK> make_import_container(RendAlloc* p_alloc, const RendContextVK* p_rend_data) {
-    return make_ref<ROCSingleVK>(p_alloc, [p_alloc, p_rend_data](uint32_t /*p_slot*/) {
-        return make_ref<TestContainerResourceVK>(p_alloc, p_rend_data).dynamic_cast_ref<IRendObjectVK>();
+Ref<ROCSingle> make_import_container(RendAlloc* p_alloc) {
+    return make_ref<ROCSingle>(p_alloc, [p_alloc](uint32_t /*p_slot*/) {
+        return make_ref<TestContainerResourceVK>(p_alloc).dynamic_cast_ref<IRendObject>();
     });
 }
 
@@ -459,29 +454,28 @@ TEST(WBERendGraphDescVKTest, NestedSubgraphsArePrefixedAgain) {
 
 TEST(WBERendGraphDescVKTest, SubgraphImportsMergeIntoTheGraph) {
     RendAlloc alloc(WBE_KI_B(128));
-    RendContextVK rend_data(&alloc);
-    Ref<ROCSingleVK> mesh = make_import_container(&alloc, &rend_data);
+    Ref<ROCSingle> mesh = make_import_container(&alloc);
     RendGraphDescVK desc(&alloc);
     desc.add_resource(RendResVK{.res_id = "mesh", .container = mesh});
     RendSubgraphDescVK subgraph(&alloc);
     subgraph.graph.add_resource(RendResVK{.res_id = "mesh", .container = mesh});
-    subgraph.graph.add_resource(RendResVK{.res_id = "camera", .container = make_import_container(&alloc, &rend_data)});
+    subgraph.graph.add_resource(RendResVK{.res_id = "camera", .container = make_import_container(&alloc)});
     subgraph.graph.add_task(make_empty_task(&alloc, "draw"));
     desc.add_subgraph("first", subgraph, {});
 
     ASSERT_EQ(desc.resources.size(), 2U);
     EXPECT_EQ(desc.resources[1].res_id, "camera");
     // Each import of a render object wraps it in a container of its own; the same object still merges.
-    const Ref<IRendObjectVK> camera = desc.resources[1].container->get().dynamic_cast_ref<IRendObjectVK>();
+    const Ref<IRendObject> camera = desc.resources[1].container->get().dynamic_cast_ref<IRendObject>();
     RendSubgraphDescVK rewrapping(&alloc);
-    rewrapping.graph.add_resource(RendResVK{.res_id = "camera", .container = make_ref<ROCSingleVK>(&alloc, [camera](uint32_t /*p_slot*/) {
+    rewrapping.graph.add_resource(RendResVK{.res_id = "camera", .container = make_ref<ROCSingle>(&alloc, [camera](uint32_t /*p_slot*/) {
                                                 return camera;
                                             })});
     desc.add_subgraph("rewrapping", rewrapping, {});
     EXPECT_EQ(desc.resources.size(), 2U);
     // A second subgraph importing another resource under an imported id conflicts.
     RendSubgraphDescVK conflicting(&alloc);
-    conflicting.graph.add_resource(RendResVK{.res_id = "mesh", .container = make_import_container(&alloc, &rend_data)});
+    conflicting.graph.add_resource(RendResVK{.res_id = "mesh", .container = make_import_container(&alloc)});
     EXPECT_THROW(desc.add_subgraph("second", conflicting, {}), std::runtime_error);
 }
 

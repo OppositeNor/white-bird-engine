@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
 #include "function/rend_vk/i_ro_ray_tracing_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
@@ -147,7 +147,7 @@ public:
      */
     uint32_t get_desc_index() const;
 
-    virtual DebugDataRows desc_debug_data() const override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
 
 
     /**

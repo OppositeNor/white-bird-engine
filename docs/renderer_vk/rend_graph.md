@@ -72,8 +72,8 @@ The diff relies on complete `operator==` on the description structs.
 - **Graph-owned resources** are declared with `add_buffer()`, `add_image()`, `add_image_view()`, and `add_sampler()`, each
   taking a factory of the context that returns `RendBufferDescVK`, `RendImageDescVK`, `RendImageViewDescVK`, or
   `RendSamplerDescVK`. The primary usage (`RendResPrimaryUsageVK`) selects Vulkan usage flags. Buffers take a memory domain,
-  optional initial data, and `per_frame`. Per-frame resources live in an `ROCMultislotsVK` with one slot per frame in flight,
-  and others in an `ROCSingleVK`. `set_debug_name()` names the objects the graph creates for a resource
+  optional initial data, and `per_frame`. Per-frame resources live in an `ROCMultislots` with one slot per frame in flight,
+  and others in an `ROCSingle`. `set_debug_name()` names the objects the graph creates for a resource
   (`<graph key>.<name>`, with `[<slot>]` per frame); unnamed ones are named by their id.
 - **Exports** (`add_export(name, resource_id)`) are the names `RendGraphVK::acquire_resource()` takes, so C++ can reach
   a resource whose id it does not know, such as one a recipe generated. Subgraphs cannot export.
@@ -89,7 +89,7 @@ export:
 
 ```cpp
 // The recipe returns graph.build({ tasks = { ... }, exports = { camera_info = camera_info } }).
-Ref<ROCMultislotsVK> camera_buffers = graph->acquire_resource("camera_info").dynamic_cast_ref<ROCMultislotsVK>();
+Ref<ROCMultislots> camera_buffers = graph->acquire_resource("camera_info").dynamic_cast_ref<ROCMultislots>();
 camera_buffers->publish_buffer_update(&camera_info, 0, sizeof(camera_info));
 ```
 

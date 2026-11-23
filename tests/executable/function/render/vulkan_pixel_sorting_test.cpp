@@ -32,7 +32,7 @@
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_desc_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_targets_vk.hh"
 #include "function/rend_vk/renderer_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
@@ -409,7 +409,7 @@ private:
     // The active render graph instance.
     WBE::Ref<WBE::RendGraphVK> rend_graph;
     // Graph-owned container of the post-processed result image, the content of the screenshots.
-    WBE::Ref<WBE::RendObjectContainerVK> result_image;
+    WBE::Ref<WBE::IRendObjectContainer> result_image;
     // A frame capture whose result image readback has not completed yet.
     struct PendingCapture {
         std::future<std::vector<uint8_t>> readback;

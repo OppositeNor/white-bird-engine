@@ -21,7 +21,7 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_image_view_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
@@ -100,7 +100,7 @@ void RTGenerateMipmapsVK::append_accesses(
 
 void RTGenerateMipmapsVK::bind_resources(const RendResViewVK& p_resources) {
     auto bind_view = [&p_resources](std::string_view p_view_id) {
-        Ref<RendObjectContainerVK> container = p_resources.get(p_view_id).container;
+        Ref<IRendObjectContainer> container = p_resources.get(p_view_id).container;
         if (container == MEM_NULL || container->get_resource_type_id() != TypeUUID<ROImageViewVK>::UUID) {
             throw std::runtime_error("RTGenerateMipmapsVK: image-view resource has the wrong type.");
         }

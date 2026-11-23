@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/shader_metadata_vk_utils.hh"
 #include <bit>
@@ -137,7 +137,7 @@ private:
     const RendContextVK* rend_data;
     ShaderDescHeapLayoutVK layout;
     Vector<uint8_t, RendAlloc> push_data;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> containers;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> containers;
     Vector<bool, RendAlloc> custom_values_set;
 };
 

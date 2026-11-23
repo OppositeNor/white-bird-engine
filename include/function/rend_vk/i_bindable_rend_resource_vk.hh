@@ -22,8 +22,8 @@
 namespace WhiteBirdEngine {
 
 struct RendGraphDescVK;
-class IRendObjectVK;
-class RendObjectContainerVK;
+class IRendObject;
+class IRendObjectContainer;
 class RendResourceListVK;
 
 /**
@@ -66,13 +66,13 @@ protected:
      * An object without a debug name is named p_resource_id. Call on the rendering thread.
      * @throws std::runtime_error If p_resource is null or p_resource_id is empty.
      */
-    static void bind_rend_object(RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObjectVK> p_resource);
+    static void bind_rend_object(RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObject> p_resource);
 
     /**
      * @brief Import one container under p_resource_id.
      * @throws std::runtime_error If p_container is null or p_resource_id is empty.
      */
-    static void bind_container(RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<RendObjectContainerVK> p_container);
+    static void bind_container(RendGraphDescVK& p_graph, std::string_view p_resource_id, Ref<IRendObjectContainer> p_container);
 
     /**
      * @brief Import an aggregate resource list under p_resource_id; its entries are registered as `<p_resource_id>[<index>]`.

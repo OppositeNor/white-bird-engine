@@ -24,7 +24,7 @@
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
 #include "function/rend_vk/ro_staging_buffer_vk.hh"
 #include "function/rend_vk/rt_params_cpu_in_flight_buffer_acquire_vk.hh"

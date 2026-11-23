@@ -250,12 +250,12 @@ DeferredRecipeContext ApplicationVulkanDeferredPBRTest::make_deferred_recipe_con
 RendGraphRecipeImportsVK ApplicationVulkanDeferredPBRTest::make_deferred_recipe_imports(bool p_use_summed_area_table) {
     // The renderer supplies the swap chain.
     RendGraphRecipeImportsVK imports;
-    imports.add(GBUFFER_CAMERA_INFO_BUFFER, *gbuffer_camera_info_ubos)
-        .add(COMPOSITION_CAMERA_INFO_BUFFER, *composition_camera_info_ubos)
-        .add(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_buffers);
+    imports.add(GBUFFER_CAMERA_INFO_BUFFER, gbuffer_camera_info_ubos)
+        .add(COMPOSITION_CAMERA_INFO_BUFFER, composition_camera_info_ubos)
+        .add(SPOT_LIGHT_INFO_BUFFER, spot_light_info_buffers);
     for (uint32_t light_index = 0; light_index < SPOT_LIGHT_COUNT; ++light_index) {
         const SpotLightGraphIds ids = make_spot_light_graph_ids(light_index);
-        imports.add(ids.shadow_light_info, *shadow_light_info_buffers[light_index]).add(ids.light_billboard_info, *light_billboard_ubos[light_index]);
+        imports.add(ids.shadow_light_info, shadow_light_info_buffers[light_index]).add(ids.light_billboard_info, *light_billboard_ubos[light_index]);
     }
     imports.add_task(create_frame_sequence_acquire_task_desc(p_use_summed_area_table)).add_task(create_imgui_task_desc());
     if (mesh_acceleration_structure != MEM_NULL) {

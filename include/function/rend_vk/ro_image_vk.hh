@@ -22,7 +22,8 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/rend_vk/device_memory_vk.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/ro_image.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/ktx_vulkan_adapter.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
@@ -240,7 +241,7 @@ struct ImageAliasDescVK {
  * @brief Image.
  *
  */
-class WBE_META(WBE_REND_OBJECT) ROImageVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class WBE_META(WBE_REND_OBJECT) ROImageVK final : public ROImage, public IBindableRendResourceVK {
     friend struct MemoryBarrierBuilder;
     friend class RendererVK;
 
@@ -291,8 +292,6 @@ public:
     ROImageVK& operator=(ROImageVK&&) noexcept = delete;
 
     virtual TypeID get_type_uuid() const override;
-
-    virtual void apply_debug_name(std::string_view p_name) override;
 
     /**
      * @brief Constructor. Allocates a device-local device memory for the image and binds it.
@@ -346,7 +345,7 @@ public:
      *
      * @return The device memory, or null.
      */
-    Ref<DeviceMemoryVK> acquire_memory() const {
+    Ref<DeviceMemoryVK> get_memory() const {
         return memory;
     }
 
@@ -622,6 +621,8 @@ public:
      * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
      */
     virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
+protected:
+    virtual void apply_debug_name(std::string_view p_name) override;
 
 private:
     enum class Ownership {
@@ -630,6 +631,7 @@ private:
         SWAP_CHAIN,
     };
 
+    const RendContextVK* rend_data = nullptr;
     ExposedFields exposed_fields{};
     Ref<DeviceMemoryVK> memory;
     ktxVulkanTexture ktx_texture{};

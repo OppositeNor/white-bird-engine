@@ -26,7 +26,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_resource_unit.hh"
 #include "function/rend_vk/graphics_pipeline_compiler_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/mesh_acceleration_structure_compiler_vk.hh"
 #include "function/rend_vk/mesh_acceleration_structure_vk.hh"
 #include "function/rend_vk/mesh_compiler_vk.hh"
@@ -35,7 +35,7 @@
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "function/rend_vk/rt_triggered_vk.hh"
 #include "function/rend_vk/vulkan_enums_vk.hh"
@@ -113,12 +113,12 @@ void update_spot_light_view(ComponentSpotLight& p_spot_light_component) {
 }
 
 // Each frame's buffer is registered in the global render cache as `<p_key>[<slot>]`, which names it.
-Ref<ROCMultislotsVK> create_per_frame_buffers(
+Ref<ROCMultislots> create_per_frame_buffers(
     RendAlloc* p_alloc, const RendContextVK* p_rend_data, std::string_view p_key, VkDeviceSize p_buffer_size, VkBufferUsageFlags p_usage) {
-    return make_ref<ROCMultislotsVK>(p_alloc,
+    return make_ref<ROCMultislots>(p_alloc,
         p_alloc,
         p_rend_data->frames_in_flight,
-        [p_rend_data, key = std::string(p_key), p_buffer_size, p_usage](uint32_t p_frame_slot) -> Ref<IRendObjectVK> {
+        [p_rend_data, key = std::string(p_key), p_buffer_size, p_usage](uint32_t p_frame_slot) -> Ref<IRendObject> {
             Ref<ROBufferVK> buffer = p_rend_data->create_buffer(ROBufferVK::Builder().set_properties(p_buffer_size, p_usage));
             p_rend_data->rend_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
             return buffer;
@@ -791,19 +791,19 @@ void ApplicationVulkanDeferredPBRTest::write_dynamic_camera_descs() {
 
     gbuffer_camera_info_ubos->publish_buffer_update(&gbuffer_camera_info, 0, sizeof(gbuffer_camera_info));
     composition_camera_info_ubos->publish_buffer_update(&composition_camera_info, 0, sizeof(composition_camera_info));
-    log_uniform_buffer_descs(gbuffer_camera_info_ubos, "G-buffer camera buffer");
-    log_uniform_buffer_descs(composition_camera_info_ubos, "Composition camera buffer");
+    log_uniform_buffer_descs(rend_alloc, gbuffer_camera_info_ubos, "G-buffer camera buffer");
+    log_uniform_buffer_descs(rend_alloc, composition_camera_info_ubos, "Composition camera buffer");
 }
 
 void ApplicationVulkanDeferredPBRTest::write_dynamic_light_descs() {
     SpotLightInfosGPU spot_light_infos = make_spot_light_infos_gpu(spot_light_components);
 
     spot_light_info_buffers->publish_buffer_update(&spot_light_infos, 0, sizeof(spot_light_infos));
-    log_uniform_buffer_descs(spot_light_info_buffers, "Spot light buffer");
+    log_uniform_buffer_descs(rend_alloc, spot_light_info_buffers, "Spot light buffer");
     for (uint32_t i = 0; i < SPOT_LIGHT_COUNT; ++i) {
         shadow_light_info_buffers[i]->publish_buffer_update(
             &spot_light_infos.spot_light_info[i], 0, sizeof(spot_light_infos.spot_light_info[i]));
-        log_uniform_buffer_descs(shadow_light_info_buffers[i], std::format("Spot light {} shadow camera buffer", i));
+        log_uniform_buffer_descs(rend_alloc, shadow_light_info_buffers[i], std::format("Spot light {} shadow camera buffer", i));
     }
 }
 

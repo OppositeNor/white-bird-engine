@@ -15,6 +15,10 @@
 #ifndef WBE_FILE_I_REND_OBJECT_HH
 #define WBE_FILE_I_REND_OBJECT_HH
 
+#include "core/core_utils.hh"
+#include "core/memory/reference_strong.hh"
+#include "function/render/debug_data.hh"
+#include "function/render/rend_defs.hh"
 #include "utils/utils.hh"
 
 #include <string>
@@ -30,12 +34,13 @@ namespace WhiteBirdEngine {
  * Render objects are confined to the rendering thread: their methods provide no internal synchronization, and other threads
  * submit work on them through IRenderer::add_job(). Their lifetime is bound to the renderer that created them; every
  * reference must be released before that renderer shuts down. Composite objects, which own other render objects (such as
- * a render graph and the resources it allocates), are render objects too.
+ * a render graph and the resources it allocates), are render objects too. Objects created with make_ref() know their owning
+ * Ref (acquire_this_ref()), which bindable render objects use to import themselves into render graphs.
  */
-class IRendObject {
+class IRendObject : public ThisRef<IRendObject> {
 public:
     IRendObject() = default;
-    virtual ~IRendObject() = default;
+    virtual ~IRendObject() override = default;
     IRendObject(const IRendObject&) = delete;
     IRendObject(IRendObject&&) noexcept = delete;
     IRendObject& operator=(const IRendObject&) = delete;
@@ -60,6 +65,19 @@ public:
     void set_debug_name(std::string_view p_name) {
         debug_name = p_name;
         apply_debug_name(debug_name);
+    }
+
+    /**
+     * @brief Return the descriptor-debug rows of the render object.
+     *
+     * Implementations must report only descriptors that already exist and must not allocate new descriptors while inspecting.
+     * The default implementation reports no rows.
+     *
+     * @param p_alloc The allocator of the returned rows.
+     * @return Descriptor-debug rows for this object.
+     */
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const {
+        return DebugDataRows(p_alloc);
     }
 
     /**

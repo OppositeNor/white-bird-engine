@@ -13,11 +13,12 @@
    limitations under the License.
 */
 #include "function/rend_vk/ro_sampler_vk.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/debug_utils_vk.hh"
 #include <string_view>
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/desc_heap_alloc_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/utils.hh"
@@ -195,7 +196,7 @@ VkSampler SamplerDescVK::create_vk_object(const RendContextVK* p_rend_data) cons
     return result;
 }
 
-ROSamplerVK::ROSamplerVK(const RendContextVK* p_rend_data, const Builder& p_builder) : IRendObjectVK(p_rend_data) {
+ROSamplerVK::ROSamplerVK(const RendContextVK* p_rend_data, const Builder& p_builder) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     create_info = VkSamplerCreateInfo{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .magFilter = p_builder.mag_filter,
         .minFilter = p_builder.min_filter,
@@ -252,8 +253,8 @@ uint32_t ROSamplerVK::get_sampler_index() const {
     return *sampler_index;
 }
 
-DebugDataRows ROSamplerVK::desc_debug_data() const {
-    DebugDataRows rows(rend_data->alloc);
+DebugDataRows ROSamplerVK::desc_debug_data(RendAlloc* p_alloc) const {
+    DebugDataRows rows(p_alloc);
     if (sampler_index.has_value()) {
         rows.emplace_back(make_desc_row(*sampler_index));
     }

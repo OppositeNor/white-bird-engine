@@ -42,7 +42,7 @@
 #include "function/rend_vk/ro_fense_vk.hh"
 #include "function/rend_vk/ro_image_view_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "function/window/i_window.hh"
 #include "generated/enum_reflection.gen.hh"
@@ -241,7 +241,7 @@ void RendererVK::execute_graph(Ref<RendGraphVK> p_graph, double p_delta) {
     ++rend_context.current_frame;
 }
 
-Ref<ROCMultislotsVK> RendererVK::acquire_swap_chain_image_view_container() const {
+Ref<ROCMultislots> RendererVK::acquire_swap_chain_image_view_container() const {
     if (swap_chain_image_view_container == MEM_NULL) {
         throw std::runtime_error("RendererVK: swap-chain image-view container is unavailable.");
     }
@@ -676,7 +676,7 @@ void RendererVK::refresh_swap_chain_image_view_container() {
     if (swap_chain_image_view_container == MEM_NULL || swap_chain_image_view_container->get_slot_count() != frames_in_flight) {
         // Every slot starts with a view of the current swap chain; execute_graph() rebinds the slot of each frame to the
         // view of the acquired image.
-        swap_chain_image_view_container = make_ref<ROCMultislotsVK>(
+        swap_chain_image_view_container = make_ref<ROCMultislots>(
             alloc,
             alloc,
             frames_in_flight,

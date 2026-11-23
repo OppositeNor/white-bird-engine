@@ -57,7 +57,7 @@ import; complete C++ descriptors (`RendGraphVK::build_from_desc()`) are for focu
 ```cpp
 // A compiler test's desc, bound to the graph it is built for.
 RendGraphDescVK graph_desc(rend_alloc, &graph);
-graph_desc.add_resource(REND_RES_SWAP_CHAIN, *swap_chain_container)
+graph_desc.add_resource(REND_RES_SWAP_CHAIN, swap_chain_container)
     .add_image("shadow_depth_image",
         [=](const RendGraphContextVK& /*p_context*/) {
             return RendImageDescVK{
@@ -87,8 +87,8 @@ sampler factories may be null to take defaults. The primary usage (`RendResPrima
 data. Unset view fields follow the viewed image, and depth formats default to the depth aspect. Size swap-chain-dependent
 resources from the context. Ids are unique lower-snake-case strings across imports and graph-owned resources.
 
-Every import is an `IBindableRendResourceVK`; null containers are rejected. When an import varies by frame, bind one
-stable container (`ROCMultislotsVK`) and mutate the objects inside it. Swap-chain-style containers use `p_flush = false`. The
+Every import is an `IBindableRendResourceVK` or a container passed as `Ref<IRendObjectContainer>`; null containers are rejected. When an import varies by frame, bind one
+stable container (`ROCMultislots`) and mutate the objects inside it. Swap-chain-style containers use `p_flush = false`. The
 renderer replaces the swap-chain container when `frames_in_flight` changes, so the graph acquires it again on every build.
 
 Update graph-owned buffers through `acquire_resource(export_name)` on the rendering thread, and re-acquire after a rebuild

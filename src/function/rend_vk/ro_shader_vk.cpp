@@ -18,7 +18,7 @@
 #include "core/core_utils.hh"
 #include "function/render/rend_resource_unit.hh"
 #include "function/render/shader_variant_resolver.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "resource/resource_manager/resource_manager.hh"
@@ -89,19 +89,19 @@ VkShaderModule ShaderDescVK::create_vk_object(const RendContextVK* p_rend_data, 
 }
 
 ROShaderVK::ROShaderVK(const RendContextVK* p_rend_context, const Builder& p_builder)
-    : IRendObjectVK(p_rend_context) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_context)) {
     init(p_builder);
 }
 
 ROShaderVK::ROShaderVK(const RendContextVK* p_rend_context, std::string_view p_resource_id)
-    : IRendObjectVK(p_rend_context) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_context)) {
     Builder builder;
     builder.set_code(p_resource_id);
     init(builder);
 }
 
 ROShaderVK::ROShaderVK(const RendContextVK* p_rend_context, RefRes<RUShader> p_resource)
-    : IRendObjectVK(p_rend_context) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_context)) {
     Builder builder;
     builder.set_code(p_resource);
     init(builder);

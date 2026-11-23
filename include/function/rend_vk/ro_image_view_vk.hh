@@ -20,9 +20,9 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
 #include "utils/utils.hh"
@@ -148,7 +148,7 @@ private:
  * @brief Vulkan image view object.
  *
  */
-class WBE_META(WBE_REND_OBJECT) ROImageViewVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class WBE_META(WBE_REND_OBJECT) ROImageViewVK final : public IRendObject, public IBindableRendResourceVK {
 public:
     /**
      * @brief Compatibility name for ImageViewDescVK.
@@ -361,7 +361,7 @@ public:
         return image_view;
     }
 
-    virtual DebugDataRows desc_debug_data() const override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
 
     /**
      * @brief Get or lazily create the sampled-image descriptor index.
@@ -403,6 +403,7 @@ public:
     virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
+    const RendContextVK* rend_data = nullptr;
     VkImageView image_view = VK_NULL_HANDLE;
 
     ExposedFields exposed_fields{};

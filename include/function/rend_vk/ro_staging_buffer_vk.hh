@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "utils/defs.hh"
@@ -127,7 +127,7 @@ struct StagingBufferDescVK {
     Unique<ROStagingBufferVK> create_unique(const RendContextVK* p_rend_context) const;
 };
 
-class WBE_META(WBE_REND_OBJECT) ROStagingBufferVK final : public IRendObjectVK {
+class WBE_META(WBE_REND_OBJECT) ROStagingBufferVK final : public IRendObject {
     friend class ROBufferVK;
 
 public:
@@ -224,6 +224,7 @@ private:
     };
     static_assert(sizeof(DataChunkHeader) == 16, "The size of the data chunk header should be 16.");
     static constexpr size_t DATA_CHUNK_HEADER_SIZE = sizeof(DataChunkHeader);
+    const RendContextVK* rend_data = nullptr;
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
     VmaAllocation allocation = VK_NULL_HANDLE;

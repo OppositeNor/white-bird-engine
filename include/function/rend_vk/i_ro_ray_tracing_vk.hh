@@ -15,11 +15,12 @@
 #ifndef WBE_FILE_RO_RAY_TRACING_VK
 #define WBE_FILE_RO_RAY_TRACING_VK
 
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include <stdexcept>
 namespace WhiteBirdEngine {
-class IRORayTracingVK : public IRendObjectVK {
+class IRORayTracingVK : public IRendObject {
 public:
     IRORayTracingVK() = delete;
     virtual ~IRORayTracingVK() override = default;
@@ -34,13 +35,18 @@ public:
      * @param p_rend_data The base render data.
      */
     IRORayTracingVK(const RendContextVK* p_rend_data, const BaseRayTracingDataVK* p_ray_tracing_data)
-        : IRendObjectVK(p_rend_data), ray_tracing_data(p_ray_tracing_data) {
+        : rend_data(WBE_REQUIRES_VALID(p_rend_data)), ray_tracing_data(p_ray_tracing_data) {
         if (p_ray_tracing_data == nullptr) {
             throw std::runtime_error("Ray tracing data is nullptr.");
         }
     }
 
 protected:
+    /**
+     * @brief The base render data.
+     */
+    const RendContextVK* rend_data = nullptr;
+
     const BaseRayTracingDataVK* ray_tracing_data;
 };
 

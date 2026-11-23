@@ -24,7 +24,7 @@
 #include "function/function_utils.hh"
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/device_memory_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/ktx_vulkan_adapter.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/renderer_vk.hh"
@@ -487,7 +487,7 @@ void ROImageVK::MemoryBarrierBuilder::apply_barrier(VkCommandBuffer p_command_bu
     }
 }
 
-ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const Builder& p_builder) : IRendObjectVK(p_rend_data) {
+ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const Builder& p_builder) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     create_image(p_builder, MEM_NULL, 0);
     memory = DeviceMemoryVK::Builder().set_image_requirements(exposed_fields.image).set_domain(DeviceDomain::DEVICE).create_ref(rend_data);
     VkResult result = vmaBindImageMemory(rend_data->vma_allocator, memory->get(), exposed_fields.image);
@@ -497,7 +497,7 @@ ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const Builder& p_builder)
     exposed_fields.image_memory = memory->fields().device_memory;
 }
 
-ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const AliasBuilder& p_builder) : IRendObjectVK(p_rend_data) {
+ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const AliasBuilder& p_builder) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing image: device memory is null.");
     }
@@ -507,7 +507,7 @@ ROImageVK::ROImageVK(const RendContextVK* p_rend_data, const AliasBuilder& p_bui
 }
 
 ROImageVK::ROImageVK(const RendContextVK* p_rend_data, VkImage p_image, VkImageLayout p_init_image_layout)
-    : IRendObjectVK(p_rend_data) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     exposed_fields.image = p_image;
     p_image = VK_NULL_HANDLE;
     exposed_fields.image_memory = VK_NULL_HANDLE;
@@ -517,7 +517,7 @@ ROImageVK::ROImageVK(const RendContextVK* p_rend_data, VkImage p_image, VkImageL
     ownership = Ownership::SWAP_CHAIN;
 }
 
-ROImageVK::ROImageVK(const RendContextVK* p_rend_data, ktxVulkanTexture p_texture) : IRendObjectVK(p_rend_data) {
+ROImageVK::ROImageVK(const RendContextVK* p_rend_data, ktxVulkanTexture p_texture) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     if (p_texture.image == VK_NULL_HANDLE || p_texture.deviceMemory == VK_NULL_HANDLE) {
         ktxVulkanTexture_Destruct(&p_texture, p_rend_data->logic_device, p_rend_data->allocation_callbacks);
         throw std::runtime_error("Failed to adopt libktx Vulkan texture: image or device memory is null.");

@@ -12,11 +12,10 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_bindable_rend_resource_vk.hh"
+#include "function/render/debug_data.hh"
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -40,12 +39,8 @@ std::string desc_rows_to_string(const DebugDataRows& p_rows) {
 
 } // namespace
 
-std::string RendObjectContainerVK::to_string() const {
-    return desc_rows_to_string(desc_debug_data());
-}
-
-void RendObjectContainerVK::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
-    bind_container(p_graph, p_resource_id, acquire_this_ref());
+std::string IRendObjectContainer::to_string(RendAlloc* p_alloc) const {
+    return desc_rows_to_string(desc_debug_data(p_alloc));
 }
 
 } // namespace WhiteBirdEngine

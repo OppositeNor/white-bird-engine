@@ -19,10 +19,10 @@
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/function_utils.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/desc_heap_alloc_vk.hh"
 #include "function/rend_vk/device_memory_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/renderer_vk.hh"
 #include "function/rend_vk/ro_fense_vk.hh"
@@ -379,7 +379,7 @@ void upload_init_data(
 
 } // namespace
 
-ROBufferVK::ROBufferVK(const RendContextVK* p_rend_data, const Builder& p_builder) : IRendObjectVK(p_rend_data) {
+ROBufferVK::ROBufferVK(const RendContextVK* p_rend_data, const Builder& p_builder) : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     exposed_fields.domain = WBE_REQUIRED(p_builder.domain);
     create_buffer(p_builder, false);
     memory = DeviceMemoryVK::Builder().set_buffer_requirements(buffer).set_domain(exposed_fields.domain).create_ref(rend_data);
@@ -391,7 +391,7 @@ ROBufferVK::ROBufferVK(const RendContextVK* p_rend_data, const Builder& p_builde
 }
 
 ROBufferVK::ROBufferVK(const RendContextVK* p_rend_data, const AliasBuilder& p_builder)
-    : IRendObjectVK(p_rend_data) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     if (p_builder.memory == MEM_NULL) {
         throw std::runtime_error("Failed to create aliasing buffer: device memory is null.");
     }
@@ -512,8 +512,8 @@ std::future<void> ROBufferVK::acquire_buffer_content(size_t p_source_offset, std
         });
 }
 
-DebugDataRows ROBufferVK::desc_debug_data() const {
-    DebugDataRows rows(rend_data->alloc);
+DebugDataRows ROBufferVK::desc_debug_data(RendAlloc* p_alloc) const {
+    DebugDataRows rows(p_alloc);
     if (!uniform_view_index.has_value() && !storage_view_index.has_value()) {
         return rows;
     }

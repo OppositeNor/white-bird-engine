@@ -23,7 +23,7 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/pipeline_desc_bindings_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_compute_pipeline_vk.hh"
 #include "function/rend_vk/rt_params_run_compute_pipeline_indirect_vk.hh"
@@ -114,7 +114,7 @@ private:
     Unique<PipelineDescBindingsVK> desc_bindings;
     std::string indirect_buffer_id;
     VkDeviceSize indirect_offset = 0;
-    Ref<RendObjectContainerVK> indirect_buffer_container;
+    Ref<IRendObjectContainer> indirect_buffer_container;
 };
 
 } // namespace WhiteBirdEngine

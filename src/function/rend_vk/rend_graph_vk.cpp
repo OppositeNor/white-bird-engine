@@ -27,10 +27,9 @@
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_graph_resource_registry.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/desc_heap_alloc_vk.hh"
 #include "function/rend_vk/i_rend_graph_bindings_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/mesh_resources_vk.hh"
 #include "function/rend_vk/rd_params_compute_pipeline_vk.hh"
@@ -54,8 +53,8 @@
 #include "function/rend_vk/ro_image_view_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
 #include "function/rend_vk/ro_sampler_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_multislots.hh"
+#include "function/render/roc_single.hh"
 #include "function/rend_vk/rr_compute_pipeline_vk.hh"
 #include "function/rend_vk/rr_graphics_pipeline_vk.hh"
 #include "function/rend_vk/rr_image_vk.hh"
@@ -108,11 +107,9 @@ void register_resource_list(Map<std::string, Ref<RendResVK>, RendAlloc>* p_resou
         if (p_resources->contains(indexed_id)) {
             throw std::runtime_error(std::format("RendGraphVK: duplicate resource-list entry id: {}.", indexed_id));
         }
-        Ref<IRendObjectVK> resource = p_resource_list->acquire_resource(index).dynamic_cast_ref<IRendObjectVK>();
-        if (resource == MEM_NULL) {
-            throw std::runtime_error(std::format("RendGraphVK: resource-list entry '{}' is not a Vulkan render object.", indexed_id));
-        }
-        Ref<ROCSingleVK> container = make_ref<ROCSingleVK>(p_alloc, [resource](uint32_t /*p_slot*/) {
+        // RendResourceListVK::add_resource() rejects null entries.
+        Ref<IRendObject> resource = p_resource_list->acquire_resource(index);
+        Ref<ROCSingle> container = make_ref<ROCSingle>(p_alloc, [resource](uint32_t /*p_slot*/) {
             return resource;
         });
         Ref<RendResVK> indexed_resource = make_ref<RendResVK>(p_alloc);
@@ -123,11 +120,11 @@ void register_resource_list(Map<std::string, Ref<RendResVK>, RendAlloc>* p_resou
     }
 }
 
-Ref<IRendObjectVK> resolve_rend_object(const RendResVK& p_resource, uint32_t p_slot) {
+Ref<IRendObject> resolve_rend_object(const RendResVK& p_resource, uint32_t p_slot) {
     if (p_resource.container == MEM_NULL) {
         return MEM_NULL;
     }
-    return p_resource.container->get(p_slot).dynamic_cast_ref<IRendObjectVK>();
+    return p_resource.container->get(p_slot);
 }
 
 DebugData make_desc_data(const DebugDataRows& p_rows) {
@@ -433,7 +430,7 @@ void validate_image_desc(std::string_view p_resource_id, const RendImageDescVK& 
     static_cast<void>(image_usage_flags(p_desc.usage, p_resource_id));
 }
 
-Ref<IRendObjectVK> make_buffer(const RendContextVK* p_rend_data, std::string_view p_resource_id, const RendBufferDescVK& p_desc) {
+Ref<IRendObject> make_buffer(const RendContextVK* p_rend_data, std::string_view p_resource_id, const RendBufferDescVK& p_desc) {
     WBE_DEBUG_ASSERT(p_desc.size != 0 || !p_desc.init_data.empty());
     const size_t size = p_desc.size == 0 ? p_desc.init_data.size() : p_desc.size;
     ROBufferVK::Builder builder;
@@ -444,7 +441,7 @@ Ref<IRendObjectVK> make_buffer(const RendContextVK* p_rend_data, std::string_vie
     return p_rend_data->create_buffer(builder);
 }
 
-Ref<IRendObjectVK> make_image(const RendContextVK* p_rend_data, std::string_view p_resource_id, const RendImageDescVK& p_desc) {
+Ref<IRendObject> make_image(const RendContextVK* p_rend_data, std::string_view p_resource_id, const RendImageDescVK& p_desc) {
     WBE_DEBUG_ASSERT(p_desc.format != VK_FORMAT_UNDEFINED);
     ROImageVK::Builder builder;
     builder.set_image_type(p_desc.image_type)
@@ -456,15 +453,10 @@ Ref<IRendObjectVK> make_image(const RendContextVK* p_rend_data, std::string_view
     return p_rend_data->create_image(builder);
 }
 
-uint32_t container_slot_count(const RendObjectContainerVK& p_container) {
-    const auto* multislots = dynamic_cast<const ROCMultislotsVK*>(&p_container);
-    return multislots != nullptr ? multislots->get_slot_count() : 1U;
-}
-
 // Whether a kept view no longer views the objects of its image container, because the image was recreated or an
 // imported image was replaced outside the graph.
-bool view_image_changed(const Ref<RendObjectContainerVK>& p_view_container, const Ref<RendObjectContainerVK>& p_image_container) {
-    const uint32_t slot_count = container_slot_count(*p_view_container);
+bool view_image_changed(const Ref<IRendObjectContainer>& p_view_container, const Ref<IRendObjectContainer>& p_image_container) {
+    const uint32_t slot_count = p_view_container->get_slot_count();
     for (uint32_t slot = 0; slot < slot_count; ++slot) {
         Ref<ROImageViewVK> view = p_view_container->get(slot).dynamic_cast_ref<ROImageViewVK>();
         WBE_DEBUG_ASSERT(view != MEM_NULL);
@@ -532,7 +524,7 @@ RendGraphResourceDiffVK::Signatures evaluate_signatures(const RendGraphDescVK& p
         const auto imported_image = p_imports.find(view_decl.image_id);
         if (!image_per_frame.has_value() && imported_image != p_imports.end() &&
             imported_image->second->container != MEM_NULL && imported_image->second->res_type_id == TypeUUID<ROImageVK>::UUID) {
-            image_per_frame = imported_image->second->container.dynamic_cast_ref<ROCMultislotsVK>() != MEM_NULL;
+            image_per_frame = imported_image->second->container.dynamic_cast_ref<ROCMultislots>() != MEM_NULL;
         }
         if (!image_per_frame.has_value()) {
             throw std::runtime_error(std::format("RendGraphVK: image view '{}' views '{}', which is not a declared image resource.",
@@ -611,7 +603,7 @@ struct RendGraphVK::RebuildState {
     std::optional<RendGraphRecipeSourceVK> recipe_source;
     std::optional<RendGraphDescVK> fixed_desc;
     RendGraphResourceDiffVK::Signatures signatures;
-    Map<std::string, Ref<RendObjectContainerVK>, RendAlloc> owned_containers;
+    Map<std::string, Ref<IRendObjectContainer>, RendAlloc> owned_containers;
     Vector<RendTaskDescVK, RendAlloc> task_descs;
     Vector<RendSubgraphVK, RendAlloc> subgraphs;
     // The current build's debug names of owned resources and exports; see RendGraphDescVK.
@@ -767,7 +759,7 @@ DebugDataRows RendResViewVK::desc_debug_data() const {
         if (resource == MEM_NULL || resource->container == MEM_NULL) {
             continue;
         }
-        DebugDataRows resource_rows = resource->container->desc_debug_data();
+        DebugDataRows resource_rows = resource->container->desc_debug_data(alloc);
         for (DebugData& row : resource_rows) {
             row.set_value("resource_id", resource_id);
             rows.emplace_back(std::move(row));
@@ -1061,15 +1053,15 @@ RendGraphDescVK RendGraphVK::make_desc() {
     const DataValue recipe_context = make_recipe_context(std::move(prepared.context), facts, recipe_key);
     const DataValue recipe = RendGraphScriptVK::run(*source.recipe, recipe_context, source.parameters);
     // Renderer-owned imports are acquired again for every build, so a rebuild sees the renderer's current objects.
-    Ref<ROCMultislotsVK> swap_chain;
-    if (recipe_declares_import(recipe, REND_RES_SWAP_CHAIN) && prepared.imports.find(REND_RES_SWAP_CHAIN) == nullptr) {
+    Ref<ROCMultislots> swap_chain;
+    if (recipe_declares_import(recipe, REND_RES_SWAP_CHAIN) && !prepared.imports.contains(REND_RES_SWAP_CHAIN)) {
         RendererVK* renderer = RendererVK::get_singleton();
         if (renderer == nullptr || renderer->get_rend_context() != rend_data) {
             throw std::runtime_error(std::format(
                 "RendGraphVK: recipe '{}' imports '{}', but the graph's renderer is unavailable.", recipe_key, REND_RES_SWAP_CHAIN));
         }
         swap_chain = renderer->acquire_swap_chain_image_view_container();
-        prepared.imports.add(REND_RES_SWAP_CHAIN, *swap_chain);
+        prepared.imports.add(REND_RES_SWAP_CHAIN, swap_chain);
     }
     stdout_log(WBE_CHANNEL_DEBUG)
         ->message(std::format("Compiling render graph '{}' from recipe '{}' for a {}x{} swap chain.",
@@ -1126,7 +1118,7 @@ Map<std::string, Ref<RendResVK>, RendAlloc> RendGraphVK::index_resources(const R
     return resources_by_id;
 }
 
-void RendGraphVK::bind_owned_resource(std::string_view p_resource_id, Ref<RendObjectContainerVK> p_container) {
+void RendGraphVK::bind_owned_resource(std::string_view p_resource_id, Ref<IRendObjectContainer> p_container) {
     if (all_resources.contains(p_resource_id)) {
         throw std::runtime_error(std::format("RendGraphVK: duplicate resource id: {}.", p_resource_id));
     }
@@ -1137,14 +1129,14 @@ void RendGraphVK::bind_owned_resource(std::string_view p_resource_id, Ref<RendOb
     all_resources.emplace(std::string(p_resource_id), std::move(resource));
 }
 
-Ref<RendObjectContainerVK> RendGraphVK::create_container(
-    std::string_view p_resource_id, bool p_per_frame, RendObjectContainerVK::Factory p_factory) const {
+Ref<IRendObjectContainer> RendGraphVK::create_container(
+    std::string_view p_resource_id, bool p_per_frame, IRendObjectContainer::Factory p_factory) const {
     // Register every object the container creates, including ones recreated after the context changes, as
     // `<graph key>.<id>`, or `<graph key>.<id>[<slot>]` for each frame's copy, then name it by its debug name the same way.
     // The debug name is looked up when the object is created, so a recreated object takes the current build's name.
-    RendObjectContainerVK::Factory factory =
+    IRendObjectContainer::Factory factory =
         [this, inner = std::move(p_factory), resource_id = std::string(p_resource_id), p_per_frame](uint32_t p_slot) {
-            Ref<IRendObjectVK> result = inner(p_slot);
+            Ref<IRendObject> result = inner(p_slot);
             if (result == MEM_NULL) {
                 return result;
             }
@@ -1162,9 +1154,9 @@ Ref<RendObjectContainerVK> RendGraphVK::create_container(
         };
     if (p_per_frame) {
         const uint32_t frames = std::max<uint32_t>(rend_data->frames_in_flight, 1U);
-        return make_ref<ROCMultislotsVK>(rend_data->alloc, rend_data->alloc, frames, std::move(factory));
+        return make_ref<ROCMultislots>(rend_data->alloc, rend_data->alloc, frames, std::move(factory));
     }
-    return make_ref<ROCSingleVK>(rend_data->alloc, std::move(factory));
+    return make_ref<ROCSingle>(rend_data->alloc, std::move(factory));
 }
 
 void RendGraphVK::apply_desc(const RendGraphDescVK& p_desc) {
@@ -1216,12 +1208,12 @@ void RendGraphVK::apply_owned_resource(std::string_view p_resource_id, RendResRe
     const auto signature = rebuild_state->signatures.find(p_resource_id);
     WBE_DEBUG_ASSERT(signature != rebuild_state->signatures.end());
     auto owned = rebuild_state->owned_containers.find(p_resource_id);
-    Ref<RendObjectContainerVK> container;
+    Ref<IRendObjectContainer> container;
     if (p_action == RendResRebuildActionVK::CREATE || p_action == RendResRebuildActionVK::REPLACE ||
         owned == rebuild_state->owned_containers.end()) {
         container = create_container(p_resource_id,
             signature->second.per_frame,
-            [this, resource_id = std::string(p_resource_id)](uint32_t p_slot) -> Ref<IRendObjectVK> {
+            [this, resource_id = std::string(p_resource_id)](uint32_t p_slot) -> Ref<IRendObject> {
                 return create_owned_object(resource_id, p_slot);
             });
         rebuild_state->owned_containers.insert_or_assign(std::string(p_resource_id), container);
@@ -1240,7 +1232,7 @@ void RendGraphVK::apply_owned_resource(std::string_view p_resource_id, RendResRe
     bind_owned_resource(p_resource_id, std::move(container));
 }
 
-Ref<IRendObjectVK> RendGraphVK::create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const {
+Ref<IRendObject> RendGraphVK::create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const {
     const auto signature = rebuild_state->signatures.find(p_resource_id);
     WBE_DEBUG_ASSERT(signature != rebuild_state->signatures.end());
     const RendResSignatureVK& resource = signature->second;
@@ -1286,7 +1278,7 @@ std::string RendGraphVK::describe_resource(std::string_view p_resource_id) const
     return name == p_resource_id ? std::format("'{}'", p_resource_id) : std::format("'{}' ({})", name, p_resource_id);
 }
 
-Ref<RendObjectContainerVK> RendGraphVK::acquire_resource(std::string_view p_export_name) const {
+Ref<IRendObjectContainer> RendGraphVK::acquire_resource(std::string_view p_export_name) const {
     const auto exported = rebuild_state->exports.find(p_export_name);
     if (exported == rebuild_state->exports.end()) {
         throw std::runtime_error(std::format("RendGraphVK: no resource is exported as '{}'.", p_export_name));
@@ -1921,7 +1913,7 @@ void RendGraphVK::record_edge_barriers(VkCommandBuffer p_command_buffer, Ref<RGN
     Vector<VkBufferMemoryBarrier2, RendAlloc> buffer_barriers(rend_data->alloc);
     Vector<VkImageMemoryBarrier2, RendAlloc> image_barriers(rend_data->alloc);
     for (const RGBarrierVK& barrier : p_node->barriers) {
-        Ref<IRendObjectVK> resource = resolve_rend_object(p_resources.get(barrier.res_id), rend_data->current_frame_slot);
+        Ref<IRendObject> resource = resolve_rend_object(p_resources.get(barrier.res_id), rend_data->current_frame_slot);
         if (auto buffer = resource.dynamic_cast_ref<ROBufferVK>(); buffer != MEM_NULL) {
             buffer_barriers.push_back(VkBufferMemoryBarrier2{
                 .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
@@ -1988,7 +1980,7 @@ void RendGraphVK::record_present_transition(VkCommandBuffer p_command_buffer) {
     if (renderer == nullptr) {
         throw std::runtime_error("RendGraphVK: renderer singleton is unavailable.");
     }
-    Ref<ROCMultislotsVK> swap_chain_image_views = renderer->acquire_swap_chain_image_view_container();
+    Ref<ROCMultislots> swap_chain_image_views = renderer->acquire_swap_chain_image_view_container();
     auto image_view = swap_chain_image_views->get(rend_data->current_frame_slot).dynamic_cast_ref<ROImageViewVK>();
     if (image_view == MEM_NULL || image_view->fields().image == MEM_NULL) {
         throw std::runtime_error("RendGraphVK: swap-chain image-view container did not resolve to an image view.");

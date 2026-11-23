@@ -22,7 +22,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/pipeline_desc_bindings_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_targets_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_graphics_pipeline_vk.hh"
@@ -237,10 +237,10 @@ private:
 
         Dispatch dispatch;
         RendTargetsVK rend_targets;
-        std::vector<Ref<RendObjectContainerVK>> vertex_buffer_containers;
+        std::vector<Ref<IRendObjectContainer>> vertex_buffer_containers;
         std::vector<VkBuffer> bound_vertex_buffers;
-        Ref<RendObjectContainerVK> index_buffer_container;
-        Ref<RendObjectContainerVK> indirect_buffer_container;
+        Ref<IRendObjectContainer> index_buffer_container;
+        Ref<IRendObjectContainer> indirect_buffer_container;
         Unique<PipelineDescBindingsVK> desc_bindings;
     };
 

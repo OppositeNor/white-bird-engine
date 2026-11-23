@@ -18,9 +18,10 @@
 #include "core/memory/reference_strong.hh"
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "utils/utils.hh"
 #include <cstdint>
@@ -218,7 +219,7 @@ private:
  * @class ROSamplerVK
  * @brief Vulkan sampler render object.
  */
-class WBE_META(WBE_REND_OBJECT) ROSamplerVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class WBE_META(WBE_REND_OBJECT) ROSamplerVK final : public IRendObject, public IBindableRendResourceVK {
 public:
     /**
      * @brief Compatibility name for SamplerDescVK.
@@ -251,7 +252,7 @@ public:
         return sampler;
     }
 
-    virtual DebugDataRows desc_debug_data() const override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
 
     /**
      * @brief Get or lazily create the sampler descriptor index.
@@ -266,6 +267,7 @@ public:
     virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
 private:
+    const RendContextVK* rend_data = nullptr;
     VkSampler sampler = VK_NULL_HANDLE;
     VkSamplerCreateInfo create_info{};
     mutable std::optional<uint32_t> sampler_index;

@@ -13,12 +13,13 @@
    limitations under the License.
 */
 #include "function/rend_vk/ro_desc_heap_vk.hh"
+#include "core/core_utils.hh"
 
 #include "core/alloc/i_alloc.hh"
 #include "core/alloc/stl_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/rend_defs.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -117,7 +118,7 @@ VkBindHeapInfoEXT RODescHeapVK::Backing::get_bind_info() const {
 
 RODescHeapVK::RODescHeapVK(
     const RendContextVK* p_rend_data, Ref<Backing> p_backing, DescHeapTypeVK p_type, uint32_t p_first_index, uint32_t p_capacity, VkDeviceSize p_stride)
-    : IRendObjectVK(p_rend_data), backing(std::move(p_backing)), type(p_type), first_index(p_first_index),
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)), backing(std::move(p_backing)), type(p_type), first_index(p_first_index),
       capacity(p_capacity), stride(p_stride) {
     if (backing == MEM_NULL || capacity == 0 || stride == 0) {
         throw std::runtime_error("Failed to create descriptor heap arena: invalid backing, capacity, or stride.");

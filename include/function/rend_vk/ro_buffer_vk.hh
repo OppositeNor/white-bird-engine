@@ -21,13 +21,13 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
 #include "function/rend_vk/device_memory_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/ro_buffer.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_staging_buffer_vk.hh"
-#include "function/rend_vk/vma_vk.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
 #include <cstddef>
@@ -294,7 +294,7 @@ struct BufferAliasDescVK {
  * @class ROBufferVK
  * @brief Buffer render object.
  */
-class WBE_META(WBE_REND_OBJECT) ROBufferVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class WBE_META(WBE_REND_OBJECT) ROBufferVK final : public ROBuffer, public IBindableRendResourceVK {
 public:
     /**
      * @class ExposedFields
@@ -516,8 +516,6 @@ public:
 
     virtual TypeID get_type_uuid() const override;
 
-    virtual void apply_debug_name(std::string_view p_name) override;
-
     /**
      * @brief Get the buffer instance.
      *
@@ -539,7 +537,7 @@ public:
      *
      * @return The device memory.
      */
-    Ref<DeviceMemoryVK> acquire_memory() const {
+    Ref<DeviceMemoryVK> get_memory() const {
         return memory;
     }
 
@@ -552,7 +550,7 @@ public:
         return memory_offset;
     }
 
-    virtual DebugDataRows desc_debug_data() const override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
 
     /**
      * @brief Get or lazily create the whole-buffer uniform descriptor index.
@@ -602,7 +600,7 @@ public:
      * @param p_size The size of the data in bytes that would be copied to the
      * buffer.
      */
-    void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size);
+    virtual void update_buffer(const void* p_data, size_t p_dst_offset, size_t p_size) override;
 
     /**
      * @brief Update the buffer. Updating from main memory must specify the
@@ -662,6 +660,14 @@ public:
         return exposed_fields;
     }
 
+    virtual size_t get_size() const override {
+        return exposed_fields.buffer_size;
+    }
+
+    virtual void* get_mapped() const override {
+        return mapped_memory;
+    }
+
     /**
      * @brief Return the Vulkan usage flags the buffer was created with.
      */
@@ -669,13 +675,12 @@ public:
         return usage;
     }
 
-    /**
-     * @brief Import this object under p_resource_id.
-     * @throws std::runtime_error If the object was not created with make_ref() or p_resource_id is empty.
-     */
     virtual void bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const override;
 
+protected:
+    virtual void apply_debug_name(std::string_view p_name) override;
 private:
+    const RendContextVK* rend_data = nullptr;
     void* mapped_memory = nullptr;
     VkBuffer buffer = VK_NULL_HANDLE;
     Ref<DeviceMemoryVK> memory;

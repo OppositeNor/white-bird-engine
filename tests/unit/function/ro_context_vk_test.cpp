@@ -13,14 +13,15 @@
    limitations under the License.
 */
 #include "core/alloc/i_alloc.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "core/parser/parser_json.hh"
 #include "function/render/rend_defs.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/debug_data.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_multislots.hh"
+#include "function/render/roc_single.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
 #include "utils/utils.hh"
@@ -60,10 +61,9 @@ DebugData make_desc_row(
 
 } // namespace
 
-class TestContextResourceVK final : public IRendObjectVK {
+class TestContextResourceVK final : public IRendObject {
 public:
-    TestContextResourceVK(const RendContextVK* p_rend_data, uint32_t p_context_id)
-        : IRendObjectVK(p_rend_data), context_id(p_context_id) {
+    explicit TestContextResourceVK(uint32_t p_context_id) : context_id(p_context_id) {
     }
     virtual ~TestContextResourceVK() override = default;
     TestContextResourceVK(const TestContextResourceVK&) = delete;
@@ -76,10 +76,10 @@ public:
     uint32_t context_id;
 };
 
-class TestDescResourceVK final : public IRendObjectVK {
+class TestDescResourceVK final : public IRendObject {
 public:
     TestDescResourceVK(const RendContextVK* p_rend_data, DebugDataArray p_rows)
-        : IRendObjectVK(p_rend_data), rows(p_rend_data->alloc) {
+        : rows(p_rend_data->alloc) {
         rows.reserve(p_rows.size());
         for (DebugData& row : p_rows) {
             rows.emplace_back(std::move(row));
@@ -93,7 +93,7 @@ public:
 
     virtual TypeID get_type_uuid() const override;
 
-    virtual DebugDataRows desc_debug_data() const override {
+    virtual DebugDataRows desc_debug_data(RendAlloc* /*p_alloc*/) const override {
         return rows;
     }
 
@@ -124,29 +124,26 @@ TypeID TestDescResourceVK::get_type_uuid() const {
 namespace {
 
 // Factory of one TestContextResourceVK per slot, identified by p_first_id plus the slot index.
-RendObjectContainerVK::Factory make_context_factory(
-    RendAlloc* p_alloc, const RendContextVK* p_rend_data, uint32_t p_first_id = 0) {
-    return [p_alloc, p_rend_data, p_first_id](uint32_t p_slot) {
-        return make_ref<TestContextResourceVK>(p_alloc, p_rend_data, p_first_id + p_slot).template dynamic_cast_ref<IRendObjectVK>();
+IRendObjectContainer::Factory make_context_factory(RendAlloc* p_alloc, uint32_t p_first_id = 0) {
+    return [p_alloc, p_first_id](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(p_alloc, p_first_id + p_slot).template dynamic_cast_ref<IRendObject>();
     };
 }
 
 // Factory of TestDescResourceVK objects without descriptor rows.
-RendObjectContainerVK::Factory make_empty_desc_factory(RendAlloc* p_alloc, const RendContextVK* p_rend_data) {
+IRendObjectContainer::Factory make_empty_desc_factory(RendAlloc* p_alloc, const RendContextVK* p_rend_data) {
     return [p_alloc, p_rend_data](uint32_t /*p_slot*/) {
-        return make_ref<TestDescResourceVK>(p_alloc, p_rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObjectVK>();
+        return make_ref<TestDescResourceVK>(p_alloc, p_rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObject>();
     };
 }
 
 } // namespace
 
-TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
+TEST(WBEROCMultislotsTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
-    rend_data.frames_in_flight = 3;
 
-    ROCMultislotsVK context(&alloc, 3, ROCMultislotsVK::Factory{[&rend_data, &alloc](uint32_t p_slot) {
-        return make_ref<TestContextResourceVK>(&alloc, &rend_data, p_slot).template dynamic_cast_ref<IRendObjectVK>();
+    ROCMultislots context(&alloc, 3, ROCMultislots::Factory{[&alloc](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(&alloc, p_slot).template dynamic_cast_ref<IRendObject>();
     }});
 
     EXPECT_EQ(context.get_resource_type_id(), TypeUUID<TestContextResourceVK>::UUID);
@@ -162,28 +159,26 @@ TEST(WBEROCMultislotsVKTest, CreatesOneResourcePerSlotAndDefaultsToFirstSlot) {
     EXPECT_EQ(explicit_resource->context_id, 2U);
 }
 
-TEST(WBEROCMultislotsVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
+TEST(WBEROCMultislotsTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
 
-    EXPECT_THROW(ROCMultislotsVK(&alloc, 2, ROCMultislotsVK::Factory{}), std::runtime_error);
-    EXPECT_THROW(ROCMultislotsVK(&alloc, 2, ROCMultislotsVK::Factory{[](uint32_t /*p_slot*/) {
-        return Ref<IRendObjectVK>(MEM_NULL);
+    EXPECT_THROW(ROCMultislots(&alloc, 2, ROCMultislots::Factory{}), std::runtime_error);
+    EXPECT_THROW(ROCMultislots(&alloc, 2, ROCMultislots::Factory{[](uint32_t /*p_slot*/) {
+        return Ref<IRendObject>(MEM_NULL);
     }}),
         std::runtime_error);
-    EXPECT_THROW(ROCMultislotsVK(nullptr, 2, make_context_factory(&alloc, &rend_data)), std::runtime_error);
-    EXPECT_THROW(ROCMultislotsVK(&alloc, 0, make_context_factory(&alloc, &rend_data)), std::runtime_error);
+    EXPECT_THROW(ROCMultislots(nullptr, 2, make_context_factory(&alloc)), std::runtime_error);
+    EXPECT_THROW(ROCMultislots(&alloc, 0, make_context_factory(&alloc)), std::runtime_error);
 }
 
-TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
+TEST(WBEROCMultislotsTest, UpdatesOneSlotIndependently) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
 
-    ROCMultislotsVK context(&alloc, 3, make_context_factory(&alloc, &rend_data, 100));
+    ROCMultislots context(&alloc, 3, make_context_factory(&alloc, 100));
     auto slot_zero_resource =
-        make_ref<TestContextResourceVK>(&alloc, &rend_data, 0).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestContextResourceVK>(&alloc, 0).template dynamic_cast_ref<IRendObject>();
     auto slot_two_resource =
-        make_ref<TestContextResourceVK>(&alloc, &rend_data, 2).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestContextResourceVK>(&alloc, 2).template dynamic_cast_ref<IRendObject>();
 
     context.set(0, slot_zero_resource);
     context.set(2, slot_two_resource);
@@ -200,17 +195,16 @@ TEST(WBEROCMultislotsVKTest, UpdatesOneSlotIndependently) {
     EXPECT_EQ(context.get(1), MEM_NULL);
 }
 
-TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
+TEST(WBEROCMultislotsTest, NoFlushModeStillSupportsPerSlotReplacement) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
 
-    ROCMultislotsVK context(&alloc, 2, make_context_factory(&alloc, &rend_data, 100), false);
+    ROCMultislots context(&alloc, 2, make_context_factory(&alloc, 100), false);
     auto slot_zero_resource =
-        make_ref<TestContextResourceVK>(&alloc, &rend_data, 10).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestContextResourceVK>(&alloc, 10).template dynamic_cast_ref<IRendObject>();
     auto slot_one_resource =
-        make_ref<TestContextResourceVK>(&alloc, &rend_data, 11).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestContextResourceVK>(&alloc, 11).template dynamic_cast_ref<IRendObject>();
     auto replacement_resource =
-        make_ref<TestContextResourceVK>(&alloc, &rend_data, 42).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestContextResourceVK>(&alloc, 42).template dynamic_cast_ref<IRendObject>();
 
     context.set(0, slot_zero_resource);
     context.set(1, slot_one_resource);
@@ -225,22 +219,20 @@ TEST(WBEROCMultislotsVKTest, NoFlushModeStillSupportsPerSlotReplacement) {
     EXPECT_EQ(other_resource->context_id, 10U);
 }
 
-TEST(WBEROCMultislotsVKTest, RejectsEmptyPublishedBufferUpdate) {
+TEST(WBEROCMultislotsTest, RejectsEmptyPublishedBufferUpdate) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
-    ROCMultislotsVK context(&alloc, 2, make_context_factory(&alloc, &rend_data));
+    ROCMultislots context(&alloc, 2, make_context_factory(&alloc));
 
     EXPECT_THROW(context.publish_buffer_update(nullptr, 0, 1), std::runtime_error);
     uint8_t value = 0;
     EXPECT_THROW(context.publish_buffer_update(&value, 0, 0), std::runtime_error);
 }
 
-TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
+TEST(WBEROCSingleTest, ReturnsStoredResource) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
 
-    auto resource = make_ref<TestContextResourceVK>(&alloc, &rend_data, 7).template dynamic_cast_ref<IRendObjectVK>();
-    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+    auto resource = make_ref<TestContextResourceVK>(&alloc, 7).template dynamic_cast_ref<IRendObject>();
+    ROCSingle container([resource](uint32_t /*p_slot*/) {
         return resource;
     });
 
@@ -251,19 +243,19 @@ TEST(WBEROCSingleVKTest, ReturnsStoredResource) {
     EXPECT_EQ(stored_resource->context_id, 7U);
 }
 
-TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescs) {
+TEST(WBEROCSingleTest, ToStringOmitsSlotIndexAndPreservesMultipleDescs) {
     RendAlloc alloc(WBE_KI_B(64));
     RendContextVK rend_data(&alloc);
     auto resource = make_ref<TestDescResourceVK>(&alloc,
         &rend_data,
         DebugDataArray{make_desc_row("ROBufferVK", "uniform_buffer", "resource", 13, true),
             make_desc_row("ROImageViewVK", "sampled_image", "resource", 17, false)})
-                        .template dynamic_cast_ref<IRendObjectVK>();
+                        .template dynamic_cast_ref<IRendObject>();
 
-    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+    ROCSingle container([resource](uint32_t /*p_slot*/) {
         return resource;
     });
-    DebugDataArray rows = parse_json_array(container.to_string());
+    DebugDataArray rows = parse_json_array(container.to_string(&alloc));
 
     ASSERT_EQ(rows.size(), 2U);
     EXPECT_FALSE(rows[0].contains("slot_index"));
@@ -276,22 +268,22 @@ TEST(WBEROCSingleVKTest, ToStringOmitsSlotIndexAndPreservesMultipleDescs) {
     EXPECT_EQ(rows[1].get_value<std::nullptr_t>("device_address"), nullptr);
 }
 
-TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
+TEST(WBEROCMultislotsTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
     RendAlloc alloc(WBE_KI_B(64));
     RendContextVK rend_data(&alloc);
 
-    ROCMultislotsVK container(&alloc, 3, make_empty_desc_factory(&alloc, &rend_data));
+    ROCMultislots container(&alloc, 3, make_empty_desc_factory(&alloc, &rend_data));
     container.clear(1);
     container.set(0,
         make_ref<TestDescResourceVK>(
             &alloc, &rend_data, DebugDataArray{make_desc_row("ROBufferVK", "uniform_buffer", "resource", 4, true)})
-            .template dynamic_cast_ref<IRendObjectVK>());
+            .template dynamic_cast_ref<IRendObject>());
     container.set(2,
         make_ref<TestDescResourceVK>(
             &alloc, &rend_data, DebugDataArray{make_desc_row("ROSamplerVK", "sampler", "sampler", 1, false)})
-            .template dynamic_cast_ref<IRendObjectVK>());
+            .template dynamic_cast_ref<IRendObject>());
 
-    DebugDataArray rows = parse_json_array(container.to_string());
+    DebugDataArray rows = parse_json_array(container.to_string(&alloc));
 
     ASSERT_EQ(rows.size(), 2U);
     EXPECT_EQ(rows[0].get_value<uint32_t>("slot_index"), 0U);
@@ -301,47 +293,46 @@ TEST(WBEROCMultislotsVKTest, ToStringAddsSlotIndexAndSkipsEmptyResources) {
     EXPECT_EQ(rows[1].get_value<std::nullptr_t>("device_address"), nullptr);
 }
 
-TEST(WBEROCMultislotsVKTest, ToStringDoesNotTriggerFlushSynchronization) {
+TEST(WBEROCMultislotsTest, ToStringDoesNotTriggerFlushSynchronization) {
     RendAlloc alloc(WBE_KI_B(64));
     RendContextVK rend_data(&alloc);
 
-    ROCMultislotsVK container(&alloc, 1, make_empty_desc_factory(&alloc, &rend_data));
+    ROCMultislots container(&alloc, 1, make_empty_desc_factory(&alloc, &rend_data));
     container.set(0,
         make_ref<TestDescResourceVK>(
             &alloc, &rend_data, DebugDataArray{make_desc_row("ROBufferVK", "uniform_buffer", "resource", 9, true)})
-            .template dynamic_cast_ref<IRendObjectVK>());
+            .template dynamic_cast_ref<IRendObject>());
 
     uint8_t value = 7;
     container.publish_buffer_update(&value, 0, sizeof(value));
 
     EXPECT_NO_THROW({
-        DebugDataArray rows = parse_json_array(container.to_string());
+        DebugDataArray rows = parse_json_array(container.to_string(&alloc));
         ASSERT_EQ(rows.size(), 1U);
         EXPECT_EQ(rows[0].get_value<uint32_t>("slot_index"), 0U);
     });
 }
 
-TEST(WBEROCSingleVKTest, EmptyDescResourcesProduceEmptyJsonArray) {
+TEST(WBEROCSingleTest, EmptyDescResourcesProduceEmptyJsonArray) {
     RendAlloc alloc(WBE_KI_B(64));
     RendContextVK rend_data(&alloc);
     auto resource =
-        make_ref<TestDescResourceVK>(&alloc, &rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObjectVK>();
+        make_ref<TestDescResourceVK>(&alloc, &rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObject>();
 
-    ROCSingleVK container([resource](uint32_t /*p_slot*/) {
+    ROCSingle container([resource](uint32_t /*p_slot*/) {
         return resource;
     });
-    DebugDataArray rows = parse_json_array(container.to_string());
+    DebugDataArray rows = parse_json_array(container.to_string(&alloc));
 
     EXPECT_TRUE(rows.empty());
 }
 
-TEST(WBEROCSingleVKTest, RecreateReplacesTheResourceWithANewOneFromTheFactory) {
+TEST(WBEROCSingleTest, RecreateReplacesTheResourceWithANewOneFromTheFactory) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
     uint32_t created_count = 0;
-    ROCSingleVK container([&alloc, &rend_data, &created_count](uint32_t p_slot) {
+    ROCSingle container([&alloc, &created_count](uint32_t p_slot) {
         EXPECT_EQ(p_slot, 0U);
-        return make_ref<TestContextResourceVK>(&alloc, &rend_data, created_count++).template dynamic_cast_ref<IRendObjectVK>();
+        return make_ref<TestContextResourceVK>(&alloc, created_count++).template dynamic_cast_ref<IRendObject>();
     });
     EXPECT_EQ(container.get().dynamic_cast_ref<TestContextResourceVK>()->context_id, 0U);
 
@@ -351,23 +342,22 @@ TEST(WBEROCSingleVKTest, RecreateReplacesTheResourceWithANewOneFromTheFactory) {
     EXPECT_EQ(container.get().dynamic_cast_ref<TestContextResourceVK>()->context_id, 1U);
 }
 
-TEST(WBEROCSingleVKTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
-    EXPECT_THROW(ROCSingleVK(RendObjectContainerVK::Factory{}), std::runtime_error);
-    EXPECT_THROW(ROCSingleVK([](uint32_t /*p_slot*/) {
-        return Ref<IRendObjectVK>(MEM_NULL);
+TEST(WBEROCSingleTest, ThrowsWhenFactoryIsMissingOrReturnsNull) {
+    EXPECT_THROW(ROCSingle(IRendObjectContainer::Factory{}), std::runtime_error);
+    EXPECT_THROW(ROCSingle([](uint32_t /*p_slot*/) {
+        return Ref<IRendObject>(MEM_NULL);
     }),
         std::runtime_error);
 }
 
-TEST(WBEROCMultislotsVKTest, RecreateReplacesEverySlotIncludingClearedAndReplacedOnes) {
+TEST(WBEROCMultislotsTest, RecreateReplacesEverySlotIncludingClearedAndReplacedOnes) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
     uint32_t generation = 0;
-    ROCMultislotsVK container(&alloc, 3, [&alloc, &rend_data, &generation](uint32_t p_slot) {
-        return make_ref<TestContextResourceVK>(&alloc, &rend_data, generation * 10 + p_slot).template dynamic_cast_ref<IRendObjectVK>();
+    ROCMultislots container(&alloc, 3, [&alloc, &generation](uint32_t p_slot) {
+        return make_ref<TestContextResourceVK>(&alloc, generation * 10 + p_slot).template dynamic_cast_ref<IRendObject>();
     });
     container.clear(1);
-    container.set(2, make_ref<TestContextResourceVK>(&alloc, &rend_data, 99).template dynamic_cast_ref<IRendObjectVK>());
+    container.set(2, make_ref<TestContextResourceVK>(&alloc, 99).template dynamic_cast_ref<IRendObject>());
 
     generation = 1;
     container.recreate();

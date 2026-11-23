@@ -12,12 +12,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_single.hh"
 #include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_rend_object.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/debug_data.hh"
 #include "utils/defs.hh"
 #include <cstdint>
 #include <stdexcept>
@@ -25,64 +24,68 @@
 
 namespace WhiteBirdEngine {
 
-ROCSingleVK::ROCSingleVK(Factory p_factory) : factory(std::move(p_factory)) {
+ROCSingle::ROCSingle(Factory p_factory) : factory(std::move(p_factory)) {
     if (factory == nullptr) {
-        throw std::runtime_error("ROCSingleVK: resource factory is null.");
+        throw std::runtime_error("ROCSingle: resource factory is null.");
     }
     recreate();
 }
 
-void ROCSingleVK::recreate() {
-    Ref<IRendObjectVK> new_resource = factory(0);
+void ROCSingle::recreate() {
+    Ref<IRendObject> new_resource = factory(0);
     if (new_resource == MEM_NULL) {
-        throw std::runtime_error("ROCSingleVK: resource factory returned null.");
+        throw std::runtime_error("ROCSingle: resource factory returned null.");
     }
     retain_resource_type(new_resource);
     resource = std::move(new_resource);
 }
 
-void ROCSingleVK::set(uint32_t p_frame_slot, Ref<IRendObjectVK> p_resource) {
+void ROCSingle::set(uint32_t p_frame_slot, Ref<IRendObject> p_resource) {
     if (p_frame_slot != 0) {
-        throw std::runtime_error("ROCSingleVK: slot is out of range.");
+        throw std::runtime_error("ROCSingle: slot is out of range.");
     }
     resource = std::move(p_resource);
     retain_resource_type(resource);
 }
 
-void ROCSingleVK::clear(uint32_t p_frame_slot) {
+void ROCSingle::clear(uint32_t p_frame_slot) {
     if (p_frame_slot != 0) {
-        throw std::runtime_error("ROCSingleVK: slot is out of range.");
+        throw std::runtime_error("ROCSingle: slot is out of range.");
     }
     resource = MEM_NULL;
 }
 
-void ROCSingleVK::clear() {
+void ROCSingle::clear() {
     clear(0);
 }
 
-void ROCSingleVK::set(Ref<IRendObjectVK> p_resource) {
+void ROCSingle::set(Ref<IRendObject> p_resource) {
     set(0, std::move(p_resource));
 }
 
-Ref<IRendObject> ROCSingleVK::get() {
+Ref<IRendObject> ROCSingle::get() {
     return resource;
 }
 
-Ref<IRendObject> ROCSingleVK::get() const {
+Ref<IRendObject> ROCSingle::get() const {
     return resource;
 }
 
-Ref<IRendObject> ROCSingleVK::get(uint32_t /*p_frame_slot*/) {
+Ref<IRendObject> ROCSingle::get(uint32_t /*p_frame_slot*/) {
     return resource;
 }
 
-Ref<IRendObject> ROCSingleVK::get(uint32_t /*p_frame_slot*/) const {
+Ref<IRendObject> ROCSingle::get(uint32_t /*p_frame_slot*/) const {
     return resource;
 }
 
-DebugDataRows ROCSingleVK::desc_debug_data() const {
+uint32_t ROCSingle::get_slot_count() const {
+    return 1;
+}
+
+DebugDataRows ROCSingle::desc_debug_data(RendAlloc* p_alloc) const {
     WBE_DEBUG_ASSERT(resource != MEM_NULL);
-    return resource->desc_debug_data();
+    return resource->desc_debug_data(p_alloc);
 }
 
 } // namespace WhiteBirdEngine

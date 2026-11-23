@@ -12,19 +12,28 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_DEBUG_DATA_VK_HH
-#define WBE_FILE_DEBUG_DATA_VK_HH
+#ifndef WBE_FILE_RO_IMAGE_HH
+#define WBE_FILE_RO_IMAGE_HH
 
-#include "core/alloc/stl_alloc.hh"
-#include "core/data/data_value.hh"
-#include "function/render/rend_defs.hh"
-#include <vector>
+#include "function/render/i_rend_object.hh"
 
 namespace WhiteBirdEngine {
 
-using DebugData = DataValue;
-using DebugDataRows = Vector<DebugData, RendAlloc>;
-using DebugDataArray = std::vector<DebugData>;
+/**
+ * @class ROImage
+ * @brief Backend-independent image render object. Neither copyable nor movable.
+ *
+ * Confined to the rendering thread, like every render object.
+ */
+class ROImage : public IRendObject {
+public:
+    ROImage() = default;
+    virtual ~ROImage() override = default;
+    ROImage(const ROImage&) = delete;
+    ROImage(ROImage&&) noexcept = delete;
+    ROImage& operator=(const ROImage&) = delete;
+    ROImage& operator=(ROImage&&) noexcept = delete;
+};
 
 } // namespace WhiteBirdEngine
 

@@ -12,56 +12,63 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_ROC_SINGLE_VK_HH
-#define WBE_FILE_ROC_SINGLE_VK_HH
+#ifndef WBE_FILE_ROC_SINGLE_HH
+#define WBE_FILE_ROC_SINGLE_HH
 
 #include "core/memory/reference_strong.hh"
+#include "function/render/debug_data.hh"
 #include "function/render/i_rend_object.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
+#include "function/render/rend_defs.hh"
 #include <cstdint>
 
 namespace WhiteBirdEngine {
 
 /**
- * @class ROCSingleVK
- * @brief Container that resolves the same render object for every slot.
+ * @class ROCSingle
+ * @brief Container that resolves the same render object for every slot. Neither copyable nor movable.
  */
-class ROCSingleVK final : public RendObjectContainerVK {
+class ROCSingle final : public IRendObjectContainer {
 public:
-    ROCSingleVK() = delete;
-    virtual ~ROCSingleVK() override = default;
-    ROCSingleVK(const ROCSingleVK&) = delete;
-    ROCSingleVK(ROCSingleVK&&) noexcept = delete;
-    ROCSingleVK& operator=(const ROCSingleVK&) = delete;
-    ROCSingleVK& operator=(ROCSingleVK&&) noexcept = delete;
+    ROCSingle() = delete;
+    virtual ~ROCSingle() override = default;
+    ROCSingle(const ROCSingle&) = delete;
+    ROCSingle(ROCSingle&&) noexcept = delete;
+    ROCSingle& operator=(const ROCSingle&) = delete;
+    ROCSingle& operator=(ROCSingle&&) noexcept = delete;
 
     /**
      * @brief Create the render object with a factory.
      * @param p_factory Factory called with slot 0 now and on every recreate().
      * @throws std::runtime_error If p_factory is null or returns null.
      */
-    explicit ROCSingleVK(Factory p_factory);
+    explicit ROCSingle(Factory p_factory);
 
-    virtual void set(uint32_t p_frame_slot, Ref<IRendObjectVK> p_resource) override;
+    virtual void set(uint32_t p_frame_slot, Ref<IRendObject> p_resource) override;
 
     virtual void clear(uint32_t p_frame_slot) override;
 
     virtual void clear() override;
 
-    void set(Ref<IRendObjectVK> p_resource);
+    /**
+     * @brief Replace the resource.
+     *
+     * @param p_resource Replacement resource.
+     * @throws std::runtime_error If the resource's concrete type differs from the container's.
+     */
+    void set(Ref<IRendObject> p_resource);
 
     virtual Ref<IRendObject> get() override;
     virtual Ref<IRendObject> get() const override;
     virtual Ref<IRendObject> get(uint32_t p_frame_slot) override;
     virtual Ref<IRendObject> get(uint32_t p_frame_slot) const override;
-    virtual DebugDataRows desc_debug_data() const override;
+    virtual uint32_t get_slot_count() const override;
+    virtual DebugDataRows desc_debug_data(RendAlloc* p_alloc) const override;
     virtual void recreate() override;
 
 private:
     Factory factory;
-    Ref<IRendObjectVK> resource;
+    Ref<IRendObject> resource;
 };
 
 } // namespace WhiteBirdEngine

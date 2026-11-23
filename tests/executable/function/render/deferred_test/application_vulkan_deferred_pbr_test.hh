@@ -47,7 +47,7 @@
 #include "function/rend_vk/ro_graphics_pipeline_vk.hh"
 #include "function/rend_vk/ro_image_view_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/rt_cpu_in_flight_acquire_vk.hh"
 #include "i_voxel_rend_feature.hh"
 #include "imgui_overlay_vk.hh"
@@ -278,11 +278,11 @@ private:
     RDParamsMeshVK static_mesh_params;
     Ref<MeshResourcesVK> static_mesh_resources = MEM_NULL;
     Ref<MeshAccelerationStructureVK> mesh_acceleration_structure = MEM_NULL;
-    Ref<ROCMultislotsVK> gbuffer_camera_info_ubos;
-    Ref<ROCMultislotsVK> composition_camera_info_ubos;
-    Ref<ROCMultislotsVK> spot_light_info_buffers;
+    Ref<ROCMultislots> gbuffer_camera_info_ubos;
+    Ref<ROCMultislots> composition_camera_info_ubos;
+    Ref<ROCMultislots> spot_light_info_buffers;
     // One light camera per spot light, read by that light's shadow passes as shadow_light_info.
-    std::array<Ref<ROCMultislotsVK>, SPOT_LIGHT_COUNT> shadow_light_info_buffers;
+    std::array<Ref<ROCMultislots>, SPOT_LIGHT_COUNT> shadow_light_info_buffers;
     std::array<Ref<ROBufferVK>, SPOT_LIGHT_COUNT> light_billboard_ubos;
 
     std::array<ComponentSpotLight, SPOT_LIGHT_COUNT> spot_light_components{};

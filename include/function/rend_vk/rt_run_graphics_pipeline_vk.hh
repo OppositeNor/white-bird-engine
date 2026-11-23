@@ -24,7 +24,7 @@
 #include "function/rend_vk/pipeline_desc_bindings_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_targets_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_graphics_pipeline_vk.hh"
@@ -197,9 +197,9 @@ private:
     std::vector<std::string> vertex_buffer_ids;
     std::vector<VkDeviceSize> vertex_buffer_offsets;
     std::optional<std::string> index_buffer_id;
-    std::vector<Ref<RendObjectContainerVK>> vertex_buffer_containers;
+    std::vector<Ref<IRendObjectContainer>> vertex_buffer_containers;
     std::vector<VkBuffer> bound_vertex_buffers;
-    Ref<RendObjectContainerVK> index_buffer_container;
+    Ref<IRendObjectContainer> index_buffer_container;
     std::optional<IndexedDrawRegionVK> indexed_draw_region;
     VertexInputDescriptionVK vertex_input;
     uint32_t draw_vertex_count = 3;

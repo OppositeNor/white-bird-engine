@@ -25,7 +25,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_resource_unit.hh"
 #include "function/rend_vk/i_rend_graph_bindings_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_graph_script_vk.hh"
 #include "function/rend_vk/rend_recipe_context_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
@@ -34,7 +34,7 @@
 #include "function/rend_vk/renderer_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/vulkan_enums_vk.hh"
 #include "global/global.hh"
 #include "input_manager_mocked.hh"
@@ -124,13 +124,13 @@ BillboardInfoGPU make_light_billboard_info(const WBE::ComponentSpotLight& p_spot
 }
 
 // Each frame's buffer is registered in the global render cache as `<p_key>[<slot>]`, which names it.
-WBE::Ref<WBE::ROCMultislotsVK> create_per_frame_uniform_buffers(
+WBE::Ref<WBE::ROCMultislots> create_per_frame_uniform_buffers(
     WBE::RendAlloc* p_alloc, const WBE::RendContextVK* p_rend_data, std::string_view p_key, VkDeviceSize p_buffer_size) {
-    return WBE::make_ref<WBE::ROCMultislotsVK>(p_alloc,
+    return WBE::make_ref<WBE::ROCMultislots>(p_alloc,
         p_alloc,
         p_rend_data->frames_in_flight,
-        WBE::ROCMultislotsVK::Factory{
-            [p_rend_data, key = std::string(p_key), p_buffer_size](uint32_t p_frame_slot) -> WBE::Ref<WBE::IRendObjectVK> {
+        WBE::ROCMultislots::Factory{
+            [p_rend_data, key = std::string(p_key), p_buffer_size](uint32_t p_frame_slot) -> WBE::Ref<WBE::IRendObject> {
                 WBE::Ref<WBE::ROBufferVK> buffer = p_rend_data->create_buffer(
                     WBE::ROBufferVK::Builder().set_properties(p_buffer_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
                 p_rend_data->rend_cache->insert(std::format("{}[{}]", key, p_frame_slot), buffer);
@@ -167,9 +167,9 @@ private:
     WBE::RendAlloc* rend_alloc = nullptr;
     // The source resources the graph registers; the ResourceManager owns them.
     WBE::Ref<WBE::RendGraphVK> rend_graph;
-    WBE::Ref<WBE::ROCMultislotsVK> camera_info_ubos;
-    WBE::Ref<WBE::ROCMultislotsVK> spot_light_info_ubos;
-    WBE::Ref<WBE::ROCMultislotsVK> spot_light_count_ubos;
+    WBE::Ref<WBE::ROCMultislots> camera_info_ubos;
+    WBE::Ref<WBE::ROCMultislots> spot_light_info_ubos;
+    WBE::Ref<WBE::ROCMultislots> spot_light_count_ubos;
     WBE::ComponentSpotLight spot_light_component{};
     float spot_light_yaw = 0.0F;
     float spot_light_pitch = 0.0F;
@@ -423,7 +423,7 @@ void ApplicationVulkanDrawSponzaTest::write_shadow_dynamic_descs() {
     }
     SpotLightInfoGPU spot_light_info = make_spot_light_info_gpu(spot_light_component);
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
-    log_uniform_buffer_descs(spot_light_info_ubos, "forward sponza shadow light buffer");
+    log_uniform_buffer_descs(rend_alloc, spot_light_info_ubos, "forward sponza shadow light buffer");
 }
 
 void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descs() {
@@ -445,9 +445,9 @@ void ApplicationVulkanDrawSponzaTest::write_main_dynamic_descs() {
     spot_light_info_ubos->publish_buffer_update(&spot_light_info, 0, sizeof(spot_light_info));
     spot_light_count_ubos->publish_buffer_update(&spot_light_count, 0, sizeof(spot_light_count));
 
-    log_uniform_buffer_descs(camera_info_ubos, "forward sponza camera buffer");
-    log_uniform_buffer_descs(spot_light_info_ubos, "forward sponza main light buffer");
-    log_uniform_buffer_descs(spot_light_count_ubos, "forward sponza light count buffer");
+    log_uniform_buffer_descs(rend_alloc, camera_info_ubos, "forward sponza camera buffer");
+    log_uniform_buffer_descs(rend_alloc, spot_light_info_ubos, "forward sponza main light buffer");
+    log_uniform_buffer_descs(rend_alloc, spot_light_count_ubos, "forward sponza light count buffer");
 }
 
 void ApplicationVulkanDrawSponzaTest::acquire_draw_sponza_rend_graph() {
@@ -466,11 +466,11 @@ void ApplicationVulkanDrawSponzaTest::acquire_draw_sponza_rend_graph() {
                 context.depth_format = static_cast<WBE::ImageFormatVK>(MAIN_DEPTH_FORMAT);
                 WBE::RendGraphPreparedBindingsVK result;
                 result.context = WBE::RendGraphScriptVK::serialize_context(context);
-                result.imports.add(SHADOW_LIGHT_INFO_BUFFER, *spot_light_info_ubos)
-                    .add(CAMERA_INFO_BUFFER, *camera_info_ubos)
-                    .add(SPOT_LIGHT_INFO_BUFFER, *spot_light_info_ubos)
-                    .add(SPOT_LIGHT_COUNT_BUFFER, *spot_light_count_ubos)
-                    .add(GBUFFER_CAMERA_INFO_BUFFER, *camera_info_ubos)
+                result.imports.add(SHADOW_LIGHT_INFO_BUFFER, spot_light_info_ubos)
+                    .add(CAMERA_INFO_BUFFER, camera_info_ubos)
+                    .add(SPOT_LIGHT_INFO_BUFFER, spot_light_info_ubos)
+                    .add(SPOT_LIGHT_COUNT_BUFFER, spot_light_count_ubos)
+                    .add(GBUFFER_CAMERA_INFO_BUFFER, camera_info_ubos)
                     .add(LIGHT_BILLBOARD_INFO_BUFFER, *light_billboard_ubo);
                 return result;
             }));

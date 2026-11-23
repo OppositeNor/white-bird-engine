@@ -29,7 +29,8 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/material_texture_contract.hh"
 #include "function/render/mesh_node_contract.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include <utility>
 #include "resource/resource_unit/resource_unit.hh"
@@ -86,7 +87,7 @@ enum class WBE_META(WBE_REFLECT_ENUM, WBE_REFLECT_SCRIPT) MeshPartVK : uint8_t {
  * rendering-thread-confined. bind() imports each present member under `<key>.<member>`, using the member names below, with
  * every material table built so far; absent optional categories are not declared.
  */
-class WBE_META(WBE_REND_OBJECT) MeshResourcesVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class WBE_META(WBE_REND_OBJECT) MeshResourcesVK final : public IRendObject, public IBindableRendResourceVK {
 public:
     /** Member name prefix of the vertex buffers; vertex buffer i is the member `vertices.<i>`. */
     static constexpr std::string_view VERTICES = "vertices";
@@ -300,6 +301,7 @@ private:
         Ref<ROBufferVK> buffer = MEM_NULL;
     };
 
+    const RendContextVK* rend_data = nullptr;
     RendAlloc* alloc = nullptr;
     RefRes<RUMesh3D> mesh = MEM_NULL;
     Vector<Ref<ROBufferVK>, RendAlloc> vertex_buffers;

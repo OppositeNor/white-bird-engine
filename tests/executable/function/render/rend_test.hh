@@ -21,14 +21,14 @@
 #include "function/ecs/components.hh"
 #include "function/render/i_renderer.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_rend_graph_bindings_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_bindings_function_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
 #include "function/rend_vk/renderer_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/vulkan_enums_vk.hh"
 #include "function/window/i_window.hh"
 #include "platform/file_system/path.hh"
@@ -490,8 +490,8 @@ inline SpotLightInfoGPU make_spot_light_info_gpu(const WBE::ComponentSpotLight& 
     };
 }
 
-inline void log_uniform_buffer_descs(WBE::Ref<WBE::ROCMultislotsVK> p_buffers, std::string_view p_label) {
-    WBE::write_desc_debug_output(std::format("{}_descriptors", p_label), p_buffers->to_string());
+inline void log_uniform_buffer_descs(WBE::RendAlloc* p_alloc, WBE::Ref<WBE::ROCMultislots> p_buffers, std::string_view p_label) {
+    WBE::write_desc_debug_output(std::format("{}_descriptors", p_label), p_buffers->to_string(p_alloc));
 }
 
 #endif

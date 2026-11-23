@@ -19,7 +19,7 @@
 #include "core/memory/reference_strong.hh"
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_graphics_pipeline_vk.hh"
 #include <cstdint>
@@ -129,8 +129,8 @@ private:
     Vector<VkClearValue, RendAlloc> clear_values;
     VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
     VkAttachmentLoadOp depth_load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> color_containers;
-    Ref<RendObjectContainerVK> depth_container;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> color_containers;
+    Ref<IRendObjectContainer> depth_container;
 };
 
 } // namespace WhiteBirdEngine

@@ -209,7 +209,7 @@ Existing helpers worth reusing before writing your own:
 Unit tests under `tests/unit/function/*_vk_test.cpp` run without a GPU or `VkDevice`. They exercise builders,
 validation logic, graph compilation, and metadata by constructing `RendContextVK` over a `RendAlloc` and
 using fake handles (`reinterpret_cast<VkBuffer>(uintptr_t{1})`) or test doubles derived from the real interfaces
-(e.g. a local `IRendObjectVK` subclass in an anonymous namespace; see `rend_graph_vk_test.cpp`).
+(e.g. a local `IRendObject` subclass in an anonymous namespace; see `rend_graph_vk_test.cpp`).
 
 Keep them that way: don't call real Vulkan entry points that need a device from `wbe_unit_test`, because validation
 runs headless. Behavior that truly needs a device or window belongs in a rendering executable

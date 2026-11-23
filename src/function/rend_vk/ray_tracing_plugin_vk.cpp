@@ -28,7 +28,7 @@
 #include "function/rend_vk/ro_acceleration_structure_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
 #include "function/rend_vk/ro_desc_heap_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_single.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/defs.hh"
 

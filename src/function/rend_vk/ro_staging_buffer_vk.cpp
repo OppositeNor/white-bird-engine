@@ -14,7 +14,7 @@
 */
 #include "function/rend_vk/ro_staging_buffer_vk.hh"
 #include "core/core_utils.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -45,7 +45,7 @@ TypeID ROStagingBufferVK::get_type_uuid() const {
 }
 
 ROStagingBufferVK::ROStagingBufferVK(const RendContextVK* p_rend_data, const Builder& p_builder)
-    : IRendObjectVK(p_rend_data) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     if (p_builder.size < DATA_CHUNK_HEADER_SIZE || p_builder.size > std::numeric_limits<uint32_t>::max()) {
         throw std::runtime_error("Failed to create Vulkan staging buffer: buffer size is outside the supported range.");
     }

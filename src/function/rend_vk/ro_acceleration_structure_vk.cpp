@@ -18,7 +18,7 @@
 #include <string_view>
 #include "core/core_utils.hh"
 #include "function/function_utils.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/desc_heap_alloc_vk.hh"
 #include "function/rend_vk/i_ro_ray_tracing_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
@@ -116,8 +116,8 @@ uint32_t ROAccelerationStructureVK::get_desc_index() const {
     return *desc_index;
 }
 
-DebugDataRows ROAccelerationStructureVK::desc_debug_data() const {
-    DebugDataRows rows(rend_data->alloc);
+DebugDataRows ROAccelerationStructureVK::desc_debug_data(RendAlloc* p_alloc) const {
+    DebugDataRows rows(p_alloc);
     if (desc_index.has_value()) {
         rows.emplace_back(make_desc_row(*desc_index, get_device_address()));
     }

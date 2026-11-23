@@ -20,6 +20,7 @@
 #include "core/reflection/reflection_defs.hh"
 #include "function/function_utils.hh"
 #include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/render/i_rend_task.hh"
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_task_resource_map.hh"
@@ -477,6 +478,16 @@ struct RendGraphDescVK {
      * @throws std::runtime_error If the resource cannot be bound.
      */
     RendGraphDescVK& add_resource(std::string_view p_resource_id, const IBindableRendResourceVK& p_resource);
+
+    /**
+     * @brief Import a container owned outside the graph under p_resource_id; the descriptor retains it.
+     *
+     * @param p_resource_id Graph resource identifier.
+     * @param p_container Container to import.
+     * @return This graph descriptor.
+     * @throws std::runtime_error If p_container is null or p_resource_id is empty.
+     */
+    RendGraphDescVK& add_resource(std::string_view p_resource_id, Ref<IRendObjectContainer> p_container);
 
     /**
      * @brief Declare a buffer allocated by the graph during compilation.

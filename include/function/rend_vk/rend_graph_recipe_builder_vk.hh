@@ -16,7 +16,9 @@
 #define WBE_FILE_REND_GRAPH_RECIPE_BUILDER_VK_HH
 
 #include "core/data/data_value.hh"
+#include "core/memory/reference_strong.hh"
 #include "function/render/i_rend_graph.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_desc_vk.hh"
@@ -24,6 +26,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -33,8 +36,9 @@ namespace WhiteBirdEngine {
  * @brief The resources and tasks a caller supplies to a render graph recipe, by import name and task id. Copyable and
  * movable.
  *
- * Holds references to resources: every supplied resource must outlive RendGraphRecipeBuilderVK::build(), which binds it
- * into the graph descriptor (the descriptor then retains it). Tasks are held by value and copied into the descriptor.
+ * Holds references to bindable resources: every supplied bindable must outlive RendGraphRecipeBuilderVK::build(), which
+ * binds it into the graph descriptor (the descriptor then retains it). Containers are held strongly. Tasks are held by value
+ * and copied into the descriptor.
  */
 class RendGraphRecipeImportsVK final {
 public:
@@ -53,9 +57,22 @@ public:
     RendGraphRecipeImportsVK& add(std::string_view p_name, const IBindableRendResourceVK& p_resource);
 
     /**
-     * @brief Get a supplied resource, or null when no resource is supplied under the name.
+     * @brief Supply a container under an import name; it is bound into the graph under that name.
+     * @return This table.
+     * @throws std::runtime_error If p_name is empty or already supplied, or p_container is null.
      */
-    const IBindableRendResourceVK* find(std::string_view p_name) const;
+    RendGraphRecipeImportsVK& add(std::string_view p_name, Ref<IRendObjectContainer> p_container);
+
+    /**
+     * @brief Whether a resource is supplied under the name.
+     */
+    bool contains(std::string_view p_name) const;
+
+    /**
+     * @brief Bind the resource supplied under p_name into p_graph under the same name.
+     * @throws std::runtime_error If no resource is supplied under the name, or it cannot be bound.
+     */
+    void bind(RendGraphDescVK& p_graph, std::string_view p_name) const;
 
     /**
      * @brief Get every supplied import name, in sorted order.
@@ -84,7 +101,11 @@ public:
     std::vector<std::string> get_task_ids() const;
 
 private:
-    std::map<std::string, const IBindableRendResourceVK*, std::less<>> resources;
+    using Resource = std::variant<const IBindableRendResourceVK*, Ref<IRendObjectContainer>>;
+
+    RendGraphRecipeImportsVK& add_resource(std::string_view p_name, Resource p_resource);
+
+    std::map<std::string, Resource, std::less<>> resources;
     std::map<std::string, RendTaskDescVK, std::less<>> tasks;
 };
 

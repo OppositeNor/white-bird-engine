@@ -17,7 +17,8 @@
 
 #include "core/memory/reference_strong.hh"
 #include "core/reflection/reflection_defs.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
+#include "core/core_utils.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/vma_vk.hh"
 #include "utils/utils.hh"
@@ -47,7 +48,7 @@ enum class DescHeapTypeVK : uint8_t {
  *
  * This object is neither copyable nor movable.
  */
-class WBE_META(WBE_REND_OBJECT) RODescHeapVK final : public IRendObjectVK {
+class WBE_META(WBE_REND_OBJECT) RODescHeapVK final : public IRendObject {
 public:
     /**
      * @class Backing
@@ -143,6 +144,7 @@ private:
     void clear_desc(uint32_t p_index) const;
     VkBindHeapInfoEXT get_bind_info() const;
 
+    const RendContextVK* rend_data = nullptr;
     Ref<Backing> backing;
     DescHeapTypeVK type = DescHeapTypeVK::RESOURCE;
     uint32_t first_index = 0;

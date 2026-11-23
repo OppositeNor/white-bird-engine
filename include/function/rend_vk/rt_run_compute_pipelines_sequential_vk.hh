@@ -24,7 +24,7 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/pipeline_desc_bindings_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_compute_pipeline_vk.hh"
 #include "function/rend_vk/rt_params_run_compute_pipelines_sequential_vk.hh"
@@ -184,7 +184,7 @@ private:
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Vector<Entry, RendAlloc> entries;
     Vector<Unique<PipelineDescBindingsVK>, RendAlloc> desc_bindings;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> indirect_buffer_containers;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> indirect_buffer_containers;
 };
 
 } // namespace WhiteBirdEngine

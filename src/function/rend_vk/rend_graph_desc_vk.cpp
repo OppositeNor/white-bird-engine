@@ -24,8 +24,8 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/i_rend_object_container.hh"
+#include "function/render/roc_single.hh"
 #include <algorithm>
 #include <cstddef>
 #include <format>
@@ -107,8 +107,8 @@ bool is_same_import(const RendResVK& p_left, const RendResVK& p_right) {
     if (p_left.container == MEM_NULL || p_right.container == MEM_NULL) {
         return false;
     }
-    const Ref<ROCSingleVK> left = p_left.container.dynamic_cast_ref<ROCSingleVK>();
-    const Ref<ROCSingleVK> right = p_right.container.dynamic_cast_ref<ROCSingleVK>();
+    const Ref<ROCSingle> left = p_left.container.dynamic_cast_ref<ROCSingle>();
+    const Ref<ROCSingle> right = p_right.container.dynamic_cast_ref<ROCSingle>();
     return left != MEM_NULL && right != MEM_NULL && left->get().get() == right->get().get();
 }
 
@@ -350,6 +350,11 @@ RendGraphDescVK& RendGraphDescVK::add_resource(RendResVK p_resource) {
 
 RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, const IBindableRendResourceVK& p_resource) {
     p_resource.bind(*this, p_resource_id);
+    return *this;
+}
+
+RendGraphDescVK& RendGraphDescVK::add_resource(std::string_view p_resource_id, Ref<IRendObjectContainer> p_container) {
+    IBindableRendResourceVK::bind_container(*this, p_resource_id, std::move(p_container));
     return *this;
 }
 

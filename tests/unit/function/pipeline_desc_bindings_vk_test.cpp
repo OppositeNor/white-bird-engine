@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/alloc/i_alloc.hh"
+#include "core/core_utils.hh"
 #include "core/alloc/stl_alloc.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/i_rend_task.hh"
@@ -24,7 +25,7 @@
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
 #include "function/rend_vk/ro_image_view_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
+#include "function/render/roc_multislots.hh"
 #include "function/rend_vk/shader_metadata_vk_utils.hh"
 #include "generated/type_uuid.gen.hh"
 #include "utils/defs.hh"
@@ -144,10 +145,9 @@ ShaderDescHeapLayoutVK make_mapping_layout() {
     return layout;
 }
 
-class TestMappingResourceVK final : public IRendObjectVK {
+class TestMappingResourceVK final : public IRendObject {
 public:
-    explicit TestMappingResourceVK(const RendContextVK* p_rend_data) : IRendObjectVK(p_rend_data) {
-    }
+    TestMappingResourceVK() = default;
     virtual ~TestMappingResourceVK() override = default;
     TestMappingResourceVK(const TestMappingResourceVK&) = delete;
     TestMappingResourceVK(TestMappingResourceVK&&) noexcept = delete;
@@ -161,19 +161,18 @@ public:
 
 // Add a resource whose two slots are empty, so that pushing its descriptor fails.
 void add_mapping_resource(RendAlloc* p_alloc,
-    const RendContextVK* p_rend_data,
     Map<std::string, Ref<RendResVK>, RendAlloc>& p_resources,
     std::string_view p_id,
     RendResTID p_type) {
     auto resource = make_ref<RendResVK>(p_alloc);
     resource->res_id = p_id;
     resource->res_type_id = p_type;
-    auto container = make_ref<ROCMultislotsVK>(
+    auto container = make_ref<ROCMultislots>(
         p_alloc,
         p_alloc,
         2,
-        [p_alloc, p_rend_data](uint32_t /*p_slot*/) {
-            return make_ref<TestMappingResourceVK>(p_alloc, p_rend_data).dynamic_cast_ref<IRendObjectVK>();
+        [p_alloc](uint32_t /*p_slot*/) {
+            return make_ref<TestMappingResourceVK>(p_alloc).dynamic_cast_ref<IRendObject>();
         },
         false);
     container->clear();
@@ -211,7 +210,7 @@ TEST(WBEPipelineDescBindingsVKTest, BindsReflectedResourcesThroughTheTaskResourc
     Map<std::string, Ref<RendResVK>, RendAlloc> resources(&alloc);
     RendResViewVK view(&resources, &map);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
-    add_mapping_resource(&alloc, &rend_data, resources, "mapped", TypeUUID<ROImageViewVK>::UUID);
+    add_mapping_resource(&alloc, resources, "mapped", TypeUUID<ROImageViewVK>::UUID);
     EXPECT_THROW(bindings.bind_resources(view), std::runtime_error);
     resources.at("mapped")->res_type_id = TypeUUID<ROBufferVK>::UUID;
     EXPECT_NO_THROW(bindings.bind_resources(view));

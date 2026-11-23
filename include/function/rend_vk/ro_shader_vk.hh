@@ -20,7 +20,7 @@
 #include "core/memory/unique.hh"
 #include "core/reflection/reflection_defs.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
 #include "utils/utils.hh"
@@ -102,7 +102,7 @@ private:
  * @brief Shader class for Vulkan. Holds one shader module per variant of its source, all created eagerly.
  *
  */
-class WBE_META(WBE_REND_OBJECT) ROShaderVK final : public IRendObjectVK {
+class WBE_META(WBE_REND_OBJECT) ROShaderVK final : public IRendObject {
 public:
     /**
      * @brief Compatibility name for the resource creation description.
@@ -165,6 +165,7 @@ private:
         std::string name;
         VkShaderModule module = VK_NULL_HANDLE;
     };
+    const RendContextVK* rend_data = nullptr;
     size_t default_variant_index = 0;
     // Sorted by name.
     std::vector<VariantModule> variant_modules;

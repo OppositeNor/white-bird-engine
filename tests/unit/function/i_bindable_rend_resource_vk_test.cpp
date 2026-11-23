@@ -13,10 +13,11 @@
    limitations under the License.
 */
 #include "core/alloc/stl_alloc.hh"
+#include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_bindable_rend_resource_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_desc_vk.hh"
 #include "utils/defs.hh"
@@ -30,11 +31,9 @@ namespace WhiteBirdEngine {
 namespace {
 
 // A render object that imports itself through bind_rend_object() and records the names it is given.
-class TestBindableRendObjectVK final : public IRendObjectVK, public IBindableRendResourceVK {
+class TestBindableRendObjectVK final : public IRendObject, public IBindableRendResourceVK {
 public:
-    TestBindableRendObjectVK() = delete;
-    explicit TestBindableRendObjectVK(const RendContextVK* p_rend_data) : IRendObjectVK(p_rend_data) {
-    }
+    TestBindableRendObjectVK() = default;
     virtual ~TestBindableRendObjectVK() override = default;
     TestBindableRendObjectVK(const TestBindableRendObjectVK&) = delete;
     TestBindableRendObjectVK(TestBindableRendObjectVK&&) noexcept = delete;
@@ -61,9 +60,8 @@ protected:
 
 TEST(WBEBindableRendResourceVKTest, ImportNamesAnUnnamedObjectAfterItsResourceId) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
     RendGraphDescVK graph(&alloc);
-    Ref<TestBindableRendObjectVK> object = make_ref<TestBindableRendObjectVK>(&alloc, &rend_data);
+    Ref<TestBindableRendObjectVK> object = make_ref<TestBindableRendObjectVK>(&alloc);
 
     object->bind(graph, "svo_node_buffer");
     // A later import under another id keeps the first name, so a shared import is named the same in every graph.
@@ -75,9 +73,8 @@ TEST(WBEBindableRendResourceVKTest, ImportNamesAnUnnamedObjectAfterItsResourceId
 
 TEST(WBEBindableRendResourceVKTest, ImportKeepsAnExistingName) {
     RendAlloc alloc(WBE_KI_B(64));
-    RendContextVK rend_data(&alloc);
     RendGraphDescVK graph(&alloc);
-    Ref<TestBindableRendObjectVK> object = make_ref<TestBindableRendObjectVK>(&alloc, &rend_data);
+    Ref<TestBindableRendObjectVK> object = make_ref<TestBindableRendObjectVK>(&alloc);
     object->set_debug_name("sponza#vk_usage_130");
 
     object->bind(graph, "mesh");

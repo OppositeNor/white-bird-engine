@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "core/alloc/heap_alloc.hh"
+#include "core/core_utils.hh"
 #include "core/alloc/i_alloc.hh"
 #include "core/alloc/stack_alloc.hh"
 #include "core/alloc/stl_alloc.hh"
@@ -24,9 +25,8 @@
 #include "function/render/i_rend_object.hh"
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_resource_unit.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_rend_graph_bindings_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rd_params_compute_pipeline_vk.hh"
 #include "function/rend_vk/rd_params_graphics_pipeline_vk.hh"
@@ -38,10 +38,10 @@
 #include "function/rend_vk/rend_graph_desc_vk.hh"
 #include "function/rend_vk/rend_graph_metadata_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_resource_list_vk.hh"
-#include "function/rend_vk/roc_multislots_vk.hh"
-#include "function/rend_vk/roc_single_vk.hh"
+#include "function/render/roc_multislots.hh"
+#include "function/render/roc_single.hh"
 #include "function/rend_vk/rt_triggered_vk.hh"
 #include "generated/type_uuid.gen.hh"
 #include "global/global.hh"
@@ -84,10 +84,10 @@ DebugData make_desc_row(
     return row;
 }
 
-class TestDescResourceVK final : public IRendObjectVK {
+class TestDescResourceVK final : public IRendObject {
 public:
     TestDescResourceVK(const RendContextVK* p_rend_data, DebugDataArray p_rows)
-        : IRendObjectVK(p_rend_data), rows(p_rend_data->alloc) {
+        : rows(p_rend_data->alloc) {
         rows.reserve(p_rows.size());
         for (DebugData& row : p_rows) {
             rows.emplace_back(std::move(row));
@@ -103,7 +103,7 @@ public:
         return static_hash("RendGraphTestDescResourceVK");
     }
 
-    virtual DebugDataRows desc_debug_data() const override {
+    virtual DebugDataRows desc_debug_data(RendAlloc* /*p_alloc*/) const override {
         return rows;
     }
 
@@ -111,10 +111,10 @@ private:
     DebugDataRows rows;
 };
 
-Ref<ROCSingleVK> make_test_container(RendAlloc* p_alloc, const RendContextVK* p_rend_data) {
-    Ref<IRendObjectVK> resource =
-        make_ref<TestDescResourceVK>(p_alloc, p_rend_data, DebugDataArray{}).dynamic_cast_ref<IRendObjectVK>();
-    return make_ref<ROCSingleVK>(p_alloc, [resource](uint32_t /*p_slot*/) {
+Ref<ROCSingle> make_test_container(RendAlloc* p_alloc, const RendContextVK* p_rend_data) {
+    Ref<IRendObject> resource =
+        make_ref<TestDescResourceVK>(p_alloc, p_rend_data, DebugDataArray{}).dynamic_cast_ref<IRendObject>();
+    return make_ref<ROCSingle>(p_alloc, [resource](uint32_t /*p_slot*/) {
         return resource;
     });
 }
@@ -263,30 +263,30 @@ TEST(WBERendGraphVKTest, RendResViewDescDebugDataAddsResourceIdsAndSortsDetermin
     rend_data.frames_in_flight = 2;
     Map<std::string, Ref<RendResVK>, RendAlloc> resources(&alloc);
 
-    Ref<IRendObjectVK> single_resource = make_ref<TestDescResourceVK>(
+    Ref<IRendObject> single_resource = make_ref<TestDescResourceVK>(
         &alloc, &rend_data, DebugDataArray{make_desc_row("ROImageViewVK", "sampled_image", "resource", 7)})
-                                               .template dynamic_cast_ref<IRendObjectVK>();
-    auto single_container = make_ref<ROCSingleVK>(&alloc, [single_resource](uint32_t /*p_slot*/) {
+                                               .template dynamic_cast_ref<IRendObject>();
+    auto single_container = make_ref<ROCSingle>(&alloc, [single_resource](uint32_t /*p_slot*/) {
         return single_resource;
     });
-    auto per_frame_container = make_ref<ROCMultislotsVK>(
+    auto per_frame_container = make_ref<ROCMultislots>(
         &alloc,
         &alloc,
         rend_data.frames_in_flight,
         [&alloc, &rend_data](uint32_t /*p_slot*/) {
-            return make_ref<TestDescResourceVK>(&alloc, &rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObjectVK>();
+            return make_ref<TestDescResourceVK>(&alloc, &rend_data, DebugDataArray{}).template dynamic_cast_ref<IRendObject>();
         },
         false);
     per_frame_container->set(0,
         make_ref<TestDescResourceVK>(
             &alloc, &rend_data, DebugDataArray{make_desc_row("ROSamplerVK", "sampler", "sampler", 7)})
-            .template dynamic_cast_ref<IRendObjectVK>());
+            .template dynamic_cast_ref<IRendObject>());
     per_frame_container->set(1,
         make_ref<TestDescResourceVK>(&alloc,
             &rend_data,
             DebugDataArray{make_desc_row("ROBufferVK", "uniform_buffer", "resource", 3),
                 make_desc_row("ROBufferVK", "storage_buffer", "resource", 7)})
-            .template dynamic_cast_ref<IRendObjectVK>());
+            .template dynamic_cast_ref<IRendObject>());
 
     auto alpha_resource = make_ref<RendResVK>(&alloc);
     alpha_resource->res_id = "alpha";
@@ -336,7 +336,7 @@ TEST(WBERendGraphVKTest, ResourceViewLooksUpGraphGlobalResources) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     Map<std::string, Ref<RendResVK>, RendAlloc> resources(&alloc);
-    Ref<ROCSingleVK> global_container = make_test_container(&alloc, &rend_data);
+    Ref<ROCSingle> global_container = make_test_container(&alloc, &rend_data);
 
     auto global_resource = make_ref<RendResVK>(&alloc);
     global_resource->res_id = TEST_SHARED_RESOURCE;
@@ -354,8 +354,8 @@ TEST(WBERendGraphVKTest, RejectsDuplicateGraphResourceRegistration) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     RendGraphVK graph(&rend_data);
 
     EXPECT_THROW(build_graph(graph, desc), std::runtime_error);
@@ -365,7 +365,7 @@ TEST(WBERendGraphVKTest, AcquiresExportedResourcesByTheirExportNames) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data)).add_export("exported", TEST_LOGICAL_RESOURCE);
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data)).add_export("exported", TEST_LOGICAL_RESOURCE);
     desc.add_task(make_probe_desc(&alloc, "probe", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     RendGraphVK graph(&rend_data);
     EXPECT_NE(build_error(graph, desc).find(TEST_VALIDATION_PASSED_MESSAGE), std::string::npos);
@@ -396,7 +396,7 @@ TEST(WBERendGraphVKTest, GlobalResourceAccessesConflictAcrossTasks) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task("first", [&alloc](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTGraphResourceProbeVK>(&alloc, false, true);
     });
@@ -418,7 +418,7 @@ TEST(WBERendGraphVKTest, InactiveTriggeredWritesStillRequireExplicitOrdering) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task("first", [&alloc](const RendGraphContextVK& /*p_context*/) {
         return make_unique<RTTriggeredVK>(&alloc, make_unique<RTGraphResourceProbeVK>(&alloc, false, true));
     });
@@ -468,7 +468,7 @@ TEST(WBERendGraphVKTest, AliasedTaskAccessesResolveToGraphResourcesForValidation
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource("dynamic_nodes", *make_test_container(&alloc, &rend_data));
+    desc.add_resource("dynamic_nodes", make_test_container(&alloc, &rend_data));
     // Both tasks access the task-local "nodes" identifier, which their descriptors map to the same graph resource.
     RendTaskDescVK writer = make_probe_desc(&alloc, "writer", QueueFamilyVK::GRAPHICS, {}, {"nodes"});
     writer.alias("nodes", "dynamic_nodes");
@@ -486,7 +486,7 @@ TEST(WBERendGraphVKTest, TaskFactoriesReceiveTheContextOfTheRendData) {
     RendContextVK rend_data(&alloc);
     rend_data.swap_chain_extent = {.width = 640, .height = 360};
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     VkExtent2D received_extent{};
     desc.add_task("task", [&alloc, &received_extent](const RendGraphContextVK& p_context) {
         received_extent = p_context.swap_chain_extent;
@@ -507,7 +507,7 @@ namespace {
 // Bindings that record the renderer facts they receive and supply one resource, one native task, and a context entry.
 class RecordingBindingsVK final : public IRendGraphBindingsVK {
 public:
-    RecordingBindingsVK(RendAlloc* p_alloc, Ref<RendObjectContainerVK> p_container)
+    RecordingBindingsVK(RendAlloc* p_alloc, Ref<IRendObjectContainer> p_container)
         : IRendGraphBindingsVK("recording"), alloc(p_alloc), container(std::move(p_container)) {
     }
 
@@ -520,7 +520,7 @@ public:
         result.context.set_value("label", std::string("bound"));
         // The graph replaces the renderer facts with its own.
         result.context.set_value("frames_in_flight", int64_t{99});
-        result.imports.add(TEST_LOGICAL_RESOURCE, *container);
+        result.imports.add(TEST_LOGICAL_RESOURCE, container);
         result.imports.add_task(RendTaskDescVK(alloc, "native", [this](const RendGraphContextVK& /*p_context*/) {
             return make_unique<RTGraphEdgeProbeVK>(alloc,
                 alloc,
@@ -537,7 +537,7 @@ public:
 
 private:
     RendAlloc* alloc;
-    Ref<RendObjectContainerVK> container;
+    Ref<IRendObjectContainer> container;
 };
 
 // Imports the bindings' resource and task, and fails unless the context and parameters reached build(context, parameters).
@@ -707,7 +707,7 @@ TEST(WBERendGraphVKTest, RejectsAliasesThatTheTaskNeverUses) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     RendTaskDescVK task = make_probe_desc(&alloc, "task", QueueFamilyVK::GRAPHICS, {"input"}, {});
     task.alias("input", TEST_LOGICAL_RESOURCE).alias("unused", TEST_LOGICAL_RESOURCE);
     desc.add_task(std::move(task));
@@ -720,7 +720,7 @@ TEST(WBERendGraphVKTest, ResourceEdgeChainOrdersConflictingAccesses) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     // Declared out of execution order to exercise topological sorting.
     desc.add_task(make_probe_desc(&alloc, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     desc.add_task(make_probe_desc(&alloc, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
@@ -746,7 +746,7 @@ TEST(WBERendGraphVKTest, DumpGraphMetadataListsTasksInExecutionOrderAndEdgeAcces
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     // Declared out of execution order to check that the metadata follows the topological order.
     desc.add_task(make_probe_desc(&alloc, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     desc.add_task(make_probe_desc(&alloc, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
@@ -792,8 +792,8 @@ TEST(WBERendGraphVKTest, EdgesOnAnotherResourceDoNotOrderAConflict) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
-    desc.add_resource(TEST_SHARED_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_SHARED_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(
         make_probe_desc(&alloc, "writer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE, TEST_SHARED_RESOURCE}));
     desc.add_task(
@@ -808,7 +808,7 @@ TEST(WBERendGraphVKTest, RejectsCyclicResourceEdges) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "first", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     desc.add_task(make_probe_desc(&alloc, "second", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     desc.get_task("first").connect("second", TEST_LOGICAL_RESOURCE);
@@ -826,7 +826,7 @@ TEST(WBERendGraphVKTest, RejectsSelfEdgesUnknownTasksAndUndeclaredResources) {
     RendContextVK rend_data(&alloc);
     auto make_desc = [&] {
         RendGraphDescVK desc(&alloc);
-        desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+        desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
         desc.add_task(make_probe_desc(&alloc, "task", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
         desc.add_task(make_probe_desc(&alloc, "other", QueueFamilyVK::GRAPHICS, {}, {}));
         return desc;
@@ -851,7 +851,7 @@ TEST(WBERendGraphVKTest, RejectsEdgesWhoseTasksDoNotAccessTheResource) {
     RendContextVK rend_data(&alloc);
     auto make_desc = [&] {
         RendGraphDescVK desc(&alloc);
-        desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+        desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
         desc.add_task(make_probe_desc(&alloc, "accessor", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
         desc.add_task(make_probe_desc(&alloc, "bystander", QueueFamilyVK::GRAPHICS, {}, {}));
         return desc;
@@ -873,7 +873,7 @@ TEST(WBERendGraphVKTest, GraphOwnedResourcesRejectDuplicateIdsBeforeAllocation) 
     RendGraphVK graph(&rend_data);
 
     RendGraphDescVK imported_duplicate(&alloc);
-    imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    imported_duplicate.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     imported_duplicate.add_buffer(TEST_LOGICAL_RESOURCE, [=](const RendGraphContextVK& /*p_context*/) {
         return RendBufferDescVK{.usage = RendResPrimaryUsageVK::BUFFER_STORAGE, .size = 16};
     });
@@ -936,7 +936,7 @@ TEST(WBERendGraphVKTest, ImageViewsMustViewDeclaredImages) {
         std::string::npos);
 
     RendGraphDescVK non_image(&alloc);
-    non_image.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    non_image.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     non_image.add_image_view("view", TEST_LOGICAL_RESOURCE);
     EXPECT_NE(build_error(graph, non_image).find("which is not a declared image resource"), std::string::npos);
 }
@@ -967,7 +967,7 @@ TEST(WBERendGraphVKTest, SubgraphEdgesConnectToTheEntriesAndLeaveFromTheExits) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     desc.add_task(make_probe_desc(&alloc, "consumer", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     desc.add_subgraph("sort", make_rewriting_subgraph(&alloc), LOGICAL_DATA_PORT).connect("consumer", TEST_LOGICAL_RESOURCE);
@@ -987,7 +987,7 @@ TEST(WBERendGraphVKTest, UnconnectedSubgraphAccessesStillConflict) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     desc.add_subgraph("sort", make_rewriting_subgraph(&alloc), LOGICAL_DATA_PORT);
     RendGraphVK graph(&rend_data);
@@ -999,7 +999,7 @@ TEST(WBERendGraphVKTest, SubgraphsConnectToSubgraphsAndExposeTheirMembers) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "reader", QueueFamilyVK::GRAPHICS, {TEST_LOGICAL_RESOURCE}, {}));
     desc.add_subgraph("upstream", make_rewriting_subgraph(&alloc), LOGICAL_DATA_PORT).connect("downstream", TEST_LOGICAL_RESOURCE);
     desc.add_subgraph("downstream", make_rewriting_subgraph(&alloc), LOGICAL_DATA_PORT);
@@ -1023,7 +1023,7 @@ TEST(WBERendGraphVKTest, NestedSubgraphsResolveToTheirInnermostTasks) {
     const std::array<RendSubgraphPortBindingVK, 1> sort_ports{{{.port = "data", .resource = "target"}}};
     post.graph.add_subgraph("sort", make_rewriting_subgraph(&alloc), sort_ports).connect("finish", "target");
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "producer", QueueFamilyVK::GRAPHICS, {}, {TEST_LOGICAL_RESOURCE}));
     const std::array<RendSubgraphPortBindingVK, 1> post_ports{{{.port = "target", .resource = TEST_LOGICAL_RESOURCE}}};
     desc.add_subgraph("post", post, post_ports);
@@ -1056,8 +1056,8 @@ TEST(WBERendGraphVKTest, RejectsSubgraphEdgesOnResourcesNoMemberAccesses) {
     RendAlloc alloc(WBE_KI_B(128));
     RendContextVK rend_data(&alloc);
     RendGraphDescVK desc(&alloc);
-    desc.add_resource(TEST_LOGICAL_RESOURCE, *make_test_container(&alloc, &rend_data));
-    desc.add_resource("other", *make_test_container(&alloc, &rend_data));
+    desc.add_resource(TEST_LOGICAL_RESOURCE, make_test_container(&alloc, &rend_data));
+    desc.add_resource("other", make_test_container(&alloc, &rend_data));
     desc.add_task(make_probe_desc(&alloc, "consumer", QueueFamilyVK::GRAPHICS, {"other"}, {}));
     desc.add_subgraph("sort", make_rewriting_subgraph(&alloc), LOGICAL_DATA_PORT).connect("consumer", "other");
     RendGraphVK graph(&rend_data);

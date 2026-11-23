@@ -13,6 +13,7 @@
    limitations under the License.
 */
 #include "function/rend_vk/mesh_resources_vk.hh"
+#include "core/core_utils.hh"
 #include "function/render/global_rend_cache.hh"
 #include "core/alloc/i_alloc.hh"
 #include "core/memory/reference_strong.hh"
@@ -58,7 +59,7 @@ Ref<ROBufferVK> create_material_params_buffer(const RendContextVK* p_rend_data, 
 } // namespace
 
 MeshResourcesVK::MeshResourcesVK(const RendContextVK* p_rend_data)
-    : IRendObjectVK(p_rend_data), alloc(get_rend_alloc(p_rend_data)), vertex_buffers(alloc),
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)), alloc(get_rend_alloc(p_rend_data)), vertex_buffers(alloc),
       vertex_binaries(alloc), textures(make_ref<RendResourceListVK>(alloc, alloc)), opaque_batches(alloc),
       opaque_double_sided_batches(alloc), masked_batches(alloc) {
 }

@@ -16,9 +16,9 @@
 #include "function/rend_vk/debug_utils_vk.hh"
 #include "core/core_utils.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/rend_vk/debug_data_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/desc_heap_alloc_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_image_vk.hh"
 #include "generated/type_uuid.gen.hh"
@@ -159,7 +159,7 @@ VkImageView ImageViewDescVK::create_vk_object(const RendContextVK* p_rend_data) 
 }
 
 ROImageViewVK::ROImageViewVK(const RendContextVK* p_rend_data, const Builder& p_builder)
-    : IRendObjectVK(p_rend_data) {
+    : rend_data(WBE_REQUIRES_VALID(p_rend_data)) {
     if (p_rend_data == nullptr) {
         throw std::runtime_error("Render data is nullptr.");
     }
@@ -259,8 +259,8 @@ uint32_t ROImageViewVK::get_storage_view_index() const {
     return *storage_view_index;
 }
 
-DebugDataRows ROImageViewVK::desc_debug_data() const {
-    DebugDataRows rows(rend_data->alloc);
+DebugDataRows ROImageViewVK::desc_debug_data(RendAlloc* p_alloc) const {
+    DebugDataRows rows(p_alloc);
     if (sampled_view_index.has_value()) {
         rows.emplace_back(make_desc_row("sampled_image", *sampled_view_index));
     }

@@ -40,6 +40,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace WhiteBirdEngine {
@@ -75,9 +76,8 @@ void bind_imports(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, B
             throw std::runtime_error(std::format(
                 "Failed to build render graph recipe: {}imports[{}] '{}' is listed more than once.", p_scope, i, name));
         }
-        const IBindableRendResourceVK* resource = p_state.imports.find(name);
-        if (resource != nullptr) {
-            p_graph.add_resource(name, *resource);
+        if (p_state.imports.contains(name)) {
+            p_state.imports.bind(p_graph, name);
             p_state.declared_imports.insert(name);
             continue;
         }
@@ -406,18 +406,40 @@ void build_level(RendGraphDescVK& p_graph, const RendGraphRecipeVK& p_recipe, Bu
 } // namespace
 
 RendGraphRecipeImportsVK& RendGraphRecipeImportsVK::add(std::string_view p_name, const IBindableRendResourceVK& p_resource) {
+    return add_resource(p_name, &p_resource);
+}
+
+RendGraphRecipeImportsVK& RendGraphRecipeImportsVK::add(std::string_view p_name, Ref<IRendObjectContainer> p_container) {
+    if (p_container == MEM_NULL) {
+        throw std::runtime_error(std::format("Failed to add render graph recipe import '{}': the container is null.", p_name));
+    }
+    return add_resource(p_name, std::move(p_container));
+}
+
+RendGraphRecipeImportsVK& RendGraphRecipeImportsVK::add_resource(std::string_view p_name, Resource p_resource) {
     if (p_name.empty()) {
         throw std::runtime_error("Failed to add render graph recipe import: the name is empty.");
     }
-    if (!resources.emplace(std::string(p_name), &p_resource).second) {
+    if (!resources.emplace(std::string(p_name), std::move(p_resource)).second) {
         throw std::runtime_error(std::format("Failed to add render graph recipe import: '{}' is already supplied.", p_name));
     }
     return *this;
 }
 
-const IBindableRendResourceVK* RendGraphRecipeImportsVK::find(std::string_view p_name) const {
+bool RendGraphRecipeImportsVK::contains(std::string_view p_name) const {
+    return resources.contains(p_name);
+}
+
+void RendGraphRecipeImportsVK::bind(RendGraphDescVK& p_graph, std::string_view p_name) const {
     auto resource = resources.find(p_name);
-    return resource == resources.end() ? nullptr : resource->second;
+    if (resource == resources.end()) {
+        throw std::runtime_error(std::format("Failed to bind render graph recipe import: '{}' is not supplied.", p_name));
+    }
+    if (const auto* bindable = std::get_if<const IBindableRendResourceVK*>(&resource->second)) {
+        p_graph.add_resource(p_name, **bindable);
+        return;
+    }
+    p_graph.add_resource(p_name, std::get<Ref<IRendObjectContainer>>(resource->second));
 }
 
 RendGraphRecipeImportsVK& RendGraphRecipeImportsVK::add_task(RendTaskDescVK p_task) {

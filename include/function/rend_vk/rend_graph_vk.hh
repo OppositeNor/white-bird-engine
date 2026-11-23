@@ -28,8 +28,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/render/rend_graph_resource_registry.hh"
 #include "function/render/rend_task_resource_map.hh"
-#include "function/rend_vk/debug_data_vk.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/debug_data.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rd_params_compute_pipeline_vk.hh"
 #include "function/rend_vk/rd_params_graphics_pipeline_vk.hh"
@@ -38,7 +37,7 @@
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_metadata_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_resource_list_vk.hh"
 #include "function/rend_vk/semaphore_vk.hh"
 #include "resource/resource_unit/resource_unit.hh"
@@ -82,7 +81,7 @@ struct RendResVK {
     // The runtime type id of the underlying resource (TypeUUID<T>::UUID).
     RendResTID res_type_id = 0;
     // The resource container bound during graph construction.
-    Ref<RendObjectContainerVK> container;
+    Ref<IRendObjectContainer> container;
     // Aggregate CPU-side resource list. Aggregate accesses expand to its indexed graph resources.
     Ref<RendResourceListVK> resource_list;
 };
@@ -507,7 +506,7 @@ public:
     /**
      * @brief Acquire the container bound to an exported graph resource (RendGraphDescVK::add_export()).
      *
-     * Resources allocated by the graph are held in an ROCSingleVK, or in an ROCMultislotsVK with one slot per frame in
+     * Resources allocated by the graph are held in an ROCSingle, or in an ROCMultislots with one slot per frame in
      * flight when they were declared per frame. Use the container to update graph-owned buffers on the rendering thread.
      *
      * @param p_export_name The name the resource is exported under.
@@ -515,7 +514,7 @@ public:
      * @throws std::runtime_error If nothing is exported under the name, or the exported resource is an aggregate resource
      * list.
      */
-    Ref<RendObjectContainerVK> acquire_resource(std::string_view p_export_name) const;
+    Ref<IRendObjectContainer> acquire_resource(std::string_view p_export_name) const;
 
 private:
     const RendContextVK* rend_data;
@@ -561,16 +560,16 @@ private:
     Map<std::string, Ref<RendResVK>, RendAlloc> index_resources(const RendGraphDescVK& p_desc);
     void apply_desc(const RendGraphDescVK& p_desc);
     void apply_owned_resource(std::string_view p_resource_id, RendResRebuildActionVK p_action);
-    Ref<IRendObjectVK> create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const;
-    void bind_owned_resource(std::string_view p_resource_id, Ref<RendObjectContainerVK> p_container);
+    Ref<IRendObject> create_owned_object(std::string_view p_resource_id, uint32_t p_slot) const;
+    void bind_owned_resource(std::string_view p_resource_id, Ref<IRendObjectContainer> p_container);
     // The debug name of a graph-owned resource of the current build, or p_resource_id when it has none.
     std::string_view resource_name(std::string_view p_resource_id) const;
     // A resource as diagnostics name it: `'<name>' (<id>)`, or `'<id>'` when it has no debug name.
     std::string describe_resource(std::string_view p_resource_id) const;
     // Objects the container creates are registered as `<resource_key>.<p_resource_id>` and named by their debug name; see
     // RendGraphVK().
-    Ref<RendObjectContainerVK> create_container(
-        std::string_view p_resource_id, bool p_per_frame, RendObjectContainerVK::Factory p_factory) const;
+    Ref<IRendObjectContainer> create_container(
+        std::string_view p_resource_id, bool p_per_frame, IRendObjectContainer::Factory p_factory) const;
     void build_tasks(const Vector<RendTaskDescVK, RendAlloc>& p_tasks, const Vector<RendSubgraphVK, RendAlloc>& p_subgraphs);
     void instantiate_tasks(const Vector<RendTaskDescVK, RendAlloc>& p_tasks);
     void normalize_task_accesses(Ref<RGNode> p_node) const;

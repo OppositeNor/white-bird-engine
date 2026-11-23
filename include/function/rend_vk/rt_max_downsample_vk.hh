@@ -22,7 +22,7 @@
 #include "function/render/rend_defs.hh"
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_compute_pipeline_vk.hh"
 #include "function/rend_vk/rt_params_max_downsample_vk.hh"
@@ -120,7 +120,7 @@ private:
     QueueFamilyVK queue_family_id = QueueFamilyVK::GRAPHICS;
     Ref<ROComputePipelineVK> pipeline;
     Vector<std::string, RendAlloc> mip_view_ids;
-    Vector<Ref<RendObjectContainerVK>, RendAlloc> mip_view_containers;
+    Vector<Ref<IRendObjectContainer>, RendAlloc> mip_view_containers;
     Vector<uint8_t, RendAlloc> push_data;
     uint32_t source_offset = 0;
     uint32_t destination_offset = 0;

@@ -89,7 +89,7 @@ resource, allocates a `Ref<DeviceMemoryVK>` for its requirements, and binds it. 
 `Ref<DeviceMemoryVK>` and an offset (`set_memory()`) and creates the resource through `DeviceMemoryVK::create_buffer()` or
 `create_image()`, which check the memory type, alignment, and remaining size before creating anything, then use
 `vmaCreateAliasingBuffer2()` / `vmaCreateAliasingImage2()`. Memory for several aliases can come from explicit requirements
-(`DeviceMemoryVK::Builder::set_requirements()`) or from an existing resource (`acquire_memory()`). Dedicated allocations cannot
+(`DeviceMemoryVK::Builder::set_requirements()`) or from an existing resource (`get_memory()`). Dedicated allocations cannot
 be aliased.
 
 Every bound resource holds a reference to its memory until its own delayed destruction. Aliased resources share contents, so

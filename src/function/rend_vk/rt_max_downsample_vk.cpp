@@ -21,7 +21,7 @@
 #include "function/rend_vk/i_rend_task_vk.hh"
 #include "function/rend_vk/rend_graph_context_vk.hh"
 #include "function/rend_vk/rend_graph_vk.hh"
-#include "function/rend_vk/rend_object_container_vk.hh"
+#include "function/render/i_rend_object_container.hh"
 #include "function/rend_vk/rend_task_create_utils_vk.hh"
 #include "function/rend_vk/rend_context_vk.hh"
 #include "function/rend_vk/ro_compute_pipeline_vk.hh"
@@ -154,7 +154,7 @@ void RTMaxDownsampleVK::append_accesses(Vector<ResAccessVK, RendAlloc>& p_reads,
 
 void RTMaxDownsampleVK::bind_resources(const RendResViewVK& p_resources) {
     for (size_t i = 0; i < mip_view_ids.size(); ++i) {
-        Ref<RendObjectContainerVK> container = p_resources.get(mip_view_ids[i]).container;
+        Ref<IRendObjectContainer> container = p_resources.get(mip_view_ids[i]).container;
         if (container == MEM_NULL) {
             throw std::runtime_error(std::format("RTMaxDownsampleVK: image-view resource '{}' has no container.", mip_view_ids[i]));
         }

@@ -14,7 +14,7 @@
 */
 #include "entity_draw_data.hh"
 #include "core/memory/reference_strong.hh"
-#include "function/rend_vk/i_rend_object_vk.hh"
+#include "function/render/i_rend_object.hh"
 #include "function/rend_vk/mesh_gpu_data_vk.hh"
 #include "function/rend_vk/ro_buffer_vk.hh"
 #include "glm/ext/matrix_float3x3.hpp"
@@ -33,10 +33,10 @@ EntityDrawData::EntityDrawData(const RendContextVK* p_rend_data, Ref<MeshResourc
     if (p_rend_data == nullptr || mesh == MEM_NULL) {
         throw std::runtime_error("Failed to construct entity draw data: render data or mesh is missing.");
     }
-    transform_buffers = make_ref<ROCMultislotsVK>(p_rend_data->alloc,
+    transform_buffers = make_ref<ROCMultislots>(p_rend_data->alloc,
         p_rend_data->alloc,
         p_rend_data->frames_in_flight,
-        [p_rend_data](uint32_t) -> Ref<IRendObjectVK> {
+        [p_rend_data](uint32_t) -> Ref<IRendObject> {
             return p_rend_data->create_buffer(ROBufferVK::Builder().set_properties(sizeof(GeometryNodeGPU), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
         });
     set_transform(glm::mat4(1.0F));
@@ -63,7 +63,7 @@ void EntityDrawData::set_transform(const glm::mat4& p_transform) {
 }
 
 void EntityDrawData::bind(RendGraphDescVK& p_graph, std::string_view p_resource_id) const {
-    transform_buffers->bind(p_graph, make_member_resource_id(p_resource_id, TRANSFORM));
+    bind_container(p_graph, make_member_resource_id(p_resource_id, TRANSFORM), transform_buffers);
 }
 
 } // namespace WhiteBirdEngine
