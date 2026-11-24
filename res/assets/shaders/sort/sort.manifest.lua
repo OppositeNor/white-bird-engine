@@ -15,7 +15,8 @@ return {
     {
         id = "radix_sort_histogram_workgroup_process_0_8",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -26,7 +27,8 @@ return {
     {
         id = "radix_sort_histogram_workgroup_process_8_16",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -37,7 +39,8 @@ return {
     {
         id = "radix_sort_histogram_workgroup_process_16_24",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -48,7 +51,8 @@ return {
     {
         id = "radix_sort_histogram_workgroup_process_24_32",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -59,27 +63,32 @@ return {
     {
         id = "radix_sort_histogram_prefix_sum",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_prefix_sum.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_prefix_sum",
     },
     {
         id = "radix_sort_histogram_overflow_prefix_sum",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_overflow_prefix_sum.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_overflow_prefix_sum",
     },
     {
         id = "radix_sort_histogram_add_overflow",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_histogram_add_overflow.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_histogram_add_overflow",
     },
     {
         id = "radix_sort_prepare_dispatch",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_prepare_dispatch.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_prepare_dispatch",
     },
     {
         id = "radix_sort_scatter_0_8",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_scatter",
         variants = {
             {
                 name = "default",
@@ -90,7 +99,8 @@ return {
     {
         id = "radix_sort_scatter_8_16",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_scatter",
         variants = {
             {
                 name = "default",
@@ -101,7 +111,8 @@ return {
     {
         id = "radix_sort_scatter_16_24",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_scatter",
         variants = {
             {
                 name = "default",
@@ -112,7 +123,8 @@ return {
     {
         id = "radix_sort_scatter_24_32",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_scatter",
         variants = {
             {
                 name = "default",
@@ -123,7 +135,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_0_8",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -134,7 +147,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_8_16",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -145,7 +159,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_16_24",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -156,7 +171,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_24_32",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -167,7 +183,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_32_40",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -178,7 +195,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_40_48",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -189,7 +207,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_48_56",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -200,7 +219,8 @@ return {
     {
         id = "radix_sort_uint2_histogram_workgroup_process_56_64",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_histogram_workgroup_process.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_histogram_workgroup_process",
         variants = {
             {
                 name = "default",
@@ -211,7 +231,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_0_8",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -222,7 +243,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_8_16",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -233,7 +255,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_16_24",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -244,7 +267,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_24_32",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -255,7 +279,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_32_40",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -266,7 +291,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_40_48",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -277,7 +303,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_48_56",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",
@@ -288,7 +315,8 @@ return {
     {
         id = "radix_sort_uint2_scatter_56_64",
         source_type = "shader",
-        src = "assets/shaders/sort/radix_sort_uint2_scatter.slang",
+        src = "assets/shaders/sort/sort_kernel.slang",
+        kernel = "radix_sort_uint2_scatter_keys",
         variants = {
             {
                 name = "default",

@@ -21,6 +21,9 @@ endif()
 if (NOT DEFINED WBE_MODEL_COMPILER_DIR)
     message(FATAL_ERROR "WBE_MODEL_COMPILER_DIR must point to the vendored model compiler source directory.")
 endif()
+if (NOT DEFINED WBE_SHADER_COMPILER_DIR)
+    message(FATAL_ERROR "WBE_SHADER_COMPILER_DIR must point to the vendored shader compiler source directory.")
+endif()
 if (NOT DEFINED WBE_DEPENDENCIES_ROOT)
     message(FATAL_ERROR "WBE_DEPENDENCIES_ROOT must point to the engine dependency directory.")
 endif()
@@ -49,3 +52,6 @@ set_target_properties(ktx PROPERTIES
 
 set(PYTHON_EXTENSION_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python/wbe_utils_model_compiler")
 add_subdirectory(${WBE_MODEL_COMPILER_DIR} ${CMAKE_BINARY_DIR}/model_compiler)
+
+set(PYTHON_EXTENSION_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python/wbe_utils_shader_compiler")
+add_subdirectory(${WBE_SHADER_COMPILER_DIR} ${CMAKE_BINARY_DIR}/shader_compiler)

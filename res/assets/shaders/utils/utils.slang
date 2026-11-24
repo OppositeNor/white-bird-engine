@@ -114,6 +114,60 @@ struct wbe_push_constantAttribute {
 };
 
 /**
+ * Marks a compute kernel: an ordinary function that a shader resource selects with `kernel = "<function>"`, for which the
+ * ACP generates the entry point (wbe-utils-shader-compiler). Every parameter is a system value (an SV_ semantic, forwarded
+ * from the entry point), a resource marked wbe::bind, or a four-byte scalar marked wbe::push. The kernel must not be
+ * generic. Kernels live in <feature>_kernel.slang files, beside the <feature>_utils.slang building blocks they call. Tests
+ * call a kernel through the generated test entry point, which binds plain globals.
+ */
+[__AttributeUsage(_AttributeTargets.Function)]
+struct wbe_kernelAttribute {
+    /** Workgroup size along x. */
+    int x;
+    /** Workgroup size along y. */
+    int y = 1;
+    /** Workgroup size along z. */
+    int z = 1;
+};
+
+/**
+ * Binds a kernel parameter of a resource type (constant, structured, or byte address buffer, texture, sampler, or
+ * acceleration structure) to a descriptor-heap resource. The generated entry point declares it as a wbe::desc
+ * DescriptorHandle push-data field.
+ */
+[__AttributeUsage(_AttributeTargets.Param)]
+struct wbe_bindAttribute {
+    /** Logical render-graph resource identifier resolved by the owning task. */
+    string resource_id;
+    /**
+     * Shader access: "read", "write", or "read_write". Omitted means the parameter type's access: "read_write" for RW
+     * types, which may narrow it to "read" or "write", and "read" for every other type.
+     */
+    string access = "";
+    /** Descriptor category as in wbe::desc; omitted means the category the parameter type implies, which it must match. */
+    string desc_type = "";
+};
+
+/**
+ * Supplies a four-byte uint, int, or float kernel parameter as push data, like wbe::push_constant: "time" and "frame_slot"
+ * are supplied by the renderer, and any other identifier is a custom value the owning render task sets.
+ */
+[__AttributeUsage(_AttributeTargets.Param)]
+struct wbe_pushAttribute {
+    /** Renderer value identifier or custom push-constant identifier. */
+    string value;
+};
+
+/**
+ * Embeds a kernel parameter of a struct type, or a sized array of one, in the push data as-is. The struct declares its own
+ * wbe::desc handles and wbe::push_constant scalars, as hand-written push data does (e.g. LightParamDescIndices), so helpers
+ * taking it work unchanged.
+ */
+[__AttributeUsage(_AttributeTargets.Param)]
+struct wbe_push_dataAttribute {
+};
+
+/**
  * @brief View the descriptor of a handle as another resource type, for a resource accessed through more than one view.
  * @details The heap slot is shared; the descriptor types must be compatible, as for two ResourceDescriptorHeap reads of
  * one index, e.g. a structured buffer read as RWStructuredBuffer<T> and StructuredBuffer<T>.

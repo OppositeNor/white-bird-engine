@@ -19,8 +19,9 @@
  * @file octree_debug_draw.slang
  * @brief Wireframes of the octree's leaves and bounds, or of its occupied nodes.
  * @details Without WBE_OCTREE_DEBUG_NODES this is the leaf view, drawn with one indirect command per subgrid from
- * octree_debug_gather_leaves.slang: instance i draws the occupied leaf of rank i % OCTREE_DEBUG_SUBGRID_LEAF_COUNT in the
- * occupancy mask of subgrid i / OCTREE_DEBUG_SUBGRID_LEAF_COUNT, and the instance after the last subgrid draws the bounds.
+ * octree_debug_gather_leaves() in octree_kernel.slang: instance i draws the occupied leaf of rank
+ * i % OCTREE_DEBUG_SUBGRID_LEAF_COUNT in the occupancy mask of subgrid i / OCTREE_DEBUG_SUBGRID_LEAF_COUNT, and the instance
+ * after the last subgrid draws the bounds.
  * With WBE_OCTREE_DEBUG_NODES this is the node view: instance i draws the i-th gathered node, colored by depth.
  */
 

@@ -6,12 +6,14 @@
    (`{ name, values = { { name, value }, ... }, default? }`, each compiled separately and selected by name; see
    `docs/resource/resource_standard.md`). Its SPIR-V and metadata outputs are derived next to the source as
    `<source stem>.<id>[.<variant name>].spv` and `.json`.
-2. `build_script/resource/acp/acp_compiler_shader.py` runs `slangc` from `PATH` with profile
-   `spirv_1_6+spvDescriptorHeapEXT+vk_mem_model` (shaders under `sort/` or `pixel_sort/` temporarily omit `vk_mem_model`),
-   include paths `res/assets/shaders` and `res/assets/shaders/utils`, `-DWBE_SHADER_DEBUG` when the target enables shader
-   debug, `-g3` when tests are generated, and the variant's macros. Output is validated with `spirv-val`.
+2. `build_script/resource/acp/acp_compiler_shader.py` only resolves `src` and configures `WBEUtilsShaderCompiler`
+   (`dependencies/wbe-utils-shader-compiler`), which validates the resource and compiles each variant. Its
+   `SlangCompiler` runs `slangc` from `PATH` with profile `spirv_1_6+spvDescriptorHeapEXT+vk_mem_model`, include paths
+   `res/assets/shaders` and `res/assets/shaders/utils`, `-DWBE_SHADER_DEBUG=1` when the target enables shader debug, `-g3`
+   when tests are generated, and the variant's macros. Output is validated with `spirv-val`. A resource with
+   `kernel = "<function>"` instead compiles the entry point generated for that `[wbe::kernel]` function.
 3. A second temporary compile with `WBE_REFLECTION_METADATA=1` lets reflection-only declarations contribute metadata
-   without entering the runtime shader. Slang's JSON is normalized into the snake-case schema of
+   without entering the runtime shader. `ShaderMetadataNormalizer` normalizes Slang's JSON into the snake-case schema of
    `include/function/render/shader_metadata.hh`.
 4. The loader stores the SPIR-V words and metadata path in `RUShader`; pipeline resources carry stage entry names
    (`src/function/rend_vk/rend_vk_resource_unit_loader.cpp`).
@@ -146,7 +148,8 @@ and `transform` / `normal_transform` offsets from the global `mesh` parameter.
 
 Trace the exact raw Slang JSON first; do not infer layout from Slang source alone.
 
-1. Normalize the new property in the narrowest helper of `acp_compiler_shader.py`.
+1. Normalize the new property in the narrowest helper of `ShaderMetadataNormalizer`
+   (`dependencies/wbe-utils-shader-compiler/wbe_utils_shader_compiler/shader_metadata.py`), with a test in that package.
 2. If runtime consumers need it, add a serializable field in `shader_metadata.hh`; let the build regenerate serialization.
 3. Cover deserialization in `tests/unit/function/shader_metadata_vk_test.cpp` with a small normalized JSON and, when Slang
    behavior matters, a compiled fixture under `res/assets/shaders` reached from a `res/res_chunks` manifest that calls `scope("test_only")`.

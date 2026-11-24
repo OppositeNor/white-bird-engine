@@ -172,7 +172,7 @@ struct PixelSortContrastGPU {
 
 /**
  * @class PixelSortingPostProcessingParamsGPU
- * @brief GPU layout of PixelSortingPostProcessingParams in pixel_sorting_post_processing.slang.
+ * @brief GPU layout of PixelSortingPostProcessingParams in pixel_sort/pixel_sort_kernel.slang.
  */
 struct PixelSortingPostProcessingParamsGPU {
     /** The exponent every color channel is raised to; 1 leaves the color unchanged. */

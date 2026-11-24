@@ -411,6 +411,25 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - `rma` is the canonical project abbreviation and texture role for the roughness, metallic, and ambient-occlusion channel pack.
   Use `rma` in project-owned identifiers instead of a spelled-out equivalent.
 
+### Shader Kernels
+
+- A compute shader may be a kernel: a concrete function marked `[wbe::kernel(x, y, z)]` (attributes in `utils/utils.slang`)
+  whose parameters are system values (`SV_` semantics), `[wbe::bind(resource_id, access?, desc_type?)]` resources,
+  `[wbe::push(value)]` four-byte scalars, or `[wbe::push_data]` structs (or arrays of them) of `wbe::desc` /
+  `wbe::push_constant` fields, such as `LightParamDescIndices`, embedded in the push data as-is. All of a directory's
+  kernels live in one `<directory>_kernel.slang`, beside the `*_utils.slang` building blocks they call. Compute shaders
+  are kernels; graphics shaders, and the test fixtures of hand-written push data, keep `DescIndices` structs.
+- A shader resource selects one with `kernel = "<function>"` (instead of `stage` and `entry`) and `src` naming the kernel
+  file. `wbe-utils-shader-compiler` (`dependencies/`, built with the ACP dependencies) compiles every shader resource;
+  `ACPCompilerShader` only resolves `src` and configures it for the build target. For a kernel it reflects the function
+  per variant and compiles the generated entry point from `build/<target>/generated/shaders/`, which declares the usual
+  `wbe::desc` / `wbe::push_constant` push data; `kernel` does not reach the runtime manifest. Shader compilation and
+  metadata normalization changes belong in that package, not the adapter.
+- Binding descriptor types and accesses are inferred from the parameter type; state them only to check or to narrow an RW
+  access. Do not edit generated entry points.
+- Shader tests call kernels through `load_kernel_function(source, kernel_name, defines)` in `tests/shader/conftest.py`,
+  which compiles the generated test entry point: bindings and pushes are globals named as their parameters without `p_`.
+
 ## Configuration Files
 
 - Engine and game configuration files (`res/config/**/*.toml`) are TOML, loaded with `ParserTOML` from

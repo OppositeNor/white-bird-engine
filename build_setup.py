@@ -91,6 +91,8 @@ project_script_modules_dir = (os.path.join(project_resource_dir, "assets", "scri
 cache_dir = os.path.join(build_dir, "build_cache")
 metadata_cache_dir = os.path.join(cache_dir, "source_metadata")
 model_compiler_cache_dir = os.path.join(cache_dir, "model_compiler")
+# Entry points the shader compiler generates for kernel shader resources.
+generated_shader_dir = os.path.join(build_dir, "generated", "shaders")
 licenses_output_dir = os.path.join(resource_output_dir, "licenses")
 
 # Create directories
@@ -145,7 +147,8 @@ def setup_acp_compilers() -> None:
         acp_dependencies_compiler.get_ktx_library_dir(), acp_dependencies_compiler.get_python_package_dir())
     sdf_compiler = SDFCompilerMeshToSDF(texture_compiler)
     def add_compilers(p_acp: ACP, p_shader_include_dirs: list[str], p_script_module_dirs: list[str]) -> None:
-        p_acp.add_compiler(ACPCompilerShader([Path(include_dir) for include_dir in p_shader_include_dirs]))
+        p_acp.add_compiler(ACPCompilerShader([Path(include_dir) for include_dir in p_shader_include_dirs],
+                                             Path(generated_shader_dir)))
         p_acp.add_compiler(ACPCompilerTexture(texture_compiler))
         p_acp.add_compiler(ACPCompilerModel(texture_compiler, sdf_compiler, Path(model_compiler_cache_dir)))
         p_acp.add_compiler(ACPCompilerMesh(sdf_compiler))

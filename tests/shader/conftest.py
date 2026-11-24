@@ -16,6 +16,7 @@ from typing import Callable
 
 import pytest
 import slangpy as spy
+from wbe_utils_shader_compiler import WBEUtilsShaderCompiler
 
 import build_config
 
@@ -50,5 +51,37 @@ def load_kernel(device: spy.Device) -> Callable[[str, dict[str, str | int]], spy
         session = device.create_slang_session(compiler_options={"include_paths": [*SHADER_INCLUDE_PATHS, KERNEL_DIR],
             "defines": {name: str(value) for name, value in p_defines.items()}})
         module = session.load_module(p_kernel_name)
+        return device.create_compute_kernel(session.link_program([module], [module.entry_point("main")]))
+    return load
+
+
+KernelFunctionLoader = Callable[[str, str, dict[str, str | int]], spy.ComputeKernel]
+
+
+@pytest.fixture(scope="session")
+def load_kernel_function(device: spy.Device, tmp_path_factory: pytest.TempPathFactory) -> KernelFunctionLoader:
+    """
+    Loader for the [wbe::kernel] functions of the engine shaders, through their generated test entry points.
+
+    Each call reflects the kernel in a shader source, given relative to the shader root, with the given preprocessor
+    defines, and compiles the test entry point wbe-utils-shader-compiler generates for it. The entry point declares each
+    wbe::bind and wbe::push parameter as a global named as the parameter without its `p_` prefix, so a dispatch binds
+    them by those names.
+    """
+    shader_compiler = WBEUtilsShaderCompiler()
+    generated_dir = tmp_path_factory.mktemp("kernel_functions")
+    generated_count = 0
+
+    def load(p_source: str, p_kernel_name: str, p_defines: dict[str, str | int]) -> spy.ComputeKernel:
+        nonlocal generated_count
+        defines = {name: str(value) for name, value in p_defines.items()}
+        kernel = shader_compiler.reflect_kernel(SHADER_INCLUDE_DIR / p_source, p_kernel_name, SHADER_INCLUDE_PATHS,
+            list(defines.items()))
+        generated_path = generated_dir / f"{p_kernel_name}_{generated_count}.slang"
+        generated_count += 1
+        generated_path.write_text(shader_compiler.generate_test_source(kernel), encoding="utf-8")
+        session = device.create_slang_session(compiler_options={"include_paths": SHADER_INCLUDE_PATHS,
+            "defines": defines})
+        module = session.load_module(generated_path.as_posix())
         return device.create_compute_kernel(session.link_program([module], [module.entry_point("main")]))
     return load

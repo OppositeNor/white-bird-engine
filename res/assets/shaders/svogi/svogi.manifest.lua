@@ -15,16 +15,19 @@ return {
     {
         id = "svogi_occupancy_injection",
         source_type = "shader",
-        src = "assets/shaders/svogi/svogi_occupancy_injection.slang",
+        src = "assets/shaders/svogi/svogi_kernel.slang",
+        kernel = "inject_svo_occupancy",
     },
     {
         id = "svogi_radiance_injection",
         source_type = "shader",
-        src = "assets/shaders/svogi/svogi_radiance_injection.slang",
+        src = "assets/shaders/svogi/svogi_kernel.slang",
+        kernel = "inject_svogi_radiance",
     },
     {
         id = "svogi_occupancy_propagation",
         source_type = "shader",
-        src = "assets/shaders/svogi/svogi_occupancy_propagation.slang",
+        src = "assets/shaders/svogi/svogi_kernel.slang",
+        kernel = "propagate_svogi_occupancy",
     },
 }

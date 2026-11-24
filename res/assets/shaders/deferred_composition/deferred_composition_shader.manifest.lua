@@ -15,17 +15,20 @@ return {
     {
         id = "shadow_moments_summed_area_table_horizontal_shader",
         source_type = "shader",
-        src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_horizontal.slang",
+        src = "assets/shaders/deferred_composition/deferred_composition_kernel.slang",
+        kernel = "shadow_moments_summed_area_table_horizontal",
     },
     {
         id = "shadow_moments_summed_area_table_vertical_shader",
         source_type = "shader",
-        src = "assets/shaders/deferred_composition/shadow_moments_summed_area_table_vertical.slang",
+        src = "assets/shaders/deferred_composition/deferred_composition_kernel.slang",
+        kernel = "shadow_moments_summed_area_table_vertical",
     },
     {
         id = "direct_lighting_shader",
         source_type = "shader",
-        src = "assets/shaders/deferred_composition/direct_lighting.slang",
+        src = "assets/shaders/deferred_composition/deferred_composition_kernel.slang",
+        kernel = "direct_lighting",
         -- WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS filters the shadow moments through their summed-area table.
         variants = {
             { name = "default" },
@@ -35,7 +38,8 @@ return {
     {
         id = "indirect_lighting_rsm_shader",
         source_type = "shader",
-        src = "assets/shaders/deferred_composition/indirect_lighting_rsm.slang",
+        src = "assets/shaders/deferred_composition/deferred_composition_kernel.slang",
+        kernel = "indirect_lighting_rsm",
         -- WBE_VOXEL_DEBUG_VIEW outputs the voxel debug view instead of the indirect lighting.
         variants = {
             { name = "default" },
@@ -45,7 +49,8 @@ return {
     {
         id = "combine_lighting_shader",
         source_type = "shader",
-        src = "assets/shaders/deferred_composition/combine_lighting.slang",
+        src = "assets/shaders/deferred_composition/deferred_composition_kernel.slang",
+        kernel = "combine_lighting",
     },
     {
         id = "present_post_processing_shader",

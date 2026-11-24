@@ -58,3 +58,6 @@
 [submodule "dependencies/tl"]
 	path = dependencies/tl
 	url = https://github.com/teal-language/tl.git
+[submodule "dependencies/wbe-utils-shader-compiler"]
+	path = dependencies/wbe-utils-shader-compiler
+	url = https://github.com/OppositeNor/wbe-utils-shader-compiler.git

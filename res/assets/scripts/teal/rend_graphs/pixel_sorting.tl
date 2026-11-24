@@ -22,9 +22,9 @@
 -- Imported tasks: `draw_imgui`, the application's ImGui overlay, drawn after `present_sorted_pixels`.
 -- Exports: `post_processing_output_image`, the result image, which the application reads back for screenshots.
 
--- Must match the numthreads of write_sorted_pixels.slang and pixel_sorting_post_processing.slang.
+-- Must match the workgroup size of the write_sorted_pixels and pixel_sorting_post_processing kernels (pixel_sort_kernel.slang).
 local PIXEL_SORT_TILE_SIZE = 16
--- Must match the numthreads of count_pixel_sort_mask.slang and register_pixel_sort_keys.slang, which run one invocation
+-- Must match the workgroup size of the count_pixel_sort_mask and register_pixel_sort_keys kernels, which run one invocation
 -- per line.
 local PIXEL_SORT_COLUMN_WORKGROUP_SIZE = 64
 -- Must match WBE_PIXEL_SORT_COLUMN_OFFSETS_START in pixel_sort_utils.slang.

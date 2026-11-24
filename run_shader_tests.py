@@ -20,6 +20,7 @@ import sys
 from typing import TextIO
 
 import build_config
+from build_script.build_dependency.build_dependency_acp import BuildDependencyACP
 from build_script.build_dependency.build_dependency_slangpy import BuildDependencySlangPy
 
 
@@ -38,11 +39,24 @@ def get_slangpy_python_dir() -> Path:
         build_config.dependency_build_info).get_python_package_dir()
 
 
+def get_acp_python_dir() -> Path:
+    """
+    Return the directory to add to the Python path to import the ACP packages, such as wbe_utils_shader_compiler.
+
+    :return: The Python package directory of the ACP build dependency shared by every target.
+    """
+    dependency_build_dir = ROOT_DIR / "build" / build_config.dependency_build_dir
+    return BuildDependencyACP(ROOT_DIR, dependency_build_dir, ROOT_DIR / "dependencies",
+        build_config.dependency_build_info).get_python_package_dir()
+
+
 def run_shader_tests(p_output: TextIO | None = None, p_pytest_args: list[str] | None = None) -> int:
     """
     Run the slangpy-based shader tests under tests/shader.
 
-    slangpy is a build dependency of every test-generating target, so one such target must be built first.
+    slangpy is a build dependency of every test-generating target, and the ACP packages, which provide the shader compiler
+    that generates kernel test entry points, are built for every target, so one test-generating target must be built
+    first.
 
     :param p_output: Stream receiving the test output, or None to inherit the process output.
     :param p_pytest_args: Extra arguments forwarded to pytest.
@@ -53,7 +67,7 @@ def run_shader_tests(p_output: TextIO | None = None, p_pytest_args: list[str] | 
     if not (slangpy_python_dir / "slangpy").is_dir():
         raise RuntimeError("slangpy is not built. Build a test-generating target with build.py first.")
     environment = os.environ.copy()
-    python_paths = [slangpy_python_dir.as_posix(), ROOT_DIR.as_posix()]
+    python_paths = [slangpy_python_dir.as_posix(), get_acp_python_dir().as_posix(), ROOT_DIR.as_posix()]
     if environment.get("PYTHONPATH"):
         python_paths.append(environment["PYTHONPATH"])
     environment["PYTHONPATH"] = os.pathsep.join(python_paths)

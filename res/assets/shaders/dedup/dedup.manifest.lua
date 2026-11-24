@@ -15,16 +15,19 @@ return {
     {
         id = "dedup_large_prepare_dispatch",
         source_type = "shader",
-        src = "assets/shaders/dedup/dedup_large_prepare_dispatch.slang",
+        src = "assets/shaders/dedup/dedup_kernel.slang",
+        kernel = "dedup_large_prepare_dispatch",
     },
     {
         id = "dedup_large_mark",
         source_type = "shader",
-        src = "assets/shaders/dedup/dedup_large_mark.slang",
+        src = "assets/shaders/dedup/dedup_kernel.slang",
+        kernel = "dedup_large_mark_keys",
     },
     {
         id = "dedup_large_scatter",
         source_type = "shader",
-        src = "assets/shaders/dedup/dedup_large_scatter.slang",
+        src = "assets/shaders/dedup/dedup_kernel.slang",
+        kernel = "dedup_large_scatter_keys",
     },
 }

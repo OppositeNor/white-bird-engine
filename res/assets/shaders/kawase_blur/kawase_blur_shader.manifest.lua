@@ -15,7 +15,8 @@ return {
     {
         id = "kawase_blur_shader",
         source_type = "shader",
-        src = "assets/shaders/kawase_blur/kawase_blur.slang",
+        src = "assets/shaders/kawase_blur/kawase_blur_kernel.slang",
+        kernel = "kawase_blur_iteration",
         -- Without the macro the blur writes pong; with it, ping.
         variants = {
             { name = "default" },

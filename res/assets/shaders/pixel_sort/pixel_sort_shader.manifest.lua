@@ -15,12 +15,14 @@ return {
     {
         id = "copy_pixel_sort_source_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/copy_pixel_sort_source.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "copy_pixel_sort_source",
     },
     {
         id = "count_pixel_sort_mask_vertical_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "count_pixel_sort_mask",
         variants = {
             {
                 name = "default",
@@ -31,7 +33,8 @@ return {
     {
         id = "count_pixel_sort_mask_horizontal_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/count_pixel_sort_mask.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "count_pixel_sort_mask",
         variants = {
             {
                 name = "default",
@@ -42,12 +45,14 @@ return {
     {
         id = "prefix_sum_pixel_sort_columns_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/prefix_sum_pixel_sort_columns.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "prefix_sum_pixel_sort_columns",
     },
     {
         id = "register_pixel_sort_keys_vertical_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "register_pixel_sort_keys",
         variants = {
             {
                 name = "default",
@@ -58,7 +63,8 @@ return {
     {
         id = "register_pixel_sort_keys_horizontal_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/register_pixel_sort_keys.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "register_pixel_sort_keys",
         variants = {
             {
                 name = "default",
@@ -69,7 +75,8 @@ return {
     {
         id = "write_sorted_pixels_vertical_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/write_sorted_pixels.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "write_sorted_pixels",
         variants = {
             {
                 name = "default",
@@ -80,7 +87,8 @@ return {
     {
         id = "write_sorted_pixels_horizontal_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/write_sorted_pixels.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "write_sorted_pixels",
         variants = {
             {
                 name = "default",
@@ -91,7 +99,8 @@ return {
     {
         id = "pixel_sorting_post_processing_shader",
         source_type = "shader",
-        src = "assets/shaders/pixel_sort/pixel_sorting_post_processing.slang",
+        src = "assets/shaders/pixel_sort/pixel_sort_kernel.slang",
+        kernel = "pixel_sorting_post_processing",
     },
     {
         id = "present_pixel_sort_shader",

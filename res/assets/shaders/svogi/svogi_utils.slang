@@ -114,6 +114,52 @@ void propagate_svo_occupancy(SVOWriteBuffer<float> p_svo_occupancy, uint p_block
     p_svo_occupancy.write_data_at_index(parent.data_index, occupancy_sum / 8.0f, p_frame_slot);
 }
 
+/**
+ * @brief Number of sub-voxels in the brick of one SVO leaf, and the stride of a leaf's data index in a radiance key.
+ */
+static const uint SVOGI_SUBVOXEL_COUNT = SVO_BRICK_SIZE * SVO_BRICK_SIZE * SVO_BRICK_SIZE;
+
+/**
+ * @brief Locate the leaf sub-voxel that receives radiance injected at a world-space position.
+ * @details Traces the position with svo.trace_data() and selects the sub-voxel with svo_pos_to_subvoxel_pos(). Positions
+ * outside the SVO, which the trace would wrap into it, and positions whose trace ends at a node rather than an occupied
+ * leaf, receive no radiance.
+ * @param p_svo The SVO to inject into.
+ * @param p_world_position Position in world space.
+ * @param p_key Receives SVOGI_SUBVOXEL_COUNT * the leaf's data index + the sub-voxel index; 0 when nothing is located.
+ * @param p_subvoxel_position Receives the position in the sub-voxel's local unit cube; 0 when nothing is located.
+ * @return Whether an occupied leaf's sub-voxel was located.
+ */
+bool try_locate_svogi_subvoxel(SVO p_svo, float3 p_world_position, out uint p_key, out float3 p_subvoxel_position) {
+    p_key = 0;
+    p_subvoxel_position = float3(0.0);
+    float3 svo_position = p_svo.get_svo_position(p_world_position);
+    if (any(svo_position < 0.0) || any(svo_position >= 1.0)) {
+        return false;
+    }
+    SVONodeTraceInfo trace_info;
+    uint data_index = p_svo.trace_data(p_world_position, trace_info);
+    if (trace_info.is_node()) {
+        return false;
+    }
+    uint subvoxel_index;
+    p_subvoxel_position = svo_pos_to_subvoxel_pos(trace_info.svo_position, subvoxel_index);
+    p_key = SVOGI_SUBVOXEL_COUNT * data_index + subvoxel_index;
+    return true;
+}
+
+/**
+ * @brief The radiance vector a flux sample adds to its sub-voxel.
+ * @details The flux is treated as a small virtual point light at its position in the sub-voxel, so each row is that
+ * position scaled by one color channel of the flux.
+ * @param p_subvoxel_position Position in the sub-voxel's local unit cube, from try_locate_svogi_subvoxel().
+ * @param p_flux RGB flux of the sample.
+ * @return The rows (ir, ig, ib): p_subvoxel_position scaled by p_flux.r, p_flux.g, and p_flux.b.
+ */
+float3x3 make_svogi_subvoxel_radiance(float3 p_subvoxel_position, float3 p_flux) {
+    return float3x3(p_subvoxel_position * p_flux.r, p_subvoxel_position * p_flux.g, p_subvoxel_position * p_flux.b);
+}
+
 // TODO(5): Add propagate_svo_radiance(), mirroring propagate_svo_occupancy() above: average the eight siblings' radiance
 // into the parent, with the same depth, dynamic/static block, and empty-child checks. Leaves' parents are written
 // first from the 27 subvoxels of each leaf (as inject_svo_leaf_parent_occupancy() does for occupancy). Weighting by

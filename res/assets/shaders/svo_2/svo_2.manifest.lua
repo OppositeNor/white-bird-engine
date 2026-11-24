@@ -33,17 +33,20 @@ return {
     {
         id = "svo_2_reset_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_reset.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_reset",
     },
     {
         id = "svo_2_build_deferred_propagation_pong_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
     },
     {
         id = "svo_2_build_deferred_propagation_ping_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -54,7 +57,8 @@ return {
     {
         id = "svo_2_update_states_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_update_states.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_update_states",
     },
     {
         id = "svo_2_dynamic_build_static_mesh",
@@ -83,7 +87,8 @@ return {
     {
         id = "svo_2_dynamic_build_deferred_propagation_pong_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -94,7 +99,8 @@ return {
     {
         id = "svo_2_dynamic_build_deferred_propagation_ping_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -105,11 +111,13 @@ return {
     {
         id = "svo_2_dynamic_update_states_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_dynamic_update_states.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_dynamic_update_states",
     },
     {
         id = "svo_2_dynamic_clear_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_2/svo_clear_dynamic.slang",
+        src = "assets/shaders/svo_2/svo_2_kernel.slang",
+        kernel = "svo_clear_dynamic",
     },
 }

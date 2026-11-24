@@ -11,18 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import pytest
 import slangpy as spy
 
-from test_svo_common import (LEAF_DTYPE, OCCUPANCY_BIT_OFFSET, STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF,
+from test_svo_common import (Voxel, LEAF_DTYPE, OCCUPANCY_BIT_OFFSET, STATE_BIT_OFFSET, STATE_EMPTY, STATE_LEAF,
     STATE_LEAF_DYNAMIC, STATE_NODE_DYNAMIC, StaticSVO, build_static_svo, make_buffer, make_tree_info, node_depth,
     pack_children_data, pack_parent_data, random_voxels, read_buffer, voxel_prefix)
 
 
 RANDOM_SEED = 20261024
+KERNEL_DIR = Path(__file__).parent / "kernels"
+SAMPLE_COUNT = 1024
+
+# Texels along each axis of an SVO voxel data brick (SVO_BRICK_SIZE).
+BRICK_SIZE = 3
+# Sub-voxels of one leaf's brick (SVOGI_SUBVOXEL_COUNT), the stride of a leaf's data index in a radiance key.
+SUBVOXEL_COUNT = BRICK_SIZE ** 3
+# A non-unit SVO placement whose width is a power of two, so the sample positions map to leaf positions exactly.
+SVO_ORIGIN = np.array([-3.0, 1.5, 2.0], dtype=np.float32)
+SVO_WIDTH = 8.0
+# Local leaf coordinates of the samples: a grid offset from the sub-voxel boundaries at 0.25 and 0.75.
+LEAF_COORDINATES = (np.arange(16, dtype=np.float32) + 0.5) / 16.0
 
 KernelLoader = Callable[[str, dict[str, str | int]], spy.ComputeKernel]
 
@@ -33,6 +46,11 @@ UNWRITTEN = -1.0
 @pytest.fixture
 def rng() -> np.random.Generator:
     return np.random.default_rng(RANDOM_SEED)
+
+
+@pytest.fixture(scope="module")
+def subvoxel_functions(device: spy.Device) -> spy.Module:
+    return spy.Module.load_from_file(device, str(KERNEL_DIR / "svogi_subvoxel_functions.slang"))
 
 
 def make_occupancy_buffer(p_device: spy.Device, p_values: np.ndarray) -> spy.Buffer:
@@ -253,3 +271,160 @@ def test_propagate_svo_occupancy_reads_the_referenced_dynamic_block(device: spy.
     for other_sector in range(8):
         if other_sector != sector:
             assert result[other_sector] == pytest.approx(expected[other_sector], rel=1e-6)
+
+
+def test_propagate_svo_occupancy_skips_root_sectors_and_absent_depths(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator) -> None:
+    max_depth = 4
+    voxels = random_voxels(rng, 40, max_depth)
+    tree = build_static_svo(voxels, max_depth)
+    expected = expected_occupancy(tree, voxels)
+    depths = node_depths(tree)
+    # Every level below the root sectors already holds its occupancy; the root sectors are unwritten.
+    initial = np.array([UNWRITTEN if depths[i] == 1 else expected[i] for i in range(len(tree.nodes))], dtype=np.float32)
+    occupancy = make_occupancy_buffer(device, initial)
+    nodes = tree.node_array()
+    # The root sectors have no stored parent, and no node lies at the leaves' depth, so neither dispatch writes.
+    for child_depth in [1, max_depth]:
+        run_propagation(device, load_kernel, nodes, tree.leaf_array(), make_static_tree_info(tree), occupancy, child_depth)
+        np.testing.assert_array_equal(read_occupancy_buffer(occupancy, len(tree.nodes)), initial)
+
+
+def subvoxel_reference(p_positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The (position, index) svo_pos_to_subvoxel_pos() returns for each local position."""
+    brick_positions = p_positions.astype(np.float32) * np.float32(BRICK_SIZE - 1)
+    subvoxels = np.minimum((brick_positions + np.float32(0.5)).astype(np.uint32), BRICK_SIZE - 1)
+    indices = subvoxels[:, 0] + BRICK_SIZE * (subvoxels[:, 1] + BRICK_SIZE * subvoxels[:, 2])
+    return brick_positions - subvoxels.astype(np.float32) + np.float32(0.5), indices
+
+
+def call_subvoxel_position(p_functions: spy.Module, p_positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    result = p_functions.svogi_subvoxel_position(p_positions.astype(np.float32), _result="numpy")
+    return result[:, :3], result[:, 3].astype(np.uint32)
+
+
+def test_svo_pos_to_subvoxel_pos_matches_reference(subvoxel_functions: spy.Module, rng: np.random.Generator) -> None:
+    positions = rng.random((SAMPLE_COUNT, 3), dtype=np.float32)
+    subvoxel_positions, indices = call_subvoxel_position(subvoxel_functions, positions)
+    expected_positions, expected_indices = subvoxel_reference(positions)
+    np.testing.assert_array_equal(indices, expected_indices)
+    np.testing.assert_allclose(subvoxel_positions, expected_positions, atol=1e-6)
+    # The sub-voxel and the position inside it recover the local position.
+    subvoxels = np.stack([indices % BRICK_SIZE, indices // BRICK_SIZE % BRICK_SIZE, indices // BRICK_SIZE ** 2], axis=1)
+    np.testing.assert_allclose((subvoxels + subvoxel_positions - 0.5) / (BRICK_SIZE - 1), positions, atol=1e-6)
+
+
+@pytest.mark.parametrize(("p_coordinate", "p_subvoxel", "p_subvoxel_coordinate"), [
+    (0.0, 0, 0.5),
+    (0.2, 0, 0.9),
+    (0.25, 1, 0.0),
+    (0.5, 1, 0.5),
+    (0.7, 1, 0.9),
+    (0.75, 2, 0.0),
+    (0.95, 2, 0.4),
+])
+def test_svo_pos_to_subvoxel_pos_selects_nearest_subvoxel_center(subvoxel_functions: spy.Module, p_coordinate: float,
+        p_subvoxel: int, p_subvoxel_coordinate: float) -> None:
+    # The same coordinate on every axis selects the same sub-voxel on each.
+    subvoxel_positions, indices = call_subvoxel_position(subvoxel_functions, np.full((1, 3), p_coordinate))
+    assert indices[0] == p_subvoxel * (1 + BRICK_SIZE + BRICK_SIZE ** 2)
+    np.testing.assert_allclose(subvoxel_positions[0], np.full(3, p_subvoxel_coordinate), atol=1e-6)
+
+
+def test_svo_pos_to_subvoxel_pos_flattens_x_fastest(subvoxel_functions: spy.Module) -> None:
+    positions = np.array([[0.9, 0.0, 0.0], [0.0, 0.9, 0.0], [0.0, 0.0, 0.9], [0.5, 0.5, 0.5], [0.9, 0.5, 0.0]])
+    _, indices = call_subvoxel_position(subvoxel_functions, positions)
+    np.testing.assert_array_equal(indices, [2, 6, 18, 13, 5])
+
+
+def test_svo_pos_to_subvoxel_pos_edge_subvoxels_extend_past_the_voxel(subvoxel_functions: spy.Module,
+        rng: np.random.Generator) -> None:
+    positions = rng.random((SAMPLE_COUNT, 3), dtype=np.float32)
+    subvoxel_positions, indices = call_subvoxel_position(subvoxel_functions, positions)
+    subvoxels = np.stack([indices % BRICK_SIZE, indices // BRICK_SIZE % BRICK_SIZE, indices // BRICK_SIZE ** 2], axis=1)
+    # The low sub-voxel covers only its upper half, the high one only its lower half, and the middle one all of itself.
+    low = subvoxel_positions[subvoxels == 0]
+    middle = subvoxel_positions[subvoxels == 1]
+    high = subvoxel_positions[subvoxels == BRICK_SIZE - 1]
+    assert np.all((low >= 0.5) & (low <= 1.0))
+    assert np.all((middle >= 0.0) & (middle <= 1.0))
+    assert np.all((high >= 0.0) & (high < 0.5))
+
+
+def run_radiance_sample(p_device: spy.Device, p_load_kernel: KernelLoader, p_tree: StaticSVO, p_positions: np.ndarray,
+        p_fluxes: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Locate and weight every flux sample; return the (located, key) results, sub-voxel positions, and radiance."""
+    count = len(p_positions)
+    tree_info = make_static_tree_info(p_tree)
+    tree_info["origin"] = SVO_ORIGIN
+    tree_info["width"] = SVO_WIDTH
+    padded_positions = np.zeros((count, 4), dtype=np.float32)
+    padded_positions[:, :3] = p_positions
+    padded_fluxes = np.zeros((count, 4), dtype=np.float32)
+    padded_fluxes[:, :3] = p_fluxes
+    results = make_buffer(p_device, np.full((count, 2), 0xDEADBEEF, dtype=np.uint32))
+    subvoxel_positions = make_buffer(p_device, np.full((count, 4), UNWRITTEN, dtype=np.float32))
+    radiance_rows = make_buffer(p_device, np.full((count * 3, 4), UNWRITTEN, dtype=np.float32))
+    p_load_kernel("svogi_radiance_sample.slang", {}).dispatch(thread_count=[count, 1, 1], vars={
+        "nodes": make_buffer(p_device, p_tree.node_array()), "leaves": make_buffer(p_device, p_tree.leaf_array()),
+        "tree_info": make_buffer(p_device, tree_info), "positions": make_buffer(p_device, padded_positions),
+        "fluxes": make_buffer(p_device, padded_fluxes), "results": results, "subvoxel_positions": subvoxel_positions,
+        "radiance_rows": radiance_rows})
+    return (read_buffer(results, np.uint32).reshape(-1, 2)[:count],
+        read_buffer(subvoxel_positions, np.float32).reshape(-1, 4)[:count, :3],
+        read_buffer(radiance_rows, np.float32).reshape(-1, 3, 4)[:count, :, :3])
+
+
+def leaf_samples(p_rng: np.random.Generator, p_voxels: list[Voxel], p_max_depth: int) -> tuple[np.ndarray, np.ndarray]:
+    """A world position inside each voxel, at a random grid point of LEAF_COORDINATES, and that local position."""
+    local_positions = p_rng.choice(LEAF_COORDINATES, (len(p_voxels), 3))
+    leaf_width = SVO_WIDTH / float(1 << p_max_depth)
+    positions = SVO_ORIGIN + (np.array(p_voxels, dtype=np.float32) + local_positions) * np.float32(leaf_width)
+    return positions.astype(np.float32), local_positions
+
+
+@pytest.mark.parametrize("p_max_depth", [2, 3, 4])
+def test_try_locate_svogi_subvoxel_keys_occupied_leaf_subvoxels(device: spy.Device, load_kernel: KernelLoader,
+        rng: np.random.Generator, p_max_depth: int) -> None:
+    occupied = random_voxels(rng, 40, p_max_depth)
+    tree = build_static_svo(occupied, p_max_depth)
+    # Several samples per occupied voxel, and as many in voxels that are not.
+    queries = occupied * 4 + random_voxels(rng, 4 * len(occupied), p_max_depth)
+    positions, local_positions = leaf_samples(rng, queries, p_max_depth)
+    fluxes = rng.random((len(queries), 3), dtype=np.float32)
+    results, subvoxel_positions, radiance = run_radiance_sample(device, load_kernel, tree, positions, fluxes)
+    expected_subvoxel_positions, subvoxel_indices = subvoxel_reference(local_positions)
+    leaves = tree.leaf_array()
+    for index, voxel in enumerate(queries):
+        if voxel in tree.leaf_of_voxel:
+            data_index = int(leaves[tree.leaf_of_voxel[voxel]]["data_index"])
+            assert tuple(results[index]) == (1, SUBVOXEL_COUNT * data_index + subvoxel_indices[index])
+            np.testing.assert_allclose(subvoxel_positions[index], expected_subvoxel_positions[index], atol=1e-6)
+            np.testing.assert_allclose(radiance[index], np.outer(fluxes[index], expected_subvoxel_positions[index]),
+                atol=1e-6)
+        else:
+            # The trace of an unoccupied voxel ends at a node, which receives no radiance.
+            assert tuple(results[index]) == (0, 0)
+            np.testing.assert_array_equal(subvoxel_positions[index], np.zeros(3))
+            np.testing.assert_array_equal(radiance[index], np.zeros((3, 3)))
+
+
+def test_try_locate_svogi_subvoxel_rejects_positions_outside_the_svo(device: spy.Device, load_kernel: KernelLoader) -> None:
+    max_depth = 2
+    # Every leaf is occupied, so only the bounds check can reject a position.
+    voxels = [(x, y, z) for x in range(4) for y in range(4) for z in range(4)]
+    tree = build_static_svo(voxels, max_depth)
+    inside = SVO_ORIGIN + np.float32(SVO_WIDTH / 2.0)
+    positions = np.array([
+        SVO_ORIGIN - np.float32(0.25),
+        SVO_ORIGIN + np.float32(SVO_WIDTH),
+        inside - np.array([SVO_WIDTH, 0.0, 0.0], dtype=np.float32),
+        inside + np.array([0.0, SVO_WIDTH, 0.0], dtype=np.float32),
+        inside + np.array([0.0, 0.0, SVO_WIDTH * 0.5], dtype=np.float32),
+        # The origin and the center are inside, and located.
+        SVO_ORIGIN,
+        inside,
+    ], dtype=np.float32)
+    results, _, _ = run_radiance_sample(device, load_kernel, tree, positions, np.ones((len(positions), 3), np.float32))
+    np.testing.assert_array_equal(results[:, 0], [0, 0, 0, 0, 0, 1, 1])
+    np.testing.assert_array_equal(results[:5, 1], np.zeros(5))

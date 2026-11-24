@@ -63,6 +63,7 @@ class BuildDependencyACP(BuildDependency):
             f"-DCMAKE_BUILD_TYPE={self._build_info['cmake-build-type']}",
             f"-DKTX_SOFTWARE_DIR={(self._dependencies_dir / 'KTX-Software').as_posix()}",
             f"-DWBE_MODEL_COMPILER_DIR={(self._dependencies_dir / 'wbe-utils-model-compiler').as_posix()}",
+            f"-DWBE_SHADER_COMPILER_DIR={(self._dependencies_dir / 'wbe-utils-shader-compiler').as_posix()}",
             f"-DWBE_DEPENDENCIES_ROOT={self._dependencies_dir.as_posix()}",
         ]
         if self._build_info.get("generator") is not None:
@@ -80,8 +81,15 @@ class BuildDependencyACP(BuildDependency):
             model_package_build_dir,
             dirs_exist_ok=True,
             ignore=shutil.ignore_patterns("_native*.so", "_native*.pyd", "__pycache__"))
+        shader_package_source_dir = self._dependencies_dir / "wbe-utils-shader-compiler" / "wbe_utils_shader_compiler"
+        shader_package_build_dir = self.get_python_package_dir() / "wbe_utils_shader_compiler"
+        shutil.copytree(shader_package_source_dir,
+            shader_package_build_dir,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("_native*.so", "_native*.pyd", "__pycache__"))
 
-        build_command = ["cmake", "--build", self._build_dir.as_posix(), "--target", "ktx", "_native"]
+        build_command = ["cmake", "--build", self._build_dir.as_posix(), "--target", "ktx", "_native",
+            "wbe_utils_shader_compiler_native"]
         if os.cpu_count() is not None:
             build_command.extend(["-j", str(os.cpu_count())])
         if subprocess.run(build_command, check=False, env=environment).returncode != 0:

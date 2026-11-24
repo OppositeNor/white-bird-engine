@@ -31,6 +31,7 @@ return {
     {
         id = "svo_3_prepare_leaves_shader",
         source_type = "shader",
-        src = "assets/shaders/svo_3/svo_3_prepare_leaves.slang",
+        src = "assets/shaders/svo_3/svo_3_kernel.slang",
+        kernel = "svo_3_prepare_leaves",
     },
 }

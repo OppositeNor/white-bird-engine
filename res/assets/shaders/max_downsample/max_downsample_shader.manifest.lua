@@ -15,6 +15,7 @@ return {
     {
         id = "max_downsample_shader",
         source_type = "shader",
-        src = "assets/shaders/max_downsample/max_downsample.slang",
+        src = "assets/shaders/max_downsample/max_downsample_kernel.slang",
+        kernel = "max_downsample_level",
     },
 }

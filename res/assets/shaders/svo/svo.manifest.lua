@@ -31,12 +31,14 @@ return {
     {
         id = "svo_reset_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_reset.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_reset",
     },
     {
         id = "svo_deferred_count_reset_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_deferred_count_reset.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_deferred_count_reset",
         -- Without the macro the reset clears the pong count; with it, the ping count.
         variants = {
             { name = "default" },
@@ -46,12 +48,14 @@ return {
     {
         id = "svo_build_deferred_propagation_pong_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
     },
     {
         id = "svo_build_deferred_propagation_ping_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -83,7 +87,8 @@ return {
     {
         id = "svo_dynamic_build_deferred_propagation_pong_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -94,7 +99,8 @@ return {
     {
         id = "svo_dynamic_build_deferred_propagation_ping_write_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_build_deferred_propagation.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_build_deferred_propagation",
         variants = {
             {
                 name = "default",
@@ -105,17 +111,20 @@ return {
     {
         id = "svo_pre_deferred_debug_capture_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_pre_deferred_debug_capture.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_pre_deferred_debug_capture",
     },
     {
         id = "svo_debug_draw_setup_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_debug_draw_setup.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_debug_draw_setup",
     },
     {
         id = "svo_debug_draw_find_nodes_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_debug_draw_find_nodes.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_debug_draw_find_nodes",
     },
     {
         id = "svo_debug_draw_shader",
@@ -197,6 +206,7 @@ return {
     {
         id = "svo_dynamic_clear_shader",
         source_type = "shader",
-        src = "assets/shaders/svo/svo_clear_dynamic.slang",
+        src = "assets/shaders/svo/svo_kernel.slang",
+        kernel = "svo_clear_dynamic",
     },
 }

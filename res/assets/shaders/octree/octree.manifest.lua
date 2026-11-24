@@ -52,12 +52,14 @@ return {
     {
         id = "octree_debug_gather_leaves_shader",
         source_type = "shader",
-        src = "assets/shaders/octree/octree_debug_gather_leaves.slang",
+        src = "assets/shaders/octree/octree_kernel.slang",
+        kernel = "octree_debug_gather_leaves",
     },
     {
         id = "octree_debug_gather_nodes_shader",
         source_type = "shader",
-        src = "assets/shaders/octree/octree_debug_gather_nodes.slang",
+        src = "assets/shaders/octree/octree_kernel.slang",
+        kernel = "octree_debug_gather_nodes",
     },
     {
         id = "octree_debug_draw_shader",

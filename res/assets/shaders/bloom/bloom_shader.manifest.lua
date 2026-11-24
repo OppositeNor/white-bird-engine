@@ -15,6 +15,7 @@ return {
     {
         id = "bloom_shader_extract",
         source_type = "shader",
-        src = "assets/shaders/bloom/bloom_extract.slang",
+        src = "assets/shaders/bloom/bloom_kernel.slang",
+        kernel = "bloom_extract",
     },
 }
