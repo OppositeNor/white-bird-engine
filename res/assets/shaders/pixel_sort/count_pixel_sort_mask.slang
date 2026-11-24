@@ -25,11 +25,11 @@
 /** Descriptor indices of the resources used by the count pass. */
 struct CountPixelSortMaskDescIndices {
     /** Image whose pixels are sorted. */
-    [wbe::desc("sampled_image", "pixel_sort_source")] uint2 source;
+    [wbe::desc("sampled_image", "pixel_sort_source")] DescriptorHandle<Texture2D<float4>> source;
     /** The contrast range of the sorted pixels. */
-    [wbe::desc("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
+    [wbe::desc("uniform_buffer", "pixel_sort_contrast")] DescriptorHandle<ConstantBuffer<PixelSortContrast>> contrast;
     /** Buffer receiving the mask count of every line. */
-    [wbe::desc("storage_buffer", "pixel_sort_column_offsets", "write")] uint2 column_offsets;
+    [wbe::desc("storage_buffer", "pixel_sort_column_offsets", "write")] DescriptorHandle<RWStructuredBuffer<uint>> column_offsets;
 };
 
 [vk::push_constant]
@@ -38,9 +38,9 @@ ConstantBuffer<CountPixelSortMaskDescIndices> di;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    Texture2D<float4> source = ResourceDescriptorHeap[di.source.x];
-    ConstantBuffer<PixelSortContrast> contrast = ResourceDescriptorHeap[di.contrast.x];
-    RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[di.column_offsets.x];
+    Texture2D<float4> source = di.source;
+    ConstantBuffer<PixelSortContrast> contrast = di.contrast;
+    RWStructuredBuffer<uint> column_offsets = di.column_offsets;
     uint2 extent;
     source.GetDimensions(extent.x, extent.y);
     uint2 line_extent = pixel_sort_line_coordinates(extent);

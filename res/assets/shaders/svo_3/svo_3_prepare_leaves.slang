@@ -17,8 +17,8 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "svo_info", "read")] uint2 svo_info;
-    [wbe::desc("storage_buffer", "svo_deferred_list", "read_write")] uint2 deferred_list;
+    [wbe::desc("storage_buffer", "svo_info", "read")] DescriptorHandle<RWStructuredBuffer<SVOInfo>> svo_info;
+    [wbe::desc("storage_buffer", "svo_deferred_list", "read_write")] DescriptorHandle<RWByteAddressBuffer> deferred_list;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
@@ -31,7 +31,7 @@ ConstantBuffer<DescIndices> di;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info = di.svo_info;
     uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> deferred_list =
         CountedBuffer<uint>(di.deferred_list, frame_slot);

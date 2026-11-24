@@ -16,8 +16,8 @@
 #include "dedup/dedup_large_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "keys", "read_write")] uint2 keys;
-    [wbe::desc("storage_buffer", "dispatch_buffer", "write")] uint2 dispatch_buffer;
+    [wbe::desc("storage_buffer", "keys", "read_write")] DescriptorHandle<RWByteAddressBuffer> keys;
+    [wbe::desc("storage_buffer", "dispatch_buffer", "write")] DescriptorHandle<RWStructuredBuffer<DispatchIndirectCommand>> dispatch_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
@@ -31,7 +31,7 @@ ConstantBuffer<DescIndices> di;
 void main() {
     uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> keys = CountedBuffer<uint>(di.keys, frame_slot);
-    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = di.dispatch_buffer;
     uint key_count = keys.size();
     keys.set_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX, radix_sort_local_sort_num(key_count));
     dispatch_buffer[0] = DispatchIndirectCommand(dedup_large_group_num(key_count));

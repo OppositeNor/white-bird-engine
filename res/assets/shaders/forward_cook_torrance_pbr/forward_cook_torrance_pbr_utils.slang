@@ -54,11 +54,11 @@ struct VSOutput {
 
 struct ForwardLightParamDescIndices {
     [wbe::desc("uniform_buffer", "spot_light_info")]
-    uint2 info;
+    DescriptorHandle<ConstantBuffer<SpotLightInfo>> info;
     [wbe::desc("sampled_image", "shadowmap")]
-    uint2 shadowmap;
+    DescriptorHandle<Texture2D<float>> shadowmap;
     [wbe::desc("sampler", "shadow_sampler")]
-    uint2 shadowmap_sampler;
+    DescriptorHandle<SamplerState> shadowmap_sampler;
 };
 
 /**

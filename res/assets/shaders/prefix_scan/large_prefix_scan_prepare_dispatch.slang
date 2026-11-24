@@ -17,9 +17,9 @@
 
 struct DescIndices {
     [wbe::desc("storage_buffer", "data_buffer", "read")]
-    uint2 data_buffer;
+    DescriptorHandle<RWByteAddressBuffer> data_buffer;
     [wbe::desc("storage_buffer", "dispatch_buffer", "write")]
-    uint2 dispatch_buffer;
+    DescriptorHandle<RWStructuredBuffer<DispatchIndirectCommand>> dispatch_buffer;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -34,6 +34,6 @@ ConstantBuffer<DescIndices> di;
 void main() {
     CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer =
         CountedBuffer<WBE_PREFIX_SCAN_TYPE>(di.data_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = di.dispatch_buffer;
     dispatch_buffer[0] = DispatchIndirectCommand(large_prefix_scan_block_num(data_buffer.size()));
 }

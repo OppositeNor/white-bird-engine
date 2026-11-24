@@ -70,34 +70,32 @@ struct LightParamDescIndices {
 #else
     [wbe::desc("sampled_image", "shadow_moments_sampled[]")]
 #endif
-    uint2 shadowmap;
+    DescriptorHandle<Texture2D<float2>> shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
     [wbe::desc("sampled_image", "shadow_sat[]")]
-    uint2 shadow_moments_summed_area_table;
+    DescriptorHandle<Texture2D<float2>> shadow_moments_summed_area_table;
 #endif
     [wbe::desc("sampled_image", "shadowmap_color[]")]
-    uint2 rsm_flux;
+    DescriptorHandle<Texture2D<float4>> rsm_flux;
     [wbe::desc("sampled_image", "rsm_normal[]")]
-    uint2 rsm_octa_normal;
+    DescriptorHandle<Texture2D<float2>> rsm_octa_normal;
     [wbe::desc("sampler", "shadow_sampler")]
-    uint2 shadowmap_sampler;
+    DescriptorHandle<SamplerState> shadowmap_sampler;
 };
 
 // Structured-buffer matrices use ordinary mul(). The uniform-buffer scalar-load workaround
 // transposes these matrices and must not be applied to this returned value.
-SpotLightInfo get_spot_light_info(uint2 p_light_infos, uint p_spot_light_index) {
-    StructuredBuffer<SpotLightInfoBuffer> light_infos = ResourceDescriptorHeap[p_light_infos.x];
-    return light_infos[0].spot_light_info[p_spot_light_index];
+SpotLightInfo get_spot_light_info(StructuredBuffer<SpotLightInfoBuffer> p_light_infos, uint p_spot_light_index) {
+    return p_light_infos[0].spot_light_info[p_spot_light_index];
 }
 
 /**
  * @brief Read the number of active spot lights stored in a spot light table, clamped to WBE_MAX_SPOT_LIGHT_COUNT.
- * @param p_light_infos Descriptor indices of a storage buffer holding one SpotLightInfoBuffer.
+ * @param p_light_infos Storage buffer holding one SpotLightInfoBuffer.
  * @return The number of spot light entries to evaluate.
  */
-uint get_spot_light_count(uint2 p_light_infos) {
-    StructuredBuffer<SpotLightInfoBuffer> light_infos = ResourceDescriptorHeap[p_light_infos.x];
-    return min(light_infos[0].spot_light_count, WBE_MAX_SPOT_LIGHT_COUNT);
+uint get_spot_light_count(StructuredBuffer<SpotLightInfoBuffer> p_light_infos) {
+    return min(p_light_infos[0].spot_light_count, WBE_MAX_SPOT_LIGHT_COUNT);
 }
 
 /**
@@ -155,20 +153,20 @@ struct SpotLight {
 
     /**
      * @brief Resolve one spot light and its shadow resources.
-     * @param p_light_infos Descriptor indices of a storage buffer holding one SpotLightInfoBuffer.
-     * @param p_light Shadow-resource descriptor indices of the light.
+     * @param p_light_infos Storage buffer holding one SpotLightInfoBuffer.
+     * @param p_light Shadow-resource descriptor handles of the light.
      * @param p_index Index of the light in the spot light table; must be below get_spot_light_count().
      */
-    __init(uint2 p_light_infos, LightParamDescIndices p_light, uint p_index) {
+    __init(StructuredBuffer<SpotLightInfoBuffer> p_light_infos, LightParamDescIndices p_light, uint p_index) {
         info = get_spot_light_info(p_light_infos, p_index);
         index = p_index;
-        shadow_moments = ResourceDescriptorHeap[p_light.shadowmap.x];
+        shadow_moments = p_light.shadowmap;
 #if WBE_USE_SUMMED_AREA_TABLE_SHADOW_MOMENTS
-        shadow_moments_summed_area_table = ResourceDescriptorHeap[p_light.shadow_moments_summed_area_table.x];
+        shadow_moments_summed_area_table = p_light.shadow_moments_summed_area_table;
 #endif
-        rsm_flux = ResourceDescriptorHeap[p_light.rsm_flux.x];
-        rsm_octa_normal = ResourceDescriptorHeap[p_light.rsm_octa_normal.x];
-        shadowmap_sampler = SamplerDescriptorHeap[p_light.shadowmap_sampler.x];
+        rsm_flux = p_light.rsm_flux;
+        rsm_octa_normal = p_light.rsm_octa_normal;
+        shadowmap_sampler = p_light.shadowmap_sampler;
     }
 
     /**

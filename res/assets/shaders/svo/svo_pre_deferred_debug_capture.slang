@@ -25,15 +25,15 @@ struct DrawIndexedIndirectCommand {
 
 struct SVOPreDeferredDebugCaptureDescIndices {
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_deferred_list_ping", "read")]
-    uint2 deferred_list;
+    DescriptorHandle<StructuredBuffer<uint>> deferred_list;
     [wbe::desc("storage_buffer", "svo_pre_deferred_debug_info_buffer")]
-    uint2 captured_svo_info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> captured_svo_info;
     [wbe::desc("storage_buffer", "svo_pre_deferred_debug_list_buffer")]
-    uint2 captured_deferred_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> captured_deferred_list;
     [wbe::desc("storage_buffer", "svo_pre_deferred_debug_draw_indirect_buffer")]
-    uint2 indirect_draw;
+    DescriptorHandle<RWStructuredBuffer<DrawIndexedIndirectCommand>> indirect_draw;
 };
 
 [vk::push_constant]
@@ -45,12 +45,12 @@ ConstantBuffer<SVOPreDeferredDebugCaptureDescIndices> di;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
-    RWStructuredBuffer<SVOInfo> captured_svo_info = ResourceDescriptorHeap[di.captured_svo_info.x];
+    ConstantBuffer<SVOInfo> svo_info = di.svo_info;
+    StructuredBuffer<uint> deferred_list = di.deferred_list;
+    RWStructuredBuffer<SVOInfo> captured_svo_info = di.captured_svo_info;
     RWStructuredBuffer<uint> captured_deferred_list =
-        ResourceDescriptorHeap[di.captured_deferred_list.x];
-    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[di.indirect_draw.x];
+        di.captured_deferred_list;
+    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = di.indirect_draw;
 
     SVOInfo info = svo_info;
     uint deferred_task_count = deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX];

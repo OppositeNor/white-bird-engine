@@ -45,7 +45,7 @@ struct Vertex3DUnshadedInput {
  */
 struct DrawCubeUnshadedDescIndices {
     [wbe::desc("uniform_buffer", "camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     MeshDescIndices mesh;
 };
 
@@ -60,8 +60,8 @@ ConstantBuffer<DrawCubeUnshadedDescIndices> di;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DUnshadedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));

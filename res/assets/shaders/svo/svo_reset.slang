@@ -17,13 +17,13 @@
 
 struct SVOResetDescIndices {
     [wbe::desc("storage_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 tree_nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
-    uint2 deferred_list_ping;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_ping;
     [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
-    uint2 deferred_list_pong;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_pong;
 };
 
 [vk::push_constant]
@@ -35,14 +35,14 @@ ConstantBuffer<SVOResetDescIndices> di;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    RWStructuredBuffer<SVOInfo> svo_info = di.svo_info;
+    RWStructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
 
     svo_info[0].node_count = 8;
     svo_info[0].leaves_count = 0;
     svo_info[0].data_count = 8;
-    RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[di.deferred_list_ping.x];
-    RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[di.deferred_list_pong.x];
+    RWStructuredBuffer<uint> deferred_list_ping = di.deferred_list_ping;
+    RWStructuredBuffer<uint> deferred_list_pong = di.deferred_list_pong;
     deferred_list_ping[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
     deferred_list_pong[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
 

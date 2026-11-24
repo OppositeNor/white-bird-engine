@@ -29,11 +29,11 @@ struct MaskedShadowVSOutput {
 
 struct MaskedShadowDescIndices {
     [wbe::desc("uniform_buffer", "shadow_light_info")]
-    uint2 light_camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> light_camera_info;
     [wbe::desc("uniform_buffer", "material_params")]
-    uint2 material_params;
+    DescriptorHandle<ConstantBuffer<MaterialParamsBuffer>> material_params;
     [wbe::desc("sampler", "material_sampler")]
-    uint2 material_sampler;
+    DescriptorHandle<SamplerState> material_sampler;
     MeshDescIndices mesh;
 };
 
@@ -48,9 +48,9 @@ ConstantBuffer<MaskedShadowDescIndices> di;
  */
 [shader("vertex")]
 MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
+    ConstantBuffer<CameraInfo> light_camera_info = di.light_camera_info;
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
+    StructuredBuffer<SubmeshData> submeshes = di.mesh.submeshes;
     InstanceData instance = instances[p_instance_id];
     float4 world_position = mul(load_mesh_node(di.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
     MaskedShadowVSOutput output;
@@ -65,8 +65,8 @@ MaskedShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_
 
 [shader("fragment")]
 float4 fragment_main(MaskedShadowVSOutput p_input) : SV_Target0 {
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = di.material_params;
+    SamplerState material_sampler = di.material_sampler;
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);

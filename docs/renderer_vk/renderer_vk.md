@@ -107,8 +107,9 @@ stride; unified stride is not enabled.
 `ROBufferVK`, `ROImageViewVK`, `ROSamplerVK`, and `ROAccelerationStructureVK` own their descriptor indices, allocated lazily
 by their getters (or transferred through builders), and defer release for the frames in flight.
 
-Shaders receive each resource as an aligned `uint2` field in a single push-data block, marked
-`WBE_DESC("TYPE", "resource_id", "ACCESS")`:
+Shaders receive each resource as a `DescriptorHandle<T>` field in a single push-data block (reflected as an aligned
+`uint2` heap index), marked `wbe::desc("TYPE", "resource_id", "ACCESS")`. Shaders use the handles directly; a resource
+read through a second view uses `reinterpret_desc_handle<U>()` from `utils/utils.slang`:
 
 - `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`.
 - `resource_id` is the task-local name the task's `RendTaskDescVK::alias()` maps to a graph resource; recipe tasks bind
@@ -117,7 +118,7 @@ Shaders receive each resource as an aligned `uint2` field in a single push-data 
 - `ACCESS` is optional: `read`, `write`, or `read_write`. Only storage buffers and images may be written; they default to
   `read_write`, so annotate read-only ones with `read`.
 
-`WBE_PUSH_CONSTANT` marks four-byte scalars in the same block: `"time"` (`float`) and `"frame_slot"` (`uint`) are filled by
+`wbe::push_constant` marks four-byte scalars in the same block: `"time"` (`float`) and `"frame_slot"` (`uint`) are filled by
 the renderer, and any other name is a custom value set on compute tasks with `set_push_constant()` or the recipe params'
 `push_constants` table.
 

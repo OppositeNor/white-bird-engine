@@ -14,14 +14,15 @@
 */
 
 #include "utils/utils.slang"
+#include "prefix_scan/prefix_scan_utils.slang"
 
 struct DescIndices {
     [wbe::desc("storage_buffer", "spot_light_infos", "read")]
-    uint2 radiance_key_buffer;
+    DescriptorHandle<RWByteAddressBuffer> radiance_key_buffer;
     [wbe::desc("storage_buffer", "spot_light_infos", "read")]
-    uint2 radiance_buffer;
+    DescriptorHandle<StructuredBuffer<SegmentedWrapper<float3x3>>> radiance_buffer;
     [wbe::desc("storage_buffer", "spot_light_infos", "write")]
-    uint2 radiance_buffer_merged;
+    DescriptorHandle<RWStructuredBuffer<float3x3>> radiance_buffer_merged;
 };
 
 [vk::push_constant]

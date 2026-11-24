@@ -16,8 +16,8 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
-    [wbe::desc("storage_buffer", "histogram_buffer", "write")] uint2 histogram_buffer;
+    [wbe::desc("storage_buffer", "input_buffer", "read")] DescriptorHandle<RWByteAddressBuffer> input_buffer;
+    [wbe::desc("storage_buffer", "histogram_buffer", "write")] DescriptorHandle<RWStructuredBuffer<uint>> histogram_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
@@ -41,8 +41,8 @@ void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThrea
     CountedBuffer<uint> keys =
         CountedBuffer<uint>(di.input_buffer, di.shader_debug_frame_slot);
     // A uint view of the same buffer, which is only read, for the range workgroup_scope_radix_sort_histogram counts.
-    RWStructuredBuffer<uint> input_words = ResourceDescriptorHeap[di.input_buffer.x];
-    RWStructuredBuffer<uint> histogram_buffer = ResourceDescriptorHeap[di.histogram_buffer.x];
+    RWStructuredBuffer<uint> input_words = reinterpret_desc_handle<RWStructuredBuffer<uint>>(di.input_buffer);
+    RWStructuredBuffer<uint> histogram_buffer = di.histogram_buffer;
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
     // The starting position of a thread in a 256 chunk.

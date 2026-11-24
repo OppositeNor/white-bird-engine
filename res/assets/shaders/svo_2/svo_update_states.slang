@@ -23,12 +23,12 @@ struct SVOUpdateStatesDescIndices {
      * @brief Descriptor-heap reference to svo_info.
      */
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 tree_nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> tree_nodes;
 };
 
 [vk::push_constant]
@@ -42,12 +42,12 @@ ConstantBuffer<SVOUpdateStatesDescIndices> di;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
+    ConstantBuffer<SVOInfo> tree_info = di.svo_info;
     uint node_index = p_dispatch_thread_id.x;
     if (node_index >= tree_info.node_count) {
         return;
     }
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.tree_nodes.x];
+    RWStructuredBuffer<SVONode> nodes = di.tree_nodes;
     uint children_data = nodes[node_index].children_data;
     if ((children_data >> SVO_CHILDREN_STATE_SHIFT) != uint(SVONode::ChildrenState::ALLOCATING)) {
         return;

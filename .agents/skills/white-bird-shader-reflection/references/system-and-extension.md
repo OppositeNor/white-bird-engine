@@ -43,7 +43,8 @@ Compiled fixtures in tests are parsed directly from `test_env/res/assets/shaders
 `src/function/rend_vk/shader_metadata_vk_utils.cpp` parses `wbe::desc` types through
 `EnumReflection<ShaderDescHeapTypeVK>` (canonical names with lowercase aliases). Each annotation takes two or three
 string arguments: type, non-empty resource id, optional access. It must mark an aligned eight-byte `uint2` in the entry
-point's only push-data parameter. The walker flattens nested structs and fixed-size struct arrays into paths such as
+point's only push-data parameter; shaders declare it as `DescriptorHandle<T>`, which Slang reflects as that `uint2`.
+Reflection does not record `T`, so the attribute's type is authoritative. The walker flattens nested structs and fixed-size struct arrays into paths such as
 `lights[0].shadowmap`; paths identify layout fields, while binding uses resource ids.
 
 Rejected with `std::runtime_error`: fewer than two arguments, unknown types, `write` on read-only types, misaligned or
@@ -73,12 +74,12 @@ All are declared in `res/assets/shaders/utils/utils.slang`.
 See above. Per-array-instance ids: an id ending in `[]` becomes `<name>[i]` for element `i` of the nearest enclosing
 descriptor struct array; multiple fields may share one id.
 
-Ray tracing keeps the metadata declaration and runtime index distinct:
+Ray tracing keeps the metadata declaration and runtime handle distinct:
 
 ```slang
 struct DescIndices {
     [wbe::desc("acceleration_structure", "acceleration_structure")]
-    uint2 scene;
+    DescriptorHandle<RaytracingAccelerationStructure> scene;
 };
 
 #ifdef WBE_REFLECTION_METADATA

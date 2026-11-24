@@ -31,7 +31,7 @@ struct ShadowVSOutput {
  */
 struct ShadowDescIndices {
     [wbe::desc("uniform_buffer", "shadow_light_info")]
-    uint2 light_camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> light_camera_info;
     MeshDescIndices mesh;
 };
 
@@ -46,8 +46,8 @@ ConstantBuffer<ShadowDescIndices> di;
  */
 [shader("vertex")]
 ShadowVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    ConstantBuffer<CameraInfo> light_camera_info = di.light_camera_info;
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
     InstanceData instance = instances[p_instance_id];
     float4 world_position = mul(load_mesh_node(di.mesh, instance.node_index).transform, float4(p_input.position.xyz, 1.0));
     ShadowVSOutput output;

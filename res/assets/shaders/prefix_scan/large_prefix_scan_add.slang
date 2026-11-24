@@ -17,9 +17,9 @@
 
 struct DescIndices {
     [wbe::desc("storage_buffer", "data_buffer", "read_write")]
-    uint2 data_buffer;
+    DescriptorHandle<RWByteAddressBuffer> data_buffer;
     [wbe::desc("storage_buffer", "sections_buffer", "read")]
-    uint2 sections_buffer;
+    DescriptorHandle<RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE>> sections_buffer;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -33,7 +33,7 @@ ConstantBuffer<DescIndices> di;
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer =
         CountedBuffer<WBE_PREFIX_SCAN_TYPE>(di.data_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = ResourceDescriptorHeap[di.sections_buffer.x];
+    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = di.sections_buffer;
     // TODO: Generalize to all types
     large_prefix_scan_add<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         data_buffer,

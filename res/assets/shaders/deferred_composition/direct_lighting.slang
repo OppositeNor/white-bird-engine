@@ -16,22 +16,22 @@
 
 struct DirectLightingDescIndices {
     [wbe::desc("uniform_buffer", "composition_camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CompositionCamera>> camera_info;
     [wbe::desc("storage_buffer", "spot_light_infos", "read")]
-    uint2 light_infos;
+    DescriptorHandle<StructuredBuffer<SpotLightInfoBuffer>> light_infos;
     LightParamDescIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
     [wbe::desc("sampled_image", "gbuffer_albedo")]
-    uint2 gbuffer_albedo;
+    DescriptorHandle<Texture2D<float4>> gbuffer_albedo;
     [wbe::desc("sampled_image", "gbuffer_normal")]
-    uint2 gbuffer_octa_normal;
+    DescriptorHandle<Texture2D<float2>> gbuffer_octa_normal;
     [wbe::desc("sampled_image", "gbuffer_rma")]
-    uint2 gbuffer_rma;
+    DescriptorHandle<Texture2D<float4>> gbuffer_rma;
     [wbe::desc("sampled_image", "gbuffer_depth")]
-    uint2 gbuffer_depth;
+    DescriptorHandle<Texture2D<float>> gbuffer_depth;
     [wbe::desc("sampler", "gbuffer_sampler")]
-    uint2 gbuffer_sampler;
+    DescriptorHandle<SamplerState> gbuffer_sampler;
     [wbe::desc("storage_image", "direct_lighting")]
-    uint2 direct_lighting_output;
+    DescriptorHandle<RWTexture2D<float4>> direct_lighting_output;
 };
 
 [vk::push_constant]
@@ -40,13 +40,13 @@ ConstantBuffer<DirectLightingDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    ConstantBuffer<CompositionCamera> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    Texture2D<float4> gbuffer_albedo = ResourceDescriptorHeap[di.gbuffer_albedo.x];
-    Texture2D<float2> gbuffer_octa_normal = ResourceDescriptorHeap[di.gbuffer_octa_normal.x];
-    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[di.gbuffer_rma.x];
-    Texture2D<float> gbuffer_depth = ResourceDescriptorHeap[di.gbuffer_depth.x];
-    SamplerState gbuffer_sampler = SamplerDescriptorHeap[di.gbuffer_sampler.x];
-    RWTexture2D<float4> direct_lighting_output = ResourceDescriptorHeap[di.direct_lighting_output.x];
+    ConstantBuffer<CompositionCamera> camera_info = di.camera_info;
+    Texture2D<float4> gbuffer_albedo = di.gbuffer_albedo;
+    Texture2D<float2> gbuffer_octa_normal = di.gbuffer_octa_normal;
+    Texture2D<float4> gbuffer_rma = di.gbuffer_rma;
+    Texture2D<float> gbuffer_depth = di.gbuffer_depth;
+    SamplerState gbuffer_sampler = di.gbuffer_sampler;
+    RWTexture2D<float4> direct_lighting_output = di.direct_lighting_output;
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);

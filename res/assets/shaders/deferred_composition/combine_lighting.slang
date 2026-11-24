@@ -16,13 +16,13 @@
 
 struct CombineLightingDescIndices {
     [wbe::desc("sampled_image", "gbuffer_rma")]
-    uint2 gbuffer_rma;
+    DescriptorHandle<Texture2D<float4>> gbuffer_rma;
     [wbe::desc("sampled_image", "direct_lighting")]
-    uint2 direct_lighting;
+    DescriptorHandle<Texture2D<float4>> direct_lighting;
     [wbe::desc("sampled_image", "indirect_lighting")]
-    uint2 indirect_lighting;
+    DescriptorHandle<Texture2D<float4>> indirect_lighting;
     [wbe::desc("storage_image", "result_image")]
-    uint2 result_image;
+    DescriptorHandle<RWTexture2D<float4>> result_image;
 };
 
 [vk::push_constant]
@@ -36,10 +36,10 @@ ConstantBuffer<CombineLightingDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    Texture2D<float4> gbuffer_rma = ResourceDescriptorHeap[di.gbuffer_rma.x];
-    Texture2D<float4> direct_lighting = ResourceDescriptorHeap[di.direct_lighting.x];
-    Texture2D<float4> indirect_lighting = ResourceDescriptorHeap[di.indirect_lighting.x];
-    RWTexture2D<float4> result_image = ResourceDescriptorHeap[di.result_image.x];
+    Texture2D<float4> gbuffer_rma = di.gbuffer_rma;
+    Texture2D<float4> direct_lighting = di.direct_lighting;
+    Texture2D<float4> indirect_lighting = di.indirect_lighting;
+    RWTexture2D<float4> result_image = di.result_image;
     uint width;
     uint height;
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);

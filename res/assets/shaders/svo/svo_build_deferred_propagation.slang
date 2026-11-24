@@ -20,21 +20,21 @@
 
 struct SVODescIndices {
     [wbe::desc("storage_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 tree_nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_leaf_buffer")]
-    uint2 tree_leaves;
+    DescriptorHandle<RWStructuredBuffer<SVOLeaf>> tree_leaves;
 #ifdef WBE_USE_PING_WRITE
     [wbe::desc("storage_buffer", "svo_deferred_list_pong", "read")]
-    uint2 deferred_list_read;
+    DescriptorHandle<StructuredBuffer<uint>> deferred_list_read;
     [wbe::desc("storage_buffer", "svo_deferred_list_ping")]
-    uint2 deferred_list_write;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_write;
 #else
     [wbe::desc("storage_buffer", "svo_deferred_list_ping", "read")]
-    uint2 deferred_list_read;
+    DescriptorHandle<StructuredBuffer<uint>> deferred_list_read;
     [wbe::desc("storage_buffer", "svo_deferred_list_pong")]
-    uint2 deferred_list_write;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_write;
 #endif
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
@@ -46,13 +46,13 @@ ConstantBuffer<SVODescIndices> di;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info = di.svo_info;
     // The list may exceed one dispatch's thread count, so each invocation strides over the whole dispatch.
     uint task_stride = WorkgroupCount().x * 128;
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
-    StructuredBuffer<uint> deferred_list_read = ResourceDescriptorHeap[di.deferred_list_read.x];
-    RWStructuredBuffer<uint> deferred_list_write = ResourceDescriptorHeap[di.deferred_list_write.x];
+    RWStructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    RWStructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
+    StructuredBuffer<uint> deferred_list_read = di.deferred_list_read;
+    RWStructuredBuffer<uint> deferred_list_write = di.deferred_list_write;
     uint deferred_task_count = deferred_list_read[SVO_DEFERRED_LIST_COUNT_INDEX];
     for (uint task_index = p_dispatch_thread_id.x; task_index < deferred_task_count; task_index += task_stride) {
         uint task = deferred_list_read[SVO_DEFERRED_LIST_ENTRY_OFFSET + task_index];

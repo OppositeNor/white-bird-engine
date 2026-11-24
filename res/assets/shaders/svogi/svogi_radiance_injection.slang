@@ -21,17 +21,17 @@
 
 struct DescIndices {
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
-    uint2 tree_nodes;
+    DescriptorHandle<StructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
-    uint2 tree_leaves;
+    DescriptorHandle<StructuredBuffer<SVOLeaf>> tree_leaves;
     [wbe::desc("storage_buffer", "index_buffer", "write")]
-    uint2 index_buffer;
+    DescriptorHandle<RWByteAddressBuffer> index_buffer;
     [wbe::desc("storage_buffer", "staged_buffer", "write")]
-    uint2 staged_buffer;
+    DescriptorHandle<RWStructuredBuffer<SegmentedWrapper<float3x3>>> staged_buffer;
     [wbe::desc("storage_buffer", "spot_light_infos", "read")]
-    uint2 light_infos;
+    DescriptorHandle<StructuredBuffer<SpotLightInfoBuffer>> light_infos;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
     LightParamDescIndices lights[WBE_MAX_SPOT_LIGHT_COUNT];
@@ -52,11 +52,11 @@ groupshared uint global_index_start;
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
+    ConstantBuffer<SVOInfo> svo_info = di.svo_info;
+    StructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    StructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
     CountedBuffer<uint2> index_buffer = CountedBuffer<uint2>(di.index_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<SegmentedWrapper<float3x3>> staged_buffer = ResourceDescriptorHeap[di.staged_buffer.x];
+    RWStructuredBuffer<SegmentedWrapper<float3x3>> staged_buffer = di.staged_buffer;
     uint frame_slot = di.shader_debug_frame_slot;
 
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);

@@ -25,15 +25,15 @@ struct DrawIndexedIndirectCommand {
 
 struct SVODebugDrawSetupDescIndices {
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_debug_draw_indirect_buffer")]
-    uint2 indirect_draw;
+    DescriptorHandle<RWStructuredBuffer<DrawIndexedIndirectCommand>> indirect_draw;
     [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
-    uint2 tree_nodes;
+    DescriptorHandle<StructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("uniform_buffer", "svo_debug_draw_settings")]
-    uint2 settings;
+    DescriptorHandle<ConstantBuffer<SVODebugDrawSettings>> settings;
     [wbe::desc("storage_buffer", "svo_debug_draw_node_list", "write")]
-    uint2 node_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> node_list;
 };
 
 [vk::push_constant]
@@ -48,11 +48,11 @@ ConstantBuffer<SVODebugDrawSetupDescIndices> di;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = ResourceDescriptorHeap[di.indirect_draw.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[di.settings.x];
-    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
+    ConstantBuffer<SVOInfo> svo_info = di.svo_info;
+    RWStructuredBuffer<DrawIndexedIndirectCommand> indirect_draw = di.indirect_draw;
+    StructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    ConstantBuffer<SVODebugDrawSettings> settings = di.settings;
+    RWStructuredBuffer<uint> node_list = di.node_list;
     DrawIndexedIndirectCommand command;
     // The edges of VOXEL_DEBUG_CUBE_INDICES, or the faces of VOXEL_DEBUG_CUBE_SOLID_INDICES.
     command.index_count = settings.style == 0 ? 24 : 36;

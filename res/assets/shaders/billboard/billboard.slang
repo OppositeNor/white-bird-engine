@@ -22,13 +22,13 @@ struct BillboardInfo {
 
 struct BillboardDescIndices {
     [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     [wbe::desc("uniform_buffer", "light_billboard_info")]
-    uint2 billboard_info;
+    DescriptorHandle<ConstantBuffer<BillboardInfo>> billboard_info;
     [wbe::desc("sampled_image", "light_billboard_texture")]
-    uint2 texture_image;
+    DescriptorHandle<Texture2D<float4>> texture_image;
     [wbe::desc("sampler", "light_billboard_sampler")]
-    uint2 texture_sampler;
+    DescriptorHandle<SamplerState> texture_sampler;
 };
 
 [vk::push_constant]
@@ -115,22 +115,22 @@ VSOutput build_billboard_vertex(uint p_vertex_id,
 
 [shader("vertex")]
 VSOutput vertex_face_camera(uint p_vertex_id : SV_VulkanVertexID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    ConstantBuffer<BillboardInfo> billboard_info = ResourceDescriptorHeap[di.billboard_info.x];
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
+    ConstantBuffer<BillboardInfo> billboard_info = di.billboard_info;
     return build_billboard_vertex(p_vertex_id, false, camera_info, billboard_info);
 }
 
 [shader("vertex")]
 VSOutput vertex_axis_limited(uint p_vertex_id : SV_VulkanVertexID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    ConstantBuffer<BillboardInfo> billboard_info = ResourceDescriptorHeap[di.billboard_info.x];
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
+    ConstantBuffer<BillboardInfo> billboard_info = di.billboard_info;
     return build_billboard_vertex(p_vertex_id, true, camera_info, billboard_info);
 }
 
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
-    Texture2D<float4> texture_image = ResourceDescriptorHeap[di.texture_image.x];
-    SamplerState texture_sampler = SamplerDescriptorHeap[di.texture_sampler.x];
+    Texture2D<float4> texture_image = di.texture_image;
+    SamplerState texture_sampler = di.texture_sampler;
     float4 sampled = texture_image.Sample(texture_sampler, p_input.uv);
     if (sampled.a <= 0.01) {
         discard;

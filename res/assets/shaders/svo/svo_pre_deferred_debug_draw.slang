@@ -18,16 +18,16 @@
 
 struct SVOPreDeferredDebugDrawDescIndices {
     [wbe::desc("storage_buffer", "svo_pre_deferred_debug_info_buffer", "read")]
-    uint2 svo_info;
+    DescriptorHandle<StructuredBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
-    uint2 tree_nodes;
+    DescriptorHandle<StructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
-    uint2 tree_leaves;
+    DescriptorHandle<StructuredBuffer<SVOLeaf>> tree_leaves;
 
     [wbe::desc("storage_buffer", "svo_pre_deferred_debug_list_buffer", "read")]
-    uint2 deferred_list;
+    DescriptorHandle<StructuredBuffer<uint>> deferred_list;
     [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -58,11 +58,11 @@ uint3 get_deferred_task_grid_position(uint p_task, SVOInfo p_tree_info) {
  */
 [shader("vertex")]
 SVOPreDeferredDebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
-    StructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
+    StructuredBuffer<SVOInfo> svo_info_buffer = di.svo_info;
+    StructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    StructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
+    StructuredBuffer<uint> deferred_list = di.deferred_list;
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
     SVOInfo svo_info = svo_info_buffer[0];
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 

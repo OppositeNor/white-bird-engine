@@ -18,10 +18,10 @@
 struct SVODeferredCountResetDescIndices {
 #ifdef WBE_RESET_PING_COUNT
     [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
-    uint2 deferred_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list;
 #else
     [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
-    uint2 deferred_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list;
 #endif
 };
 
@@ -34,6 +34,6 @@ ConstantBuffer<SVODeferredCountResetDescIndices> di;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main() {
-    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
+    RWStructuredBuffer<uint> deferred_list = di.deferred_list;
     deferred_list[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
 }

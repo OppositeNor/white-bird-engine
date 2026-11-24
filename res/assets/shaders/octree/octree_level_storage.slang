@@ -18,7 +18,7 @@
 #include "octree/octree_common.slang"
 
 /**
- * @brief Descriptor-heap reference to the single-level storage view of one mip level.
+ * @brief Descriptor-heap handle to the single-level storage view of one mip level.
  * @details WBE_DYNAMIC_BUILD selects the dynamic octree texture instead of the static one.
  */
 struct OctreeLevelDescIndices {
@@ -27,7 +27,7 @@ struct OctreeLevelDescIndices {
 #else
     [wbe::desc("storage_image", "octree_static_levels[]")]
 #endif
-    uint2 level;
+    DescriptorHandle<RWTexture3D<uint>> level;
 };
 
 /**
@@ -40,12 +40,11 @@ struct OctreeHeapLevelStorage : IOctreeLevelStorage {
     OctreeLevelDescIndices levels[OCTREE_LEVEL_DESC_COUNT];
 
     uint load(uint p_level, uint3 p_texel) {
-        RWTexture3D<uint> level = ResourceDescriptorHeap[levels[p_level].level.x];
-        return level[p_texel];
+        return levels[p_level].level[p_texel];
     }
 
     void store(uint p_level, uint3 p_texel, uint p_value) {
-        RWTexture3D<uint> level = ResourceDescriptorHeap[levels[p_level].level.x];
+        RWTexture3D<uint> level = levels[p_level].level;
         level[p_texel] = p_value;
     }
 };

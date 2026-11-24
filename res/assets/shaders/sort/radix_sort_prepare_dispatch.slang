@@ -16,8 +16,8 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "input_buffer", "read")] uint2 input_buffer;
-    [wbe::desc("storage_buffer", "dispatch_buffer", "write")] uint2 dispatch_buffer;
+    [wbe::desc("storage_buffer", "input_buffer", "read")] DescriptorHandle<RWByteAddressBuffer> input_buffer;
+    [wbe::desc("storage_buffer", "dispatch_buffer", "write")] DescriptorHandle<RWStructuredBuffer<DispatchIndirectCommand>> dispatch_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
@@ -34,7 +34,7 @@ ConstantBuffer<DescIndices> di;
 void main() {
     CountedBuffer<uint> keys =
         CountedBuffer<uint>(di.input_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = ResourceDescriptorHeap[di.dispatch_buffer.x];
+    RWStructuredBuffer<DispatchIndirectCommand> dispatch_buffer = di.dispatch_buffer;
     uint local_sort_num = keys.get_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX);
     dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX] = DispatchIndirectCommand(local_sort_num);
     dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX] = DispatchIndirectCommand(

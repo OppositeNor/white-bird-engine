@@ -400,11 +400,14 @@ Header / source naming: `snake_case.hh` / `snake_case.cpp`. Header guards: `WBE_
 - Static-mesh compilation resolves textures to global sampled-image descriptor-heap indices and stores those indices in the reflected
   material-parameter table. Keep engine propagation generic; do not branch on concrete roles such as `albedo`, `normal`, or
   `rma`.
-- Vulkan shader resources are declared as aligned `uint2` fields in push data with `wbe::desc("TYPE", "resource_id", "ACCESS")`,
+- Vulkan shader resources are declared as `DescriptorHandle<T>` fields in push data (reflected as aligned `uint2`) with
+  `wbe::desc("TYPE", "resource_id", "ACCESS")`,
   where `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`, `storage_image`, `sampler`, or `acceleration_structure`, and
   the optional `ACCESS` is `read`, `write`, or `read_write`. Storage buffers and images default to `read_write`; annotate read-only
-  ones with `read`. Runtime shaders access the renderer-owned global heaps through those indices; metadata-only resource
-  declarations belong under `WBE_REFLECTION_METADATA`.
+  ones with `read`. Runtime shaders use the handles directly (they convert to their resource type), never
+  `ResourceDescriptorHeap[...]` with a push-data index; a resource read through a second view uses
+  `reinterpret_desc_handle<U>()` from `utils/utils.slang`. Metadata-only resource declarations belong under
+  `WBE_REFLECTION_METADATA`.
 - `rma` is the canonical project abbreviation and texture role for the roughness, metallic, and ambient-occlusion channel pack.
   Use `rma` in project-owned identifiers instead of a spelled-out equivalent.
 
@@ -472,7 +475,7 @@ Rules:
     name such as `RendRes`, `RendGraphVK`, or `rend_vk`; the word on its own stays `render`, and `Renderer` is not
     shortened).
     `allocation` and `description` stay spelled out, so they never collide with `alloc` and `desc`.
-  - Allowed in Slang only: `di` for the push-constant `ConstantBuffer<DescriptorIndices>` of a shader entry point.
+  - Allowed in Slang only: `di` for the push-constant `ConstantBuffer<DescIndices>` of a shader entry point.
   - An allowed abbreviation is required in new names (`RendFooVK`, not `RenderFooVK`); existing names are not renamed
     unless requested.
   - To add an abbreviation, add it to this list. Interface prefixes of derived implementations (`RO`, `RT`, ...) follow

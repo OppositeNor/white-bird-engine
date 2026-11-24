@@ -90,12 +90,12 @@ struct SVODescIndices {
      * @brief Descriptor-heap reference to svo_info.
      */
     [wbe::desc("storage_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> svo_info;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list, which receives the Morton code of every rasterized leaf.
      */
     [wbe::desc("storage_buffer", "svo_deferred_list")]
-    uint2 deferred_list;
+    DescriptorHandle<RWByteAddressBuffer> deferred_list;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
@@ -116,10 +116,10 @@ ConstantBuffer<SVODescIndices> di;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = di.svo_info;
     SVOInfo svo_info = svo_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
+    StructuredBuffer<SubmeshData> submeshes = di.mesh.submeshes;
 
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
@@ -222,7 +222,7 @@ void fragment_main(GSOutput p_input) {
     uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> deferred_list =
         CountedBuffer<uint>(di.deferred_list, frame_slot);
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = di.svo_info;
     // Helper invocations cannot publish storage writes and receive undefined atomic results.
     // Keep them out of allocation retry loops; this shader does not need derivatives.
     if (IsHelperLane()) {
@@ -233,7 +233,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVOInfo> tree_info = reinterpret_desc_handle<StructuredBuffer<SVOInfo>>(di.svo_info);
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;

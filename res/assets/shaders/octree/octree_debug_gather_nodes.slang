@@ -23,27 +23,27 @@ struct OctreeDebugGatherNodesDescIndices {
      * @brief Descriptor-heap reference to octree_info.
      */
     [wbe::desc("storage_buffer", "octree_info", "read")]
-    uint2 octree_info;
+    DescriptorHandle<StructuredBuffer<OctreeInfo>> octree_info;
     /**
      * @brief Descriptor-heap reference to the static octree texture with every mip level.
      */
     [wbe::desc("sampled_image", "octree_static")]
-    uint2 static_levels;
+    DescriptorHandle<Texture3D<uint>> static_levels;
     /**
      * @brief Descriptor-heap reference to the dynamic octree texture with every mip level.
      */
     [wbe::desc("sampled_image", "octree_dynamic")]
-    uint2 dynamic_levels;
+    DescriptorHandle<Texture3D<uint>> dynamic_levels;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_list.
      */
     [wbe::desc("storage_buffer", "octree_debug_node_list")]
-    uint2 node_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> node_list;
     /**
      * @brief Descriptor-heap reference to octree_debug_node_draw_indirect_buffer.
      */
     [wbe::desc("storage_buffer", "octree_debug_node_draw_indirect_buffer")]
-    uint2 node_indirect_draw;
+    DescriptorHandle<RWStructuredBuffer<DrawIndexedIndirectCommand>> node_indirect_draw;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
@@ -61,9 +61,9 @@ void gather_node(OctreeInfo p_info, Texture3D<uint> p_static_levels, Texture3D<u
     if (get_octree_occupancy(p_static_levels, p_dynamic_levels, true, p_level, p_node) == 0) {
         return;
     }
-    RWStructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
+    RWStructuredBuffer<uint> node_list = di.node_list;
     RWStructuredBuffer<DrawIndexedIndirectCommand> node_indirect_draw =
-        ResourceDescriptorHeap[di.node_indirect_draw.x];
+        di.node_indirect_draw;
     uint entry_index;
     InterlockedAdd(node_list[OCTREE_DEBUG_NODE_LIST_COUNT_INDEX], 1, entry_index);
     WBE_SHADER_DEBUG_ASSERT(entry_index < p_info.max_debug_node_count,
@@ -84,9 +84,9 @@ void gather_node(OctreeInfo p_info, Texture3D<uint> p_static_levels, Texture3D<u
 [shader("compute")]
 [numthreads(4, 4, 4)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[di.octree_info.x];
-    Texture3D<uint> static_levels = ResourceDescriptorHeap[di.static_levels.x];
-    Texture3D<uint> dynamic_levels = ResourceDescriptorHeap[di.dynamic_levels.x];
+    StructuredBuffer<OctreeInfo> octree_info_buffer = di.octree_info;
+    Texture3D<uint> static_levels = di.static_levels;
+    Texture3D<uint> dynamic_levels = di.dynamic_levels;
     OctreeInfo info = octree_info_buffer[0];
     uint gather_level = min(OCTREE_DEBUG_GATHER_LEVEL, info.max_depth);
     uint3 texel = p_dispatch_thread_id;

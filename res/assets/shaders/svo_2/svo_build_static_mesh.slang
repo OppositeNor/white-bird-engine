@@ -89,23 +89,23 @@ struct SVODescIndices {
      * @brief Descriptor-heap reference to svo_info.
      */
     [wbe::desc("storage_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> svo_info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 tree_nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> tree_nodes;
     /**
      * @brief Descriptor-heap reference to svo_leaf_buffer.
      */
     [wbe::desc("storage_buffer", "svo_leaf_buffer")]
-    uint2 tree_leaves;
+    DescriptorHandle<RWStructuredBuffer<SVOLeaf>> tree_leaves;
 
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
     [wbe::desc("storage_buffer", "svo_deferred_list_ping")]
-    uint2 deferred_list;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list;
     /**
      * @brief Renderer frame slot used for shader validation reports.
      */
@@ -126,10 +126,10 @@ ConstantBuffer<SVODescIndices> di;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    RWStructuredBuffer<SVOInfo> svo_info_buffer = ResourceDescriptorHeap[di.svo_info.x];
+    RWStructuredBuffer<SVOInfo> svo_info_buffer = di.svo_info;
     SVOInfo svo_info = svo_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
+    StructuredBuffer<SubmeshData> submeshes = di.mesh.submeshes;
 
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
@@ -224,10 +224,10 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
  * @brief Allocates a covered cell, queueing the voxel for a retry from the root on contention.
  */
 void allocate_covered_voxel(float3 p_svo_position) {
-    RWStructuredBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    RWStructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    RWStructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
-    RWStructuredBuffer<uint> deferred_list = ResourceDescriptorHeap[di.deferred_list.x];
+    RWStructuredBuffer<SVOInfo> svo_info = di.svo_info;
+    RWStructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    RWStructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
+    RWStructuredBuffer<uint> deferred_list = di.deferred_list;
     // Trace to the bottom-most node
     SVONodeTraceInfo trace_info = get_svo_root_trace_info(p_svo_position, svo_info[0].max_depth);
     // Try to allocate the node.
@@ -263,7 +263,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<SVOInfo> tree_info = ResourceDescriptorHeap[di.svo_info.x];
+    StructuredBuffer<SVOInfo> tree_info = reinterpret_desc_handle<StructuredBuffer<SVOInfo>>(di.svo_info);
     float extent = float(1u << tree_info[0].max_depth);
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;

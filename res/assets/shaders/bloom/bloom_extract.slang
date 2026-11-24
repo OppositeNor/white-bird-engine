@@ -15,9 +15,9 @@
 #include "utils.slang"
 
 struct BloomExtractDescIndices {
-    [wbe::desc("sampled_image", "result_image")] uint2 bloom_input;
-    [wbe::desc("storage_image", "bloom_ping")] uint2 bloom_output;
-    [wbe::desc("sampler", "bloom_sampler")] uint2 bloom_sampler;
+    [wbe::desc("sampled_image", "result_image")] DescriptorHandle<Texture2D<float4>> bloom_input;
+    [wbe::desc("storage_image", "bloom_ping")] DescriptorHandle<RWTexture2D<float4>> bloom_output;
+    [wbe::desc("sampler", "bloom_sampler")] DescriptorHandle<SamplerState> bloom_sampler;
 };
 
 static const float BLOOM_THRESHOLD = 1.0;
@@ -29,9 +29,9 @@ ConstantBuffer<BloomExtractDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    Texture2D<float4> bloom_input = ResourceDescriptorHeap[di.bloom_input.x];
-    RWTexture2D<float4> bloom_output = ResourceDescriptorHeap[di.bloom_output.x];
-    SamplerState bloom_sampler = SamplerDescriptorHeap[di.bloom_sampler.x];
+    Texture2D<float4> bloom_input = di.bloom_input;
+    RWTexture2D<float4> bloom_output = di.bloom_output;
+    SamplerState bloom_sampler = di.bloom_sampler;
     uint width;
     uint height;
     bloom_output.GetDimensions(width, height);

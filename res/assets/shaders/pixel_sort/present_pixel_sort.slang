@@ -27,9 +27,9 @@ struct VSOutput {
 /** Descriptor indices of the resources used by the present pass. */
 struct PresentPixelSortDescIndices {
     /** The post-processed pixel-sorted image, from pixel_sorting_post_processing. */
-    [wbe::desc("sampled_image", "pixel_sorting_post_processing_output")] uint2 sorted_image;
+    [wbe::desc("sampled_image", "pixel_sorting_post_processing_output")] DescriptorHandle<Texture2D<float4>> sorted_image;
     /** Sampler used to scale the sorted image to the render target. */
-    [wbe::desc("sampler", "pixel_sort_sampler")] uint2 sorted_sampler;
+    [wbe::desc("sampler", "pixel_sort_sampler")] DescriptorHandle<SamplerState> sorted_sampler;
 };
 
 [vk::push_constant]
@@ -50,8 +50,8 @@ VSOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID) {
 
 [shader("fragment")]
 float4 fragment_main(VSOutput p_input) : SV_Target0 {
-    Texture2D<float4> sorted_image = ResourceDescriptorHeap[di.sorted_image.x];
-    SamplerState sorted_sampler = SamplerDescriptorHeap[di.sorted_sampler.x];
+    Texture2D<float4> sorted_image = di.sorted_image;
+    SamplerState sorted_sampler = di.sorted_sampler;
     float2 image_extent;
     sorted_image.GetDimensions(image_extent.x, image_extent.y);
     // The uv spans [0, 1] across the render target, so its per-pixel derivative is the reciprocal of the target extent.

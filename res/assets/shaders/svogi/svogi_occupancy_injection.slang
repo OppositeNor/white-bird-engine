@@ -18,13 +18,13 @@
 
 struct DescIndices {
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
-    uint2 tree_nodes;
+    DescriptorHandle<StructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
-    uint2 tree_leaves;
+    DescriptorHandle<StructuredBuffer<SVOLeaf>> tree_leaves;
     [wbe::desc("storage_buffer", "atlas", "write")]
-    uint2 atlas;
+    DescriptorHandle<RWStructuredBuffer<float>> atlas;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -39,10 +39,10 @@ ConstantBuffer<DescIndices> di;
 void main(uint2 p_group_id : SV_GroupID, uint p_group_thread_id : SV_GroupThreadID) {
     uint group_index = p_group_id.y * WorkgroupCount().x + p_group_id.x;
     uint thread_id = group_index * 256 + p_group_thread_id;
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
-    RWStructuredBuffer<float> atlas = ResourceDescriptorHeap[di.atlas.x];
+    ConstantBuffer<SVOInfo> svo_info = di.svo_info;
+    StructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    StructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
+    RWStructuredBuffer<float> atlas = di.atlas;
     uint frame_slot = di.shader_debug_frame_slot;
 
     SVOWriteBuffer<float> svo_occupancy = SVOWriteBuffer<float>(SVO(tree_nodes, tree_leaves, svo_info, true), atlas);

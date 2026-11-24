@@ -29,17 +29,17 @@
 /** Descriptor indices of the resources used by the write pass. */
 struct WriteSortedPixelsDescIndices {
     /** Image whose pixels are sorted. */
-    [wbe::desc("sampled_image", "pixel_sort_source")] uint2 source;
+    [wbe::desc("sampled_image", "pixel_sort_source")] DescriptorHandle<Texture2D<float4>> source;
     /** Radix sort key buffer holding the sorted keys. */
-    [wbe::desc("storage_buffer", "pixel_sort_keys", "read")] uint2 keys;
+    [wbe::desc("storage_buffer", "pixel_sort_keys", "read")] DescriptorHandle<RWByteAddressBuffer> keys;
     /** Mask image holding the line rank, span offset, and span length of every masked pixel, from register_pixel_sort_keys. */
-    [wbe::desc("storage_image", "pixel_sort_mask", "read")] uint2 mask;
+    [wbe::desc("storage_image", "pixel_sort_mask", "read")] DescriptorHandle<RWTexture2D<uint4>> mask;
     /** The scope of the sort. */
-    [wbe::desc("uniform_buffer", "pixel_sort_contrast")] uint2 contrast;
+    [wbe::desc("uniform_buffer", "pixel_sort_contrast")] DescriptorHandle<ConstantBuffer<PixelSortContrast>> contrast;
     /** The end offset of every line in the key buffer, from prefix_sum_pixel_sort_columns. */
-    [wbe::desc("storage_buffer", "pixel_sort_column_offsets", "read")] uint2 column_offsets;
+    [wbe::desc("storage_buffer", "pixel_sort_column_offsets", "read")] DescriptorHandle<RWStructuredBuffer<uint>> column_offsets;
     /** Image receiving the sorted pixels; must have the extent of source. */
-    [wbe::desc("storage_image", "pixel_sort_destination", "write")] uint2 destination;
+    [wbe::desc("storage_image", "pixel_sort_destination", "write")] DescriptorHandle<RWTexture2D<float4>> destination;
     /** Renderer frame slot receiving shader-debug errors. */
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
@@ -50,13 +50,13 @@ ConstantBuffer<WriteSortedPixelsDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    Texture2D<float4> source = ResourceDescriptorHeap[di.source.x];
+    Texture2D<float4> source = di.source;
     uint frame_slot = di.shader_debug_frame_slot;
     CountedBuffer<uint> keys = CountedBuffer<uint>(di.keys, frame_slot);
-    RWTexture2D<uint4> mask = ResourceDescriptorHeap[di.mask.x];
-    ConstantBuffer<PixelSortContrast> contrast = ResourceDescriptorHeap[di.contrast.x];
-    RWStructuredBuffer<uint> column_offsets = ResourceDescriptorHeap[di.column_offsets.x];
-    RWTexture2D<float4> destination = ResourceDescriptorHeap[di.destination.x];
+    RWTexture2D<uint4> mask = di.mask;
+    ConstantBuffer<PixelSortContrast> contrast = di.contrast;
+    RWStructuredBuffer<uint> column_offsets = di.column_offsets;
+    RWTexture2D<float4> destination = di.destination;
     uint2 extent;
     source.GetDimensions(extent.x, extent.y);
     uint2 pixel = p_dispatch_thread_id.xy;

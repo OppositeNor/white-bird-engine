@@ -96,12 +96,12 @@ struct OctreeBuildDescIndices {
 #else
     [wbe::desc("storage_image", "octree_static", "write")]
 #endif
-    uint2 texture;
+    DescriptorHandle<RWTexture3D<uint>> texture;
     /**
      * @brief Descriptor-heap reference to octree_info.
      */
     [wbe::desc("storage_buffer", "octree_info", "read")]
-    uint2 octree_info;
+    DescriptorHandle<StructuredBuffer<OctreeInfo>> octree_info;
     /**
      * @brief Storage views of the texture's mip levels.
      */
@@ -120,9 +120,9 @@ ConstantBuffer<OctreeBuildDescIndices> di;
  */
 [shader("vertex")]
 VSOutput vertex_main(VSInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    StructuredBuffer<OctreeInfo> octree_info_buffer = ResourceDescriptorHeap[di.octree_info.x];
+    StructuredBuffer<OctreeInfo> octree_info_buffer = di.octree_info;
     OctreeInfo octree_info = octree_info_buffer[0];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
 
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
@@ -228,7 +228,7 @@ void fragment_main(GSOutput p_input) {
     if (any(cell < p_input.cell_bounds.xy) || any(cell > p_input.cell_bounds.zw)) {
         return;
     }
-    StructuredBuffer<OctreeInfo> octree_info = ResourceDescriptorHeap[di.octree_info.x];
+    StructuredBuffer<OctreeInfo> octree_info = di.octree_info;
     uint depth_axis = p_input.depth_axis;
     uint horizontal_axis = depth_axis == 0 ? 1 : 0;
     uint vertical_axis = depth_axis == 2 ? 1 : 2;

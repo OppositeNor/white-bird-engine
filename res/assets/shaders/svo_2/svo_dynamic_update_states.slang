@@ -22,12 +22,12 @@ struct DynamicDescIndices {
      * @brief Descriptor-heap reference to svo_info.
      */
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> nodes;
 };
 [vk::push_constant]
 ConstantBuffer<DynamicDescIndices> di;
@@ -38,8 +38,8 @@ ConstantBuffer<DynamicDescIndices> di;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    ConstantBuffer<SVOInfo> info = ResourceDescriptorHeap[di.info.x];
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.nodes.x];
+    ConstantBuffer<SVOInfo> info = di.info;
+    RWStructuredBuffer<SVONode> nodes = di.nodes;
     uint index = p_id.x;
     // The node buffer holds the static nodes followed by the dynamic nodes.
     if (index >= info.node_count + info.dynamic_node_count) {

@@ -16,9 +16,9 @@
 
 struct ShadowMomentsVerticalDescIndices {
     [wbe::desc("sampled_image", "shadow_sat_horizontal")]
-    uint2 shadow_moments_horizontal_input;
+    DescriptorHandle<Texture2D<float2>> shadow_moments_horizontal_input;
     [wbe::desc("storage_image", "shadow_sat")]
-    uint2 shadow_moments_summed_area_table_output;
+    DescriptorHandle<RWTexture2D<float2>> shadow_moments_summed_area_table_output;
 };
 
 [vk::push_constant]
@@ -32,9 +32,9 @@ ConstantBuffer<ShadowMomentsVerticalDescIndices> di;
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     Texture2D<float2> shadow_moments_horizontal_input =
-        ResourceDescriptorHeap[di.shadow_moments_horizontal_input.x];
+        di.shadow_moments_horizontal_input;
     RWTexture2D<float2> shadow_moments_summed_area_table_output =
-        ResourceDescriptorHeap[di.shadow_moments_summed_area_table_output.x];
+        di.shadow_moments_summed_area_table_output;
     uint width;
     uint height;
     shadow_moments_horizontal_input.GetDimensions(width, height);

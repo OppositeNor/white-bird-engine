@@ -16,7 +16,7 @@
 #include "prefix_scan/large_prefix_scan_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "sections_buffer", "read_write")] uint2 sections_buffer;
+    [wbe::desc("storage_buffer", "sections_buffer", "read_write")] DescriptorHandle<RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE>> sections_buffer;
 };
 
 [vk::push_constant]
@@ -28,7 +28,7 @@ groupshared WBE_PREFIX_SCAN_TYPE section_totals[WBE_LARGE_PREFIX_SCAN_SECTION_NU
 [shader("compute")]
 [numthreads(WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = ResourceDescriptorHeap[di.sections_buffer.x];
+    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = di.sections_buffer;
     large_prefix_scan_totals<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         sections_buffer,
         p_group_thread_id.x,

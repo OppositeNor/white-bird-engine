@@ -16,8 +16,8 @@
 #include "prefix_scan/large_prefix_scan_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "data_buffer", "read_write")] uint2 data_buffer;
-    [wbe::desc("storage_buffer", "sections_buffer", "write")] uint2 sections_buffer;
+    [wbe::desc("storage_buffer", "data_buffer", "read_write")] DescriptorHandle<RWByteAddressBuffer> data_buffer;
+    [wbe::desc("storage_buffer", "sections_buffer", "write")] DescriptorHandle<RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE>> sections_buffer;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 
@@ -32,7 +32,7 @@ groupshared WBE_PREFIX_SCAN_TYPE block[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE];
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
     CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer =
         CountedBuffer<WBE_PREFIX_SCAN_TYPE>(di.data_buffer, di.shader_debug_frame_slot);
-    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = ResourceDescriptorHeap[di.sections_buffer.x];
+    RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> sections_buffer = di.sections_buffer;
     large_prefix_scan_blocks<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         data_buffer,
         sections_buffer,

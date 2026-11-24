@@ -16,7 +16,7 @@
 #include "sort/radix_sort_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "histogram_buffer", "read_write")] uint2 histogram_buffer;
+    [wbe::desc("storage_buffer", "histogram_buffer", "read_write")] DescriptorHandle<RWStructuredBuffer<uint>> histogram_buffer;
 };
 
 [vk::push_constant]
@@ -32,7 +32,7 @@ ConstantBuffer<DescIndices> di;
 [shader("compute")]
 [numthreads(WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    RWStructuredBuffer<uint> buffer = ResourceDescriptorHeap[di.histogram_buffer.x];
+    RWStructuredBuffer<uint> buffer = di.histogram_buffer;
     uint sub_histogram_num = buffer[WBE_RADIX_SORT_SUB_HISTOGRAM_NUM_INDEX];
     uint overflow_start = buffer[WBE_RADIX_SORT_OVERFLOW_START_INDEX];
     uint lane_start = buffer[WBE_RADIX_SORT_LANE_START_INDEX];

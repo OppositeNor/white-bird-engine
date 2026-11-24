@@ -33,11 +33,11 @@ struct RSMVSOutput {
 
 struct RSMDescIndices {
     [wbe::desc("uniform_buffer", "shadow_light_info")]
-    uint2 light_camera_info;
+    DescriptorHandle<ConstantBuffer<SpotLightInfo>> light_camera_info;
     [wbe::desc("uniform_buffer", "material_params")]
-    uint2 material_params;
+    DescriptorHandle<ConstantBuffer<MaterialParamsBuffer>> material_params;
     [wbe::desc("sampler", "material_sampler")]
-    uint2 material_sampler;
+    DescriptorHandle<SamplerState> material_sampler;
     MeshDescIndices mesh;
 };
 
@@ -51,7 +51,7 @@ struct RSMFragmentOutput {
 };
 
 float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p_base_color, float p_metallic) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = di.light_camera_info;
     float3 to_light = light_camera_info.position - p_world_position;
     float light_distance = length(to_light);
     float3 light_direction = to_light / max(light_distance, 0.0001);
@@ -75,9 +75,9 @@ float3 compute_rsm_flux(float3 p_world_position, float3 p_world_normal, float3 p
  */
 [shader("vertex")]
 RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = di.light_camera_info;
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
+    StructuredBuffer<SubmeshData> submeshes = di.mesh.submeshes;
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
     float4 world_position = mul(node.transform, float4(p_input.position.xyz, 1.0));
@@ -101,9 +101,9 @@ RSMVSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_V
  * @brief Shades a reflective shadow-map fragment, reversing back-face lighting normals when requested.
  */
 RSMFragmentOutput shade_fragment(RSMVSOutput p_input, bool p_front_face) {
-    ConstantBuffer<SpotLightInfo> light_camera_info = ResourceDescriptorHeap[di.light_camera_info.x];
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
+    ConstantBuffer<SpotLightInfo> light_camera_info = di.light_camera_info;
+    ConstantBuffer<MaterialParamsBuffer> material_params = di.material_params;
+    SamplerState material_sampler = di.material_sampler;
     uint material_index = uint(round(p_input.material_index));
     MaterialParams active_material = material_params.materials[material_index];
     uint albedo_index = uint(active_material.albedo_index >= 0 ? active_material.albedo_index : 0);

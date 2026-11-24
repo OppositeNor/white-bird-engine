@@ -23,9 +23,9 @@
 /** Descriptor indices of the resources used by the copy pass. */
 struct CopyPixelSortSourceDescIndices {
     /** Image whose pixels are sorted. */
-    [wbe::desc("sampled_image", "pixel_sort_input")] uint2 input;
+    [wbe::desc("sampled_image", "pixel_sort_input")] DescriptorHandle<Texture2D<float4>> input;
     /** Image receiving the copy; must have the extent of input. */
-    [wbe::desc("storage_image", "pixel_sort_source", "write")] uint2 source;
+    [wbe::desc("storage_image", "pixel_sort_source", "write")] DescriptorHandle<RWTexture2D<float4>> source;
 };
 
 [vk::push_constant]
@@ -34,8 +34,8 @@ ConstantBuffer<CopyPixelSortSourceDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    Texture2D<float4> input = ResourceDescriptorHeap[di.input.x];
-    RWTexture2D<float4> source = ResourceDescriptorHeap[di.source.x];
+    Texture2D<float4> input = di.input;
+    RWTexture2D<float4> source = di.source;
     uint2 extent;
     input.GetDimensions(extent.x, extent.y);
     uint2 pixel = p_dispatch_thread_id.xy;

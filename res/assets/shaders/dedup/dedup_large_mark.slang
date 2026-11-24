@@ -16,8 +16,8 @@
 #include "dedup/dedup_large_utils.slang"
 
 struct DescIndices {
-    [wbe::desc("storage_buffer", "keys", "read")] uint2 keys;
-    [wbe::desc("storage_buffer", "marks", "write")] uint2 marks;
+    [wbe::desc("storage_buffer", "keys", "read")] DescriptorHandle<RWByteAddressBuffer> keys;
+    [wbe::desc("storage_buffer", "marks", "write")] DescriptorHandle<RWByteAddressBuffer> marks;
     [wbe::push_constant("frame_slot")] uint shader_debug_frame_slot;
 };
 

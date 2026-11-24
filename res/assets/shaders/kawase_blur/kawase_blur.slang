@@ -33,17 +33,17 @@
 struct KawaseBlurDescIndices {
 #ifdef WBE_KAWASE_BLUR_WRITE_PING
     /** Image sampled by the blur. */
-    [wbe::desc("sampled_image", "kawase_blur_pong")] uint2 source;
+    [wbe::desc("sampled_image", "kawase_blur_pong")] DescriptorHandle<Texture2D<float4>> source;
     /** Image receiving the blurred result. */
-    [wbe::desc("storage_image", "kawase_blur_ping", "write")] uint2 destination;
+    [wbe::desc("storage_image", "kawase_blur_ping", "write")] DescriptorHandle<RWTexture2D<float4>> destination;
 #else
     /** Image sampled by the blur. */
-    [wbe::desc("sampled_image", "kawase_blur_ping")] uint2 source;
+    [wbe::desc("sampled_image", "kawase_blur_ping")] DescriptorHandle<Texture2D<float4>> source;
     /** Image receiving the blurred result. */
-    [wbe::desc("storage_image", "kawase_blur_pong", "write")] uint2 destination;
+    [wbe::desc("storage_image", "kawase_blur_pong", "write")] DescriptorHandle<RWTexture2D<float4>> destination;
 #endif
     /** Linear-filtering sampler used for every tap. */
-    [wbe::desc("sampler", "kawase_blur_sampler")] uint2 blur_sampler;
+    [wbe::desc("sampler", "kawase_blur_sampler")] DescriptorHandle<SamplerState> blur_sampler;
 };
 
 [vk::push_constant]
@@ -52,9 +52,9 @@ ConstantBuffer<KawaseBlurDescIndices> di;
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    Texture2D<float4> source = ResourceDescriptorHeap[di.source.x];
-    RWTexture2D<float4> destination = ResourceDescriptorHeap[di.destination.x];
-    SamplerState blur_sampler = SamplerDescriptorHeap[di.blur_sampler.x];
+    Texture2D<float4> source = di.source;
+    RWTexture2D<float4> destination = di.destination;
+    SamplerState blur_sampler = di.blur_sampler;
     uint destination_width;
     uint destination_height;
     destination.GetDimensions(destination_width, destination_height);

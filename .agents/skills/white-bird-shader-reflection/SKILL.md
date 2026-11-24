@@ -45,18 +45,31 @@ duplicated; `resolve_entry_point` allows an omitted name only when the stage has
 
 ## Write shader contracts
 
-Descriptor fields are aligned `uint2` values in the entry point's single push-data block:
+Descriptor fields are `DescriptorHandle<T>` values in the entry point's single push-data block. Each handle reflects as an
+aligned `uint2` whose `x` is the heap index, and converts to its resource type, so shaders use it directly:
 
 ```slang
-struct PushData {
+struct DescIndices {
     [wbe::desc("uniform_buffer", "camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     [wbe::desc("storage_buffer", "lights", "read")]
-    uint2 lights;
+    DescriptorHandle<StructuredBuffer<SpotLightInfoBuffer>> lights;
     [wbe::push_constant("time")]
     float time;
 };
+
+[vk::push_constant]
+ConstantBuffer<DescIndices> di;
+
+// ConstantBuffer handles dereference with `*`; other handles index or convert directly.
+CameraInfo camera = *di.camera_info;
+StructuredBuffer<SpotLightInfoBuffer> lights = di.lights;
 ```
+
+- Do not read `ResourceDescriptorHeap[...]` with push-data indices. A resource accessed through a second view (for example
+  `RWStructuredBuffer<T>` and `StructuredBuffer<T>`) uses `reinterpret_desc_handle<U>(di.field)` from `utils/utils.slang`.
+- Helpers take resources (`StructuredBuffer<T>`, ...) or descriptor structs of handles, never `uint2` indices; callers pass
+  handles, which convert implicitly.
 
 - `wbe::desc("TYPE", "resource_id", "ACCESS")`: `TYPE` is `uniform_buffer`, `storage_buffer`, `sampled_image`,
   `storage_image`, `sampler`, or `acceleration_structure`; the resource id is required; `ACCESS` (`read`, `write`,

@@ -22,22 +22,22 @@ struct DynamicDescIndices {
      * @brief Descriptor-heap reference to svo_info.
      */
     [wbe::desc("storage_buffer", "svo_info")]
-    uint2 info;
+    DescriptorHandle<RWStructuredBuffer<SVOInfo>> info;
     /**
      * @brief Descriptor-heap reference to svo_node_buffer.
      */
     [wbe::desc("storage_buffer", "svo_node_buffer")]
-    uint2 nodes;
+    DescriptorHandle<RWStructuredBuffer<SVONode>> nodes;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_ping.
      */
     [wbe::desc("storage_buffer", "svo_deferred_list_ping", "write")]
-    uint2 deferred_list_ping;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_ping;
     /**
      * @brief Descriptor-heap reference to svo_deferred_list_pong.
      */
     [wbe::desc("storage_buffer", "svo_deferred_list_pong", "write")]
-    uint2 deferred_list_pong;
+    DescriptorHandle<RWStructuredBuffer<uint>> deferred_list_pong;
 };
 [vk::push_constant]
 ConstantBuffer<DynamicDescIndices> di;
@@ -50,8 +50,8 @@ ConstantBuffer<DynamicDescIndices> di;
 [shader("compute")]
 [numthreads(128, 1, 1)]
 void main(uint3 p_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<SVOInfo> info = ResourceDescriptorHeap[di.info.x];
-    RWStructuredBuffer<SVONode> nodes = ResourceDescriptorHeap[di.nodes.x];
+    RWStructuredBuffer<SVOInfo> info = di.info;
+    RWStructuredBuffer<SVONode> nodes = di.nodes;
     uint index = p_id.x;
     if (index < info[0].node_count) {
         uint description = nodes[index].children_data;
@@ -65,8 +65,8 @@ void main(uint3 p_id : SV_DispatchThreadID) {
     if (index == 0) {
         info[0].dynamic_node_count = 0;
         info[0].dynamic_leaves_count = 0;
-        RWStructuredBuffer<uint> deferred_list_ping = ResourceDescriptorHeap[di.deferred_list_ping.x];
-        RWStructuredBuffer<uint> deferred_list_pong = ResourceDescriptorHeap[di.deferred_list_pong.x];
+        RWStructuredBuffer<uint> deferred_list_ping = di.deferred_list_ping;
+        RWStructuredBuffer<uint> deferred_list_pong = di.deferred_list_pong;
         deferred_list_ping[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
         deferred_list_pong[SVO_DEFERRED_LIST_COUNT_INDEX] = 0;
     }

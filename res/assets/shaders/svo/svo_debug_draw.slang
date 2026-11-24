@@ -21,22 +21,22 @@
 
 struct SVODebugDrawDescIndices {
     [wbe::desc("uniform_buffer", "svo_info")]
-    uint2 svo_info;
+    DescriptorHandle<ConstantBuffer<SVOInfo>> svo_info;
     [wbe::desc("storage_buffer", "svo_node_buffer", "read")]
-    uint2 tree_nodes;
+    DescriptorHandle<StructuredBuffer<SVONode>> tree_nodes;
     [wbe::desc("storage_buffer", "svo_leaf_buffer", "read")]
-    uint2 tree_leaves;
+    DescriptorHandle<StructuredBuffer<SVOLeaf>> tree_leaves;
     [wbe::desc("uniform_buffer", "svo_debug_draw_settings")]
-    uint2 settings;
+    DescriptorHandle<ConstantBuffer<SVODebugDrawSettings>> settings;
     [wbe::desc("storage_buffer", "svo_debug_draw_node_list", "read")]
-    uint2 node_list;
+    DescriptorHandle<StructuredBuffer<uint>> node_list;
 #if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
     [wbe::desc("storage_buffer", "svogi_occupancy_buffer", "read")]
-    uint2 occupancy;
+    DescriptorHandle<StructuredBuffer<float>> occupancy;
 #endif
 
     [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     [wbe::push_constant("frame_slot")]
     uint shader_debug_frame_slot;
 };
@@ -87,12 +87,12 @@ float3 face_normal(uint p_face) {
  */
 [shader("vertex")]
 SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<SVOInfo> svo_info = ResourceDescriptorHeap[di.svo_info.x];
-    StructuredBuffer<SVONode> tree_nodes = ResourceDescriptorHeap[di.tree_nodes.x];
-    StructuredBuffer<SVOLeaf> tree_leaves = ResourceDescriptorHeap[di.tree_leaves.x];
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    ConstantBuffer<SVODebugDrawSettings> settings = ResourceDescriptorHeap[di.settings.x];
-    StructuredBuffer<uint> node_list = ResourceDescriptorHeap[di.node_list.x];
+    ConstantBuffer<SVOInfo> svo_info = di.svo_info;
+    StructuredBuffer<SVONode> tree_nodes = di.tree_nodes;
+    StructuredBuffer<SVOLeaf> tree_leaves = di.tree_leaves;
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
+    ConstantBuffer<SVODebugDrawSettings> settings = di.settings;
+    StructuredBuffer<uint> node_list = di.node_list;
     uint frame_slot = di.shader_debug_frame_slot;
     SVO svo = SVO(tree_nodes, tree_leaves, svo_info, true);
 
@@ -136,7 +136,7 @@ SVODebugDrawVertexOutput vertex_main(uint p_vertex_id : SV_VulkanVertexID, uint 
     float3 color = float3(1.0);
 #if defined(WBE_SVO_DEBUG_DRAW_OCCUPANCY)
     if (!is_bounds) {
-        StructuredBuffer<float> occupancy = ResourceDescriptorHeap[di.occupancy.x];
+        StructuredBuffer<float> occupancy = di.occupancy;
         // The gray level is the occupancy: black for empty, white for full.
         color = float3(saturate(occupancy[data_index]));
     }

@@ -22,11 +22,11 @@ ParameterBlock<MeshContractMetadata> mesh;
 
 struct DeferredGBufferDescIndices {
     [wbe::desc("uniform_buffer", "gbuffer_camera_info")]
-    uint2 camera_info;
+    DescriptorHandle<ConstantBuffer<CameraInfo>> camera_info;
     [wbe::desc("uniform_buffer", "material_params")]
-    uint2 material_params;
+    DescriptorHandle<ConstantBuffer<MaterialParamsBuffer>> material_params;
     [wbe::desc("sampler", "material_sampler")]
-    uint2 material_sampler;
+    DescriptorHandle<SamplerState> material_sampler;
     MeshDescIndices mesh;
 };
 
@@ -41,9 +41,9 @@ ConstantBuffer<DeferredGBufferDescIndices> di;
  */
 [shader("vertex")]
 VSOutput vertex_main(Vertex3DTexturedInput p_input, uint p_instance_id : SV_VulkanInstanceID) {
-    ConstantBuffer<CameraInfo> camera_info = ResourceDescriptorHeap[di.camera_info.x];
-    StructuredBuffer<InstanceData> instances = ResourceDescriptorHeap[di.mesh.instances.x];
-    StructuredBuffer<SubmeshData> submeshes = ResourceDescriptorHeap[di.mesh.submeshes.x];
+    ConstantBuffer<CameraInfo> camera_info = di.camera_info;
+    StructuredBuffer<InstanceData> instances = di.mesh.instances;
+    StructuredBuffer<SubmeshData> submeshes = di.mesh.submeshes;
     InstanceData instance = instances[p_instance_id];
     NodeData node = load_mesh_node(di.mesh, instance.node_index);
     SubmeshData submesh = submeshes[instance.submesh_index];
@@ -89,8 +89,8 @@ struct GBufferOutput {
  */
 static GBufferOutput shade_fragment(VSOutput p_input, bool p_masked, bool p_front_face) {
     GBufferOutput output;
-    ConstantBuffer<MaterialParamsBuffer> material_params = ResourceDescriptorHeap[di.material_params.x];
-    SamplerState material_sampler = SamplerDescriptorHeap[di.material_sampler.x];
+    ConstantBuffer<MaterialParamsBuffer> material_params = di.material_params;
+    SamplerState material_sampler = di.material_sampler;
 
     uint material_index = uint(round(p_input.world_position.w));
     MaterialParams active_material = material_params.materials[material_index];

@@ -18,10 +18,10 @@
 // WBE_SHADER_VARIANT_EXTRA adds an input buffer, so the variants differ in their reflected parameters.
 struct ShaderVariantIndices {
     [wbe::desc("storage_buffer", "output_buffer", "write")]
-    uint2 output_buffer;
+    DescriptorHandle<RWStructuredBuffer<uint>> output_buffer;
 #ifdef WBE_SHADER_VARIANT_EXTRA
     [wbe::desc("storage_buffer", "extra_buffer", "read")]
-    uint2 extra_buffer;
+    DescriptorHandle<StructuredBuffer<uint>> extra_buffer;
 #endif
 };
 
@@ -31,10 +31,10 @@ ConstantBuffer<ShaderVariantIndices> shader_variant_indices;
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void compute_main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    RWStructuredBuffer<uint> output_buffer = ResourceDescriptorHeap[shader_variant_indices.output_buffer.x];
+    RWStructuredBuffer<uint> output_buffer = shader_variant_indices.output_buffer;
     uint value = p_dispatch_thread_id.x * WBE_SHADER_VARIANT_SCALE;
 #ifdef WBE_SHADER_VARIANT_EXTRA
-    StructuredBuffer<uint> extra_buffer = ResourceDescriptorHeap[shader_variant_indices.extra_buffer.x];
+    StructuredBuffer<uint> extra_buffer = shader_variant_indices.extra_buffer;
     value += extra_buffer[p_dispatch_thread_id.x];
 #endif
     output_buffer[p_dispatch_thread_id.x] = value;

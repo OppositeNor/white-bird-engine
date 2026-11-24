@@ -86,7 +86,10 @@ struct wbe_vertex_inputAttribute {
     string vertex_role = "";
 };
 
-/** Marks a push-data uint2 as an index into one descriptor-heap arena. */
+/**
+ * Marks a push-data DescriptorHandle<T> field as a descriptor in one descriptor-heap arena. The handle reflects as an aligned
+ * uint2 whose x is the heap index.
+ */
 [__AttributeUsage(_AttributeTargets.Var)]
 struct wbe_descAttribute {
     /** Descriptor category interpreted by the Vulkan pipeline compiler. */
@@ -109,6 +112,17 @@ struct wbe_push_constantAttribute {
     /** Renderer value identifier or custom push-constant identifier. */
     string value;
 };
+
+/**
+ * @brief View the descriptor of a handle as another resource type, for a resource accessed through more than one view.
+ * @details The heap slot is shared; the descriptor types must be compatible, as for two ResourceDescriptorHeap reads of
+ * one index, e.g. a structured buffer read as RWStructuredBuffer<T> and StructuredBuffer<T>.
+ * @param p_handle Handle declared with wbe::desc.
+ * @return A handle to the same heap slot as a U.
+ */
+DescriptorHandle<U> reinterpret_desc_handle<U : IOpaqueDescriptor, T : IOpaqueDescriptor>(DescriptorHandle<T> p_handle) {
+    return DescriptorHandle<U>(uint2(p_handle));
+}
 
 /**
  * @brief The workgroup counts of one indirect compute dispatch, laid out as VkDispatchIndirectCommand.
@@ -304,32 +318,30 @@ struct MeshContractMetadata {
  */
 struct MeshDescIndices {
     [wbe::desc("storage_buffer", "mesh_submeshes", "read")]
-    uint2 submeshes;
+    DescriptorHandle<StructuredBuffer<SubmeshData>> submeshes;
     /** Instance-local transforms, relative to the mesh transform. */
     [wbe::desc("storage_buffer", "mesh_nodes", "read")]
-    uint2 nodes;
+    DescriptorHandle<StructuredBuffer<NodeData>> nodes;
     [wbe::desc("storage_buffer", "mesh_instances", "read")]
-    uint2 instances;
+    DescriptorHandle<StructuredBuffer<InstanceData>> instances;
 #ifdef WBE_MESH_TRANSFORM
     /** One NodeData holding the whole mesh's transform and normal transform. Only declared by shader variants that
      * define WBE_MESH_TRANSFORM, i.e. variants drawing placed (entity) meshes. */
     [wbe::desc("storage_buffer", "mesh_transform", "read")]
-    uint2 transform;
+    DescriptorHandle<StructuredBuffer<NodeData>> transform;
 #endif
 };
 
 /**
  * @brief Load one instance's world transform. With WBE_MESH_TRANSFORM this is the mesh transform applied after the
  * instance-local transform; without it the instance-local transform is already the world transform.
- * @param p_mesh Mesh descriptor indices of the drawn mesh.
+ * @param p_mesh Mesh descriptor handles of the drawn mesh.
  * @param p_node_index Index into the mesh's node table, from InstanceData::node_index.
  */
 NodeData load_mesh_node(MeshDescIndices p_mesh, uint p_node_index) {
-    StructuredBuffer<NodeData> nodes = ResourceDescriptorHeap[p_mesh.nodes.x];
-    NodeData local_node = nodes[p_node_index];
+    NodeData local_node = p_mesh.nodes[p_node_index];
 #ifdef WBE_MESH_TRANSFORM
-    StructuredBuffer<NodeData> mesh_transform = ResourceDescriptorHeap[p_mesh.transform.x];
-    NodeData mesh_node = mesh_transform[0];
+    NodeData mesh_node = p_mesh.transform[0];
     NodeData result;
     result.transform = mul(mesh_node.transform, local_node.transform);
     result.normal_transform = mul(mesh_node.normal_transform, local_node.normal_transform);
