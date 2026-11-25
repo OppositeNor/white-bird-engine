@@ -22,7 +22,7 @@
 #include "svogi/svogi_utils.slang"
 #include "prefix_scan/prefix_scan_utils.slang"
 #include "utils/utils.slang"
-#include "utils/counted_buffer.slang"
+#include "utils/gpu_vector.slang"
 #include "light/spot_light_utils.slang"
 
 /**
@@ -49,7 +49,7 @@ void inject_svo_occupancy(uint2 p_group_id : SV_GroupID, uint p_group_thread_id 
                           [wbe::push("frame_slot")] uint p_frame_slot) {
     uint group_index = p_group_id.y * WorkgroupCount().x + p_group_id.x;
     uint thread_id = group_index * 256 + p_group_thread_id;
-    SVOWriteBuffer<float> svo_occupancy = SVOWriteBuffer<float>(SVO(p_tree_nodes, p_tree_leaves, p_svo_info, true), p_atlas);
+    var svo_occupancy = SVOWriteBuffer<float>(SVO(p_tree_nodes, p_tree_leaves, p_svo_info, true), p_atlas);
     inject_svo_leaf_occupancy(svo_occupancy, thread_id, p_frame_slot);
     GroupMemoryBarrierWithGroupSync();
     if (p_group_thread_id >= 32) {
@@ -80,8 +80,7 @@ void propagate_svogi_occupancy(uint p_thread_id : SV_DispatchThreadID,
                                [wbe::bind("atlas")] RWStructuredBuffer<float> p_atlas,
                                [wbe::push("frame_slot")] uint p_frame_slot,
                                [wbe::push("child_depth")] uint p_child_depth) {
-    SVOWriteBuffer<float> svo_occupancy =
-        SVOWriteBuffer<float>(SVO(p_tree_nodes, p_tree_leaves, p_svo_info, true), p_atlas);
+    var svo_occupancy = SVOWriteBuffer<float>(SVO(p_tree_nodes, p_tree_leaves, p_svo_info, true), p_atlas);
     propagate_svo_occupancy(svo_occupancy, p_thread_id * 8, p_child_depth, p_frame_slot);
 }
 
@@ -104,7 +103,7 @@ groupshared uint inject_svogi_radiance_global_index_start;
  * @param p_svo_info Spatial configuration of the SVO.
  * @param p_tree_nodes The SVO's nodes.
  * @param p_tree_leaves The SVO's leaves.
- * @param p_index_buffer The counted buffer receiving each sample's (key, index).
+ * @param p_index_buffer The GPU vector receiving each sample's (key, index).
  * @param p_staged_buffer The buffer receiving each sample's radiance.
  * @param p_light_infos The spot light information.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
@@ -116,12 +115,13 @@ void inject_svogi_radiance(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_i
                            [wbe::bind("svo_node_buffer")] StructuredBuffer<SVONode> p_tree_nodes,
                            [wbe::bind("svo_leaf_buffer")] StructuredBuffer<SVOLeaf> p_tree_leaves,
                            [wbe::bind("index_buffer", "write")] RWByteAddressBuffer p_index_buffer,
-                           [wbe::bind("staged_buffer", "write")] RWStructuredBuffer<SegmentedWrapper<float3x3>> p_staged_buffer,
+                           [wbe::bind("staged_buffer", "write")] RWByteAddressBuffer p_staged_buffer,
                            [wbe::bind("spot_light_infos")] StructuredBuffer<SpotLightInfoBuffer> p_light_infos,
                            [wbe::push("frame_slot")] uint p_frame_slot,
                            [wbe::push_data] LightParamDescIndices p_lights[WBE_MAX_SPOT_LIGHT_COUNT]) {
     uint2 dispatch_thread_id = z_order_swizzle_16x16(p_group_id.xy, p_group_thread_id.xy);
-    CountedBuffer<uint2> index_buffer = CountedBuffer<uint2>(p_index_buffer, p_frame_slot);
+    var index_buffer = GPUVector<uint2>(p_index_buffer, p_frame_slot);
+    var staged_buffer = GPUVector<SegmentedWrapper<float3x3>>(p_staged_buffer, p_frame_slot);
 
     SVO svo = SVO(p_tree_nodes, p_tree_leaves, p_svo_info, true);
     uint spot_light_count = get_spot_light_count(p_light_infos);
@@ -154,6 +154,10 @@ void inject_svogi_radiance(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_i
     GroupMemoryBarrierWithGroupSync();
     if (all(p_group_thread_id.xy == uint2(0, 0))) {
         inject_svogi_radiance_global_index_start = index_buffer.atomic_expand(inject_svogi_radiance_buffer_tracker);
+        // There might be racing conditions; however, since we atomically expanded index_buffer, it will end up >= the expected
+        // size, so it's fine. Eventually, one of the workgroup would set this to the largest expected size, which is the one
+        // we'd expect.
+        staged_buffer.set_size(max(staged_buffer.size(), index_buffer.size()));
     }
     GroupMemoryBarrierWithGroupSync();
     // We have a maximum of 256 * WBE_MAX_SPOT_LIGHT_COUNT indices to write. Each invocation is responsible of WBE_MAX_SPOT_LIGHT_COUNT.
@@ -164,9 +168,25 @@ void inject_svogi_radiance(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_i
             return;
         }
         index_buffer.set(inject_svogi_radiance_global_index_start + index, inject_svogi_radiance_local_index_buffer[index]);
-        p_staged_buffer[inject_svogi_radiance_global_index_start + index] =
-            {inject_svogi_radiance_local_staged_buffer[index], 0};
+        staged_buffer.set(inject_svogi_radiance_global_index_start + index, {inject_svogi_radiance_local_staged_buffer[index], 0});
     }
 }
 
+[wbe::kernel(256)]
+void radiance_duplication_mark(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID,
+                               [wbe::bind("staged_buffer", "write")] RWByteAddressBuffer p_staged_buffer,
+                               [wbe::push("frame_slot")] uint p_frame_slot) {
+    GPUVector<SegmentedWrapper<float3x3>> staged_buffer = GPUVector<SegmentedWrapper<float3x3>>(p_staged_buffer, p_frame_slot);
+    uint index = p_group_id.x * 256 + p_group_thread_id.x;
+    if (index > staged_buffer.size()) {
+        return;
+    }
+    if (index == 0) {
+        staged_buffer.set(0, {float3x3(0.0), false});
+        return;
+    }
+    let current = staged_buffer.get(index);
+    let previous = staged_buffer.get(index - 1);
+    staged_buffer.set(index, {current.value, any(current.value != previous.value) ? 1 : 0});
+}
 #endif

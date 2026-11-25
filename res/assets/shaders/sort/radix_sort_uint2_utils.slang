@@ -22,7 +22,7 @@
 // whose bits [0, 32) are y and bits [32, 64) are x. Each pass sorts stably by one WBE_RADIX_SORT_BUCKET_BIT_SIZE-bit digit,
 // so sorting only the digits of x orders the keys by x and carries y as a payload that keeps its input order among equal x.
 // The passes share the histogram buffer, the histogram prefix sum passes, and the dispatch preparation of the uint radix
-// sort. A uint2 key buffer is a uint2 counted buffer whose header holds the same words as a uint radix sort key buffer.
+// sort. A uint2 key buffer is a uint2 GPU vector whose header holds the same words as a uint radix sort key buffer.
 
 // The number of invocations of the histogram and scatter passes.
 #define WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE 64
@@ -61,7 +61,7 @@ uint radix_sort_digit(uint2 p_key, uint p_bit_region) {
  * @param p_group_thread_id The local invocation index in [0, WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE).
  * @param p_bit_region The bit offset of the digit to count, as for radix_sort_digit(uint2, uint).
  */
-void radix_sort_uint2_histogram(CountedBuffer<uint2> p_keys, RWStructuredBuffer<uint> p_histogram_buffer,
+void radix_sort_uint2_histogram(GPUVector<uint2> p_keys, RWStructuredBuffer<uint> p_histogram_buffer,
         __ref groupshared uint p_histogram[WBE_RADIX_SORT_BUCKET_COUNT], uint p_group_id, uint p_group_thread_id,
         uint p_bit_region) {
     uint thread_data_start = p_group_thread_id * 4;
@@ -126,8 +126,8 @@ void radix_sort_uint2_histogram(CountedBuffer<uint2> p_keys, RWStructuredBuffer<
  * @param p_group_thread_id The local invocation index in [0, WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE).
  * @param p_bit_region The bit offset of the digit to sort by, as for radix_sort_digit(uint2, uint).
  */
-void radix_sort_uint2_scatter(CountedBuffer<uint2> p_input_keys, RWStructuredBuffer<uint> p_histogram_buffer,
-        CountedBuffer<uint2> p_output_keys, __ref groupshared uint p_entries[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
+void radix_sort_uint2_scatter(GPUVector<uint2> p_input_keys, RWStructuredBuffer<uint> p_histogram_buffer,
+        GPUVector<uint2> p_output_keys, __ref groupshared uint p_entries[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint p_scratch[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint2 p_batch_keys[WBE_RADIX_SORT_UINT2_BATCH_SIZE],
         __ref groupshared uint p_digit_offsets[WBE_RADIX_SORT_BUCKET_COUNT],

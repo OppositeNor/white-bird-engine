@@ -44,8 +44,8 @@ enum class ShaderDebugError {
     OCTREE_LEAF_LIST_OVERFLOW = 7,
     OCTREE_DEBUG_NODE_LIST_OVERFLOW = 8,
     SVO_VOXEL_DATA_INDEX_OVERFLOW = 9,
-    COUNTED_BUFFER_OVERFLOW = 10,
-    COUNTED_BUFFER_UNALIGNED_SIZE = 11,
+    GPU_VECTOR_OVERFLOW = 10,
+    GPU_VECTOR_UNALIGNED_SIZE = 11,
 };
 
 /** Shader-visible buffer descriptor reserved by the renderer. */

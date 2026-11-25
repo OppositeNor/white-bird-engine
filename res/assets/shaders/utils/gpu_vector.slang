@@ -12,30 +12,30 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-#ifndef WBE_FILE_COUNTED_BUFFER_SLANG
-#define WBE_FILE_COUNTED_BUFFER_SLANG
+#ifndef WBE_FILE_GPU_VECTOR_SLANG
+#define WBE_FILE_GPU_VECTOR_SLANG
 
 #include "utils/utils.slang"
 
-// A counted buffer starts with a header of WBE_COUNTED_BUFFER_HEADER_WORD_NUM uints, whatever its elements are, followed by
-// its elements. Header word WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX holds the byte size of the elements, so views of different
+// A GPU vector starts with a header of WBE_GPU_VECTOR_HEADER_WORD_NUM uints, whatever its elements are, followed by
+// its elements. Header word WBE_GPU_VECTOR_BYTE_SIZE_INDEX holds the byte size of the elements, so views of different
 // element types read the same buffer; the other header words are left to the algorithms using the buffer, such as the
 // local sort count of a radix sort key buffer.
-#define WBE_COUNTED_BUFFER_HEADER_WORD_NUM 4
-#define WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE (WBE_COUNTED_BUFFER_HEADER_WORD_NUM * 4)
-#define WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX 0
+#define WBE_GPU_VECTOR_HEADER_WORD_NUM 4
+#define WBE_GPU_VECTOR_HEADER_BYTE_SIZE (WBE_GPU_VECTOR_HEADER_WORD_NUM * 4)
+#define WBE_GPU_VECTOR_BYTE_SIZE_INDEX 0
 
 /**
  * @brief A view of a storage buffer holding a variable number of elements after a header that records their byte size.
- * @details Element i starts at byte WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE + i * sizeof(T). The capacity is the number of
+ * @details Element i starts at byte WBE_GPU_VECTOR_HEADER_BYTE_SIZE + i * sizeof(T). The capacity is the number of
  * elements the buffer has room for after the header, which the host sizes; size() never exceeds it except after a failed
  * try_atomic_expand(). get() and set() do not check their index against the size or the capacity. In shader-debug builds,
- * reading the size reports COUNTED_BUFFER_UNALIGNED_SIZE when the byte size is not a multiple of sizeof(T). The view is
+ * reading the size reports GPU_VECTOR_UNALIGNED_SIZE when the byte size is not a multiple of sizeof(T). The view is
  * copyable and does not own the buffer.
  * @tparam T Element type, made of 32-bit integer words, such as uint or uint2. Slang emits invalid SPIR-V for loads of
  * float types through a RWByteAddressBuffer held by a struct, so reinterpret floats with asuint() and asfloat().
  */
-struct CountedBuffer<T> {
+struct GPUVector<T> {
     /**
      * @brief The whole buffer, header included.
      */
@@ -46,7 +46,7 @@ struct CountedBuffer<T> {
     uint frame_slot;
 
     /**
-     * @brief View a buffer laid out as a counted buffer.
+     * @brief View a buffer laid out as a GPU vector.
      * @param p_buffer The buffer.
      * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
      */
@@ -68,15 +68,19 @@ struct CountedBuffer<T> {
      * @return The byte size, read without synchronization.
      */
     uint byte_size() {
-        return buffer.Load(WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX * 4);
+        return buffer.Load(WBE_GPU_VECTOR_BYTE_SIZE_INDEX * 4);
     }
 
     /**
      * @brief Overwrite the byte size of the elements.
+     * @details In shader-debug builds, a byte size past capacity() elements reports GPU_VECTOR_OVERFLOW; the byte size is
+     * written regardless.
      * @param p_byte_size The new byte size; must be a multiple of sizeof(T) and not exceed capacity() elements.
      */
     void set_byte_size(uint p_byte_size) {
-        buffer.Store(WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX * 4, p_byte_size);
+        WBE_SHADER_DEBUG_ASSERT(p_byte_size <= capacity() * element_byte_size(), ShaderDebugError::GPU_VECTOR_OVERFLOW,
+            frame_slot);
+        store_byte_size(p_byte_size);
     }
 
     /**
@@ -89,6 +93,7 @@ struct CountedBuffer<T> {
 
     /**
      * @brief Overwrite the element count.
+     * @details In shader-debug builds, a count past capacity() reports GPU_VECTOR_OVERFLOW, as set_byte_size() does.
      * @param p_size The new element count; must not exceed capacity().
      */
     void set_size(uint p_size) {
@@ -102,7 +107,7 @@ struct CountedBuffer<T> {
     uint capacity() {
         uint buffer_byte_size;
         buffer.GetDimensions(buffer_byte_size);
-        return (buffer_byte_size - WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE) / element_byte_size();
+        return (buffer_byte_size - WBE_GPU_VECTOR_HEADER_BYTE_SIZE) / element_byte_size();
     }
 
     /**
@@ -126,15 +131,15 @@ struct CountedBuffer<T> {
     /**
      * @brief Get the byte offset of an element in buffer.
      * @param p_index The element index.
-     * @return WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE + p_index * sizeof(T).
+     * @return WBE_GPU_VECTOR_HEADER_BYTE_SIZE + p_index * sizeof(T).
      */
     uint get_byte_offset(uint p_index) {
-        return WBE_COUNTED_BUFFER_HEADER_BYTE_SIZE + p_index * element_byte_size();
+        return WBE_GPU_VECTOR_HEADER_BYTE_SIZE + p_index * element_byte_size();
     }
 
     /**
      * @brief Read a header word.
-     * @param p_word The header word index, in [0, WBE_COUNTED_BUFFER_HEADER_WORD_NUM).
+     * @param p_word The header word index, in [0, WBE_GPU_VECTOR_HEADER_WORD_NUM).
      * @return The header word.
      */
     uint get_header(uint p_word) {
@@ -143,8 +148,8 @@ struct CountedBuffer<T> {
 
     /**
      * @brief Write a header word.
-     * @details Writing WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX is equivalent to set_byte_size().
-     * @param p_word The header word index, in [0, WBE_COUNTED_BUFFER_HEADER_WORD_NUM).
+     * @details Writing WBE_GPU_VECTOR_BYTE_SIZE_INDEX is equivalent to set_byte_size().
+     * @param p_word The header word index, in [0, WBE_GPU_VECTOR_HEADER_WORD_NUM).
      * @param p_value The value written.
      */
     void set_header(uint p_word, uint p_value) {
@@ -153,7 +158,7 @@ struct CountedBuffer<T> {
 
     /**
      * @brief Atomically add onto a header word.
-     * @param p_word The header word index, in [0, WBE_COUNTED_BUFFER_HEADER_WORD_NUM).
+     * @param p_word The header word index, in [0, WBE_GPU_VECTOR_HEADER_WORD_NUM).
      * @param p_value The value added.
      * @return The header word before the addition.
      */
@@ -166,27 +171,28 @@ struct CountedBuffer<T> {
     /**
      * @brief Grow the element count, without synchronization.
      * @details Callers must ensure no other invocation accesses the byte size during the calling pass. In shader-debug
-     * builds, growing past capacity() reports COUNTED_BUFFER_OVERFLOW; the count is not guarded otherwise.
+     * builds, growing past capacity() reports GPU_VECTOR_OVERFLOW; the count is not guarded otherwise.
      * @param p_size The number of elements added.
      * @return The previous element count, which is the index of the first added element.
      */
     uint expand(uint p_size) {
         uint first_index = size();
         check_fits(first_index, p_size);
-        set_size(first_index + p_size);
+        // check_fits() already reported an overflow, so the store skips set_byte_size()'s check.
+        store_byte_size((first_index + p_size) * element_byte_size());
         return first_index;
     }
 
     /**
      * @brief Atomically grow the element count, reserving a range of elements for the calling invocation.
-     * @details In shader-debug builds, growing past capacity() reports COUNTED_BUFFER_OVERFLOW; the count is not guarded
+     * @details In shader-debug builds, growing past capacity() reports GPU_VECTOR_OVERFLOW; the count is not guarded
      * otherwise. Use try_atomic_expand() when running out of room is allowed.
      * @param p_size The number of elements added.
      * @return The previous element count, which is the index of the first reserved element.
      */
     uint atomic_expand(uint p_size) {
         uint first_index =
-            to_element_count(atomic_add_header(WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX, p_size * element_byte_size()));
+            to_element_count(atomic_add_header(WBE_GPU_VECTOR_BYTE_SIZE_INDEX, p_size * element_byte_size()));
         check_fits(first_index, p_size);
         return first_index;
     }
@@ -201,13 +207,45 @@ struct CountedBuffer<T> {
      */
     bool try_atomic_expand(uint p_size, out uint p_first_index) {
         p_first_index =
-            to_element_count(atomic_add_header(WBE_COUNTED_BUFFER_BYTE_SIZE_INDEX, p_size * element_byte_size()));
+            to_element_count(atomic_add_header(WBE_GPU_VECTOR_BYTE_SIZE_INDEX, p_size * element_byte_size()));
         return fits(p_first_index, p_size);
+    }
+
+    /**
+     * @brief Append an element, without synchronization.
+     * @details Equivalent to expand(1) followed by set(), so callers must ensure no other invocation accesses the byte
+     * size during the calling pass. In shader-debug builds, appending past capacity() reports GPU_VECTOR_OVERFLOW; the
+     * element is written regardless, so the vector must have room for it.
+     * @param p_value The element appended.
+     * @return The index of the appended element.
+     */
+    uint push_back(T p_value) {
+        uint index = expand(1);
+        set(index, p_value);
+        return index;
+    }
+
+    /**
+     * @brief Atomically append an element.
+     * @details Equivalent to atomic_expand(1) followed by set(), so invocations may append concurrently, in no particular
+     * order. In shader-debug builds, appending past capacity() reports GPU_VECTOR_OVERFLOW; the element is written
+     * regardless, so the vector must have room for it. Use try_atomic_expand() when running out of room is allowed.
+     * @param p_value The element appended.
+     * @return The index of the appended element.
+     */
+    uint atomic_push_back(T p_value) {
+        uint index = atomic_expand(1);
+        set(index, p_value);
+        return index;
+    }
+
+    void store_byte_size(uint p_byte_size) {
+        buffer.Store(WBE_GPU_VECTOR_BYTE_SIZE_INDEX * 4, p_byte_size);
     }
 
     uint to_element_count(uint p_byte_size) {
         WBE_SHADER_DEBUG_ASSERT(p_byte_size % element_byte_size() == 0,
-            ShaderDebugError::COUNTED_BUFFER_UNALIGNED_SIZE, frame_slot);
+            ShaderDebugError::GPU_VECTOR_UNALIGNED_SIZE, frame_slot);
         return p_byte_size / element_byte_size();
     }
 
@@ -217,7 +255,7 @@ struct CountedBuffer<T> {
     }
 
     void check_fits(uint p_first_index, uint p_size) {
-        WBE_SHADER_DEBUG_ASSERT(fits(p_first_index, p_size), ShaderDebugError::COUNTED_BUFFER_OVERFLOW, frame_slot);
+        WBE_SHADER_DEBUG_ASSERT(fits(p_first_index, p_size), ShaderDebugError::GPU_VECTOR_OVERFLOW, frame_slot);
     }
 }
 

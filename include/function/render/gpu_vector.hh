@@ -35,9 +35,9 @@ namespace WhiteBirdEngine {
  * @brief A size-tracked array of elements stored in a buffer, with its size stored in the buffer too.
  *
  * The buffer starts with a HEADER_SIZE-byte header whose first uint32_t is the byte size of the elements, so shaders can read
- * the size; the elements follow the header. This is the layout of CountedBuffer in utils/counted_buffer.slang. The number
- * of elements is the byte size divided by sizeof(T), rounded down. The capacity is the number of whole elements after the header, and never grows.
- * Elements are never destroyed, so the element type must be trivially copyable.
+ * the size; the elements follow the header. This is the layout of the shader-side GPUVector in utils/gpu_vector.slang. The
+ * number of elements is the byte size divided by sizeof(T), rounded down. The capacity is the number of whole elements after
+ * the header, and never grows. Elements are never destroyed, so the element type must be trivially copyable.
  *
  * The vector reads and writes the header and the elements through the buffer's host mapping. Over a buffer that is not host
  * visible, the size and elements are unavailable to the CPU: every operation that needs them fails with NOT_VISIBLE, and

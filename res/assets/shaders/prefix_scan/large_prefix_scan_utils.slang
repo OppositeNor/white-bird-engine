@@ -17,7 +17,7 @@
 #define WBE_FILE_LARGE_PREFIX_SCAN_UTILS_SLANG
 
 #include "prefix_scan/prefix_scan_utils.slang"
-#include "utils/counted_buffer.slang"
+#include "utils/gpu_vector.slang"
 
 #ifndef WBE_PREFIX_SCAN_TYPE
 #define WBE_PREFIX_SCAN_TYPE uint
@@ -34,7 +34,7 @@
 //    block totals and store the section total.
 // 3. large_prefix_scan_totals: one workgroup scans the section totals.
 // 4. large_prefix_scan_add: each workgroup adds to its block the sum of every earlier block.
-// The scanned buffer is a counted buffer of uint (see counted_buffer.slang), the layout of the radix sort key buffers (see
+// The scanned buffer is a GPU vector of uint (see gpu_vector.slang), the layout of the radix sort key buffers (see
 // radix_sort_utils.slang). The sections buffer holds the section totals, then the block totals.
 
 // The number of invocations of the block passes; each owns 4 contiguous elements of a block.
@@ -77,11 +77,7 @@ uint large_prefix_scan_blocks_per_section(uint p_block_num) {
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  * @param p_scratch Scratch array of one element per block element; its contents are overwritten.
  */
-// TODO(3): The large prefix scan only handles uint with Add<uint>. Make these passes (and the large_prefix_scan_*.slang
-// entry points) generic over the element type T and operator O : IOperator<T>, so SVOGI can run
-// SegmentedPrefix<float3x3, Add<float3x3>> over SegmentedWrapper<float3x3>; the block and section totals must then hold
-// T as well. Keep the uint instantiation for the existing users, and add tests next to the existing prefix scan tests.
-void large_prefix_scan_blocks<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
+void large_prefix_scan_blocks<T, O: IOperator<T>>(GPUVector<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
         uint p_thread_id, __ref groupshared T p_scratch[WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE]) {
     uint element_count = p_data.size();
     uint thread_data_start = p_thread_id * 4;
@@ -115,7 +111,7 @@ void large_prefix_scan_blocks<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStr
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  * @param p_scratch Scratch array of one element per invocation; its contents are overwritten.
  */
-void large_prefix_scan_sections<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_section,
+void large_prefix_scan_sections<T, O: IOperator<T>>(GPUVector<T> p_data, RWStructuredBuffer<T> p_sections, uint p_section,
         uint p_thread_id, __ref groupshared T p_scratch[WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE]) {
     uint block_num = large_prefix_scan_block_num(p_data.size());
     uint blocks_per_section = large_prefix_scan_blocks_per_section(block_num);
@@ -160,7 +156,7 @@ void large_prefix_scan_totals<T, O: IOperator<T>>(RWStructuredBuffer<T> p_sectio
  * @param p_block The block of this workgroup, in [0, large_prefix_scan_block_num(element count)).
  * @param p_thread_id The local invocation index in [0, WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE).
  */
-void large_prefix_scan_add<T, O: IOperator<T>>(CountedBuffer<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
+void large_prefix_scan_add<T, O: IOperator<T>>(GPUVector<T> p_data, RWStructuredBuffer<T> p_sections, uint p_block,
         uint p_thread_id) {
     if (p_block == 0) {
         return;

@@ -19,7 +19,7 @@
  * @details Required defines: ELEMENT_TYPE, the element type T; OPERATOR, an IOperator<T> such as Add<uint> or
  * SegmentedPrefix<float3x3, Add<float3x3> >; and KERNEL_PASS, 0 for large_prefix_scan_blocks(), 1 for
  * large_prefix_scan_sections(), 2 for large_prefix_scan_totals(), and 3 for large_prefix_scan_add(). Each workgroup runs
- * the pass for its group id. The scanned buffer is a counted buffer of T, and the sections buffer holds T.
+ * the pass for its group id. The scanned buffer is a GPU vector of T, and the sections buffer holds T.
  */
 #include "prefix_scan/large_prefix_scan_utils.slang"
 
@@ -36,7 +36,7 @@ groupshared ELEMENT_TYPE scratch[WBE_LARGE_PREFIX_SCAN_SECTION_NUM];
 [shader("compute")]
 [numthreads(WBE_LARGE_PREFIX_SCAN_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    CountedBuffer<ELEMENT_TYPE> counted_data = CountedBuffer<ELEMENT_TYPE>(data, 0);
+    GPUVector<ELEMENT_TYPE> counted_data = GPUVector<ELEMENT_TYPE>(data, 0);
 #if KERNEL_PASS == 0
     large_prefix_scan_blocks<ELEMENT_TYPE, OPERATOR>(counted_data, sections, p_group_id.x, p_group_thread_id.x, scratch);
 #elif KERNEL_PASS == 1

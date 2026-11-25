@@ -128,7 +128,7 @@ void register_pixel_sort_keys(uint3 p_dispatch_thread_id : SV_DispatchThreadID,
     [wbe::bind("pixel_sort_keys", "write")] RWByteAddressBuffer p_keys,
     [wbe::bind("pixel_sort_mask", "write")] RWTexture2D<uint4> p_mask,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint> keys = CountedBuffer<uint>(p_keys, p_frame_slot);
+    GPUVector<uint> keys = GPUVector<uint>(p_keys, p_frame_slot);
     uint2 extent;
     p_source.GetDimensions(extent.x, extent.y);
     uint2 line_extent = pixel_sort_line_coordinates(extent);
@@ -214,7 +214,7 @@ void write_sorted_pixels(uint3 p_dispatch_thread_id : SV_DispatchThreadID,
     [wbe::bind("pixel_sort_column_offsets", "read")] RWStructuredBuffer<uint> p_column_offsets,
     [wbe::bind("pixel_sort_destination", "write")] RWTexture2D<float4> p_destination,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint> keys = CountedBuffer<uint>(p_keys, p_frame_slot);
+    GPUVector<uint> keys = GPUVector<uint>(p_keys, p_frame_slot);
     uint2 extent;
     p_source.GetDimensions(extent.x, extent.y);
     uint2 pixel = p_dispatch_thread_id.xy;

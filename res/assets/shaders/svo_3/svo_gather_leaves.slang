@@ -220,8 +220,8 @@ void geometry_main(triangle VSOutput p_input[3], inout TriangleStream<GSOutput> 
 [shader("fragment")]
 void fragment_main(GSOutput p_input) {
     uint frame_slot = di.shader_debug_frame_slot;
-    CountedBuffer<uint> deferred_list =
-        CountedBuffer<uint>(di.deferred_list, frame_slot);
+    GPUVector<uint> deferred_list =
+        GPUVector<uint>(di.deferred_list, frame_slot);
     RWStructuredBuffer<SVOInfo> svo_info_buffer = di.svo_info;
     // Helper invocations cannot publish storage writes and receive undefined atomic results.
     // Keep them out of allocation retry loops; this shader does not need derivatives.

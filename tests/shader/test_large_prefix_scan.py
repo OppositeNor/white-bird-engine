@@ -20,7 +20,7 @@ import slangpy as spy
 
 
 RANDOM_SEED = 20251003
-# Must match large_prefix_scan_utils.slang and counted_buffer.slang.
+# Must match large_prefix_scan_utils.slang and gpu_vector.slang.
 WORKGROUP_SIZE = 64
 BLOCK_SIZE = 256
 SECTION_NUM = 256
@@ -46,7 +46,7 @@ class ScanElement:
     element_type: str
     # The Slang IOperator<T> the elements are combined with.
     operator: str
-    # The 32-bit words of one element in the counted buffer.
+    # The 32-bit words of one element in the GPU vector.
     word_count: int
     # Random elements, as an (element count, word_count) array of words.
     generate: Callable[[np.random.Generator, int], np.ndarray]
@@ -133,7 +133,7 @@ def create_buffer(p_device: spy.Device, p_values: np.ndarray) -> spy.Buffer:
 
 
 def make_scan_data(p_values: np.ndarray) -> np.ndarray:
-    """The scanned buffer layout: the counted buffer header with the byte size, the elements, then the guards. p_values
+    """The scanned buffer layout: the GPU vector header with the byte size, the elements, then the guards. p_values
     holds one uint per element, or an (element count, words) array of the words of each element."""
     words = p_values if p_values.ndim == 2 else p_values[:, None]
     data = np.full(DATA_START + words.size + GUARD_COUNT, GUARD_VALUE, dtype=np.uint32)

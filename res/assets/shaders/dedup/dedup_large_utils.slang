@@ -22,7 +22,7 @@
 // The large deduplication removes the repeated keys of a key buffer in four steps: the radix sort orders the keys,
 // dedup_large_mark() marks the first key of every run of equal keys, the large prefix scan turns the marks into each
 // marked key's rank among the unique keys plus one, and dedup_large_scatter() writes each marked key to its rank. The key
-// buffer, the unique keys, and the marks are counted buffers of uint.
+// buffer, the unique keys, and the marks are GPU vectors of uint.
 
 // The number of invocations of the per-key passes, each of which processes one key.
 #define WBE_DEDUP_LARGE_WORKGROUP_SIZE 256
@@ -44,7 +44,7 @@ uint dedup_large_group_num(uint p_key_count) {
  * @param p_marks The marks, one per key.
  * @param p_key The key to mark.
  */
-void dedup_large_mark(CountedBuffer<uint> p_keys, CountedBuffer<uint> p_marks, uint p_key) {
+void dedup_large_mark(GPUVector<uint> p_keys, GPUVector<uint> p_marks, uint p_key) {
     uint key_count = p_keys.size();
     if (p_key >= key_count) {
         return;
@@ -66,8 +66,8 @@ void dedup_large_mark(CountedBuffer<uint> p_keys, CountedBuffer<uint> p_marks, u
  * @param p_unique_keys The unique keys.
  * @param p_key The key to write.
  */
-void dedup_large_scatter(CountedBuffer<uint> p_keys, CountedBuffer<uint> p_mark_offsets,
-        CountedBuffer<uint> p_unique_keys, uint p_key) {
+void dedup_large_scatter(GPUVector<uint> p_keys, GPUVector<uint> p_mark_offsets,
+        GPUVector<uint> p_unique_keys, uint p_key) {
     uint key_count = p_keys.size();
     if (p_key >= key_count) {
         return;

@@ -16,7 +16,7 @@
 #define WBE_FILE_SORT_SLANG
 
 #include "utils/utils.slang"
-#include "utils/counted_buffer.slang"
+#include "utils/gpu_vector.slang"
 #include "prefix_scan/prefix_scan_utils.slang"
 
 #define WBE_RADIX_SORT_BUCKET_BIT_SIZE 8
@@ -33,7 +33,7 @@
 // size. Past WBE_RADIX_SORT_MAX_WORKGROUP_COUNT local sorts, each local sort owns more elements instead.
 #define WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP 256
 #define WBE_RADIX_SORT_MAX_WORKGROUP_COUNT 16384
-// The radix sort key buffers are counted buffers whose header also holds the number of local sorts, at header word
+// The radix sort key buffers are GPU vectors whose header also holds the number of local sorts, at header word
 // WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX.
 #define WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX 1
 

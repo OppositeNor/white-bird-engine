@@ -35,7 +35,7 @@
 void svo_3_prepare_leaves([wbe::bind("svo_info", "read")] RWStructuredBuffer<SVOInfo> p_svo_info,
     [wbe::bind("svo_deferred_list")] RWByteAddressBuffer p_deferred_list,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint> deferred_list = CountedBuffer<uint>(p_deferred_list, p_frame_slot);
+    GPUVector<uint> deferred_list = GPUVector<uint>(p_deferred_list, p_frame_slot);
     deferred_list.set_size(min(deferred_list.size(), p_svo_info[0].max_deferred_task_count));
 }
 

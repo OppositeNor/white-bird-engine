@@ -164,7 +164,7 @@ void radix_sort_histogram_add_overflow(uint3 p_group_id : SV_GroupID, uint3 p_gr
 void radix_sort_prepare_dispatch([wbe::bind("input_buffer", "read")] RWByteAddressBuffer p_input_buffer,
     [wbe::bind("dispatch_buffer", "write")] RWStructuredBuffer<DispatchIndirectCommand> p_dispatch_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint> keys = CountedBuffer<uint>(p_input_buffer, p_frame_slot);
+    GPUVector<uint> keys = GPUVector<uint>(p_input_buffer, p_frame_slot);
     uint local_sort_num = keys.get_header(WBE_RADIX_SORT_LOCAL_SORT_NUM_INDEX);
     p_dispatch_buffer[WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX] = DispatchIndirectCommand(local_sort_num);
     p_dispatch_buffer[WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX] = DispatchIndirectCommand(
@@ -179,7 +179,7 @@ groupshared uint radix_sort_histogram_workgroup_process_histogram[WBE_RADIX_SORT
  * @brief Count the digit at WBE_RADIX_HISTOGRAM_BIT_REGION of every key into one sub-histogram per workgroup.
  * @details Workgroup g owns the contiguous key range [g * elements_per_group, (g + 1) * elements_per_group), with
  * elements_per_group = ceil(element_count / sub_histogram_num), and writes the raw digit counts of that range to
- * sub-histogram g. The input buffer is a counted buffer of the keys whose header also holds the local sort count. The
+ * sub-histogram g. The input buffer is a GPU vector of the keys whose header also holds the local sort count. The
  * histogram buffer receives its metadata: the sub-histogram count, equal to the local sort count; the start of the overflow
  * histograms, after the last sub-histogram; and WBE_RADIX_SORT_LANE_START, where sub-histogram g starts at
  * WBE_RADIX_SORT_LANE_START + g * WBE_RADIX_SORT_BUCKET_COUNT. Must be dispatched with the local sort dispatch.
@@ -197,7 +197,7 @@ void radix_sort_histogram_workgroup_process(uint3 p_group_id : SV_GroupID, uint3
     [wbe::bind("histogram_buffer", "write")] RWStructuredBuffer<uint> p_histogram_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot,
     [wbe::bind("input_buffer", "read")] RWStructuredBuffer<uint> p_input_words) {
-    CountedBuffer<uint> keys = CountedBuffer<uint>(p_input_buffer, p_frame_slot);
+    GPUVector<uint> keys = GPUVector<uint>(p_input_buffer, p_frame_slot);
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
     // The starting position of a thread in a 256 chunk.
@@ -264,8 +264,8 @@ void radix_sort_scatter(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id :
     [wbe::bind("output_buffer", "write")] RWByteAddressBuffer p_output_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
     RWStructuredBuffer<uint> histogram_buffer = p_histogram_buffer;
-    CountedBuffer<uint> input_keys = CountedBuffer<uint>(p_input_buffer, p_frame_slot);
-    CountedBuffer<uint> output_keys = CountedBuffer<uint>(p_output_buffer, p_frame_slot);
+    GPUVector<uint> input_keys = GPUVector<uint>(p_input_buffer, p_frame_slot);
+    GPUVector<uint> output_keys = GPUVector<uint>(p_output_buffer, p_frame_slot);
     uint group_id = p_group_id.x;
     uint group_thread_id = p_group_thread_id.x;
     uint thread_data_start = group_thread_id * 4;
@@ -382,7 +382,7 @@ void radix_sort_uint2_histogram_workgroup_process(uint3 p_group_id : SV_GroupID,
     [wbe::bind("input_buffer", "read")] RWByteAddressBuffer p_input_buffer,
     [wbe::bind("histogram_buffer", "write")] RWStructuredBuffer<uint> p_histogram_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint2> input_buffer = CountedBuffer<uint2>(p_input_buffer, p_frame_slot);
+    GPUVector<uint2> input_buffer = GPUVector<uint2>(p_input_buffer, p_frame_slot);
     radix_sort_uint2_histogram(input_buffer, p_histogram_buffer, radix_sort_uint2_histogram_workgroup_process_histogram,
         p_group_id.x, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);
 }
@@ -411,8 +411,8 @@ void radix_sort_uint2_scatter_keys(uint3 p_group_id : SV_GroupID, uint3 p_group_
     [wbe::bind("histogram_buffer", "read")] RWStructuredBuffer<uint> p_histogram_buffer,
     [wbe::bind("output_buffer", "write")] RWByteAddressBuffer p_output_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<uint2> input_buffer = CountedBuffer<uint2>(p_input_buffer, p_frame_slot);
-    CountedBuffer<uint2> output_buffer = CountedBuffer<uint2>(p_output_buffer, p_frame_slot);
+    GPUVector<uint2> input_buffer = GPUVector<uint2>(p_input_buffer, p_frame_slot);
+    GPUVector<uint2> output_buffer = GPUVector<uint2>(p_output_buffer, p_frame_slot);
     radix_sort_uint2_scatter(input_buffer, p_histogram_buffer, output_buffer, radix_sort_uint2_scatter_sort_entries,
         radix_sort_uint2_scatter_sort_scratch, radix_sort_uint2_scatter_batch_keys, radix_sort_uint2_scatter_digit_offsets,
         radix_sort_uint2_scatter_batch_digit_starts, p_group_id.x, p_group_thread_id.x, WBE_RADIX_HISTOGRAM_BIT_REGION);

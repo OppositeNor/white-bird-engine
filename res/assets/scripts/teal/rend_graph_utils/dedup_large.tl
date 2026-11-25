@@ -18,7 +18,7 @@
 -- key its index among the unique keys, to which it is scattered. The application compiles the pipelines under their shader ids
 -- (dedup_large_prepare_dispatch, dedup_large_mark, dedup_large_scatter), and those of the radix sort (see
 -- rend_graph_utils.sort) and the large prefix scan (see rend_graph_utils.large_prefix_scan). The key buffer and the
--- unique keys are counted buffers of the keys; see dedup_large_utils.slang and counted_buffer.slang.
+-- unique keys are GPU vectors of the keys; see dedup_large_utils.slang and gpu_vector.slang.
 
 local graph = require("rend_graph_utils.rend_graph_utils")
 local sort = require("rend_graph_utils.sort")
@@ -33,6 +33,7 @@ local record dedup_large
     record DedupLargeBuffersDesc
         name: string
         max_element_count: integer
+        element_size: integer
     end
 
     -- The graph resources of a large deduplication.
@@ -65,14 +66,14 @@ function dedup_large.buffers(desc: dedup_large.DedupLargeBuffersDesc): dedup_lar
         -- At most every key is unique.
         unique_keys = graph.storage_buffer({
             name = member_name(name, "unique_keys"),
-            size = large_prefix_scan.data_buffer_size(max_element_count),
+            size = large_prefix_scan.data_buffer_size(max_element_count, desc.element_size),
         }),
         sort = sort_buffers,
         marks = graph.storage_buffer({
             name = member_name(name, "marks"),
-            size = large_prefix_scan.data_buffer_size(max_element_count),
+            size = large_prefix_scan.data_buffer_size(max_element_count, desc.element_size),
         }),
-        scan = large_prefix_scan.buffers({ name = member_name(name, "mark_scan"), max_element_count = max_element_count }),
+        scan = large_prefix_scan.buffers({ name = member_name(name, "mark_scan"), max_element_count = max_element_count, element_size = desc.element_size }),
         dispatch = graph.buffer({
             name = member_name(name, "dedup_dispatch"),
             usage = "buffer_indirect",

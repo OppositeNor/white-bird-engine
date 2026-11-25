@@ -61,7 +61,7 @@ struct WBE_META(WBE_REFLECT_SCRIPT) SVOBufferSizes {
     WBE_META(WBE_REFLECT)
     uint64_t occupancy = 0;
     /**
-     * @brief svogi_radiance_index_buffer, a counted buffer of the radiance injection's (key, entry) pairs.
+     * @brief svogi_radiance_index_buffer, a GPU vector of the radiance injection's (key, entry) pairs.
      */
     WBE_META(WBE_REFLECT)
     uint64_t radiance_index = 0;

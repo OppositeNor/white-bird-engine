@@ -35,8 +35,8 @@ groupshared uint batch_digit_starts[WBE_RADIX_SORT_BUCKET_COUNT];
 [shader("compute")]
 [numthreads(WBE_RADIX_SORT_UINT2_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_group_id : SV_GroupID, uint3 p_group_thread_id : SV_GroupThreadID) {
-    CountedBuffer<uint2> input = CountedBuffer<uint2>(input_keys, 0);
-    CountedBuffer<uint2> output = CountedBuffer<uint2>(output_keys, 0);
+    GPUVector<uint2> input = GPUVector<uint2>(input_keys, 0);
+    GPUVector<uint2> output = GPUVector<uint2>(output_keys, 0);
 #if KERNEL_PASS == 0
     radix_sort_uint2_histogram(input, histogram_buffer, histogram, p_group_id.x, p_group_thread_id.x,
         WBE_RADIX_HISTOGRAM_BIT_REGION);

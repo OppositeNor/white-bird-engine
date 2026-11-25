@@ -30,7 +30,7 @@
  * @brief Write the indirect dispatch of the block passes of a large prefix scan, with one workgroup per block of the
  * element count of the scanned buffer.
  * @details Must be dispatched with exactly one workgroup.
- * @param p_data_buffer The counted buffer to scan.
+ * @param p_data_buffer The GPU vector to scan.
  * @param p_dispatch_buffer Receives the dispatch of the block passes.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
@@ -39,7 +39,7 @@ void large_prefix_scan_prepare_dispatch(
     [wbe::bind("data_buffer", "read")] RWByteAddressBuffer p_data_buffer,
     [wbe::bind("dispatch_buffer", "write")] RWStructuredBuffer<DispatchIndirectCommand> p_dispatch_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer = CountedBuffer<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
+    GPUVector<WBE_PREFIX_SCAN_TYPE> data_buffer = GPUVector<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
     p_dispatch_buffer[0] = DispatchIndirectCommand(large_prefix_scan_block_num(data_buffer.size()));
 }
 
@@ -50,7 +50,7 @@ groupshared WBE_PREFIX_SCAN_TYPE large_prefix_scan_blocks_scratch[WBE_LARGE_PREF
  * @details Must be dispatched with one workgroup per block.
  * @param p_group_id The block of the workgroup in x.
  * @param p_group_thread_id The invocation's index in its workgroup in x.
- * @param p_data_buffer The counted buffer to scan, scanned in place within each block.
+ * @param p_data_buffer The GPU vector to scan, scanned in place within each block.
  * @param p_sections_buffer Receives the block totals.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
@@ -59,7 +59,7 @@ void large_prefix_scan_blocks_kernel(uint3 p_group_id : SV_GroupID, uint3 p_grou
     [wbe::bind("data_buffer")] RWByteAddressBuffer p_data_buffer,
     [wbe::bind("sections_buffer", "write")] RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> p_sections_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer = CountedBuffer<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
+    GPUVector<WBE_PREFIX_SCAN_TYPE> data_buffer = GPUVector<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
     large_prefix_scan_blocks<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         data_buffer,
         p_sections_buffer,
@@ -75,7 +75,7 @@ groupshared WBE_PREFIX_SCAN_TYPE large_prefix_scan_sections_scratch[WBE_LARGE_PR
  * @details Must be dispatched with exactly WBE_LARGE_PREFIX_SCAN_SECTION_NUM workgroups.
  * @param p_group_id The section of the workgroup in x.
  * @param p_group_thread_id The invocation's index in its workgroup in x.
- * @param p_data_buffer The counted buffer being scanned.
+ * @param p_data_buffer The GPU vector being scanned.
  * @param p_sections_buffer The section and block totals, scanned in place.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
@@ -84,7 +84,7 @@ void large_prefix_scan_sections_kernel(uint3 p_group_id : SV_GroupID, uint3 p_gr
     [wbe::bind("data_buffer", "read")] RWByteAddressBuffer p_data_buffer,
     [wbe::bind("sections_buffer")] RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> p_sections_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer = CountedBuffer<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
+    GPUVector<WBE_PREFIX_SCAN_TYPE> data_buffer = GPUVector<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
     large_prefix_scan_sections<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         data_buffer,
         p_sections_buffer,
@@ -115,7 +115,7 @@ void large_prefix_scan_totals_kernel(uint3 p_group_thread_id : SV_GroupThreadID,
  * @details Must be dispatched with one workgroup per block.
  * @param p_group_id The block of the workgroup in x.
  * @param p_group_thread_id The invocation's index in its workgroup in x.
- * @param p_data_buffer The counted buffer being scanned, completed in place.
+ * @param p_data_buffer The GPU vector being scanned, completed in place.
  * @param p_sections_buffer The scanned section and block totals.
  * @param p_frame_slot Renderer frame slot receiving shader-debug errors.
  */
@@ -124,7 +124,7 @@ void large_prefix_scan_add_kernel(uint3 p_group_id : SV_GroupID, uint3 p_group_t
     [wbe::bind("data_buffer")] RWByteAddressBuffer p_data_buffer,
     [wbe::bind("sections_buffer", "read")] RWStructuredBuffer<WBE_PREFIX_SCAN_TYPE> p_sections_buffer,
     [wbe::push("frame_slot")] uint p_frame_slot) {
-    CountedBuffer<WBE_PREFIX_SCAN_TYPE> data_buffer = CountedBuffer<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
+    GPUVector<WBE_PREFIX_SCAN_TYPE> data_buffer = GPUVector<WBE_PREFIX_SCAN_TYPE>(p_data_buffer, p_frame_slot);
     large_prefix_scan_add<WBE_PREFIX_SCAN_TYPE, WBE_PREFIX_SCAN_OPERATION>(
         data_buffer,
         p_sections_buffer,

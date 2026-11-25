@@ -13,16 +13,16 @@
    limitations under the License.
 */
 /**
- * @file counted_buffer_operations.slang
- * @brief Test kernel for CountedBuffer from utils/counted_buffer.slang.
+ * @file gpu_vector_operations.slang
+ * @brief Test kernel for GPUVector from utils/gpu_vector.slang.
  * @details Required defines: ELEMENT_TYPE and KERNEL_PASS. Pass 0 has every invocation reserve id % 3 + 1 elements with
  * atomic_expand() and fill them with its id. Pass 1 has every invocation reserve one element with try_atomic_expand(),
  * fill it with its id when it fits, and write whether it fit to results[id]. Pass 2 runs the non-atomic operations on
  * invocation 0 and writes their results to results. Pass 3 has every invocation add its id onto header word 3 with
  * atomic_add_header(), and invocation 0 read the buffer through a uint view and write its size and second element to
- * results.
+ * results. Pass 4 has every invocation append its id with atomic_push_back() and write the returned index to results[id].
  */
-#include "utils/counted_buffer.slang"
+#include "utils/gpu_vector.slang"
 
 RWByteAddressBuffer data;
 RWStructuredBuffer<uint> results;
@@ -30,7 +30,7 @@ RWStructuredBuffer<uint> results;
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
-    CountedBuffer<ELEMENT_TYPE> buffer = CountedBuffer<ELEMENT_TYPE>(data, 0);
+    GPUVector<ELEMENT_TYPE> buffer = GPUVector<ELEMENT_TYPE>(data, 0);
     uint id = p_dispatch_thread_id.x;
 #if KERNEL_PASS == 0
     uint count = id % 3 + 1;
@@ -64,13 +64,17 @@ void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
     results[9] = all(buffer.get(second_index) == ELEMENT_TYPE(77)) ? 77 : 0;
     results[10] = buffer.byte_size();
     buffer.set_header(2, 0x1234);
-#else
+    results[11] = buffer.push_back(ELEMENT_TYPE(88));
+    results[12] = buffer.size();
+#elif KERNEL_PASS == 3
     buffer.atomic_add_header(3, id);
     if (id != 0) {
         return;
     }
-    CountedBuffer<uint> words = CountedBuffer<uint>(data, 0);
+    GPUVector<uint> words = GPUVector<uint>(data, 0);
     results[0] = words.size();
     results[1] = words.get(1);
+#else
+    results[id] = buffer.atomic_push_back(ELEMENT_TYPE(id));
 #endif
 }

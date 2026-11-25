@@ -37,7 +37,7 @@ def rng() -> np.random.Generator:
 def deduplicate(p_device: spy.Device, p_load_kernel: KernelLoader, p_sorted_keys: np.ndarray) -> np.ndarray:
     """Marks, scans, and scatters the sorted keys, and returns the unique keys buffer."""
     key_count = len(p_sorted_keys)
-    # The keys are a counted buffer, whose header holds their byte size.
+    # The keys are a GPU vector, whose header holds their byte size.
     key_data = make_scan_data(p_sorted_keys)
     key_data[0] = key_count * KEY_BYTE_SIZE
     keys = create_buffer(p_device, key_data)

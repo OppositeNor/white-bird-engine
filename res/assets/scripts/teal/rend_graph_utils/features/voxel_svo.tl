@@ -364,7 +364,7 @@ local function add_svogi_injection(builder: Builder)
         name = "propagate_svogi_occupancy",
         bindings = occupancy_bindings,
     })
-    -- The radiance index buffer is a counted buffer, whose element byte size shares the deferred lists' count element; the
+    -- The radiance index buffer is a GPU vector, whose element byte size shares the deferred lists' count element; the
     -- pong list's count reset clears it.
     local reset_radiance_index_params: graph.RTParamsRunComputePipelineVK =
         { pipeline = pipelines.reset_ping, queue_family = "compute_1" }
@@ -387,7 +387,7 @@ local function add_svogi_injection(builder: Builder)
         queue_family = "compute_1",
     }, { name = "inject_svogi_radiance", bindings = radiance_bindings })
     -- TODO(2): Sort the (key, index) pairs in svogi_radiance_index_buffer by key with sort.radix_sort_key_value_task()
-    -- (rend_graph_utils/sort.tl; pixel_sort.tl is an example). The counted buffer's count drives the indirect dispatches.
+    -- (rend_graph_utils/sort.tl; pixel_sort.tl is an example). The GPU vector's count drives the indirect dispatches.
     local radiance_sort_buffers = sort.radix_sort_buffers({
         name = "svogi_radiance_sort",
         max_element_count = (parameters.buffer_sizes.radiance_index),

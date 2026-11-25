@@ -17,8 +17,8 @@
 -- is scanned and its total stored, 256 sections of the block totals are scanned and their totals stored, the section
 -- totals are scanned in one workgroup, and every block adds the sum of the blocks before it. The application compiles the pipelines under their shader ids (large_prefix_scan_prepare_dispatch,
 -- large_prefix_scan_blocks, large_prefix_scan_sections, large_prefix_scan_totals, and large_prefix_scan_add). The
--- scanned buffer is a counted buffer of uint: a header holding the byte size of the elements, followed by the elements;
--- see large_prefix_scan_utils.slang and counted_buffer.slang.
+-- scanned buffer is a GPU vector of uint: a header holding the byte size of the elements, followed by the elements;
+-- see large_prefix_scan_utils.slang and gpu_vector.slang.
 
 local math_utils = require("utils.math")
 local graph = require("rend_graph_utils.rend_graph_utils")
@@ -26,7 +26,7 @@ local graph = require("rend_graph_utils.rend_graph_utils")
 local ceil_div = math_utils.ceil_div
 
 -- Must match WBE_LARGE_PREFIX_SCAN_BLOCK_SIZE and WBE_LARGE_PREFIX_SCAN_SECTION_NUM in large_prefix_scan_utils.slang, and
--- LARGE_PREFIX_SCAN_DATA_START the header uints, WBE_COUNTED_BUFFER_HEADER_WORD_NUM in counted_buffer.slang.
+-- LARGE_PREFIX_SCAN_DATA_START the header uints, WBE_GPU_VECTOR_HEADER_WORD_NUM in gpu_vector.slang.
 local LARGE_PREFIX_SCAN_BLOCK_SIZE = 256
 local LARGE_PREFIX_SCAN_SECTION_NUM = 256
 local LARGE_PREFIX_SCAN_DATA_START = 4
@@ -34,7 +34,6 @@ local LARGE_PREFIX_SCAN_DATA_START = 4
 local LARGE_PREFIX_SCAN_MAX_BLOCK_NUM = 65535
 -- One VkDispatchIndirectCommand (3 uint32), the block pass dispatch.
 local LARGE_PREFIX_SCAN_DISPATCH_BUFFER_SIZE = 12
-local UINT32_SIZE = 4
 
 -- TODO(3): Once the shaders are generic, let buffers() and dispatches() take the element byte size and the pipelines of
 -- a specific instantiation (for example the segmented float3x3 one SVOGI needs), instead of assuming uint elements.
@@ -44,6 +43,7 @@ local record large_prefix_scan
     record LargePrefixScanBuffersDesc
         name: string
         max_element_count: integer
+        element_size: integer
     end
 
     -- The scratch buffers of a large prefix scan, which the scan alone uses: the block and section totals, and the
@@ -68,7 +68,7 @@ function large_prefix_scan.buffers(desc: large_prefix_scan.LargePrefixScanBuffer
         -- The section totals, then one block total per block.
         sections = graph.storage_buffer({
             name = name ~= nil and name .. ".sections" or nil,
-            size = (LARGE_PREFIX_SCAN_SECTION_NUM + math.max(max_block_num, 1)) * UINT32_SIZE,
+            size = (LARGE_PREFIX_SCAN_SECTION_NUM + math.max(max_block_num, 1)) * desc.element_size,
         }),
         dispatch = graph.buffer({
             name = name ~= nil and name .. ".dispatch" or nil,
@@ -79,8 +79,8 @@ function large_prefix_scan.buffers(desc: large_prefix_scan.LargePrefixScanBuffer
 end
 
 -- The size in bytes of a buffer scanned by a large prefix scan of up to max_element_count elements.
-function large_prefix_scan.data_buffer_size(max_element_count: integer): integer
-    return (LARGE_PREFIX_SCAN_DATA_START + max_element_count) * UINT32_SIZE
+function large_prefix_scan.data_buffer_size(max_element_count: integer, element_size: integer): integer
+    return (LARGE_PREFIX_SCAN_DATA_START + max_element_count) * element_size
 end
 
 -- The dispatches that compute the inclusive prefix sum of data in place, bound to the handles of data and buffers.

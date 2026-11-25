@@ -17,8 +17,8 @@
 -- (radix_sort_prepare_dispatch, radix_sort_histogram_prefix_sum, radix_sort_histogram_overflow_prefix_sum,
 -- radix_sort_histogram_add_overflow, and the per-pass radix_sort_histogram_workgroup_process_<bits> and
 -- radix_sort_scatter_<bits>, or for uint2 keys radix_sort_uint2_histogram_workgroup_process_<bits> and
--- radix_sort_uint2_scatter_<bits>). The key buffer is a counted buffer: a header holding the byte size of the keys and
--- the local sort count, followed by the keys; see counted_buffer.slang, radix_sort_utils.slang, and
+-- radix_sort_uint2_scatter_<bits>). The key buffer is a GPU vector: a header holding the byte size of the keys and
+-- the local sort count, followed by the keys; see gpu_vector.slang, radix_sort_utils.slang, and
 -- radix_sort_uint2_utils.slang. uint2 keys are ordered by x and then by y; sorting only bits
 -- [32, 64), the bits of x, orders them by x and carries y as a payload.
 
@@ -31,7 +31,7 @@ local ceil_div = math_utils.ceil_div
 -- Must match WBE_RADIX_SORT_BUCKET_COUNT, WBE_RADIX_SORT_ELEMENTS_PER_WORKGROUP, WBE_RADIX_SORT_MAX_WORKGROUP_COUNT,
 -- WBE_RADIX_SORT_SCAN_HISTOGRAM_NUM, WBE_RADIX_SORT_LOCAL_SORT_DISPATCH_INDEX, and
 -- WBE_RADIX_SORT_HISTOGRAM_SCAN_DISPATCH_INDEX in radix_sort_utils.slang, and RADIX_SORT_DATA_START the header uints,
--- WBE_COUNTED_BUFFER_HEADER_WORD_NUM in counted_buffer.slang.
+-- WBE_GPU_VECTOR_HEADER_WORD_NUM in gpu_vector.slang.
 local RADIX_SORT_BUCKET_COUNT = 256
 local RADIX_SORT_ELEMENTS_PER_WORKGROUP = 256
 local RADIX_SORT_MAX_WORKGROUP_COUNT = 16384

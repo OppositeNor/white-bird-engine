@@ -28,9 +28,9 @@ RWByteAddressBuffer unique_keys;
 [numthreads(WBE_DEDUP_LARGE_WORKGROUP_SIZE, 1, 1)]
 void main(uint3 p_dispatch_thread_id : SV_DispatchThreadID) {
 #if KERNEL_PASS == 0
-    dedup_large_mark(CountedBuffer<uint>(keys, 0), CountedBuffer<uint>(marks, 0), p_dispatch_thread_id.x);
+    dedup_large_mark(GPUVector<uint>(keys, 0), GPUVector<uint>(marks, 0), p_dispatch_thread_id.x);
 #else
-    dedup_large_scatter(CountedBuffer<uint>(keys, 0), CountedBuffer<uint>(marks, 0), CountedBuffer<uint>(unique_keys, 0),
+    dedup_large_scatter(GPUVector<uint>(keys, 0), GPUVector<uint>(marks, 0), GPUVector<uint>(unique_keys, 0),
         p_dispatch_thread_id.x);
 #endif
 }
